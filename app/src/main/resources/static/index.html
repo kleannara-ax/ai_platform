@@ -227,7 +227,7 @@ async function api(method, path, body) {
 // ══ Auth ══
 async function doLogin() {
   const id = document.getElementById('loginId').value.trim();
-  const pw = document.getElementById('loginPw').value;
+  const pw = document.getElementById('loginPw').value.trim();
   const errEl = document.getElementById('loginError');
   if (!id || !pw) { errEl.style.display='block'; errEl.textContent='아이디와 비밀번호를 입력해주세요.'; return; }
   try {
@@ -447,11 +447,11 @@ function openCreateUser(){
 
 async function submitCreateUser(){
   const body={
-    loginId:document.getElementById('m_loginId').value,
-    password:document.getElementById('m_password').value,
-    userName:document.getElementById('m_userName').value,
-    email:document.getElementById('m_email').value||null,
-    phone:document.getElementById('m_phone').value||null,
+    loginId:document.getElementById('m_loginId').value.trim(),
+    password:document.getElementById('m_password').value.trim(),
+    userName:document.getElementById('m_userName').value.trim(),
+    email:document.getElementById('m_email').value.trim()||null,
+    phone:document.getElementById('m_phone').value.trim()||null,
     role:document.getElementById('m_role').value,
     deptId:document.getElementById('m_deptId').value?parseInt(document.getElementById('m_deptId').value):null,
     position:document.getElementById('m_position').value||null,
@@ -500,9 +500,9 @@ async function openEditUser(id){
 
 async function submitEditUser(id){
   const body={
-    userName:document.getElementById('m_userName').value,
-    email:document.getElementById('m_email').value||null,
-    phone:document.getElementById('m_phone').value||null,
+    userName:document.getElementById('m_userName').value.trim(),
+    email:document.getElementById('m_email').value.trim()||null,
+    phone:document.getElementById('m_phone').value.trim()||null,
     deptId:document.getElementById('m_deptId').value?parseInt(document.getElementById('m_deptId').value):null,
     position:document.getElementById('m_position').value||null,
     jobTitle:document.getElementById('m_jobTitle').value||null,

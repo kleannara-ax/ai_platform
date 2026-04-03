@@ -39,18 +39,25 @@ public class UserUpdateRequest {
     private String internalExt;
 
     /**
-     * 빈 문자열 이메일을 null로 변환 (Jackson 역직렬화 시 호출됨)
-     * @Email 검증은 null을 허용하지만, 빈 문자열("")은 검증 실패하므로
-     * 빈 문자열을 null로 변환하여 선택적 이메일 입력을 지원한다.
+     * 사용자명 앞뒤 공백 제거
+     */
+    public void setUserName(String userName) {
+        this.userName = (userName != null) ? userName.trim() : null;
+    }
+
+    /**
+     * 빈 문자열 이메일을 null로 변환, 앞뒤 공백 제거
      */
     public void setEmail(String email) {
+        if (email != null) email = email.trim();
         this.email = (email != null && email.isBlank()) ? null : email;
     }
 
     /**
-     * 빈 문자열 전화번호를 null로 변환
+     * 빈 문자열 전화번호를 null로 변환, 앞뒤 공백 제거
      */
     public void setPhone(String phone) {
+        if (phone != null) phone = phone.trim();
         this.phone = (phone != null && phone.isBlank()) ? null : phone;
     }
 }
