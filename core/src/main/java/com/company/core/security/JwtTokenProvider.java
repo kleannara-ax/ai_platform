@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Date;
 
 /**
@@ -26,10 +28,21 @@ public class JwtTokenProvider {
     private final CustomUserDetailsService userDetailsService;
 
     public JwtTokenProvider(
-            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.secret:}") String secret,
             @Value("${jwt.access-token-expiration:3600000}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration:604800000}") long refreshTokenExpiration,
             CustomUserDetailsService userDetailsService) {
+
+        // JWT 시크릿 키가 비어있으면 자동 생성
+        if (secret == null || secret.isBlank()) {
+            byte[] keyBytes = new byte[64];
+            new SecureRandom().nextBytes(keyBytes);
+            secret = Base64.getEncoder().encodeToString(keyBytes);
+            log.warn("JWT 시크릿 키가 설정되지 않아 자동 생성되었습니다. "
+                    + "서버 재시작 시 기존 토큰이 무효화됩니다. "
+                    + "운영 환경에서는 jwt.secret 또는 JWT_SECRET 환경변수를 설정하세요.");
+        }
+
         this.secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;

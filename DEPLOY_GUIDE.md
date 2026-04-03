@@ -424,8 +424,10 @@ spring:
         use_sql_comments: false
 
 jwt:
-  # 운영용 JWT 시크릿 키 (반드시 변경! - Base64 인코딩된 256비트 이상)
-  secret: 여기에_운영용_JWT_시크릿_키_입력
+  # JWT 시크릿 키 (설정하지 않으면 서버 시작 시 자동 생성)
+  # 자동 생성 시 서버 재시작하면 기존 로그인 토큰이 무효화됩니다
+  # 고정 키를 사용하려면: openssl rand -base64 64 실행 후 결과값 입력
+  # secret: 여기에_고정_키_입력 (선택사항)
   access-token-expiration: 3600000     # 1시간
   refresh-token-expiration: 604800000  # 7일
 
@@ -439,11 +441,17 @@ logging:
 EOF
 ```
 
-### 5.3 JWT 시크릿 키 생성
+### 5.3 JWT 시크릿 키 (선택사항)
+
+> **JWT 시크릿 키는 별도로 설정하지 않아도 됩니다.**
+> 설정하지 않으면 서버 시작 시 자동 생성됩니다.
+> 단, 서버 재시작 시 기존 로그인 토큰이 무효화됩니다.
+
+고정 키를 사용하고 싶다면:
 ```bash
-# Base64 인코딩된 256비트 이상의 안전한 키 생성
+# Base64 인코딩된 키 생성
 openssl rand -base64 64
-# 출력된 문자열을 application-prod.yml의 jwt.secret에 입력
+# 출력된 문자열을 platform.env의 JWT_SECRET에 입력 (선택)
 ```
 
 ### 5.4 환경변수로 민감 정보 관리 (권장)
@@ -458,7 +466,7 @@ DB_PORT=3306
 DB_NAME=platform_db
 DB_USERNAME=platform_user
 DB_PASSWORD=여기에_DB_비밀번호
-JWT_SECRET=여기에_JWT_시크릿_키
+# JWT_SECRET=  (선택사항 - 미설정 시 서버 시작할 때 자동 생성)
 EOF
 
 # 보안: 본인만 읽기 가능
@@ -474,7 +482,7 @@ spring:
     password: ${DB_PASSWORD}
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:}  # 비어있으면 서버 시작 시 자동 생성
 ```
 
 ### 5.5 수동 실행 테스트
@@ -798,7 +806,7 @@ server {
 
 ### 보안 설정
 - [ ] **관리자 비밀번호 변경**: 기본 `admin123!`는 즉시 변경
-- [ ] **JWT 시크릿 키**: 운영용 랜덤 키로 변경 (`openssl rand -base64 64`)
+- [ ] **JWT 시크릿 키**: 미설정 시 자동 생성됨 (고정 키 사용 시 `openssl rand -base64 64` 결과를 platform.env에 설정)
 - [ ] **DB 비밀번호**: 강력한 비밀번호 설정
 - [ ] **MariaDB 외부 접근 차단**: `bind-address = 127.0.0.1` 확인
 - [ ] **8080 포트 외부 차단**: Nginx 프록시 사용 시 외부 노출 불필요
