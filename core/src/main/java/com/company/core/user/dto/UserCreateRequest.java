@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDate;
 
@@ -15,6 +16,7 @@ import java.time.LocalDate;
  * 사용자 생성 요청 DTO (프로필 정보 포함)
  */
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -47,4 +49,20 @@ public class UserCreateRequest {
     private LocalDate joinDate;
     private String officePhone;
     private String internalExt;
+
+    /**
+     * 빈 문자열 이메일을 null로 변환 (Jackson 역직렬화 시 호출됨)
+     * @Email 검증은 null을 허용하지만, 빈 문자열("")은 검증 실패하므로
+     * 빈 문자열을 null로 변환하여 선택적 이메일 입력을 지원한다.
+     */
+    public void setEmail(String email) {
+        this.email = (email != null && email.isBlank()) ? null : email;
+    }
+
+    /**
+     * 빈 문자열 전화번호를 null로 변환
+     */
+    public void setPhone(String phone) {
+        this.phone = (phone != null && phone.isBlank()) ? null : phone;
+    }
 }

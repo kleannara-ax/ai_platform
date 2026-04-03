@@ -465,7 +465,7 @@ async function submitCreateUser(){
   try{
     const res=await api('POST','/api/integrated/users',body);
     if(res.success){toast('사용자가 등록되었습니다.','success');closeModal();renderUsers();}
-    else toast(res.message||'등록 실패','error');
+    else { showValidationErrors(res); }
   }catch(e){toast(e.message,'error');}
 }
 
@@ -514,7 +514,7 @@ async function submitEditUser(id){
   try{
     const res=await api('PUT','/api/integrated/users/'+id,body);
     if(res.success){toast('사용자 정보가 수정되었습니다.','success');closeModal();renderUsers();}
-    else toast(res.message||'수정 실패','error');
+    else { showValidationErrors(res); }
   }catch(e){toast(e.message,'error');}
 }
 
@@ -756,6 +756,14 @@ async function saveAcl(){
 }
 
 // ══ UI Helpers ══
+function showValidationErrors(res){
+  if(res.data && typeof res.data==='object'){
+    const msgs=Object.entries(res.data).map(([field,msg])=>field+': '+msg);
+    toast(msgs.join('\n')||res.message||'처리 실패','error');
+  } else {
+    toast(res.message||'처리 실패','error');
+  }
+}
 function roleBadge(role){
   if(!role)return'-';
   const map={'ROLE_ADMIN':'badge-admin','ROLE_MANAGER':'badge-manager','ROLE_USER':'badge-user'};
