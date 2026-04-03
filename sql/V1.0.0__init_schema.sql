@@ -8,11 +8,13 @@
 -- ============================================================
 
 -- ── 데이터베이스 생성 ──
-CREATE DATABASE IF NOT EXISTS platform_db
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_general_ci;
+-- CREATE DATABASE IF NOT EXISTS platform_db
+--     DEFAULT CHARACTER SET utf8mb4
+--     DEFAULT COLLATE utf8mb4_general_ci;
+-- ※ DB 이름이 다른 경우(예: aiplatform) 환경에 맞게 수정하세요
 
-USE platform_db;
+-- USE platform_db;
+-- ※ DB 이름이 다른 경우 위 USE 문을 환경에 맞게 수정하세요
 
 
 -- ============================================================

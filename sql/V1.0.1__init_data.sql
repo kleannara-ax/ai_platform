@@ -9,7 +9,8 @@
 --    mariadb -u platform_user -p platform_db < V1.0.1__init_data.sql
 -- ============================================================
 
-USE platform_db;
+-- USE platform_db;
+-- ※ DB 이름이 다른 경우(예: aiplatform) 위 USE 문을 환경에 맞게 수정하세요
 
 
 -- ============================================================
@@ -19,7 +20,7 @@ USE platform_db;
 INSERT INTO CORE_USER (LOGIN_ID, PASSWORD, USER_NAME, EMAIL, PHONE, ROLE, ENABLED, CREATED_AT, UPDATED_AT, CREATED_BY)
 VALUES (
     'admin',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    '$2a$10$GKQBHCZW3fUd/bnINzscKuHAsHFU4YaH/oCqvhlzWWiMRkT5H8WqW',
     '시스템 관리자',
     'admin@company.com',
     '010-0000-0000',
