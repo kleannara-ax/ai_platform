@@ -1,0 +1,30 @@
+plugins {
+    id 'java-library'
+}
+
+// core 모듈은 라이브러리이므로 bootJar 생성하지 않음
+// (spring-boot 플러그인은 root에만 적용, 여기서는 dependency-management만 상속)
+
+dependencies {
+    // Spring Boot Starters
+    api 'org.springframework.boot:spring-boot-starter-web'
+    api 'org.springframework.boot:spring-boot-starter-data-jpa'
+    api 'org.springframework.boot:spring-boot-starter-security'
+    api 'org.springframework.boot:spring-boot-starter-validation'
+
+    // JWT
+    api 'io.jsonwebtoken:jjwt-api:0.12.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
+
+    // MariaDB Driver
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+
+    // Jackson
+    api 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // AOP (LoggingAspect에서 사용)
+    api 'org.springframework.boot:spring-boot-starter-aop'
+
+    // Logging (SLF4J + Logback은 spring-boot-starter에 포함)
+}

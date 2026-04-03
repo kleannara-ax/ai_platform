@@ -1,0 +1,26 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+// 실행형 JAR 생성 - 이 모듈만 bootJar 활성화
+bootJar {
+    archiveBaseName = 'platform'
+    archiveVersion = "${project.version}"
+    mainClass = 'com.company.app.PlatformApplication'
+}
+
+// 일반 jar는 비활성화 (bootJar만 사용)
+jar {
+    enabled = false
+}
+
+dependencies {
+    // Core 모듈
+    implementation project(':core')
+
+    // 업무 모듈 - 새 모듈 추가 시 여기에 등록
+    implementation project(':module-user')
+
+    // MariaDB Driver (런타임)
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+}

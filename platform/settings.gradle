@@ -1,0 +1,5 @@
+rootProject.name = 'platform'
+
+include 'core'
+include 'module-user'
+include 'app'
