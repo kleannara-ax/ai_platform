@@ -42,7 +42,7 @@ public class UserCreateRequest {
     private Role role;
 
     // ── 프로필 정보 ──
-    private Long deptId;
+    private String deptCode;
     private String position;
     private String jobTitle;
     private String employeeNo;

@@ -49,13 +49,13 @@ public class UserProfileController {
     }
 
     /**
-     * 부서별 프로필 목록 조회
+     * 부서별 프로필 목록 조회 (부서 코드로 조회)
      */
-    @GetMapping("/department/{deptId}")
+    @GetMapping("/department/{deptCode}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getProfilesByDept(
-            @PathVariable Long deptId) {
-        List<UserProfileResponse> response = userProfileService.getProfilesByDeptId(deptId);
+            @PathVariable String deptCode) {
+        List<UserProfileResponse> response = userProfileService.getProfilesByDeptCode(deptCode);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

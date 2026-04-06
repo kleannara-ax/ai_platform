@@ -2,7 +2,6 @@ package com.company.app.user.dto;
 
 import com.company.core.user.entity.CoreUser;
 import com.company.core.user.entity.Role;
-import com.company.module.user.entity.Department;
 import com.company.module.user.entity.UserProfile;
 import lombok.Builder;
 import lombok.Getter;
@@ -28,7 +27,7 @@ public class IntegratedUserResponse {
     private LocalDateTime updatedAt;
 
     // ── 프로필 정보 ──
-    private Long deptId;
+    private String deptCode;
     private String deptName;
     private String position;
     private String jobTitle;
@@ -50,7 +49,7 @@ public class IntegratedUserResponse {
                 .updatedAt(user.getUpdatedAt());
 
         if (profile != null) {
-            b.deptId(profile.getDeptId())
+            b.deptCode(profile.getDeptCode())
              .deptName(deptName)
              .position(profile.getPosition())
              .jobTitle(profile.getJobTitle())

@@ -30,9 +30,9 @@ public class UserProfile {
     @Comment("사용자 ID (CORE_USER 참조)")
     private Long userId;
 
-    @Column(name = "DEPT_ID")
-    @Comment("부서 ID (MOD_USER_DEPARTMENT 참조)")
-    private Long deptId;
+    @Column(name = "DEPT_CODE", length = 50)
+    @Comment("부서 코드 (공통코드 DEPT 참조)")
+    private String deptCode;
 
     @Column(name = "POSITION", length = 50)
     @Comment("직위")
@@ -79,9 +79,9 @@ public class UserProfile {
 
     // ── 비즈니스 메서드 ──
 
-    public void updateProfile(Long deptId, String position, String jobTitle,
+    public void updateProfile(String deptCode, String position, String jobTitle,
                               String officePhone, String internalExt) {
-        this.deptId = deptId;
+        this.deptCode = deptCode;
         this.position = position;
         this.jobTitle = jobTitle;
         this.officePhone = officePhone;

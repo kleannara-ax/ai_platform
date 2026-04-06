@@ -27,7 +27,7 @@ public class UserResponse {
     private LocalDateTime updatedAt;
 
     // ── 프로필 정보 ──
-    private Long deptId;
+    private String deptCode;
     private String deptName;
     private String position;
     private String jobTitle;

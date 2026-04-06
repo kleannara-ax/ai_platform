@@ -38,7 +38,7 @@ public class UserProfileService {
 
         UserProfile profile = UserProfile.builder()
                 .userId(request.getUserId())
-                .deptId(request.getDeptId())
+                .deptCode(request.getDeptCode())
                 .position(request.getPosition())
                 .jobTitle(request.getJobTitle())
                 .employeeNo(request.getEmployeeNo())
@@ -65,8 +65,8 @@ public class UserProfileService {
     /**
      * 부서별 프로필 목록 조회
      */
-    public List<UserProfileResponse> getProfilesByDeptId(Long deptId) {
-        return userProfileRepository.findByDeptId(deptId)
+    public List<UserProfileResponse> getProfilesByDeptCode(String deptCode) {
+        return userProfileRepository.findByDeptCode(deptCode)
                 .stream()
                 .map(UserProfileResponse::from)
                 .collect(Collectors.toList());
@@ -81,7 +81,7 @@ public class UserProfileService {
                 .orElseThrow(() -> new EntityNotFoundException("UserProfile", userId));
 
         profile.updateProfile(
-                request.getDeptId(),
+                request.getDeptCode(),
                 request.getPosition(),
                 request.getJobTitle(),
                 request.getOfficePhone(),

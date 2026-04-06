@@ -20,7 +20,7 @@ public class UserProfileRequest {
     @NotNull(message = "사용자 ID는 필수입니다.")
     private Long userId;
 
-    private Long deptId;
+    private String deptCode;
     private String position;
     private String jobTitle;
     private String employeeNo;

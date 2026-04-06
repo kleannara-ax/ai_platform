@@ -8,7 +8,6 @@ import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.Role;
 import com.company.core.user.service.CoreUserService;
-import com.company.module.user.entity.Department;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -17,8 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * 통합 사용자 관리 API
@@ -89,9 +86,5 @@ public class IntegratedUserController {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRole(userId, role)));
     }
 
-    /** 부서 목록 (드롭다운용) */
-    @GetMapping("/departments")
-    public ResponseEntity<ApiResponse<List<Department>>> getDepartments() {
-        return ResponseEntity.ok(ApiResponse.success(integratedUserService.getDepartments()));
-    }
+
 }

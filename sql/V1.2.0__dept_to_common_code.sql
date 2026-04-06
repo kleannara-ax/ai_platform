@@ -1,0 +1,43 @@
+-- ============================================================
+--  부서를 공통코드로 전환하는 마이그레이션 스크립트
+--  MariaDB 10.11+ (utf8mb4)
+--  최종 갱신: 2026-04-06
+--
+--  변경 내용:
+--   1. 기존 MOD_USER_DEPARTMENT 데이터를 MOD_CODE_DETAIL (DEPT 그룹)으로 복사
+--   2. MOD_USER_PROFILE.DEPT_ID → DEPT_CODE 로 전환
+--   3. 기존 DEPT_ID FK/인덱스 제거 후 컬럼 삭제
+-- ============================================================
+
+-- 1. 공통코드 DEPT 그룹 생성
+INSERT INTO MOD_CODE_GROUP (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER)
+VALUES ('DEPT', '부서', '부서 목록 (공통코드로 관리)', 1, 4);
+
+SET @deptGroupId = LAST_INSERT_ID();
+
+-- 2. 기존 부서 데이터를 공통코드 상세로 복사
+INSERT INTO MOD_CODE_DETAIL (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER)
+SELECT @deptGroupId, d.DEPT_CODE, d.DEPT_NAME,
+       CASE WHEN d.PARENT_DEPT_ID IS NOT NULL
+            THEN CONCAT((SELECT pd.DEPT_NAME FROM MOD_USER_DEPARTMENT pd WHERE pd.DEPT_ID = d.PARENT_DEPT_ID), ' > ', d.DEPT_NAME)
+            ELSE NULL END,
+       d.ENABLED, d.SORT_ORDER
+FROM MOD_USER_DEPARTMENT d
+ORDER BY d.SORT_ORDER;
+
+-- 3. MOD_USER_PROFILE 에 DEPT_CODE 컬럼 추가
+ALTER TABLE MOD_USER_PROFILE ADD COLUMN DEPT_CODE VARCHAR(50) NULL COMMENT '부서 코드 (공통코드 DEPT 참조)' AFTER DEPT_ID;
+
+-- 4. 기존 DEPT_ID 값을 DEPT_CODE 로 변환
+UPDATE MOD_USER_PROFILE p
+SET p.DEPT_CODE = (SELECT d.DEPT_CODE FROM MOD_USER_DEPARTMENT d WHERE d.DEPT_ID = p.DEPT_ID)
+WHERE p.DEPT_ID IS NOT NULL;
+
+-- 5. FK 제약 제거 (이름은 환경마다 다를 수 있으니 확인 후 실행)
+ALTER TABLE MOD_USER_PROFILE DROP FOREIGN KEY FK_MOD_USER_PROFILE_DEPT;
+
+-- 6. DEPT_ID 인덱스 제거
+ALTER TABLE MOD_USER_PROFILE DROP INDEX IDX_MOD_USER_PROFILE_DEPT;
+
+-- 7. DEPT_ID 컬럼 삭제
+ALTER TABLE MOD_USER_PROFILE DROP COLUMN DEPT_ID;

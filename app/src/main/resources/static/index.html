@@ -315,7 +315,7 @@ async function renderDashboard() {
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     const activeUsers=users.filter(u=>u.enabled);
     const admins=users.filter(u=>u.role==='ROLE_ADMIN');
-    const withProfile=users.filter(u=>u.deptId||u.position||u.employeeNo);
+    const withProfile=users.filter(u=>u.deptCode||u.position||u.employeeNo);
 
     el.innerHTML=`
       <div class="stats-grid">
@@ -353,7 +353,7 @@ async function renderUsers(){
   try {
     const [usersRes,deptsRes]=await Promise.all([
       api('GET','/api/integrated/users?page=0&size=100'),
-      api('GET','/api/integrated/users/departments')
+      api('GET','/api/codes/lookup/DEPT')
     ]);
     allUsers=usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     allDepts=deptsRes.success?(deptsRes.data||[]):[];
@@ -448,8 +448,8 @@ function showUserDetail(userId){
   `,'<button class="btn btn-sm btn-outline" onclick="closeModal()">닫기</button>');
 }
 
-function deptOptions(selectedId){
-  return '<option value="">선택 안함</option>'+allDepts.map(d=>`<option value="${d.deptId}" ${d.deptId===selectedId?'selected':''}>${esc(d.deptName)} (${esc(d.deptCode)})</option>`).join('');
+function deptOptions(selectedCode){
+  return '<option value="">선택 안함</option>'+allDepts.map(d=>`<option value="${esc(d.code)}" ${d.code===selectedCode?'selected':''}>${esc(d.codeName)} (${esc(d.code)})</option>`).join('');
 }
 
 function openCreateUser(){
@@ -469,7 +469,7 @@ function openCreateUser(){
     </div>
     <div class="form-section">소속 / 프로필 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>부서</label><select id="m_deptId">${deptOptions(null)}</select></div>
+      <div class="form-group"><label>부서</label><select id="m_deptCode">${deptOptions(null)}</select></div>
       <div class="form-group"><label>사번</label><input id="m_empNo" placeholder="EMP-0001"></div>
     </div>
     <div class="form-row">
@@ -492,7 +492,7 @@ async function submitCreateUser(){
     email:document.getElementById('m_email').value.trim()||null,
     phone:document.getElementById('m_phone').value.trim()||null,
     role:document.getElementById('m_role').value,
-    deptId:document.getElementById('m_deptId').value?parseInt(document.getElementById('m_deptId').value):null,
+    deptCode:document.getElementById('m_deptCode').value||null,
     position:document.getElementById('m_position').value||null,
     jobTitle:document.getElementById('m_jobTitle').value||null,
     employeeNo:document.getElementById('m_empNo').value||null,
@@ -522,7 +522,7 @@ async function openEditUser(id){
     </div>
     <div class="form-section">소속 / 프로필 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>부서</label><select id="m_deptId">${deptOptions(u.deptId)}</select></div>
+      <div class="form-group"><label>부서</label><select id="m_deptCode">${deptOptions(u.deptCode)}</select></div>
       <div class="form-group"><label>사번</label><input id="m_empNo" value="${esc(u.employeeNo||'')}"></div>
     </div>
     <div class="form-row">
@@ -542,7 +542,7 @@ async function submitEditUser(id){
     userName:document.getElementById('m_userName').value.trim(),
     email:document.getElementById('m_email').value.trim()||null,
     phone:document.getElementById('m_phone').value.trim()||null,
-    deptId:document.getElementById('m_deptId').value?parseInt(document.getElementById('m_deptId').value):null,
+    deptCode:document.getElementById('m_deptCode').value||null,
     position:document.getElementById('m_position').value||null,
     jobTitle:document.getElementById('m_jobTitle').value||null,
     employeeNo:document.getElementById('m_empNo').value||null,

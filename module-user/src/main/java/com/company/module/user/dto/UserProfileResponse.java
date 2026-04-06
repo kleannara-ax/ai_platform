@@ -16,7 +16,7 @@ public class UserProfileResponse {
 
     private Long profileId;
     private Long userId;
-    private Long deptId;
+    private String deptCode;
     private String position;
     private String jobTitle;
     private String employeeNo;
@@ -30,7 +30,7 @@ public class UserProfileResponse {
         return UserProfileResponse.builder()
                 .profileId(profile.getProfileId())
                 .userId(profile.getUserId())
-                .deptId(profile.getDeptId())
+                .deptCode(profile.getDeptCode())
                 .position(profile.getPosition())
                 .jobTitle(profile.getJobTitle())
                 .employeeNo(profile.getEmployeeNo())

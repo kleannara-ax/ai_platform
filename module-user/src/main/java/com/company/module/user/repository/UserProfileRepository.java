@@ -15,7 +15,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
 
     Optional<UserProfile> findByUserId(Long userId);
 
-    List<UserProfile> findByDeptId(Long deptId);
+    List<UserProfile> findByDeptCode(String deptCode);
 
     boolean existsByUserId(Long userId);
 
