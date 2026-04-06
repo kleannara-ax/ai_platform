@@ -89,7 +89,7 @@ public class UserProfile {
     }
 
     public void updateExtended(String employeeNo, LocalDate joinDate) {
-        if (employeeNo != null) this.employeeNo = employeeNo;
-        if (joinDate != null) this.joinDate = joinDate;
+        this.employeeNo = employeeNo;
+        this.joinDate = joinDate;
     }
 }
