@@ -7,7 +7,6 @@ import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserResponse;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.CoreUser;
-import com.company.core.user.entity.Role;
 import com.company.core.user.repository.CoreUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +39,7 @@ public class CoreUserService {
                 .userName(request.getUserName())
                 .email(request.getEmail())
                 .phone(request.getPhone())
-                .role(request.getRole() != null ? request.getRole() : Role.ROLE_USER)
+                .role(request.getRole() != null && !request.getRole().isBlank() ? request.getRole() : "ROLE_USER")
                 .enabled(true)
                 .build();
         CoreUser saved = coreUserRepository.save(user);
@@ -101,7 +100,7 @@ public class CoreUserService {
     }
 
     @Transactional
-    public UserResponse changeRole(Long userId, Role role) {
+    public UserResponse changeRole(Long userId, String role) {
         CoreUser user = findUserById(userId);
         user.changeRole(role);
         log.info("사용자 역할 변경: userId={}, role={}", userId, role);

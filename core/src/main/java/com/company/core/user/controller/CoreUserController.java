@@ -5,7 +5,6 @@ import com.company.core.common.response.PageResponse;
 import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserResponse;
 import com.company.core.user.dto.UserUpdateRequest;
-import com.company.core.user.entity.Role;
 import com.company.core.user.service.CoreUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -101,7 +100,7 @@ public class CoreUserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> changeRole(
             @PathVariable Long userId,
-            @RequestParam Role role) {
+            @RequestParam String role) {
         UserResponse response = coreUserService.changeRole(userId, role);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

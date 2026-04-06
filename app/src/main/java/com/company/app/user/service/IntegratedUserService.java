@@ -4,7 +4,6 @@ import com.company.app.user.dto.IntegratedUserResponse;
 import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.CoreUser;
-import com.company.core.user.entity.Role;
 import com.company.core.user.service.CoreUserService;
 import com.company.module.code.entity.CodeDetail;
 import com.company.module.code.repository.CodeDetailRepository;
@@ -131,7 +130,7 @@ public class IntegratedUserService {
      * 역할 변경
      */
     @Transactional
-    public IntegratedUserResponse changeRole(Long userId, Role role) {
+    public IntegratedUserResponse changeRole(Long userId, String role) {
         coreUserService.changeRole(userId, role);
         return getUser(userId);
     }

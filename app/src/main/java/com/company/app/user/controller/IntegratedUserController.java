@@ -6,7 +6,6 @@ import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
 import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserUpdateRequest;
-import com.company.core.user.entity.Role;
 import com.company.core.user.service.CoreUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +81,7 @@ public class IntegratedUserController {
     @PatchMapping("/{userId}/role")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> changeRole(
-            @PathVariable Long userId, @RequestParam Role role) {
+            @PathVariable Long userId, @RequestParam String role) {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRole(userId, role)));
     }
 

@@ -1,6 +1,5 @@
 package com.company.core.user.dto;
 
-import com.company.core.user.entity.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -39,7 +38,7 @@ public class UserCreateRequest {
 
     private String phone;
 
-    private Role role;
+    private String role;
 
     // ── 프로필 정보 ──
     private String deptCode;

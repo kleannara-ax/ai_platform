@@ -1,7 +1,6 @@
 package com.company.app.user.dto;
 
 import com.company.core.user.entity.CoreUser;
-import com.company.core.user.entity.Role;
 import com.company.module.user.entity.UserProfile;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +20,7 @@ public class IntegratedUserResponse {
     private String userName;
     private String email;
     private String phone;
-    private Role role;
+    private String role;
     private Boolean enabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

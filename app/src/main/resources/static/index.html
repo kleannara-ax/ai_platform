@@ -196,7 +196,7 @@ table tr:last-child td{border-bottom:none;}
 <script>
 const BASE = window.location.origin;
 let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
-let allDepts = [], userMenus = [];
+let allDepts = [], allRoles = [], userMenus = [];
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -230,6 +230,8 @@ async function enterApp() {
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
   document.getElementById('userRole').textContent=currentUser.role||'';
+  // 공통코드에서 역할 목록 로드
+  try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; }catch(e){ allRoles=[]; }
   await loadUserMenus();
   navigate('dashboard');
 }
@@ -368,7 +370,7 @@ function drawUserTable(users){
     <div class="toolbar">
       <input type="text" id="userSearch" placeholder="이름, 아이디, 부서, 사번으로 검색..." oninput="filterUsers()">
       <select id="roleFilter" onchange="filterUsers()" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);">
-        <option value="">전체 역할</option><option value="ROLE_ADMIN">관리자</option><option value="ROLE_MANAGER">매니저</option><option value="ROLE_USER">일반사용자</option>
+        <option value="">전체 역할</option>${allRoles.map(r=>`<option value="${esc(r.code)}">${esc(r.codeName)}</option>`).join('')}
       </select>
       <select id="statusFilter" onchange="filterUsers()" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);">
         <option value="">전체 상태</option><option value="active">활성</option><option value="inactive">비활성</option>
@@ -461,7 +463,7 @@ function openCreateUser(){
     </div>
     <div class="form-row">
       <div class="form-group"><label>이름 *</label><input id="m_userName" placeholder="이름 입력"></div>
-      <div class="form-group"><label>역할</label><select id="m_role"><option value="ROLE_USER">일반사용자</option><option value="ROLE_MANAGER">매니저</option><option value="ROLE_ADMIN">관리자</option></select></div>
+      <div class="form-group"><label>역할</label><select id="m_role">${allRoles.slice().reverse().map(r=>`<option value="${esc(r.code)}">${esc(r.codeName)}</option>`).join('')}</select></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>이메일</label><input id="m_email" type="email" placeholder="email@example.com"></div>
@@ -559,13 +561,12 @@ async function submitEditUser(id){
 
 function openRoleChange(id,currentRole){
   const u=allUsers.find(x=>x.userId===id);
+  const curLabel=(allRoles.find(r=>r.code===currentRole)||{}).codeName||currentRole;
   openModal('역할 변경 - '+(u?u.loginId:id),`
-    <div class="form-group"><label>현재 역할</label><input value="${currentRole}" disabled></div>
+    <div class="form-group"><label>현재 역할</label><input value="${esc(curLabel)} (${currentRole})" disabled></div>
     <div class="form-group"><label>변경할 역할</label>
       <select id="m_newRole">
-        <option value="ROLE_USER" ${currentRole==='ROLE_USER'?'selected':''}>일반사용자</option>
-        <option value="ROLE_MANAGER" ${currentRole==='ROLE_MANAGER'?'selected':''}>매니저</option>
-        <option value="ROLE_ADMIN" ${currentRole==='ROLE_ADMIN'?'selected':''}>관리자</option>
+        ${allRoles.map(r=>`<option value="${esc(r.code)}" ${r.code===currentRole?'selected':''}>${esc(r.codeName)}</option>`).join('')}
       </select>
     </div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitRoleChange(${id})">역할 변경</button>`);
@@ -683,8 +684,10 @@ async function renderPermissions(){
     allRoleMappings=roleRes.success?(roleRes.data||[]):[];
     allMenus=menuRes.success?(menuRes.data||[]):[];
     const tree=treeRes.success?(treeRes.data||[]):[];
-    const roles=['ROLE_ADMIN','ROLE_MANAGER','ROLE_USER'];
-    const roleLabels={'ROLE_ADMIN':'관리자','ROLE_MANAGER':'매니저','ROLE_USER':'일반'};
+    // 공통코드에서 역할 목록을 동적으로 가져옴 (allRoleMappings 기반)
+    const roles=allRoleMappings.map(rm=>rm.role);
+    const roleLabels={};
+    allRoleMappings.forEach(rm=>{roleLabels[rm.role]=rm.roleDescription||rm.role;});
     const roleMaps={};
     allRoleMappings.forEach(rm=>{roleMaps[rm.role]=new Set(rm.menuIds);});
 
@@ -711,13 +714,14 @@ async function renderPermissions(){
       return html;
     }
 
-    // Summary cards
-    const summaryCards=roles.map(role=>{
+    // Summary cards — 동적 색상 배열
+    const roleColors=['var(--primary)','var(--orange)','var(--green)','#8b5cf6','#ec4899','#06b6d4','#f59e0b','#10b981'];
+    const summaryCards=roles.map((role,i)=>{
       const rm=allRoleMappings.find(r=>r.role===role);
       const cnt=rm?rm.menuIds.length:0;
       const total=allMenus.length;
       const pct=total>0?Math.round(cnt/total*100):0;
-      const color=role==='ROLE_ADMIN'?'var(--primary)':role==='ROLE_MANAGER'?'var(--orange)':'var(--green)';
+      const color=roleColors[i%roleColors.length];
       return `<div class="stat-card" style="border-left:4px solid ${color};">
         <div class="label">${roleBadge(role)} ${esc(roleLabels[role])}</div>
         <div class="value" style="color:${color};">${cnt}<span style="font-size:14px;font-weight:400;color:var(--text3);"> / ${total}</span></div>
@@ -726,7 +730,7 @@ async function renderPermissions(){
     }).join('');
 
     el.innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">${summaryCards}</div>
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(roles.length,4)},1fr);gap:16px;margin-bottom:24px;">${summaryCards}</div>
       <div class="card">
         <div class="card-header">
           <h3>메뉴별 접근 권한</h3>
@@ -780,7 +784,7 @@ function resetAcl(){
 }
 
 async function saveAcl(){
-  const roles=['ROLE_ADMIN','ROLE_MANAGER','ROLE_USER'];
+  const roles=allRoleMappings.map(rm=>rm.role);
   try{
     for(const role of roles){
       const cbs=document.querySelectorAll(`.acl_cb[data-role="${role}"]:checked`);
@@ -1046,9 +1050,12 @@ function showValidationErrors(res){
 }
 function roleBadge(role){
   if(!role)return'-';
-  const map={'ROLE_ADMIN':'badge-admin','ROLE_MANAGER':'badge-manager','ROLE_USER':'badge-user'};
-  const labels={'ROLE_ADMIN':'관리자','ROLE_MANAGER':'매니저','ROLE_USER':'일반'};
-  return `<span class="badge ${map[role]||''}">${labels[role]||role.replace('ROLE_','')}</span>`;
+  const badgeColors=['badge-admin','badge-manager','badge-user','badge-active','badge-inactive'];
+  const idx=allRoles.findIndex(r=>r.code===role);
+  const cls=idx>=0&&idx<badgeColors.length?badgeColors[idx]:(idx>=0?'badge-active':'');
+  const r=allRoles.find(r=>r.code===role);
+  const label=r?r.codeName:role.replace('ROLE_','');
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
 }
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}

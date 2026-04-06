@@ -5,7 +5,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.core.permission.dto.*;
 import com.company.core.permission.entity.*;
 import com.company.core.permission.repository.*;
-import com.company.core.user.entity.Role;
+import com.company.core.permission.support.RoleProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +21,7 @@ public class CorePermissionService {
     private final CorePermissionRepository permRepo;
     private final CoreRoleMenuRepository roleMenuRepo;
     private final CoreRolePermissionRepository rolePermRepo;
+    private final RoleProvider roleProvider;
 
     // ── 권한 CRUD ──
 
@@ -63,16 +64,21 @@ public class CorePermissionService {
                 .map(CoreRoleMenu::getMenuId).collect(Collectors.toList());
         List<Long> permIds = rolePermRepo.findByRole(role).stream()
                 .map(CoreRolePermission::getPermId).collect(Collectors.toList());
-        String desc = "";
-        try { desc = Role.valueOf(role).getDescription(); } catch (Exception ignored) {}
+        // 공통코드 ROLE 그룹에서 역할 설명을 조회
+        Map<String, String> roleNameMap = roleProvider.getRoleNameMap();
+        String desc = roleNameMap.getOrDefault(role, role);
         return RoleMappingResponse.builder()
                 .role(role).roleDescription(desc)
                 .menuIds(menuIds).permissionIds(permIds).build();
     }
 
+    /**
+     * 모든 역할별 매핑 조회 – 공통코드 ROLE 그룹에서 활성 역할 목록을 가져온다.
+     */
     public List<RoleMappingResponse> getAllRoleMappings() {
-        return Arrays.stream(Role.values())
-                .map(r -> getRoleMapping(r.name()))
+        List<String> roles = roleProvider.getActiveRoles();
+        return roles.stream()
+                .map(this::getRoleMapping)
                 .collect(Collectors.toList());
     }
 

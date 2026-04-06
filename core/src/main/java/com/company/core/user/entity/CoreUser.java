@@ -47,10 +47,9 @@ public class CoreUser {
     @Comment("전화번호")
     private String phone;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "ROLE", nullable = false, length = 30)
-    @Comment("역할 (ROLE_ADMIN, ROLE_MANAGER, ROLE_USER)")
-    private Role role;
+    @Comment("역할 코드 (공통코드 ROLE 그룹에서 관리)")
+    private String role;
 
     @Column(name = "ENABLED", nullable = false)
     @Comment("활성화 여부")
@@ -98,7 +97,7 @@ public class CoreUser {
         this.phone = phone;
     }
 
-    public void changeRole(Role role) {
+    public void changeRole(String role) {
         this.role = role;
     }
 
