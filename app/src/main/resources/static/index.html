@@ -169,25 +169,8 @@ table tr:last-child td{border-bottom:none;}
       <div class="avatar" id="userAvatar">A</div>
       <div class="info"><div class="name" id="userName">Admin</div><div class="role" id="userRole">ROLE_ADMIN</div></div>
     </div>
-    <nav class="nav-menu">
-      <div class="nav-section">일반</div>
-      <div class="nav-item active" onclick="navigate('dashboard',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        대시보드
-      </div>
-      <div class="nav-section">코어</div>
-      <div class="nav-item" onclick="navigate('users',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        사용자 관리
-      </div>
-      <div class="nav-item" onclick="navigate('menus',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        메뉴 관리
-      </div>
-      <div class="nav-item" onclick="navigate('permissions',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        접근 권한
-      </div>
+    <nav class="nav-menu" id="sidebarMenu">
+      <div style="padding:20px 24px;color:#64748b;font-size:12px;">메뉴를 불러오는 중...</div>
     </nav>
     <div class="sidebar-footer"><button onclick="doLogout()">로그아웃</button></div>
   </aside>
@@ -213,7 +196,7 @@ table tr:last-child td{border-bottom:none;}
 <script>
 const BASE = window.location.origin;
 let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
-let allDepts = [];
+let allDepts = [], userMenus = [];
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -242,12 +225,65 @@ async function doLogin() {
   } catch(e) { errEl.style.display='block'; errEl.textContent='연결 오류: '+e.message; }
 }
 function doLogout() { token='';refreshTk='';currentUser=null;document.getElementById('appShell').classList.add('hidden');document.getElementById('loginPage').classList.remove('hidden'); }
-function enterApp() {
+async function enterApp() {
   document.getElementById('loginPage').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
   document.getElementById('userRole').textContent=currentUser.role||'';
+  await loadUserMenus();
   navigate('dashboard');
+}
+
+// ══ 사용자 권한별 메뉴 로드 ══
+const menuIcons = {
+  'DASHBOARD': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  'USER_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
+  'MENU_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+  'PERM_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+  '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
+};
+const menuCodeToPage = {
+  'DASHBOARD': 'dashboard',
+  'USER_MGMT': 'users',
+  'MENU_MGMT': 'menus',
+  'PERM_MGMT': 'permissions'
+};
+
+async function loadUserMenus() {
+  const nav = document.getElementById('sidebarMenu');
+  try {
+    const role = currentUser.role || 'ROLE_USER';
+    const res = await api('GET', '/api/core/menus/role/' + role);
+    userMenus = res.success ? (res.data || []) : [];
+    renderSidebarMenus();
+  } catch(e) {
+    nav.innerHTML = '<div style="padding:20px 24px;color:#ef4444;font-size:12px;">메뉴 로드 실패</div>';
+  }
+}
+
+function renderSidebarMenus() {
+  const nav = document.getElementById('sidebarMenu');
+  if (userMenus.length === 0) {
+    nav.innerHTML = '<div style="padding:20px 24px;color:#64748b;font-size:12px;">접근 가능한 메뉴가 없습니다.</div>';
+    return;
+  }
+  let html = '';
+  userMenus.forEach((menu, idx) => {
+    if (idx === 0) html += '<div class="nav-section">메뉴</div>';
+    const page = menuCodeToPage[menu.menuCode] || menu.menuCode.toLowerCase();
+    const icon = menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
+    const active = (idx === 0) ? ' active' : '';
+    html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}">${icon} ${esc(menu.menuName)}</div>`;
+    // 하위 메뉴 렌더링
+    if (menu.children && menu.children.length > 0) {
+      menu.children.forEach(child => {
+        const childPage = menuCodeToPage[child.menuCode] || child.menuCode.toLowerCase();
+        const childIcon = menuIcons[child.menuCode] || menuIcons['_DEFAULT'];
+        html += `<div class="nav-item" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" style="padding-left:44px;font-size:12px;">${childIcon} ${esc(child.menuName)}</div>`;
+      });
+    }
+  });
+  nav.innerHTML = html;
 }
 
 // ══ Navigation ══
