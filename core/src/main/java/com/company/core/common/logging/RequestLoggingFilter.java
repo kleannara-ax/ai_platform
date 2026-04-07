@@ -53,12 +53,14 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         } finally {
             long duration = System.currentTimeMillis() - startTime;
 
-            log.info("[HTTP] {} {} → {} ({}ms) [rid:{}]",
+            String clientIp = LogUtil.getClientIp(request);
+            log.info("[HTTP] {} {} → {} ({}ms) [rid:{}] [ip:{}]",
                     request.getMethod(),
                     request.getRequestURI(),
                     response.getStatus(),
                     duration,
-                    requestId);
+                    requestId,
+                    clientIp);
 
             wrappedResponse.copyBodyToResponse();
             org.slf4j.MDC.remove("requestId");

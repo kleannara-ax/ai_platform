@@ -1,5 +1,6 @@
 package com.company.core.menu.controller;
 
+import com.company.core.common.logging.LogUtil;
 import com.company.core.common.response.ApiResponse;
 import com.company.core.menu.dto.MenuRequest;
 import com.company.core.menu.dto.MenuResponse;
@@ -40,7 +41,9 @@ public class CoreMenuController {
     @GetMapping("/role/{role}")
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRole(
             @PathVariable String role, HttpServletRequest request) {
-        String clientIp = resolveClientIp(request);
+        // IP 헤더 전체 덤프 (디버깅용)
+        LogUtil.logAllIpHeaders(request, "메뉴조회");
+        String clientIp = LogUtil.getClientIp(request);
         log.info("[메뉴조회] role={}, clientIp={}", role, clientIp);
         List<MenuResponse> menus = menuService.getMenuTreeByRole(role, clientIp);
         log.info("[메뉴조회] 반환 메뉴 수={}, 메뉴목록={}", menus.size(),
@@ -81,24 +84,9 @@ public class CoreMenuController {
     /** 현재 접속자 IP 조회 */
     @GetMapping("/my-ip")
     public ResponseEntity<ApiResponse<Map<String, String>>> getClientIp(HttpServletRequest request) {
-        String ip = resolveClientIp(request);
+        LogUtil.logAllIpHeaders(request, "IP조회");
+        String ip = LogUtil.getClientIp(request);
         log.info("[IP조회] resolvedIp={}", ip);
         return ResponseEntity.ok(ApiResponse.success(Map.of("ip", ip)));
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String[] headers = {"X-Forwarded-For", "X-Real-IP", "Proxy-Client-IP",
-                "WL-Proxy-Client-IP", "HTTP_CLIENT_IP", "HTTP_X_FORWARDED_FOR"};
-        for (String h : headers) {
-            String v = request.getHeader(h);
-            if (v != null && !v.isBlank() && !"unknown".equalsIgnoreCase(v)) {
-                String resolved = v.split(",")[0].trim();
-                log.info("[IP해석] header={}  value={}  resolved={}", h, v, resolved);
-                return resolved;
-            }
-        }
-        String remoteAddr = request.getRemoteAddr();
-        log.info("[IP해석] 프록시 헤더 없음, remoteAddr={}", remoteAddr);
-        return remoteAddr;
     }
 }
