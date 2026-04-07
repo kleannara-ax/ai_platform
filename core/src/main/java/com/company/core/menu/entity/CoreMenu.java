@@ -20,6 +20,7 @@ public class CoreMenu {
     @Column(name = "IS_VISIBLE") @Builder.Default private Boolean isVisible = true;
     @Column(name = "IS_ACTIVE") @Builder.Default private Boolean isActive = true;
     @Column(name = "DESCRIPTION", length = 200) private String description;
+    @Column(name = "ALLOWED_IPS", length = 1000) private String allowedIps;
     @Column(name = "CREATED_AT", updatable = false) private LocalDateTime createdAt;
     @Column(name = "UPDATED_AT") private LocalDateTime updatedAt;
 
@@ -27,9 +28,11 @@ public class CoreMenu {
     @PreUpdate  protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 
     public void update(String menuName, String menuUrl, String icon, Integer sortOrder,
-                       String menuType, Boolean isVisible, Boolean isActive, String description, Long parentId) {
+                       String menuType, Boolean isVisible, Boolean isActive, String description,
+                       Long parentId, String allowedIps) {
         this.menuName = menuName; this.menuUrl = menuUrl; this.icon = icon;
         this.sortOrder = sortOrder; this.menuType = menuType; this.isVisible = isVisible;
         this.isActive = isActive; this.description = description; this.parentId = parentId;
+        this.allowedIps = allowedIps;
     }
 }

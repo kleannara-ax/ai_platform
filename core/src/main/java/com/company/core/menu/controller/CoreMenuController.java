@@ -4,6 +4,7 @@ import com.company.core.common.response.ApiResponse;
 import com.company.core.menu.dto.MenuRequest;
 import com.company.core.menu.dto.MenuResponse;
 import com.company.core.menu.service.CoreMenuService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/core/menus")
@@ -66,5 +68,24 @@ public class CoreMenuController {
     public ResponseEntity<ApiResponse<Void>> deleteMenu(@PathVariable Long menuId) {
         menuService.deleteMenu(menuId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /** 현재 접속자 IP 조회 */
+    @GetMapping("/my-ip")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getClientIp(HttpServletRequest request) {
+        String ip = resolveClientIp(request);
+        return ResponseEntity.ok(ApiResponse.success(Map.of("ip", ip)));
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String[] headers = {"X-Forwarded-For", "X-Real-IP", "Proxy-Client-IP",
+                "WL-Proxy-Client-IP", "HTTP_CLIENT_IP", "HTTP_X_FORWARDED_FOR"};
+        for (String h : headers) {
+            String v = request.getHeader(h);
+            if (v != null && !v.isBlank() && !"unknown".equalsIgnoreCase(v)) {
+                return v.split(",")[0].trim();
+            }
+        }
+        return request.getRemoteAddr();
     }
 }

@@ -18,6 +18,7 @@ public class MenuResponse {
     private Boolean isVisible;
     private Boolean isActive;
     private String description;
+    private String allowedIps;
     @Builder.Default private List<MenuResponse> children = new ArrayList<>();
 
     public static MenuResponse from(CoreMenu e) {
@@ -26,6 +27,6 @@ public class MenuResponse {
             .parentId(e.getParentId()).menuUrl(e.getMenuUrl()).icon(e.getIcon())
             .sortOrder(e.getSortOrder()).menuType(e.getMenuType())
             .isVisible(e.getIsVisible()).isActive(e.getIsActive())
-            .description(e.getDescription()).build();
+            .description(e.getDescription()).allowedIps(e.getAllowedIps()).build();
     }
 }

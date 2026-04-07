@@ -64,6 +64,7 @@ public class CoreMenuService {
                 .isVisible(req.getIsVisible() != null ? req.getIsVisible() : true)
                 .isActive(req.getIsActive() != null ? req.getIsActive() : true)
                 .description(req.getDescription())
+                .allowedIps(normalizeIps(req.getAllowedIps()))
                 .build();
         return MenuResponse.from(menuRepository.save(menu));
     }
@@ -78,7 +79,8 @@ public class CoreMenuService {
                 req.getMenuType() != null ? req.getMenuType() : menu.getMenuType(),
                 req.getIsVisible() != null ? req.getIsVisible() : menu.getIsVisible(),
                 req.getIsActive() != null ? req.getIsActive() : menu.getIsActive(),
-                req.getDescription(), req.getParentId());
+                req.getDescription(), req.getParentId(),
+                normalizeIps(req.getAllowedIps()));
         return MenuResponse.from(menu);
     }
 
@@ -89,6 +91,18 @@ public class CoreMenuService {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         menuRepository.deleteById(menuId);
+    }
+
+    /**
+     * IP 문자열 정규화: 공백 제거, 빈 문자열은 null 반환
+     */
+    private String normalizeIps(String ips) {
+        if (ips == null || ips.isBlank()) return null;
+        String normalized = Arrays.stream(ips.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(","));
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private List<MenuResponse> buildTree(List<CoreMenu> menus) {

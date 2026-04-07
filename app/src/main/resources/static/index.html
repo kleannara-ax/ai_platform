@@ -199,7 +199,7 @@ table tr:last-child td{border-bottom:none;}
 <script>
 const BASE = window.location.origin;
 let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
-let allDepts = [], allRoles = [], userMenus = [];
+let allDepts = [], allRoles = [], userMenus = [], clientIp = '';
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -235,6 +235,8 @@ async function enterApp() {
   document.getElementById('userRole').textContent=currentUser.role||'';
   // 공통코드에서 역할 목록 로드
   try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; }catch(e){ allRoles=[]; }
+  // 현재 접속자 IP 조회
+  try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
   await loadUserMenus();
   navigate('dashboard');
 }
@@ -256,12 +258,27 @@ const menuCodeToPage = {
   'CODE_MGMT': 'codes'
 };
 
+function isIpAllowed(menu){
+  if(!menu.allowedIps) return true; // NULL이면 제한 없음
+  const allowed=menu.allowedIps.split(',').map(s=>s.trim()).filter(Boolean);
+  if(allowed.length===0) return true;
+  return allowed.includes(clientIp);
+}
+function filterMenusByIp(menus){
+  return menus.filter(m=>{
+    if(!isIpAllowed(m)) return false;
+    if(m.children&&m.children.length>0) m.children=filterMenusByIp(m.children);
+    return true;
+  });
+}
+
 async function loadUserMenus() {
   const nav = document.getElementById('sidebarMenu');
   try {
     const role = currentUser.role || 'ROLE_USER';
     const res = await api('GET', '/api/core/menus/role/' + role);
-    userMenus = res.success ? (res.data || []) : [];
+    let menus = res.success ? (res.data || []) : [];
+    userMenus = filterMenusByIp(menus);
     renderSidebarMenus();
   } catch(e) {
     nav.innerHTML = '<div style="padding:20px 24px;color:#ef4444;font-size:12px;">메뉴 로드 실패</div>';
@@ -611,11 +628,13 @@ async function renderMenus(){
         <div class="card"><div class="card-header"><h3>메뉴 트리</h3></div><div class="card-body dept-tree">${renderMenuTree(tree,0)}</div></div>
         <div class="card"><div class="card-header"><h3>전체 메뉴 목록</h3></div>
           <div class="card-body" style="padding:0;overflow-x:auto;">
-            <table><thead><tr><th>ID</th><th>메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>표시</th><th>상태</th>${isAdmin?'<th class="text-center">관리</th>':''}</tr></thead>
+            <table><thead><tr><th>ID</th><th>메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>허용 IP</th><th>표시</th><th>상태</th>${isAdmin?'<th class="text-center">관리</th>':''}</tr></thead>
             <tbody>${allMenus.map(m=>`<tr>
               <td>${m.menuId}</td><td><b>${esc(m.menuName)}</b></td><td><code>${esc(m.menuCode)}</code></td>
               <td>${esc(m.menuUrl||'-')}</td><td><span class="badge ${m.menuType==='MENU'?'badge-admin':'badge-user'}">${m.menuType}</span></td>
-              <td>${m.sortOrder}</td><td>${m.isVisible?'표시':'숨김'}</td>
+              <td>${m.sortOrder}</td>
+              <td style="max-width:180px;">${m.allowedIps?`<span style="font-size:11px;color:var(--text2);word-break:break-all;">${esc(m.allowedIps)}</span>`:'<span style="font-size:11px;color:var(--text3);">제한없음</span>'}</td>
+              <td>${m.isVisible?'표시':'숨김'}</td>
               <td>${m.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
               ${isAdmin?`<td class="text-center"><button class="btn-icon" title="수정" onclick="openEditMenu(${m.menuId})">&#9998;</button><button class="btn-icon" title="삭제" onclick="deleteMenu(${m.menuId})" style="color:var(--red)">&#128465;</button></td>`:''}</tr>`).join('')}</tbody>
             </table></div></div></div>`;
@@ -626,7 +645,8 @@ function renderMenuTree(nodes,level){
   return nodes.map(n=>{
     const hasKids=n.children&&n.children.length>0;
     const icon=n.menuType==='BUTTON'?'&#9679;':(hasKids?'&#9660;':'&#9654;');
-    return `<div class="dept-node" style="padding-left:${12+level*20}px"><span class="toggle">${icon}</span><span>${esc(n.menuName)}</span><code style="font-size:10px;color:var(--text3);margin-left:auto;">${esc(n.menuCode)}</code></div>${hasKids?renderMenuTree(n.children,level+1):''}`;
+    const ipTag=n.allowedIps?`<span style="font-size:9px;color:var(--orange);margin-left:4px;" title="${esc(n.allowedIps)}">&#128274;IP</span>`:'';
+    return `<div class="dept-node" style="padding-left:${12+level*20}px"><span class="toggle">${icon}</span><span>${esc(n.menuName)}${ipTag}</span><code style="font-size:10px;color:var(--text3);margin-left:auto;">${esc(n.menuCode)}</code></div>${hasKids?renderMenuTree(n.children,level+1):''}`;
   }).join('');
 }
 
@@ -641,10 +661,11 @@ function openCreateMenu(){
     <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU">메뉴</option><option value="BUTTON">버튼/기능</option><option value="API">API</option></select></div>
     <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="0"></div>
     <div class="form-group"><label>설명</label><input id="m_desc" placeholder="메뉴 설명"></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" placeholder="예: 192.168.1.1, 10.0.0.0 (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP를 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,'<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitCreateMenu()">등록</button>');
 }
 async function submitCreateMenu(){
-  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value.toUpperCase(),parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,isVisible:true,isActive:true};
+  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value.toUpperCase(),parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,allowedIps:document.getElementById('m_allowedIps').value.trim()||null,isVisible:true,isActive:true};
   if(!body.menuName||!body.menuCode){toast('필수 항목을 입력해주세요.','error');return;}
   try{const res=await api('POST','/api/core/menus',body);if(res.success){toast('메뉴가 등록되었습니다.','success');closeModal();renderMenus();}else toast(res.message||'등록 실패','error');}catch(e){toast(e.message,'error');}
 }
@@ -660,10 +681,11 @@ async function openEditMenu(id){
     <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU" ${m.menuType==='MENU'?'selected':''}>메뉴</option><option value="BUTTON" ${m.menuType==='BUTTON'?'selected':''}>버튼</option><option value="API" ${m.menuType==='API'?'selected':''}>API</option></select></div>
     <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="${m.sortOrder||0}"></div>
     <div class="form-group"><label>설명</label><input id="m_desc" value="${esc(m.description||'')}"></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" value="${esc(m.allowedIps||'')}" placeholder="예: 192.168.1.1, 10.0.0.0 (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP를 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitEditMenu(${id})">저장</button>`);
 }
 async function submitEditMenu(id){
-  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value,parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,isVisible:true,isActive:true};
+  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value,parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,allowedIps:document.getElementById('m_allowedIps').value.trim()||null,isVisible:true,isActive:true};
   try{const res=await api('PUT','/api/core/menus/'+id,body);if(res.success){toast('메뉴가 수정되었습니다.','success');closeModal();renderMenus();}else toast(res.message||'수정 실패','error');}catch(e){toast(e.message,'error');}
 }
 async function deleteMenu(id){

@@ -16,4 +16,5 @@ public class MenuRequest {
     private Boolean isVisible;
     private Boolean isActive;
     private String description;
+    private String allowedIps;
 }
