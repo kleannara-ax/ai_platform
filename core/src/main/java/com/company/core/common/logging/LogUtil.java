@@ -24,21 +24,31 @@ public class LogUtil {
 
     /**
      * HttpServletRequest에서 실제 클라이언트 IP를 추출한다.
-     * X-Forwarded-For 헤더가 있으면 첫 번째 IP(=원본 클라이언트 IP)를 반환한다.
+     * remoteAddr을 우선 사용한다 (방화벽이 프록시 헤더를 덮어쓰는 환경 대응).
+     * remoteAddr이 루프백(127.0.0.1, 0:0:0:0:0:0:0:1)인 경우에만 프록시 헤더를 확인한다.
      *
      * @param request HttpServletRequest
      * @return 클라이언트 IP
      */
     public static String getClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        // remoteAddr이 실제 클라이언트 IP이면 바로 사용
+        if (remoteAddr != null && !isLoopback(remoteAddr)) {
+            return remoteAddr;
+        }
+        // 루프백인 경우(리버스 프록시 경유) → 프록시 헤더에서 추출
         for (String header : IP_HEADERS) {
             String value = request.getHeader(header);
             if (value != null && !value.isBlank() && !"unknown".equalsIgnoreCase(value)) {
-                // X-Forwarded-For: clientIP, proxy1IP, proxy2IP → 첫 번째가 실제 클라이언트
-                String clientIp = value.split(",")[0].trim();
-                return clientIp;
+                return value.split(",")[0].trim();
             }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
+    }
+
+    /** 루프백 IP 여부 확인 */
+    private static boolean isLoopback(String ip) {
+        return "127.0.0.1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip);
     }
 
     /**
