@@ -7,6 +7,7 @@ import com.company.core.menu.service.CoreMenuService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/core/menus")
 @RequiredArgsConstructor
@@ -39,7 +41,11 @@ public class CoreMenuController {
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRole(
             @PathVariable String role, HttpServletRequest request) {
         String clientIp = resolveClientIp(request);
-        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTreeByRole(role, clientIp)));
+        log.info("[메뉴조회] role={}, clientIp={}", role, clientIp);
+        List<MenuResponse> menus = menuService.getMenuTreeByRole(role, clientIp);
+        log.info("[메뉴조회] 반환 메뉴 수={}, 메뉴목록={}", menus.size(),
+                menus.stream().map(m -> m.getMenuCode() + "(allowedIps=" + m.getAllowedIps() + ")").collect(java.util.stream.Collectors.joining(", ")));
+        return ResponseEntity.ok(ApiResponse.success(menus));
     }
 
     /** 메뉴 상세 */
@@ -76,6 +82,7 @@ public class CoreMenuController {
     @GetMapping("/my-ip")
     public ResponseEntity<ApiResponse<Map<String, String>>> getClientIp(HttpServletRequest request) {
         String ip = resolveClientIp(request);
+        log.info("[IP조회] resolvedIp={}", ip);
         return ResponseEntity.ok(ApiResponse.success(Map.of("ip", ip)));
     }
 
@@ -85,9 +92,13 @@ public class CoreMenuController {
         for (String h : headers) {
             String v = request.getHeader(h);
             if (v != null && !v.isBlank() && !"unknown".equalsIgnoreCase(v)) {
-                return v.split(",")[0].trim();
+                String resolved = v.split(",")[0].trim();
+                log.info("[IP해석] header={}  value={}  resolved={}", h, v, resolved);
+                return resolved;
             }
         }
-        return request.getRemoteAddr();
+        String remoteAddr = request.getRemoteAddr();
+        log.info("[IP해석] 프록시 헤더 없음, remoteAddr={}", remoteAddr);
+        return remoteAddr;
     }
 }

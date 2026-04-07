@@ -168,14 +168,19 @@ public class CoreMenuService {
      * 지원 형식: 단일IP, CIDR, 와일드카드(*), 범위(-)
      */
     public boolean isIpAllowed(String allowedIps, String clientIp) {
-        if (allowedIps == null || allowedIps.isBlank()) return true;
+        if (allowedIps == null || allowedIps.isBlank()) {
+            log.info("[IP참크] allowedIps=NULL → 제한없음");
+            return true;
+        }
         String[] rules = allowedIps.split(",");
         for (String rule : rules) {
             String r = rule.trim();
             if (r.isEmpty()) continue;
-            if (matchIpRule(r, clientIp)) return true;
+            boolean matched = matchIpRule(r, clientIp);
+            log.info("[IP참크] rule={}  clientIp={}  matched={}", r, clientIp, matched);
+            if (matched) return true;
         }
-        log.debug("IP 접근 거부: clientIp={}, allowedIps={}", clientIp, allowedIps);
+        log.info("[IP참크] 접근거부! clientIp={}  allowedIps={}", clientIp, allowedIps);
         return false;
     }
 
