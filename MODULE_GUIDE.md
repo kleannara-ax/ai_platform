@@ -24,8 +24,8 @@
 platform/
 ├── core/                    ← 공통 모듈 (인증, 메뉴, 권한, 보안)
 │   └── com.company.core
-├── module-user/             ← 업무 모듈 예시 (사용자 프로필, 부서)
-│   └── com.company.module.user
+├── module-common/           ← 공통 모듈 (사용자 프로필, 부서, 공통코드)
+│   └── com.company.module.user, com.company.module.code
 ├── module-xxx/              ← 신규 모듈 (여기에 추가!)
 │   └── com.company.module.xxx
 └── app/                     ← 실행 모듈 (모든 모듈 조합)
@@ -87,7 +87,7 @@ dependencies {
 rootProject.name = 'platform'
 
 include 'core'
-include 'module-user'
+include 'module-common'
 include 'module-notice'    // ← 추가
 include 'app'
 ```
@@ -99,7 +99,7 @@ include 'app'
 ```groovy
 dependencies {
     implementation project(':core')
-    implementation project(':module-user')
+    implementation project(':module-common')
     implementation project(':module-notice')    // ← 추가
 
     runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'

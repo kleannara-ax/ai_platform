@@ -20,7 +20,7 @@ mkdir -p module-board/src/test/java/com/company/module/board
 rootProject.name = 'platform'
 
 include 'core'
-include 'module-user'
+include 'module-common'
 include 'module-board'    // ← 추가
 include 'app'
 ```
@@ -38,7 +38,7 @@ dependencies {
 ```groovy
 dependencies {
     implementation project(':core')
-    implementation project(':module-user')
+    implementation project(':module-common')
     implementation project(':module-board')    // ← 추가
 }
 ```

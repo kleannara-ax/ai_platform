@@ -1055,7 +1055,7 @@ platform/
   │   └── build/libs/
   │       └── platform-1.0.0.jar   # 실행형 Fat JAR (53MB)
   ├── core/                   # 핵심 모듈 (인증, 메뉴, 권한, 사용자 CRUD)
-  ├── module-user/            # 사용자 확장 모듈 (부서, 프로필)
+  ├── module-common/           # 공통 모듈 (사용자 프로필, 부서, 공통코드)
   ├── sql/
   │   ├── V1.0.0__init_schema.sql  # 테이블 생성 스크립트
   │   └── V1.0.1__init_data.sql    # 초기 데이터
