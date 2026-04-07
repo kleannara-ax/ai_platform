@@ -259,7 +259,7 @@ const menuCodeToPage = {
 };
 
 function isIpAllowed(menu){
-  if(!menu.allowedIps) return true; // NULL이면 제한 없음
+  if(!menu.allowedIps || menu.allowedIps.trim()==='') return true; // NULL 또는 빈값이면 제한 없음
   const allowed=menu.allowedIps.split(',').map(s=>s.trim()).filter(Boolean);
   if(allowed.length===0) return true;
   return allowed.includes(clientIp);
