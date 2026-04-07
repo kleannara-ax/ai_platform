@@ -1,6 +1,5 @@
 rootProject.name = 'platform'
 
 include 'core'
-include 'module-user'
-include 'module-code'
+include 'module-common'
 include 'app'

@@ -12,7 +12,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * <p>Component Scan 전략:
  * <ul>
  *   <li>com.company.core   → Core 모듈 (보안, 인증, 공통 기능)</li>
- *   <li>com.company.module  → 모든 업무 모듈 (module-user, module-xxx...)</li>
+ *   <li>com.company.module  → 모든 업무 모듈 (module-common, module-xxx...)</li>
  *   <li>com.company.app     → 애플리케이션 자체 설정</li>
  * </ul>
  *

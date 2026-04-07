@@ -15,10 +15,10 @@ import java.util.List;
 
 /**
  * 사용자 프로필 API
- * URL Prefix: /api/module-user/profiles
+ * URL Prefix: /api/module-common/profiles
  */
 @RestController
-@RequestMapping("/api/module-user/profiles")
+@RequestMapping("/api/module-common/profiles")
 @RequiredArgsConstructor
 public class UserProfileController {
 

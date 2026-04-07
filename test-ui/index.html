@@ -183,10 +183,10 @@
         <span>users/{id}/role</span>
       </div>
 
-      <div class="nav-group-title">Departments (module-user)</div>
+      <div class="nav-group-title">Departments (module-common)</div>
       <div class="nav-item" onclick="selectApi(10,this)">
         <span class="method-badge method-GET">GET</span>
-        <span>/api/module-user/depts</span>
+        <span>/api/module-common/depts</span>
       </div>
       <div class="nav-item" onclick="selectApi(11,this)">
         <span class="method-badge method-GET">GET</span>
@@ -201,7 +201,7 @@
         <span>departments/{id}/children</span>
       </div>
 
-      <div class="nav-group-title">Profiles (module-user)</div>
+      <div class="nav-group-title">Profiles (module-common)</div>
       <div class="nav-item" onclick="selectApi(14,this)">
         <span class="method-badge method-POST">POST</span>
         <span>profiles (Create)</span>
@@ -276,19 +276,19 @@ const apis = [
   // 9
   { method:'PATCH', path:'/api/core/users/{userId}/role', desc:'Change user role. Requires ADMIN.', params:[{name:'userId',val:'1',inPath:true},{name:'role',val:'ROLE_ADMIN',isQuery:true,options:['ROLE_ADMIN','ROLE_MANAGER','ROLE_USER']}], body:null },
   // 10
-  { method:'GET', path:'/api/module-user/departments', desc:'List all active departments.', params:[], body:null },
+  { method:'GET', path:'/api/module-common/departments', desc:'List all active departments.', params:[], body:null },
   // 11
-  { method:'GET', path:'/api/module-user/departments/{deptId}', desc:'Get single department.', params:[{name:'deptId',val:'1',inPath:true}], body:null },
+  { method:'GET', path:'/api/module-common/departments/{deptId}', desc:'Get single department.', params:[{name:'deptId',val:'1',inPath:true}], body:null },
   // 12
-  { method:'POST', path:'/api/module-user/departments', desc:'Create a new department. Requires ADMIN.', params:[], body:{ deptName:'New Team', deptCode:'NEWT', parentDeptId:1, sortOrder:10 }},
+  { method:'POST', path:'/api/module-common/departments', desc:'Create a new department. Requires ADMIN.', params:[], body:{ deptName:'New Team', deptCode:'NEWT', parentDeptId:1, sortOrder:10 }},
   // 13
-  { method:'GET', path:'/api/module-user/departments/{parentDeptId}/children', desc:'List child departments under parent.', params:[{name:'parentDeptId',val:'1',inPath:true}], body:null },
+  { method:'GET', path:'/api/module-common/departments/{parentDeptId}/children', desc:'List child departments under parent.', params:[{name:'parentDeptId',val:'1',inPath:true}], body:null },
   // 14
-  { method:'POST', path:'/api/module-user/profiles', desc:'Create user profile. Requires ADMIN or MANAGER.', params:[], body:{ userId:3, deptId:5, position:'Manager', jobTitle:'Team Lead', employeeNo:'EMP-0003', joinDate:'2022-06-15', officePhone:'02-9876-5432', internalExt:'5678' }},
+  { method:'POST', path:'/api/module-common/profiles', desc:'Create user profile. Requires ADMIN or MANAGER.', params:[], body:{ userId:3, deptId:5, position:'Manager', jobTitle:'Team Lead', employeeNo:'EMP-0003', joinDate:'2022-06-15', officePhone:'02-9876-5432', internalExt:'5678' }},
   // 15
-  { method:'GET', path:'/api/module-user/profiles/user/{userId}', desc:'Get profile by user ID.', params:[{name:'userId',val:'1',inPath:true}], body:null },
+  { method:'GET', path:'/api/module-common/profiles/user/{userId}', desc:'Get profile by user ID.', params:[{name:'userId',val:'1',inPath:true}], body:null },
   // 16
-  { method:'GET', path:'/api/module-user/profiles/department/{deptId}', desc:'List profiles by department.', params:[{name:'deptId',val:'5',inPath:true}], body:null },
+  { method:'GET', path:'/api/module-common/profiles/department/{deptId}', desc:'List profiles by department.', params:[{name:'deptId',val:'5',inPath:true}], body:null },
 ];
 
 // ── Login ──

@@ -5,7 +5,7 @@ import java.util.Map;
 
 /**
  * 역할(Role) 목록 제공 인터페이스.
- * core 모듈은 공통코드(module-code)에 직접 의존하지 않고,
+ * core 모듈은 공통코드(module-common)에 직접 의존하지 않고,
  * app 모듈에서 공통코드 기반 구현체를 주입받는다.
  */
 public interface RoleProvider {

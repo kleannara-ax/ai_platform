@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 /**
  * 사용자 + 프로필 통합 서비스
- * app 모듈에서 core와 module-user, module-code를 조합한다.
+ * app 모듈에서 core와 module-common(사용자 프로필 + 공통코드)을 조합한다.
  * 부서는 공통코드(DEPT 그룹)로 관리한다.
  */
 @Slf4j

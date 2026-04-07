@@ -1,4 +1,0 @@
-dependencies {
-    // Core 모듈 의존
-    implementation project(':core')
-}
