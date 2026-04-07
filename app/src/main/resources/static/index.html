@@ -285,6 +285,7 @@ async function doLogin() {
     const data = await fetch(BASE+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({loginId:id,password:pw})}).then(r=>r.json());
     if (data.success && data.data) {
       token = data.data.accessToken; refreshTk = data.data.refreshToken; errEl.style.display='none';
+      currentPage = 'dashboard'; // 로그인 시 항상 대시보드부터 시작
       // /api/auth/me로 사용자 정보 조회
       const meRes = await api('GET', '/api/auth/me');
       if (meRes.success && meRes.data) {
