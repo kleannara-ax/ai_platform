@@ -34,10 +34,12 @@ public class CoreMenuController {
         return ResponseEntity.ok(ApiResponse.success(menuService.getAllMenus()));
     }
 
-    /** 역할별 메뉴 트리 */
+    /** 역할별 메뉴 트리 (접속자 IP 기반 필터링 포함) */
     @GetMapping("/role/{role}")
-    public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRole(@PathVariable String role) {
-        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTreeByRole(role)));
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRole(
+            @PathVariable String role, HttpServletRequest request) {
+        String clientIp = resolveClientIp(request);
+        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTreeByRole(role, clientIp)));
     }
 
     /** 메뉴 상세 */

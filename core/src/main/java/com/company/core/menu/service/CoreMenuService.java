@@ -11,9 +11,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -36,10 +38,21 @@ public class CoreMenuService {
 
     /** 역할별 접근 가능 메뉴 트리 */
     public List<MenuResponse> getMenuTreeByRole(String role) {
+        return getMenuTreeByRole(role, null);
+    }
+
+    /** 역할별 접근 가능 메뉴 트리 (IP 필터링 포함) */
+    public List<MenuResponse> getMenuTreeByRole(String role, String clientIp) {
         List<Long> menuIds = roleMenuRepository.findByRole(role).stream()
                 .map(rm -> rm.getMenuId()).collect(Collectors.toList());
         if (menuIds.isEmpty()) return Collections.emptyList();
         List<CoreMenu> menus = menuRepository.findByMenuIdInAndIsActiveTrueOrderBySortOrder(menuIds);
+        // IP 필터링: allowedIps가 설정된 메뉴는 clientIp가 허용 목록에 포함되어야 함
+        if (clientIp != null && !clientIp.isBlank()) {
+            menus = menus.stream()
+                    .filter(m -> isIpAllowed(m.getAllowedIps(), clientIp))
+                    .collect(Collectors.toList());
+        }
         return buildTree(menus);
     }
 
@@ -147,6 +160,61 @@ public class CoreMenuService {
             } catch (NumberFormatException e) { return false; }
         }
         return true;
+    }
+
+    /**
+     * 클라이언트 IP가 허용 목록에 포함되는지 확인
+     * allowedIps가 null/빈값이면 제한 없음 (true 반환)
+     * 지원 형식: 단일IP, CIDR, 와일드카드(*), 범위(-)
+     */
+    public boolean isIpAllowed(String allowedIps, String clientIp) {
+        if (allowedIps == null || allowedIps.isBlank()) return true;
+        String[] rules = allowedIps.split(",");
+        for (String rule : rules) {
+            String r = rule.trim();
+            if (r.isEmpty()) continue;
+            if (matchIpRule(r, clientIp)) return true;
+        }
+        log.debug("IP 접근 거부: clientIp={}, allowedIps={}", clientIp, allowedIps);
+        return false;
+    }
+
+    private boolean matchIpRule(String rule, String ip) {
+        try {
+            // CIDR: 192.168.1.0/24
+            if (rule.contains("/")) {
+                String[] parts = rule.split("/", 2);
+                long mask = 0xFFFFFFFFL << (32 - Integer.parseInt(parts[1]));
+                return (ipToLong(parts[0]) & mask) == (ipToLong(ip) & mask);
+            }
+            // 와일드카드: 192.168.*.*
+            if (rule.contains("*")) {
+                String[] rParts = rule.split("\\.", -1);
+                String[] iParts = ip.split("\\.", -1);
+                if (rParts.length != 4 || iParts.length != 4) return false;
+                for (int i = 0; i < 4; i++) {
+                    if (!"*".equals(rParts[i]) && !rParts[i].equals(iParts[i])) return false;
+                }
+                return true;
+            }
+            // 범위: 192.168.1.1-192.168.1.254
+            if (rule.contains("-")) {
+                String[] parts = rule.split("-", 2);
+                long v = ipToLong(ip);
+                return v >= ipToLong(parts[0].trim()) && v <= ipToLong(parts[1].trim());
+            }
+            // 정확히 일치
+            return rule.equals(ip);
+        } catch (Exception e) {
+            log.warn("IP 매칭 오류: rule={}, ip={}, error={}", rule, ip, e.getMessage());
+            return false;
+        }
+    }
+
+    private long ipToLong(String ip) {
+        String[] parts = ip.split("\\.");
+        return ((Long.parseLong(parts[0]) << 24) | (Long.parseLong(parts[1]) << 16)
+                | (Long.parseLong(parts[2]) << 8) | Long.parseLong(parts[3]));
     }
 
     private List<MenuResponse> buildTree(List<CoreMenu> menus) {
