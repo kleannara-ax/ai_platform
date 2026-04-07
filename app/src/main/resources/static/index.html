@@ -494,11 +494,18 @@ async function renderDashboard() {
 
 // ══ User Management (Integrated) ══
 let allUsers=[];
+// 메뉴 접근 권한이 있으면 CRUD 가능
+// 해당 페이지에 진입할 수 있다 = 사이드바 메뉴에 표시됨 = 권한 있음
+function hasMenuAccess(menuCode){
+  // 인증된 사용자가 해당 페이지에 접근한 시점이면 권한 있음
+  if(currentUser) return true;
+  return false;
+}
 async function renderUsers(){
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">사용자 목록을 불러오는 중...</p>';
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
-  document.getElementById('topbarActions').innerHTML=isAdmin?'<button class="btn btn-sm btn-primary" onclick="openCreateUser()">+ 사용자 추가</button>':'';
+  const canManage=hasMenuAccess('USER_MGMT');
+  document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateUser()">+ 사용자 추가</button>':'';
   try {
     const [usersRes,deptsRes]=await Promise.all([
       api('GET','/api/integrated/users?page=0&size=100'),
@@ -511,7 +518,7 @@ async function renderUsers(){
 }
 
 function drawUserTable(users){
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
+  const canManage=hasMenuAccess('USER_MGMT');
   const el=document.getElementById('pageContent');
   el.innerHTML=`
     <div class="toolbar">
@@ -528,14 +535,14 @@ function drawUserTable(users){
     <div class="card">
       <div class="card-body" style="padding:0;overflow-x:auto;">
         <table>
-          <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직급/직책</th><th>사번</th><th>역할</th><th>상태</th>${isAdmin?'<th class="text-center">관리</th>':''}</tr></thead>
-          <tbody id="userTableBody">${users.map(u=>userRow(u,isAdmin)).join('')}</tbody>
+          <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직급/직책</th><th>사번</th><th>역할</th><th>상태</th>${canManage?'<th class="text-center">관리</th>':''}</tr></thead>
+          <tbody id="userTableBody">${users.map(u=>userRow(u,canManage)).join('')}</tbody>
         </table>
       </div>
     </div>`;
 }
 
-function userRow(u,isAdmin){
+function userRow(u,canManage){
   const posJob=[u.position,u.jobTitle].filter(Boolean).join(' / ');
   return `<tr style="cursor:pointer" onclick="showUserDetail(${u.userId})">
     <td><b>${esc(u.userName)}</b><br><span style="font-size:11px;color:var(--text3)">${esc(u.email||'')}</span></td>
@@ -545,7 +552,7 @@ function userRow(u,isAdmin){
     <td><code>${esc(u.employeeNo||'-')}</code></td>
     <td>${roleBadge(u.role)}</td>
     <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
-    ${isAdmin?`<td class="text-center" onclick="event.stopPropagation()">
+    ${canManage?`<td class="text-center" onclick="event.stopPropagation()">
       <button class="btn-icon" title="수정" onclick="openEditUser(${u.userId})">&#9998;</button>
       <button class="btn-icon" title="역할 변경" onclick="openRoleChange(${u.userId},'${u.role}')">&#128100;</button>
       ${u.enabled
@@ -566,8 +573,8 @@ function filterUsers(){
     if(status==='inactive'&&u.enabled)return false;
     return true;
   });
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
-  document.getElementById('userTableBody').innerHTML=filtered.map(u=>userRow(u,isAdmin)).join('');
+  const canManage=hasMenuAccess('USER_MGMT');
+  document.getElementById('userTableBody').innerHTML=filtered.map(u=>userRow(u,canManage)).join('');
 }
 
 function showUserDetail(userId){
@@ -744,8 +751,8 @@ let allMenus=[];
 async function renderMenus(){
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">메뉴 목록을 불러오는 중...</p>';
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
-  document.getElementById('topbarActions').innerHTML=isAdmin?'<button class="btn btn-sm btn-primary" onclick="openCreateMenu()">+ 메뉴 추가</button>':'';
+  const canManage=hasMenuAccess('MENU_MGMT');
+  document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateMenu()">+ 메뉴 추가</button>':'';
   try {
     const [treeRes,listRes]=await Promise.all([api('GET','/api/core/menus'),api('GET','/api/core/menus/list')]);
     allMenus=listRes.success?(listRes.data||[]):[];
@@ -755,7 +762,7 @@ async function renderMenus(){
         <div class="card"><div class="card-header"><h3>메뉴 트리</h3></div><div class="card-body dept-tree">${renderMenuTree(tree,0)}</div></div>
         <div class="card"><div class="card-header"><h3>전체 메뉴 목록</h3></div>
           <div class="card-body" style="padding:0;overflow-x:auto;">
-            <table><thead><tr><th>ID</th><th>메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>허용 IP</th><th>표시</th><th>상태</th>${isAdmin?'<th class="text-center">관리</th>':''}</tr></thead>
+            <table><thead><tr><th>ID</th><th>메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>허용 IP</th><th>표시</th><th>상태</th>${canManage?'<th class="text-center">관리</th>':''}</tr></thead>
             <tbody>${allMenus.map(m=>`<tr>
               <td>${m.menuId}</td><td><b>${esc(m.menuName)}</b></td><td><code>${esc(m.menuCode)}</code></td>
               <td>${esc(m.menuUrl||'-')}</td><td><span class="badge ${m.menuType==='MENU'?'badge-admin':'badge-user'}">${m.menuType}</span></td>
@@ -763,7 +770,7 @@ async function renderMenus(){
               <td style="max-width:180px;">${m.allowedIps?`<span style="font-size:11px;color:var(--text2);word-break:break-all;">${esc(m.allowedIps)}</span>`:'<span style="font-size:11px;color:var(--text3);">제한없음</span>'}</td>
               <td>${m.isVisible?'표시':'숨김'}</td>
               <td>${m.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
-              ${isAdmin?`<td class="text-center"><button class="btn-icon" title="수정" onclick="openEditMenu(${m.menuId})">&#9998;</button><button class="btn-icon" title="삭제" onclick="deleteMenu(${m.menuId})" style="color:var(--red)">&#128465;</button></td>`:''}</tr>`).join('')}</tbody>
+              ${canManage?`<td class="text-center"><button class="btn-icon" title="수정" onclick="openEditMenu(${m.menuId})">&#9998;</button><button class="btn-icon" title="삭제" onclick="deleteMenu(${m.menuId})" style="color:var(--red)">&#128465;</button></td>`:''}</tr>`).join('')}</tbody>
             </table></div></div></div>`;
   } catch(e){el.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;}
 }
@@ -825,7 +832,7 @@ let allRoleMappings=[];
 async function renderPermissions(){
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">접근 권한 정보를 불러오는 중...</p>';
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
+  const canManage=hasMenuAccess('PERM_MGMT');
   document.getElementById('topbarActions').innerHTML='';
   try{
     const [roleRes,menuRes,treeRes]=await Promise.all([
@@ -857,7 +864,7 @@ async function renderPermissions(){
         html+=`<td style="padding-left:${16+indent}px;white-space:nowrap;">${icon} ${esc(n.menuName)}${typeBadge}</td>`;
         roles.forEach(role=>{
           const checked=roleMaps[role]&&roleMaps[role].has(n.menuId)?'checked':'';
-          const disabled=isAdmin?'':'disabled';
+          const disabled=canManage?'':'disabled';
           html+=`<td class="text-center"><input type="checkbox" class="acl_cb" data-menu="${n.menuId}" data-role="${role}" ${checked} ${disabled} onchange="onAclChange(this)"></td>`;
         });
         html+='</tr>';
@@ -898,7 +905,7 @@ async function renderPermissions(){
           </table>
         </div>
       </div>
-      ${isAdmin?`<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+      ${canManage?`<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
         <button class="btn btn-sm btn-outline" onclick="resetAcl()">초기화</button>
         <button class="btn btn-sm btn-primary" onclick="saveAcl()">변경사항 저장</button>
       </div>`:''}
@@ -955,17 +962,17 @@ let codeGroups=[], selectedGroup=null, codeDetails=[];
 async function renderCodes(){
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">공통코드를 불러오는 중...</p>';
-  const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
-  document.getElementById('topbarActions').innerHTML=isAdmin?'<button class="btn btn-sm btn-primary" onclick="openCreateGroup()">+ 그룹 추가</button>':'';
+  const canManage=hasMenuAccess('CODE_MGMT');
+  document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateGroup()">+ 그룹 추가</button>':'';
   try{
     const res=await api('GET','/api/codes/groups');
     codeGroups=res.success?(res.data||[]):[];
     selectedGroup=null; codeDetails=[];
-    drawCodePage(isAdmin);
+    drawCodePage(canManage);
   }catch(e){el.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;}
 }
 
-function drawCodePage(isAdmin){
+function drawCodePage(canManage){
   const el=document.getElementById('pageContent');
   const groupRows=codeGroups.map(g=>{
     const active=selectedGroup&&selectedGroup.groupId===g.groupId;
@@ -982,7 +989,7 @@ function drawCodePage(isAdmin){
       <div class="card-header">
         <h3>${esc(selectedGroup.groupName)} <code style="font-size:12px;color:var(--text3);margin-left:8px;">${esc(selectedGroup.groupCode)}</code></h3>
         <div style="display:flex;gap:6px;">
-          ${isAdmin?`<button class="btn btn-sm btn-primary" onclick="openCreateDetail()">+ 코드 추가</button>
+          ${canManage?`<button class="btn btn-sm btn-primary" onclick="openCreateDetail()">+ 코드 추가</button>
           <button class="btn btn-sm btn-outline" onclick="openEditGroup(${selectedGroup.groupId})">그룹 수정</button>
           <button class="btn btn-sm btn-danger" onclick="deleteCodeGroup(${selectedGroup.groupId})">그룹 삭제</button>`:''}
         </div>
@@ -990,7 +997,7 @@ function drawCodePage(isAdmin){
       <div class="card-body" style="padding:0;">
         ${selectedGroup.description?`<div style="padding:12px 20px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);">${esc(selectedGroup.description)}</div>`:''}
         <table>
-          <thead><tr><th>순서</th><th>코드</th><th>코드명</th><th>설명</th><th>부가값1</th><th>부가값2</th><th>상태</th>${isAdmin?'<th class="text-center">관리</th>':''}</tr></thead>
+          <thead><tr><th>순서</th><th>코드</th><th>코드명</th><th>설명</th><th>부가값1</th><th>부가값2</th><th>상태</th>${canManage?'<th class="text-center">관리</th>':''}</tr></thead>
           <tbody>${codeDetails.length>0?codeDetails.map(d=>`<tr>
             <td>${d.sortOrder}</td>
             <td><code>${esc(d.code)}</code></td>
@@ -999,11 +1006,11 @@ function drawCodePage(isAdmin){
             <td style="font-size:12px;">${esc(d.extraValue1||'-')}</td>
             <td style="font-size:12px;">${esc(d.extraValue2||'-')}</td>
             <td>${d.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
-            ${isAdmin?`<td class="text-center">
+            ${canManage?`<td class="text-center">
               <button class="btn-icon" title="수정" onclick="openEditDetail(${d.codeId})">&#9998;</button>
               <button class="btn-icon" title="삭제" onclick="deleteCodeDetail(${d.codeId})" style="color:var(--red)">&#128465;</button>
             </td>`:''}
-          </tr>`).join(''):'<tr><td colspan="'+(isAdmin?8:7)+'" class="text-center" style="padding:40px;color:var(--text3);">등록된 코드가 없습니다.</td></tr>'}</tbody>
+          </tr>`).join(''):'<tr><td colspan="'+(canManage?8:7)+'" class="text-center" style="padding:40px;color:var(--text3);">등록된 코드가 없습니다.</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -1034,8 +1041,8 @@ async function selectCodeGroup(groupId){
     if(res.success){
       selectedGroup=res.data;
       codeDetails=res.data.details||[];
-      const isAdmin=currentUser&&currentUser.role==='ROLE_ADMIN';
-      drawCodePage(isAdmin);
+      const canManage=hasMenuAccess('CODE_MGMT');
+      drawCodePage(canManage);
     }
   }catch(e){toast('그룹 조회 실패: '+e.message,'error');}
 }

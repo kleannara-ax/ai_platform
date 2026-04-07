@@ -57,25 +57,25 @@ public class CoreMenuController {
         return ResponseEntity.ok(ApiResponse.success(menuService.getMenu(menuId)));
     }
 
-    /** 메뉴 생성 (ADMIN) */
+    /** 메뉴 생성 - 메뉴관리 접근 권한 보유 시 가능 */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<MenuResponse>> createMenu(@Valid @RequestBody MenuRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(menuService.createMenu(req)));
     }
 
-    /** 메뉴 수정 (ADMIN) */
+    /** 메뉴 수정 - 메뉴관리 접근 권한 보유 시 가능 */
     @PutMapping("/{menuId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<MenuResponse>> updateMenu(
             @PathVariable Long menuId, @Valid @RequestBody MenuRequest req) {
         return ResponseEntity.ok(ApiResponse.success(menuService.updateMenu(menuId, req)));
     }
 
-    /** 메뉴 삭제 (ADMIN) */
+    /** 메뉴 삭제 - 메뉴관리 접근 권한 보유 시 가능 */
     @DeleteMapping("/{menuId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteMenu(@PathVariable Long menuId) {
         menuService.deleteMenu(menuId);
         return ResponseEntity.ok(ApiResponse.success(null));

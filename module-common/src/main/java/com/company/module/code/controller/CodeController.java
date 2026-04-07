@@ -49,7 +49,7 @@ public class CodeController {
 
     /** 코드 그룹 생성 (ADMIN) */
     @PostMapping("/groups")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CodeGroupResponse>> createGroup(@Valid @RequestBody CodeGroupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(codeService.createGroup(request)));
@@ -57,7 +57,7 @@ public class CodeController {
 
     /** 코드 그룹 수정 (ADMIN) */
     @PutMapping("/groups/{groupId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CodeGroupResponse>> updateGroup(
             @PathVariable Long groupId, @Valid @RequestBody CodeGroupRequest request) {
         return ResponseEntity.ok(ApiResponse.success(codeService.updateGroup(groupId, request)));
@@ -65,7 +65,7 @@ public class CodeController {
 
     /** 코드 그룹 삭제 (ADMIN) */
     @DeleteMapping("/groups/{groupId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteGroup(@PathVariable Long groupId) {
         codeService.deleteGroup(groupId);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -95,7 +95,7 @@ public class CodeController {
 
     /** 코드 추가 (ADMIN) */
     @PostMapping("/groups/{groupId}/details")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CodeDetailResponse>> createDetail(
             @PathVariable Long groupId, @Valid @RequestBody CodeDetailRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -104,7 +104,7 @@ public class CodeController {
 
     /** 코드 수정 (ADMIN) */
     @PutMapping("/details/{codeId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CodeDetailResponse>> updateDetail(
             @PathVariable Long codeId, @Valid @RequestBody CodeDetailRequest request) {
         return ResponseEntity.ok(ApiResponse.success(codeService.updateDetail(codeId, request)));
@@ -112,7 +112,7 @@ public class CodeController {
 
     /** 코드 삭제 (ADMIN) */
     @DeleteMapping("/details/{codeId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteDetail(@PathVariable Long codeId) {
         codeService.deleteDetail(codeId);
         return ResponseEntity.ok(ApiResponse.success(null));

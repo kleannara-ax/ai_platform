@@ -31,17 +31,17 @@ public class CorePermissionController {
         return ResponseEntity.ok(ApiResponse.success(permService.getPermission(permId)));
     }
 
-    /** 권한 생성 (ADMIN) */
+    /** 권한 생성 */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PermissionResponse>> createPermission(@Valid @RequestBody PermissionRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(permService.createPermission(req)));
     }
 
-    /** 권한 수정 (ADMIN) */
+    /** 권한 수정 */
     @PutMapping("/{permId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<PermissionResponse>> updatePermission(
             @PathVariable Long permId, @Valid @RequestBody PermissionRequest req) {
         return ResponseEntity.ok(ApiResponse.success(permService.updatePermission(permId, req)));
@@ -59,9 +59,9 @@ public class CorePermissionController {
         return ResponseEntity.ok(ApiResponse.success(permService.getRoleMapping(role)));
     }
 
-    /** 역할별 메뉴/권한 매핑 갱신 (ADMIN) */
+    /** 역할별 메뉴/권한 매핑 갱신 */
     @PutMapping("/roles")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<RoleMappingResponse>> updateRoleMapping(
             @Valid @RequestBody RoleMappingRequest req) {
         return ResponseEntity.ok(ApiResponse.success(permService.updateRoleMapping(req)));
