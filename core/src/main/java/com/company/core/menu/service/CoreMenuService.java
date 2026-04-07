@@ -94,15 +94,59 @@ public class CoreMenuService {
     }
 
     /**
-     * IP 문자열 정규화: 공백 제거, 빈 문자열은 null 반환
+     * IP 문자열 정규화: 공백 제거, 유효성 검증, 빈 문자열은 null 반환
+     * 지원 형식: 단일IP(192.168.1.1), CIDR(192.168.1.0/24), 와일드카드(192.168.1.*), 범위(192.168.1.1-192.168.1.254)
      */
     private String normalizeIps(String ips) {
         if (ips == null || ips.isBlank()) return null;
-        String normalized = Arrays.stream(ips.split(","))
+        List<String> entries = Arrays.stream(ips.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.joining(","));
+                .collect(Collectors.toList());
+        for (String entry : entries) {
+            if (!isValidIpEntry(entry)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "유효하지 않은 IP 형식입니다: " + entry +
+                        " (허용 형식: 192.168.1.1, 192.168.1.0/24, 192.168.1.*, 192.168.1.1-192.168.1.254)");
+            }
+        }
+        String normalized = String.join(",", entries);
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    /** 단일 IP 엔트리 유효성 검증 */
+    private boolean isValidIpEntry(String entry) {
+        // CIDR: 192.168.1.0/24
+        if (entry.contains("/")) {
+            String[] parts = entry.split("/", 2);
+            if (!isValidIpOrWildcard(parts[0])) return false;
+            try {
+                int prefix = Integer.parseInt(parts[1]);
+                return prefix >= 0 && prefix <= 32;
+            } catch (NumberFormatException e) { return false; }
+        }
+        // 범위: 192.168.1.1-192.168.1.254
+        if (entry.contains("-")) {
+            String[] parts = entry.split("-", 2);
+            return isValidIpOrWildcard(parts[0].trim()) && isValidIpOrWildcard(parts[1].trim());
+        }
+        // 단일 IP 또는 와일드카드
+        return isValidIpOrWildcard(entry);
+    }
+
+    /** IP 또는 와일드카드(*) 포함 IP 형식 검증 */
+    private boolean isValidIpOrWildcard(String ip) {
+        if (ip == null || ip.isBlank()) return false;
+        String[] octets = ip.split("\\.", -1);
+        if (octets.length != 4) return false;
+        for (String octet : octets) {
+            if ("*".equals(octet)) continue;
+            try {
+                int v = Integer.parseInt(octet);
+                if (v < 0 || v > 255) return false;
+            } catch (NumberFormatException e) { return false; }
+        }
+        return true;
     }
 
     private List<MenuResponse> buildTree(List<CoreMenu> menus) {

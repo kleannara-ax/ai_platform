@@ -258,11 +258,39 @@ const menuCodeToPage = {
   'CODE_MGMT': 'codes'
 };
 
+// IP → 32비트 정수 변환
+function ipToInt(ip){
+  const p=ip.split('.').map(Number);
+  return((p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3])>>>0;
+}
+// 단일 허용 규칙과 클라이언트 IP 매칭
+function matchIpRule(rule,ip){
+  if(!ip)return false;
+  // CIDR: 192.168.1.0/24
+  if(rule.includes('/')){
+    const[net,bits]=rule.split('/');
+    const mask=(~0 << (32 - parseInt(bits)))>>>0;
+    return (ipToInt(net) & mask) === (ipToInt(ip) & mask);
+  }
+  // 와일드카드: 192.168.1.* 또는 192.168.*.*
+  if(rule.includes('*')){
+    const rParts=rule.split('.'), iParts=ip.split('.');
+    return rParts.every((p,i)=> p==='*' || p===iParts[i]);
+  }
+  // 범위: 192.168.1.1-192.168.1.254
+  if(rule.includes('-')){
+    const[from,to]=rule.split('-').map(s=>s.trim());
+    const v=ipToInt(ip);
+    return v>=ipToInt(from) && v<=ipToInt(to);
+  }
+  // 정확히 일치
+  return rule===ip;
+}
 function isIpAllowed(menu){
-  if(!menu.allowedIps || menu.allowedIps.trim()==='') return true; // NULL 또는 빈값이면 제한 없음
-  const allowed=menu.allowedIps.split(',').map(s=>s.trim()).filter(Boolean);
-  if(allowed.length===0) return true;
-  return allowed.includes(clientIp);
+  if(!menu.allowedIps || menu.allowedIps.trim()==='') return true;
+  const rules=menu.allowedIps.split(',').map(s=>s.trim()).filter(Boolean);
+  if(rules.length===0) return true;
+  return rules.some(rule=>matchIpRule(rule,clientIp));
 }
 function filterMenusByIp(menus){
   return menus.filter(m=>{
@@ -661,7 +689,7 @@ function openCreateMenu(){
     <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU">메뉴</option><option value="BUTTON">버튼/기능</option><option value="API">API</option></select></div>
     <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="0"></div>
     <div class="form-group"><label>설명</label><input id="m_desc" placeholder="메뉴 설명"></div>
-    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" placeholder="예: 192.168.1.1, 10.0.0.0 (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP를 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP/대역을 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br><b>지원 형식:</b> 단일 IP(<code>192.168.1.1</code>), CIDR 대역(<code>192.168.1.0/24</code>), 와일드카드(<code>10.0.0.*</code>), 범위(<code>192.168.1.1-192.168.1.254</code>)<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,'<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitCreateMenu()">등록</button>');
 }
 async function submitCreateMenu(){
@@ -681,7 +709,7 @@ async function openEditMenu(id){
     <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU" ${m.menuType==='MENU'?'selected':''}>메뉴</option><option value="BUTTON" ${m.menuType==='BUTTON'?'selected':''}>버튼</option><option value="API" ${m.menuType==='API'?'selected':''}>API</option></select></div>
     <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="${m.sortOrder||0}"></div>
     <div class="form-group"><label>설명</label><input id="m_desc" value="${esc(m.description||'')}"></div>
-    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" value="${esc(m.allowedIps||'')}" placeholder="예: 192.168.1.1, 10.0.0.0 (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP를 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" value="${esc(m.allowedIps||'')}" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP/대역을 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br><b>지원 형식:</b> 단일 IP(<code>192.168.1.1</code>), CIDR 대역(<code>192.168.1.0/24</code>), 와일드카드(<code>10.0.0.*</code>), 범위(<code>192.168.1.1-192.168.1.254</code>)<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitEditMenu(${id})">저장</button>`);
 }
 async function submitEditMenu(id){
