@@ -44,42 +44,42 @@ public class IntegratedUserController {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.getUser(userId)));
     }
 
-    /** 사용자 생성 (프로필 포함) */
+    /** 사용자 생성 (프로필 포함) - 사용자관리 메뉴 접근 권한 보유 시 가능 */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> createUser(
             @Valid @RequestBody UserCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(integratedUserService.createUser(request)));
     }
 
-    /** 사용자 수정 (프로필 포함) */
+    /** 사용자 수정 (프로필 포함) - 사용자관리 메뉴 접근 권한 보유 시 가능 */
     @PutMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> updateUser(
             @PathVariable Long userId, @Valid @RequestBody UserUpdateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.updateUser(userId, request)));
     }
 
-    /** 비활성화 */
+    /** 비활성화 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
     @PatchMapping("/{userId}/disable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable Long userId) {
         coreUserService.disableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    /** 활성화 */
+    /** 활성화 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
     @PatchMapping("/{userId}/enable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable Long userId) {
         coreUserService.enableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    /** 역할 변경 */
+    /** 역할 변경 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
     @PatchMapping("/{userId}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> changeRole(
             @PathVariable Long userId, @RequestParam String role) {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRole(userId, role)));

@@ -29,7 +29,7 @@ public class DepartmentController {
      * 부서 생성
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<DepartmentResponse>> createDepartment(
             @Valid @RequestBody DepartmentCreateRequest request) {
         DepartmentResponse response = departmentService.createDepartment(request);
@@ -74,7 +74,7 @@ public class DepartmentController {
      * 부서 비활성화
      */
     @PatchMapping("/{deptId}/disable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> disableDepartment(@PathVariable Long deptId) {
         departmentService.disableDepartment(deptId);
         return ResponseEntity.ok(ApiResponse.success());

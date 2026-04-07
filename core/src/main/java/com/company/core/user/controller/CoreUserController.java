@@ -31,7 +31,7 @@ public class CoreUserController {
      * ADMIN만 가능
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserResponse>> createUser(
             @Valid @RequestBody UserCreateRequest request) {
         UserResponse response = coreUserService.createUser(request);
@@ -65,7 +65,7 @@ public class CoreUserController {
      * 사용자 정보 수정
      */
     @PutMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable Long userId,
             @Valid @RequestBody UserUpdateRequest request) {
@@ -77,7 +77,7 @@ public class CoreUserController {
      * 사용자 비활성화
      */
     @PatchMapping("/{userId}/disable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable Long userId) {
         coreUserService.disableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
@@ -87,7 +87,7 @@ public class CoreUserController {
      * 사용자 활성화
      */
     @PatchMapping("/{userId}/enable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable Long userId) {
         coreUserService.enableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
@@ -97,7 +97,7 @@ public class CoreUserController {
      * 사용자 역할 변경
      */
     @PatchMapping("/{userId}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserResponse>> changeRole(
             @PathVariable Long userId,
             @RequestParam String role) {
