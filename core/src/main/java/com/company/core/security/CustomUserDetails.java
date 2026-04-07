@@ -31,9 +31,15 @@ public class CustomUserDetails implements UserDetails {
         this.authorities = List.of(new SimpleGrantedAuthority(user.getRole()));
     }
 
+    /** UserDetails 인터페이스 구현 - Spring Security 인증 시 사용 */
     @Override
     public String getUsername() {
         return this.loginId;
+    }
+
+    /** 사용자 이름(실명) 반환 - getUsername()과 구분 */
+    public String getUserDisplayName() {
+        return this.userName;
     }
 
     @Override

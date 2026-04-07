@@ -61,7 +61,7 @@ public class SecurityConfig {
             // URL 기반 접근 제어
             .authorizeHttpRequests(auth -> auth
                 // 인증 없이 접근 가능한 URL
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 // 정적 리소스 (테스트 UI 등)
