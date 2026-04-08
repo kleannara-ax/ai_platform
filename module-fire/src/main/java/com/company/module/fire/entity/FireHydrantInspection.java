@@ -1,0 +1,84 @@
+package com.company.module.fire.entity;
+
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/**
+ * 소화전 점검 이력 엔티티
+ * <p>
+ * 기존 ASP.NET: FireHydrantInspection
+ * - FireHydrant와 1:N 관계 (Cascade Delete)
+ * - 최근 12건만 유지 (서비스에서 trim 처리)
+ *
+ * 테이블명: fire_hydrant_inspection
+ */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Entity
+@Table(name = "fire_hydrant_inspection")
+public class FireHydrantInspection {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "inspection_id")
+    private Long inspectionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hydrant_id", nullable = false)
+    private FireHydrant hydrant;
+
+    /** 점검일 */
+    @Column(name = "inspection_date", nullable = false)
+    private LocalDate inspectionDate;
+
+    /** 비정상 여부 */
+    @Column(name = "is_faulty", nullable = false)
+    private boolean isFaulty;
+
+    /** 불량 사유 */
+    @Column(name = "fault_reason", length = 500)
+    private String faultReason;
+
+    /** 점검자 ID (WebUser FK) */
+    @Column(name = "inspected_by_user_id")
+    private Long inspectedByUserId;
+
+    /** 점검자 표시 이름 스냅샷 */
+    @Column(name = "inspected_by_name", length = 200)
+    private String inspectedByName;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @Builder
+    public FireHydrantInspection(FireHydrant hydrant, LocalDate inspectionDate,
+                                  boolean isFaulty, String faultReason,
+                                  Long inspectedByUserId, String inspectedByName) {
+        this.hydrant = hydrant;
+        this.inspectionDate = inspectionDate;
+        this.isFaulty = isFaulty;
+        this.faultReason = isFaulty ? faultReason : null;
+        this.inspectedByUserId = inspectedByUserId;
+        this.inspectedByName = inspectedByName;
+    }
+
+    public void updateInspection(LocalDate inspectionDate, boolean isFaulty, String faultReason, String inspectorName) {
+        this.inspectionDate = inspectionDate;
+        this.isFaulty = isFaulty;
+        this.faultReason = isFaulty ? faultReason : null;
+        if (inspectorName != null && !inspectorName.isBlank()) {
+            this.inspectedByName = inspectorName.trim();
+        }
+    }
+}
