@@ -64,6 +64,12 @@ public class FirePageController {
         return serveHtml("static/maps/floor.html");
     }
 
+    @GetMapping({"/maps/cheongju", "/maps/cheongju/", "/maps/cheongju.html"})
+    @ResponseBody
+    public ResponseEntity<String> cheongjuPage() throws IOException {
+        return serveHtml("static/maps/cheongju.html");
+    }
+
     /**
      * 이미지 리소스 직접 서빙 (classpath:/static/images/* 에서 로드).
      * Spring Boot의 기본 정적 리소스 핸들러가 nested JAR에서 이미지를 못 찾는 경우 대비.
