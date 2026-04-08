@@ -16,4 +16,8 @@ public interface CoreRoleMenuRepository extends JpaRepository<CoreRoleMenu, Long
     @Modifying
     @Query("DELETE FROM CoreRoleMenu r WHERE r.role = :role AND r.menuId = :menuId")
     void deleteByRoleAndMenuId(String role, Long menuId);
+
+    @Modifying
+    @Query("DELETE FROM CoreRoleMenu r WHERE r.menuId = :menuId")
+    void deleteByMenuId(Long menuId);
 }

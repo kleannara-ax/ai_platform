@@ -750,84 +750,235 @@ async function toggleUser(id,enable){
 }
 
 // ══ Menu Management ══
-let allMenus=[];
+let allMenus=[], menuTree=[], menuExpandState={};
 async function renderMenus(){
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">메뉴 목록을 불러오는 중...</p>';
   const canManage=hasMenuAccess('MENU_MGMT');
-  document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateMenu()">+ 메뉴 추가</button>':'';
+  document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateMenu(null)">+ 최상위 메뉴 추가</button>':'';
   try {
-    const [treeRes,listRes]=await Promise.all([api('GET','/api/core/menus'),api('GET','/api/core/menus/list')]);
+    const [treeRes,listRes]=await Promise.all([api('GET','/api/core/menus/tree'),api('GET','/api/core/menus/list/all')]);
     allMenus=listRes.success?(listRes.data||[]):[];
-    const tree=treeRes.success?(treeRes.data||[]):[];
-    el.innerHTML=`
-      <div style="display:grid;grid-template-columns:340px 1fr;gap:20px;">
-        <div class="card"><div class="card-header"><h3>메뉴 트리</h3></div><div class="card-body dept-tree">${renderMenuTree(tree,0)}</div></div>
-        <div class="card"><div class="card-header"><h3>전체 메뉴 목록</h3></div>
-          <div class="card-body" style="padding:0;overflow-x:auto;">
-            <table><thead><tr><th>ID</th><th>메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>허용 IP</th><th>표시</th><th>상태</th>${canManage?'<th class="text-center">관리</th>':''}</tr></thead>
-            <tbody>${allMenus.map(m=>`<tr>
-              <td>${m.menuId}</td><td><b>${esc(m.menuName)}</b></td><td><code>${esc(m.menuCode)}</code></td>
-              <td>${esc(m.menuUrl||'-')}</td><td><span class="badge ${m.menuType==='MENU'?'badge-admin':'badge-user'}">${m.menuType}</span></td>
-              <td>${m.sortOrder}</td>
-              <td style="max-width:180px;">${m.allowedIps?`<span style="font-size:11px;color:var(--text2);word-break:break-all;">${esc(m.allowedIps)}</span>`:'<span style="font-size:11px;color:var(--text3);">제한없음</span>'}</td>
-              <td>${m.isVisible?'표시':'숨김'}</td>
-              <td>${m.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
-              ${canManage?`<td class="text-center"><button class="btn-icon" title="수정" onclick="openEditMenu(${m.menuId})">&#9998;</button><button class="btn-icon" title="삭제" onclick="deleteMenu(${m.menuId})" style="color:var(--red)">&#128465;</button></td>`:''}</tr>`).join('')}</tbody>
-            </table></div></div></div>`;
+    menuTree=treeRes.success?(treeRes.data||[]):[];
+    // 최초 로드시 최상위 메뉴 펼침
+    if(Object.keys(menuExpandState).length===0) menuTree.forEach(m=>{menuExpandState[m.menuId]=true;});
+    drawMenuPage(canManage);
   } catch(e){el.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;}
 }
 
-function renderMenuTree(nodes,level){
-  return nodes.map(n=>{
-    const hasKids=n.children&&n.children.length>0;
-    const icon=n.menuType==='BUTTON'?'&#9679;':(hasKids?'&#9660;':'&#9654;');
-    const ipTag=n.allowedIps?`<span style="font-size:9px;color:var(--orange);margin-left:4px;" title="${esc(n.allowedIps)}">&#128274;IP</span>`:'';
-    return `<div class="dept-node" style="padding-left:${12+level*20}px"><span class="toggle">${icon}</span><span>${esc(n.menuName)}${ipTag}</span><code style="font-size:10px;color:var(--text3);margin-left:auto;">${esc(n.menuCode)}</code></div>${hasKids?renderMenuTree(n.children,level+1):''}`;
-  }).join('');
+function drawMenuPage(canManage){
+  const el=document.getElementById('pageContent');
+  const topCount=menuTree.length;
+  const totalCount=allMenus.length;
+  const subCount=totalCount-topCount;
+  const activeCount=allMenus.filter(m=>m.isActive).length;
+
+  el.innerHTML=`
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-card blue"><div class="label">전체 메뉴</div><div class="value">${totalCount}</div><div class="sub">등록된 메뉴 수</div></div>
+      <div class="stat-card green"><div class="label">최상위 메뉴</div><div class="value">${topCount}</div><div class="sub">1레벨 메뉴</div></div>
+      <div class="stat-card orange"><div class="label">하위 메뉴</div><div class="value">${subCount}</div><div class="sub">2레벨 이하</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--green);"><div class="label">활성 메뉴</div><div class="value" style="color:var(--green);">${activeCount}</div><div class="sub">${totalCount-activeCount}개 비활성</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>메뉴 구조</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-outline" onclick="menuExpandAll(true)">전체 펼치기</button>
+          <button class="btn btn-sm btn-outline" onclick="menuExpandAll(false)">전체 접기</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table>
+          <thead><tr><th style="min-width:280px;">메뉴명</th><th>코드</th><th>URL</th><th>유형</th><th>순서</th><th>허용 IP</th><th>표시</th><th>상태</th>${canManage?'<th class="text-center" style="min-width:140px;">관리</th>':''}</tr></thead>
+          <tbody>${renderMenuTableRows(menuTree,0,canManage)}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
-function openCreateMenu(){
-  const parentOpts=allMenus.filter(m=>m.menuType==='MENU').map(m=>`<option value="${m.menuId}">${esc(m.menuName)} (${esc(m.menuCode)})</option>`).join('');
-  openModal('메뉴 추가',`
-    <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" placeholder="예: 사용자 관리"></div>
-    <div class="form-group"><label>메뉴 코드 *</label><input id="m_menuCode" placeholder="예: USER_MGMT" style="text-transform:uppercase"></div>
-    <div class="form-group"><label>상위 메뉴</label><select id="m_parentMenu"><option value="">없음 (최상위)</option>${parentOpts}</select></div>
-    <div class="form-group"><label>URL</label><input id="m_menuUrl" placeholder="예: /users"></div>
-    <div class="form-group"><label>아이콘</label><input id="m_icon" placeholder="예: users"></div>
-    <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU">메뉴</option><option value="BUTTON">버튼/기능</option><option value="API">API</option></select></div>
-    <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="0"></div>
+function renderMenuTableRows(nodes,level,canManage){
+  let html='';
+  nodes.forEach(n=>{
+    const hasKids=n.children&&n.children.length>0;
+    const isExpanded=!!menuExpandState[n.menuId];
+    const indent=level*24;
+    const isTop=level===0;
+    const bg=isTop?'background:var(--surface2);':'';
+    const toggleIcon=hasKids?(isExpanded?'&#9660;':'&#9654;'):'<span style="color:var(--border);">&#8226;</span>';
+    const toggleClick=hasKids?`onclick="toggleMenuExpand(${n.menuId})" style="cursor:pointer;"`:'';
+    const ipTag=n.allowedIps?`<span style="font-size:9px;color:var(--orange);margin-left:4px;" title="${esc(n.allowedIps)}">&#128274;</span>`:'';
+    const levelBadge=level>0?`<span style="font-size:9px;color:var(--text3);background:var(--bg);padding:1px 5px;border-radius:3px;margin-left:4px;">L${level+1}</span>`:'';
+    const childCount=hasKids?`<span style="font-size:10px;color:var(--primary);margin-left:4px;">(${n.children.length})</span>`:'';
+
+    html+=`<tr style="${bg}">
+      <td style="padding-left:${16+indent}px;white-space:nowrap;">
+        <span ${toggleClick} style="display:inline-block;width:18px;text-align:center;font-size:11px;color:var(--text3);">${toggleIcon}</span>
+        <b style="margin-left:4px;">${esc(n.menuName)}</b>${ipTag}${childCount}${levelBadge}
+      </td>
+      <td><code style="font-size:12px;">${esc(n.menuCode)}</code></td>
+      <td style="font-size:12px;">${esc(n.menuUrl||'-')}</td>
+      <td><span class="badge ${n.menuType==='MENU'?'badge-admin':'badge-user'}" style="font-size:10px;padding:2px 8px;">${n.menuType}</span></td>
+      <td>${n.sortOrder}</td>
+      <td style="max-width:150px;">${n.allowedIps?`<span style="font-size:11px;color:var(--text2);word-break:break-all;">${esc(n.allowedIps)}</span>`:'<span style="font-size:11px;color:var(--text3);">-</span>'}</td>
+      <td>${n.isVisible?'<span style="color:var(--green);">&#10003;</span>':'<span style="color:var(--text3);">-</span>'}</td>
+      <td>${n.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
+      ${canManage?`<td class="text-center" style="white-space:nowrap;">
+        <button class="btn-icon" title="하위 메뉴 추가" onclick="openCreateMenu(${n.menuId})" style="color:var(--primary);">&#10010;</button>
+        <button class="btn-icon" title="수정" onclick="openEditMenu(${n.menuId})">&#9998;</button>
+        <button class="btn-icon" title="삭제${hasKids?' (하위 메뉴 포함)':''}" onclick="deleteMenu(${n.menuId},${hasKids})" style="color:var(--red);">&#128465;</button>
+      </td>`:''}</tr>`;
+    if(hasKids && isExpanded){
+      html+=renderMenuTableRows(n.children,level+1,canManage);
+    }
+  });
+  return html;
+}
+
+function toggleMenuExpand(menuId){
+  menuExpandState[menuId]=!menuExpandState[menuId];
+  const canManage=hasMenuAccess('MENU_MGMT');
+  drawMenuPage(canManage);
+}
+function menuExpandAll(expand){
+  allMenus.forEach(m=>{menuExpandState[m.menuId]=expand;});
+  const canManage=hasMenuAccess('MENU_MGMT');
+  drawMenuPage(canManage);
+}
+
+function getParentOptions(excludeId,prefix,nodes){
+  let opts='';
+  (nodes||menuTree).forEach(n=>{
+    if(n.menuId===excludeId)return;
+    const label=prefix?prefix+' > '+n.menuName:n.menuName;
+    opts+=`<option value="${n.menuId}">${esc(label)} (${esc(n.menuCode)})</option>`;
+    if(n.children&&n.children.length>0){
+      opts+=getParentOptions(excludeId,label,n.children);
+    }
+  });
+  return opts;
+}
+
+function openCreateMenu(parentId){
+  const parentMenu=parentId?allMenus.find(m=>m.menuId===parentId):null;
+  const title=parentMenu?`하위 메뉴 추가 - ${parentMenu.menuName}`:'최상위 메뉴 추가';
+  const parentOpts=getParentOptions(null,'',menuTree);
+  const parentLabel=parentMenu?`${parentMenu.menuName} (${parentMenu.menuCode})`:'';
+
+  openModal(title,`
+    <div class="form-row">
+      <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" placeholder="예: 사용자 관리"></div>
+      <div class="form-group"><label>메뉴 코드 *</label><input id="m_menuCode" placeholder="예: USER_MGMT" style="text-transform:uppercase"></div>
+    </div>
+    <div class="form-group"><label>상위 메뉴</label><select id="m_parentMenu"><option value="">없음 (최상위)</option>${parentOpts}</select>
+      ${parentMenu?`<div style="font-size:11px;color:var(--primary);margin-top:4px;">상위 메뉴: <b>${esc(parentLabel)}</b></div>`:''}
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>URL</label><input id="m_menuUrl" placeholder="예: /users"></div>
+      <div class="form-group"><label>아이콘</label><input id="m_icon" placeholder="예: users"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU">메뉴</option><option value="BUTTON">버튼/기능</option><option value="API">API</option></select></div>
+      <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>표시 여부</label><select id="m_isVisible"><option value="true">표시</option><option value="false">숨김</option></select></div>
+      <div class="form-group"><label>활성 여부</label><select id="m_isActive"><option value="true">활성</option><option value="false">비활성</option></select></div>
+    </div>
     <div class="form-group"><label>설명</label><input id="m_desc" placeholder="메뉴 설명"></div>
-    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP/대역을 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br><b>지원 형식:</b> 단일 IP(<code>192.168.1.1</code>), CIDR 대역(<code>192.168.1.0/24</code>), 와일드카드(<code>10.0.0.*</code>), 범위(<code>192.168.1.1-192.168.1.254</code>)<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)">
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분. 비워두면 제한없음. <b>형식:</b> <code>192.168.1.1</code>, <code>192.168.1.0/24</code>, <code>10.0.0.*</code>, <code>192.168.1.1-192.168.1.254</code><br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,'<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitCreateMenu()">등록</button>');
+  // 상위 메뉴 자동 선택
+  if(parentId){
+    const sel=document.getElementById('m_parentMenu');
+    if(sel) sel.value=parentId;
+  }
 }
 async function submitCreateMenu(){
-  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value.toUpperCase(),parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,allowedIps:document.getElementById('m_allowedIps').value.trim()||null,isVisible:true,isActive:true};
-  if(!body.menuName||!body.menuCode){toast('필수 항목을 입력해주세요.','error');return;}
-  try{const res=await api('POST','/api/core/menus',body);if(res.success){toast('메뉴가 등록되었습니다.','success');closeModal();renderMenus();}else toast(res.message||'등록 실패','error');}catch(e){toast(e.message,'error');}
+  const body={
+    menuName:document.getElementById('m_menuName').value,
+    menuCode:document.getElementById('m_menuCode').value.toUpperCase(),
+    parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,
+    menuUrl:document.getElementById('m_menuUrl').value||null,
+    icon:document.getElementById('m_icon').value||null,
+    menuType:document.getElementById('m_menuType').value,
+    sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,
+    description:document.getElementById('m_desc').value||null,
+    allowedIps:document.getElementById('m_allowedIps').value.trim()||null,
+    isVisible:document.getElementById('m_isVisible').value==='true',
+    isActive:document.getElementById('m_isActive').value==='true'
+  };
+  if(!body.menuName||!body.menuCode){toast('메뉴명과 메뉴코드는 필수입니다.','error');return;}
+  try{
+    const res=await api('POST','/api/core/menus',body);
+    if(res.success){
+      // 상위 메뉴 펼침 상태 설정
+      if(body.parentId) menuExpandState[body.parentId]=true;
+      toast('메뉴가 등록되었습니다.','success');closeModal();renderMenus();
+    } else toast(res.message||'등록 실패','error');
+  }catch(e){toast(e.message,'error');}
 }
 async function openEditMenu(id){
   const m=allMenus.find(x=>x.menuId===id);if(!m)return;
-  const parentOpts=allMenus.filter(x=>x.menuType==='MENU'&&x.menuId!==id).map(x=>`<option value="${x.menuId}" ${x.menuId===m.parentId?'selected':''}>${esc(x.menuName)}</option>`).join('');
-  openModal('메뉴 수정 - '+m.menuCode,`
-    <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" value="${esc(m.menuName)}"></div>
-    <div class="form-group"><label>메뉴 코드 *</label><input id="m_menuCode" value="${esc(m.menuCode)}" readonly style="background:var(--bg)"></div>
-    <div class="form-group"><label>상위 메뉴</label><select id="m_parentMenu"><option value="">없음</option>${parentOpts}</select></div>
-    <div class="form-group"><label>URL</label><input id="m_menuUrl" value="${esc(m.menuUrl||'')}"></div>
-    <div class="form-group"><label>아이콘</label><input id="m_icon" value="${esc(m.icon||'')}"></div>
-    <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU" ${m.menuType==='MENU'?'selected':''}>메뉴</option><option value="BUTTON" ${m.menuType==='BUTTON'?'selected':''}>버튼</option><option value="API" ${m.menuType==='API'?'selected':''}>API</option></select></div>
-    <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="${m.sortOrder||0}"></div>
+  const parentOpts=getParentOptions(id,'',menuTree);
+  const parentName=m.parentId?(allMenus.find(x=>x.menuId===m.parentId)||{}).menuName:'';
+
+  openModal('메뉴 수정 - '+m.menuName,`
+    <div class="form-row">
+      <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" value="${esc(m.menuName)}"></div>
+      <div class="form-group"><label>메뉴 코드</label><input id="m_menuCode" value="${esc(m.menuCode)}" readonly style="background:var(--bg)"></div>
+    </div>
+    <div class="form-group"><label>상위 메뉴</label><select id="m_parentMenu"><option value="">없음 (최상위)</option>${parentOpts}</select>
+      ${parentName?`<div style="font-size:11px;color:var(--text3);margin-top:4px;">현재 상위: <b>${esc(parentName)}</b></div>`:''}
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>URL</label><input id="m_menuUrl" value="${esc(m.menuUrl||'')}"></div>
+      <div class="form-group"><label>아이콘</label><input id="m_icon" value="${esc(m.icon||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>유형</label><select id="m_menuType"><option value="MENU" ${m.menuType==='MENU'?'selected':''}>메뉴</option><option value="BUTTON" ${m.menuType==='BUTTON'?'selected':''}>버튼/기능</option><option value="API" ${m.menuType==='API'?'selected':''}>API</option></select></div>
+      <div class="form-group"><label>정렬 순서</label><input id="m_sortOrder" type="number" value="${m.sortOrder||0}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>표시 여부</label><select id="m_isVisible"><option value="true" ${m.isVisible?'selected':''}>표시</option><option value="false" ${!m.isVisible?'selected':''}>숨김</option></select></div>
+      <div class="form-group"><label>활성 여부</label><select id="m_isActive"><option value="true" ${m.isActive?'selected':''}>활성</option><option value="false" ${!m.isActive?'selected':''}>비활성</option></select></div>
+    </div>
     <div class="form-group"><label>설명</label><input id="m_desc" value="${esc(m.description||'')}"></div>
-    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" value="${esc(m.allowedIps||'')}" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)"><div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분하여 여러 IP/대역을 입력할 수 있습니다. 비워두면 모든 IP에서 접근 가능합니다.<br><b>지원 형식:</b> 단일 IP(<code>192.168.1.1</code>), CIDR 대역(<code>192.168.1.0/24</code>), 와일드카드(<code>10.0.0.*</code>), 범위(<code>192.168.1.1-192.168.1.254</code>)<br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
+    <div class="form-group"><label>허용 IP</label><input id="m_allowedIps" value="${esc(m.allowedIps||'')}" placeholder="예: 192.168.1.0/24, 10.0.0.* (비워두면 제한없음)">
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">쉼표(,)로 구분. 비워두면 제한없음. <b>형식:</b> <code>192.168.1.1</code>, <code>192.168.1.0/24</code>, <code>10.0.0.*</code>, <code>192.168.1.1-192.168.1.254</code><br>현재 접속 IP: <b>${clientIp||'확인중'}</b></div></div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitEditMenu(${id})">저장</button>`);
+  // 현재 상위 메뉴 선택
+  if(m.parentId){const sel=document.getElementById('m_parentMenu');if(sel)sel.value=m.parentId;}
 }
 async function submitEditMenu(id){
-  const body={menuName:document.getElementById('m_menuName').value,menuCode:document.getElementById('m_menuCode').value,parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,menuUrl:document.getElementById('m_menuUrl').value||null,icon:document.getElementById('m_icon').value||null,menuType:document.getElementById('m_menuType').value,sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,description:document.getElementById('m_desc').value||null,allowedIps:document.getElementById('m_allowedIps').value.trim()||null,isVisible:true,isActive:true};
-  try{const res=await api('PUT','/api/core/menus/'+id,body);if(res.success){toast('메뉴가 수정되었습니다.','success');closeModal();renderMenus();}else toast(res.message||'수정 실패','error');}catch(e){toast(e.message,'error');}
+  const body={
+    menuName:document.getElementById('m_menuName').value,
+    menuCode:document.getElementById('m_menuCode').value,
+    parentId:document.getElementById('m_parentMenu').value?parseInt(document.getElementById('m_parentMenu').value):null,
+    menuUrl:document.getElementById('m_menuUrl').value||null,
+    icon:document.getElementById('m_icon').value||null,
+    menuType:document.getElementById('m_menuType').value,
+    sortOrder:parseInt(document.getElementById('m_sortOrder').value)||0,
+    description:document.getElementById('m_desc').value||null,
+    allowedIps:document.getElementById('m_allowedIps').value.trim()||null,
+    isVisible:document.getElementById('m_isVisible').value==='true',
+    isActive:document.getElementById('m_isActive').value==='true'
+  };
+  try{
+    const res=await api('PUT','/api/core/menus/'+id,body);
+    if(res.success){toast('메뉴가 수정되었습니다.','success');closeModal();renderMenus();}
+    else toast(res.message||'수정 실패','error');
+  }catch(e){toast(e.message,'error');}
 }
-async function deleteMenu(id){
-  if(!confirm('이 메뉴를 삭제하시겠습니까?'))return;
-  try{const res=await api('DELETE','/api/core/menus/'+id);if(res.success){toast('메뉴가 삭제되었습니다.','success');renderMenus();}else toast(res.message||'삭제 실패','error');}catch(e){toast(e.message,'error');}
+async function deleteMenu(id,hasChildren){
+  const msg=hasChildren?'이 메뉴와 하위 메뉴를 모두 삭제하시겠습니까?\n(하위 메뉴도 함께 삭제됩니다)':'이 메뉴를 삭제하시겠습니까?';
+  if(!confirm(msg))return;
+  try{
+    const res=await api('DELETE','/api/core/menus/'+id);
+    if(res.success){toast('메뉴가 삭제되었습니다.','success');renderMenus();}
+    else toast(res.message||'삭제 실패','error');
+  }catch(e){toast(e.message,'error');}
 }
 
 // ══ Access Control Management (접근 권한) ══
