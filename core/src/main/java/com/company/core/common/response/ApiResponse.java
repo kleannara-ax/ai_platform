@@ -94,4 +94,12 @@ public class ApiResponse<T> {
                 .data(data)
                 .build();
     }
+
+    public static <T> ApiResponse<T> fail(String message) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .code(400)
+                .message(message)
+                .build();
+    }
 }

@@ -1,0 +1,24 @@
+// module-fire: 소화기/소화전 자산 관리 모듈
+//
+// [의존 구조]
+//   compileOnly project(':core')  → 컴파일 시에만 참조 (ApiResponse, BusinessException 등)
+//   런타임에는 core 앱이 모든 클래스를 포함하므로 runtimeOnly 불필요
+
+dependencies {
+    // core 공통 클래스 참조 (컴파일 전용: 순환 의존 방지)
+    compileOnly project(':core')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // QR 코드 생성 (ZXing)
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.zxing:javase:3.5.3'
+}
+
+// spring-boot 플러그인 미적용 서브모듈: plain jar만 생성
+jar {
+    enabled = true
+}

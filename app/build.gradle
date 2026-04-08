@@ -20,6 +20,7 @@ dependencies {
 
     // 업무 모듈 - 새 모듈 추가 시 여기에 등록
     implementation project(':module-common')
+    implementation project(':module-fire')
 
     // MariaDB Driver (런타임)
     runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'

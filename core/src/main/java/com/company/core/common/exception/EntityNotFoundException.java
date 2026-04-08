@@ -13,4 +13,8 @@ public class EntityNotFoundException extends BusinessException {
         super(ErrorCode.RESOURCE_NOT_FOUND,
                 String.format("%s(id=%s)를 찾을 수 없습니다.", entityName, id));
     }
+
+    public EntityNotFoundException(String message) {
+        super(ErrorCode.RESOURCE_NOT_FOUND, message);
+    }
 }
