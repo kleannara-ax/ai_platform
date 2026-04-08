@@ -25,16 +25,28 @@ public class CoreMenuController {
 
     private final CoreMenuService menuService;
 
-    /** 전체 메뉴 트리 조회 */
+    /** 전체 메뉴 트리 조회 (활성 메뉴만) */
     @GetMapping
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenuTree() {
         return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTree()));
     }
 
-    /** 플랫 리스트 조회 */
+    /** 전체 메뉴 트리 조회 (비활성 포함, 관리용) */
+    @GetMapping("/tree")
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenuTreeAll() {
+        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTreeAll()));
+    }
+
+    /** 플랫 리스트 조회 (활성 메뉴만) */
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getAllMenus() {
         return ResponseEntity.ok(ApiResponse.success(menuService.getAllMenus()));
+    }
+
+    /** 플랫 리스트 조회 (비활성 포함, 관리용) */
+    @GetMapping("/list/all")
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getAllMenusAll() {
+        return ResponseEntity.ok(ApiResponse.success(menuService.getAllMenusIncludeInactive()));
     }
 
     /** 역할별 메뉴 트리 (접속자 IP 기반 필터링 포함) */

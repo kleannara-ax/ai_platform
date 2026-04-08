@@ -97,13 +97,37 @@ public class CoreMenuService {
         return MenuResponse.from(menu);
     }
 
-    /** 메뉴 삭제 */
+    /** 메뉴 삭제 (하위 메뉴가 있으면 함께 삭제) */
     @Transactional
     public void deleteMenu(Long menuId) {
         if (!menuRepository.existsById(menuId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
+        // 하위 메뉴 재귀 삭제
+        deleteMenuRecursive(menuId);
+    }
+
+    /** 하위 메뉴를 재귀적으로 삭제 */
+    private void deleteMenuRecursive(Long menuId) {
+        List<CoreMenu> children = menuRepository.findByParentIdOrderBySortOrder(menuId);
+        for (CoreMenu child : children) {
+            deleteMenuRecursive(child.getMenuId());
+        }
+        // 역할-메뉴 매핑도 삭제
+        roleMenuRepository.deleteByMenuId(menuId);
         menuRepository.deleteById(menuId);
+    }
+
+    /** 전체 메뉴 목록 (비활성 포함, 관리용) */
+    public List<MenuResponse> getAllMenusIncludeInactive() {
+        return menuRepository.findAllByOrderBySortOrder().stream()
+                .map(MenuResponse::from).collect(Collectors.toList());
+    }
+
+    /** 전체 메뉴 트리 (비활성 포함, 관리용) */
+    public List<MenuResponse> getMenuTreeAll() {
+        List<CoreMenu> all = menuRepository.findAllByOrderBySortOrder();
+        return buildTree(all);
     }
 
     /**
