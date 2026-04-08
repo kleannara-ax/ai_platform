@@ -64,8 +64,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
-                // 정적 리소스 (테스트 UI 등)
+                // 정적 리소스 (HTML, JS, CSS, 이미지 등)
                 .requestMatchers("/", "/index.html", "/favicon.ico", "/static/**").permitAll()
+                .requestMatchers("/images/**", "/js/**", "/css/**", "/uploads/**").permitAll()
+                .requestMatchers("/login.html", "/extinguishers.html", "/hydrants.html",
+                        "/receivers.html", "/pumps.html").permitAll()
+                .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
+                .requestMatchers("/account/**").permitAll()
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()
             )
