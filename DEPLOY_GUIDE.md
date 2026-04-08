@@ -267,7 +267,7 @@ mariadb -u platform_user -p platform_db < /data/aiplatform/sql/V1.0.1__init_data
 | `CORE_ROLE_MENU` | 역할-메뉴 매핑 |
 | `CORE_ROLE_PERMISSION` | 역할-권한 매핑 |
 | `MOD_USER_DEPARTMENT` | 부서 |
-| `MOD_USER_PROFILE` | 사용자 프로필 |
+| `user_profile` | 사용자 프로필 |
 
 초기 데이터:
 - **관리자 계정**: `admin` / `admin123!` (ROLE_ADMIN)

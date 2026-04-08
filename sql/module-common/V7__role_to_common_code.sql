@@ -5,13 +5,13 @@
 -- ============================================================
 
 -- 1) ROLE 공통코드 그룹 생성
-INSERT INTO MOD_CODE_GROUP (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER, CREATED_AT, UPDATED_AT)
+INSERT INTO code_group (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER, CREATED_AT, UPDATED_AT)
 VALUES ('ROLE', '사용자 역할', '시스템 사용자 역할 구분 (Spring Security Role)', TRUE, 0, NOW(), NOW());
 
 SET @role_gid = LAST_INSERT_ID();
 
 -- 2) 기존 역할 3종을 공통코드 상세로 등록
-INSERT INTO MOD_CODE_DETAIL (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, EXTRA_VALUE1, IS_ACTIVE, SORT_ORDER, CREATED_AT, UPDATED_AT)
+INSERT INTO code_detail (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, EXTRA_VALUE1, IS_ACTIVE, SORT_ORDER, CREATED_AT, UPDATED_AT)
 VALUES
   (@role_gid, 'ROLE_ADMIN',   '관리자',     '시스템 전체 관리 권한',      'admin',   TRUE, 1, NOW(), NOW()),
   (@role_gid, 'ROLE_MANAGER', '매니저',     '부서/팀 관리 권한',          'manager', TRUE, 2, NOW(), NOW()),
