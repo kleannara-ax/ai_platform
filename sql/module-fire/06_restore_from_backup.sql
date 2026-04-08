@@ -108,19 +108,19 @@ ON DUPLICATE KEY UPDATE serial_number = VALUES(serial_number);
 -- 소화전 레코드
 -- -----------------------------------------------------------------------
 INSERT INTO fire_hydrant
-  (hydrant_id, serial_number, hydrant_type, operation_type, building_id, floor_id, location_description, image_path, is_active, created_at)
+  (hydrant_id, serial_number, hydrant_type, operation_type, building_id, floor_id, location_description, image_path, qr_key, is_active, created_at)
 VALUES
-(1,  'HYD-000001', 'Indoor',   'Manual', 1, 1, NULL, '/images/indoorfirehydrant.PNG', 1, NOW()),
-(2,  'HYD-000002', 'Indoor',   'Manual', 1, 1, NULL, '/uploads/hydrants/hydrant6.jpg', 1, NOW()),
-(3,  'HYD-000003', 'Indoor',   'Manual', 1, 1, NULL, NULL, 1, NOW()),
-(4,  'HYD-000004', 'Indoor',   'Auto',   1, 1, NULL, NULL, 1, NOW()),
-(5,  'HYD-000005', 'Indoor',   'Auto',   1, 1, NULL, NULL, 1, NOW()),
-(6,  'HYD-000006', 'Outdoor',  'Manual', 99, 1, '화장지 4호기 앞', NULL, 1, NOW()),
-(7,  'HYD-000007', 'Outdoor',  'Manual', 99, 1, '화장지 4호기 앞 계근대 옆 자동문', NULL, 1, NOW()),
-(8,  'HYD-000008', 'Outdoor',  'Manual', 99, 1, '아', NULL, 1, NOW()),
-(9,  'HYD-000009', 'Outdoor',  'Auto',   99, 1, NULL, '/uploads/hydrants/hyd_20260224_172553_35fdeed18ed64b12ba42f4aea79d61e2.jpg', 1, NOW()),
-(10, 'HYD-000010', 'Outdoor',  'Auto',   99, 1, NULL, '/uploads/hydrants/hydrant20.png', 1, NOW()),
-(11, 'HYD-000011', 'Outdoor',  'Manual', 99, 1, NULL, NULL, 1, NOW())
+(1,  'HYD-000001', 'Indoor',   'Manual', 1, 1, NULL, '/images/indoorfirehydrant.PNG', REPLACE(UUID(),'-',''), 1, NOW()),
+(2,  'HYD-000002', 'Indoor',   'Manual', 1, 1, NULL, '/uploads/hydrants/hydrant6.jpg', REPLACE(UUID(),'-',''), 1, NOW()),
+(3,  'HYD-000003', 'Indoor',   'Manual', 1, 1, NULL, NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(4,  'HYD-000004', 'Indoor',   'Auto',   1, 1, NULL, NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(5,  'HYD-000005', 'Indoor',   'Auto',   1, 1, NULL, NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(6,  'HYD-000006', 'Outdoor',  'Manual', 99, 1, '화장지 4호기 앞', NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(7,  'HYD-000007', 'Outdoor',  'Manual', 99, 1, '화장지 4호기 앞 계근대 옆 자동문', NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(8,  'HYD-000008', 'Outdoor',  'Manual', 99, 1, '아', NULL, REPLACE(UUID(),'-',''), 1, NOW()),
+(9,  'HYD-000009', 'Outdoor',  'Auto',   99, 1, NULL, '/uploads/hydrants/hyd_20260224_172553_35fdeed18ed64b12ba42f4aea79d61e2.jpg', REPLACE(UUID(),'-',''), 1, NOW()),
+(10, 'HYD-000010', 'Outdoor',  'Auto',   99, 1, NULL, '/uploads/hydrants/hydrant20.png', REPLACE(UUID(),'-',''), 1, NOW()),
+(11, 'HYD-000011', 'Outdoor',  'Manual', 99, 1, NULL, NULL, REPLACE(UUID(),'-',''), 1, NOW())
 ON DUPLICATE KEY UPDATE serial_number = VALUES(serial_number);
 
 SET FOREIGN_KEY_CHECKS = 1;
