@@ -102,11 +102,13 @@ CREATE TABLE IF NOT EXISTS fire_hydrant (
     y                       DECIMAL(5,2)                            COMMENT '도면 Y 좌표',
     location_description    VARCHAR(200)                            COMMENT '위치 설명 (옥외)',
     image_path              VARCHAR(600)                            COMMENT '이미지 경로',
+    qr_key                  VARCHAR(100)    NOT NULL                COMMENT 'QR 고유키',
     is_active               TINYINT(1)      NOT NULL DEFAULT 1      COMMENT '활성 여부',
     created_at              DATETIME        NOT NULL DEFAULT NOW()  COMMENT '등록일시',
 
     PRIMARY KEY (hydrant_id),
     UNIQUE KEY uk_hydrant_serial (serial_number),
+    UNIQUE KEY uk_hydrant_qr_key (qr_key),
     CONSTRAINT fk_hyd_building FOREIGN KEY (building_id) REFERENCES building(building_id) ON DELETE RESTRICT,
     CONSTRAINT fk_hyd_floor    FOREIGN KEY (floor_id)    REFERENCES floor(floor_id)       ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='소화전';
