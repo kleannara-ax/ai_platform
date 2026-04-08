@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 테이블 Prefix: CORE_
  */
 @Entity
-@Table(name = "CORE_USER",
+@Table(name = "core_user",
        uniqueConstraints = {
            @UniqueConstraint(name = "UK_CORE_USER_LOGIN_ID", columnNames = "LOGIN_ID")
        })

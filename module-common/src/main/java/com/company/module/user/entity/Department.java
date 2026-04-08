@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 테이블 Prefix: MOD_USER_
  */
 @Entity
-@Table(name = "MOD_USER_DEPARTMENT")
+@Table(name = "mod_user_department")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor

@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "CORE_ROLE_MENU")
+@Table(name = "core_role_menu")
 @Getter @NoArgsConstructor(access = AccessLevel.PROTECTED) @AllArgsConstructor @Builder
 public class CoreRoleMenu {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

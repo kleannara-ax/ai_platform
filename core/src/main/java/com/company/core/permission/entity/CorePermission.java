@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "CORE_PERMISSION")
+@Table(name = "core_permission")
 @Getter @NoArgsConstructor(access = AccessLevel.PROTECTED) @AllArgsConstructor @Builder
 public class CorePermission {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
