@@ -8,12 +8,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * 건물 마스터 엔티티
- * <p>
- * 기존 ASP.NET: Building (BuildingId, BuildingName, IsActive)
  * 테이블명: building
- *
- * NOTE: boolean 필드명을 'active'로 선언 → Lombok @Getter 충돌 방지.
- *       DB 컬럼은 @Column(name="is_active") 명시 매핑.
  */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -23,17 +18,13 @@ public class Building {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "building_id")
+    @Column(name = "BUILDING_ID")
     private Long buildingId;
 
-    @Column(name = "building_name", nullable = false, length = 200)
+    @Column(name = "BUILDING_NAME", nullable = false, length = 200)
     private String buildingName;
 
-    /**
-     * 활성 여부
-     * NOTE: 필드명 'active' → DB 컬럼 'is_active' 명시 매핑
-     */
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "IS_ACTIVE", nullable = false)
     private boolean active = true;
 
     @Builder
@@ -42,7 +33,6 @@ public class Building {
         this.active = isActive;
     }
 
-    /** 기존 코드 호환 편의 메서드 */
     public boolean isActive() {
         return this.active;
     }

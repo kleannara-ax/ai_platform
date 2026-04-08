@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR 코드 관리 - FireWeb</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f4f7fb; color:#111827; }
+    .fireweb-navbar { position:relative; z-index:1030; }
+    .fireweb-navbar .nav-link.account-link { color:#fff !important; }
+    .fireweb-navbar .brand-logos { display:flex; align-items:center; gap:8px; }
+    .fireweb-navbar .brand-logos img { height:32px !important; width:auto !important; display:block; object-fit:contain !important; }
+    .qr-shell { display:grid; grid-template-columns:280px minmax(0,1fr); gap:20px; padding:20px; }
+    .side-card, .content-card { background:#fff; border:0; border-radius:22px; box-shadow:0 18px 40px rgba(15,23,42,.08); }
+    .side-card { padding:18px; position:sticky; top:20px; height:fit-content; }
+    .content-card { padding:20px; }
+    .menu-title { font-size:13px; font-weight:800; color:#64748b; letter-spacing:.04em; text-transform:uppercase; margin-bottom:10px; }
+    .equip-menu { display:grid; gap:8px; }
+    .equip-btn {
+      width:100%; border:1px solid rgba(148,163,184,.24); border-radius:16px; background:#f8fafc; padding:14px 16px;
+      display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#0f172a; text-align:left;
+    }
+    .equip-btn.active { background:linear-gradient(135deg,#2563eb 0%,#7c3aed 100%); color:#fff; border-color:transparent; box-shadow:0 14px 26px rgba(79,70,229,.24); }
+    .equip-btn .count { font-size:12px; opacity:.82; }
+    .filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .filter-box label { display:block; font-size:13px; font-weight:800; color:#475569; margin-bottom:6px; }
+    .filter-box select, .filter-box input { width:100%; min-height:44px; border:1px solid rgba(148,163,184,.28); border-radius:14px; padding:10px 12px; }
+    .filter-box[hidden] { display:none !important; }
+    .filter-actions { display:flex; gap:10px; align-items:flex-end; }
+    .summary-bar { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:18px; }
+    .summary-title { font-size:24px; font-weight:900; margin:0; }
+    .summary-sub { color:#64748b; font-size:14px; margin-top:6px; }
+    .section-block + .section-block { margin-top:24px; }
+    .section-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .section-head h3 { font-size:18px; font-weight:900; margin:0; }
+    .section-head .meta { font-size:13px; color:#64748b; }
+    .qr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+    .qr-grid.large { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
+    .qr-card {
+      background:#fff; border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px;
+      box-shadow:0 10px 22px rgba(15,23,42,.06); cursor:pointer; transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .qr-card:hover { transform:translateY(-2px); box-shadow:0 16px 28px rgba(15,23,42,.12); }
+    .qr-card-row { display:flex; flex-direction:column; gap:12px; align-items:center; }
+    .qr-img {
+      width:120px; height:120px; border-radius:14px; border:1px solid rgba(148,163,184,.18); background:#fff;
+      display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;
+    }
+    .qr-grid.large .qr-img { width:200px; height:200px; }
+    .qr-img img { width:100%; height:100%; object-fit:contain; display:block; }
+    .qr-meta { width:100%; min-width:0; font-size:14px; color:#334155; line-height:1.6; text-align:center; }
+    .qr-meta .line { overflow:hidden; text-overflow:ellipsis; }
+    .manual-fill { display:inline-block; min-width:110px; height:16px; border-bottom:1px solid #94a3b8; vertical-align:bottom; }
+    .empty-state { padding:22px; border-radius:18px; background:#f8fafc; color:#64748b; text-align:center; }
+    body.modal-open { overflow:hidden !important; padding-right:0 !important; }
+    #qrDetailsFrame { width:100%; height:min(90vh,1200px); border:0; display:block; background:transparent; }
+    @media (max-width: 991px) {
+      .qr-shell { grid-template-columns:1fr; }
+      .side-card { position:static; }
+      .filter-grid { grid-template-columns:1fr 1fr; }
+      .summary-bar { flex-direction:column; align-items:flex-start; }
+    }
+    @media (max-width: 767px) {
+      .filter-grid { grid-template-columns:1fr; }
+      .qr-grid, .qr-grid.large { grid-template-columns:1fr; }
+      .qr-card-row { align-items:center; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <nav class="navbar navbar-expand-lg navbar-dark fireweb-navbar" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/index.html">
+        <span class="brand-logos" aria-hidden="true">
+          <img src="/images/Kleannara.PNG" alt="" onerror="this.style.display='none'" />
+          <img src="/images/KFMS.PNG" alt="" onerror="this.style.display='none'" />
+        </span>
+        <span class="visually-hidden">FireWeb</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3">
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/extinguishers.html">소화기</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/hydrants.html">소화전</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/receivers.html">수신기</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/pumps.html">소방펌프</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold active" href="/qr">QR코드</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="qr-shell">
+  <aside class="side-card">
+    <div class="menu-title">설비 선택</div>
+    <div class="equip-menu" id="equipMenu"></div>
+  </aside>
+
+  <section class="content-card">
+    <div class="summary-bar">
+      <div>
+        <h1 class="summary-title" id="pageTitle">QR 코드 관리</h1>
+        <div class="summary-sub" id="pageSub">설비별 QR을 조회하고, 미등록 QR도 바로 확인할 수 있습니다.</div>
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-outline-secondary" id="btnPrint">인쇄</button>
+      </div>
+    </div>
+
+    <div class="filter-grid mb-4">
+      <div class="filter-box">
+        <label for="filterBuilding">건물</label>
+        <select id="filterBuilding"><option value="">전체</option></select>
+      </div>
+      <div class="filter-box">
+        <label for="filterFloor">층</label>
+        <select id="filterFloor"><option value="">전체</option></select>
+      </div>
+      <div class="filter-box" id="keywordFilterBox" hidden>
+        <label for="filterKeyword">검색어</label>
+        <input type="text" id="filterKeyword" placeholder="건물명을 입력하세요" />
+      </div>
+      <div class="filter-box">
+        <label for="unregisteredCount">미등록 QR 수량</label>
+        <input type="number" id="unregisteredCount" min="0" max="500" value="0" />
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary w-100" id="btnApply">적용</button>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-head">
+        <h3 id="registeredTitle">등록 설비 QR</h3>
+        <div class="meta" id="registeredMeta"></div>
+      </div>
+      <div id="registeredWrap" class="empty-state">불러오는 중...</div>
+    </div>
+
+    <div class="section-block" id="unregisteredSection" style="display:none;">
+      <div class="section-head">
+        <h3 id="unregisteredTitle">미등록 QR</h3>
+        <div class="meta">모바일 등록 페이지로 연결되는 QR입니다.</div>
+      </div>
+      <div id="unregisteredWrap"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal fade" id="qrDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1600px);">
+    <div class="modal-content border-0 bg-transparent shadow-none">
+      <div class="modal-body p-0 bg-transparent">
+        <iframe id="qrDetailsFrame" title="상세" allowtransparency="true"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/extinguisher-modal-host.js"></script>
+<script src="/js/hydrant-modal-host.js"></script>
+<script src="/js/csrf.js"></script>
+<script src="/js/common-nav.js"></script>
+<script>
+(function () {
+  const API_BASE = '/fire-api';
+  const EQUIPMENT = {
+    ext: { key: 'ext', label: '소화기', listKey: 'extinguishers', qrType: 'ext', large: false },
+    hyd: { key: 'hyd', label: '소화전', listKey: 'hydrants', qrType: 'hyd', large: true },
+    rcv: { key: 'rcv', label: '수신기', listKey: 'receivers', qrType: 'rcv', large: true },
+    pmp: { key: 'pmp', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true }
+  };
+
+  let currentUser = null;
+  let currentEquip = 'ext';
+  let latestListData = {};
+  let buildings = [];
+  let floors = [];
+
+  function escHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function authHeaders(extra) {
+    return { ...(extra || {}) };
+  }
+
+  async function apiFetch(url, opts = {}) {
+    if (window.FireWebCsrf?.isMutation?.(opts.method)) {
+      await window.FireWebCsrf.ensureToken();
+    }
+    const headers = window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers);
+    const res = await fetch(url, { ...opts, headers });
+    if (res.status === 401) {
+      localStorage.removeItem('fireweb_user');
+      localStorage.removeItem('fw_user');
+      window.location.href = '/login.html?returnUrl=' + encodeURIComponent('/qr');
+      return null;
+    }
+    if (res.status === 403) {
+      window.location.href = '/index.html';
+      return null;
+    }
+    return res.json();
+  }
+
+  function loadCurrentUser() {
+    try {
+      currentUser = JSON.parse(localStorage.getItem('fireweb_user') || localStorage.getItem('fw_user') || 'null');
+    } catch (_) {
+      currentUser = null;
+    }
+    return currentUser;
+  }
+
+  function isAdminUser() {
+    return String(currentUser?.role || '').toUpperCase() === 'ADMIN';
+  }
+
+  function qrImgUrl(type, id) {
+    return API_BASE + '/qr/image?type=' + encodeURIComponent(type) + '&id=' + encodeURIComponent(id);
+  }
+
+  function isTextSearchEquip() {
+    return currentEquip === 'rcv' || currentEquip === 'pmp';
+  }
+
+  function getKeywordValue() {
+    return String(document.getElementById('filterKeyword')?.value || '').trim().toLowerCase();
+  }
+
+  function matchesKeyword(item, keyword) {
+    if (!keyword) return true;
+    return String(item?.buildingName || '').toLowerCase().includes(keyword);
+  }
+
+  function updateFilterMode() {
+    const buildingBox = document.getElementById('filterBuilding')?.closest('.filter-box');
+    const floorBox = document.getElementById('filterFloor')?.closest('.filter-box');
+    const keywordBox = document.getElementById('keywordFilterBox');
+    if (!buildingBox || !floorBox || !keywordBox) return;
+    const textMode = isTextSearchEquip();
+    buildingBox.hidden = textMode;
+    floorBox.hidden = textMode;
+    keywordBox.hidden = !textMode;
+    if (textMode) {
+      document.getElementById('filterBuilding').value = '';
+      document.getElementById('filterFloor').value = '';
+    } else {
+      document.getElementById('filterKeyword').value = '';
+    }
+  }
+
+  function registeredCardHtml(type, item) {
+    if (type === 'ext') {
+      return '' +
+        '<div class="qr-card" data-qr-type="ext" data-qr-id="' + escHtml(item.extinguisherId) + '">' +
+        '  <div class="qr-card-row">' +
+        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('ext', item.qrKey) + '" loading="lazy" /></div>' +
+        '    <div class="qr-meta">' +
+        '      <div class="line">건물: ' + escHtml(item.buildingName) + '</div>' +
+        '      <div class="line">소화기 종류: ' + escHtml(item.extinguisherType) + '</div>' +
+        '      <div class="line">제조일: ' + escHtml(item.manufactureDate) + '</div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>';
+    }
+    if (type === 'hyd') {
+      const opText = String(item.operationType || '').toLowerCase() === 'auto' ? '자동식'
+        : String(item.operationType || '').toLowerCase() === 'manual' ? '수동식'
+        : (item.operationType || '-');
+      return '' +
+        '<div class="qr-card" data-qr-type="hyd" data-qr-id="' + escHtml(item.hydrantId) + '">' +
+        '  <div class="qr-card-row">' +
+        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('hyd', item.qrKey) + '" loading="lazy" /></div>' +
+        '    <div class="qr-meta">' +
+        '      <div class="line">건물: ' + escHtml(item.buildingName) + '</div>' +
+        '      <div class="line">작동방식: ' + escHtml(opText) + '</div>' +
+        '      <div class="line">상세위치: ' + escHtml(item.locationDescription || '-') + '</div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>';
+    }
+    if (type === 'rcv') {
+      return '' +
+        '<div class="qr-card" data-qr-type="rcv" data-qr-id="' + escHtml(item.receiverId) + '">' +
+        '  <div class="qr-card-row">' +
+        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('rcv', item.qrKey) + '" loading="lazy" /></div>' +
+        '    <div class="qr-meta"><div class="line">건물: ' + escHtml(item.buildingName) + '</div></div>' +
+        '  </div>' +
+        '</div>';
+    }
+    return '' +
+      '<div class="qr-card" data-qr-type="pmp" data-qr-id="' + escHtml(item.pumpId) + '">' +
+      '  <div class="qr-card-row">' +
+      '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('pmp', item.qrKey) + '" loading="lazy" /></div>' +
+      '    <div class="qr-meta"><div class="line">건물: ' + escHtml(item.buildingName) + '</div></div>' +
+      '  </div>' +
+      '</div>';
+  }
+
+  function unregisteredCardHtml(type, qrKey) {
+    const meta = type === 'ext'
+      ? '<div class="line">건물: <span class="manual-fill"></span></div><div class="line">소화기 종류: <span class="manual-fill"></span></div><div class="line">제조일: <span class="manual-fill"></span></div>'
+      : type === 'hyd'
+        ? '<div class="line">건물: <span class="manual-fill"></span></div><div class="line">작동방식: <span class="manual-fill"></span></div><div class="line">상세위치: <span class="manual-fill"></span></div>'
+        : '<div class="line">건물: <span class="manual-fill"></span></div>';
+    return '' +
+      '<div class="qr-card">' +
+      '  <div class="qr-card-row">' +
+      '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl(type, qrKey) + '" loading="lazy" /></div>' +
+      '    <div class="qr-meta">' + meta + '</div>' +
+      '  </div>' +
+      '</div>';
+  }
+
+  function renderMenu() {
+    const menu = document.getElementById('equipMenu');
+    if (!menu) return;
+    menu.innerHTML = Object.values(EQUIPMENT).map((item) => {
+      const count = Array.isArray(latestListData[item.listKey]) ? latestListData[item.listKey].length : 0;
+      return '' +
+        '<button type="button" class="equip-btn' + (currentEquip === item.key ? ' active' : '') + '" data-equip="' + item.key + '">' +
+        '  <span>' + item.label + '</span>' +
+        '  <span class="count">' + count + '건</span>' +
+        '</button>';
+    }).join('');
+  }
+
+  function renderCurrentSection(unregisteredList) {
+    const conf = EQUIPMENT[currentEquip];
+    const rawItems = Array.isArray(latestListData[conf.listKey]) ? latestListData[conf.listKey] : [];
+    const keyword = getKeywordValue();
+    const items = isTextSearchEquip() ? rawItems.filter((item) => matchesKeyword(item, keyword)) : rawItems;
+    const registeredWrap = document.getElementById('registeredWrap');
+    const registeredTitle = document.getElementById('registeredTitle');
+    const registeredMeta = document.getElementById('registeredMeta');
+    const unregisteredSection = document.getElementById('unregisteredSection');
+    const unregisteredTitle = document.getElementById('unregisteredTitle');
+    const unregisteredWrap = document.getElementById('unregisteredWrap');
+    const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
+
+    document.getElementById('pageTitle').textContent = conf.label + ' QR';
+    document.getElementById('pageSub').textContent = conf.label + ' 등록/미등록 QR을 한 화면에서 관리합니다.';
+    registeredTitle.textContent = '등록 ' + conf.label + ' QR';
+    registeredMeta.textContent = '총 ' + items.length + '건';
+    if (!items.length) {
+      registeredWrap.className = 'empty-state';
+      registeredWrap.innerHTML = '조회된 ' + conf.label + ' QR이 없습니다.';
+    } else {
+      registeredWrap.className = gridClass;
+      registeredWrap.innerHTML = items.map((item) => registeredCardHtml(conf.key, item)).join('');
+    }
+
+    if (Array.isArray(unregisteredList) && unregisteredList.length) {
+      unregisteredSection.style.display = '';
+      unregisteredTitle.textContent = '미등록 ' + conf.label + ' QR';
+      unregisteredWrap.className = gridClass;
+      unregisteredWrap.innerHTML = unregisteredList.map((qrKey) => unregisteredCardHtml(conf.key, qrKey)).join('');
+    } else {
+      unregisteredSection.style.display = 'none';
+      unregisteredWrap.innerHTML = '';
+    }
+  }
+
+  async function loadFilters() {
+    const [bRes, fRes] = await Promise.all([
+      apiFetch(API_BASE + '/qr/buildings'),
+      apiFetch(API_BASE + '/qr/floors')
+    ]);
+    if (!bRes || !fRes) return false;
+    buildings = bRes.data || [];
+    floors = fRes.data || [];
+    const buildingSel = document.getElementById('filterBuilding');
+    const floorSel = document.getElementById('filterFloor');
+    buildings.forEach((building) => {
+      const opt = document.createElement('option');
+      opt.value = building.buildingId;
+      opt.textContent = building.buildingName;
+      buildingSel.appendChild(opt);
+    });
+    floors.forEach((floor) => {
+      const opt = document.createElement('option');
+      opt.value = floor.floorId;
+      opt.textContent = floor.floorName;
+      floorSel.appendChild(opt);
+    });
+    return true;
+  }
+
+  async function loadData() {
+    const buildingId = document.getElementById('filterBuilding').value;
+    const floorId = document.getElementById('filterFloor').value;
+    const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
+    const listParams = new URLSearchParams();
+    if (!isTextSearchEquip()) {
+      if (buildingId) listParams.set('buildingId', buildingId);
+      if (floorId) listParams.set('floorId', floorId);
+    }
+    const listRes = await apiFetch(API_BASE + '/qr/list' + (listParams.toString() ? ('?' + listParams.toString()) : ''));
+    if (!listRes) return;
+    latestListData = listRes.data || {};
+    renderMenu();
+
+    let unregisteredList = [];
+    if (unregisteredCount > 0) {
+      const countParams = new URLSearchParams({
+        extCount: currentEquip === 'ext' ? String(unregisteredCount) : '0',
+        hydCount: currentEquip === 'hyd' ? String(unregisteredCount) : '0',
+        receiverCount: currentEquip === 'rcv' ? String(unregisteredCount) : '0',
+        pumpCount: currentEquip === 'pmp' ? String(unregisteredCount) : '0'
+      });
+      const unregisteredRes = await apiFetch(API_BASE + '/qr/unregistered-serials?' + countParams.toString());
+      if (unregisteredRes?.data) {
+        if (currentEquip === 'ext') unregisteredList = unregisteredRes.data.unregisteredExtSerials || [];
+        if (currentEquip === 'hyd') unregisteredList = unregisteredRes.data.unregisteredHydSerials || [];
+        if (currentEquip === 'rcv') unregisteredList = unregisteredRes.data.unregisteredReceiverSerials || [];
+        if (currentEquip === 'pmp') unregisteredList = unregisteredRes.data.unregisteredPumpSerials || [];
+      }
+    }
+
+    renderCurrentSection(unregisteredList);
+  }
+
+  function openQrDetails(type, id) {
+    if (!type || !id) return;
+    if (type === 'ext') {
+      window.FireWebExtinguisherModal?.open({ mode: 'details', id });
+      return;
+    }
+    if (type === 'hyd') {
+      window.FireWebHydrantModal?.open({ mode: 'details', id });
+      return;
+    }
+    if (type === 'rcv') {
+      window.open('/receivers.html?details=' + encodeURIComponent(id), '_blank');
+      return;
+    }
+    window.open('/pumps.html?details=' + encodeURIComponent(id), '_blank');
+  }
+
+  function buildPrintHtml() {
+    const conf = EQUIPMENT[currentEquip];
+    const registeredTitle = document.getElementById('registeredTitle')?.textContent || '';
+    const unregisteredTitle = document.getElementById('unregisteredTitle')?.textContent || '';
+    const registeredHtml = document.getElementById('registeredWrap')?.innerHTML || '';
+    const unregisteredVisible = document.getElementById('unregisteredSection')?.style.display !== 'none';
+    const unregisteredHtml = unregisteredVisible ? (document.getElementById('unregisteredWrap')?.innerHTML || '') : '';
+    const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
+    return '' +
+      '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8" />' +
+      '<title>' + escHtml(conf.label) + ' QR 인쇄</title>' +
+      '<style>' +
+      'body{margin:0;padding:24px;font-family:\"Malgun Gothic\",\"Apple SD Gothic Neo\",sans-serif;color:#111827;background:#fff;}' +
+      '.print-title{font-size:24px;font-weight:800;margin:0 0 18px;}' +
+      '.section{margin-top:24px;}' +
+      '.section h2{font-size:18px;margin:0 0 12px;}' +
+      '.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}' +
+      '.qr-grid.large{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}' +
+      '.qr-card{break-inside:avoid;border:1px solid #cbd5e1;border-radius:18px;padding:16px;}' +
+      '.qr-card-row{display:flex;flex-direction:column;gap:12px;align-items:center;}' +
+      '.qr-img{width:120px;height:120px;border:1px solid #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;}' +
+      '.qr-grid.large .qr-img{width:200px;height:200px;}' +
+      '.qr-img img{width:100%;height:100%;object-fit:contain;display:block;}' +
+      '.qr-meta{width:100%;text-align:center;font-size:14px;line-height:1.6;color:#334155;}' +
+      '.manual-fill{display:inline-block;min-width:110px;height:16px;border-bottom:1px solid #94a3b8;vertical-align:bottom;}' +
+      '</style></head><body>' +
+      '<h1 class="print-title">' + escHtml(conf.label) + ' QR</h1>' +
+      '<div class="section"><h2>' + escHtml(registeredTitle) + '</h2><div class="' + gridClass + '">' + registeredHtml + '</div></div>' +
+      (unregisteredHtml ? ('<div class="section"><h2>' + escHtml(unregisteredTitle) + '</h2><div class="' + gridClass + '">' + unregisteredHtml + '</div></div>') : '') +
+      '</body></html>';
+  }
+
+  function printCurrentQrSection() {
+    const popup = window.open('', '_blank', 'width=1200,height=900');
+    if (!popup) return;
+    popup.document.open();
+    popup.document.write(buildPrintHtml());
+    popup.document.close();
+    popup.focus();
+    popup.onload = function () {
+      popup.print();
+      popup.onafterprint = function () { popup.close(); };
+    };
+  }
+
+  function bindEvents() {
+    document.getElementById('btnApply')?.addEventListener('click', loadData);
+    document.getElementById('btnPrint')?.addEventListener('click', printCurrentQrSection);
+    document.getElementById('equipMenu')?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.equip-btn[data-equip]');
+      if (!btn) return;
+      currentEquip = btn.dataset.equip;
+      updateFilterMode();
+      loadData();
+    });
+    document.getElementById('filterKeyword')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        loadData();
+      }
+    });
+    document.addEventListener('click', (event) => {
+      const card = event.target.closest('.qr-card[data-qr-type][data-qr-id]');
+      if (!card) return;
+      openQrDetails(card.dataset.qrType, card.dataset.qrId);
+    });
+  }
+
+  function renderNav() {
+    const area = document.getElementById('navAccountArea');
+    if (!area) return;
+    const username = currentUser?.displayName || currentUser?.username || '';
+    if (!username) {
+      area.innerHTML = '<li class="nav-item"><a class="nav-link account-link" href="/login.html">로그인</a></li>';
+      return;
+    }
+    area.innerHTML = '' +
+      '<li class="nav-item dropdown">' +
+      '  <a class="nav-link dropdown-toggle account-link" href="#" data-bs-toggle="dropdown">' + escHtml(username) + '</a>' +
+      '  <ul class="dropdown-menu dropdown-menu-end">' +
+      '    <li><a class="dropdown-item" href="#" id="btnLogout">로그아웃</a></li>' +
+      '  </ul>' +
+      '</li>';
+    document.getElementById('btnLogout')?.addEventListener('click', () => window.FireWebNav?.logout?.());
+  }
+
+  async function init() {
+    loadCurrentUser();
+    if (!currentUser) {
+      window.location.href = '/login.html?returnUrl=' + encodeURIComponent('/qr');
+      return;
+    }
+    if (!isAdminUser()) {
+      window.location.href = '/index.html';
+      return;
+    }
+    renderNav();
+    bindEvents();
+    const ok = await loadFilters();
+    if (!ok) return;
+    updateFilterMode();
+    await loadData();
+  }
+
+  window.FireWebNav?.mount?.();
+  init();
+})();
+</script>
+</body>
+</html>

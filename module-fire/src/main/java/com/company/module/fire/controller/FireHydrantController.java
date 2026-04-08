@@ -28,9 +28,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * ????Β?れ??????援온??API Controller
- * <p>
- * ???뚯????ASP.NET: Pages/FireHydrants/* ???? * URL Prefix: /fire-api/hydrants/**
+ * 소화전 관리 API Controller
+ * URL Prefix: /fire-api/hydrants/**
  */
 @RestController
 @RequestMapping("/fire-api/hydrants")
@@ -42,11 +41,7 @@ public class FireHydrantController {
     private final FireHydrantService fireHydrantService;
     private final InspectorNameResolver inspectorNameResolver;
 
-    /**
-     * GET /fire-api/hydrants
-     * ????Β?れ????꿔꺂??袁ㅻ븶筌믠뫀萸???됰슦????     * <p>
-     * ???뚯????ASP.NET: GET /FireHydrants
-     */
+    /** 소화전 목록 페이징 조회 */
     @GetMapping
     public ResponseEntity<ApiResponse<Page<FireHydrantResponse>>> getList(
             @RequestParam(required = false) Long buildingId,
@@ -60,21 +55,13 @@ public class FireHydrantController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    /**
-     * GET /fire-api/hydrants/{id}
-     * ????Β?れ???????노듋????됰슦????(??? ?????????
-     */
+    /** 소화전 상세 조회 (점검이력 포함) */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<FireHydrantResponse>> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(fireHydrantService.getHydrantDetail(id)));
     }
 
-    /**
-     * POST /fire-api/hydrants
-     * ????Β?れ????嚥싲갭큔?댁쉩??????볥궚??(Admin ????썹땟??
-     * <p>
-     * ???뚯????ASP.NET: POST /FireHydrants?handler=HydSave
-     */
+    /** 소화전 등록/수정 (ADMIN) */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<FireHydrantResponse>> save(
@@ -164,11 +151,7 @@ public class FireHydrantController {
         }
     }
 
-    /**
-     * POST /fire-api/hydrants/{id}/inspect
-     * ????Β?れ?????? ?嚥싲갭큔?댁쉩??     * <p>
-     * ???뚯????ASP.NET: POST /FireHydrants?handler=Inspect
-     */
+    /** 소화전 점검 등록 */
     @PostMapping("/{id}/inspect")
     public ResponseEntity<ApiResponse<Void>> inspect(
             @PathVariable Long id,
@@ -229,10 +212,7 @@ public class FireHydrantController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    /**
-     * DELETE /fire-api/hydrants/{id}
-     * ????Β?れ???????(Admin ????썹땟??
-     */
+    /** 소화전 삭제 (ADMIN) */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {

@@ -31,38 +31,6 @@ public class MapController {
     private final ExtinguisherRepository extinguisherRepository;
     private final FireHydrantRepository fireHydrantRepository;
 
-    /**
-     * 건물 목록 조회
-     * GET /fire-api/maps/buildings
-     */
-    @GetMapping("/buildings")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getBuildings() {
-        List<Building> buildings = buildingRepository.findAllByOrderByBuildingNameAsc();
-        List<Map<String, Object>> list = buildings.stream().map(b -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("buildingId", b.getBuildingId());
-            m.put("buildingName", b.getBuildingName());
-            return m;
-        }).collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(ApiResponse.success(list));
-    }
-
-    /**
-     * 층 목록 조회
-     * GET /fire-api/maps/floors
-     */
-    @GetMapping("/floors")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getFloors() {
-        List<Floor> floors = floorRepository.findAllByOrderBySortOrderAscFloorNameAsc();
-        List<Map<String, Object>> list = floors.stream().map(f -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("floorId", f.getFloorId());
-            m.put("floorName", f.getFloorName());
-            return m;
-        }).collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(ApiResponse.success(list));
-    }
-
     @GetMapping("/floor-data")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFloorData(
             @RequestParam Long buildingId,

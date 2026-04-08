@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>소화기 목록 - FireWeb</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* ===== _Layout.cshtml 그대로 ===== */
+    .fireweb-navbar { position: relative; z-index: 1030; border-bottom-left-radius:14px; border-bottom-right-radius:14px; overflow:visible; }
+    .fireweb-navbar .dropdown-menu { z-index: 1040; }
+    .fireweb-navbar .nav-link.account-link { color: #fff !important; }
+    .fireweb-navbar .brand-logos { display:flex; align-items:center; gap:8px; }
+    .fireweb-navbar .brand-logos img{ height:32px !important; width:auto !important; display:block; object-fit:contain !important; }
+    .summary-gradient-card{
+      border:0 !important;
+      box-shadow:none !important;
+      background:transparent !important;
+    }
+    .summary-gradient-card .card-body{
+      border-radius:14px;
+      border:0 !important;
+      box-shadow:none !important;
+    }
+
+   /* ===== Extinguishers/Index.cshtml 그대로 ===== */
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background-color: rgba(0,0,0,.04); }
+    .js-zoomable { cursor: zoom-in; }
+    .info-row { font-size: 0.95rem; }
+    .ext-actions {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    /* ===== 토스트===== */
+    #fwToast { position:fixed; top:16px; right:16px; z-index:2000; }
+    .modal-backdrop.show { background: rgba(17,24,39,.35) !important; backdrop-filter: blur(4px); }
+    #extUpsertModal .modal-header,
+    #detailsModal .modal-header,
+    #inspectModal .modal-header { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-bottom:0; }
+    #extUpsertModal .modal-title,
+    #detailsModal .modal-title,
+    #inspectModal .modal-title { color:#fff; font-weight:700; }
+    #extUpsertModal .btn-close,
+    #detailsModal .btn-close,
+    #inspectModal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+
+    /* ===== ✅ cshtml 보라색 테이블 헤더(스크린샷 동일) ===== */
+    .table thead.table-dark{ position: relative; }
+    .table thead.table-dark::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      z-index:0;
+    }
+    .table thead.table-dark th{
+      position:relative;
+      z-index:1;
+      background: transparent !important;
+      color:#fff !important;
+      font-weight:700;
+      border-color: rgba(255,255,255,.18) !important;
+    }
+    .table thead.table-dark th:first-child{ border-top-left-radius:10px; }
+    .table thead.table-dark th:last-child{ border-top-right-radius:10px; }
+    .table>:not(caption)>*>*{ border-color: rgba(15,23,42,.12); }
+
+    
+    /* ===== FireWeb 버튼(원본 cshtml 톤) ===== */
+    .btn-fw-edit{
+      background:#fff !important;
+      border:1px solid rgba(99,102,241,.45) !important;
+      color:#2563eb !important;
+      font-weight:700;
+      padding:.30rem .70rem;
+      border-radius:8px;
+      box-shadow: 0 1px 0 rgba(15,23,42,.04);
+    }
+    .btn-fw-edit:hover{ background:rgba(99,102,241,.06) !important; }
+
+    .btn-fw-inspect{
+      background:#12c2e9 !important;
+      border:1px solid #12c2e9 !important;
+      color:#fff !important;
+      font-weight:800;
+      padding:.30rem .70rem;
+      border-radius:8px;
+      box-shadow: 0 1px 0 rgba(15,23,42,.04);
+    }
+    .btn-fw-inspect:hover{ filter:brightness(.97); }
+
+    /* ===== 정상/비정상 pill (원본 cshtml 톤) ===== */
+    .fw-status{
+      display:inline-block;
+      padding: .18rem .72rem;
+      border-radius: 999px;
+      font-weight:800;
+      font-size: .78rem;
+      line-height: 1.25;
+      color:#fff;
+      letter-spacing:-.2px;
+      vertical-align:middle;
+    }
+    .fw-status.fw-ok{ background:#178a54; }      /* 정상 */
+    .fw-status.fw-bad{ background:#d64545; }     /* 비정상 */
+
+    /* ===== 테이블 모서리 윤곽선 제거(헤더 둥근 모서리 깔끔) ===== */
+    .fw-table-wrap{
+      border-radius:10px;
+      overflow:hidden;
+      box-shadow: 0 1px 0 rgba(15,23,42,.04);
+    }
+    .fw-main-list-card{
+      border-top:0 !important;
+    }
+    #mainTableWrap .fw-table-wrap{
+      box-shadow:none;
+    }
+    .fw-list-table {
+      width: 100%;
+      table-layout: fixed;
+    }
+    .fw-list-table th,
+    .fw-list-table td {
+      white-space: nowrap;
+    }
+    .fw-list-table .col-note {
+      white-space: nowrap;
+    }
+    table, .table{ border:none !important; border-collapse:collapse; border-spacing:0; }
+    .table thead th{ border:none !important; }
+    .table tbody td{ border-left:none !important; border-right:none !important; }
+    .table>:not(caption)>*>*{ border-bottom-color: rgba(15,23,42,.12) !important; }
+
+  
+
+    /* ===== ✅ 보라색 헤더를 '칸마다' 그라데이션처럼 보이게(원본 cshtml 느낌) ===== */
+    .table thead.table-dark::before{ display:none !important; } /* 기존 전체-오버레이 비활성화 */
+    .table thead.table-dark th{
+      background-image: linear-gradient(135deg,#667eea 0%,#764ba2 100%) !important;
+      background-size: 260% 100% !important;
+      background-position: var(--fw-bgpos, 0% 0%) !important;
+      color:#fff !important;
+      font-weight:700 !important;
+      padding: 12px 16px !important;   /* ✅ 헤더 높이 */
+      border-color: rgba(255,255,255,.14) !important;
+      white-space: nowrap;
+    }
+    .table td{
+      padding: 14px 16px !important;   /* ✅ 행 높이 */
+      vertical-align: middle !important;
+    }
+    .table th{ vertical-align: middle !important; }
+
+    @media (max-width: 1399.98px) {
+      .fw-list-table {
+        font-size: .78rem;
+      }
+      .fw-list-table th,
+      .fw-list-table td {
+        padding: 9px 6px !important;
+      }
+      .ext-actions {
+        gap: 3px;
+      }
+      .ext-actions .btn {
+        padding: .24rem .42rem !important;
+        font-size: .72rem !important;
+      }
+    }
+    @media (max-width: 1599.98px) {
+      .fw-list-table .col-note {
+        display: none;
+      }
+    }
+
+    /* ===== ✅ 관리 버튼(편집/점검) cshtml 톤 ===== */
+    .btn-fw-edit{
+      background:#fff !important;
+      color:#2f6bff !important;
+      border:1px solid rgba(47,107,255,.35) !important;
+      border-radius:8px !important;
+      padding:6px 12px !important;
+      font-weight:700 !important;
+    }
+    .btn-fw-edit:hover{ background:rgba(47,107,255,.06) !important; }
+    .btn-fw-inspect{
+      background:#22c7f2 !important;
+      color:#fff !important;
+      border:0 !important;
+      border-radius:10px !important;
+      padding:6px 14px !important;
+      font-weight:800 !important;
+    }
+    .btn-fw-inspect:hover{ filter: brightness(.96); }
+    .btn-fw-delete{
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+      color:#fff !important;
+      border:0 !important;
+      border-radius:10px !important;
+      padding:6px 14px !important;
+      font-weight:800 !important;
+      box-shadow:0 6px 14px rgba(220,38,38,.28) !important;
+    }
+    .btn-fw-delete:hover{ filter: brightness(.96); }
+
+    .status-chip-group {
+      display: inline-flex;
+      gap: 8px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+    }
+    .status-chip-group .btn {
+      border: 0 !important;
+      border-radius: 999px !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+      letter-spacing: -.1px;
+      padding: .42rem .88rem !important;
+      box-shadow: 0 6px 16px rgba(15,23,42,.22);
+      transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+    }
+    .status-chip-group .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      box-shadow: 0 10px 22px rgba(15,23,42,.28);
+    }
+    .status-chip-group .btn:active {
+      transform: translateY(0);
+      filter: brightness(.98);
+      box-shadow: 0 4px 12px rgba(15,23,42,.22);
+    }
+    #btnStatusInspect {
+      background: linear-gradient(135deg,#06b6d4 0%,#2563eb 100%) !important;
+    }
+    #btnStatusPlanned {
+      background: linear-gradient(135deg,#f59e0b 0%,#d97706 100%) !important;
+    }
+    #btnStatusUrgent {
+      background: linear-gradient(135deg,#f43f5e 0%,#be123c 100%) !important;
+    }
+    .status-chip-group .btn.status-add-btn {
+      background: linear-gradient(135deg,#22c55e 0%,#15803d 100%) !important;
+    }
+    #extUpsertModal .modal-dialog,
+    #detailsModal .modal-dialog { max-width: 1180px; }
+    #inspectModal .modal-dialog { max-width: 820px; }
+    #extUpsertModal .modal-content,
+    #detailsModal .modal-content,
+    #inspectModal .modal-content {
+      border: 0;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 28px 60px rgba(15,23,42,.18);
+    }
+    #extUpsertModal .modal-body,
+    #detailsModal .modal-body,
+    #inspectModal .modal-body {
+      background:
+        radial-gradient(circle at top right, rgba(102,126,234,.08), transparent 34%),
+        linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+    }
+    #detailsModal .modal-dialog-scrollable .modal-body,
+    #inspectModal .modal-dialog-scrollable .modal-body {
+      overflow-y: auto;
+      max-height: calc(100vh - 110px);
+    }
+    #extUpsertModal .modal-footer,
+    #detailsModal .modal-footer,
+    #inspectModal .modal-footer {
+      border-top: 1px solid rgba(148,163,184,.18);
+      background: rgba(255,255,255,.9);
+    }
+    .fw-edit-section {
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 16px 32px rgba(15,23,42,.06);
+    }
+    .fw-edit-section + .fw-edit-section { margin-top: 16px; }
+    .fw-edit-section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .fw-edit-section-title strong {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #1e293b;
+      letter-spacing: -.02em;
+    }
+    .fw-edit-section-title span {
+      font-size: .82rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+    #extUpsertModal .form-label,
+    #inspectModal .form-label {
+      font-size: .88rem;
+      font-weight: 800;
+      color: #334155;
+      margin-bottom: .45rem;
+    }
+    #extUpsertModal .form-control,
+    #extUpsertModal .form-select,
+    #inspectModal .form-control,
+    #inspectModal .form-select {
+      border-radius: 12px;
+      border-color: rgba(148,163,184,.35);
+      min-height: 44px;
+      box-shadow: inset 0 1px 2px rgba(15,23,42,.03);
+    }
+    #extUpsertModal textarea.form-control,
+    #inspectModal textarea.form-control { min-height: 88px; }
+    #extUpsertModal .form-control:focus,
+    #extUpsertModal .form-select:focus,
+    #inspectModal .form-control:focus,
+    #inspectModal .form-select:focus {
+      border-color: rgba(59,130,246,.6);
+      box-shadow: 0 0 0 .2rem rgba(59,130,246,.12);
+    }
+    .fw-detail-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .fw-detail-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f8fbff;
+    }
+    .fw-detail-item-label {
+      width: 110px;
+      flex: 0 0 110px;
+      font-size: .82rem;
+      font-weight: 800;
+      color: #64748b;
+    }
+    .fw-detail-item-value {
+      min-width: 0;
+      font-weight: 700;
+      color: #0f172a;
+      word-break: break-word;
+    }
+    .fw-media-box {
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+    }
+    .fw-empty-box {
+      border: 1px dashed rgba(148,163,184,.45);
+      border-radius: 16px;
+      background: rgba(248,250,252,.95);
+      color: #64748b;
+      text-align: center;
+      padding: 24px 18px;
+    }
+    .fw-inspect-lead {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(59,130,246,.08);
+      color: #1e3a8a;
+      font-weight: 700;
+    }
+    .ext-checklist-wrap { display:grid; gap:10px; }
+    .ext-check-item { border:1px solid rgba(148,163,184,.22); border-radius:14px; padding:12px 14px; background:#fff; }
+    .ext-check-item .label { font-size:14px; font-weight:700; margin-bottom:7px; color:#0f172a; }
+    .ext-check-radio { display:flex; gap:16px; flex-wrap:wrap; }
+    .ext-check-radio label { display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; cursor:pointer; color:#334155; }
+    .ext-check-radio input[type="radio"] { width:18px; height:18px; cursor:pointer; }
+    #extFaultReasonAuto { margin-top:12px; color:#b91c1c; font-size:13px; font-weight:700; display:none; }
+    .fw-history-wrap {
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .fw-history-table {
+      min-width: 760px;
+      margin-bottom: 0;
+    }
+    .fw-history-table thead th {
+      background-image: linear-gradient(135deg,#667eea 0%,#764ba2 100%) !important;
+      color: #fff !important;
+      border: 0 !important;
+      font-size: .82rem;
+      font-weight: 800;
+      padding: 12px 14px !important;
+    }
+    .fw-history-table tbody td {
+      background: #fff;
+      padding: 12px 14px !important;
+      vertical-align: middle !important;
+    }
+    .fw-history-table tbody tr:nth-child(even) td {
+      background: #f8fbff;
+    }
+    .fw-history-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .fw-history-name {
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .fw-history-empty td {
+      padding: 24px 12px !important;
+      background: #fff !important;
+    }
+    .fw-history-table .form-control,
+    .fw-history-table .form-select {
+      min-height: 36px;
+      border-radius: 10px;
+    }
+    
+</style>
+</head>
+<body>
+
+<!-- ===== Navbar (_Layout.cshtml) ===== -->
+<header>
+  <nav class="navbar navbar-expand-lg navbar-dark fireweb-navbar" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/index.html">
+        <span class="brand-logos" aria-hidden="true">
+          <img src="/images/Kleannara.PNG" alt="" onerror="this.style.display='none'" />
+          <img src="/images/KFMS.PNG" alt="" onerror="this.style.display='none'" />
+        </span>
+        <span class="visually-hidden">FireWeb</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3">
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/extinguishers.html">소화기 목록</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/hydrants.html">소화전 목록</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5">도면</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/qr/index.html">QR코드</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea">
+          <!-- JS로 렌더링 -->
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="container-fluid py-4">
+
+  <!-- ===== 상단 헤더 카드 (Extinguishers/Index.cshtml) ===== -->
+  <div class="card shadow-sm mb-4 summary-gradient-card">
+    <div class="card-body d-flex justify-content-between align-items-center text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+      <div>
+        <h3 class="mb-1 fw-bold">소화기 목록</h3>
+        <div class="text-white-50 fw-semibold">총 <span id="totalCount">0</span> 건</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="btn-group status-chip-group" role="group">
+          <button type="button" class="btn btn-info text-white" id="btnStatusInspect">
+            점검필요 <span id="countInspect">(0)</span>
+          </button>
+          <button type="button" class="btn btn-warning text-white" id="btnStatusPlanned">
+            교체예정 <span id="countPlanned">(0)</span>
+          </button>
+          <button type="button" class="btn btn-danger text-white" id="btnStatusUrgent">
+            교체필요 <span id="countUrgent">(0)</span>
+          </button>
+                  <button type="button" class="btn status-add-btn" id="btnExtAdd" style="display:none;">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ===== 필터 ===== -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-4">
+          <input id="filterQ" class="form-control" placeholder="검색어(건물/층/종류/비고)" />
+        </div>
+        <div class="col-md-3">
+          <select id="filterBuildingId" class="form-select">
+            <option value="">-- 건물 전체 --</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select id="filterFloorId" class="form-select">
+            <option value="">-- 층 전체 --</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button class="btn btn-primary w-100" type="button" id="btnSearch">검색</button>
+          <button class="btn btn-outline-secondary w-100" type="button" id="btnReset">초기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 상태 목록 (collapse) ===== -->
+  <div class="collapse mb-4" id="statusPanel">
+    <div class="card shadow-sm">
+      <div class="card-body p-0" style="max-height:35vh; overflow-y:auto;">
+        <div id="statusPanelBody"></div>
+      </div>
+    </div>
+  </div>
+
+<!-- ===== 메인 테이블 ===== -->
+    <div class="card shadow-sm fw-main-list-card">
+      <div class="card-body p-0" id="mainTableWrap">
+      <div class="text-center py-5 text-muted">데이터를 불러오는 중...</div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== 소화기 상세 모달 (_detailsModal.cshtml 기반) ===== -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">소화기 상세</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="detailsModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 확대 모달 -->
+<div class="modal fade" id="detailImageZoomModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: min(96vw, 1600px);">
+    <div class="modal-content bg-dark">
+      <div class="modal-header border-0">
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-0 pb-3">
+        <div id="detailImageZoomStage" class="position-relative mx-auto" style="width:100%; height:min(88vh,1200px);">
+          <img id="detailImageZoomTarget" alt="확대 이미지" style="width:100%;height:100%;object-fit:contain;display:block;" />
+          <div id="detailImageZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== _InspectModal.cshtml ===== -->
+<!-- ✅ 점검 완료 토스트 (공용) -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:3000;">
+    <div id="inspectToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="inspectToastBody">점검이 완료되었습니다.</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ 점검 모달 (공용) -->
+<div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">점검 완료</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="fw-edit-section">
+                    <div class="fw-edit-section-title">
+                        <strong>점검 체크리스트</strong>
+                    </div>
+                    <div class="fw-inspect-lead mb-3">항목별로 정상 여부를 선택하면 점검 결과가 자동으로 정리됩니다.</div>
+                    <div class="ext-checklist-wrap" id="extChecklistWrap">
+                        <div class="ext-check-item" data-reason="안전핀 또는 봉인 스티커 상태 이상">
+                            <div class="label">안전핀 및 봉인 상태 확인</div>
+                            <div class="ext-check-radio">
+                                <label><input type="radio" name="extCheckPinSeal" value="ok"> 정상</label>
+                                <label><input type="radio" name="extCheckPinSeal" value="bad"> 비정상</label>
+                            </div>
+                        </div>
+                        <div class="ext-check-item" data-reason="압력계 지시 상태 이상">
+                            <div class="label">압력계(게이지) 정상 범위 확인</div>
+                            <div class="ext-check-radio">
+                                <label><input type="radio" name="extCheckGauge" value="ok"> 정상</label>
+                                <label><input type="radio" name="extCheckGauge" value="bad"> 비정상</label>
+                            </div>
+                        </div>
+                        <div class="ext-check-item" data-reason="호스 또는 노즐 상태 이상">
+                            <div class="label">호스 및 노즐 파손 여부 확인</div>
+                            <div class="ext-check-radio">
+                                <label><input type="radio" name="extCheckHoseNozzle" value="ok"> 정상</label>
+                                <label><input type="radio" name="extCheckHoseNozzle" value="bad"> 비정상</label>
+                            </div>
+                        </div>
+                        <div class="ext-check-item" data-reason="소화기 본체 부식 또는 변형 발생">
+                            <div class="label">본체 부식, 변형, 누출 여부 확인</div>
+                            <div class="ext-check-radio">
+                                <label><input type="radio" name="extCheckBody" value="ok"> 정상</label>
+                                <label><input type="radio" name="extCheckBody" value="bad"> 비정상</label>
+                            </div>
+                        </div>
+                        <div class="ext-check-item" data-reason="소화기 표지 또는 전면 적치 상태 이상">
+                            <div class="label">표지 및 전면 적치 금지 상태 확인</div>
+                            <div class="ext-check-radio">
+                                <label><input type="radio" name="extCheckAccess" value="ok"> 정상</label>
+                                <label><input type="radio" name="extCheckAccess" value="bad"> 비정상</label>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="extFaultReasonInput" />
+                    <div id="extFaultReasonAuto"></div>
+                </div>
+
+                <div class="fw-edit-section">
+                    <div class="fw-edit-section-title">
+                        <strong>점검 사진</strong>
+                    </div>
+                    <div class="fw-inspect-lead mb-3">점검 사진은 선택 사항이며, 현재 점검 기록과 함께 저장됩니다.</div>
+                    <input class="form-control" type="file" id="inspectPhotoInput" accept="image/*" />
+                    <div class="text-muted small mt-3" style="line-height:1.5;">
+                        ※ 정면에서 촬영하고, 압력계(게이지)가 크게 보이도록 가까이 찍어주세요.<br />
+                        ※ 빛 반사·그림자가 적고, 바늘 위치/색상 구분이 명확한 사진이 정확합니다.
+                    </div>
+
+                    <div class="text-muted small mt-2">jpg/jpeg/png/webp · 5MB 이하</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                <button class="btn btn-success" id="confirmInspectBtn">점검 완료</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 소화기등록/수정 모달 (_ExtinguisherUpsertModal.cshtml) ===== -->
+<div class="modal fade" id="extUpsertModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="extUpsertTitle">소화기</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="extUpsertForm" enctype="multipart/form-data">
+          <input type="hidden" name="ExtinguisherId" id="extId" value="0" />
+          <input type="hidden" name="BuildingId" id="extBuildingId" />
+          <input type="hidden" name="FloorId" id="extFloorId" />
+          <input type="hidden" name="X" id="extX" />
+          <input type="hidden" name="Y" id="extY" />
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>기본 정보</strong>
+            </div>
+            <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">건물</label>
+              <select class="form-select" id="extBuildingSel">
+                <option value="">-- 건물 선택 --</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">층</label>
+              <select class="form-select" id="extFloorSel">
+                <option value="">-- 층 선택 --</option>
+              </select>
+            </div>
+            <div class="col-12" id="extMapSection">
+              <label class="form-label">도면 위치 선택</label>
+              <div class="border rounded p-2 bg-light">
+                <div id="extMapCanvas" class="position-relative" style="height:260px; overflow:hidden; background:#fff; border:1px solid #ddd; border-radius:8px;">
+                  <img id="extPlanImg" alt="도면" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%;width:auto;height:auto;display:block;" />
+                  <div id="extMarkerLayer" style="position:absolute; inset:0; pointer-events:none; z-index:3;"></div>
+                </div>
+                <div class="small text-muted mt-1">도면 클릭으로 위치를 선택하세요.</div>
+                <div class="small mt-1">선택 좌표: X <span id="extCoordX">-</span> / Y <span id="extCoordY">-</span></div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">제조일</label>
+              <input type="month" class="form-control" name="InstallDate" id="extInstallDate" required />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">수량</label>
+              <input type="number" class="form-control" name="Quantity" id="extQty" min="1" value="1" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">소화기 종류</label>
+              <select class="form-select" name="ExtinguisherType" id="extType" required>
+                <option value="">-- 종류 선택 --</option>
+                <option value="분말소화기 3kg">분말소화기 3kg</option>
+                <option value="분말소화기 20kg">분말소화기 20kg</option>
+                <option value="이산화탄소소화기">이산화탄소소화기</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">비고</label>
+              <textarea class="form-control" rows="2" name="Note" id="extNote"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label">소화기 사진 교체</label>
+              <input type="file" class="form-control" name="Photo" id="extPhoto" accept="image/*" />
+              <div class="form-text">이미지 경로는 표시하지 않습니다.</div>
+            </div>
+            </div>
+          </div>
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>점검 이력</strong>
+              <span>최대 12건 수정 / 추가 / 삭제</span>
+            </div>
+            <div class="col-12">
+              <label class="form-label">점검 이력 (최근 12개)</label>
+              <div class="table-responsive fw-history-wrap">
+                <table class="table table-sm fw-history-table">
+                  <thead>
+                    <tr>
+                      <th style="width:18%;">점검일</th>
+                      <th style="width:18%;">결과</th>
+                      <th style="width:22%;">점검자</th>
+                      <th>고장 사유</th>
+                      <th style="width:160px;">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="extInspectHistoryBody">
+                    <tr><td colspan="5" class="text-muted text-center">점검 이력이 없습니다.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+        <button type="button" class="btn btn-primary" id="extSaveBtn">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 컨테이너 -->
+<div id="fwToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/extinguisher-modal-host.js"></script>
+<script src="/js/csrf.js"></script>
+<script>
+ // ===== JWT & 공용 API =====
+const API = (() => {
+  const getUser  = () => { try{ return JSON.parse(localStorage.getItem('fireweb_user')||'null'); }catch{ return null; } };
+  const isAdmin  = () => { const u = getUser(); return u && u.role === 'ADMIN'; };
+
+  async function req(url, opts = {}) {
+    const requestOpts = { ...opts };
+    const headers = { ...(requestOpts.headers||{}) };
+    if (window.FireWebCsrf?.isMutation?.(requestOpts.method)) {
+      await window.FireWebCsrf.ensureToken();
+    }
+    if (!(requestOpts.body instanceof FormData) && requestOpts.body && typeof requestOpts.body === 'object') {
+      headers['Content-Type'] = 'application/json';
+      requestOpts.body = JSON.stringify(requestOpts.body);
+    }
+    requestOpts.headers = window.FireWebCsrf?.headers(headers, requestOpts.method) || headers;
+    const res = await fetch(url, requestOpts);
+    if (res.status === 401) {
+      localStorage.removeItem('fireweb_user');
+      localStorage.removeItem('fw_user');
+      window.location.href = '/login.html';
+      return null;
+    }
+    return res;
+  }
+  return { req, getUser, isAdmin };
+})();
+
+ // ===== 상태 =====
+let allItems = [];
+let currentStatusType = null;
+let currentExtinguisherId = null;
+let optionBuildings = [];
+let optionFloors = [];
+const isAdmin = API.isAdmin();
+const EMBED_MODAL_MODE = (() => {
+  const qs = new URLSearchParams(window.location.search);
+  return qs.get('embedEdit') === '1' || qs.get('embedInspect') === '1' || qs.get('embedDetails') === '1';
+})();
+function getModalInstance(el) {
+  return bootstrap.Modal.getOrCreateInstance(el, EMBED_MODAL_MODE ? { backdrop: false } : {});
+}
+
+// ===== 토스트=====
+function showToast(msg, type='success') {
+  const id = 'fwToastBox';
+  let box = document.getElementById(id);
+  if (!box) {
+    box = document.createElement('div');
+    box.id = id;
+    box.className = `alert alert-${type} shadow`;
+    box.style.cssText = 'margin:0; opacity:0; transition:opacity 500ms ease;';
+    document.getElementById('fwToast').appendChild(box);
+  }
+  box.className = `alert alert-${type} shadow`;
+  box.textContent = msg;
+  document.getElementById('fwToast').style.cssText = 'position:fixed;top:16px;right:16px;z-index:2000;';
+  requestAnimationFrame(() => { box.style.opacity = '1'; });
+  setTimeout(() => { box.style.opacity = '0'; }, 2200);
+  setTimeout(() => { const w = document.getElementById('fwToast'); if(w) w.innerHTML=''; }, 3200);
+}
+
+// ===== 내비게이션 계정 영역 렌더링(_Layout.cshtml) =====
+function renderNav() {
+  const user = API.getUser();
+  const area = document.getElementById('navAccountArea');
+  if (!area) return;
+  if (user) {
+    area.innerHTML = `
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle fw-semibold account-link" href="#" role="button" data-bs-toggle="dropdown">
+          ${user.displayName || user.username || '사용자'}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="/account/index.html">내 정보</a></li>
+          ${isAdmin ? '<li><a class="dropdown-item" href="/account/users.html">계정관리</a></li>' : ''}
+          <li><hr class="dropdown-divider" /></li>
+          <li class="px-3 pb-2"><button type="button" class="btn btn-sm btn-danger w-100" onclick="logout()">로그아웃</button></li>
+        </ul>
+      </li>`;
+  } else {
+    area.innerHTML = '<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="/login.html">로그인</a></li>';
+  }
+}
+
+function logout() {
+  window.FireWebNav?.logout?.() || (window.location.href = '/login.html');
+}
+
+// ===== 건물/층 옵션 로드 =====
+async function loadBuildingOptions() {
+  let buildings = [];
+  let floors = [];
+  try {
+    const br = await API.req('/fire-api/qr/buildings');
+    const bj = br && br.ok ? await br.json().catch(()=>null) : null;
+    buildings = Array.isArray(bj?.data) ? bj.data : [];
+    const fr = await API.req('/fire-api/qr/floors');
+    const fj = fr && fr.ok ? await fr.json().catch(()=>null) : null;
+    floors = Array.isArray(fj?.data) ? fj.data : [];
+  } catch {}
+
+  // Fallback: QR API 실패 시 현재 목록 데이터에서 건물/층 후보 구성
+  if (!buildings.length || !floors.length) {
+    const bMap = new Map();
+    const fMap = new Map();
+    (allItems || []).forEach(it => {
+      if (it?.buildingId != null && !bMap.has(String(it.buildingId))) {
+        bMap.set(String(it.buildingId), { buildingId: it.buildingId, buildingName: it.buildingName || String(it.buildingId) });
+      }
+      if (it?.floorId != null && !fMap.has(String(it.floorId))) {
+        fMap.set(String(it.floorId), { floorId: it.floorId, floorName: it.floorName || String(it.floorId) });
+      }
+    });
+    if (!buildings.length) buildings = Array.from(bMap.values());
+    if (!floors.length) floors = Array.from(fMap.values());
+  }
+
+  optionBuildings = buildings;
+  optionFloors = floors;
+
+  const bSel = document.getElementById('filterBuildingId');
+  const fSel = document.getElementById('filterFloorId');
+  bSel.innerHTML = '<option value="">-- 건물 전체 --</option>' +
+    buildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  fSel.innerHTML = '<option value="">-- 층 전체 --</option>' +
+    floors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+
+  const ebSel = document.getElementById('extBuildingSel');
+  const efSel = document.getElementById('extFloorSel');
+  if (ebSel) {
+    ebSel.innerHTML = '<option value="">-- 건물 선택 --</option>' +
+      buildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  }
+  if (efSel) {
+    efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
+      floors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+  }
+
+}
+
+// ===== 소화기목록 로드 =====
+async function loadExtinguishers(q='', buildingId='', floorId='') {
+  const params = new URLSearchParams({ size: 200, page: 0 });
+  if (q) params.set('q', q);
+  if (buildingId) params.set('buildingId', buildingId);
+  if (floorId) params.set('floorId', floorId);
+  const res = await API.req(`/fire-api/extinguishers?${params}`);
+  if (!res) return;
+  const json = await res.json();
+  if (json.ok && json.data) {
+    allItems = (json.data.content || []).slice().sort((a, b) => {
+      const left = String(a?.serialNumber || '');
+      const right = String(b?.serialNumber || '');
+      return left.localeCompare(right, 'ko');
+    });
+  } else {
+    allItems = [];
+  }
+  await loadBuildingOptions();
+  const filterBuilding = document.getElementById('filterBuildingId');
+  const filterFloor = document.getElementById('filterFloorId');
+  if (buildingId && filterBuilding && Array.from(filterBuilding.options).some(option => option.value === String(buildingId))) {
+    filterBuilding.value = String(buildingId);
+  }
+  if (floorId && filterFloor && Array.from(filterFloor.options).some(option => option.value === String(floorId))) {
+    filterFloor.value = String(floorId);
+  }
+  renderTable(getStatusFilteredItems(allItems));
+  updateBucketCounts();
+  syncStatusButtons();
+}
+
+ // ===== 버킷 카운트 계산 (날짜 기반) =====
+function calcBuckets(items) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  let inspectCount = 0, plannedCount = 0, urgentCount = 0;
+  items.forEach(item => {
+    const lastDate = item.lastInspectionDate ? new Date(item.lastInspectionDate) : null;
+    const dueDate  = item.replacementDueDate ? new Date(item.replacementDueDate) : null;
+    const isFaulty = item.lastIsFaulty === true;
+
+    // 점검 필요: 최종 점검 후 1개월 이상 지난 경우
+    const needInspect = !lastDate || (new Date(lastDate.getTime() + 30*24*3600*1000) <= today);
+    if (needInspect) inspectCount++;
+
+    // 교체 필요: 비정상이거나 교체예정일이 30일 이내/지남
+    const replaceNeed = isFaulty || (dueDate && (dueDate < today || dueDate <= new Date(today.getTime() + 30*24*3600*1000)));
+    if (replaceNeed) urgentCount++;
+
+    // 교체예정: 6개월 이내이고 교체필요 아닌 경우
+    const replacePlanned = dueDate && dueDate >= today && dueDate <= new Date(today.getTime() + 180*24*3600*1000) && !replaceNeed;
+    if (replacePlanned) plannedCount++;
+  });
+  return { inspectCount, plannedCount, urgentCount };
+}
+
+function updateBucketCounts() {
+  const { inspectCount, plannedCount, urgentCount } = calcBuckets(allItems);
+  document.getElementById('totalCount').textContent = allItems.length;
+  document.getElementById('countInspect').textContent = `(${inspectCount})`;
+  document.getElementById('countPlanned').textContent = `(${plannedCount})`;
+  document.getElementById('countUrgent').textContent = `(${urgentCount})`;
+}
+
+ // ===== 메인 테이블 렌더링 (_ExtListTable.cshtml 기반) =====
+function formatYearMonth(value) {
+  if (!value) return '-';
+  const text = String(value).trim();
+  if (text.length < 7) return text;
+  return `${text.slice(0, 4)}년 ${text.slice(5, 7)}월`;
+}
+
+function toMonthInputValue(value) {
+  return value ? String(value).slice(0, 7) : '';
+}
+
+function toMonthStartDate(value) {
+  return value ? `${value}-01` : '';
+}
+
+function renderTable(items) {
+  const wrap = document.getElementById('mainTableWrap');
+  if (!items.length) {
+    wrap.innerHTML = '<div class="text-center text-muted py-4">조회 결과가 없습니다.</div>';
+    return;
+  }
+  let rows = '';
+  items.forEach((item, index) => {
+    const lastInspDate = item.lastInspectionDate ? item.lastInspectionDate.slice(0,10) : '';
+    const lastInspector = item.lastInspectorName || '';
+    const installDate = formatYearMonth(item.manufactureDate);
+    const replaceDue = formatYearMonth(item.replacementDueDate);
+    rows += `
+      <tr class="clickable-row js-detail-row" data-id="${item.extinguisherId}">
+        <td style="text-align:center;">${index + 1}</td>
+        <td style="text-align:center;">${item.serialNumber||'-'}</td>
+        <td class="text-truncate" title="${item.buildingName||''}">${item.buildingName||'-'}</td>
+        <td class="text-truncate" title="${item.floorName||''}">${item.floorName||'-'}</td>
+        <td class="text-truncate" title="${item.extinguisherType||''}">${item.extinguisherType||'-'}</td>
+        <td>${installDate}</td>
+        <td>${replaceDue}</td>
+        <td>${lastInspDate || '-'}</td>
+        <td class="text-truncate" title="${lastInspector}">${lastInspector || '-'}</td>
+        <td>
+          ${item.lastInspectionDate==null?'<span class="text-muted">-</span>':(item.lastIsFaulty===true?'<span class="fw-status fw-bad">비정상</span>':'<span class="fw-status fw-ok">정상</span>')}
+        </td>
+        <td class="text-truncate" title="${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}">
+          ${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}
+        </td>
+        <td style="text-align:center;">${item.quantity||1}</td>
+        <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
+        <td class="text-center">
+          <div class="ext-actions">
+            ${isAdmin ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
+            <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
+            ${isAdmin ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+  });
+  wrap.innerHTML = `
+    <div class="fw-table-wrap"><div class="table-responsive">
+      <table class="table table-hover mb-0 fw-list-table">
+        <thead class="table-dark">
+          <tr>
+            <th style="width:44px;text-align:center;">No.</th>
+            <th style="width:72px;text-align:center;">소화기 ID</th>
+            <th style="width:86px;">건물</th>
+            <th style="width:50px;">층</th>
+            <th style="width:100px;">종류</th>
+            <th style="width:86px;">제조일</th>
+            <th style="width:86px;">교체예정일</th>
+            <th style="width:86px;">최종 점검일</th>
+            <th style="width:74px;">점검자</th>
+            <th style="width:68px;">고장유무</th>
+            <th style="width:112px;">고장 사유</th>
+            <th style="width:48px;text-align:center;">수량</th>
+            <th class="col-note" style="width:110px;">비고</th>
+            <th style="width:144px;text-align:center;">관리</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div></div>`;
+}
+
+// ===== 상태 목록(statusPanel) 렌더링 =====
+function getStatusFilteredItems(items, type = currentStatusType) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (type === 'inspect') {
+    return items.filter(item => {
+      const lastDate = item.lastInspectionDate ? new Date(item.lastInspectionDate) : null;
+      return !lastDate || (new Date(lastDate.getTime() + 30*24*3600*1000) <= today);
+    });
+  }
+  if (type === 'planned') {
+    return items.filter(item => {
+      const dueDate = item.replacementDueDate ? new Date(item.replacementDueDate) : null;
+      const isFaulty = item.lastIsFaulty === true;
+      const replaceNeed = isFaulty || (dueDate && (dueDate < today || dueDate <= new Date(today.getTime() + 30*24*3600*1000)));
+      return dueDate && dueDate >= today && dueDate <= new Date(today.getTime() + 180*24*3600*1000) && !replaceNeed;
+    });
+  }
+  if (type === 'urgent') {
+    return items.filter(item => {
+      const dueDate = item.replacementDueDate ? new Date(item.replacementDueDate) : null;
+      const isFaulty = item.lastIsFaulty === true;
+      return isFaulty || (dueDate && (dueDate < today || dueDate <= new Date(today.getTime() + 30*24*3600*1000)));
+    });
+  }
+  return items;
+}
+
+function syncStatusButtons() {
+  const buttonTypes = { btnStatusInspect: 'inspect', btnStatusPlanned: 'planned', btnStatusUrgent: 'urgent' };
+  Object.entries(buttonTypes).forEach(([id, type]) => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    const active = currentStatusType === type;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function applyStatusFilter(type) {
+  currentStatusType = currentStatusType === type ? null : type;
+  const panelEl = document.getElementById('statusPanel');
+  if (panelEl?.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(panelEl).hide();
+  renderTable(getStatusFilteredItems(allItems));
+  syncStatusButtons();
+}
+
+function renderStatusPanel(type) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const filtered = getStatusFilteredItems(allItems, type);
+  const body = document.getElementById('statusPanelBody');
+  if (!filtered.length) {
+    body.innerHTML = '<div class="text-center text-muted py-3">해당 항목이 없습니다.</div>';
+    return;
+  }
+  let rows = filtered.map(item => `
+    <tr class="clickable-row js-detail-row" data-id="${item.extinguisherId}">
+      <td style="text-align:center;">${item.extinguisherId}</td>
+      <td class="text-truncate" title="${item.buildingName||''}">${item.buildingName||'-'}</td>
+      <td class="text-truncate" title="${item.floorName||''}">${item.floorName||'-'}</td>
+      <td class="text-truncate" title="${item.extinguisherType||''}">${item.extinguisherType||'-'}</td>
+      <td>${formatYearMonth(item.manufactureDate)}</td>
+      <td>${formatYearMonth(item.replacementDueDate)}</td>
+      <td>${item.lastInspectionDate ? item.lastInspectionDate.slice(0,10) : '-'}</td>
+      <td class="text-truncate" title="${item.lastInspectorName||''}">${item.lastInspectorName||'-'}</td>
+      <td>${item.lastInspectionDate
+        ? (item.lastIsFaulty===true?'<span class="fw-status fw-bad">비정상</span>':'<span class="fw-status fw-ok">정상</span>')
+        : '<span class="text-muted">-</span>'}</td>
+      <td class="text-truncate" title="${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}">${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}</td>
+      <td style="text-align:center;">${item.quantity||1}</td>
+      <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
+      <td class="text-center">
+        <div class="ext-actions">
+          ${isAdmin ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
+          <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
+          ${isAdmin ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+  body.innerHTML = `
+    <div class="fw-table-wrap"><div class="table-responsive">
+      <table class="table table-hover mb-0 fw-list-table">
+        <thead class="table-dark"><tr>
+          <th style="width:72px;text-align:center;">소화기 ID</th>
+          <th style="width:86px;">건물</th>
+          <th style="width:50px;">층</th>
+          <th style="width:100px;">종류</th>
+          <th style="width:86px;">제조일</th>
+          <th style="width:86px;">교체예정일</th>
+          <th style="width:86px;">최종 점검일</th>
+          <th style="width:74px;">점검자</th>
+          <th style="width:68px;">고장유무</th>
+          <th style="width:112px;">고장 사유</th>
+          <th style="width:48px;text-align:center;">수량</th>
+          <th class="col-note" style="width:110px;">비고</th>
+          <th style="width:144px;text-align:center;">관리</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div></div>`;
+}
+function openStatus(type) {
+  applyStatusFilter(type);
+}
+
+// ===== 상세 모달 (_detailsModal.cshtml 湲곕컲) =====
+function resolveDetailPlanImagePathExt(buildingName, floorName){
+  const b = String(buildingName || '').replace(/\s+/g,'').toLowerCase().replace(/[.,_\-]/g,'');
+  const fRaw = String(floorName || '').replace(/\s+/g,'').toLowerCase();
+  const f = (fRaw === 'b1' || fRaw.includes('지하') || fRaw.includes('b1')) ? 'b1'
+    : (fRaw.includes('1') ? '1f'
+    : (fRaw.includes('2') ? '2f'
+    : (fRaw.includes('3') ? '3f' : fRaw)));
+  if (b.includes('복지관') || b.includes('bokji')) {
+    if (f === 'b1') return '/images/bokji_B1.png';
+    if (f === '1f') return '/images/bokji_1F.png';
+    if (f === '2f') return '/images/bokji_2F.png';
+    if (f === '3f') return '/images/bokji_3F.png';
+  }
+  if ((b.includes('관리동') || b.includes('gwanri')) && f === '1f') return '/images/gwanri_1F.png';
+  if (b.includes('제지12호기') || b.includes('jeji12')) {
+    if (f === '1f') return '/images/jeji1,2_1F.PNG';
+    if (f === '2f') return '/images/jeji1,2_2F.PNG';
+  }
+  if (b.includes('제지3호기') || b.includes('jeji3')) {
+    if (f === '1f') return '/images/jeji3_1F.PNG';
+    if (f === '2f') return '/images/jeji3_2F.PNG';
+  }
+  if (b.includes('패드동') || b.includes('pad')) {
+    if (f === '1f') return '/images/pad_1F.PNG';
+    if (f === '2f') return '/images/pad_2F.PNG';
+  }
+  if (b.includes('심면펄퍼') || b.includes('palpa') || b.includes('pulper')) {
+    if (f === '1f') return '/images/palpa_1F.PNG';
+    if (f === '2f') return '/images/palpa_2F.PNG';
+  }
+  if (b.includes('화장지36호기') || b.includes('tissue13') || b.includes('tissue36')) {
+    if (f === '1f') return '/images/tissue1,3_1F.PNG';
+    if (f === '2f') return '/images/tissue1,3_2F.PNG';
+  }
+  if (b.includes('화장지45호기') || b.includes('tissue45')) {
+    if (f === 'b1') return '/images/tissue4,5_B1.PNG';
+    if (f === '1f') return '/images/tissue4,5_1F.PNG';
+    if (f === '2f') return '/images/tissue4,5_2F.PNG';
+    if (f === '3f') return '/images/tissue4,5_3F.PNG';
+  }
+  if ((b.includes('기저귀동') || b.includes('diaper')) && f === '1f') return '/images/diaper_1F.png';
+  if (b.includes('옥외') || b.includes('outdoor')) return '/images/drone_photo.JPG';
+  return '';
+}
+
+async function fetchDetailPlanImagePathExt(d){
+  const b = String(d?.buildingId ?? '').trim();
+  const f = String(d?.floorId ?? '').trim();
+  if (b && f) {
+    try {
+      const qs = new URLSearchParams({ buildingId: b, floorId: f });
+      const r = await API.req(`/fire-api/maps/floor-data?${qs.toString()}`);
+      if (r && r.ok) {
+        const j = await r.json().catch(() => null);
+        const p = j?.data?.planImagePath || '';
+        if (p) return p;
+      }
+    } catch {}
+  }
+  return resolveDetailPlanImagePathExt(d?.buildingName, d?.floorName);
+}
+
+function renderDetailPlanSingleMarker(wrapId, imgId, layerId, markerIcon, x, y){
+  const wrap = document.getElementById(wrapId);
+  const img = document.getElementById(imgId);
+  const layer = document.getElementById(layerId);
+  if (!wrap || !img || !layer) return;
+  const nx = Number(x), ny = Number(y);
+  const hasCoord = Number.isFinite(nx) && Number.isFinite(ny);
+
+  const draw = () => {
+    layer.innerHTML = '';
+    const rect = wrap.getBoundingClientRect();
+    const cw = rect.width || 0, ch = rect.height || 0;
+    const iw = img.naturalWidth || 0, ih = img.naturalHeight || 0;
+    if (!cw || !ch || !iw || !ih) return;
+    const scale = Math.min(cw / iw, ch / ih);
+    const w = iw * scale, h = ih * scale;
+    const ox = (cw - w) / 2, oy = (ch - h) / 2;
+    img.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;transform:none;object-fit:contain;display:block;`;
+    if (!hasCoord) return;
+    const left = ox + w * (Math.max(0, Math.min(100, nx)) / 100);
+    const top = oy + h * (Math.max(0, Math.min(100, ny)) / 100);
+    const m = document.createElement('div');
+    const markerSize = Math.max(16, Math.min(40, Math.min(w, h) * 0.04));
+    m.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${markerSize}px;height:${markerSize}px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 6px rgba(0,0,0,.65));`;
+    m.innerHTML = `<img src="${markerIcon}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+    layer.appendChild(m);
+  };
+  if (img.complete) draw();
+  img.onload = draw;
+  setTimeout(draw, 0);
+}
+
+
+function renderExtZoomMarker(target){
+  const layer = document.getElementById('detailImageZoomMarkerLayer');
+  const stage = document.getElementById('detailImageZoomStage');
+  if (!target || !layer || !stage) return;
+  layer.innerHTML = '';
+
+  const mx = parseFloat(target.dataset.markerX || '');
+  const my = parseFloat(target.dataset.markerY || '');
+  if (!Number.isFinite(mx) || !Number.isFinite(my)) return;
+
+  const icon = target.dataset.markerIcon || '/images/Extinguisher.PNG';
+  const stageRect = stage.getBoundingClientRect();
+  const iw = target.naturalWidth || 0;
+  const ih = target.naturalHeight || 0;
+  if (!iw || !ih || !stageRect.width || !stageRect.height) return;
+
+  const scale = Math.min(stageRect.width / iw, stageRect.height / ih);
+  const w = iw * scale;
+  const h = ih * scale;
+  const ox = (stageRect.width - w) / 2;
+  const oy = (stageRect.height - h) / 2;
+
+  const left = ox + (Math.max(0, Math.min(100, mx)) / 100) * w;
+  const top  = oy + (Math.max(0, Math.min(100, my)) / 100) * h;
+  const markerSize = Math.max(18, Math.min(48, Math.min(w, h) * 0.04));
+
+  const m = document.createElement('div');
+  m.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${markerSize}px;height:${markerSize}px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 8px rgba(0,0,0,.7));`;
+  m.innerHTML = `<img src="${icon}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+  layer.appendChild(m);
+}
+
+async function openDetails(id) {
+  const res = await API.req(`/fire-api/extinguishers/${id}`);
+  if (!res) return;
+  const json = await res.json();
+  if (!json.ok || !json.data) { alert('상세 정보를 불러오지 못했습니다.'); return; }
+  const d = json.data;
+  const planImagePath = await fetchDetailPlanImagePathExt(d);
+  const qrId = (d.qrKey || '').trim();
+  const qrUrl = qrId ? `/fire-api/qr/image?type=ext&id=${encodeURIComponent(qrId)}` : '';
+
+  // 점검 이력
+  let inspRows = '';
+  if (d.inspections && d.inspections.length) {
+    inspRows = d.inspections.slice(0,12).map(r => `
+      <tr>
+        <td>${r.inspectionDate ? r.inspectionDate.slice(0,10) : '-'}</td>
+        <td>${r.inspectorName || '-'}</td>
+      </tr>`).join('');
+  } else {
+    inspRows = '<tr><td colspan="2" class="text-muted text-center">점검 이력이 없습니다.</td></tr>';
+  }
+
+  const lastStatus = !d.lastInspectionDate
+    ? '<span class="text-muted">-</span>'
+    : (d.lastIsFaulty
+       ? `<span class="fw-status fw-bad">비정상</span> <span class="text-muted">${d.lastFaultReason||'사유 없음'}</span>`
+       : '<span class="fw-status fw-ok">정상</span>');
+
+  document.getElementById('detailsModalBody').innerHTML = `
+    <div class="container-fluid">
+      <div class="row g-4">
+        <div class="col-md-6 d-flex flex-column gap-3">
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>기본 정보</strong>
+            </div>
+            <div class="fw-detail-grid">
+              <div class="fw-detail-item"><div class="fw-detail-item-label">소화기 ID</div><div class="fw-detail-item-value">${d.serialNumber || '-'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">건물</div><div class="fw-detail-item-value">${d.buildingName || '-'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">층</div><div class="fw-detail-item-value">${d.floorName || '-'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">종류</div><div class="fw-detail-item-value">${d.extinguisherType || '-'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">수량</div><div class="fw-detail-item-value">${d.quantity || 1} 개</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">제조일</div><div class="fw-detail-item-value">${formatYearMonth(d.manufactureDate)}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">교체예정일</div><div class="fw-detail-item-value">${d.replacementDueDate ? d.replacementDueDate.slice(0,10) : '-'}</div></div>
+            </div>
+          </div>
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>점검 정보</strong>
+              <span>최근 12건</span>
+            </div>
+            <div class="fw-detail-grid mb-3">
+              <div class="fw-detail-item"><div class="fw-detail-item-label">최종 점검</div><div class="fw-detail-item-value">${d.lastInspectionDate ? `<strong>${d.lastInspectionDate.slice(0,10)}</strong>${d.lastInspectorName?` <span class="text-muted">/ ${d.lastInspectorName}</span>`:''}` : '<span class="text-muted">-</span>'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">점검 결과</div><div class="fw-detail-item-value">${lastStatus}</div></div>
+            </div>
+            <div class="fw-history-wrap">
+              <table class="table table-sm fw-history-table">
+                <thead>
+                  <tr><th style="width:50%;">점검일</th><th style="width:50%;">점검자</th></tr>
+                </thead>
+                <tbody>${inspRows}</tbody>
+              </table>
+            </div>
+            ${d.note ? `<div class="fw-media-box mt-3"><div class="fw-edit-section-title mb-2"><strong>비고</strong></div><div class="small">${d.note}</div></div>` : ''}
+          </div>
+        </div>
+        <div class="col-md-6 d-flex flex-column gap-3">
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>이미지</strong>
+            </div>
+            ${d.imagePath
+              ? `<div class="fw-media-box text-center"><img src="${d.imagePath}" alt="소화기 이미지" class="img-fluid rounded shadow js-zoomable" style="max-width:100%;max-height:260px;object-fit:contain;" /><p class="text-muted mt-2 mb-0"><small>소화기 사진</small></p></div>`
+              : '<div class="fw-empty-box">등록된 이미지가 없습니다.</div>'}
+          </div>
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>도면</strong>
+            </div>
+            ${planImagePath
+              ? `<div id="extDetailPlanWrap" class="fw-media-box position-relative" style="height:260px;overflow:hidden;">
+                   <img id="extDetailPlanImg" src="${planImagePath}" alt="도면 이미지" class="js-zoomable" data-marker-x="${d.x ?? ""}" data-marker-y="${d.y ?? ""}" data-marker-icon="/images/Extinguisher.PNG" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%;width:auto;height:auto;display:block;" />
+                   <div id="extDetailPlanMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>
+                 </div>`
+              : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}
+          </div>
+          <div class="fw-edit-section">
+            <div class="fw-edit-section-title">
+              <strong>QR코드</strong>
+            </div>
+            ${qrUrl
+              ? `<div class="fw-media-box text-center"><img src="${qrUrl}" alt="소화기 QR" class="img-fluid rounded shadow js-zoomable" style="max-width:220px;max-height:220px;object-fit:contain;" /></div>`
+              : '<div class="fw-empty-box">QR 정보가 없습니다.</div>'}
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>.js-zoomable{cursor:zoom-in;}</style>`;
+
+  getModalInstance(document.getElementById('detailsModal')).show();
+  if (planImagePath) {
+    renderDetailPlanSingleMarker('extDetailPlanWrap', 'extDetailPlanImg', 'extDetailPlanMarkerLayer', '/images/Extinguisher.PNG', d.x, d.y);
+  }
+}
+
+// ===== _InspectModalScripts.cshtml 기반 =====
+(() => {
+  if (window.__inspectModalInit) return;
+  window.__inspectModalInit = true;
+
+  let currentExtinguisherId = null;
+
+  const collectExtChecklistResult = () => {
+    let hasUnchecked = false;
+    const reasons = [];
+    document.querySelectorAll('#extChecklistWrap .ext-check-item').forEach(item => {
+      const checked = item.querySelector('input[type="radio"]:checked');
+      if (!checked) {
+        hasUnchecked = true;
+        return;
+      }
+      if (checked && checked.value === 'bad') {
+        const reason = item.getAttribute('data-reason') || '';
+        if (reason) reasons.push(reason);
+      }
+    });
+    return { isFaulty: reasons.length > 0, faultReason: reasons.join(', '), hasUnchecked };
+  };
+
+  const updateExtChecklistReason = () => {
+    const result = collectExtChecklistResult();
+    const input = document.getElementById('extFaultReasonInput');
+    if (input) input.value = result.faultReason;
+    const auto = document.getElementById('extFaultReasonAuto');
+    if (auto) {
+      auto.style.display = result.isFaulty ? 'block' : 'none';
+      auto.textContent = result.isFaulty ? ('자동 고장 사유: ' + result.faultReason) : '';
+    }
+  };
+
+  const resetExtChecklist = () => {
+    document.querySelectorAll('#extChecklistWrap input[type="radio"]').forEach(r => r.checked = false);
+    updateExtChecklistReason();
+  };
+
+  // expose for pages
+  window.openInspectModal = (e, id) => {
+    if (e) e.stopPropagation?.();
+    currentExtinguisherId = id;
+
+    const input = document.getElementById('inspectPhotoInput');
+    if (input) input.value = '';
+
+    resetExtChecklist();
+
+    const modalEl = document.getElementById('inspectModal');
+    if (modalEl) getModalInstance(modalEl).show();
+  };
+
+  document.querySelectorAll('#extChecklistWrap input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', updateExtChecklistReason);
+  });
+
+  document.getElementById('confirmInspectBtn')?.addEventListener('click', async () => {
+    if (!currentExtinguisherId) return;
+    const today = new Date().toISOString().slice(0,10);
+    const picked = (allItems || []).find(x => Number(x.extinguisherId) === Number(currentExtinguisherId));
+    const last = picked?.lastInspectionDate ? String(picked.lastInspectionDate).slice(0,10) : '';
+    if (last === today) {
+      alert('오늘 이미 점검 완료된 소화기입니다.');
+      return;
+    }
+
+    const result = collectExtChecklistResult();
+    if (result.hasUnchecked) {
+      alert('모든 점검 항목의 정상/비정상을 선택해 주세요.');
+      return;
+    }
+    const isFaulty = result.isFaulty;
+    const faultReason = result.faultReason;
+
+    const btn = document.getElementById('confirmInspectBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const body = { extinguisherId: currentExtinguisherId, isFaulty, faultReason };
+      const r = await API.req('/fire-api/extinguishers/inspect', { method: 'POST', body });
+
+      if (!r || !r.ok) {
+        const t = await r?.text().catch(() => '');
+        alert(t || `점검 처리 실패(${r?.status})`);
+        return;
+      }
+
+      const data = await r.json().catch(() => null);
+      if (data && data.ok === false) {
+        alert(data?.message || '점검 처리 실패');
+        return;
+      }
+
+
+      const inspectPhoto = document.getElementById('inspectPhotoInput')?.files?.[0];
+      if (inspectPhoto) {
+        const fd = new FormData();
+        fd.append('file', inspectPhoto);
+        const up = await API.req('/fire-api/extinguishers/' + encodeURIComponent(currentExtinguisherId) + '/image', {
+          method: 'POST',
+          body: fd
+        });
+        if (!up || !up.ok) {
+          const ut = await up?.text().catch(() => '');
+          alert(ut || ('Photo upload failed (HTTP ' + (up?.status || '') + ')'));
+        }
+      }
+
+      const modalEl = document.getElementById('inspectModal');
+      if (modalEl) getModalInstance(modalEl).hide();
+
+      const toastEl = document.getElementById('inspectToast');
+      if (toastEl) bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 2000 }).show();
+
+      // ✅ pages can react
+      document.dispatchEvent(new CustomEvent('inspection:completed', {
+        detail: { extinguisherId: currentExtinguisherId }
+      }));
+
+    } catch (err) {
+      alert('점검 처리 실패: ' + (err?.message || err));
+    } finally {
+      if (btn) btn.disabled = false;
+      currentExtinguisherId = null;
+    }
+  });
+})();
+
+// ===== 소화기등록/수정 모달 (_ExtinguisherUpsertModalScripts.cshtml 기반) =====
+(function(){
+  const modalEl = document.getElementById('extUpsertModal');
+  const formEl  = document.getElementById('extUpsertForm');
+  const saveBtn = document.getElementById('extSaveBtn');
+  if(!modalEl || !formEl || !saveBtn) return;
+  const forceExtTypeSelect = () => {
+    const oldEl = document.getElementById('extType');
+    if (!oldEl || oldEl.tagName === 'SELECT') return;
+    const sel = document.createElement('select');
+    sel.className = 'form-select';
+    sel.name = 'ExtinguisherType';
+    sel.id = 'extType';
+    sel.required = true;
+    sel.innerHTML = [
+      '<option value="">-- 종류 선택 --</option>',
+      '<option value="분말소화기 3kg">분말소화기 3kg</option>',
+      '<option value="분말소화기 20kg">분말소화기 20kg</option>',
+      '<option value="이산화탄소소화기">이산화탄소소화기</option>'
+    ].join('');
+    const prev = String(oldEl.value || '');
+    oldEl.replaceWith(sel);
+    if (prev) sel.value = prev;
+  };
+  forceExtTypeSelect();
+  const buildingSel = document.getElementById('extBuildingSel');
+  const floorSel = document.getElementById('extFloorSel');
+  const mapCanvas = document.getElementById('extMapCanvas');
+  const mapSection = document.getElementById('extMapSection');
+  const planImg = document.getElementById('extPlanImg');
+  const markerLayer = document.getElementById('extMarkerLayer');
+  const EXT_ICON_URL = '/images/Extinguisher.PNG';
+  const coordXEl = document.getElementById('extCoordX');
+  const coordYEl = document.getElementById('extCoordY');
+  const histBody = document.getElementById('extInspectHistoryBody');
+  let currentEditingExtId = 0;
+  let selectedCoord = null;
+
+  function setVal(id, v){
+    const el = document.getElementById(id);
+    if(el) el.value = (v ?? '').toString();
+  }
+  function norm(v){ return String(v || '').replace(/\s+/g,'').toLowerCase(); }
+  function normFloor(v){
+    const s = norm(v).replace(/[()]/g, '');
+    if (!s) return '';
+    if (s === 'b1' || s.includes('지하1') || s.includes('지하') || s.includes('地下1') || s.includes('地下')) return 'b1';
+    const m = s.match(/([1-9])\s*f?$/);
+    if (m) return `${m[1]}f`;
+    if (s.includes('1')) return '1f';
+    if (s.includes('2')) return '2f';
+    if (s.includes('3')) return '3f';
+    if (s.includes('4')) return '4f';
+    return s;
+  }
+  function normBuilding(v){
+    return norm(v).replace(/[.,_\-]/g,'');
+  }
+  function parseNum(v){
+    const n = parseFloat(String(v ?? ''));
+    return Number.isFinite(n) ? n : null;
+  }
+  function mapTypeValue(v){
+    const raw = String(v || '').trim();
+    const n = raw.replace(/\s+/g, '').toLowerCase();
+    if (n === '분말소화기3kg') return '분말소화기 3kg';
+    if (n === '분말소화기20kg') return '분말소화기 20kg';
+    if (n === '이산화탄소소화기') return '이산화탄소소화기';
+    return raw;
+  }
+  function setCoord(x, y){
+    const rx = Number(x).toFixed(2);
+    const ry = Number(y).toFixed(2);
+    setVal('extX', rx);
+    setVal('extY', ry);
+    if (coordXEl) coordXEl.textContent = rx;
+    if (coordYEl) coordYEl.textContent = ry;
+    selectedCoord = { x: Number(rx), y: Number(ry) };
+    renderSelectedMarker();
+  }
+  function clearCoord(){
+    setVal('extX', '');
+    setVal('extY', '');
+    if (coordXEl) coordXEl.textContent = '-';
+    if (coordYEl) coordYEl.textContent = '-';
+    selectedCoord = null;
+    renderSelectedMarker();
+  }
+  function computeFit(){
+    const rect = mapCanvas?.getBoundingClientRect?.();
+    const cw = rect?.width || 0;
+    const ch = rect?.height || 0;
+    const iw = planImg?.naturalWidth || 0;
+    const ih = planImg?.naturalHeight || 0;
+    if (!cw || !ch || !iw || !ih) return null;
+    const scale = Math.min(cw / iw, ch / ih);
+    const w = iw * scale;
+    const h = ih * scale;
+    return { ox:(cw - w) / 2, oy:(ch - h) / 2, w, h };
+  }
+  function layoutPlan(f){
+    if (!planImg || !f) return;
+    planImg.style.cssText = `position:absolute;left:${f.ox}px;top:${f.oy}px;width:${f.w}px;height:${f.h}px;transform:none;object-fit:contain;display:block;`;
+  }
+  function toPx(x, y, f){
+    if (!f) return null;
+    return { left: f.ox + f.w * (x / 100), top: f.oy + f.h * (y / 100) };
+  }
+  function renderSelectedMarker(){
+    if (!markerLayer) return;
+    markerLayer.innerHTML = '';
+    const f = computeFit();
+    if (!f) return;
+    layoutPlan(f);
+    const x = (selectedCoord && Number.isFinite(selectedCoord.x)) ? selectedCoord.x : parseNum(document.getElementById('extX')?.value);
+    const y = (selectedCoord && Number.isFinite(selectedCoord.y)) ? selectedCoord.y : parseNum(document.getElementById('extY')?.value);
+    if (x == null || y == null) return;
+    const pos = toPx(Number(x), Number(y), f);
+    if (!pos) return;
+    const marker = document.createElement('div');
+    marker.style.cssText = [
+      'position:absolute',
+      `left:${pos.left}px`,
+      `top:${pos.top}px`,
+      'transform:translate(-50%,-50%)',
+      'width:34px',
+      'height:34px',
+      'pointer-events:none',
+      'border-radius:50%',
+      'background:rgba(220,53,69,.18)'
+    ].join(';');
+    marker.innerHTML = `<img src="${EXT_ICON_URL}" alt="extinguisher-marker" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 4px rgba(0,0,0,.35));" onerror="this.style.display='none';" />`;
+    markerLayer.appendChild(marker);
+  }
+  function selectOptionSmart(sel, id, name){
+    if (!sel) return;
+    const sid = String(id ?? '').trim();
+    if (sid) {
+      const byValue = Array.from(sel.options || []).find(x => String(x.value).trim() === sid);
+      if (byValue) { sel.value = sid; return; }
+    }
+    const n = norm(name);
+    if (!n) return;
+    const byText = Array.from(sel.options || []).find(x => norm(x.textContent) === n);
+    if (byText) { sel.value = byText.value; return; }
+    const floorAlias = normFloor(name);
+    if (floorAlias) {
+      const byFloor = Array.from(sel.options || []).find(x => normFloor(x.textContent) === floorAlias);
+      if (byFloor) { sel.value = byFloor.value; return; }
+    }
+    const byContains = Array.from(sel.options || []).find(x => norm(x.textContent).includes(n) || n.includes(norm(x.textContent)));
+    if (byContains) sel.value = byContains.value;
+  }
+  function resolvePlanImagePathByName(buildingName, floorName){
+    const b = normBuilding(buildingName);
+    const f = normFloor(floorName);
+    if (b.includes('복지관') || b.includes('bokji')) {
+      if (f === 'b1') return '/images/bokji_B1.png';
+      if (f === '1f') return '/images/bokji_1F.png';
+      if (f === '2f') return '/images/bokji_2F.png';
+      if (f === '3f') return '/images/bokji_3F.png';
+    }
+    if ((b.includes('관리동') || b.includes('gwanri')) && f === '1f') return '/images/gwanri_1F.png';
+    if (b.includes('제지12호기') || b.includes('jeji12')) {
+      if (f === '1f') return '/images/jeji1,2_1F.PNG';
+      if (f === '2f') return '/images/jeji1,2_2F.PNG';
+    }
+    if (b.includes('제지3호기') || b.includes('jeji3')) {
+      if (f === '1f') return '/images/jeji3_1F.PNG';
+      if (f === '2f') return '/images/jeji3_2F.PNG';
+    }
+    if (b.includes('패드동') || b.includes('pad')) {
+      if (f === '1f') return '/images/pad_1F.PNG';
+      if (f === '2f') return '/images/pad_2F.PNG';
+    }
+    if (b.includes('심면펄퍼') || b.includes('palpa') || b.includes('pulper')) {
+      if (f === '1f') return '/images/palpa_1F.PNG';
+      if (f === '2f') return '/images/palpa_2F.PNG';
+    }
+    if (b.includes('화장지36호기') || b.includes('tissue13') || b.includes('tissue36')) {
+      if (f === '1f') return '/images/tissue1,3_1F.PNG';
+      if (f === '2f') return '/images/tissue1,3_2F.PNG';
+    }
+    if (b.includes('화장지45호기') || b.includes('tissue45')) {
+      if (f === 'b1') return '/images/tissue4,5_B1.PNG';
+      if (f === '1f') return '/images/tissue4,5_1F.PNG';
+      if (f === '2f') return '/images/tissue4,5_2F.PNG';
+      if (f === '3f') return '/images/tissue4,5_3F.PNG';
+    }
+    if ((b.includes('기저귀동') || b.includes('diaper')) && f === '1f') return '/images/diaper_1F.png';
+    if (b.includes('옥외') || b.includes('outdoor')) return '/images/drone_photo.JPG';
+    if (b.includes('복지')) {
+      if (f === 'b1') return '/images/bokji_B1.png';
+      if (f.includes('1')) return '/images/bokji_1F.png';
+      if (f.includes('2')) return '/images/bokji_2F.png';
+      if (f.includes('3')) return '/images/bokji_3F.png';
+    }
+    if (b.includes('관리') && f === '1f') return '/images/gwanri_1F.png';
+    return '';
+  }
+  async function loadPlanImage(forceBuildingId, forceFloorId){
+    const b = String(forceBuildingId ?? (buildingSel?.value || '')).trim();
+    const f = String(forceFloorId ?? (floorSel?.value || '')).trim();
+    const hasNumericIds = /^\d+$/.test(String(b || '')) && /^\d+$/.test(String(f || ''));
+    if (!b || !f || !planImg) {
+      if (planImg) planImg.removeAttribute('src');
+      clearCoord();
+      return;
+    }
+    let mapUrl = '';
+    try {
+      if (hasNumericIds) {
+        const params = new URLSearchParams({ buildingId: b, floorId: f });
+        const r = await API.req(`/fire-api/maps/floor-data?${params.toString()}`);
+        if (r && r.ok) {
+          const j = await r.json().catch(() => null);
+          mapUrl = j?.data?.planImagePath || '';
+        }
+      }
+    } catch {}
+    if (!mapUrl) {
+      const bName = buildingSel?.selectedOptions?.[0]?.textContent || '';
+      const fName = floorSel?.selectedOptions?.[0]?.textContent || '';
+      mapUrl = resolvePlanImagePathByName(bName, fName);
+    }
+    if (!mapUrl) {
+      planImg.removeAttribute('src');
+      renderSelectedMarker();
+      return;
+    }
+    planImg.onload = () => renderSelectedMarker();
+    planImg.src = `${mapUrl}?v=${Date.now()}`;
+  }
+  function syncHiddenFromSelect(){
+    setVal('extBuildingId', buildingSel?.value || '');
+    setVal('extFloorId', floorSel?.value || '');
+  }
+  function escapeAttr(value){
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+  function historyRowMarkup(row){
+    const inspectionId = row.inspectionId ? String(row.inspectionId) : '';
+    const inspectionDate = row.inspectionDate ? String(row.inspectionDate).slice(0,10) : '';
+    const isFaulty = row.isFaulty === true;
+    const isNew = !inspectionId;
+    const resultValue = isFaulty ? 'bad' : 'ok';
+    const reasonDisabled = isFaulty ? '' : 'disabled';
+    const reasonValue = escapeAttr(row.faultReason || '');
+    const saveLabel = isNew ? '등록' : '수정';
+    const deleteBtn = !isNew
+      ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-hist-delete" data-inspection-id="${inspectionId}">삭제</button>`
+      : '';
+    return `
+      <tr class="${isNew ? 'fw-history-new' : ''}">
+        <td>
+          ${isAdmin
+            ? `<input type="date" class="form-control form-control-sm js-ext-hist-date" data-inspection-id="${inspectionId}" value="${inspectionDate}" />`
+            : (inspectionDate || '-')}
+        </td>
+        <td>
+          ${isAdmin
+            ? `<select class="form-select form-select-sm js-ext-hist-result" data-inspection-id="${inspectionId}">
+                <option value="ok" ${resultValue === 'ok' ? 'selected' : ''}>정상</option>
+                <option value="bad" ${resultValue === 'bad' ? 'selected' : ''}>비정상</option>
+              </select>`
+            : (isFaulty ? '<span class="fw-status fw-bad">비정상</span>' : '<span class="fw-status fw-ok">정상</span>')}
+        </td>
+        <td><span class="fw-history-name">${row.inspectorName || '-'}</span></td>
+        <td>
+          ${isAdmin
+            ? `<input type="text" class="form-control form-control-sm js-ext-hist-reason" data-inspection-id="${inspectionId}" value="${reasonValue}" ${reasonDisabled} placeholder="고장 사유" />`
+            : (isFaulty ? (row.faultReason || '-') : '-')}
+        </td>
+        <td>
+          ${isAdmin
+            ? `<div class="fw-history-actions">
+                 <button type="button" class="btn btn-sm btn-fw-edit js-ext-hist-save" data-inspection-id="${inspectionId}">${saveLabel}</button>
+                 ${deleteBtn}
+               </div>`
+            : '-'}
+        </td>
+      </tr>`;
+  }
+  function renderHistory(inspections){
+    if (!histBody) return;
+    const rows = Array.isArray(inspections) ? inspections.slice(0, 12) : [];
+    const markup = [];
+    if (!rows.length) {
+      markup.push('<tr class="fw-history-empty"><td colspan="5" class="text-muted text-center">점검 이력이 없습니다.</td></tr>');
+    }
+    rows.forEach((row) => markup.push(historyRowMarkup(row)));
+    if (isAdmin && rows.length < 12 && currentEditingExtId > 0) {
+      markup.push(historyRowMarkup({
+        inspectionId: '',
+        inspectionDate: '',
+        inspectorName: '-',
+        isFaulty: false,
+        faultReason: ''
+      }));
+    }
+    histBody.innerHTML = markup.join('');
+  }
+
+  window.openExtinguisherUpsertModal = async function(opts){
+    const id = Number(opts?.id || 0);
+    currentEditingExtId = id;
+    const qs = new URLSearchParams(window.location.search);
+    const hideMap = opts?.hideMap === true || qs.get('noMap') === '1';
+    document.getElementById('extUpsertTitle').textContent = id ? '소화기 수정' : '소화기 추가';
+    if (mapSection) mapSection.style.display = hideMap ? 'none' : '';
+    formEl.reset();
+    setVal('extId', id);
+    setVal('extBuildingId', opts?.buildingId ?? '');
+    setVal('extFloorId', opts?.floorId ?? '');
+    setVal('extX', opts?.x ?? '');
+    setVal('extY', opts?.y ?? '');
+    renderHistory([]);
+
+    if(!id){
+      const fb = document.getElementById('filterBuildingId')?.value || '';
+      const ff = document.getElementById('filterFloorId')?.value || '';
+      if (buildingSel) {
+        selectOptionSmart(buildingSel, (opts?.buildingId ?? fb ?? ''), (opts?.buildingName ?? ''));
+      }
+      if (floorSel) {
+        selectOptionSmart(floorSel, (opts?.floorId ?? ff ?? ''), (opts?.floorName ?? ''));
+      }
+      syncHiddenFromSelect();
+      setVal('extType','');
+      setVal('extInstallDate', new Date().toISOString().slice(0,7));
+      setVal('extQty', 1);
+      setVal('extNote','');
+      const file = document.getElementById('extPhoto');
+      if(file) file.value='';
+      if (opts?.x != null && opts?.y != null) setCoord(opts.x, opts.y);
+      else clearCoord();
+      if (!hideMap) await loadPlanImage();
+      getModalInstance(modalEl).show();
+      return;
+    }
+
+    try{
+      const res = await API.req(`/fire-api/extinguishers/${id}`);
+      if(!res) return;
+      const json = await res.json();
+      const data = json.data;
+      selectOptionSmart(buildingSel, data.buildingId, data.buildingName);
+      selectOptionSmart(floorSel, data.floorId, data.floorName);
+      syncHiddenFromSelect();
+      setVal('extBuildingId', data.buildingId);
+      setVal('extFloorId', data.floorId);
+      setVal('extX', data.x ?? '');
+      setVal('extY', data.y ?? '');
+      const mappedType = mapTypeValue(data.extinguisherType);
+      const extTypeEl = document.getElementById('extType');
+      if (extTypeEl && mappedType && !Array.from(extTypeEl.options).some(o => o.value === mappedType)) {
+        const opt = document.createElement('option');
+        opt.value = mappedType;
+        opt.textContent = mappedType;
+        extTypeEl.appendChild(opt);
+      }
+      setVal('extType', mappedType);
+      setVal('extInstallDate', toMonthInputValue(data.manufactureDate));
+      setVal('extQty', data.quantity ?? 1);
+      setVal('extNote', data.note ?? '');
+      renderHistory(data.inspections);
+      const file = document.getElementById('extPhoto');
+      if(file) file.value='';
+      if (!hideMap) {
+        await loadPlanImage(data.buildingId, data.floorId);
+        if (data.x != null && data.y != null) setCoord(data.x, data.y);
+        else clearCoord();
+      }
+      getModalInstance(modalEl).show();
+    }catch(err){
+      alert('소화기 로드 실패: '+(err?.message||err));
+    }
+  };
+
+  saveBtn.addEventListener('click', async function(){
+    saveBtn.disabled = true;
+    try {
+      const id = Number(document.getElementById('extId')?.value || 0);
+      syncHiddenFromSelect();
+      const body = {
+        extinguisherId: id || undefined,
+        buildingId: parseInt(document.getElementById('extBuildingId')?.value || '0'),
+        floorId: parseInt(document.getElementById('extFloorId')?.value || '0'),
+        extinguisherType: document.getElementById('extType')?.value || '',
+        manufactureDate: toMonthStartDate(document.getElementById('extInstallDate')?.value || ''),
+        quantity: parseInt(document.getElementById('extQty')?.value || '1'),
+        note: document.getElementById('extNote')?.value || '',
+        x: document.getElementById('extX')?.value ? parseFloat(document.getElementById('extX').value) : null,
+        y: document.getElementById('extY')?.value ? parseFloat(document.getElementById('extY').value) : null,
+      };
+      if (!body.buildingId || !body.floorId) { alert('건물과 층을 선택해주세요.'); return; }
+      if (!body.extinguisherType) { alert('소화기 종류를 입력해 주세요.'); return; }
+      if (!body.manufactureDate) { alert('제조일을 입력해주세요.'); return; }
+
+      const r = await API.req('/fire-api/extinguishers', { method:'POST', body });
+      if (!r || !r.ok) { const t=await r?.text().catch(()=>''); alert('저장 실패: '+t); return; }
+      await r.json().catch(() => null);
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+      document.dispatchEvent(new CustomEvent('extinguisher:upsertCompleted'));
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  histBody?.addEventListener('click', async (ev) => {
+    if (!isAdmin) return alert('관리자만 수정 가능합니다.');
+    const saveBtnEl = ev.target.closest('.js-ext-hist-save');
+    const deleteBtnEl = ev.target.closest('.js-ext-hist-delete');
+    const actionBtn = saveBtnEl || deleteBtnEl;
+    if (!actionBtn || !currentEditingExtId) return;
+    const inspectionIdRaw = actionBtn.getAttribute('data-inspection-id') || '';
+    const inspectionId = Number(inspectionIdRaw || '0');
+    const rowDate = histBody.querySelector(`.js-ext-hist-date[data-inspection-id="${inspectionIdRaw}"]`);
+    const rowResult = histBody.querySelector(`.js-ext-hist-result[data-inspection-id="${inspectionIdRaw}"]`);
+    const rowReason = histBody.querySelector(`.js-ext-hist-reason[data-inspection-id="${inspectionIdRaw}"]`);
+    const isFaulty = (rowResult?.value || 'ok') === 'bad';
+    const faultReason = (rowReason?.value || '').trim();
+    if (deleteBtnEl) {
+      if (!inspectionId) return;
+      deleteBtnEl.disabled = true;
+      try {
+        const dr = await API.req(`/fire-api/extinguishers/${currentEditingExtId}/inspections/${inspectionId}`, {
+          method: 'DELETE'
+        });
+        if (!dr || !dr.ok) {
+          const t = await dr?.text().catch(()=> '');
+          alert(t || '점검 이력 삭제에 실패했습니다.');
+          return;
+        }
+        const rr = await API.req(`/fire-api/extinguishers/${currentEditingExtId}`);
+        const rj = rr && rr.ok ? await rr.json().catch(() => null) : null;
+        if (rj?.data) {
+          selectOptionSmart(buildingSel, rj.data.buildingId, rj.data.buildingName);
+          selectOptionSmart(floorSel, rj.data.floorId, rj.data.floorName);
+          syncHiddenFromSelect();
+        }
+        renderHistory(rj?.data?.inspections || []);
+        document.dispatchEvent(new CustomEvent('extinguisher:upsertCompleted'));
+      } finally {
+        deleteBtnEl.disabled = false;
+      }
+      return;
+    }
+    const inspectionDate = rowDate?.value || '';
+    if (!inspectionDate) return alert('점검일을 입력해 주세요.');
+    if (isFaulty && !faultReason) return alert('비정상인 경우 고장 사유를 입력해 주세요.');
+    saveBtnEl.disabled = true;
+    try {
+      const url = inspectionId > 0
+        ? `/fire-api/extinguishers/${currentEditingExtId}/inspections/${inspectionId}`
+        : `/fire-api/extinguishers/${currentEditingExtId}/inspections`;
+      const ur = await API.req(url, {
+        method: inspectionId > 0 ? 'PATCH' : 'POST',
+        body: { inspectionDate, isFaulty, faultReason }
+      });
+      if (!ur || !ur.ok) {
+        const t = await ur?.text().catch(()=>'');
+        alert(t || '점검 이력 저장에 실패했습니다.');
+        return;
+      }
+      const rr = await API.req(`/fire-api/extinguishers/${currentEditingExtId}`);
+      const rj = rr && rr.ok ? await rr.json().catch(() => null) : null;
+      if (rj?.data) {
+        selectOptionSmart(buildingSel, rj.data.buildingId, rj.data.buildingName);
+        selectOptionSmart(floorSel, rj.data.floorId, rj.data.floorName);
+        syncHiddenFromSelect();
+      }
+      renderHistory(rj?.data?.inspections || []);
+      document.dispatchEvent(new CustomEvent('extinguisher:upsertCompleted'));
+    } finally {
+      saveBtnEl.disabled = false;
+    }
+  });
+  histBody?.addEventListener('change', (ev) => {
+    const sel = ev.target.closest('.js-ext-hist-result');
+    if (!sel) return;
+    const inspectionId = sel.getAttribute('data-inspection-id') || '';
+    const reason = histBody.querySelector(`.js-ext-hist-reason[data-inspection-id="${inspectionId}"]`);
+    const isBad = sel.value === 'bad';
+    if (reason) {
+      reason.disabled = !isBad;
+      if (!isBad) reason.value = '';
+    }
+  });
+
+  buildingSel?.addEventListener('change', async () => {
+    syncHiddenFromSelect();
+    await loadPlanImage();
+  });
+  floorSel?.addEventListener('change', async () => {
+    syncHiddenFromSelect();
+    await loadPlanImage();
+  });
+  planImg?.addEventListener('load', renderSelectedMarker);
+  window.addEventListener('resize', renderSelectedMarker);
+  mapCanvas?.addEventListener('click', (e) => {
+    const f = computeFit();
+    if (!f) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    if (px < f.ox || px > f.ox + f.w || py < f.oy || py > f.oy + f.h) return;
+    const x = Math.max(0, Math.min(100, ((px - f.ox) / f.w) * 100));
+    const y = Math.max(0, Math.min(100, ((py - f.oy) / f.h) * 100));
+    setCoord(x, y);
+  });
+  modalEl?.addEventListener('shown.bs.modal', renderSelectedMarker);
+})();
+// ===== 이벤트 위임 (클릭) =====
+document.addEventListener('click', async (ev) => {
+  const inspBtn = ev.target.closest('.js-inspect');
+  if (inspBtn) {
+    ev.preventDefault();
+    const id = Number(inspBtn.getAttribute('data-id')||'0');
+    if (id) window.openInspectModal(ev, id);
+    return;
+  }
+
+  const editBtn = ev.target.closest('.js-ext-edit');
+  if (editBtn) {
+    ev.preventDefault();
+    const id = Number(editBtn.getAttribute('data-id')||'0');
+    if (id) window.openExtinguisherUpsertModal({ id });
+    return;
+  }
+
+  const delBtn = ev.target.closest('.js-ext-delete');
+  if (delBtn) {
+    ev.preventDefault();
+    const id = Number(delBtn.getAttribute('data-id') || '0');
+    const serial = delBtn.getAttribute('data-serial') || '';
+    if (!id) return;
+    const ok = window.confirm(`Delete this extinguisher?\n${serial ? `(${serial})` : ''}`);
+    if (!ok) return;
+    const r = await API.req(`/fire-api/extinguishers/${id}`, { method:'DELETE' });
+    if (!r) return;
+    if (!r.ok) {
+      let msg = 'Delete failed';
+      try { const j = await r.json(); if (j?.message) msg = j.message; } catch {}
+      showToast(msg, 'danger');
+      return;
+    }
+    showToast('Deleted.', 'success');
+    await loadExtinguishers(
+      document.getElementById('filterQ')?.value||'',
+      document.getElementById('filterBuildingId')?.value||'',
+      document.getElementById('filterFloorId')?.value||'');
+    return;
+  }
+
+  const row = ev.target.closest('tr.clickable-row[data-id]');
+  if (row) {
+    if (ev.target.closest('a,button')) return;
+    const id = Number(row.getAttribute('data-id')||'0');
+    if (id) openDetails(id);
+    return;
+  }
+
+  const zoomable = ev.target.closest('.js-zoomable');
+  if (zoomable) {
+    const src = zoomable.getAttribute('data-zoom-src') || zoomable.getAttribute('src');
+    if (src) {
+      const target = document.getElementById('detailImageZoomTarget');
+      target.dataset.markerX = zoomable.dataset.markerX || '';
+      target.dataset.markerY = zoomable.dataset.markerY || '';
+      target.dataset.markerIcon = zoomable.dataset.markerIcon || '';
+      target.onload = () => renderExtZoomMarker(target);
+      target.src = src;
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('detailImageZoomModal')).show();
+      setTimeout(() => renderExtZoomMarker(target), 0);
+    }
+  }
+});
+
+// ===== 버튼 이벤트 =====
+document.getElementById('btnSearch')?.addEventListener('click', () => {
+  const q = document.getElementById('filterQ')?.value || '';
+  const b = document.getElementById('filterBuildingId')?.value || '';
+  const f = document.getElementById('filterFloorId')?.value || '';
+  loadExtinguishers(q, b, f);
+});
+document.getElementById('filterQ')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btnSearch')?.click();
+});
+document.getElementById('btnReset')?.addEventListener('click', () => {
+  document.getElementById('filterQ').value = '';
+  document.getElementById('filterBuildingId').value = '';
+  document.getElementById('filterFloorId').value = '';
+  currentStatusType = null;
+  syncStatusButtons();
+  loadExtinguishers();
+});
+document.getElementById('btnStatusInspect')?.addEventListener('click', () => applyStatusFilter('inspect'));
+document.getElementById('btnStatusPlanned')?.addEventListener('click', () => applyStatusFilter('planned'));
+document.getElementById('btnStatusUrgent')?.addEventListener('click', () => applyStatusFilter('urgent'));
+document.getElementById('btnExtAdd')?.addEventListener('click', () => window.openExtinguisherUpsertModal({ id: 0 }));
+
+// 등록/점검 완료 후 목록 새로고침
+document.addEventListener('inspection:completed', () => loadExtinguishers(
+  document.getElementById('filterQ')?.value||'',
+  document.getElementById('filterBuildingId')?.value||'',
+  document.getElementById('filterFloorId')?.value||''));
+document.addEventListener('extinguisher:upsertCompleted', () => loadExtinguishers(
+  document.getElementById('filterQ')?.value||'',
+  document.getElementById('filterBuildingId')?.value||'',
+  document.getElementById('filterFloorId')?.value||''));
+
+function _norm(v) { return String(v || '').replace(/\s+/g,'').toLowerCase(); }
+function _normBuildingCompat(v) { return _norm(v).replace(/[.,_\-]/g,''); }
+function _normFloorCompat(v) {
+  const s = _norm(v).replace(/[()]/g, '');
+  if (!s) return '';
+  if (s === 'b1' || s.includes('지하1') || s.includes('지하') || s.includes('地下1') || s.includes('地下')) return 'b1';
+  if (s.includes('1')) return '1f';
+  if (s.includes('2')) return '2f';
+  if (s.includes('3')) return '3f';
+  if (s.includes('4')) return '4f';
+  return s;
+}
+
+// ===== 珥덇린??=====
+(async function init() {
+  const qs = new URLSearchParams(window.location.search);
+  const embedEditMode = qs.get('embedEdit') === '1';
+  const embedDetailsMode = qs.get('embedDetails') === '1';
+  const embedInspectMode = qs.get('embedInspect') === '1';
+
+  const user = localStorage.getItem('fireweb_user') || localStorage.getItem('fw_user');
+  if (!user) { window.location.href = '/login.html'; return; }
+  window.FireWebNav?.mount?.();
+  if (embedEditMode || embedDetailsMode || embedInspectMode) {
+    const headerEl = document.querySelector('header');
+    const mainEl = document.querySelector('main');
+    if (headerEl) headerEl.style.display = 'none';
+    if (mainEl) mainEl.style.display = 'none';
+    // iframe 내부를 완전 투명하게 — 모달만 표시
+    const embedStyle = document.createElement('style');
+    embedStyle.textContent = [
+      'html, body { background: transparent !important; }',
+      '.modal-backdrop { display: none !important; }',
+      '.modal { background: transparent !important; }',
+      '#extUpsertModal .modal-header { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-bottom:0; }',
+      '#extUpsertModal .modal-title { color:#fff; font-weight:700; }',
+      '#extUpsertModal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }'
+    ].join('\n');
+    document.head.appendChild(embedStyle);
+  }
+  if (isAdmin) {
+    const addBtn = document.getElementById('btnExtAdd');
+    if (addBtn) addBtn.style.display = '';
+  }
+  await loadExtinguishers();
+
+  const editId = parseInt(qs.get('edit') || '0', 10);
+  if (isAdmin && editId > 0) {
+    window.openExtinguisherUpsertModal({ id: editId });
+    return;
+  }
+
+  const detailsId = parseInt(qs.get('details') || '0', 10);
+  if (detailsId > 0) {
+    openDetails(detailsId);
+    return;
+  }
+
+  const inspectId = parseInt(qs.get('inspect') || '0', 10);
+  if (inspectId > 0) {
+    window.openInspectModal?.(null, inspectId);
+    return;
+  }
+
+  const add = qs.get('add');
+  if (isAdmin && add === '1') {
+    const bIdQ = qs.get('buildingId') || '';
+    const fIdQ = qs.get('floorId') || '';
+    const bx = qs.get('buildingName') || '';
+    const fx = qs.get('floorName') || '';
+    const x = parseFloat(qs.get('x') || '');
+    const y = parseFloat(qs.get('y') || '');
+
+    let matched = null;
+    if (bIdQ && fIdQ) {
+      matched = allItems.find(it =>
+        String(it.buildingId || '') === String(bIdQ) &&
+        String(it.floorId || '') === String(fIdQ)
+      );
+    }
+    if (!matched) {
+      matched = allItems.find(it =>
+        _normBuildingCompat(it.buildingName) === _normBuildingCompat(bx) &&
+        _normFloorCompat(it.floorName) === _normFloorCompat(fx)
+      );
+    }
+    window.openExtinguisherUpsertModal({
+      id: 0,
+      buildingId: matched?.buildingId || bIdQ || '',
+      floorId: matched?.floorId || fIdQ || '',
+      buildingName: matched?.buildingName || bx || '',
+      floorName: matched?.floorName || fx || '',
+      x: Number.isFinite(x) ? x : '',
+      y: Number.isFinite(y) ? y : ''
+    });
+  }
+})();
+
+function releaseModalFocus(modalEl) {
+  const active = document.activeElement;
+  if (modalEl && active instanceof HTMLElement && modalEl.contains(active)) {
+    active.blur();
+  }
+}
+
+document.getElementById('extUpsertModal')?.addEventListener('hide.bs.modal', (e) => {
+  releaseModalFocus(e.currentTarget);
+  e.currentTarget?.setAttribute('inert', '');
+});
+document.getElementById('extUpsertModal')?.addEventListener('shown.bs.modal', (e) => {
+  e.currentTarget?.removeAttribute('inert');
+});
+
+document.getElementById('extUpsertModal')?.addEventListener('hidden.bs.modal', () => {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get('embedEdit') === '1') {
+    try { window.parent?.postMessage('fireweb:ext-edit-close', '*'); } catch {}
+  }
+});
+
+document.getElementById('detailImageZoomStage')?.addEventListener('click', () => {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('detailImageZoomModal')).hide();
+});
+document.getElementById('detailImageZoomTarget')?.addEventListener('click', () => {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('detailImageZoomModal')).hide();
+});
+document.getElementById('detailImageZoomModal')?.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'detailImageZoomModal') {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('detailImageZoomModal')).hide();
+  }
+});
+document.getElementById('detailImageZoomModal')?.addEventListener('shown.bs.modal', () => {
+  renderExtZoomMarker(document.getElementById('detailImageZoomTarget'));
+});
+document.getElementById('detailsModal')?.addEventListener('shown.bs.modal', () => {
+  const img = document.getElementById('extDetailPlanImg');
+  if (!img) return;
+  renderDetailPlanSingleMarker(
+    'extDetailPlanWrap',
+    'extDetailPlanImg',
+    'extDetailPlanMarkerLayer',
+    img.dataset.markerIcon || '/images/Extinguisher.PNG',
+    img.dataset.markerX,
+    img.dataset.markerY
+  );
+});
+window.addEventListener('resize', () => {
+  const modalEl = document.getElementById('detailImageZoomModal');
+  if (modalEl?.classList.contains('show')) {
+    renderExtZoomMarker(document.getElementById('detailImageZoomTarget'));
+  }
+});
+
+document.getElementById('detailsModal')?.addEventListener('hidden.bs.modal', () => {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get('embedDetails') === '1') {
+    try { window.parent?.postMessage('fireweb:ext-details-close', '*'); } catch {}
+  }
+});
+
+document.getElementById('detailsModal')?.addEventListener('hide.bs.modal', (e) => {
+  releaseModalFocus(e.currentTarget);
+  e.currentTarget?.setAttribute('inert', '');
+});
+document.getElementById('detailsModal')?.addEventListener('shown.bs.modal', (e) => {
+  e.currentTarget?.removeAttribute('inert');
+});
+
+document.getElementById('inspectModal')?.addEventListener('hidden.bs.modal', () => {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get('embedInspect') === '1') {
+    try { window.parent?.postMessage('fireweb:ext-inspect-close', '*'); } catch {}
+  }
+});
+
+document.getElementById('inspectModal')?.addEventListener('hide.bs.modal', (e) => {
+  releaseModalFocus(e.currentTarget);
+  e.currentTarget?.setAttribute('inert', '');
+});
+document.getElementById('inspectModal')?.addEventListener('shown.bs.modal', (e) => {
+  e.currentTarget?.removeAttribute('inert');
+});
+
+if (!EMBED_MODAL_MODE) {
+  const localOpenDetails = openDetails;
+  const localOpenInspectModal = window.openInspectModal;
+  const localOpenExtinguisherUpsertModal = window.openExtinguisherUpsertModal;
+
+  function buildListAddOptions() {
+    const buildingSel = document.getElementById('filterBuildingId');
+    const floorSel = document.getElementById('filterFloorId');
+    const buildingId = buildingSel?.value || '';
+    const floorId = floorSel?.value || '';
+    return {
+      mode: 'edit',
+      add: true,
+      buildingId,
+      floorId,
+      buildingName: buildingId ? (buildingSel?.selectedOptions?.[0]?.textContent || '') : '',
+      floorName: floorId ? (floorSel?.selectedOptions?.[0]?.textContent || '') : ''
+    };
+  }
+
+  function refreshCurrentList() {
+    return loadExtinguishers(
+      document.getElementById('filterQ')?.value || '',
+      document.getElementById('filterBuildingId')?.value || '',
+      document.getElementById('filterFloorId')?.value || ''
+    );
+  }
+
+  openDetails = function(id) {
+    if (!id) return;
+    if (!window.FireWebExtinguisherModal) return localOpenDetails(id);
+    window.FireWebExtinguisherModal.open({ mode: 'details', id });
+  };
+
+  window.openInspectModal = function(e, id) {
+    if (!id) return;
+    if (!window.FireWebExtinguisherModal) return localOpenInspectModal(e, id);
+    if (e) e.stopPropagation?.();
+    window.FireWebExtinguisherModal.open({
+      mode: 'inspect',
+      id,
+      onClose: ({ reason }) => {
+        if (reason !== 'dismiss') refreshCurrentList();
+      }
+    });
+  };
+
+  window.openExtinguisherUpsertModal = function(opts) {
+    if (!window.FireWebExtinguisherModal) {
+      return localOpenExtinguisherUpsertModal(opts);
+    }
+    const hasId = Number(opts?.id || 0) > 0;
+    const options = hasId
+      ? { mode: 'edit', id: Number(opts.id) }
+      : { ...buildListAddOptions(), ...(opts || {}) };
+    window.FireWebExtinguisherModal.open({
+      ...options,
+      onClose: ({ reason }) => {
+        if (reason !== 'dismiss') refreshCurrentList();
+      }
+    });
+  };
+}
+</script>
+<script src="/js/common-nav.js"></script>
+
+<script>
+/* fwHeaderGradient: thead.table-dark의 각 th에 서로 다른 gradient position을 줘서 '칸마다' 그라데이션처럼 보이게 */
+(function fwHeaderGradient(){
+  document.querySelectorAll('table.table thead.table-dark').forEach(function(thead){
+    var ths = Array.prototype.slice.call(thead.querySelectorAll('th'));
+    var n = ths.length;
+    ths.forEach(function(th, i){
+      var pos = (n <= 1) ? 0 : (i / (n - 1)) * 100;
+      th.style.setProperty('--fw-bgpos', pos.toFixed(2) + '% 0%');
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

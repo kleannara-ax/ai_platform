@@ -2,6 +2,7 @@ package com.company.module.fire.dto;
 
 import com.company.module.fire.entity.Extinguisher;
 import com.company.module.fire.entity.ExtinguisherInspection;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -12,10 +13,9 @@ import java.util.stream.Collectors;
 
 /**
  * 소화기 목록/상세 응답 DTO
- * <p>
- * 기존 ASP.NET: VwExtinguisherList + DetailsModalVm 통합
  */
 @Getter
+@Builder
 public class ExtinguisherResponse {
 
     private final Long extinguisherId;
@@ -45,24 +45,29 @@ public class ExtinguisherResponse {
     // 점검 이력 (상세 조회 시)
     private List<InspectionRow> inspections;
 
-    public ExtinguisherResponse(Extinguisher e) {
-        this.extinguisherId = e.getExtinguisherId();
-        this.serialNumber = e.getSerialNumber();
-        this.qrKey = e.getNoteKey();
-        this.buildingId = e.getBuilding() != null ? e.getBuilding().getBuildingId() : null;
-        this.buildingName = e.getBuilding() != null ? e.getBuilding().getBuildingName() : null;
-        this.floorId = e.getFloor() != null ? e.getFloor().getFloorId() : null;
-        this.floorName = e.getFloor() != null ? e.getFloor().getFloorName() : null;
-        this.extinguisherType = e.getExtinguisherType();
-        this.manufactureDate = e.getManufactureDate();
-        this.replacementCycleYears = e.getReplacementCycleYears();
-        this.replacementDueDate = e.getReplacementDueDate();
-        this.quantity = e.getQuantity();
-        this.note = e.getNote();
-        this.imagePath = e.getImagePath();
-        this.x = e.getX();
-        this.y = e.getY();
-        this.createdAt = e.getCreatedAt();
+    /**
+     * Entity → Response 변환 팩토리
+     */
+    public static ExtinguisherResponse from(Extinguisher e) {
+        return ExtinguisherResponse.builder()
+                .extinguisherId(e.getExtinguisherId())
+                .serialNumber(e.getSerialNumber())
+                .qrKey(e.getNoteKey())
+                .buildingId(e.getBuilding() != null ? e.getBuilding().getBuildingId() : null)
+                .buildingName(e.getBuilding() != null ? e.getBuilding().getBuildingName() : null)
+                .floorId(e.getFloor() != null ? e.getFloor().getFloorId() : null)
+                .floorName(e.getFloor() != null ? e.getFloor().getFloorName() : null)
+                .extinguisherType(e.getExtinguisherType())
+                .manufactureDate(e.getManufactureDate())
+                .replacementCycleYears(e.getReplacementCycleYears())
+                .replacementDueDate(e.getReplacementDueDate())
+                .quantity(e.getQuantity())
+                .note(e.getNote())
+                .imagePath(e.getImagePath())
+                .x(e.getX())
+                .y(e.getY())
+                .createdAt(e.getCreatedAt())
+                .build();
     }
 
     public void setLastInspection(ExtinguisherInspection inspection) {

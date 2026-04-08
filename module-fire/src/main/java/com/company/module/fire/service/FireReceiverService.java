@@ -37,6 +37,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class FireReceiverService {
 
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 7L;
@@ -47,12 +48,12 @@ public class FireReceiverService {
     private final FloorRepository floorRepository;
     private final ObjectMapper objectMapper;
 
-    @Transactional(readOnly = true)
+
     public Page<FireReceiverResponse> getReceivers(String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("receiverId").ascending());
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
         return fireReceiverRepository.search(kw, pageable).map(receiver -> {
-            FireReceiverResponse response = new FireReceiverResponse(receiver);
+            FireReceiverResponse response = FireReceiverResponse.from(receiver);
             fireReceiverInspectionRepository
                     .findTopByReceiver_ReceiverIdOrderByInspectionDateDescInspectionIdDesc(receiver.getReceiverId())
                     .ifPresent(response::setLastInspection);
@@ -60,12 +61,12 @@ public class FireReceiverService {
         });
     }
 
-    @Transactional(readOnly = true)
+
     public FireReceiverResponse getReceiverDetail(Long receiverId) {
         FireReceiver receiver = fireReceiverRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("FireReceiver", receiverId));
 
-        FireReceiverResponse response = new FireReceiverResponse(receiver);
+        FireReceiverResponse response = FireReceiverResponse.from(receiver);
         Pageable pageable = PageRequest.of(0, MAX_INSPECTION_HISTORY,
                 Sort.by("inspectionDate").descending().and(Sort.by("inspectionId").descending()));
         List<FireReceiverInspection> history = fireReceiverInspectionRepository
@@ -78,7 +79,7 @@ public class FireReceiverService {
         return response;
     }
 
-    @Transactional(readOnly = true)
+
     public byte[] exportInspectionCsv(Long receiverId, LocalDate fromDate, LocalDate toDate) {
         if (fromDate == null || toDate == null) {
             throw new BusinessException("조회 시작일과 종료일을 입력해 주세요.");
@@ -112,7 +113,7 @@ public class FireReceiverService {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    @Transactional(readOnly = true)
+
     public byte[] exportAllInspectionCsv(LocalDate fromDate, LocalDate toDate) {
         validateExportRange(fromDate, toDate);
         List<FireReceiverInspection> inspections = fireReceiverInspectionRepository
@@ -164,7 +165,7 @@ public class FireReceiverService {
         }
 
         log.info("FireReceiver saved: id={}, serial={}", receiver.getReceiverId(), receiver.getSerialNumber());
-        return new FireReceiverResponse(receiver);
+        return FireReceiverResponse.from(receiver);
     }
 
     @Transactional

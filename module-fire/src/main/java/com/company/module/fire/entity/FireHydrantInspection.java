@@ -11,11 +11,6 @@ import java.time.LocalDateTime;
 
 /**
  * 소화전 점검 이력 엔티티
- * <p>
- * 기존 ASP.NET: FireHydrantInspection
- * - FireHydrant와 1:N 관계 (Cascade Delete)
- * - 최근 12건만 유지 (서비스에서 trim 처리)
- *
  * 테이블명: fire_hydrant_inspection
  */
 @Getter
@@ -26,34 +21,29 @@ public class FireHydrantInspection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inspection_id")
+    @Column(name = "INSPECTION_ID")
     private Long inspectionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hydrant_id", nullable = false)
+    @JoinColumn(name = "HYDRANT_ID", nullable = false)
     private FireHydrant hydrant;
 
-    /** 점검일 */
-    @Column(name = "inspection_date", nullable = false)
+    @Column(name = "INSPECTION_DATE", nullable = false)
     private LocalDate inspectionDate;
 
-    /** 비정상 여부 */
-    @Column(name = "is_faulty", nullable = false)
+    @Column(name = "IS_FAULTY", nullable = false)
     private boolean isFaulty;
 
-    /** 불량 사유 */
-    @Column(name = "fault_reason", length = 500)
+    @Column(name = "FAULT_REASON", length = 500)
     private String faultReason;
 
-    /** 점검자 ID (WebUser FK) */
-    @Column(name = "inspected_by_user_id")
+    @Column(name = "INSPECTED_BY_USER_ID")
     private Long inspectedByUserId;
 
-    /** 점검자 표시 이름 스냅샷 */
-    @Column(name = "inspected_by_name", length = 200)
+    @Column(name = "INSPECTED_BY_NAME", length = 200)
     private String inspectedByName;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

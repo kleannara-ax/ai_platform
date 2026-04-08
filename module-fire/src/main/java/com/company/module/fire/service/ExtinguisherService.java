@@ -28,6 +28,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ExtinguisherService {
 
     private final ExtinguisherRepository extinguisherRepository;
@@ -40,10 +41,7 @@ public class ExtinguisherService {
 
     /**
      * 소화기 목록 조회
-     * <p>
-     * 기존 ASP.NET `IndexModel.OnGetAsync()` 대응
      */
-    @Transactional(readOnly = true)
     public Page<ExtinguisherResponse> getExtinguishers(Long buildingId, Long floorId,
                                                         String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("extinguisherId").ascending());
@@ -54,7 +52,7 @@ public class ExtinguisherService {
 
         Page<Extinguisher> entityPage = extinguisherRepository.searchExtinguishers(bId, fId, kw, pageable);
         return entityPage.map(e -> {
-            ExtinguisherResponse dto = new ExtinguisherResponse(e);
+            ExtinguisherResponse dto = ExtinguisherResponse.from(e);
             inspectionRepository
                     .findTopByExtinguisher_ExtinguisherIdOrderByInspectionDateDescInspectionIdDesc(e.getExtinguisherId())
                     .ifPresent(dto::setLastInspection);
@@ -63,15 +61,13 @@ public class ExtinguisherService {
     }
 
     /**
-     * 소화기 상세 조회
-     * 최근 점검 이력을 함께 반환한다.
+     * 소화기 상세 조회 (최근 점검 이력 포함)
      */
-    @Transactional(readOnly = true)
     public ExtinguisherResponse getExtinguisherDetail(Long extinguisherId) {
         Extinguisher e = extinguisherRepository.findById(extinguisherId)
                 .orElseThrow(() -> new EntityNotFoundException("Extinguisher", extinguisherId));
 
-        ExtinguisherResponse dto = new ExtinguisherResponse(e);
+        ExtinguisherResponse dto = ExtinguisherResponse.from(e);
 
         Pageable top12 = PageRequest.of(0, MAX_INSPECTION_HISTORY,
                 Sort.by("inspectionDate").descending().and(Sort.by("inspectionId").descending()));
@@ -86,10 +82,7 @@ public class ExtinguisherService {
     }
 
     /**
-     * 소화기 저장
-     * <p>
-     * 신규 등록과 수정을 모두 처리한다.
-     * 기존 ASP.NET `OnPostExtSaveAsync()` 대응
+     * 소화기 저장 (신규 등록 / 수정)
      */
     @Transactional
     public ExtinguisherResponse saveExtinguisher(ExtinguisherSaveRequest req) {
@@ -128,15 +121,12 @@ public class ExtinguisherService {
         }
 
         log.info("Extinguisher saved: id={}, serial={}", entity.getExtinguisherId(), entity.getSerialNumber());
-        return new ExtinguisherResponse(entity);
+        return ExtinguisherResponse.from(entity);
     }
 
     /**
      * 소화기 점검 등록
-     * <p>
-     * 기존 ASP.NET `OnPostInspectAsync()` 대응
-     * - 같은 날짜 점검은 중복 등록하지 않는다.
-     * - 점검 이력은 최신 12건만 유지한다.
+     * 같은 날짜 점검 중복 불가, 최신 12건 유지
      */
     @Transactional
     public void inspect(ExtinguisherInspectRequest req, Long userId, String inspectorName) {
@@ -243,10 +233,7 @@ public class ExtinguisherService {
         inspection.updateInspection(inspectionDate, isFaulty, faultReason, inspectorName);
     }
 
-    /**
-     * 소화기 삭제
-     * 점검 이력은 Cascade Delete 된다.
-     */
+    /** 소화기 삭제 (점검 이력 Cascade) */
     @Transactional
     public void deleteExtinguisher(Long extinguisherId) {
         Extinguisher e = extinguisherRepository.findById(extinguisherId)
@@ -255,9 +242,7 @@ public class ExtinguisherService {
         log.info("Extinguisher deleted: id={}", extinguisherId);
     }
 
-    /**
-     * 이미지 경로 갱신
-     */
+    /** 이미지 경로 갱신 */
     @Transactional
     public void updateImagePath(Long extinguisherId, String imagePath) {
         Extinguisher e = extinguisherRepository.findById(extinguisherId)
@@ -265,10 +250,7 @@ public class ExtinguisherService {
         e.updateImagePath(imagePath);
     }
 
-    /**
-     * 다음 일련번호 생성
-     * `EXT-000001` 형식을 사용한다.
-     */
+    /** 다음 일련번호 생성 (EXT-000001 형식) */
     private String generateNextSerialNumber() {
         List<String> allSerials = extinguisherRepository.findAll().stream()
                 .map(Extinguisher::getSerialNumber)

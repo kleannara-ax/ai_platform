@@ -28,6 +28,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class FireHydrantService {
 
     private final FireHydrantRepository hydrantRepository;
@@ -37,7 +38,6 @@ public class FireHydrantService {
 
     private static final int MAX_INSPECTION_HISTORY = 12;
 
-    @Transactional(readOnly = true)
     public Page<FireHydrantResponse> getHydrants(Long buildingId, Long floorId,
                                                   String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("hydrantId").ascending());
@@ -48,7 +48,7 @@ public class FireHydrantService {
 
         Page<FireHydrant> entityPage = hydrantRepository.searchHydrants(bId, fId, kw, pageable);
         return entityPage.map(h -> {
-            FireHydrantResponse dto = new FireHydrantResponse(h);
+            FireHydrantResponse dto = FireHydrantResponse.from(h);
             inspectionRepository
                     .findTopByHydrant_HydrantIdOrderByInspectionDateDescInspectionIdDesc(h.getHydrantId())
                     .ifPresent(dto::setLastInspection);
@@ -56,12 +56,11 @@ public class FireHydrantService {
         });
     }
 
-    @Transactional(readOnly = true)
     public FireHydrantResponse getHydrantDetail(Long hydrantId) {
         FireHydrant h = hydrantRepository.findById(hydrantId)
                 .orElseThrow(() -> new EntityNotFoundException("FireHydrant", hydrantId));
 
-        FireHydrantResponse dto = new FireHydrantResponse(h);
+        FireHydrantResponse dto = FireHydrantResponse.from(h);
 
         Pageable top12 = PageRequest.of(0, MAX_INSPECTION_HISTORY,
                 Sort.by("inspectionDate").descending().and(Sort.by("inspectionId").descending()));
@@ -134,7 +133,7 @@ public class FireHydrantService {
 
         entity.update(operationType, building, floor, x, y, req.getLocationDescription());
         log.info("FireHydrant saved: id={}, serial={}", entity.getHydrantId(), entity.getSerialNumber());
-        return new FireHydrantResponse(entity);
+        return FireHydrantResponse.from(entity);
     }
 
     @Transactional
