@@ -4,6 +4,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +62,56 @@ public class FirePageController {
     @ResponseBody
     public ResponseEntity<String> floorPage() throws IOException {
         return serveHtml("static/maps/floor.html");
+    }
+
+    /**
+     * 이미지 리소스 직접 서빙 (classpath:/static/images/* 에서 로드).
+     * Spring Boot의 기본 정적 리소스 핸들러가 nested JAR에서 이미지를 못 찾는 경우 대비.
+     */
+    @GetMapping("/images/{filename:.+}")
+    @ResponseBody
+    public ResponseEntity<byte[]> serveImage(@PathVariable String filename) throws IOException {
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Resource resource = new ClassPathResource("static/images/" + filename);
+        if (!resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        MediaType mediaType = MediaTypeFactory.getMediaType(filename)
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+
+        byte[] data = resource.getInputStream().readAllBytes();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic())
+                .contentType(mediaType)
+                .contentLength(data.length)
+                .body(data);
+    }
+
+    /**
+     * JS 리소스 직접 서빙 (classpath:/static/js/* 에서 로드).
+     */
+    @GetMapping("/js/{filename:.+}")
+    @ResponseBody
+    public ResponseEntity<byte[]> serveJs(@PathVariable String filename) throws IOException {
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Resource resource = new ClassPathResource("static/js/" + filename);
+        if (!resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        byte[] data = resource.getInputStream().readAllBytes();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore().mustRevalidate())
+                .contentType(new MediaType("application", "javascript", StandardCharsets.UTF_8))
+                .contentLength(data.length)
+                .body(data);
     }
 
     private ResponseEntity<String> serveHtml(String resourcePath) throws IOException {
