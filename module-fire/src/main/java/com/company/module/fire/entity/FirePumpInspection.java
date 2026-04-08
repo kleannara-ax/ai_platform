@@ -10,6 +10,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * 소방펌프 점검 이력 엔티티
+ * 테이블명: fire_pump_inspection
+ */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -18,57 +22,57 @@ public class FirePumpInspection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inspection_id")
+    @Column(name = "INSPECTION_ID")
     private Long inspectionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pump_id", nullable = false)
+    @JoinColumn(name = "PUMP_ID", nullable = false)
     private FirePump pump;
 
-    @Column(name = "inspection_date", nullable = false)
+    @Column(name = "INSPECTION_DATE", nullable = false)
     private LocalDate inspectionDate;
 
-    @Column(name = "inspection_time")
+    @Column(name = "INSPECTION_TIME")
     private LocalTime inspectionTime;
 
-    @Column(name = "inspection_status", nullable = false, length = 30)
+    @Column(name = "INSPECTION_STATUS", nullable = false, length = 30)
     private String inspectionStatus;
 
     @Lob
-    @Column(name = "checklist_json", columnDefinition = "LONGTEXT")
+    @Column(name = "CHECKLIST_JSON", columnDefinition = "LONGTEXT")
     private String checklistJson;
 
-    @Column(name = "image_path", length = 600)
+    @Column(name = "IMAGE_PATH", length = 600)
     private String imagePath;
 
-    @Column(name = "note", length = 1000)
+    @Column(name = "NOTE", length = 1000)
     private String note;
 
-    @Column(name = "pump_operation_status", length = 30)
+    @Column(name = "PUMP_OPERATION_STATUS", length = 30)
     private String pumpOperationStatus;
 
-    @Column(name = "panel_status", length = 30)
+    @Column(name = "PANEL_STATUS", length = 30)
     private String panelStatus;
 
-    @Column(name = "water_supply_status", length = 30)
+    @Column(name = "WATER_SUPPLY_STATUS", length = 30)
     private String waterSupplyStatus;
 
-    @Column(name = "fuel_status", length = 30)
+    @Column(name = "FUEL_STATUS", length = 30)
     private String fuelStatus;
 
-    @Column(name = "drain_pump_status", length = 30)
+    @Column(name = "DRAIN_PUMP_STATUS", length = 30)
     private String drainPumpStatus;
 
-    @Column(name = "piping_status", length = 30)
+    @Column(name = "PIPING_STATUS", length = 30)
     private String pipingStatus;
 
-    @Column(name = "inspected_by_user_id")
+    @Column(name = "INSPECTED_BY_USER_ID")
     private Long inspectedByUserId;
 
-    @Column(name = "inspected_by_name", length = 200)
+    @Column(name = "INSPECTED_BY_NAME", length = 200)
     private String inspectedByName;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

@@ -2,6 +2,7 @@ package com.company.module.fire.dto;
 
 import com.company.module.fire.entity.FireReceiver;
 import com.company.module.fire.entity.FireReceiverInspection;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -11,7 +12,11 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 수신기 목록/상세 응답 DTO
+ */
 @Getter
+@Builder
 public class FireReceiverResponse {
 
     private final Long receiverId;
@@ -32,21 +37,27 @@ public class FireReceiverResponse {
     private String lastInspectorName;
     private String lastInspectionStatus;
     private String lastInspectionNote;
+    @Builder.Default
     private List<InspectionRow> inspections = List.of();
 
-    public FireReceiverResponse(FireReceiver receiver) {
-        this.receiverId = receiver.getReceiverId();
-        this.serialNumber = receiver.getSerialNumber();
-        this.qrKey = receiver.getQrKey();
-        this.buildingName = receiver.getBuildingName();
-        this.floorId = receiver.getFloor() != null ? receiver.getFloor().getFloorId() : null;
-        this.floorName = receiver.getFloor() != null ? receiver.getFloor().getFloorName() : null;
-        this.x = receiver.getX();
-        this.y = receiver.getY();
-        this.locationDescription = receiver.getLocationDescription();
-        this.note = receiver.getNote();
-        this.isActive = receiver.isActive();
-        this.createdAt = receiver.getCreatedAt();
+    /**
+     * Entity → Response 변환 팩토리
+     */
+    public static FireReceiverResponse from(FireReceiver receiver) {
+        return FireReceiverResponse.builder()
+                .receiverId(receiver.getReceiverId())
+                .serialNumber(receiver.getSerialNumber())
+                .qrKey(receiver.getQrKey())
+                .buildingName(receiver.getBuildingName())
+                .floorId(receiver.getFloor() != null ? receiver.getFloor().getFloorId() : null)
+                .floorName(receiver.getFloor() != null ? receiver.getFloor().getFloorName() : null)
+                .x(receiver.getX())
+                .y(receiver.getY())
+                .locationDescription(receiver.getLocationDescription())
+                .note(receiver.getNote())
+                .isActive(receiver.isActive())
+                .createdAt(receiver.getCreatedAt())
+                .build();
     }
 
     public void setLastInspection(FireReceiverInspection inspection) {

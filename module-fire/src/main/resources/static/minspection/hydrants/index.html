@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>소화전 점검 - FireWeb</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --border: rgba(0,0,0,.12);
+      --radius: 14px;
+      --shadow: 0 4px 16px rgba(0,0,0,.10);
+      --muted: #6b7280;
+      --primary: #667eea;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+      color: #111;
+      min-height: 100vh;
+    }
+    header.m-top {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 14px 16px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header.m-top .logo { font-size: 18px; font-weight: 900; }
+    main.m-container { padding: 12px; }
+
+    .mi-wrap { display: grid; gap: 12px; }
+    .mi-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .mi-title { font-weight: 900; font-size: 17px; }
+    .mi-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .mi-err { color: #b91c1c; font-weight: 800; font-size: 14px; }
+    .mi-form { display: grid; gap: 12px; }
+    .mi-form label { font-weight: 700; font-size: 13px; display: block; margin-bottom: 4px; }
+    .mi-form input, .mi-form select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.12);
+      font-size: 15px;
+    }
+    .mi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mi-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:hover { opacity: .9; }
+
+    /* 도면 맵 */
+    .mapWrap {
+      position: relative;
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .mapCanvas {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .mapInner { position: absolute; inset: 0; transform-origin: 0 0; }
+    .mapCanvas img { width: 100%; height: 100%; object-fit: fill; display: block; background: #f0f0f0; }
+    .markerLayer { position: absolute; inset: 0; pointer-events: none; }
+    .markerIcon {
+      position: absolute;
+      width: 20px; height: 20px;
+      transform: translate(-50%, -50%);
+      background: transparent; border: 0; padding: 0;
+      pointer-events: none;
+    }
+    .markerIcon img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; }
+    .markerIcon.existing { opacity: 0.8; filter: drop-shadow(0 0 4px rgba(0,0,0,.45)); }
+    .markerIcon.selected { width: 24px; height: 24px; filter: drop-shadow(0 0 7px rgba(37,99,235,.95)); }
+    .coord { font-size: 12px; color: #555; margin-top: 4px; }
+
+    /* 옥외 경고 */
+    .outdoor-note {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #9a3412;
+    }
+
+    /* 점검 모달 */
+    #inspectOverlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 500;
+    }
+    #inspectModal {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 16px 32px;
+      z-index: 501;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #inspectModal .modal-title { font-size: 18px; font-weight: 900; margin-bottom: 12px; }
+    .inspect-info { background: #f9f9f9; border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 14px; }
+    .inspect-info strong { font-size: 16px; }
+    .checklist-wrap { display: grid; gap: 10px; margin-top: 8px; }
+    .check-item {
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: #fff;
+    }
+    .check-item .label { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .radio-group { display: flex; gap: 14px; }
+    .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .radio-group input[type="radio"] { width: 18px; height: 18px; cursor: pointer; }
+    #faultReasonAuto { margin-top: 10px; color: #b91c1c; font-size: 13px; font-weight: 700; display: none; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; }
+    .btn-confirm { background: #667eea; color: #fff; }
+    .btn-cancel { background: #e5e7eb; color: #374151; }
+
+    /* 완료 화면 */
+    #completeView {
+      display: none;
+      text-align: center;
+      padding: 40px 16px;
+    }
+    #completeView .emoji { font-size: 56px; }
+    #completeView .ctitle { font-size: 22px; font-weight: 900; margin-top: 12px; }
+    #completeView .csub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    #completeView .btn-close-page {
+      margin-top: 24px;
+      display: inline-block;
+      padding: 13px 32px;
+      background: #667eea;
+      color: #fff;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="m-top">
+    <span class="logo">🚒 소화전 점검</span>
+  </header>
+
+  <main class="m-container">
+    <div id="mainView" class="mi-wrap">
+      <div class="mi-card">
+        <div class="text-center py-3" style="color:#6b7280;">불러오는 중...</div>
+      </div>
+    </div>
+
+    <div id="completeView">
+      <div class="emoji">✅</div>
+      <div class="ctitle">등록 완료!</div>
+      <div class="csub">창을 닫아주세요.</div>
+      <button class="btn-close-page" onclick="closeCurrentWindow()">닫기</button>
+    </div>
+  </main>
+
+  <!-- 점검 모달 -->
+  <div id="inspectOverlay"></div>
+  <div id="inspectModal" style="display:none;">
+    <div class="modal-title">소화전 점검</div>
+    <div class="inspect-info" id="inspectInfo"></div>
+    <div>
+      <div style="font-weight:700; margin-bottom:8px;">소화전 점검 체크리스트</div>
+      <div class="checklist-wrap" id="hydChecklistWrap">
+        <div class="check-item" data-reason="소화전 함 파손 여부 이상">
+          <div class="label">소화전 함 파손여부 확인</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckBoxDamage" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckBoxDamage" value="bad" /> 비정상</label>
+          </div>
+        </div>
+        <div class="check-item" data-reason="소방호스/노즐 수량 또는 상태 이상">
+          <div class="label">소방호스 2EA, 노즐 1EA 확인</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckHoseNozzle" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckHoseNozzle" value="bad" /> 비정상</label>
+          </div>
+        </div>
+        <div class="check-item" data-reason="소화전 사용방법 부착 상태 이상">
+          <div class="label">소화전 사용방법 부착 확인</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckManual" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckManual" value="bad" /> 비정상</label>
+          </div>
+        </div>
+        <div class="check-item" data-reason="소화전 전면 장애물 적치">
+          <div class="label">소화전 앞 장애물 적치금지</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckObstacle" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckObstacle" value="bad" /> 비정상</label>
+          </div>
+        </div>
+        <div class="check-item" data-reason="소화전 표시등 파손 또는 전원 이상">
+          <div class="label">소화전표시등 파손 및 전원 확인</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckLightPower" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckLightPower" value="bad" /> 비정상</label>
+          </div>
+        </div>
+        <div class="check-item" data-reason="소화전 밸브 파손 또는 누수 발생">
+          <div class="label">소화전 밸브 파손 및 누수 여부 확인</div>
+          <div class="radio-group">
+            <label><input type="radio" name="hydCheckValveLeak" value="ok" /> 정상</label>
+            <label><input type="radio" name="hydCheckValveLeak" value="bad" /> 비정상</label>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="faultReasonInput" />
+      <div id="faultReasonAuto"></div>
+      <div style="margin-top:12px;">
+        <label for="inspectPhotoInput">점검 사진</label>
+        <input type="file" id="inspectPhotoInput" accept="image/*" capture="environment" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnCancelInspect">취소</button>
+      <button class="btn-confirm" id="btnConfirmInspect">점검 완료</button>
+    </div>
+  </div>
+
+<script src="/js/csrf.js"></script>
+<script>
+(function(){
+  const API_BASE = '/fire-api/minspection/hydrants';
+  const RETURN_URL = location.pathname + location.search;
+  if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
+    location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+    return;
+  }
+
+  function authHeaders(extra) {
+    return { ...(extra || {}) };
+  }
+
+  async function apiFetch(url, opt) {
+    if (window.FireWebCsrf?.isMutation?.((opt || {}).method)) {
+      await window.FireWebCsrf.ensureToken();
+    }
+    const headers = window.FireWebCsrf?.headers(authHeaders((opt || {}).headers), (opt || {}).method) || authHeaders((opt || {}).headers);
+    const res = await fetch(url, { ...(opt || {}), headers: headers });
+    if (res.status === 401) {
+      localStorage.removeItem('fireweb_user');
+      localStorage.removeItem('fw_user');
+      location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+      throw new Error('unauthorized');
+    }
+    return res;
+  }
+
+  // 모바일/웹뷰 환경까지 포함한 닫기 처리
+  window.closeCurrentWindow = function () {
+    try { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('close'); } catch {}
+    try { if (window.webkit?.messageHandlers?.closeWindow) window.webkit.messageHandlers.closeWindow.postMessage('close'); } catch {}
+    try { window.open('', '_self'); } catch {}
+    try { window.close(); } catch {}
+    setTimeout(() => {
+      try { window.location.replace('about:blank'); } catch {}
+    }, 150);
+  };
+
+  const pathParts = window.location.pathname.split('/');
+  const qrKey = decodeURIComponent(pathParts[pathParts.length - 1] || '');
+
+  let hydData = null;
+  const mainView = document.getElementById('mainView');
+  const inspectOverlay = document.getElementById('inspectOverlay');
+  const inspectModal = document.getElementById('inspectModal');
+  const completeView = document.getElementById('completeView');
+
+  // ======= Load =======
+  async function loadData() {
+    if (!qrKey) {
+      mainView.innerHTML = '<div class="mi-card"><div class="mi-err">QR 코드가 올바르지 않습니다.</div></div>';
+      return;
+    }
+    const res = await apiFetch(API_BASE + '/by-key?key=' + encodeURIComponent(qrKey));
+    const json = await res.json();
+    if (!json || !json.data) {
+      mainView.innerHTML = '<div class="mi-card"><div class="mi-err">서버 오류가 발생했습니다.</div></div>';
+      return;
+    }
+    hydData = json.data;
+    if (!hydData.exists) {
+      renderRegisterForm(hydData);
+    } else {
+      renderExistsView(hydData);
+    }
+  }
+
+  // ======= 미등록 =======
+  function renderRegisterForm(data) {
+    const mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
+    const allBuildings = Array.isArray(data.buildings) ? data.buildings : [];
+    const allFloors = Array.isArray(data.floors) ? data.floors : [];
+    const outdoorBuilding = allBuildings.find(b => {
+      const n = String(b.buildingName || '').replace(/\s+/g,'').toLowerCase();
+      return n.includes('옥외') || n.includes('outdoor');
+    });
+    const outdoorFloor = allFloors.find(f => {
+      const n = String(f.floorName || '').replace(/\s+/g,'').toLowerCase();
+      return n === '1층' || n === '1f' || n === '1';
+    });
+    const outdoorMeta = {
+      buildingId: outdoorBuilding?.buildingId ?? 99,
+      buildingName: outdoorBuilding?.buildingName ?? '옥외',
+      floorId: outdoorFloor?.floorId ?? 1,
+      floorName: outdoorFloor?.floorName ?? '1층'
+    };
+
+    mainView.innerHTML = `
+      <div class="mi-card">
+        <div class="mi-title">미등록 소화전</div>
+        <div class="mi-sub">QR Key: ${escHtml(data.qrKey || qrKey)}</div>
+      </div>
+      <div class="mi-card">
+        <form class="mi-form" id="regForm">
+          <div id="regErr" class="mi-err"></div>
+
+          <div>
+            <label>구분</label>
+            <select id="regHydType">
+              <option value="Indoor">옥내</option>
+              <option value="Outdoor">옥외</option>
+            </select>
+          </div>
+
+          <div>
+            <label>작동방식</label>
+            <select id="regOpType">
+              <option value="Manual">수동</option>
+              <option value="Auto">자동</option>
+            </select>
+          </div>
+
+          <div id="indoorFields">
+            <div class="mi-row">
+              <div>
+                <label>건물</label>
+                <select id="regBuilding">
+                  <option value="">-- 건물 선택 --</option>
+                </select>
+              </div>
+              <div>
+                <label>층</label>
+                <select id="regFloor">
+                  <option value="">-- 층 선택 --</option>
+                </select>
+              </div>
+            </div>
+            <div class="mapWrap" style="margin-top:10px;">
+              <div class="mapCanvas" id="mapCanvas">
+                <div class="mapInner" id="mapInner">
+                  <img id="planImg" alt="도면" src="" />
+                  <div class="markerLayer" id="markerLayer"></div>
+                </div>
+              </div>
+            </div>
+            <div class="coord">좌표: X <span id="coordX">-</span> / Y <span id="coordY">-</span></div>
+          </div>
+
+          <div id="outdoorNote" class="outdoor-note" style="display:none;"></div>
+
+          <input type="hidden" id="inputX" />
+          <input type="hidden" id="inputY" />
+
+          <div>
+            <label>상세 위치</label>
+            <input type="text" id="regLocation" placeholder="상세 위치 입력 (예: 화장지 4호기 앞)" />
+          </div>
+
+          <div class="mi-actions">
+            <button type="submit" class="btn-primary">등록</button>
+          </div>
+        </form>
+      </div>`;
+
+    initMap();
+    bindHydMappableOptions(mapOptions, outdoorMeta);
+
+    const hydTypeEl = document.getElementById('regHydType');
+    hydTypeEl.addEventListener('change', () => {
+      const isOutdoor = hydTypeEl.value === 'Outdoor';
+      const bSel = document.getElementById('regBuilding');
+      const fSel = document.getElementById('regFloor');
+      if (isOutdoor) {
+        if (bSel) {
+          bSel.innerHTML = `<option value="${outdoorMeta.buildingId}">${escHtml(outdoorMeta.buildingName)}</option>`;
+          bSel.value = String(outdoorMeta.buildingId);
+        }
+        if (fSel) {
+          fSel.innerHTML = `<option value="${outdoorMeta.floorId}">${escHtml(outdoorMeta.floorName)}</option>`;
+          fSel.value = String(outdoorMeta.floorId);
+        }
+        if (bSel) bSel.disabled = true;
+        if (fSel) fSel.disabled = true;
+        loadMap();
+      } else {
+        if (bSel) bSel.disabled = false;
+        if (fSel) fSel.disabled = false;
+        bindHydMappableOptions(mapOptions, outdoorMeta);
+      }
+    });
+    hydTypeEl.dispatchEvent(new Event('change'));
+
+    document.getElementById('regBuilding').addEventListener('change', () => onHydRegBuildingChanged());
+    document.getElementById('regFloor').addEventListener('change', () => loadMap());
+    document.getElementById('regForm').addEventListener('submit', submitRegister);
+  }
+
+  function bindHydMappableOptions(mapOptions, outdoorMeta) {
+    const bSel = document.getElementById('regBuilding');
+    const fSel = document.getElementById('regFloor');
+    if (!bSel || !fSel) return;
+
+    const buildingMap = new Map();
+    (mapOptions || []).forEach(o => {
+      const bid = String(o.buildingId || '');
+      if (!bid) return;
+      if (!buildingMap.has(bid)) {
+        buildingMap.set(bid, { buildingId: o.buildingId, buildingName: o.buildingName || '', floors: [] });
+      }
+      buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '' });
+    });
+
+    const buildings = Array.from(buildingMap.values());
+    bSel.innerHTML = '<option value="">-- 건물 선택 --</option>' +
+      buildings.map(b => `<option value="${b.buildingId}">${escHtml(b.buildingName)}</option>`).join('');
+    bSel.dataset.mapOptions = JSON.stringify(buildings);
+    onHydRegBuildingChanged();
+  }
+
+  function onHydRegBuildingChanged() {
+    const bSel = document.getElementById('regBuilding');
+    const fSel = document.getElementById('regFloor');
+    if (!bSel || !fSel) return;
+
+    let buildings = [];
+    try { buildings = JSON.parse(bSel.dataset.mapOptions || '[]'); } catch {}
+    const selected = buildings.find(b => String(b.buildingId) === String(bSel.value));
+    const floors = selected?.floors || [];
+
+    fSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
+      floors.map(f => `<option value="${f.floorId}">${escHtml(f.floorName)}</option>`).join('');
+
+    if (floors.length) {
+      fSel.value = String(floors[0].floorId);
+      loadMap();
+    }
+  }
+
+  async function submitRegister(e) {
+    e.preventDefault();
+    const hydType = document.getElementById('regHydType').value;
+    const opType = document.getElementById('regOpType').value;
+    const location = document.getElementById('regLocation').value.trim();
+    const errEl = document.getElementById('regErr');
+    errEl.textContent = '';
+
+    let buildingId = null, floorId = null, x = null, y = null;
+
+    buildingId = parseInt(document.getElementById('regBuilding').value || '0', 10);
+    floorId = parseInt(document.getElementById('regFloor').value || '0', 10);
+    const xVal = document.getElementById('inputX').value;
+    const yVal = document.getElementById('inputY').value;
+    if (!buildingId) { errEl.textContent = '건물을 선택하세요.'; return; }
+    if (!floorId) { errEl.textContent = '층을 선택하세요.'; return; }
+    if (!xVal || !yVal) { errEl.textContent = '도면에서 위치를 선택하세요.'; return; }
+    x = parseFloat(xVal);
+    y = parseFloat(yVal);
+
+    const res = await apiFetch(API_BASE + '/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        qrKey: qrKey,
+        hydrantType: hydType,
+        operationType: opType,
+        buildingId,
+        floorId,
+        x,
+        y,
+        locationDescription: location || null
+      })
+    });
+    const json = await res.json();
+    if (!json.ok && json.message) { errEl.textContent = json.message; return; }
+    if (json.data?.hydrantId) {
+      hydData = { exists: true, hydrantId: json.data.hydrantId };
+      showAddCompleted();
+    }
+  }
+
+  function showAddCompleted() {
+    const titleEl = document.querySelector('#completeView .ctitle');
+    const subEl = document.querySelector('#completeView .csub');
+    if (titleEl) titleEl.textContent = '등록을 완료했습니다.';
+    if (subEl) subEl.textContent = '닫기를 누르면 창이 닫힙니다.';
+    document.querySelector('header.m-top').style.display = 'none';
+    mainView.style.display = 'none';
+    completeView.style.display = 'block';
+  }
+
+  function renderExistsView(data) {
+    const isOutdoor = (data.hydrantType || '').toLowerCase() === 'outdoor';
+    const locationLine = isOutdoor ? '옥외' : escHtml(data.buildingName || '-') + ' ' + escHtml(data.floorName || '');
+    const opText = (data.operationType || '').toLowerCase() === 'auto' ? '자동' : '수동';
+
+    mainView.innerHTML = `
+      <div class="mi-card">
+        <div class="mi-title">소화전 정보</div>
+        <div class="mi-sub">ID: ${escHtml(data.serialNumber || '-')}</div>
+        <div class="mi-sub">위치: ${locationLine}</div>
+        <div class="mi-sub">작동: ${opText}</div>
+        ${data.locationDescription ? `<div class="mi-sub">상세: ${escHtml(data.locationDescription)}</div>` : ''}
+      </div>`;
+
+    // 기존 등록된 소화전(QR)인 경우 점검창 자동 표시
+    if (data && data.hydrantId) {
+      setTimeout(() => openInspectModal(data.hydrantId), 200);
+    }
+  }
+
+  // ======= 점검 모달 =======
+  function collectChecklistResult() {
+    let hasUnchecked = false;
+    const reasons = [];
+    document.querySelectorAll('#hydChecklistWrap .check-item').forEach(item => {
+      const checked = item.querySelector('input[type="radio"]:checked');
+      if (!checked) {
+        hasUnchecked = true;
+        return;
+      }
+      if (checked && checked.value === 'bad') {
+        const reason = item.getAttribute('data-reason') || '';
+        if (reason) reasons.push(reason);
+      }
+    });
+    return { isFaulty: reasons.length > 0, faultReason: reasons.join(', '), hasUnchecked };
+  }
+
+  function updateChecklistReason() {
+    const result = collectChecklistResult();
+    const input = document.getElementById('faultReasonInput');
+    if (input) input.value = result.faultReason;
+    const auto = document.getElementById('faultReasonAuto');
+    if (auto) {
+      auto.style.display = result.isFaulty ? 'block' : 'none';
+      auto.textContent = result.isFaulty ? ('자동 고장 사유: ' + result.faultReason) : '';
+    }
+  }
+
+function openInspectModal(hydId) {
+    document.querySelectorAll('#hydChecklistWrap input[type="radio"]').forEach(r => r.checked = false);
+    updateChecklistReason();
+    inspectOverlay.style.display = 'block';
+    inspectModal.style.display = 'block';
+
+    apiFetch(API_BASE + '/' + hydId)
+      .then(r => r.json())
+      .then(json => {
+        if (!json.data) return;
+        const d = json.data;
+        const isOutdoor = (d.hydrantType || '').toLowerCase() === 'outdoor';
+        const locationLine = isOutdoor ? '옥외' : escHtml(d.buildingName || '-') + ' ' + escHtml(d.floorName || '');
+        const opText = (d.operationType || '').toLowerCase() === 'auto' ? '자동' : '수동';
+        const lastInspect = d.lastInspectionDate
+          ? `<br><span style="color:#6b7280;font-size:12px;">최근 점검일: ${d.lastInspectionDate} (${d.lastInspectorName || '-'})</span>`
+          : '<br><span style="color:#6b7280;font-size:12px;">점검 이력 없음</span>';
+        document.getElementById('inspectInfo').innerHTML =
+          `<strong>${escHtml(d.serialNumber)}</strong>
+           <br>위치: ${locationLine} / ${opText}
+           ${d.locationDescription ? '<br>상세: ' + escHtml(d.locationDescription) : ''}
+           ${lastInspect}`;
+      });
+
+    document.getElementById('btnConfirmInspect').onclick = () => confirmInspect(hydId);
+  }
+
+  document.getElementById('btnCancelInspect').addEventListener('click', () => {
+    inspectOverlay.style.display = 'none';
+    inspectModal.style.display = 'none';
+  });
+
+  document.querySelectorAll('#hydChecklistWrap input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', updateChecklistReason);
+  });
+
+
+  function showInspectCompleted() {
+    const titleEl = document.querySelector('#completeView .ctitle');
+    const subEl = document.querySelector('#completeView .csub');
+    const buttonEl = document.querySelector('#completeView .btn-close-page');
+    if (titleEl) titleEl.textContent = '점검을 완료했습니다.';
+    if (subEl) subEl.textContent = '완료를 누르면 창이 닫힙니다.';
+    if (buttonEl) buttonEl.textContent = '완료';
+    document.querySelector('header.m-top').style.display = 'none';
+    mainView.style.display = 'none';
+    completeView.style.display = 'block';
+  }
+  async function confirmInspect(hydId) {
+    const result = collectChecklistResult();
+    if (result.hasUnchecked) {
+      alert('모든 점검 항목의 정상/비정상을 선택해 주세요.');
+      return;
+    }
+    const isBad = result.isFaulty;
+    const faultReason = result.faultReason;
+    const res = await apiFetch(API_BASE + '/' + hydId + '/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isFaulty: isBad, faultReason: isBad ? faultReason : null })
+    });
+    if (res.ok) {
+      const inspectPhoto = document.getElementById('inspectPhotoInput')?.files?.[0];
+      if (inspectPhoto) {
+        const fd = new FormData();
+        fd.append('file', inspectPhoto);
+        const up = await apiFetch(API_BASE + '/' + encodeURIComponent(hydId) + '/image', {
+          method: 'POST',
+          body: fd
+        });
+        if (!up.ok) {
+          alert('사진 업로드에 실패했습니다. 네트워크 상태를 확인해주세요.');
+        }
+      }
+      inspectOverlay.style.display = 'none';
+      inspectModal.style.display = 'none';
+      showInspectCompleted();
+    } else {
+      let message = '';
+      try {
+        const json = await res.clone().json();
+        message = json?.message || '';
+      } catch (_) {
+        try { message = await res.text(); } catch (_) {}
+      }
+      const normalized = String(message || '');
+      if (normalized.includes('이미') || normalized.includes('중복') || normalized.includes('해당 날짜')) {
+        alert('오늘 이미 점검을 완료했습니다.');
+      } else {
+        alert(message || '점검 등록에 실패했습니다. 다시 시도해 주세요.');
+      }
+    }
+  }
+
+  // ======= 도면 맵 =======
+  let scale = 1, pan = { x: 0, y: 0 }, isDragging = false, dragStart = { x: 0, y: 0 };
+  const pointers = new Map();
+  let pinchStartDist = null, pinchStartScale = 1, pinchMidStart = { x: 0, y: 0 };
+  let currentItems = [], selectedPoint = null;
+  const HYD_IN_ICON_URL = '/images/indoorfirehydrant.PNG';
+  const HYD_OUT_ICON_URL = '/images/outdoorfirehydrant.PNG';
+
+  function currentHydIconUrl() {
+    const t = document.getElementById('regHydType')?.value || 'Indoor';
+    return t === 'Outdoor' ? HYD_OUT_ICON_URL : HYD_IN_ICON_URL;
+  }
+
+  function initMap() {
+    setTimeout(() => {
+      const mapCanvas = document.getElementById('mapCanvas');
+      const mapInner = document.getElementById('mapInner');
+      if (!mapCanvas || !mapInner) return;
+
+      function setTransform() { mapInner.style.transform = `translate(${pan.x}px,${pan.y}px) scale(${scale})`; }
+      function clampPan() {
+        const rect = mapCanvas.getBoundingClientRect();
+        const cw = rect.width, ch = rect.height;
+        pan.x = Math.max(Math.min(0, cw - cw * scale), Math.min(0, pan.x));
+        pan.y = Math.max(Math.min(0, ch - ch * scale), Math.min(0, pan.y));
+      }
+      function zoomAround(cx, cy, ns) {
+        const rect = mapCanvas.getBoundingClientRect();
+        const px = cx - rect.left, py = cy - rect.top;
+        const prev = scale, next = Math.max(1, Math.min(4, ns));
+        if (Math.abs(next - prev) < 0.0001) return;
+        const ox = (px - pan.x) / prev, oy = (py - pan.y) / prev;
+        scale = next; pan.x = px - ox * scale; pan.y = py - oy * scale;
+        clampPan(); setTransform();
+      }
+      function getDist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+      function getMid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+      function computeFit() {
+        const rect = mapCanvas.getBoundingClientRect();
+        return rect.width && rect.height ? { ox: 0, oy: 0, w: rect.width, h: rect.height } : null;
+      }
+      function renderMarkers() {
+        const markerLayer = document.getElementById('markerLayer'); if (!markerLayer) return;
+        const planImg = document.getElementById('planImg');
+        markerLayer.innerHTML = '';
+        const f = computeFit(); if (!f) return;
+        const iw = planImg?.naturalWidth || f.w || 1, ratio = f.w / iw;
+        currentItems.forEach(it => {
+          if (it.x == null || it.y == null) return;
+          const size = Math.max(8, Math.round(34 * ratio * 10) / 10);
+          const m = document.createElement('div');
+          m.className = 'markerIcon existing';
+          m.style.width = size + 'px'; m.style.height = size + 'px';
+          m.style.left = (f.ox + f.w * (it.x / 100)) + 'px';
+          m.style.top = (f.oy + f.h * (it.y / 100)) + 'px';
+          m.innerHTML = `<img src="${currentHydIconUrl()}" alt="">`;
+          markerLayer.appendChild(m);
+        });
+        if (selectedPoint) {
+          const size = Math.max(8, Math.round(34 * ratio * 1.1 * 10) / 10);
+          const sel = document.createElement('div');
+          sel.className = 'markerIcon selected';
+          sel.style.width = size + 'px'; sel.style.height = size + 'px';
+          sel.style.left = (f.ox + f.w * (selectedPoint.x / 100)) + 'px';
+          sel.style.top = (f.oy + f.h * (selectedPoint.y / 100)) + 'px';
+          sel.innerHTML = `<img src="${currentHydIconUrl()}" alt="">`;
+          markerLayer.appendChild(sel);
+        }
+      }
+
+      mapCanvas.addEventListener('click', (e) => {
+        const rect = mapCanvas.getBoundingClientRect();
+        const px = e.clientX - rect.left, py = e.clientY - rect.top;
+        const f = computeFit(); if (!f) return;
+        const localX = (px - pan.x) / scale;
+        const localY = (py - pan.y) / scale;
+        const x = Math.max(0, Math.min(100, ((localX - f.ox) / f.w) * 100));
+        const y = Math.max(0, Math.min(100, ((localY - f.oy) / f.h) * 100));
+        selectedPoint = { x, y };
+        document.getElementById('coordX').textContent = x.toFixed(2);
+        document.getElementById('coordY').textContent = y.toFixed(2);
+        document.getElementById('inputX').value = x.toFixed(2);
+        document.getElementById('inputY').value = y.toFixed(2);
+        renderMarkers();
+      });
+
+      mapCanvas.addEventListener('pointerdown', (e) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        mapCanvas.setPointerCapture(e.pointerId);
+        if (pointers.size === 1) { isDragging = true; dragStart = { x: e.clientX - pan.x, y: e.clientY - pan.y }; }
+        else if (pointers.size === 2) {
+          const pts = Array.from(pointers.values());
+          pinchStartDist = getDist(pts[0], pts[1]); pinchStartScale = scale;
+          pinchMidStart = getMid(pts[0], pts[1]); isDragging = false;
+        }
+      });
+      mapCanvas.addEventListener('pointermove', (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 1 && isDragging) {
+          pan.x = e.clientX - dragStart.x; pan.y = e.clientY - dragStart.y;
+          clampPan(); setTransform(); return;
+        }
+        if (pointers.size === 2) {
+          const pts = Array.from(pointers.values());
+          if (!pinchStartDist || pinchStartDist < 1) return;
+          const dist = getDist(pts[0], pts[1]), mid = getMid(pts[0], pts[1]);
+          zoomAround(mid.x, mid.y, pinchStartScale * (dist / pinchStartDist));
+          pan.x += (mid.x - pinchMidStart.x); pan.y += (mid.y - pinchMidStart.y);
+          pinchMidStart = mid; clampPan(); setTransform();
+        }
+      });
+      function endPointer(e) {
+        pointers.delete(e.pointerId);
+        try { mapCanvas.releasePointerCapture(e.pointerId); } catch {}
+        if (pointers.size === 0) { isDragging = false; pinchStartDist = null; }
+        else if (pointers.size === 1) {
+          const pt = Array.from(pointers.values())[0];
+          isDragging = true; dragStart = { x: pt.x - pan.x, y: pt.y - pan.y }; pinchStartDist = null;
+        }
+      }
+      mapCanvas.addEventListener('pointerup', endPointer);
+      mapCanvas.addEventListener('pointercancel', endPointer);
+      window.addEventListener('resize', () => { clampPan(); setTransform(); renderMarkers(); });
+    }, 50);
+  }
+
+  async function loadMap() {
+    const bid = parseInt(document.getElementById('regBuilding')?.value || '0', 10);
+    const fid = parseInt(document.getElementById('regFloor')?.value || '0', 10);
+    if (!bid || !fid) return;
+    const res = await apiFetch(API_BASE + '/mapdata?buildingId=' + bid + '&floorId=' + fid);
+    const json = await res.json();
+    if (!json.data?.ok) return;
+    currentItems = json.data.items || [];
+    const planImg = document.getElementById('planImg');
+    if (planImg) planImg.src = json.data.planImagePath;
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+

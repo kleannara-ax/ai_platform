@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FireWeb Floor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f5f7fa; margin:0; }
+    .fireweb-navbar { position:relative; z-index:1030; }
+    .fireweb-navbar .dropdown-menu { z-index:1040; }
+    .fireweb-navbar .nav-link.account-link { color:#fff !important; }
+    .fireweb-navbar .brand-logos { display:flex; align-items:center; gap:8px; }
+    .fireweb-navbar .brand-logos img { height:32px !important; width:auto !important; display:block; object-fit:contain !important; }
+
+    .btn { border-radius:10px; font-weight:700; }
+    .btn-primary { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); border:none; }
+    .btn-success { background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%); border:none; color:#fff; }
+    .btn-info { background:linear-gradient(135deg,#17a2b8 0%,#3dc1d3 100%); border:none; }
+    .btn-danger { background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%); border:none; }
+
+    .page-wrap { padding:clamp(8px, 1vw, 12px); }
+    .wrap { display:flex !important; flex-direction:row !important; align-items:stretch; height:calc(100vh - 100px); gap:12px; box-sizing:border-box; min-height:0; }
+    .left { flex:0 0 clamp(280px, 28vw, 380px); width:clamp(280px, 28vw, 380px); min-width:260px; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:12px; overflow:auto; }
+    .right { flex:1 1 auto; min-width:0; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:12px; overflow:hidden; position:relative; }
+
+    .titlebar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+    .title { font-size:18px; font-weight:700; margin:0; }
+    .titleSelect { width:min(220px, 100%); max-width:60vw; }
+    .sub { color:#666; font-size:13px; margin-bottom:12px; }
+    .toolbar { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+    .toolbar .btn { width:100%; white-space:nowrap; text-align:center; padding:10px 12px; }
+
+    .planWrap { position:relative; width:100%; height:calc(100% - 10px); min-height:420px; border:1px dashed #222; border-radius:12px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; }
+    .planWrap.dragging { cursor:grabbing; }
+    .planStage { position:relative; display:inline-block; padding:600px; }
+    .planInner { position:relative; display:inline-block; transform-origin:0 0; }
+    .planImg { display:block; max-width:none; width:auto; height:auto; user-select:none; -webkit-user-drag:none; }
+
+    #markers,#hydrantMarkers { position:absolute; inset:0; pointer-events:none; }
+    #markers .marker,#hydrantMarkers .hmarker { pointer-events:auto; }
+    .marker,.hmarker { position:absolute; width:35px; height:35px; transform:translate(-50%,-50%); border:0; background:transparent; padding:0; border-radius:0; }
+    .hmarker.outdoor { width:18px; height:18px; }
+    .marker img,.hmarker img { width:100%; height:100%; object-fit:contain; display:block; }
+    .marker.sel img { filter:drop-shadow(0 0 6px rgba(0,123,255,.9)); }
+    .hmarker.sel img { filter:drop-shadow(0 0 6px rgba(40,167,69,.9)); }
+    .extRow {
+      border: 1px solid rgba(148,163,184,.22);
+      border-radius: 14px;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+    }
+    .extRow:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(15,23,42,.08);
+    }
+    .extRow.sel {
+      border-color: rgba(37,99,235,.55);
+      background: linear-gradient(135deg, rgba(219,234,254,.95) 0%, rgba(239,246,255,.98) 100%);
+      box-shadow: 0 12px 22px rgba(37,99,235,.16);
+    }
+    .extRow.sel .fw-semibold { color: #1d4ed8; }
+    .extRow.sel .text-muted { color: #334155 !important; }
+
+    .infoCard { position:absolute; width:clamp(260px, 28vw, 320px); max-width:calc(100% - 24px); background:#fff; border:1px solid #e6e6e6; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; z-index:50; display:none; }
+    .infoHead{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:linear-gradient(135deg,#5b5bd6 0%,#7b52c5 100%); color:#fff; }
+    .infoHead.hyd{ background:linear-gradient(135deg,#5b5bd6 0%,#7b52c5 100%); }
+    .infoHead .t{ font-weight:700; font-size:14px; }
+    .infoHead .xbtn{ border:0; background:transparent; color:#fff; font-size:18px; line-height:18px; padding:0 4px; cursor:pointer; }
+    .infoBody{ max-height:220px; overflow:auto; padding:12px; background:#fff; }
+    .kv{ display:grid; grid-template-columns:92px 1fr; gap:6px 10px; font-size:13px; }
+    .k{ color:#666; }
+    .v{ color:#111; font-weight:600; }
+    .hint { position:absolute; right:18px; bottom:18px; background:rgba(0,0,0,.55); color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; z-index:5; }
+
+    .action-embed-modal .modal-content { background:transparent; border:0; box-shadow:none; border-radius:14px; overflow:hidden; }
+    .action-embed-modal .modal-body { padding: 0; background:transparent; }
+    .action-embed-modal .modal-dialog { max-width: min(1440px, calc(100vw - 24px)); width: calc(100vw - 24px); margin: clamp(.35rem, 1.5vw, 1rem) auto; }
+    #floorActionFrame { width: 100%; height: min(90vh, 1100px); border: 0; background: transparent; display: block; }
+    .modal-backdrop.show { background: rgba(17,24,39,.35) !important; backdrop-filter: blur(4px); }
+
+    @media (max-width: 1180px) {
+      .wrap { flex-direction:column !important; height:auto; min-height:calc(100vh - 100px); }
+      .left { width:100%; flex:0 0 auto; min-width:0; max-height:42vh; }
+      .right { min-height:70vh; }
+      .titlebar { flex-wrap:wrap; }
+      .titleSelect { max-width:100%; }
+      .planWrap { min-height:60vh; height:60vh; }
+      .hint { right:12px; bottom:12px; max-width:min(260px, calc(100% - 24px)); }
+    }
+
+    @media (max-width: 768px) {
+      .page-wrap { padding:8px; }
+      .wrap { gap:8px; }
+      .left, .right { padding:10px; border-radius:10px; }
+      .toolbar { grid-template-columns:1fr; }
+      .sub { font-size:12px; }
+      .planWrap { min-height:52vh; height:52vh; }
+      .infoCard { width:min(320px, calc(100% - 16px)); max-width:calc(100% - 16px); }
+      .kv { grid-template-columns:84px 1fr; gap:6px 8px; font-size:12px; }
+      .action-embed-modal .modal-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); margin: .35rem auto; }
+      #floorActionFrame { height: 92vh; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <nav class="navbar navbar-expand-lg navbar-dark fireweb-navbar" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/index.html">
+        <span class="brand-logos" aria-hidden="true">
+          <img src="/images/Kleannara.PNG" alt="" onerror="this.style.display='none'" />
+          <img src="/images/KFMS.PNG" alt="" onerror="this.style.display='none'" />
+        </span>
+        <span class="visually-hidden">FireWeb</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3">
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/extinguishers.html">소화기 목록</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/hydrants.html">소화전 목록</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold active" href="/maps/floor.html">도면 화면</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/qr/index.html">QR 관리</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="page-wrap">
+  <div class="wrap">
+    <div class="left">
+      <div class="titlebar"><h3 class="title">도면 화면 편집</h3></div>
+      <div class="sub">소화기/소화전을 선택하고 도면에서 위치를 지정하거나 추가할 수 있습니다.</div>
+
+      <div class="toolbar">
+        <button id="saveBtn" class="btn btn-primary">선택 설비 수정</button>
+        <button id="clearBtn" class="btn btn-outline-danger">좌표 초기화</button>
+        <button id="addExtBtn" class="btn btn-info text-white">소화기 추가</button>
+        <button id="delExtBtn" class="btn btn-outline-danger">소화기 삭제</button>
+        <button id="addHydBtn" class="btn btn-success">소화전 추가</button>
+        <button id="delHydBtn" class="btn btn-outline-danger">소화전 삭제</button>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label mb-1">현재 도면</label>
+        <div class="d-flex gap-2">
+          <select id="buildingSelect" class="form-select titleSelect"></select>
+          <select id="floorSelect" class="form-select titleSelect"></select>
+        </div>
+        <div class="form-text"><small>도면이 등록된 건물/층만 표시됩니다.</small></div>
+      </div>
+
+      <hr />
+      <div class="fw-semibold mb-2">소화기 목록</div>
+      <div id="list"></div>
+    </div>
+
+    <div class="right">
+      <div class="titlebar">
+        <h3 class="title" id="planTitle">도면</h3>
+        <div class="d-flex gap-2">
+          <button id="btnZoomReset" type="button" class="btn btn-outline-secondary btn-sm">확대 초기화</button>
+        </div>
+      </div>
+      <div class="sub">휠로 확대/축소, 드래그로 이동할 수 있습니다.</div>
+
+      <div class="planWrap" id="planWrap">
+        <div class="planStage" id="planStage">
+          <div class="planInner" id="planInner">
+            <img id="planImg" class="planImg" src="" alt="도면" />
+            <div id="markers" aria-hidden="true"></div>
+            <div id="hydrantMarkers" aria-hidden="true"></div>
+
+            <div id="markerInfo" class="infoCard" aria-hidden="true">
+              <div class="infoHead">
+                <div class="t" id="miTitle">소화기</div>
+                <button type="button" class="xbtn" id="miHeadCloseBtn" aria-label="닫기">×</button>
+              </div>
+              <div class="infoBody">
+                <div class="mb-2">
+                  <select id="miSelectExt" class="form-select form-select-sm"></select>
+                </div>
+                <div class="kv">
+                  <div class="k">종류</div><div class="v" id="miType">-</div>
+                  <div class="k">제조일</div><div class="v" id="miInstall">-</div>
+                  <div class="k">좌표</div><div class="v" id="miCoord">-</div>
+                  <div class="k">최종 점검</div><div class="v" id="miLast">-</div>
+                  <div class="k">수량</div><div class="v" id="miQty">-</div>
+                  <div class="k">고장여부</div><div class="v" id="miFault">-</div>
+                  <div class="k">고장사유</div><div class="v" id="miReason">-</div>
+                </div>
+              </div>
+              <div class="p-2 border-top bg-white">
+                <div class="row g-2">
+                  <div class="col-4"><button class="btn btn-outline-dark w-100" id="miDetailBtn" type="button">상세</button></div>
+                  <div class="col-4"><button class="btn btn-primary w-100" id="miInspectBtn" type="button">점검</button></div>
+                  <div class="col-4"><button class="btn btn-outline-primary w-100" id="miEditBtn" type="button">수정</button></div>
+                  <div class="col-6"><button class="btn btn-success w-100" id="miAddHereBtn" type="button">소화기 추가</button></div>
+                  <div class="col-6"><button class="btn btn-outline-secondary w-100" id="miCloseBtn" type="button">닫기</button></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="hydrantInfo" class="infoCard" aria-hidden="true">
+              <div class="infoHead hyd">
+                <div class="t" id="hiTitle">소화전</div>
+                <button type="button" class="xbtn" id="hiHeadCloseBtn" aria-label="닫기">×</button>
+              </div>
+              <div class="infoBody">
+                <div class="kv">
+                  <div class="k">시리얼</div><div class="v" id="hiSerial">-</div>
+                  <div class="k">구분</div><div class="v" id="hiType">-</div>
+                  <div class="k">작동방식</div><div class="v" id="hiOp">-</div>
+                  <div class="k">좌표</div><div class="v" id="hiCoord">-</div>
+                  <div class="k">최종 점검</div><div class="v" id="hiLast">-</div>
+                  <div class="k">고장여부</div><div class="v" id="hiFault">-</div>
+                  <div class="k">고장사유</div><div class="v" id="hiReason">-</div>
+                </div>
+              </div>
+              <div class="p-2 border-top bg-white">
+                <div class="row g-2">
+                  <div class="col-4"><button class="btn btn-outline-dark w-100" id="hiDetailBtn" type="button">상세</button></div>
+                  <div class="col-4"><button class="btn btn-primary w-100" id="hiInspectBtn" type="button">점검</button></div>
+                  <div class="col-4"><button class="btn btn-outline-primary w-100" id="hiEditBtn" type="button">수정</button></div>
+                  <div class="col-12"><button class="btn btn-outline-secondary w-100" id="hiCloseBtn" type="button">닫기</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">마커를 클릭하면 상세 정보가 표시됩니다.</div>
+    </div>
+  </div>
+</main>
+
+<div class="modal fade action-embed-modal" id="floorActionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-body">
+        <iframe id="floorActionFrame" title="작업"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/extinguisher-modal-host.js"></script>
+<script src="/js/hydrant-modal-host.js"></script>
+<script src="/js/csrf.js"></script>
+<script>(() => {
+  const EX_ICON_URL = '/images/Extinguisher.PNG';
+  const HYDRANT_IN_ICON_URL = '/images/indoorfirehydrant.PNG';
+  const HYDRANT_OUT_ICON_URL = '/images/outdoorfirehydrant.PNG';
+
+  const qs = new URLSearchParams(location.search);
+
+  const planWrap = document.getElementById('planWrap');
+  const planInner = document.getElementById('planInner');
+  const planImg = document.getElementById('planImg');
+  const planTitle = document.getElementById('planTitle');
+  const buildingSelect = document.getElementById('buildingSelect');
+  const floorSelect = document.getElementById('floorSelect');
+  const listEl = document.getElementById('list');
+  const markersEl = document.getElementById('markers');
+  const hydrantMarkersEl = document.getElementById('hydrantMarkers');
+  const navAccountArea = document.getElementById('navAccountArea');
+
+  if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
+    location.href = '/login.html?returnUrl=' + encodeURIComponent(location.pathname + location.search);
+    return;
+  }
+  function authHeaders(extra = {}, method = 'GET') {
+    return window.FireWebCsrf?.headers({ ...extra }, method) || { ...extra };
+  }
+  function refreshTokenFromResponse(res) {
+    return res;
+  }
+  const currentUser = (() => {
+    try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); }
+    catch (_) { return null; }
+  })();
+  const isAdmin = String(currentUser?.role || '').toUpperCase() === 'ADMIN';
+
+  const state = {
+    zoom: 1, panX: 0, panY: 0, dragging: false,
+    dragStartX: 0, dragStartY: 0, panStartX: 0, panStartY: 0,
+    moveArmed: false,
+    addMode: null,
+    selectedExtId: null, selectedHydrantId: null,
+    floors: [], buildings: [], current: null, exts: [], hyds: []
+  };
+  const activePointers = new Map();
+  let pinchStartDistance = 0;
+  let pinchStartZoom = 1;
+  const DEFAULT_FLOORS = [
+    { buildingId: 'D-GWANRI', floorId: 'D-1F', buildingName: '\uAD00\uB9AC\uB3D9', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/gwanri_1F.png' },
+    { buildingId: 'D-GWANRI', floorId: 'D-2F', buildingName: '\uAD00\uB9AC\uB3D9', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/gwanri_2F.PNG' },
+    { buildingId: 'D-BOKJI', floorId: 'D-B1', buildingName: '\uBCF5\uC9C0\uAD00', floorName: '\uC9C0\uD5581\uCE35', isOutdoor: false, planImagePath: '/images/bokji_B1.png' },
+    { buildingId: 'D-BOKJI', floorId: 'D-1F', buildingName: '\uBCF5\uC9C0\uAD00', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/bokji_1F.png' },
+    { buildingId: 'D-BOKJI', floorId: 'D-2F', buildingName: '\uBCF5\uC9C0\uAD00', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/bokji_2F.png' },
+    { buildingId: 'D-BOKJI', floorId: 'D-3F', buildingName: '\uBCF5\uC9C0\uAD00', floorName: '3\uCE35', isOutdoor: false, planImagePath: '/images/bokji_3F.png' },
+    { buildingId: 'D-JEJI12', floorId: 'D-1F', buildingName: '\uC81C\uC9C01,2\uD638\uAE30', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/jeji1,2_1F.PNG' },
+    { buildingId: 'D-JEJI12', floorId: 'D-2F', buildingName: '\uC81C\uC9C01,2\uD638\uAE30', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/jeji1,2_2F.PNG' },
+    { buildingId: 'D-JEJI3', floorId: 'D-1F', buildingName: '\uC81C\uC9C03\uD638\uAE30', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/jeji3_1F.PNG' },
+    { buildingId: 'D-JEJI3', floorId: 'D-2F', buildingName: '\uC81C\uC9C03\uD638\uAE30', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/jeji3_2F.PNG' },
+    { buildingId: 'D-PAD', floorId: 'D-1F', buildingName: '\uD328\uB4DC\uB3D9', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/pad_1F.PNG' },
+    { buildingId: 'D-PAD', floorId: 'D-2F', buildingName: '\uD328\uB4DC\uB3D9', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/pad_2F.PNG' },
+    { buildingId: 'D-PALPA', floorId: 'D-1F', buildingName: '\uC2EC\uBA74\uD384\uD37C', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/palpa_1F.PNG' },
+    { buildingId: 'D-PALPA', floorId: 'D-2F', buildingName: '\uC2EC\uBA74\uD384\uD37C', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/palpa_2F.PNG' },
+    { buildingId: 'D-T36', floorId: 'D-1F', buildingName: '\uD654\uC7A5\uC9C03,6\uD638\uAE30', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/tissue1,3_1F.PNG' },
+    { buildingId: 'D-T36', floorId: 'D-2F', buildingName: '\uD654\uC7A5\uC9C03,6\uD638\uAE30', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/tissue1,3_2F.PNG' },
+    { buildingId: 'D-T45', floorId: 'D-B1', buildingName: '\uD654\uC7A5\uC9C04,5\uD638\uAE30', floorName: '\uC9C0\uD5581\uCE35', isOutdoor: false, planImagePath: '/images/tissue4,5_B1.PNG' },
+    { buildingId: 'D-T45', floorId: 'D-1F', buildingName: '\uD654\uC7A5\uC9C04,5\uD638\uAE30', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/tissue4,5_1F.PNG' },
+    { buildingId: 'D-T45', floorId: 'D-2F', buildingName: '\uD654\uC7A5\uC9C04,5\uD638\uAE30', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/tissue4,5_2F.PNG' },
+    { buildingId: 'D-T45', floorId: 'D-3F', buildingName: '\uD654\uC7A5\uC9C04,5\uD638\uAE30', floorName: '3\uCE35', isOutdoor: false, planImagePath: '/images/tissue4,5_3F.PNG' },
+    { buildingId: 'D-DIAPER', floorId: 'D-1F', buildingName: '\uAE30\uC800\uADC0\uB3D9', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/diaper_1F.png' },
+    { buildingId: 'D-OUT', floorId: 'D-OUT', buildingName: '\uC625\uC678', floorName: '\uC625\uC678', isOutdoor: true, planImagePath: '/images/drone_photo.JPG' }
+  ];
+  function normalize(v){ return String(v || '').replace(/\s+/g, '').toLowerCase(); }
+  function cleanBuildingName(name) {
+    const n = normalize(name).replace(/[.,_-]/g, '');
+    if (n.includes('\uad00\ub9ac\ub3d9') || n.includes('gwanri')) return '\uAD00\uB9AC\uB3D9';
+    if (n.includes('\ubcf5\uc9c0\uad00') || n.includes('bokji')) return '\uBCF5\uC9C0\uAD00';
+    if (n.includes('\ud654\uc7a5\uc9c045') || n.includes('tissue45')) return '\uD654\uC7A5\uC9C04,5\uD638\uAE30';
+    if (n.includes('\ud654\uc7a5\uc9c036') || n.includes('tissue36')) return '\uD654\uC7A5\uC9C03,6\uD638\uAE30';
+    if (n.includes('\uc81c\uc9c012') || n.includes('jeji12')) return '\uC81C\uC9C01,2\uD638\uAE30';
+    if (n.includes('\uc81c\uc9c03') || n.includes('jeji3')) return '\uC81C\uC9C03\uD638\uAE30';
+    if (n.includes('\ud328\ub4dc\ub3d9') || n.includes('pad')) return '\uD328\uB4DC\uB3D9';
+    if (n.includes('\uae30\uc800\uadc0\ub3d9') || n.includes('diaper')) return '\uAE30\uC800\uADC0\uB3D9';
+    if (n.includes('\uc2ec\uba74\ud384\ud37c') || n.includes('palpa') || n.includes('pulper')) return '\uC2EC\uBA74\uD384\uD37C';
+    if (n.includes('\uc625\uc678') || n.includes('outdoor')) return '\uC625\uC678';
+    return String(name || '');
+  }
+  function cleanFloorName(name) {
+    const n = normalize(name);
+    if (n.includes('\uc9c0\ud558') || n.includes('b1')) return '\uC9C0\uD5581\uCE35';
+    if (n.includes('3')) return '3\uCE35';
+    if (n.includes('2')) return '2\uCE35';
+    if (n.includes('1')) return '1\uCE35';
+    return String(name || '');
+  }
+  function buildingOrder(name){
+    const n = normalize(name).replace(/[.,_-]/g, '');
+    if (n.includes('\uad00\ub9ac\ub3d9') || n.includes('gwanri')) return 1;
+    if (n.includes('\ubcf5\uc9c0\uad00') || n.includes('bokji')) return 2;
+    if (n.includes('\ud654\uc7a5\uc9c045') || n.includes('tissue45')) return 3;
+    if (n.includes('\ud654\uc7a5\uc9c036') || n.includes('tissue36')) return 4;
+    if (n.includes('\uc81c\uc9c012') || n.includes('jeji12')) return 5;
+    if (n.includes('\uc81c\uc9c03') || n.includes('jeji3')) return 6;
+    if (n.includes('\ud328\ub4dc\ub3d9') || n.includes('pad')) return 7;
+    if (n.includes('\uae30\uc800\uadc0\ub3d9') || n.includes('diaper')) return 8;
+    if (n.includes('\uc2ec\uba74\ud384\ud37c') || n.includes('palpa') || n.includes('pulper')) return 9;
+    if (n.includes('\uc625\uc678') || n.includes('outdoor')) return 10;
+    return 999;
+  }
+  function floorOrder(floorName){
+    const n = normalize(floorName);
+    if (n.includes('\uc9c0\ud558') || n.includes('b1')) return -1;
+    if (n.includes('1')) return 1;
+    if (n.includes('2')) return 2;
+    if (n.includes('3')) return 3;
+    const m = String(floorName || '').match(/-?\d+/);
+    return m ? Number(m[0]) : 999;
+  }
+    function pickDefaultFloor(floors){
+    if (!Array.isArray(floors) || !floors.length) return null;
+    const one = floors.find(x => {
+      const n = normalize(x.floorName);
+      return n === '1\uce35' || n === '1' || n.includes('1\uce35') || n === '1f' || n.includes('1f');
+    });
+    return one || floors[0];
+  }
+  function syncCurrentFloor(pushState){
+    if (!state.current) return;
+    state.selectedExtId = null;
+    state.selectedHydrantId = null;
+    hideInfo();
+    resetMoveArm();
+    updateActionButtons();
+    planImg.src = state.current.planImagePath || planImage(state.current.buildingName, state.current.floorName) || '';
+    planTitle.textContent = `${cleanBuildingName(state.current.buildingName)} ${cleanFloorName(state.current.floorName)}`;
+    centerPlanInView();
+    renderList();
+    renderMarkers();
+    if (pushState) {
+      const next = `/maps/floor.html?buildingName=${encodeURIComponent(state.current.buildingName)}&floorName=${encodeURIComponent(state.current.floorName)}`;
+      history.replaceState(null, '', next);
+    }
+  }
+  function syncFloorSelectForBuilding(buildingKey){
+    const b = state.buildings.find(x => x.key === buildingKey);
+    if (!b || !floorSelect) return;
+    floorSelect.innerHTML = b.floors
+      .map(f => `<option value="${String(f.floorId)}">${cleanFloorName(f.floorName)}</option>`)
+      .join('');
+  }
+  function syncBuildingFloorSelectors(setCurrentFloor){
+    if (!buildingSelect || !floorSelect) return;
+    buildingSelect.innerHTML = state.buildings
+      .map(b => `<option value="${b.key}">${cleanBuildingName(b.buildingName)}</option>`)
+      .join('');
+    if (!state.current) return;
+
+    const currentBuilding = state.buildings.find(b =>
+      String(b.buildingId) === String(state.current.buildingId) ||
+      normalize(b.buildingName) === normalize(state.current.buildingName)
+    );
+    if (!currentBuilding) return;
+    buildingSelect.value = currentBuilding.key;
+    syncFloorSelectForBuilding(currentBuilding.key);
+    floorSelect.value = String(state.current.floorId);
+    if (setCurrentFloor) syncCurrentFloor(false);
+  }
+  function planImage(buildingName, floorName){
+    const b = normalize(buildingName);
+    const f = normalize(floorName);
+    const bn = b.replace(/[.,_-]/g, '');
+    if (b.includes('\ubcf5\uc9c0\uad00') || b.includes('bokji')) {
+      if (f.includes('\uc9c0\ud558') || f.includes('b1')) return '/images/bokji_B1.png';
+      if (f.includes('3')) return '/images/bokji_3F.png';
+      if (f.includes('2')) return '/images/bokji_2F.png';
+      return '/images/bokji_1F.png';
+    }
+    if (b.includes('\uad00\ub9ac\ub3d9') || b.includes('gwanri')) {
+      if (f.includes('2')) return '/images/gwanri_2F.PNG';
+      if (f.includes('1')) return '/images/gwanri_1F.png';
+    }
+    if (b.includes('\uc625\uc678') || b.includes('outdoor')) return '/images/drone_photo.JPG';
+    if (bn.includes('\uc81c\uc9c012') || bn.includes('jeji12')) {
+      if (f.includes('2')) return '/images/jeji1,2_2F.PNG';
+      return '/images/jeji1,2_1F.PNG';
+    }
+    if (bn.includes('\uc81c\uc9c03') || bn.includes('jeji3')) {
+      if (f.includes('2')) return '/images/jeji3_2F.PNG';
+      return '/images/jeji3_1F.PNG';
+    }
+    if (bn.includes('\uc2ec\uba74\ud384\ud37c') || bn.includes('palpa') || bn.includes('pulper')) {
+      if (f.includes('2')) return '/images/palpa_2F.PNG';
+      return '/images/palpa_1F.PNG';
+    }
+    if (bn.includes('\ud328\ub4dc\ub3d9') || bn.includes('pad')) {
+      if (f.includes('2')) return '/images/pad_2F.PNG';
+      return '/images/pad_1F.PNG';
+    }
+    if (bn.includes('\ud654\uc7a5\uc9c036') || bn.includes('tissue36')) {
+      if (f.includes('2')) return '/images/tissue1,3_2F.PNG';
+      return '/images/tissue1,3_1F.PNG';
+    }
+    if (bn.includes('\ud654\uc7a5\uc9c045') || bn.includes('tissue45')) {
+      if (f.includes('\uc9c0\ud558') || f.includes('b1')) return '/images/tissue4,5_B1.PNG';
+      if (f.includes('3')) return '/images/tissue4,5_3F.PNG';
+      if (f.includes('2')) return '/images/tissue4,5_2F.PNG';
+      return '/images/tissue4,5_1F.PNG';
+    }
+    if (bn.includes('\uae30\uc800\uadc0\ub3d9') || bn.includes('diaper')) return '/images/diaper_1F.png';
+    return '';
+  }
+  async function api(url){
+    const r = await fetch(url, { headers: authHeaders() });
+    refreshTokenFromResponse(r);
+    if (r.status === 401) {
+      location.href = '/login.html?returnUrl=' + encodeURIComponent(location.pathname + location.search);
+      return null;
+    }
+    return r;
+  }
+  async function fetchPlanImagePath(buildingId, floorId){
+    if (!buildingId || !floorId) return '';
+    try {
+      const r = await api(`/fire-api/maps/floor-data?buildingId=${encodeURIComponent(buildingId)}&floorId=${encodeURIComponent(floorId)}`);
+      if (!r || !r.ok) return '';
+      const j = await r.json().catch(() => null);
+      return (j?.data?.planImagePath || '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+  function applyTransform(){ planInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`; }
+  function getPointerDistance() {
+    const pts = Array.from(activePointers.values());
+    if (pts.length < 2) return 0;
+    const [a, b] = pts;
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  function fitPlanToView() {
+    const imgW = planImg.naturalWidth || planImg.width || planImg.clientWidth || 0;
+    const imgH = planImg.naturalHeight || planImg.height || planImg.clientHeight || 0;
+    const wrapW = planWrap.clientWidth || 0;
+    const wrapH = planWrap.clientHeight || 0;
+    if (!imgW || !imgH || !wrapW || !wrapH) return;
+    const pad = 32;
+    const fitScale = Math.min(
+      Math.max((wrapW - pad) / imgW, 0.15),
+      Math.max((wrapH - pad) / imgH, 0.15),
+      1
+    );
+    state.zoom = fitScale;
+    state.panX = 0;
+    state.panY = 0;
+    applyTransform();
+  }
+  function centerPlanInView() {
+    requestAnimationFrame(() => {
+      const stageStyle = window.getComputedStyle(planStage);
+      const padLeft = parseFloat(stageStyle.paddingLeft || '0') || 0;
+      const padTop = parseFloat(stageStyle.paddingTop || '0') || 0;
+      const imgW = planImg.naturalWidth || planImg.width || planImg.clientWidth || 0;
+      const imgH = planImg.naturalHeight || planImg.height || planImg.clientHeight || 0;
+      const contentW = imgW * state.zoom;
+      const contentH = imgH * state.zoom;
+      const left = padLeft + state.panX;
+      const top = padTop + state.panY;
+      planWrap.scrollLeft = Math.max(0, left + (contentW / 2) - (planWrap.clientWidth / 2));
+      planWrap.scrollTop = Math.max(0, top + (contentH / 2) - (planWrap.clientHeight / 2));
+    });
+  }
+  function isCurrentFloor(item) {
+    if (!item || !state.current) return false;
+    const byId = String(item.buildingId) === String(state.current.buildingId) &&
+                 String(item.floorId) === String(state.current.floorId);
+    const byName = normalize(item.buildingName) === normalize(state.current.buildingName) &&
+                   normalize(item.floorName) === normalize(state.current.floorName);
+    return byId || byName;
+  }
+  function isOutdoorCurrent(){
+    if (!state.current) return false;
+    if (state.current.isOutdoor) return true;
+    const b = normalize(state.current.buildingName);
+    const f = normalize(state.current.floorName);
+    const p = String(state.current.planImagePath || '').toLowerCase();
+    return b.includes('\uc625\uc678') || b.includes('outdoor') || f === '\uc625\uc678' || p.includes('drone_photo');
+  }
+  function updateActionButtons(){
+    if (!isAdmin) return;
+    const addExtBtn = document.getElementById('addExtBtn');
+    const addHydBtn = document.getElementById('addHydBtn');
+    if (!addExtBtn || !addHydBtn) return;
+    const outdoor = isOutdoorCurrent();
+    addExtBtn.disabled = outdoor;
+    addExtBtn.title = outdoor ? '옥외에서는 소화기 추가가 비활성화됩니다.' : '';
+    addHydBtn.disabled = false;
+    addHydBtn.title = outdoor ? '옥외에서는 옥외 소화전만 추가할 수 있습니다.' : '옥내에서는 옥내 소화전만 추가할 수 있습니다.';
+  }
+  function hideMarkerInfo(){
+    const c = document.getElementById('markerInfo');
+    if (!c) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && c.contains(active)) active.blur();
+    c.setAttribute('inert', '');
+    c.style.display = 'none';
+    c.setAttribute('aria-hidden','true');
+  }
+  function hideHydrantInfo(){
+    const c = document.getElementById('hydrantInfo');
+    if (!c) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && c.contains(active)) active.blur();
+    c.setAttribute('inert', '');
+    c.style.display = 'none';
+    c.setAttribute('aria-hidden','true');
+  }
+  function hideInfo(){ hideMarkerInfo(); hideHydrantInfo(); }
+  function markerPos(x, y){ return { left: `${x}%`, top: `${y}%` }; }
+  function resetMoveArm(){
+    state.moveArmed = false;
+    const b = document.getElementById('saveBtn');
+    if (b) b.textContent = '\uC120\uD0DD \uC124\uBE44 \uC218\uC815';
+  }
+  function resetAddMode(){
+    state.addMode = null;
+  }
+  function buildAddOptions(kind, x, y){
+    const current = state.current;
+    if (!current) return null;
+    const numericBuildingId = /^\d+$/.test(String(current.buildingId || '')) ? String(current.buildingId) : '';
+    const numericFloorId = /^\d+$/.test(String(current.floorId || '')) ? String(current.floorId) : '';
+    if (kind === 'ext') {
+      return {
+        mode: 'edit',
+        add: true,
+        buildingId: numericBuildingId,
+        floorId: numericFloorId,
+        buildingName: current.buildingName || '',
+        floorName: current.floorName || '',
+        x,
+        y
+      };
+    }
+    return {
+      mode: 'edit',
+      add: true,
+      hydrantType: isOutdoorCurrent() ? 'Outdoor' : 'Indoor',
+      buildingId: numericBuildingId,
+      floorId: numericFloorId,
+      buildingName: current.buildingName || '',
+      floorName: current.floorName || '',
+      x,
+      y
+    };
+  }
+  function openAddModalAtPosition(kind, x, y){
+    const options = buildAddOptions(kind, x, y);
+    if (!options) return;
+    if (kind === 'ext') {
+      openExtinguisherActionModal(options);
+      return;
+    }
+    openHydrantActionModal(options);
+  }
+  function positionInfoCard(cardId, markerEl){
+    const card = document.getElementById(cardId);
+    const host = document.getElementById('planInner');
+    if (!card || !markerEl || !host) return;
+    card.style.display = 'block';
+    card.removeAttribute('inert');
+    card.setAttribute('aria-hidden', 'false');
+    const l = markerEl.style.left || (markerEl.offsetLeft + 'px');
+    const t = markerEl.style.top || (markerEl.offsetTop + 'px');
+    card.style.left = `calc(${l} + 24px)`;
+    card.style.top = `calc(${t} - 8px)`;
+
+    const cW = card.offsetWidth || 320;
+    const cH = card.offsetHeight || 240;
+    const hostRect = host.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    if (cardRect.right > hostRect.right) card.style.left = `calc(${l} - ${cW + 12}px)`;
+    if (cardRect.bottom > hostRect.bottom) card.style.top = `calc(${t} - ${cH + 12}px)`;
+  }
+
+  function setFaultCell(el, faulty){
+    if (!el) return;
+    el.className = 'v';
+    if (faulty === true || faulty === '1') {
+      el.innerHTML = '<span class="badge2 bad">\uACE0\uC7A5</span>';
+    } else if (faulty === false || faulty === '0') {
+      el.innerHTML = '<span class="badge2 good">\uC815\uC0C1</span>';
+    } else {
+      el.innerHTML = '<span class="muted">-</span>';
+    }
+  }
+  function openActionModal(url){
+    const frame = document.getElementById('floorActionFrame');
+    const modalEl = document.getElementById('floorActionModal');
+    if (!frame || !modalEl || !url) return;
+    frame.src = url;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+  function restoreSelectedInfoCard(kind){
+    setTimeout(() => {
+      if (kind === 'ext' && state.selectedExtId) {
+        const extBtn = markersEl.querySelector(`.marker[data-ext-id="${state.selectedExtId}"]`);
+        extBtn?.click();
+        return;
+      }
+      if (kind === 'hyd' && state.selectedHydrantId) {
+        const hydBtn = hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${state.selectedHydrantId}"]`);
+        hydBtn?.click();
+      }
+    }, 0);
+  }
+  function openExtinguisherActionModal(options){
+    const shouldRestore = document.getElementById('markerInfo')?.style.display === 'block' && !!state.selectedExtId;
+    window.FireWebExtinguisherModal?.open({
+      ...options,
+      onClose: async ({ mode, reason }) => {
+        const shouldRefresh = reason !== 'dismiss' && (mode === 'edit' || mode === 'inspect');
+        if (shouldRefresh) {
+          await refreshAfterAction();
+          restoreSelectedInfoCard('ext');
+          return;
+        }
+        if (shouldRestore && state.selectedExtId) {
+          restoreSelectedInfoCard('ext');
+        }
+      }
+    });
+  }
+  function openHydrantActionModal(options){
+    const shouldRestore = document.getElementById('hydrantInfo')?.style.display === 'block' && !!state.selectedHydrantId;
+    window.FireWebHydrantModal?.open({
+      ...options,
+      onClose: async ({ mode, reason }) => {
+        const shouldRefresh = reason !== 'dismiss' && (mode === 'edit' || mode === 'inspect');
+        if (shouldRefresh) {
+          await refreshAfterAction();
+          restoreSelectedInfoCard('hyd');
+          return;
+        }
+        if (shouldRestore && state.selectedHydrantId) {
+          restoreSelectedInfoCard('hyd');
+        }
+      }
+    });
+  }
+  function openSelectedEditModal(){
+    if (!isAdmin) {
+      alert('Admin only');
+      return;
+    }
+    if (state.selectedHydrantId) {
+      openHydrantActionModal({ mode: 'edit', id: state.selectedHydrantId });
+      return;
+    }
+    if (state.selectedExtId) {
+      openExtinguisherActionModal({ mode: 'edit', id: state.selectedExtId });
+      return;
+    }
+    alert('먼저 수정할 소화기 또는 소화전을 선택하세요.');
+  }
+  function openAddModal(kind){
+    if (!isAdmin) {
+      alert('Admin only');
+      return;
+    }
+    const current = state.current;
+    if (!current) {
+      alert('현재 도면을 먼저 선택하세요.');
+      return;
+    }
+    const numericBuildingId = /^\d+$/.test(String(current.buildingId || '')) ? String(current.buildingId) : '';
+    const numericFloorId = /^\d+$/.test(String(current.floorId || '')) ? String(current.floorId) : '';
+    if (kind === 'ext') {
+      if (isOutdoorCurrent()) {
+        alert('옥외 화면에서는 소화기를 추가할 수 없습니다.');
+        return;
+      }
+      state.addMode = 'ext';
+      return;
+    }
+    state.addMode = 'hyd';
+  }
+
+    function renderAccountMenu() {
+    let userName = localStorage.getItem('fw_user') || 'User';
+    try {
+      const raw = localStorage.getItem('fireweb_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        userName = u.displayName || u.username || userName;
+      }
+    } catch (_) {}
+    navAccountArea.innerHTML = `
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle fw-semibold account-link" href="#" role="button" data-bs-toggle="dropdown">${userName}</a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="/index.html">\uBA54\uC778 \uD654\uBA74</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><button class="dropdown-item text-danger" id="btnLogout">\uB85C\uADF8\uC544\uC6C3</button></li>
+        </ul>
+      </li>`;
+    const btnLogout = document.getElementById('btnLogout');
+    btnLogout?.addEventListener('click', () => {
+      localStorage.removeItem('fireweb_user');
+      localStorage.removeItem('fw_user');
+      location.href = '/login.html';
+    });
+  }
+
+  function renderList(){
+    if (isOutdoorCurrent()) {
+      listEl.innerHTML = '<div class="text-muted small">\uC625\uC678 \uB3C4\uBA74\uC5D0\uC11C\uB294 \uC18C\uD654\uAE30 \uBAA9\uB85D\uC774 \uD45C\uC2DC\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    const list = state.exts
+      .filter(x => isCurrentFloor(x))
+      .sort((a,b) => (a.extinguisherId || 0) - (b.extinguisherId || 0));
+    for (const it of list) {
+      const card = document.createElement('div');
+      card.className = 'card mb-2 extRow' + (state.selectedExtId === it.extinguisherId ? ' sel' : '');
+      card.style.cursor = 'pointer';
+      card.innerHTML = `<div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">#${it.extinguisherId}</div>
+          <span class="badge bg-secondary">${it.quantity || 1}</span>
+        </div>
+        <div class="small text-muted">${it.extinguisherType || '-'}</div>
+        <div class="small text-muted">\uC124\uCE58/\uC81C\uC870\uC77C: ${it.manufactureDate ? String(it.manufactureDate).slice(0,7).replace('-', '년 ') + '월' : '-'}</div>
+      </div>`;
+      card.onclick = () => {
+        resetMoveArm();
+        state.selectedExtId = it.extinguisherId;
+        state.selectedHydrantId = null;
+        hideInfo();
+        renderList();
+        renderMarkers();
+        const extBtn = markersEl.querySelector(`.marker[data-ext-id="${it.extinguisherId}"]`);
+        extBtn?.click();
+      };
+      listEl.appendChild(card);
+    }
+  }
+
+  function renderMarkers(){
+    markersEl.innerHTML = '';
+    hydrantMarkersEl.innerHTML = '';
+
+    const outdoor = isOutdoorCurrent();
+    const exts = outdoor
+      ? []
+      : state.exts.filter(x => isCurrentFloor(x) && x.x != null && x.y != null);
+    const hyds = outdoor
+      ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && x.x != null && x.y != null)
+      : state.hyds.filter(x => isCurrentFloor(x) && x.x != null && x.y != null);
+
+    for (const it of exts) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'marker' + (state.selectedExtId === it.extinguisherId ? ' sel' : '');
+      btn.dataset.extId = String(it.extinguisherId || '');
+      Object.assign(btn.style, markerPos(it.x, it.y));
+      btn.innerHTML = `<img src="${EX_ICON_URL}" alt="extinguisher">`;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        resetMoveArm();
+        state.selectedExtId = it.extinguisherId;
+        state.selectedHydrantId = null;
+        hideHydrantInfo();
+        renderList();
+        renderMarkers();
+        const sameAtPos = exts
+          .filter(x => Number(x.x).toFixed(2) === Number(it.x).toFixed(2) && Number(x.y).toFixed(2) === Number(it.y).toFixed(2))
+          .sort((a,b) => (a.extinguisherId || 0) - (b.extinguisherId || 0));
+        let cur = it;
+        const redraw = () => {
+          document.getElementById('miTitle').textContent = `\uC18C\uD654\uAE30 #${cur.extinguisherId}`;
+          document.getElementById('miType').textContent = cur.extinguisherType || '-';
+          document.getElementById('miInstall').textContent = cur.manufactureDate ? String(cur.manufactureDate).slice(0,7).replace('-', '년 ') + '월' : '-';
+          document.getElementById('miCoord').textContent = `${Number(cur.x).toFixed(2)}%, ${Number(cur.y).toFixed(2)}%`;
+          const last = cur.lastInspectionDate ? String(cur.lastInspectionDate).slice(0,10) : '';
+          const insp = cur.lastInspectorName ? ` (${cur.lastInspectorName})` : '';
+          document.getElementById('miLast').textContent = last ? (last + insp) : '\uC810\uAC80 \uC774\uB825 \uC5C6\uC74C';
+          document.getElementById('miQty').textContent = String(cur.quantity || 1) + '\uAC1C';
+          setFaultCell(document.getElementById('miFault'), cur.lastIsFaulty);
+          document.getElementById('miReason').textContent = (cur.lastIsFaulty === true) ? (cur.lastFaultReason || '-') : '-';
+
+          const sel = document.getElementById('miSelectExt');
+          if (sel) {
+            sel.innerHTML = sameAtPos.map(x => `<option value="${x.extinguisherId}" ${x.extinguisherId===cur.extinguisherId?'selected':''}>#${x.extinguisherId} ${x.extinguisherType || ''}</option>`).join('');
+          }
+          sel?.addEventListener('change', (ev) => {
+            const id = Number(ev.target.value);
+            const found = sameAtPos.find(x => x.extinguisherId === id);
+            if (!found) return;
+            cur = found;
+            state.selectedExtId = found.extinguisherId;
+            renderList();
+            renderMarkers();
+          }, { once: true });
+
+          document.getElementById('miInspectBtn').onclick = () => {
+            openExtinguisherActionModal({ mode: 'inspect', id: cur.extinguisherId });
+          };
+          document.getElementById('miDetailBtn').onclick = () => {
+            openExtinguisherActionModal({ mode: 'details', id: cur.extinguisherId });
+          };
+          document.getElementById('miEditBtn').onclick = () => {
+            if (!isAdmin) return;
+            openExtinguisherActionModal({ mode: 'edit', id: cur.extinguisherId });
+          };
+          document.getElementById('miAddHereBtn').onclick = () => {
+            if (!isAdmin) return;
+            openExtinguisherActionModal({
+              mode: 'edit',
+              add: true,
+              buildingId: cur.buildingId || '',
+              floorId: cur.floorId || '',
+              buildingName: cur.buildingName || '',
+              floorName: cur.floorName || '',
+              x: cur.x,
+              y: cur.y
+            });
+          };
+          document.getElementById('miCloseBtn').onclick = hideMarkerInfo;
+          document.getElementById('miHeadCloseBtn').onclick = hideMarkerInfo;
+        };
+        redraw();
+        positionInfoCard('markerInfo', btn);
+      };
+      markersEl.appendChild(btn);
+    }
+
+    for (const h of hyds) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hmarker' + (state.selectedHydrantId === h.hydrantId ? ' sel' : '');
+      if (String(h.hydrantType || '').toLowerCase() === 'outdoor') btn.classList.add('outdoor');
+      btn.dataset.hydrantId = String(h.hydrantId || '');
+      Object.assign(btn.style, markerPos(h.x, h.y));
+      const hydIcon = String(h.hydrantType || '').toLowerCase() === 'outdoor'
+        ? HYDRANT_OUT_ICON_URL
+        : HYDRANT_IN_ICON_URL;
+      btn.innerHTML = `<img src="${hydIcon}" alt="hydrant">`;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        resetMoveArm();
+        state.selectedHydrantId = h.hydrantId;
+        state.selectedExtId = null;
+        hideMarkerInfo();
+        renderList();
+        renderMarkers();
+        document.getElementById('hiTitle').textContent = `\uC18C\uD654\uC804 #${h.hydrantId}`;
+        document.getElementById('hiSerial').textContent = h.serialNumber || '-';
+        document.getElementById('hiType').textContent = (h.hydrantType === 'Outdoor' ? '\uC625\uC678' : '\uC625\uB0B4');
+        document.getElementById('hiOp').textContent = (h.operationType === 'Auto' ? '\uC790\uB3D9' : (h.operationType === 'Manual' ? '\uC218\uB3D9' : (h.operationType || '-')));
+        document.getElementById('hiCoord').textContent = `${Number(h.x).toFixed(2)}%, ${Number(h.y).toFixed(2)}%`;
+        const hLast = h.lastInspectionDate ? String(h.lastInspectionDate).slice(0,10) : '';
+        const hInsp = h.lastInspectorName ? ` (${h.lastInspectorName})` : '';
+        document.getElementById('hiLast').textContent = hLast ? (hLast + hInsp) : '\uC810\uAC80 \uC774\uB825 \uC5C6\uC74C';
+        setFaultCell(document.getElementById('hiFault'), h.lastIsFaulty);
+        document.getElementById('hiReason').textContent = (h.lastIsFaulty === true) ? (h.lastFaultReason || '-') : '-';
+        document.getElementById('hiInspectBtn').onclick = () => {
+          openHydrantActionModal({ mode: 'inspect', id: h.hydrantId });
+        };
+        document.getElementById('hiDetailBtn').onclick = () => {
+          openHydrantActionModal({ mode: 'details', id: h.hydrantId });
+        };
+        document.getElementById('hiEditBtn').onclick = () => {
+          if (!isAdmin) return;
+          openHydrantActionModal({ mode: 'edit', id: h.hydrantId });
+        };
+        document.getElementById('hiCloseBtn').onclick = hideHydrantInfo;
+        document.getElementById('hiHeadCloseBtn').onclick = hideHydrantInfo;
+        positionInfoCard('hydrantInfo', btn);
+      };
+      hydrantMarkersEl.appendChild(btn);
+    }
+  }
+
+  async function load(){
+    const qsNow = new URLSearchParams(location.search);
+    const qBuilding = (qsNow.get('buildingName') || '').trim();
+    const qFloor = (qsNow.get('floorName') || '').trim();
+
+    let ej = null;
+    let hj = null;
+    const er = await api('/fire-api/extinguishers?size=2000&page=0');
+    const hr = await api('/fire-api/hydrants?size=2000&page=0');
+    if (er) ej = await er.json();
+    if (hr) hj = await hr.json();
+
+    state.exts = (ej?.data?.content || []).filter(x => x.active !== false);
+    state.hyds = (hj?.data?.content || []).filter(x => x.active !== false);
+
+    const floorMap = new Map();
+    const upsertFloor = (x) => {
+      if (!x || !x.buildingId || !x.floorId) return;
+      const key = `${x.buildingId}|${x.floorId}`;
+      if (!floorMap.has(key)) {
+        floorMap.set(key, {
+          buildingId: x.buildingId,
+          floorId: x.floorId,
+          buildingName: x.buildingName || '',
+          floorName: x.floorName || '',
+          isOutdoor: false,
+          planImagePath: ''
+        });
+      } else {
+        const f = floorMap.get(key);
+        if (!f.buildingName && x.buildingName) f.buildingName = x.buildingName;
+        if (!f.floorName && x.floorName) f.floorName = x.floorName;
+      }
+    };
+
+    state.exts.forEach(upsertFloor);
+    state.hyds.forEach(upsertFloor);
+    state.hyds
+      .filter(h => String(h.hydrantType || '').toLowerCase() === 'outdoor')
+      .forEach(h => {
+        const key = `${h.buildingId}|${h.floorId}`;
+        const f = floorMap.get(key);
+        if (!f) return;
+        f.isOutdoor = true;
+        if (!f.buildingName) f.buildingName = '\uC625\uC678';
+      });
+
+    const resolved = await Promise.all(Array.from(floorMap.values()).map(async (f) => {
+      let planPath = '';
+      if (f.isOutdoor || normalize(f.buildingName).includes('\uC625\uC678') || normalize(f.buildingName).includes('outdoor')) {
+        planPath = '/images/drone_photo.JPG';
+      } else {
+        planPath = await fetchPlanImagePath(f.buildingId, f.floorId);
+        if (!planPath) {
+          planPath = planImage(f.buildingName, f.floorName);
+        }
+      }
+      return { ...f, planImagePath: planPath || '' };
+    }));
+
+    const mergedMap = new Map();
+    for (const f of resolved) {
+      const key = `${String(f.buildingId)}|${String(f.floorId)}`;
+      mergedMap.set(key, f);
+    }
+    for (const d of DEFAULT_FLOORS) {
+      const key = `${String(d.buildingId)}|${String(d.floorId)}`;
+      if (!mergedMap.has(key)) mergedMap.set(key, d);
+    }
+
+    const floorDedup = new Map();
+    for (const v of Array.from(mergedMap.values()).filter(x => !!x.planImagePath)) {
+      const bn = normalize(v.buildingName);
+      const fn = normalize(v.floorName);
+      const key = (bn && fn)
+        ? `${bn}|${fn}`
+        : `id:${String(v.buildingId)}|${String(v.floorId)}`;
+      const prev = floorDedup.get(key);
+      if (!prev) {
+        floorDedup.set(key, v);
+        continue;
+      }
+      const shouldReplace =
+        (!prev.buildingName && !!v.buildingName) ||
+        (!prev.floorName && !!v.floorName) ||
+        (!prev.planImagePath && !!v.planImagePath);
+      if (shouldReplace) floorDedup.set(key, v);
+    }
+    state.floors = Array.from(floorDedup.values())
+      .sort((a,b) => {
+        const bn = (a.buildingName || '').localeCompare((b.buildingName || ''), 'ko');
+        if (bn !== 0) return bn;
+        const fo = floorOrder(a.floorName) - floorOrder(b.floorName);
+        return fo !== 0 ? fo : String(a.floorName || '').localeCompare(String(b.floorName || ''), 'ko');
+      });
+
+    const bMap = new Map();
+    for (const f of state.floors) {
+      const key = normalize(f.buildingName) || `id:${String(f.buildingId)}`;
+      if (!bMap.has(key)) {
+        bMap.set(key, { key, buildingId: f.buildingId, buildingName: f.buildingName, floors: [] });
+      }
+      const group = bMap.get(key);
+      const floorKey = normalize(f.floorName) || `id:${String(f.floorId)}`;
+      const exists = group.floors.some(x => (normalize(x.floorName) || `id:${String(x.floorId)}`) === floorKey);
+      if (!exists) group.floors.push(f);
+    }
+    state.buildings = Array.from(bMap.values())
+      .map(b => ({
+        ...b,
+        floors: b.floors.sort((x, y) => {
+          const fo = floorOrder(x.floorName) - floorOrder(y.floorName);
+          return fo !== 0 ? fo : String(x.floorName || '').localeCompare(String(y.floorName || ''), 'ko');
+        })
+      }))
+      .sort((a, b) => {
+        const ao = buildingOrder(a.buildingName);
+        const bo = buildingOrder(b.buildingName);
+        if (ao !== bo) return ao - bo;
+        return String(a.buildingName || '').localeCompare(String(b.buildingName || ''), 'ko');
+      });
+
+    state.current = state.floors.find(v => normalize(v.buildingName) === normalize(qBuilding) && normalize(v.floorName) === normalize(qFloor)) || null;
+
+    if (!state.current) {
+      const preferredBuilding = state.buildings.find(b => normalize(b.buildingName) === normalize(qBuilding));
+      if (preferredBuilding) {
+        state.current = pickDefaultFloor(preferredBuilding.floors);
+      }
+    }
+    if (!state.current) {
+      state.current = pickDefaultFloor(state.buildings[0]?.floors || []) || null;
+    }
+
+    syncBuildingFloorSelectors(false);
+    syncCurrentFloor(false);
+
+    window.FireWebNav?.mount?.();
+    document.getElementById('saveBtn').disabled = !isAdmin;
+    document.getElementById('clearBtn').disabled = !isAdmin;
+    document.getElementById('addExtBtn').disabled = !isAdmin;
+    document.getElementById('delExtBtn').disabled = !isAdmin;
+    document.getElementById('addHydBtn').disabled = !isAdmin;
+    document.getElementById('delHydBtn').disabled = !isAdmin;
+    if (!isAdmin) {
+      document.getElementById('saveBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('clearBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('addExtBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('delExtBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('addHydBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('delHydBtn').title = '관리자 권한이 필요합니다.';
+      document.getElementById('miEditBtn').disabled = true;
+      document.getElementById('hiEditBtn').disabled = true;
+      document.getElementById('miAddHereBtn').disabled = true;
+      document.getElementById('miEditBtn').title = '관리자만 위치를 수정할 수 있습니다.';
+      document.getElementById('hiEditBtn').title = '관리자만 위치를 수정할 수 있습니다.';
+      document.getElementById('miAddHereBtn').title = '관리자만 추가할 수 있습니다.';
+    }
+    renderList();
+    renderMarkers();
+  }
+
+  buildingSelect?.addEventListener('change', () => {
+    const key = buildingSelect.value || '';
+    const b = state.buildings.find(x => x.key === key);
+    if (!b) return;
+    syncFloorSelectForBuilding(key);
+    const targetFloor = pickDefaultFloor(b.floors);
+    if (!targetFloor) return;
+    if (floorSelect) floorSelect.value = String(targetFloor.floorId);
+    state.current = targetFloor;
+    resetAddMode();
+    syncCurrentFloor(true);
+  });
+  floorSelect?.addEventListener('change', () => {
+    const bKey = buildingSelect?.value || '';
+    const b = state.buildings.find(x => x.key === bKey);
+    if (!b) return;
+    const floorId = floorSelect?.value;
+    const target = b.floors.find(f => String(f.floorId) === String(floorId));
+    if (!target) return;
+    state.current = target;
+    resetAddMode();
+    syncCurrentFloor(true);
+  });
+
+  planImg.addEventListener('click', (e) => {
+    if (!isAdmin) return;
+    if (state.addMode === 'ext') {
+      const rect = planImg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      resetAddMode();
+      openAddModalAtPosition('ext', x, y);
+      return;
+    }
+    if (state.addMode === 'hyd') {
+      const rect = planImg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      resetAddMode();
+      openAddModalAtPosition('hyd', x, y);
+      return;
+    }
+    if (state.moveArmed) {
+      resetMoveArm();
+      openSelectedEditModal();
+    }
+  });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+    openSelectedEditModal();
+  });
+
+  document.getElementById('clearBtn').onclick = () => {
+    if (!isAdmin) return alert('Admin only');
+    state.moveArmed = false;
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.textContent = '\uC120\uD0DD \uC124\uBE44 \uC218\uC815';
+    if (state.selectedHydrantId) {
+      const hyd = state.hyds.find(x => x.hydrantId === state.selectedHydrantId);
+      if (!hyd) return;
+      hyd.x = null; hyd.y = null; renderMarkers();
+      return;
+    }
+    if (!state.selectedExtId) return;
+    const ext = state.exts.find(x => x.extinguisherId === state.selectedExtId);
+    if (!ext) return;
+    ext.x = null; ext.y = null; renderMarkers();
+  };
+
+  document.getElementById('addExtBtn').onclick = () => {
+    resetMoveArm();
+    openAddModal('ext');
+  };
+  document.getElementById('delExtBtn').onclick = async () => {
+    if (!isAdmin) return alert('Admin only');
+    if (!state.selectedExtId) return alert('\uC0AD\uC81C\uD560 \uC18C\uD654\uAE30\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.');
+    if (!confirm(`\uC18C\uD654\uAE30 #${state.selectedExtId}\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return;
+    const r = await fetch(`/fire-api/extinguishers/${encodeURIComponent(state.selectedExtId)}`, { method:'DELETE', headers: authHeaders({}, 'DELETE') });
+    refreshTokenFromResponse(r);
+    if (!r.ok) return alert('Delete failed');
+    state.exts = state.exts.filter(x => x.extinguisherId !== state.selectedExtId);
+    state.selectedExtId = null;
+    hideInfo();
+    renderList();
+    renderMarkers();
+  };
+  document.getElementById('addHydBtn').onclick = () => {
+    resetMoveArm();
+    openAddModal('hyd');
+  };
+  document.getElementById('delHydBtn').onclick = async () => {
+    if (!isAdmin) return alert('Admin only');
+    if (!state.selectedHydrantId) return alert('\uC0AD\uC81C\uD560 \uC18C\uD654\uC804\uC744 \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.');
+    if (!confirm(`\uC18C\uD654\uC804 #${state.selectedHydrantId}\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return;
+    const r = await fetch(`/fire-api/hydrants/${encodeURIComponent(state.selectedHydrantId)}`, { method:'DELETE', headers: authHeaders({}, 'DELETE') });
+    refreshTokenFromResponse(r);
+    if (!r.ok) return alert('Delete failed');
+    state.hyds = state.hyds.filter(x => x.hydrantId !== state.selectedHydrantId);
+    state.selectedHydrantId = null;
+    hideInfo();
+    renderMarkers();
+  };
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t.closest('.marker') && !t.closest('#markerInfo')) hideMarkerInfo();
+    if (!t.closest('.hmarker') && !t.closest('#hydrantInfo')) hideHydrantInfo();
+  }, true);
+  async function refreshAfterAction(){
+    const wasExtInfoOpen = document.getElementById('markerInfo')?.style.display === 'block';
+    const wasHydInfoOpen = document.getElementById('hydrantInfo')?.style.display === 'block';
+    const selectedExtId = state.selectedExtId;
+    const selectedHydrantId = state.selectedHydrantId;
+
+    await load();
+
+    if (selectedExtId && !state.exts.some(x => x.extinguisherId === selectedExtId)) {
+      state.selectedExtId = null;
+    }
+    if (selectedHydrantId && !state.hyds.some(x => x.hydrantId === selectedHydrantId)) {
+      state.selectedHydrantId = null;
+    }
+    renderList();
+    renderMarkers();
+
+    if (wasExtInfoOpen && state.selectedExtId) {
+      const extBtn = markersEl.querySelector(`.marker[data-ext-id="${state.selectedExtId}"]`);
+      extBtn?.click();
+    } else if (wasHydInfoOpen && state.selectedHydrantId) {
+      const hydBtn = hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${state.selectedHydrantId}"]`);
+      hydBtn?.click();
+    }
+  }
+
+  window.addEventListener('message', async (ev) => {
+    const msg = String(ev.data || '');
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('floorActionModal'));
+
+    const isEditClose =
+      msg === 'fireweb:outdoor-edit-close' ||
+      msg === 'fireweb:hydrant-edit-close';
+    const isInspectClose = msg === 'fireweb:hydrant-inspect-close' || msg === 'fireweb:hydrant-inspect-saved';
+    const isDetailsClose = msg === 'fireweb:hydrant-details-close';
+    if (!isEditClose && !isInspectClose && !isDetailsClose) return;
+
+    modal.hide();
+
+    if (isEditClose || isInspectClose) {
+      await refreshAfterAction();
+    }
+  });
+  document.getElementById('floorActionModal')?.addEventListener('hidden.bs.modal', () => {
+    const frame = document.getElementById('floorActionFrame');
+    if (frame) frame.src = 'about:blank';
+  });
+
+  document.getElementById('btnZoomReset').onclick = () => { fitPlanToView(); centerPlanInView(); };
+  planImg.addEventListener('load', () => { fitPlanToView(); centerPlanInView(); });
+
+  planWrap.addEventListener('mousedown', (e) => {
+    state.dragging = true;
+    state.dragStartX = e.clientX;
+    state.dragStartY = e.clientY;
+    state.panStartX = state.panX;
+    state.panStartY = state.panY;
+    planWrap.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!state.dragging) return;
+    state.panX = state.panStartX + (e.clientX - state.dragStartX);
+    state.panY = state.panStartY + (e.clientY - state.dragStartY);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => { state.dragging = false; planWrap.classList.remove('dragging'); });
+  planWrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (e.target?.closest('.marker, .hmarker, .infoCard')) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size === 1) {
+      state.dragging = true;
+      state.dragStartX = e.clientX;
+      state.dragStartY = e.clientY;
+      state.panStartX = state.panX;
+      state.panStartY = state.panY;
+      planWrap.classList.add('dragging');
+    } else if (activePointers.size === 2) {
+      state.dragging = false;
+      pinchStartDistance = getPointerDistance();
+      pinchStartZoom = state.zoom;
+      planWrap.classList.remove('dragging');
+    }
+  }, { passive: true });
+  planWrap.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size >= 2) {
+      const nextDistance = getPointerDistance();
+      if (!pinchStartDistance || !nextDistance) return;
+      const nextZoom = Math.max(0.15, Math.min(3, pinchStartZoom * (nextDistance / pinchStartDistance)));
+      if (nextZoom !== state.zoom) {
+        state.zoom = nextZoom;
+        applyTransform();
+        centerPlanInView();
+      }
+      return;
+    }
+    if (!state.dragging) return;
+    state.panX = state.panStartX + (e.clientX - state.dragStartX);
+    state.panY = state.panStartY + (e.clientY - state.dragStartY);
+    applyTransform();
+  }, { passive: true });
+  const clearPointer = (e) => {
+    if (e.pointerType === 'mouse') return;
+    activePointers.delete(e.pointerId);
+    if (activePointers.size === 0) {
+      state.dragging = false;
+      planWrap.classList.remove('dragging');
+      return;
+    }
+    if (activePointers.size === 1) {
+      const remaining = Array.from(activePointers.values())[0];
+      state.dragging = true;
+      state.dragStartX = remaining.x;
+      state.dragStartY = remaining.y;
+      state.panStartX = state.panX;
+      state.panStartY = state.panY;
+      pinchStartDistance = 0;
+      planWrap.classList.add('dragging');
+    }
+  };
+  planWrap.addEventListener('pointerup', clearPointer, { passive: true });
+  planWrap.addEventListener('pointercancel', clearPointer, { passive: true });
+  planWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const oldZoom = state.zoom;
+    const newZoom = Math.max(0.15, Math.min(3, state.zoom + (e.deltaY > 0 ? -0.08 : 0.08)));
+    if (newZoom === oldZoom) return;
+    const cx = planWrap.clientWidth / 2;
+    const cy = planWrap.clientHeight / 2;
+    const ratio = newZoom / oldZoom;
+    state.panX = cx - (cx - state.panX) * ratio;
+    state.panY = cy - (cy - state.panY) * ratio;
+    state.zoom = newZoom;
+    applyTransform();
+  }, { passive:false });
+
+    function fixUiKoreanText() {
+    document.title = '\uB3C4\uBA74 \uD654\uBA74 - FireWeb';
+    const nav = Array.from(document.querySelectorAll('.navbar-nav.ms-3 .nav-link'));
+    if (nav[0]) nav[0].textContent = '\uC18C\uD654\uAE30 \uBAA9\uB85D';
+    if (nav[1]) nav[1].textContent = '\uC18C\uD654\uC804 \uBAA9\uB85D';
+    if (nav[2]) nav[2].textContent = '\uB3C4\uBA74 \uD654\uBA74';
+    if (nav[3]) nav[3].textContent = 'QR \uAD00\uB9AC';
+
+    const leftTitle = document.querySelector('.left .titlebar .title');
+    if (leftTitle) leftTitle.textContent = '\uB3C4\uBA74 \uD654\uBA74 \uD3B8\uC9D1';
+    const leftSub = document.querySelector('.left .sub');
+    if (leftSub) leftSub.textContent = '\uC18C\uD654\uAE30/\uC18C\uD654\uC804\uC744 \uC120\uD0DD\uD558\uACE0 \uB3C4\uBA74\uC5D0\uC11C \uC704\uCE58\uB97C \uC9C0\uC815\uD558\uAC70\uB098 \uCD94\uAC00\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+
+    const jumpLabel = document.querySelector('.left .mb-2 .form-label');
+    if (jumpLabel) jumpLabel.textContent = '\uD604\uC7AC \uB3C4\uBA74';
+    const jumpHelp = document.querySelector('.left .mb-2 .form-text small');
+    if (jumpHelp) jumpHelp.textContent = '\uB3C4\uBA74\uC774 \uB4F1\uB85D\uB41C \uAC74\uBB3C/\uCE35\uB9CC \uD45C\uC2DC\uB429\uB2C8\uB2E4.';
+
+    const listTitle = document.querySelector('.left .fw-semibold.mb-2');
+    if (listTitle) listTitle.textContent = '\uC18C\uD654\uAE30 \uBAA9\uB85D';
+    const planSub = document.querySelector('.right .sub');
+    if (planSub) planSub.textContent = '\uD720\uB85C \uD655\uB300/\uCD95\uC18C, \uB4DC\uB798\uADF8\uB85C \uC774\uB3D9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+    const hint = document.querySelector('.hint');
+    if (hint) hint.textContent = '\uB9C8\uCEE4\uB97C \uD074\uB9AD\uD558\uBA74 \uC0C1\uC138 \uC815\uBCF4\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4.';
+
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    set('saveBtn', '\uC120\uD0DD \uC124\uBE44 \uC218\uC815');
+    set('clearBtn', '\uC88C\uD45C \uCD08\uAE30\uD654');
+    set('addExtBtn', '\uC18C\uD654\uAE30 \uCD94\uAC00');
+    set('delExtBtn', '\uC18C\uD654\uAE30 \uC0AD\uC81C');
+    set('addHydBtn', '\uC18C\uD654\uC804 \uCD94\uAC00');
+    set('delHydBtn', '\uC18C\uD654\uC804 \uC0AD\uC81C');
+    set('btnZoomReset', '\uD655\uB300 \uCD08\uAE30\uD654');
+    set('miDetailBtn', '\uC0C1\uC138');
+    set('miInspectBtn', '\uC810\uAC80');
+    set('miEditBtn', '\uC218\uC815');
+    set('miAddHereBtn', '\uC18C\uD654\uAE30 \uCD94\uAC00');
+    set('miCloseBtn', '\uB2EB\uAE30');
+    set('hiDetailBtn', '\uC0C1\uC138');
+    set('hiInspectBtn', '\uC810\uAC80');
+    set('hiEditBtn', '\uC218\uC815');
+    set('hiCloseBtn', '\uB2EB\uAE30');
+
+    const planAlt = document.getElementById('planImg');
+    if (planAlt) planAlt.alt = '\uB3C4\uBA74';
+
+    const infoHeads = document.querySelectorAll('#markerInfo .k');
+    const infoLabels = ['\uC885\uB958', '\uC124\uCE58/\uC81C\uC870\uC77C', '\uC88C\uD45C', '\uCD5C\uC885 \uC810\uAC80', '\uC218\uB7C9', '\uACE0\uC7A5\uC5EC\uBD80', '\uACE0\uC7A5\uC0AC\uC720'];
+    infoHeads.forEach((el, i) => { if (infoLabels[i]) el.textContent = infoLabels[i]; });
+    const hydHeads = document.querySelectorAll('#hydrantInfo .k');
+    const hydLabels = ['\uC2DC\uB9AC\uC5BC', '\uAD6C\uBD84', '\uC791\uB3D9\uBC29\uC2DD', '\uC88C\uD45C', '\uCD5C\uC885 \uC810\uAC80', '\uACE0\uC7A5\uC5EC\uBD80', '\uACE0\uC7A5\uC0AC\uC720'];
+    hydHeads.forEach((el, i) => { if (hydLabels[i]) el.textContent = hydLabels[i]; });
+  }
+
+  fixUiKoreanText();
+  load();
+})();
+</script>
+<script src="/js/common-nav.js"></script>
+</body>
+</html>

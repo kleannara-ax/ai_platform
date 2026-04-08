@@ -37,6 +37,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class FirePumpService {
 
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 7L;
@@ -47,12 +48,12 @@ public class FirePumpService {
     private final FloorRepository floorRepository;
     private final ObjectMapper objectMapper;
 
-    @Transactional(readOnly = true)
+
     public Page<FirePumpResponse> getPumps(String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("pumpId").ascending());
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
         return firePumpRepository.search(kw, pageable).map(pump -> {
-            FirePumpResponse response = new FirePumpResponse(pump);
+            FirePumpResponse response = FirePumpResponse.from(pump);
             firePumpInspectionRepository
                     .findTopByPump_PumpIdOrderByInspectionDateDescInspectionIdDesc(pump.getPumpId())
                     .ifPresent(response::setLastInspection);
@@ -60,12 +61,12 @@ public class FirePumpService {
         });
     }
 
-    @Transactional(readOnly = true)
+
     public FirePumpResponse getPumpDetail(Long pumpId) {
         FirePump pump = firePumpRepository.findById(pumpId)
                 .orElseThrow(() -> new EntityNotFoundException("FirePump", pumpId));
 
-        FirePumpResponse response = new FirePumpResponse(pump);
+        FirePumpResponse response = FirePumpResponse.from(pump);
         Pageable pageable = PageRequest.of(0, MAX_INSPECTION_HISTORY,
                 Sort.by("inspectionDate").descending().and(Sort.by("inspectionId").descending()));
         List<FirePumpInspection> history = firePumpInspectionRepository
@@ -78,7 +79,7 @@ public class FirePumpService {
         return response;
     }
 
-    @Transactional(readOnly = true)
+
     public byte[] exportInspectionCsv(Long pumpId, LocalDate fromDate, LocalDate toDate) {
         if (fromDate == null || toDate == null) {
             throw new BusinessException("조회 시작일과 종료일을 입력해 주세요.");
@@ -111,7 +112,7 @@ public class FirePumpService {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    @Transactional(readOnly = true)
+
     public byte[] exportAllInspectionCsv(LocalDate fromDate, LocalDate toDate) {
         validateExportRange(fromDate, toDate);
         List<FirePumpInspection> inspections = firePumpInspectionRepository
@@ -162,7 +163,7 @@ public class FirePumpService {
         }
 
         log.info("FirePump saved: id={}, serial={}", pump.getPumpId(), pump.getSerialNumber());
-        return new FirePumpResponse(pump);
+        return FirePumpResponse.from(pump);
     }
 
     @Transactional

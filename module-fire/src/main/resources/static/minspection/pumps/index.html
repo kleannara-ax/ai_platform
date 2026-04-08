@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>소방펌프 점검 - FireWeb</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --border: rgba(0,0,0,.12);
+      --radius: 14px;
+      --shadow: 0 4px 16px rgba(0,0,0,.10);
+      --muted: #6b7280;
+      --primary: #dc2626;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #b91c1c 0%, #ea580c 100%);
+      color: #fff;
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .title { font-size: 18px; font-weight: 900; }
+    main { padding: 12px; }
+    .wrap { display: grid; gap: 12px; }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .title-lg { font-size: 17px; font-weight: 900; }
+    .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .err { color: #b91c1c; font-weight: 800; font-size: 14px; }
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 100;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 101;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 16px 32px;
+    }
+    .modal-title { font-size: 18px; font-weight: 900; margin-bottom: 12px; }
+    .inspect-info {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+    .inspect-info strong { font-size: 16px; }
+    .checklist-wrap { display: grid; gap: 10px; }
+    .check-item {
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    .check-item .label { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .radio-group { display: flex; gap: 14px; flex-wrap: wrap; }
+    .radio-group label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+    .radio-group input[type="radio"] { width: 18px; height: 18px; }
+    textarea, input[type="file"] {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.12);
+      font-size: 14px;
+      background: #fff;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    .fault-box {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fef2f2;
+      color: #b91c1c;
+      font-size: 13px;
+      font-weight: 700;
+      display: none;
+    }
+    .actions { display: flex; gap: 8px; margin-top: 16px; }
+    .actions button {
+      flex: 1;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-cancel { background: #e5e7eb; color: #374151; }
+    .btn-confirm { background: var(--primary); color: #fff; }
+    #completeView {
+      display: none;
+      text-align: center;
+      padding: 40px 16px;
+    }
+    #completeView .emoji { font-size: 56px; }
+    #completeView .ctitle { font-size: 22px; font-weight: 900; margin-top: 12px; }
+    #completeView .csub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    #completeView button {
+      margin-top: 24px;
+      padding: 13px 32px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <header><div class="title">소방펌프 점검</div></header>
+  <main>
+    <div id="mainView" class="wrap">
+      <div class="card"><div class="sub">불러오는 중...</div></div>
+    </div>
+    <div id="completeView">
+      <div class="emoji">✅</div>
+      <div class="ctitle">점검이 완료되었습니다.</div>
+      <div class="csub">창을 닫아 다음 작업으로 이동하세요.</div>
+      <button onclick="closeCurrentWindow()">닫기</button>
+    </div>
+  </main>
+
+  <div id="inspectOverlay" class="overlay"></div>
+  <div id="inspectModal" class="modal">
+    <div class="modal-title">소방펌프 점검</div>
+    <div class="inspect-info" id="inspectInfo"></div>
+    <div class="checklist-wrap" id="checklistWrap"></div>
+    <div class="fault-box" id="faultReasonAuto"></div>
+    <div style="margin-top:12px;">
+      <label for="inspectNote" style="display:block; font-weight:700; margin-bottom:6px;">점검 메모</label>
+      <textarea id="inspectNote" placeholder="특이사항이 있으면 입력하세요."></textarea>
+    </div>
+    <div style="margin-top:12px;">
+      <label for="inspectPhotoInput" style="display:block; font-weight:700; margin-bottom:6px;">점검 사진</label>
+      <input type="file" id="inspectPhotoInput" accept="image/*" capture="environment" />
+    </div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="btnCancelInspect">취소</button>
+      <button type="button" class="btn-confirm" id="btnConfirmInspect">점검 저장</button>
+    </div>
+  </div>
+
+  <script src="/js/csrf.js"></script>
+  <script>
+  (function () {
+    const API_BASE = '/fire-api/minspection/pumps';
+    const RETURN_URL = location.pathname + location.search;
+    const CHECK_ITEMS = [
+      { key: 'pump_operation', label: '펌프 운전 상태' },
+      { key: 'panel', label: '제어반 상태' },
+      { key: 'water_supply', label: '수원 및 급수 상태' },
+      { key: 'fuel', label: '동력원 및 연료 상태' },
+      { key: 'drain_pump', label: '배수펌프 상태' },
+      { key: 'piping', label: '배관 및 밸브 상태' }
+    ];
+
+    if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
+      location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+      return;
+    }
+
+    const pathParts = window.location.pathname.split('/');
+    const qrKey = decodeURIComponent(pathParts[pathParts.length - 1] || '');
+    const mainView = document.getElementById('mainView');
+    const completeView = document.getElementById('completeView');
+    const inspectOverlay = document.getElementById('inspectOverlay');
+    const inspectModal = document.getElementById('inspectModal');
+    const checklistWrap = document.getElementById('checklistWrap');
+    let pumpData = null;
+
+    function authHeaders(extra) {
+      return { ...(extra || {}) };
+    }
+
+    async function apiFetch(url, opt) {
+      if (window.FireWebCsrf?.isMutation?.((opt || {}).method)) {
+        await window.FireWebCsrf.ensureToken();
+      }
+      const headers = window.FireWebCsrf?.headers(authHeaders((opt || {}).headers), (opt || {}).method) || authHeaders((opt || {}).headers);
+      const res = await fetch(url, { ...(opt || {}), headers });
+      if (res.status === 401) {
+        localStorage.removeItem('fireweb_user');
+        localStorage.removeItem('fw_user');
+        location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+        throw new Error('unauthorized');
+      }
+      return res;
+    }
+
+    window.closeCurrentWindow = function () {
+      try { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('close'); } catch (_) {}
+      try { if (window.webkit?.messageHandlers?.closeWindow) window.webkit.messageHandlers.closeWindow.postMessage('close'); } catch (_) {}
+      try { window.open('', '_self'); } catch (_) {}
+      try { window.close(); } catch (_) {}
+      setTimeout(() => {
+        try { window.location.replace('about:blank'); } catch (_) {}
+      }, 150);
+    };
+
+    function escHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderChecklist() {
+      checklistWrap.innerHTML = CHECK_ITEMS.map((item, index) => `
+        <div class="check-item" data-key="${item.key}">
+          <div class="label">${index + 1}. ${escHtml(item.label)}</div>
+          <div class="radio-group">
+            <label><input type="radio" name="check_${item.key}" value="NORMAL"> 정상</label>
+            <label><input type="radio" name="check_${item.key}" value="FAULTY"> 불량</label>
+          </div>
+        </div>
+      `).join('');
+
+      checklistWrap.querySelectorAll('input[type="radio"]').forEach((radio) => {
+        radio.addEventListener('change', updateFaultSummary);
+      });
+    }
+
+    function collectChecklistResult() {
+      let hasUnchecked = false;
+      const items = [];
+      CHECK_ITEMS.forEach((item) => {
+        const checked = document.querySelector(`input[name="check_${item.key}"]:checked`);
+        if (!checked) {
+          hasUnchecked = true;
+          return;
+        }
+        items.push({
+          key: item.key,
+          label: item.label,
+          result: checked.value
+        });
+      });
+      return { hasUnchecked, items };
+    }
+
+    function updateFaultSummary() {
+      const faultBox = document.getElementById('faultReasonAuto');
+      const result = collectChecklistResult();
+      const faults = result.items.filter((item) => item.result === 'FAULTY').map((item) => item.label);
+      if (!faults.length) {
+        faultBox.style.display = 'none';
+        faultBox.textContent = '';
+        return;
+      }
+      faultBox.style.display = 'block';
+      faultBox.textContent = '불량 항목: ' + faults.join(', ');
+    }
+
+    function renderExistsView(data) {
+      mainView.innerHTML = `
+        <div class="card">
+          <div class="title-lg">소방펌프 정보</div>
+          <div class="sub">관리번호: ${escHtml(data.serialNumber || '-')}</div>
+          <div class="sub">위치: ${escHtml(data.buildingName || '-')} ${escHtml(data.floorName || '')}</div>
+          ${data.locationDescription ? `<div class="sub">상세위치: ${escHtml(data.locationDescription)}</div>` : ''}
+        </div>
+      `;
+      setTimeout(() => openInspectModal(data.pumpId), 200);
+    }
+
+    function openInspectModal(pumpId) {
+      renderChecklist();
+      document.getElementById('inspectNote').value = '';
+      document.getElementById('inspectPhotoInput').value = '';
+      inspectOverlay.style.display = 'block';
+      inspectModal.style.display = 'block';
+
+      apiFetch(API_BASE + '/' + pumpId)
+        .then((r) => r.json())
+        .then((json) => {
+          const data = json?.data;
+          if (!data) return;
+          const lastInspect = data.lastInspectionDate
+            ? `<br><span style="color:#6b7280;font-size:12px;">최근 점검: ${escHtml(data.lastInspectionDate)} ${data.lastInspectionTime ? escHtml(data.lastInspectionTime) : ''} / ${escHtml(data.lastInspectorName || '-')}</span>`
+            : '<br><span style="color:#6b7280;font-size:12px;">최근 점검 이력이 없습니다.</span>';
+          document.getElementById('inspectInfo').innerHTML = `
+            <strong>${escHtml(data.serialNumber || '-')}</strong>
+            <br>${escHtml(data.buildingName || '-')} ${escHtml(data.floorName || '')}
+            ${data.locationDescription ? '<br>상세위치: ' + escHtml(data.locationDescription) : ''}
+            ${lastInspect}
+          `;
+        });
+
+      document.getElementById('btnConfirmInspect').onclick = () => confirmInspect(pumpId);
+    }
+
+    async function confirmInspect(pumpId) {
+      const result = collectChecklistResult();
+      if (result.hasUnchecked) {
+        alert('모든 점검 항목에 정상 또는 불량을 선택해 주세요.');
+        return;
+      }
+
+      const note = document.getElementById('inspectNote').value.trim();
+      const btn = document.getElementById('btnConfirmInspect');
+      btn.disabled = true;
+
+      try {
+        const res = await apiFetch(API_BASE + '/' + pumpId + '/inspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: result.items,
+            note: note || null
+          })
+        });
+
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          alert(json?.message || '점검 저장 중 오류가 발생했습니다.');
+          return;
+        }
+
+        const inspectPhoto = document.getElementById('inspectPhotoInput').files?.[0];
+        if (inspectPhoto) {
+          const fd = new FormData();
+          fd.append('file', inspectPhoto);
+          const uploadRes = await apiFetch(API_BASE + '/' + pumpId + '/image', {
+            method: 'POST',
+            body: fd
+          });
+          if (!uploadRes.ok) {
+            alert('점검은 저장되었지만 사진 업로드는 실패했습니다.');
+          }
+        }
+
+        inspectOverlay.style.display = 'none';
+        inspectModal.style.display = 'none';
+        document.querySelector('header').style.display = 'none';
+        mainView.style.display = 'none';
+        completeView.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function loadData() {
+      if (!qrKey) {
+        mainView.innerHTML = '<div class="card"><div class="err">QR 키가 비어 있습니다.</div></div>';
+        return;
+      }
+
+      const res = await apiFetch(API_BASE + '/by-key?key=' + encodeURIComponent(qrKey));
+      const json = await res.json();
+      pumpData = json?.data || null;
+      if (!pumpData) {
+        mainView.innerHTML = '<div class="card"><div class="err">데이터를 불러오지 못했습니다.</div></div>';
+        return;
+      }
+      if (!pumpData.exists) {
+        mainView.innerHTML = '<div class="card"><div class="err">등록되지 않은 소방펌프 QR입니다.</div></div>';
+        return;
+      }
+      renderExistsView(pumpData);
+    }
+
+    document.getElementById('btnCancelInspect').addEventListener('click', () => {
+      inspectOverlay.style.display = 'none';
+      inspectModal.style.display = 'none';
+    });
+    inspectOverlay.addEventListener('click', () => {
+      inspectOverlay.style.display = 'none';
+      inspectModal.style.display = 'none';
+    });
+
+    loadData();
+  })();
+  </script>
+</body>
+</html>

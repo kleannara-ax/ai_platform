@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.exception.BusinessException;
-import com.company.core.common.exception.EntityNotFoundException;
 import com.company.module.fire.entity.*;
 import com.company.module.fire.repository.*;
 import com.company.module.fire.service.InspectorNameResolver;
@@ -86,7 +85,7 @@ public class MobileInspectionController {
     @GetMapping("/extinguishers/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExtById(@PathVariable Long id) {
         Extinguisher e = extinguisherRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("extinguisherId", e.getExtinguisherId());
@@ -146,9 +145,9 @@ public class MobileInspectionController {
             return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
 
         Building building = buildingRepository.findById(buildingId)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
         Floor floor = floorRepository.findById(floorId)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         String strictPlanPath = resolvePlanImagePathStrict(building.getBuildingName(), floor.getFloorName());
         if (strictPlanPath == null || strictPlanPath.isBlank()) {
@@ -208,7 +207,7 @@ public class MobileInspectionController {
             @RequestBody Map<String, Object> body) {
 
         Extinguisher e = extinguisherRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         boolean isFaulty = Boolean.TRUE.equals(body.get("isFaulty"));
         String faultReason = getString(body, "faultReason");
@@ -249,7 +248,7 @@ public class MobileInspectionController {
         }
 
         Extinguisher e = extinguisherRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         try {
             Path dir = Paths.get("/data/upload/module_fire/extinguishers");
@@ -383,7 +382,7 @@ public class MobileInspectionController {
     @GetMapping("/hydrants/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getHydById(@PathVariable Long id) {
         FireHydrant h = fireHydrantRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("hydrantId", h.getHydrantId());
@@ -453,9 +452,9 @@ public class MobileInspectionController {
         }
 
         Building building = buildingRepository.findById(buildingId)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
         Floor floor = floorRepository.findById(floorId)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         FireHydrant entity = FireHydrant.builder()
                 .serialNumber(generateNextHydrantSerialNumber())
@@ -486,7 +485,7 @@ public class MobileInspectionController {
             @RequestBody Map<String, Object> body) {
 
         FireHydrant h = fireHydrantRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         boolean isFaulty = Boolean.TRUE.equals(body.get("isFaulty"));
         String faultReason = getString(body, "faultReason");
@@ -527,7 +526,7 @@ public class MobileInspectionController {
         }
 
         FireHydrant h = fireHydrantRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         try {
             Path dir = Paths.get("/data/upload/module_fire/hydrants");
@@ -653,7 +652,7 @@ public class MobileInspectionController {
     @GetMapping("/receivers/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getReceiverById(@PathVariable Long id) {
         FireReceiver receiver = fireReceiverRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("receiverId", receiver.getReceiverId());
@@ -685,7 +684,7 @@ public class MobileInspectionController {
             @RequestBody Map<String, Object> body) {
 
         FireReceiver receiver = fireReceiverRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         if (receiverInspectionRepository.existsByReceiver_ReceiverIdAndInspectionDate(id, LocalDate.now())) {
             throw new BusinessException("이미 오늘 점검이 등록된 수신기입니다.");
@@ -739,11 +738,11 @@ public class MobileInspectionController {
         }
 
         fireReceiverRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         FireReceiverInspection inspection = receiverInspectionRepository
                 .findTopByReceiver_ReceiverIdOrderByInspectionDateDescInspectionIdDesc(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/receiver-inspections"),
                 "/fire-api/minspection/files/receivers/", inspection::updateImagePath, () -> {
@@ -783,7 +782,7 @@ public class MobileInspectionController {
     @GetMapping("/pumps/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getPumpById(@PathVariable Long id) {
         FirePump pump = firePumpRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("pumpId", pump.getPumpId());
@@ -815,7 +814,7 @@ public class MobileInspectionController {
             @RequestBody Map<String, Object> body) {
 
         FirePump pump = firePumpRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         if (pumpInspectionRepository.existsByPump_PumpIdAndInspectionDate(id, LocalDate.now())) {
             throw new BusinessException("이미 오늘 점검이 등록된 소방펌프입니다.");
@@ -869,11 +868,11 @@ public class MobileInspectionController {
         }
 
         firePumpRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         FirePumpInspection inspection = pumpInspectionRepository
                 .findTopByPump_PumpIdOrderByInspectionDateDescInspectionIdDesc(id)
-                .orElseThrow(() -> new EntityNotFoundException(MSG_NOT_FOUND));
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/pump-inspections"),
                 "/fire-api/minspection/files/pumps/", inspection::updateImagePath, () -> {

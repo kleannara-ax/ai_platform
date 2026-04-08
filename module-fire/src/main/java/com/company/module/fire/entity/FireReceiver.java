@@ -9,6 +9,10 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 수신기 엔티티
+ * 테이블명: fire_receiver
+ */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -17,38 +21,38 @@ public class FireReceiver {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "receiver_id")
+    @Column(name = "RECEIVER_ID")
     private Long receiverId;
 
-    @Column(name = "serial_number", nullable = false, unique = true, length = 50)
+    @Column(name = "SERIAL_NUMBER", nullable = false, unique = true, length = 50)
     private String serialNumber;
 
-    @Column(name = "building_name", nullable = false, length = 200)
+    @Column(name = "BUILDING_NAME", nullable = false, length = 200)
     private String buildingName;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "floor_id", nullable = false)
+    @JoinColumn(name = "FLOOR_ID", nullable = false)
     private Floor floor;
 
-    @Column(name = "x", precision = 5, scale = 2)
+    @Column(name = "X", precision = 5, scale = 2)
     private BigDecimal x;
 
-    @Column(name = "y", precision = 5, scale = 2)
+    @Column(name = "Y", precision = 5, scale = 2)
     private BigDecimal y;
 
-    @Column(name = "location_description", length = 200)
+    @Column(name = "LOCATION_DESCRIPTION", length = 200)
     private String locationDescription;
 
-    @Column(name = "note", length = 500)
+    @Column(name = "NOTE", length = 500)
     private String note;
 
-    @Column(name = "qr_key", nullable = false, unique = true, length = 100)
+    @Column(name = "QR_KEY", nullable = false, unique = true, length = 100)
     private String qrKey;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "IS_ACTIVE", nullable = false)
     private boolean active = true;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

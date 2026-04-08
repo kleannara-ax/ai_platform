@@ -1,0 +1,2660 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FireWeb</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        html, body { width:100%; height:100%; margin:0; overflow:hidden; }
+
+        :root { --menu-w:clamp(240px, 26vw, 300px); --logo-h:clamp(88px, 10vw, 120px); --hamburger:clamp(48px, 5vw, 60px); }
+
+        .screen{ position:fixed; inset:0; background:linear-gradient(135deg,#1e3c72 0%, #2a5298 100%); }
+        .scene{ position:absolute; inset:0; z-index:1; transition:transform 300ms cubic-bezier(0.4,0,0.2,1); }
+        .scene.is-draggable{ cursor:grab; }
+        body.map-panning .scene{ cursor:grabbing; }
+        .screen.menu-open .scene{ transform:translateX(var(--menu-w)); }
+
+        .scene img.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:brightness(.85); z-index:1; user-drag:none; -webkit-user-drag:none; user-select:none; }
+        #mapStage{ position:absolute; inset:0; z-index:1; transform-origin:0 0; }
+
+        /* 좌측 상단 로고/메뉴 UI */
+        .top-left{ position:absolute; top:0; left:0; z-index:700; display:flex; flex-direction:column; align-items:flex-start; }
+        .top-left .logo{ transition: opacity 220ms ease, transform 220ms ease; }
+        .top-left.fade-out .logo{ opacity:0; transform: translateX(-20px); pointer-events:none; }
+        .top-left.fade-out .hamburger{ pointer-events:auto; }
+        .logo{
+          width:var(--menu-w);
+          height:var(--logo-h);
+          background:rgba(255,255,255,.95);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          overflow:hidden;
+        }
+        .logo img{
+          width:100%;
+          height:100%;
+          object-fit:contain;
+          display:block;
+        }
+        .hamburger{ width:var(--hamburger); height:var(--hamburger); border:0; background:rgba(255,255,255,.95); cursor:pointer; border-radius:0 0 12px 0; position:relative; z-index:710; }
+        .hamburger .lines{ width:28px; height:20px; position:relative; margin:0 auto; }
+        .hamburger .lines span{ position:absolute; left:0; right:0; height:3px; background:#667eea; border-radius:3px; transition:.3s; }
+        .hamburger .lines span:nth-child(1){ top:0; }
+        .hamburger .lines span:nth-child(2){ top:8px; }
+        .hamburger .lines span:nth-child(3){ top:16px; }
+        .screen.menu-open .hamburger .lines span:nth-child(1){ top:8px; transform:rotate(45deg); }
+        .screen.menu-open .hamburger .lines span:nth-child(2){ opacity:0; }
+        .screen.menu-open .hamburger .lines span:nth-child(3){ top:8px; transform:rotate(-45deg); }
+
+        /* 사이드 메뉴 */
+        .side-menu{ position:absolute; top:0; left:0; width:var(--menu-w); height:100%; background:rgba(255,255,255,.96); z-index:250;
+            transform:translateX(-100%); transition:transform 300ms cubic-bezier(0.4,0,0.2,1);
+            padding:20px;
+            padding-top:calc(var(--logo-h) + var(--hamburger) + 20px);
+            padding-bottom:120px;
+            box-sizing:border-box; }
+        .screen.menu-open .side-menu{ transform:translateX(0); }
+
+        .menu-title{ font-size:1.25rem; font-weight:800; margin-bottom:12px; }
+        .menu-btn{ display:block; padding:14px 16px; border-radius:12px; margin-top:10px; background:#667eea; color:#fff; text-decoration:none; font-weight:700; }
+        .menu-btn:hover{ background:#5a6fe0; color:#fff; }
+
+        /* 계정 드롭다운 영역 */
+        .menu-account{ position:absolute; left:20px; right:20px; bottom:20px; }
+        .menu-account .dropdown-toggle{ border-radius:14px; padding:12px 14px; font-weight:900; }
+        .menu-account .dropdown-menu{ border-radius:14px; overflow:hidden; }
+        .menu-account .dropdown-item{ font-weight:700; }
+
+        /* 메뉴 오버레이 */
+        .overlay{ position:absolute; inset:0; background:rgba(0,0,0,.5); opacity:0; pointer-events:none; z-index:200; transition:opacity 300ms; }
+        .screen.menu-open .overlay{ opacity:1; pointer-events:auto; }
+
+        /* SVG 구역 오버레이 */
+        .zone-overlay{ position:absolute; inset:0; width:100%; height:100%; z-index:40; pointer-events:auto; }
+        .zone-overlay .zone{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,0); stroke-width:4; cursor:pointer; transition:fill 120ms, stroke 120ms; }
+        .zone-overlay .zone:hover{ fill:rgba(255,255,255,.16); stroke:rgba(255,255,255,.75); }
+        .zone-overlay .zone.selected{ fill:rgba(255,107,107,.18); stroke:rgba(255,107,107,.95); }
+
+        /* 구역 툴팁 */
+        #zoneTooltip{ position:absolute; z-index:500; display:none; padding:8px 12px; border-radius:10px; background:rgba(0,0,0,.78); color:#fff;
+            font-weight:800; font-size:.95rem; pointer-events:none; transform:translateY(-6px); opacity:0; transition:opacity 120ms, transform 120ms; }
+        #zoneTooltip.show{ opacity:1; transform:translateY(-10px); }
+
+        /* 구역 선택 팝업 */
+        .zone-popup{ position:absolute; z-index:520; min-width:min(220px, calc(100vw - 32px)); max-width:min(360px, calc(100vw - 32px)); max-height:min(420px, calc(100vh - 24px)); overflow:auto; background:rgba(255,255,255,.96); border-radius:14px;
+            padding:12px; box-shadow:0 12px 30px rgba(0,0,0,.25); border:1px solid rgba(0,0,0,.06); }
+        .zone-popup .zp-title{ font-weight:900; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+        .zone-popup .zp-close{ border:0; background:transparent; font-size:18px; cursor:pointer; opacity:.7; }
+        .zone-popup .zp-close:hover{ opacity:1; }
+        .zone-popup .zp-floors{ display:flex; flex-wrap:wrap; gap:8px; }
+        .zone-popup .zp-floor{ border:0; padding:8px 10px; border-radius:999px; background:#667eea; color:#fff; font-weight:800; cursor:pointer; }
+
+        /* 우측 정보 패널 */
+        .info-panel{ position:absolute; bottom:20px; right:20px; z-index:260; background:rgba(255,255,255,.95); padding:16px 18px; border-radius:16px;
+            box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; gap:14px; align-items:flex-start; }
+        .info-panel.show{ display:flex; }
+        .info-panel h3{ margin:0 0 10px 0; font-size:1.35rem; }
+        .info-panel p{ margin:5px 0; color:#555; }
+        .mini-btn{ border:0; padding:10px 12px; border-radius:12px; font-weight:900; cursor:pointer; background:#667eea; color:#fff; }
+        .ui-hide-toggle{
+            position:absolute;
+            left:16px;
+            bottom:16px;
+            z-index:760;
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:6px 10px;
+            border-radius:999px;
+            background:rgba(255,255,255,.94);
+            border:1px solid rgba(148,163,184,.28);
+            box-shadow:0 10px 24px rgba(15,23,42,.18);
+            cursor:pointer;
+            user-select:none;
+        }
+        .ui-hide-toggle input{ display:none; }
+        .ui-hide-toggle .track{
+            position:relative;
+            width:36px;
+            height:20px;
+            border-radius:999px;
+            background:#cbd5e1;
+            transition:background .18s ease;
+        }
+        .ui-hide-toggle .track::after{
+            content:"";
+            position:absolute;
+            top:2px;
+            left:2px;
+            width:16px;
+            height:16px;
+            border-radius:50%;
+            background:#fff;
+            box-shadow:0 2px 6px rgba(15,23,42,.18);
+            transition:transform .18s ease;
+        }
+        .ui-hide-toggle .label{
+            font-size:11px;
+            font-weight:900;
+            color:#334155;
+            letter-spacing:-.01em;
+        }
+        body.ui-hidden .ui-hide-toggle .track{ background:#2563eb; }
+        body.ui-hidden .ui-hide-toggle .track::after{ transform:translateX(16px); }
+        body.ui-hidden .top-left,
+        body.ui-hidden .outdoor-toggle,
+        body.ui-hidden .outdoor-equipment-toggle,
+        body.ui-hidden .outdoor-panel,
+        body.ui-hidden .outdoor-equipment-panel,
+        body.ui-hidden #outdoorSelect,
+        body.ui-hidden #outdoorEquipmentSelect,
+        body.ui-hidden .info-panel,
+        body.ui-hidden #zonePopup{
+            display:none !important;
+        }
+        body.ui-hidden #pickToggleBtn{
+            display:none !important;
+        }
+        body.ui-hidden.pick-mode-active #pickPanel{
+            display:block !important;
+        }
+
+        .infoCard {
+            position:absolute;
+            width: clamp(260px, 28vw, 300px);
+            max-width: calc(100% - 24px);
+            background:#fff;
+            border:1px solid #e6e6e6;
+            border-radius:14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.18);
+            overflow:hidden;
+            z-index: 50;
+            display:none;
+        }
+        .infoHead{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap: 8px;
+            padding:10px 12px;
+            background: linear-gradient(135deg, #5b5bd6 0%, #7b52c5 100%);
+            color:#fff;
+        }
+        .infoHead .t{ font-weight:700; font-size:14px; }
+        .infoHead .xbtn{
+            border:0; background: transparent; color:#fff;
+            font-size: 18px; line-height: 18px; padding: 0 4px;
+            cursor:pointer;
+        }
+        .infoBody{
+            max-height: 320px;
+            overflow:auto;
+            padding:12px;
+            background:#fff;
+        }
+        .kv{ display:grid; grid-template-columns: 80px 1fr; gap: 6px 10px; font-size:13px; }
+        .k{ color:#666; }
+        .v{ color:#111; font-weight:600; }
+        .os-label{ padding-top:4px; }
+        .os-select{ display:flex; align-items:center; }
+
+        /* 옥외 소화전 토글 패널 */
+        .outdoor-toggle{
+            position:absolute;
+            top:16px;
+            right:16px;
+            z-index: 340;
+            background:rgba(255,255,255,.95);
+            border-radius:999px;
+            padding:8px 12px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+            box-shadow:0 8px 24px rgba(0,0,0,.15);
+        }
+        .outdoor-toggle label{
+            font-weight:800;
+        }
+        .outdoor-equipment-toggle{
+            position:absolute;
+            top:68px;
+            right:16px;
+            z-index:340;
+            background:rgba(255,255,255,.95);
+            border-radius:999px;
+            padding:8px 12px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+            box-shadow:0 8px 24px rgba(0,0,0,.15);
+        }
+        .outdoor-equipment-toggle label{
+            font-weight:800;
+        }
+        .outdoor-equipment-panel{
+            position:absolute;
+            top:122px;
+            right:16px;
+            z-index:340;
+            width:clamp(220px, 24vw, 260px);
+            display:none;
+            padding:12px;
+            border-radius:16px;
+            background:rgba(255,255,255,.96);
+            box-shadow:0 16px 36px rgba(15,23,42,.18);
+            border:1px solid rgba(148,163,184,.22);
+        }
+        .outdoor-equipment-panel.show{ display:block; }
+        .outdoor-equipment-panel .panel-title,
+        .outdoor-panel .panel-title{
+            font-size:14px;
+            font-weight:900;
+            color:#0f172a;
+            margin-bottom:2px;
+        }
+        .outdoor-equipment-panel .panel-sub,
+        .outdoor-panel .panel-sub{
+            font-size:11px;
+            line-height:1.45;
+            color:#475569;
+            margin-bottom:10px;
+        }
+        .equipment-quick-grid{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:6px;
+            margin-bottom:8px;
+        }
+        .equipment-quick-grid button,
+        .outdoor-equipment-panel .panel-btn{
+            width:100%;
+            border:0;
+            border-radius:10px;
+            padding:9px 10px;
+            font-weight:900;
+            cursor:pointer;
+            transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
+            font-size:12px;
+        }
+        .equipment-quick-grid button:hover,
+        .outdoor-equipment-panel .panel-btn:hover{
+            transform:translateY(-1px);
+            filter:brightness(1.03);
+        }
+        .btn-receiver-add{
+            background:linear-gradient(135deg,#2563eb 0%,#0ea5e9 100%);
+            color:#fff;
+            box-shadow:0 10px 20px rgba(37,99,235,.22);
+        }
+        .btn-pump-add{
+            background:linear-gradient(135deg,#dc2626 0%,#f97316 100%);
+            color:#fff;
+            box-shadow:0 10px 20px rgba(220,38,38,.22);
+        }
+        .outdoor-equipment-panel .panel-btn{
+            margin-top:6px;
+            background:#eef2ff;
+            color:#1e3a8a;
+            box-shadow:inset 0 0 0 1px rgba(99,102,241,.14);
+        }
+        .outdoor-equipment-panel .panel-btn.is-muted{
+            background:#f8fafc;
+            color:#334155;
+            box-shadow:inset 0 0 0 1px rgba(148,163,184,.24);
+        }
+        .outdoor-equipment-panel button.is-active{
+            box-shadow:0 0 0 2px rgba(37,99,235,.24), 0 10px 20px rgba(37,99,235,.16);
+            transform:translateY(-1px);
+        }
+        .outdoor-equipment-panel .hint{
+            margin-top:10px;
+            font-size:11px;
+            line-height:1.45;
+            color:#475569;
+            background:#f8fafc;
+            border-radius:10px;
+            padding:8px 10px;
+        }
+        .outdoor-equipment-panel .hint.error{ color:#b02a37; background:#fff1f2; }
+        .outdoor-equipment-panel .hint.success{ color:#166534; background:#f0fdf4; }
+        .toggle-switch{
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .toggle-switch input{
+            opacity:0;
+            width:0;
+            height:0;
+        }
+        .toggle-slider{
+            position:absolute;
+            cursor:pointer;
+            inset:0;
+            background:#cfd4da;
+            border-radius:999px;
+            transition: background .2s;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+        }
+        .toggle-slider:before{
+            content:"";
+            position:absolute;
+            height:22px;
+            width:22px;
+            left:3px;
+            top:3px;
+            background:white;
+            border-radius:50%;
+            transition: transform .2s;
+            box-shadow:0 2px 6px rgba(0,0,0,.2);
+        }
+        .toggle-switch input:checked + .toggle-slider{
+            background:#34c759;
+        }
+        .toggle-switch input:checked + .toggle-slider:before{
+            transform: translateX(22px);
+        }
+        .outdoor-mode #zoneOverlay{ pointer-events:none; opacity:.45; }
+        .outdoor-mode .zone-overlay .zone{ pointer-events:none; }
+        .outdoor-mode .zone-overlay .zone:hover{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,0); }
+        .outdoor-mode #zoneTooltip{ display:none !important; }
+        .outdoor-mode #zonePopup{ display:none !important; }
+        .outdoor-equipment-mode #zoneOverlay{ pointer-events:none; opacity:.45; }
+        .outdoor-equipment-mode .zone-overlay .zone{ pointer-events:none; }
+        .outdoor-equipment-mode .zone-overlay .zone:hover{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,0); }
+        .outdoor-equipment-mode #zoneTooltip{ display:none !important; }
+        .outdoor-equipment-mode #zonePopup{ display:none !important; }
+        .outdoor-panel{
+            position:absolute;
+            top:122px;
+            right:16px;
+            z-index: 340;
+            background:rgba(255,255,255,.95);
+            border-radius:16px;
+            padding:12px;
+            display:none;
+            box-shadow:0 16px 36px rgba(15,23,42,.18);
+            border:1px solid rgba(148,163,184,.22);
+            width:clamp(220px, 24vw, 260px);
+        }
+        .outdoor-panel.show{ display:block; }
+        .outdoor-panel button{
+            width:100%;
+            margin-top:6px;
+            border:0;
+            border-radius:10px;
+            padding:9px 10px;
+            font-size:12px;
+            font-weight:900;
+            cursor:pointer;
+            transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
+        }
+        .outdoor-panel button:hover{
+            transform:translateY(-1px);
+            filter:brightness(1.03);
+        }
+        .outdoor-panel .hint{
+            font-size:11px;
+            line-height:1.45;
+            color:#475569;
+            background:#f8fafc;
+            border-radius:10px;
+            padding:8px 10px;
+            margin-top:10px;
+        }
+        .outdoor-panel button.is-active{
+            background:#1f7a3a;
+            color:#fff;
+            box-shadow:0 0 0 2px rgba(31,122,58,.2), 0 10px 20px rgba(31,122,58,.16);
+        }
+        .outdoor-panel button:disabled{
+            opacity:.55;
+            cursor:not-allowed;
+        }
+        .outdoor-panel .hint.error{ color:#b02a37; background:#fff1f2; font-weight:700; }
+        .outdoor-panel .hint.success{ color:#166534; background:#f0fdf4; font-weight:700; }
+        #outdoorMarkers{ position:absolute; inset:0; z-index:60; pointer-events:none; }
+        #outdoorMarkers .hmarker{ pointer-events:auto; }
+        .hmarker{ position:absolute; width:20px; height:20px; transform:translate(-50%,-50%); background:transparent; border:0; padding:0; }
+        .hmarker .icon{ width:100%; height:100%; display:block; object-fit:contain; }
+        .hmarker.is-selected{
+            z-index: 90;
+            filter: drop-shadow(0 0 0.45rem rgba(0,0,0,.9)) drop-shadow(0 0 0.9rem rgba(255,214,10,.95));
+        }
+        .hmarker.is-selected .icon{
+            transform: scale(1.28);
+            animation: marker-pop 1.1s ease-in-out infinite;
+        }
+        .hmarker.is-selected::after{
+            content:"";
+            position:absolute;
+            left:50%;
+            top:50%;
+            width:34px;
+            height:34px;
+            border-radius:999px;
+            transform: translate(-50%, -50%);
+            border:3px solid #ffd60a;
+            box-shadow:0 0 0 2px #0a0a0a, 0 0 18px rgba(255,214,10,.85);
+            animation: marker-ring 1.25s ease-out infinite;
+            pointer-events:none;
+        }
+        @keyframes marker-ring{
+            0%   { transform: translate(-50%, -50%) scale(0.92); opacity:1; }
+            70%  { transform: translate(-50%, -50%) scale(1.18); opacity:.85; }
+            100% { transform: translate(-50%, -50%) scale(1.24); opacity:.2; }
+        }
+        @keyframes marker-pop{
+            0%, 100% { transform: scale(1.22); }
+            50%      { transform: scale(1.34); }
+        }
+        #outdoorSelect{
+            right:16px;
+            bottom:120px;
+            z-index: 340;
+        }
+        #outdoorSelect.show{ display:block; }
+        #outdoorSelect .infoHead{
+            background:linear-gradient(135deg,#0f766e 0%,#1d4ed8 100%) !important;
+        }
+        .hmarker .badge{
+            position:absolute;
+            top:-6px;
+            right:-6px;
+            background:#ff5d5d;
+            color:#fff;
+            font-size:10px;
+            border-radius:999px;
+            padding:2px 5px;
+            line-height:1;
+        }
+        body.move-armed .scene{
+            cursor:crosshair;
+        }
+        #outdoorEquipmentMarkers{ position:absolute; inset:0; z-index:61; pointer-events:none; }
+        #outdoorEquipmentMarkers .eqmarker{ pointer-events:auto; }
+        .eqmarker{
+            position:absolute;
+            width:34px;
+            height:34px;
+            transform:translate(-50%,-50%);
+            border:0;
+            padding:0;
+            background:transparent;
+            box-shadow:0 8px 20px rgba(0,0,0,.22);
+        }
+        .eqmarker img{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            display:block;
+            pointer-events:none;
+        }
+        #outdoorEquipmentSelect{
+            right:16px;
+            bottom:120px;
+            z-index:340;
+        }
+        #outdoorEquipmentSelect.show{ display:block; }
+        #outdoorEquipmentSelect .infoHead{
+            background:linear-gradient(135deg,#0f766e 0%,#1d4ed8 100%) !important;
+        }
+        #outdoorSelect,
+        #outdoorEquipmentSelect{
+            width:clamp(240px, 24vw, 280px);
+            border-radius:16px;
+            box-shadow:0 16px 36px rgba(15,23,42,.18);
+            border:1px solid rgba(148,163,184,.22);
+        }
+        #outdoorSelect .infoBody,
+        #outdoorEquipmentSelect .infoBody{
+            padding:10px;
+            max-height:280px;
+        }
+        #outdoorSelect .kv,
+        #outdoorEquipmentSelect .kv{
+            grid-template-columns:68px 1fr;
+            gap:5px 8px;
+            font-size:12px;
+        }
+        #outdoorSelect .p-2,
+        #outdoorEquipmentSelect .p-2{
+            padding:10px !important;
+        }
+        #outdoorSelect .btn,
+        #outdoorEquipmentSelect .btn{
+            font-size:12px;
+            font-weight:800;
+            padding:8px 10px;
+            border-radius:10px;
+        }
+
+        /* 옥외 소화전 선택 패널 */
+        #pickPanel{ position:absolute; left:16px; top:160px; z-index:560; width:min(380px, calc(100vw - 32px)); background:rgba(255,255,255,.93);
+            border:1px solid rgba(0,0,0,.15); border-radius:14px; padding:12px; display:none; box-shadow:0 14px 36px rgba(0,0,0,.25); }
+        #pickPanel .row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center; }
+        #pickPanel .drag-bar{ cursor:move; user-select:none; }
+        #pickPanel .title{ font-weight:900; color:#333; flex:1; }
+        #pickPanel .drag-hint{ font-size:11px; color:#667085; font-weight:700; }
+        #pickPanel button{ border:0; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:900; background:#fff; box-shadow:0 6px 14px rgba(0,0,0,.12); }
+        #pickPanel button.primary{ background:#667eea; color:#fff; }
+        #pickPanel button.danger{ background:#ff5d5d; color:#fff; }
+        #pickPanel button.gray{ background:#f1f3f5; color:#333; }
+        #pickPanel .hint{ font-size:12px; color:#444; margin-bottom:8px; line-height:1.35; }
+        #pickOut{ width:100%; height:150px; resize:none; border-radius:12px; border:1px solid rgba(0,0,0,.15); padding:10px;
+            font-family:ui-monospace,Consolas,monospace; font-size:12px; outline:none; background:rgba(255,255,255,.9); }
+
+        /* 위치 선택용 캔버스 */
+        #pickCanvas{ position:absolute; inset:0; width:100%; height:100%; z-index:55; pointer-events:none; }
+        body.pick-mode-active #scene,
+        body.pick-mode-active #zoneOverlay,
+        body.pick-mode-active #pickCanvas{
+            cursor:crosshair;
+        }
+
+        @media (max-width: 1024px){
+            .info-panel{
+                right:12px;
+                bottom:12px;
+                max-width:min(420px, calc(100vw - 24px));
+                padding:14px 16px;
+            }
+            .outdoor-panel{
+                right:12px;
+                top:122px;
+                width:min(240px, calc(100vw - 24px));
+            }
+            #outdoorSelect{
+                right:12px;
+                bottom:112px;
+            }
+            #pickPanel{
+                left:12px;
+                top:148px;
+            }
+        }
+
+        @media (max-width: 768px){
+            :root{ --menu-w:min(250px, 82vw); --logo-h:80px; --hamburger:50px; }
+            .top-left{ max-width:calc(100vw - 16px); }
+            .logo{ max-width:min(var(--menu-w), calc(100vw - 16px)); }
+            .info-panel{
+                left:10px;
+                right:10px;
+                bottom:10px;
+                max-width:none;
+                width:auto;
+                padding:12px 14px;
+                gap:10px;
+                flex-direction:column;
+            }
+            .info-panel h3{ font-size:1.1rem; margin-bottom:6px; }
+            .info-panel p{ font-size:13px; }
+            .infoCard{
+                width:min(320px, calc(100vw - 20px));
+                max-width:calc(100vw - 20px);
+            }
+            .infoBody{
+                max-height:min(42vh, 320px);
+            }
+            .kv{
+                grid-template-columns:72px 1fr;
+                gap:6px 8px;
+                font-size:12px;
+            }
+            .outdoor-toggle{
+                top:12px;
+                right:12px;
+                padding:7px 10px;
+            }
+            .outdoor-panel{
+                right:10px;
+                top:122px;
+                width:min(220px, calc(100vw - 20px));
+            }
+            #outdoorSelect{
+                right:10px;
+                bottom:108px;
+            }
+            #pickPanel{
+                left:10px;
+                right:10px;
+                top:132px;
+                width:auto;
+            }
+            .modal-box{
+                width:min(400px, calc(100vw - 20px));
+                max-width:calc(100vw - 20px);
+                padding:18px;
+            }
+            #outdoorEditHost{
+                padding:10px !important;
+            }
+            #outdoorEditHost > div{
+                width:min(1400px, calc(100vw - 20px)) !important;
+                height:min(94vh, 1100px) !important;
+            }
+        }
+
+        @media (max-width: 520px){
+            .zone-popup{
+                min-width:0;
+                width:min(300px, calc(100vw - 16px));
+                max-width:calc(100vw - 16px);
+                padding:10px;
+            }
+            .zone-popup .zp-floors{
+                gap:6px;
+            }
+            .zone-popup .zp-floor{
+                width:100%;
+                text-align:center;
+            }
+        }
+
+        /* 점검 모달 */
+        .modal-overlay{
+            position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; display:none; align-items:center; justify-content:center;
+        }
+        .modal-overlay.show{ display:flex; }
+        .modal-box{
+            background:#fff; border-radius:16px; padding:24px; width:400px; max-width:calc(100% - 32px);
+            box-shadow:0 20px 60px rgba(0,0,0,.3);
+        }
+        .modal-box h5{ font-weight:800; margin-bottom:16px; }
+        .modal-box .form-label{ font-weight:700; }
+        .btn-submit{ background:#667eea; color:#fff; border:0; border-radius:10px; padding:10px 20px; font-weight:800; cursor:pointer; }
+        .btn-submit:hover{ background:#5a6fe0; }
+        .btn-cancel{ background:#f1f3f5; color:#333; border:0; border-radius:10px; padding:10px 20px; font-weight:800; cursor:pointer; margin-left:8px; }
+        .checklist-wrap{ display:grid; gap:10px; margin-top:8px; }
+        .check-item{ border:1px solid rgba(0,0,0,.08); border-radius:10px; padding:9px 10px; background:#fff; }
+        .check-item .label{ font-size:14px; font-weight:700; margin-bottom:6px; }
+        .check-item .radio-group{ display:flex; gap:14px; }
+        .check-item .radio-group label{ display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; cursor:pointer; }
+        .check-item .radio-group input[type="radio"]{ width:18px; height:18px; cursor:pointer; }
+        #faultReasonAuto{ margin-top:10px; color:#b91c1c; font-size:13px; font-weight:700; display:none; }
+    </style>
+</head>
+<body>
+
+<div class="screen" id="screen">
+
+    <aside class="side-menu">
+        <div class="menu-title">메뉴</div>
+        <a class="menu-btn" href="/extinguishers.html">🧯 소화기 목록</a>
+        <a class="menu-btn" href="/hydrants.html">🚒 소화전 목록</a>
+        <a class="menu-btn" href="/receivers.html">📟 수신기 목록</a>
+        <a class="menu-btn" href="/pumps.html">🛟 소방펌프 목록</a>
+        <a class="menu-btn" href="/maps/floor.html?buildingName=%EA%B4%80%EB%A6%AC%EB%8F%99&floorName=1%EC%B8%B5">🗺️ 도면</a>
+        <a class="menu-btn" href="/qr"><i class="bi bi-qr-code me-2"></i>QR코드 확인</a>
+        <a class="menu-btn" id="adminQuickBtn" href="/account/users.html" style="display:none;">👤 계정관리</a>
+
+        <div class="menu-account">
+            <div class="dropup" id="accountDropup">
+                <button class="btn btn-outline-primary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="accountBtn">로딩 중...</button>
+                <ul class="dropdown-menu w-100" id="accountMenu">
+                    <li><a class="dropdown-item" href="/account/index.html">내 정보</a></li>
+                    <li id="adminMenuLi" style="display:none;"><a class="dropdown-item" href="/account/users.html">계정관리</a></li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                        <div class="px-3 pb-2">
+                            <button type="button" class="btn btn-sm btn-danger w-100" onclick="logout()">로그아웃</button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </aside>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="scene" id="scene">
+        <div id="mapStage">
+            <img id="mapImg" src="/images/drone_photo.JPG" class="bg" alt="공장 전경" draggable="false" />
+
+            <div id="zoneTooltip"></div>
+            <div id="outdoorMarkers" aria-hidden="true"></div>
+            <div id="outdoorEquipmentMarkers" aria-hidden="true"></div>
+
+                        <svg id="zoneOverlay" class="zone-overlay"
+                 viewBox="0 0 1955 985"
+                 preserveAspectRatio="xMidYMid slice"
+                 data-base-w="1955"
+                 data-base-h="985"
+                 aria-label="Zones overlay">
+
+            <polygon class="zone" data-zone="C" data-name="관리동" data-floors="1층,2층"
+                     data-points-pct="78.656,44.220 80.344,44.127 81.094,42.452 80.531,38.172 78.562,37.893 78.094,39.196"
+                     points="1538,436 1571,435 1585,418 1574,376 1536,373 1527,386" />
+
+            <polygon class="zone" data-zone="C" data-name="복지관" data-floors="지하1층,1층,2층,3층"
+                     data-points-pct="80.156,35.288 79.359,28.869 77.062,28.869 77.109,29.892 76.312,29.985 76.266,30.264 75.562,30.264 75.234,31.195 75.562,35.288 75.984,36.870 76.172,37.707 77.484,37.521 79.875,37.614"
+                     points="1567,348 1551,284 1507,284 1507,294 1492,295 1491,298 1477,298 1471,307 1477,348 1485,363 1489,371 1515,370 1562,370" />
+
+            <polygon class="zone" data-zone="C" data-name="중문창고" data-floors="1층"
+                     data-points-pct="82.031,24.073 81.211,25.934 80.156,28.609 81.504,36.866 86.543,37.214 90.000,28.143 89.414,24.538"
+                     points="1604,237 1588,255 1567,282 1593,363 1692,367 1760,277 1748,242" />
+
+            <polygon class="zone" data-zone="C" data-name="화장지4,5호기" data-floors="지하1층,1층,2층,3층"
+                     data-points-pct="79.219,27.938 68.484,27.845 66.844,8.494 67.172,6.726 68.344,5.982 69.516,6.633 70.641,5.796 72.422,7.377 74.297,6.819 76.922,7.563"
+                     points="1549,275 1339,274 1307,84 1313,66 1336,59 1359,65 1381,57 1416,73 1453,67 1504,74" />
+
+            <polygon class="zone" data-zone="C" data-name="복합보일러" data-floors="1층,2층,3층"
+                     data-points-pct="61.547,28.962 64.547,29.148 67.781,28.962 67.359,15.937 67.031,11.750 63.281,11.564 63.187,14.820 62.203,14.820 62.344,24.868 61.594,25.054"
+                     points="1203,285 1262,287 1325,285 1317,157 1310,116 1237,114 1235,146 1216,146 1219,245 1204,247" />
+
+            <polygon class="zone" data-zone="C" data-name="화장지3,6호기" data-floors="1층,2층"
+                     data-points-pct="50.344,31.288 50.297,18.821 49.359,18.728 49.406,13.053 47.625,12.215 46.031,12.773 44.344,11.843 42.984,12.773 42.937,12.122 41.578,11.564 40.125,12.029 40.125,12.959 39.422,12.308 38.766,12.773 38.203,21.519 37.734,21.798 37.594,20.588 36.234,21.054 35.531,33.241 40.406,33.800 40.406,32.032 50.250,32.311"
+                     points="984,308 983,185 965,184 966,129 931,120 900,126 867,117 840,126 839,119 813,114 784,118 784,128 771,121 758,126 747,212 738,215 735,203 708,207 695,327 790,333 790,316 982,318" />
+
+            <polygon class="zone" data-zone="C" data-name="전기공무" data-floors="1층"
+                     data-points-pct="34.688,82.110 34.336,85.599 34.219,91.647 53.145,90.833 52.969,89.553 55.137,89.204 55.137,85.716 54.902,81.762 34.688,81.762"
+                     points="678,809 671,843 669,903 1039,895 1036,882 1078,879 1078,844 1073,805 678,805" />
+
+            <polygon class="zone" data-zone="C" data-name="제지1,2호기" data-floors="1층,2층"
+                     data-points-pct="34.997,50.334 70.798,50.502 74.062,49.802 74.109,46.266 73.641,44.313 73.687,41.242 73.312,40.126 73.453,38.265 72.937,36.963 72.562,35.009 68.156,34.730 67.969,32.032 66.422,31.846 66.234,30.729 64.359,30.450 64.406,31.753 60.656,32.032 60.562,35.009 44.344,35.381 44.297,34.172 35.531,33.800 35.625,34.451 31.453,34.730 30.469,49.616 30.562,51.197 34.687,51.104"
+                     points="684,496 1384,497 1448,491 1449,456 1440,436 1441,406 1433,395 1436,377 1426,364 1419,345 1332,342 1329,316 1299,314 1295,303 1258,300 1259,313 1186,316 1184,345 867,349 866,337 695,333 696,339 615,342 596,489 597,504 678,503" />
+
+            <polygon class="zone" data-zone="C" data-name="제지3호기" data-floors="1층,2층"
+                     data-points-pct="59.372,84.603 81.250,85.275 82.096,83.259 85.778,83.007 86.709,80.235 83.451,56.130 80.911,56.214 80.404,52.518 39.567,52.014 39.271,60.581 38.975,60.665 38.890,65.537 39.144,65.789 38.890,69.232 50.612,69.568 50.866,67.385 58.483,67.804"
+                     points="1161,833 1588,840 1605,820 1677,818 1695,790 1631,553 1582,554 1572,517 774,512 768,597 762,598 760,646 765,648 760,682 989,685 994,664 1143,668" />
+
+            <polygon class="zone" data-zone="C" data-name="패드동" data-floors="1층,2층"
+                     data-points-pct="54.951,81.248 37.187,81.248 37.187,78.062 36.745,78.062 36.745,75.866 37.187,75.646 37.464,71.253 38.294,70.264 39.401,70.923 39.512,69.715 40.729,69.825 40.785,70.703 47.979,70.374 48.034,69.605 49.362,69.605 49.362,70.484 54.730,70.264"
+                     points="1074,800 727,800 727,769 718,769 718,747 727,745 732,702 749,692 770,699 772,687 796,688 797,696 938,693 939,686 965,686 965,694 1070,692" />
+
+            <polygon class="zone" data-zone="C" data-name="기저귀동" data-floors="1층"
+                     data-points-pct="34.688,82.110 34.336,85.599 34.219,91.647 53.145,90.833 52.969,89.553 55.137,89.204 55.137,85.716 54.902,81.762 34.688,81.762"
+                     points="678,809 671,843 669,903 1039,895 1036,882 1078,879 1078,844 1073,805 678,805" />
+
+            <polygon class="zone" data-zone="C" data-name="심면펄퍼" data-floors="1층,2층"
+                     data-points-pct="24.234,35.009 16.312,42.824 13.969,34.544 18.609,30.915 18.516,30.078 21.937,27.008 22.406,28.310 23.719,28.124 25.172,32.497"
+                     points="474,345 319,422 273,340 364,305 362,296 429,266 438,279 464,277 492,320" />
+
+            <polygon class="zone" data-zone="C" data-name="수출창고" data-floors="1층"
+                     data-points-pct="65.801,98.863 66.855,98.979 66.973,99.561 85.488,99.561 86.346,98.185 86.035,94.395 86.198,92.650 85.824,90.357 84.993,90.583 84.635,86.965 65.511,86.642 64.941,88.289"
+                     points="1286,974 1307,975 1309,981 1671,981 1688,967 1682,930 1685,913 1678,890 1662,892 1655,857 1281,853 1270,870" />
+            </svg>
+
+            <!-- 좌표 선택용 캠버스 -->
+            <canvas id="pickCanvas"></canvas>
+
+            <!-- 좌표 선택용 패널 -->
+            <div id="pickPanel">
+                <div class="row drag-bar" id="pickPanelHandle">
+                    <div class="title">좌표 따기 모드 (폴리곤) <span class="drag-hint">드래그 이동</span></div>
+                    <button type="button" class="gray" onclick="Pick.end()">닫기</button>
+                </div>
+                <div class="row">
+                    <button type="button" class="primary" onclick="Pick.finish()">폴리곤 생성</button>
+                    <button type="button" onclick="Pick.undo()">되돌리기</button>
+                    <button type="button" class="danger" onclick="Pick.clear()">초기화</button>
+                    <button type="button" onclick="Pick.copy()">복사</button>
+                </div>
+                <div class="hint">
+                    - 클릭: 점 추가 / Shift+클릭: 마지막 점 삭제<br />
+                    - 더블클릭: 폴리곤 생성(닫기)<br />
+                    - 좌표는 <b>% 좌표</b>로 저장됩니다. (해상도/PC 달라도 정확)
+                </div>
+                <textarea id="pickOut" readonly></textarea>
+            </div>
+
+            <!-- 구역 선택 팝업 -->
+            <div id="zonePopup" class="zone-popup" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="top-left">
+        <div class="logo"><img src="/images/logo.png" alt="FireWeb Logo" /></div>
+        <button class="hamburger" id="menuBtn" title="메뉴" type="button">
+            <div class="lines"><span></span><span></span><span></span></div>
+        </button>
+    </div>
+
+    <div class="outdoor-toggle">
+        <label for="outdoorToggle">옥외 소화전</label>
+        <label class="toggle-switch">
+            <input type="checkbox" id="outdoorToggle" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="outdoor-equipment-toggle">
+        <label for="outdoorEquipmentToggle">수신기 / 소방펌프</label>
+        <label class="toggle-switch">
+            <input type="checkbox" id="outdoorEquipmentToggle" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="outdoor-equipment-panel" id="outdoorEquipmentPanel">
+        <div class="panel-title">옥외 수신기 / 소방펌프</div>
+        <div class="panel-sub">메인 화면에서 바로 등록하거나, 선택한 설비를 수정·이동할 수 있습니다.</div>
+        <div class="equipment-quick-grid">
+            <button type="button" class="btn-receiver-add" id="btnOutdoorReceiverAdd">수신기 추가</button>
+            <button type="button" class="btn-pump-add" id="btnOutdoorPumpAdd">소방펌프 추가</button>
+        </div>
+        <button type="button" class="panel-btn" id="btnOutdoorEquipmentEditPanel">선택 설비 수정</button>
+        <button type="button" class="panel-btn is-muted" id="btnOutdoorEquipmentMove">선택 설비 이동</button>
+        <div class="hint" id="outdoorEquipmentHint">마커를 선택하면 상세, 점검, 수정 모달을 바로 열 수 있습니다.</div>
+    </div>
+
+      <div class="outdoor-panel" id="outdoorPanel">
+          <div class="panel-title">옥외 소화전</div>
+          <button type="button" id="btnOutdoorAdd" style="display:none;">추가</button>
+          <button type="button" id="btnOutdoorMove" style="display:none;">이동</button>
+          <button type="button" id="btnOutdoorMoveCancel" style="display:none;">이동취소</button>
+          <button type="button" id="btnOutdoorMoveSave" style="display:none;">좌표저장</button>
+      </div>
+
+    <div id="outdoorSelect" class="infoCard" aria-hidden="true">
+        <div class="infoHead" style="background: linear-gradient(135deg, #5b5bd6 0%, #7b52c5 100%);">
+            <div class="t">옥외 소화전</div>
+            <button type="button" class="xbtn" id="outdoorSelectCloseBtn" aria-label="닫기">&times;</button>
+        </div>
+        <div class="infoBody">
+            <div class="kv">
+                <div class="k os-label">선택</div>
+                <div class="v os-select">
+                    <select id="outdoorSelectList" class="form-select form-select-sm"></select>
+                </div>
+                <div class="k">ID</div><div class="v" id="osId">-</div>
+                <div class="k">시리얼</div><div class="v" id="osSerial">-</div>
+                <div class="k">구분</div><div class="v" id="osType">-</div>
+                <div class="k">방식</div><div class="v" id="osOp">-</div>
+                <div class="k">좌표</div><div class="v" id="osCoord">-</div>
+                <div class="k">위치</div><div class="v" id="osLoc">-</div>
+            </div>
+        </div>
+        <div class="p-2 border-top bg-white">
+            <div class="row g-2">
+                <div class="col-4"><button class="btn btn-outline-dark w-100" id="btnOutdoorSelectDetail" type="button">상세</button></div>
+                <div class="col-4"><button class="btn btn-primary w-100" id="btnOutdoorSelectInspect" type="button">점검</button></div>
+                <div class="col-4" id="outdoorSelectEditCol" style="display:none;"><button class="btn btn-outline-primary w-100" id="btnOutdoorSelectEdit" type="button">수정</button></div>
+                <div class="col-12"><button class="btn btn-outline-secondary w-100" id="btnOutdoorSelectClose" type="button">닫기</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="outdoorEquipmentSelect" class="infoCard" aria-hidden="true">
+        <div class="infoHead" style="background: linear-gradient(135deg, #5b5bd6 0%, #7b52c5 100%);">
+            <div class="t">옥외 설비 선택</div>
+            <button type="button" class="xbtn" id="outdoorEquipmentSelectCloseBtn" aria-label="닫기">&times;</button>
+        </div>
+        <div class="infoBody">
+            <div class="kv">
+                <div class="k">구분</div><div class="v" id="oesType">-</div>
+                <div class="k">건물</div><div class="v" id="oesBuilding">-</div>
+                <div class="k">좌표</div><div class="v" id="oesCoord">-</div>
+                <div class="k">위치</div><div class="v" id="oesLocation">-</div>
+                <div class="k">최근점검</div><div class="v" id="oesLastInspection">-</div>
+            </div>
+        </div>
+        <div class="p-2 border-top bg-white">
+            <div class="row g-2">
+                <div class="col-4"><button class="btn btn-outline-dark w-100" id="btnOutdoorEquipmentDetail" type="button">상세</button></div>
+                <div class="col-4"><button class="btn btn-primary w-100" id="btnOutdoorEquipmentInspect" type="button">점검</button></div>
+                <div class="col-4"><button class="btn btn-outline-primary w-100" id="btnOutdoorEquipmentEdit" type="button">수정</button></div>
+                <div class="col-12"><button class="btn btn-outline-secondary w-100" id="btnOutdoorEquipmentSelectClose" type="button">닫기</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+        <div>
+            <h3 id="infoTitle">🔥 FireWeb</h3>
+            <p id="infoSub"><strong>소화기 관리 시스템</strong></p>
+                <p id="infoBody">구역을 클릭하여 확인하세요</p>
+        </div>
+        <div>
+            <button class="mini-btn" id="pickToggleBtn" type="button" onclick="Pick.start()" style="display:none;">✏️ 좌표 따기</button>
+        </div>
+    </div>
+    <label class="ui-hide-toggle" id="uiHideToggle" title="UI 숨김">
+        <input type="checkbox" id="uiHideCheckbox" />
+        <span class="track" aria-hidden="true"></span>
+        <span class="label">UI 숨김</span>
+    </label>
+  </div>
+
+<!-- 옥외 소화전 점검 모달 -->
+<div class="modal-overlay" id="inspectModal">
+    <div class="modal-box">
+        <h5>소화전 점검</h5>
+        <div id="inspectHydrantInfo" style="font-size:13px; color:#666; margin-bottom:12px;"></div>
+        <div class="mb-3">
+            <label class="form-label">소화전 점검 체크리스트</label>
+            <div class="checklist-wrap" id="hydChecklistWrapMain">
+                <div class="check-item" data-reason="소화전 함 파손 여부 이상">
+                    <div class="label">소화전 함 파손여부 확인</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckBoxDamage" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckBoxDamage" value="bad"> 비정상</label>
+                    </div>
+                </div>
+                <div class="check-item" data-reason="소방호스/노즐 수량 또는 상태 이상">
+                    <div class="label">소방호스 2EA, 노즐 1EA 확인</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckHoseNozzle" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckHoseNozzle" value="bad"> 비정상</label>
+                    </div>
+                </div>
+                <div class="check-item" data-reason="소화전 사용방법 부착 상태 이상">
+                    <div class="label">소화전 사용방법 부착 확인</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckManual" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckManual" value="bad"> 비정상</label>
+                    </div>
+                </div>
+                <div class="check-item" data-reason="소화전 전면 장애물 적치">
+                    <div class="label">소화전 앞 장애물 적치금지</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckObstacle" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckObstacle" value="bad"> 비정상</label>
+                    </div>
+                </div>
+                <div class="check-item" data-reason="소화전 표시등 파손 또는 전원 이상">
+                    <div class="label">소화전표시등 파손 및 전원 확인</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckLightPower" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckLightPower" value="bad"> 비정상</label>
+                    </div>
+                </div>
+                <div class="check-item" data-reason="소화전 밸브 파손 또는 누수 발생">
+                    <div class="label">소화전 밸브 파손 및 누수 여부 확인</div>
+                    <div class="radio-group">
+                        <label><input type="radio" name="mainHydCheckValveLeak" value="ok" checked> 정상</label>
+                        <label><input type="radio" name="mainHydCheckValveLeak" value="bad"> 비정상</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <input type="hidden" id="faultReasonInput" />
+        <div id="faultReasonAuto"></div>
+        <div class="d-flex justify-content-end">
+            <button class="btn-submit" onclick="submitInspect()">저장</button>
+            <button class="btn-cancel" onclick="closeInspectModal()">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 옥외 소화전 수정 모달 -->
+<div id="outdoorEditHost" style="display:none; position:fixed; inset:0; z-index:1200; background:transparent; backdrop-filter:none; padding:8px; align-items:center; justify-content:center; overflow:hidden;">
+  <div id="outdoorEditShell" style="position:relative; width:min(1240px, calc(100vw - 16px)); height:min(94vh, calc(100vh - 16px)); background:transparent; border-radius:18px; overflow:hidden; box-shadow:none;">
+    <button type="button" id="outdoorEditCloseBtn" aria-label="닫기" style="position:absolute; top:8px; right:8px; z-index:2; width:30px; height:30px; border:0; border-radius:999px; background:transparent; color:#475569; font-size:20px; line-height:1; cursor:pointer;">×</button>
+    <iframe id="outdoorEditFrame" title="옥외 소화전 수정" style="width:100%; height:100%; border:0; background:transparent;" loading="lazy"></iframe>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/hydrant-modal-host.js"></script>
+<script src="/js/csrf.js"></script>
+<script>
+// ===== 전역 상태 =====
+let currentUser = null;
+let isAdmin = false;
+let outdoorHydrants = [];
+let currentOutdoorId = null;
+let outdoorMode = false;
+let outdoorAddMode = false;
+let outdoorMoveMode = false;
+let outdoorPendingCoord = null;
+let outdoorByKey = new Map();
+let outdoorEquipmentMode = false;
+let outdoorReceivers = [];
+let outdoorPumps = [];
+let currentOutdoorEquipment = null;
+let currentInspectHydrantId = null;
+let outdoorEquipmentAddType = '';
+let outdoorEquipmentMoveMode = false;
+
+// ===== API 공통 처리 =====
+async function apiFetch(url, options = {}) {
+    const requestOptions = { ...options };
+    if (window.FireWebCsrf?.isMutation?.(requestOptions.method)) {
+        await window.FireWebCsrf.ensureToken();
+    }
+    const headers = { 'Content-Type': 'application/json', ...(requestOptions.headers || {}) };
+    requestOptions.headers = window.FireWebCsrf?.headers(headers, requestOptions.method) || headers;
+    const res = await fetch(url, requestOptions);
+    if (res.status === 401) {
+        localStorage.removeItem('fireweb_user');
+        localStorage.removeItem('fw_user');
+        window.location.href = '/login.html';
+        return null;
+    }
+    return res;
+}
+
+// ===== 로그아웃 =====
+function logout() {
+    window.FireWebNav?.logout?.() || (window.location.href = '/login.html');
+}
+
+// ===== 초기 사용자/권한 정보 로드 =====
+async function init() {
+    const savedUser = localStorage.getItem('fireweb_user');
+    const fallbackUser = localStorage.getItem('fw_user');
+    if (!savedUser && !fallbackUser) {
+        window.location.href = '/login.html';
+        return;
+    }
+    try {
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            isAdmin = currentUser.role === 'ADMIN';
+        } else if (fallbackUser) {
+            currentUser = { username: fallbackUser, displayName: fallbackUser, role: 'USER' };
+        }
+        const accountBtn = document.getElementById('accountBtn');
+        if (accountBtn && currentUser) {
+            accountBtn.textContent = currentUser.username || '사용자';
+        }
+        const qrMenuBtn = document.querySelector('.side-menu a[href="/qr"]');
+        if (qrMenuBtn) qrMenuBtn.style.display = isAdmin ? 'block' : 'none';
+        if (isAdmin) {
+            const adminLi = document.getElementById('adminMenuLi');
+            if (adminLi) adminLi.style.display = '';
+            const adminQuickBtn = document.getElementById('adminQuickBtn');
+            if (adminQuickBtn) adminQuickBtn.style.display = 'block';
+            ['btnOutdoorAdd','btnOutdoorMove'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = '';
+            });
+            const editCol = document.getElementById('outdoorSelectEditCol');
+            if (editCol) editCol.style.display = '';
+            if (outdoorEquipmentToggle?.parentElement?.parentElement) {
+                outdoorEquipmentToggle.parentElement.parentElement.style.display = 'flex';
+            }
+        } else {
+            setOutdoorHint('일반 사용자는 점검만 가능합니다.', 'error');
+            if (outdoorEquipmentToggle) outdoorEquipmentToggle.checked = false;
+            if (outdoorEquipmentToggle?.parentElement?.parentElement) {
+                outdoorEquipmentToggle.parentElement.parentElement.style.display = 'none';
+            }
+            if (outdoorEquipmentPanel) outdoorEquipmentPanel.classList.remove('show');
+        }
+        await loadOutdoorHydrants();
+        await loadOutdoorEquipment();
+    } catch(e) {
+        console.error('init error', e);
+    }
+}
+
+// ===== 옥외 소화전 데이터 로드 =====
+async function loadOutdoorHydrants() {
+    try {
+        const res = await apiFetch('/fire-api/hydrants?size=200&page=0');
+        if (!res) return;
+        const json = await res.json();
+        if (json.ok && json.data && json.data.content) {
+            outdoorHydrants = json.data.content
+                .filter(h => h.hydrantType === 'Outdoor' && h.active !== false);
+        }
+        renderOutdoorMarkers();
+    } catch(e) {
+        console.error('옥외 소화전 로드 실패', e);
+    }
+}
+
+async function loadOutdoorEquipment() {
+    try {
+        const [receiverRes, pumpRes] = await Promise.all([
+            apiFetch('/fire-api/receivers?size=200&page=0'),
+            apiFetch('/fire-api/pumps?size=200&page=0')
+        ]);
+        const receiverJson = receiverRes ? await receiverRes.json() : null;
+        const pumpJson = pumpRes ? await pumpRes.json() : null;
+        outdoorReceivers = Array.isArray(receiverJson?.data?.content)
+            ? receiverJson.data.content.filter(item => item?.floorId === 7 && item?.x != null && item?.y != null)
+            : [];
+        outdoorPumps = Array.isArray(pumpJson?.data?.content)
+            ? pumpJson.data.content.filter(item => item?.floorId === 7 && item?.x != null && item?.y != null)
+            : [];
+        renderOutdoorEquipmentMarkers();
+    } catch (e) {
+        console.error('옥외 수신기/소방펌프 로드 실패', e);
+    }
+}
+
+// ===== DOM 참조 =====
+const screen = document.getElementById('screen');
+const menuBtn = document.getElementById('menuBtn');
+const overlay = document.getElementById('overlay');
+const scene = document.getElementById('scene');
+const mapStage = document.getElementById('mapStage');
+const tooltip = document.getElementById('zoneTooltip');
+const zoneSvg = document.getElementById('zoneOverlay');
+const zonePopup = document.getElementById('zonePopup');
+const infoPanel = document.getElementById('infoPanel');
+const infoTitle = document.getElementById('infoTitle');
+const infoSub = document.getElementById('infoSub');
+const infoBody = document.getElementById('infoBody');
+const outdoorToggle = document.getElementById('outdoorToggle');
+const outdoorEquipmentToggle = document.getElementById('outdoorEquipmentToggle');
+const outdoorPanel = document.getElementById('outdoorPanel');
+const outdoorEquipmentPanel = document.getElementById('outdoorEquipmentPanel');
+const outdoorMarkers = document.getElementById('outdoorMarkers');
+const outdoorEquipmentMarkers = document.getElementById('outdoorEquipmentMarkers');
+const outdoorEquipmentSelect = document.getElementById('outdoorEquipmentSelect');
+const outdoorSelect = document.getElementById('outdoorSelect');
+const outdoorSelectList = document.getElementById('outdoorSelectList');
+const btnOutdoorSelectInspect = document.getElementById('btnOutdoorSelectInspect');
+const btnOutdoorSelectDetail = document.getElementById('btnOutdoorSelectDetail');
+const btnOutdoorSelectEdit = document.getElementById('btnOutdoorSelectEdit');
+const btnOutdoorSelectClose = document.getElementById('btnOutdoorSelectClose');
+const btnOutdoorSelectClose2 = document.getElementById('outdoorSelectCloseBtn');
+
+function releaseFocus(container){
+    const active = document.activeElement;
+    if (container && active instanceof HTMLElement && container.contains(active)) {
+        active.blur();
+    }
+}
+function setUiHidden(hidden){
+    document.body.classList.toggle('ui-hidden', !!hidden);
+    if (uiHideCheckbox) uiHideCheckbox.checked = !!hidden;
+}
+const osId = document.getElementById('osId');
+const osSerial = document.getElementById('osSerial');
+const osType = document.getElementById('osType');
+const osOp = document.getElementById('osOp');
+const osCoord = document.getElementById('osCoord');
+const osLoc = document.getElementById('osLoc');
+const btnOutdoorAdd = document.getElementById('btnOutdoorAdd');
+const btnOutdoorMove = document.getElementById('btnOutdoorMove');
+const btnOutdoorMoveCancel = document.getElementById('btnOutdoorMoveCancel');
+const btnOutdoorMoveSave = document.getElementById('btnOutdoorMoveSave');
+const btnOutdoorEdit = document.getElementById('btnOutdoorEdit');
+const outdoorActionHint = document.getElementById('outdoorActionHint');
+const mapImg = document.getElementById('mapImg');
+const outdoorEditHostEl = document.getElementById('outdoorEditHost');
+const outdoorEditShell = document.getElementById('outdoorEditShell');
+const outdoorEditFrame = document.getElementById('outdoorEditFrame');
+const outdoorEditCloseBtn = document.getElementById('outdoorEditCloseBtn');
+const pickToggleBtn = document.getElementById('pickToggleBtn');
+const uiHideToggle = document.getElementById('uiHideToggle');
+const uiHideCheckbox = document.getElementById('uiHideCheckbox');
+const oesType = document.getElementById('oesType');
+const oesBuilding = document.getElementById('oesBuilding');
+const oesCoord = document.getElementById('oesCoord');
+const oesLocation = document.getElementById('oesLocation');
+const oesLastInspection = document.getElementById('oesLastInspection');
+const btnOutdoorEquipmentDetail = document.getElementById('btnOutdoorEquipmentDetail');
+const btnOutdoorEquipmentInspect = document.getElementById('btnOutdoorEquipmentInspect');
+const btnOutdoorEquipmentEdit = document.getElementById('btnOutdoorEquipmentEdit');
+const btnOutdoorReceiverAdd = document.getElementById('btnOutdoorReceiverAdd');
+const btnOutdoorPumpAdd = document.getElementById('btnOutdoorPumpAdd');
+const btnOutdoorEquipmentEditPanel = document.getElementById('btnOutdoorEquipmentEditPanel');
+const btnOutdoorEquipmentMove = document.getElementById('btnOutdoorEquipmentMove');
+const outdoorEquipmentHint = document.getElementById('outdoorEquipmentHint');
+const btnOutdoorEquipmentSelectClose = document.getElementById('btnOutdoorEquipmentSelectClose');
+const btnOutdoorEquipmentSelectCloseBtn = document.getElementById('outdoorEquipmentSelectCloseBtn');
+
+menuBtn.onclick = () => screen.classList.toggle('menu-open');
+overlay.onclick = () => screen.classList.remove('menu-open');
+
+if (mapImg) {
+    mapImg.addEventListener('dragstart', (e) => e.preventDefault());
+}
+
+// ===== 도면 원본 크기 =====
+function getNaturalSize(){
+    const fallback = { w: 1955, h: 985 };
+    const svgW = Number(zoneSvg?.dataset.baseW) || 0;
+    const svgH = Number(zoneSvg?.dataset.baseH) || 0;
+    if (svgW > 0 && svgH > 0) return { w: svgW, h: svgH };
+    if (!mapImg) return fallback;
+    if (mapImg.naturalWidth > 0 && mapImg.naturalHeight > 0)
+        return { w: mapImg.naturalWidth, h: mapImg.naturalHeight };
+    return fallback;
+}
+
+// ===== SVG viewBox 동기화 =====
+function setOverlayViewBox(){
+    if (!zoneSvg) return;
+    const { w, h } = getNaturalSize();
+    zoneSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    zoneSvg.dataset.naturalW = String(w);
+    zoneSvg.dataset.naturalH = String(h);
+    zoneSvg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    applyPctPointsToAll();
+}
+
+// ===== points <-> % 변환 =====
+function parsePoints(pointsStr){
+    const s = (pointsStr || '').trim();
+    if (!s) return [];
+    return s.split(/\s+/).map(pair => {
+        const [x, y] = pair.split(',').map(v => parseFloat(v));
+        return { x, y };
+    }).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+}
+function toPctPoints(pxPoints, natW, natH){
+    return pxPoints.map(p => ({ xPct: (p.x / natW) * 100, yPct: (p.y / natH) * 100 }));
+}
+function pctString(pctPoints){
+    return pctPoints.map(p => `${p.xPct.toFixed(3)},${p.yPct.toFixed(3)}`).join(' ');
+}
+function pctToPxString(pctStr, natW, natH){
+    const pts = parsePoints(pctStr);
+    return pts.map(p => {
+        const x = (p.x * natW) / 100;
+        const y = (p.y * natH) / 100;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+}
+function ensurePctStored(poly){
+    const { w, h } = getNaturalSize();
+    if (!poly) return;
+    if (poly.dataset.pointsPct && poly.dataset.pointsPct.trim()) return;
+    const px = parsePoints(poly.getAttribute('points'));
+    if (!px.length) return;
+    const pct = toPctPoints(px, w, h);
+    poly.dataset.pointsPct = pctString(pct);
+}
+function applyPctPointsToAll(){
+    if (!zoneSvg) return;
+    const { w, h } = getNaturalSize();
+    zoneSvg.querySelectorAll('polygon.zone').forEach(poly => {
+        ensurePctStored(poly);
+        if (poly.dataset.pointsPct && poly.dataset.pointsPct.trim()) {
+            const pxStr = pctToPxString(poly.dataset.pointsPct, w, h);
+            if (pxStr) poly.setAttribute('points', pxStr);
+        }
+    });
+}
+
+// ===== 구역 툴팁 =====
+let tooltipHideTimer = 0;
+let tooltipFrame = 0;
+let tooltipPendingPos = null;
+function renderTooltipPosition() {
+    tooltipFrame = 0;
+    if (!tooltip || tooltip.style.display === 'none' || !tooltipPendingPos) return;
+    const r = scene.getBoundingClientRect();
+    tooltip.style.left = (tooltipPendingPos.clientX - r.left + 14) + 'px';
+    tooltip.style.top  = (tooltipPendingPos.clientY - r.top  + 18) + 'px';
+}
+function showTooltip(e, name) {
+    if (!tooltip) return;
+    if (tooltipHideTimer) {
+        clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = 0;
+    }
+    tooltip.textContent = name || '';
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+    requestAnimationFrame(() => tooltip.classList.add('show'));
+}
+function hideTooltip() {
+    if (!tooltip) return;
+    tooltip.classList.remove('show');
+    if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(() => {
+        tooltip.style.display = 'none';
+        tooltipHideTimer = 0;
+    }, 140);
+}
+function positionTooltip(e) {
+    if (!tooltip || tooltip.style.display === 'none') return;
+    tooltipPendingPos = { clientX: e.clientX, clientY: e.clientY };
+    if (tooltipFrame) return;
+    tooltipFrame = requestAnimationFrame(renderTooltipPosition);
+}
+
+// ===== 구역 선택 팝업 =====
+function closePopup() {
+    if (!zonePopup) return;
+    zonePopup.style.display = 'none';
+    zonePopup.innerHTML = '';
+}
+function clearZoneSelection() {
+    zoneSvg?.querySelectorAll('.zone.selected').forEach(p => p.classList.remove('selected'));
+    infoTitle.textContent = '🔥 FireWeb';
+    infoSub.innerHTML = '<strong>소화기 관리 시스템</strong>';
+    infoBody.textContent = '구역을 클릭하여 확인하세요';
+    closePopup();
+}
+function clampFloatingCardInScene(el, preferredLeft, preferredTop, gap = 12) {
+    if (!scene || !el) return { left: preferredLeft, top: preferredTop };
+    const sceneRect = scene.getBoundingClientRect();
+    const cardW = Math.min(el.offsetWidth || 0, Math.max(0, sceneRect.width - gap * 2));
+    const cardH = Math.min(el.offsetHeight || 0, Math.max(0, sceneRect.height - gap * 2));
+    const maxLeft = Math.max(gap, sceneRect.width - cardW - gap);
+    const maxTop = Math.max(gap, sceneRect.height - cardH - gap);
+    return {
+        left: Math.min(maxLeft, Math.max(gap, preferredLeft)),
+        top: Math.min(maxTop, Math.max(gap, preferredTop))
+    };
+}
+function openPopupNearEvent(e, zoneName, floorsCsv) {
+    if (!zonePopup) return;
+    const floors = (floorsCsv || '').split(',').map(s => s.trim()).filter(Boolean);
+    zonePopup.innerHTML = `
+        <div class="zp-title">
+            <span>${zoneName || '구역'}</span>
+            <button class="zp-close" type="button" aria-label="닫기">&times;</button>
+        </div>
+        <div class="zp-floors">
+            ${floors.map(f => `<button type="button" class="zp-floor" data-floor="${f}">${f}</button>`).join('')}
+        </div>
+    `;
+    const r = scene.getBoundingClientRect();
+    zonePopup.style.visibility = 'hidden';
+    zonePopup.style.display = 'block';
+    const pos = clampFloatingCardInScene(
+        zonePopup,
+        e.clientX - r.left + 18,
+        e.clientY - r.top + 18
+    );
+    zonePopup.style.left = `${pos.left}px`;
+    zonePopup.style.top = `${pos.top}px`;
+    zonePopup.style.visibility = '';
+    zonePopup.querySelector('.zp-close')?.addEventListener('click', clearZoneSelection);
+    zonePopup.querySelectorAll('.zp-floor').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const floor = btn.getAttribute('data-floor') || '';
+            const b = (zoneName || '').trim();
+            const f = (floor || '').trim();
+            const url = `/maps/floor.html?buildingName=${encodeURIComponent(b)}&floorName=${encodeURIComponent(f)}`;
+            window.location.href = url;
+        });
+    });
+}
+function selectZone(el) {
+    zoneSvg?.querySelectorAll('.zone.selected').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+}
+function bindZones() {
+    if (!zoneSvg) return;
+    let hoveredZone = null;
+    zoneSvg.addEventListener('mousemove', (e) => {
+        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
+        if (!zone) {
+            if (hoveredZone) {
+                hoveredZone = null;
+                hideTooltip();
+            }
+            return;
+        }
+        if (hoveredZone !== zone) {
+            hoveredZone = zone;
+            showTooltip(e, zone.dataset.name || '');
+            return;
+        }
+        positionTooltip(e);
+    });
+    zoneSvg.addEventListener('mouseleave', () => {
+        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        hoveredZone = null;
+        hideTooltip();
+    });
+    zoneSvg.addEventListener('click', (e) => {
+        const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
+        if (!zone) return;
+        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        if (Date.now() < suppressZoneClickUntil) return;
+        e.stopPropagation();
+        const name = (zone.dataset.name || '').trim();
+        const floors = zone.dataset.floors || '';
+        selectZone(zone);
+        infoTitle.textContent = `${name || '구역'}`;
+        infoSub.innerHTML = '<strong>선택된 구역</strong>';
+        infoBody.textContent = floors ? `층: ${floors}` : '구역을 클릭하여 확인하세요';
+        openPopupNearEvent(e, name, floors);
+    });
+    scene.addEventListener('click', (e) => {
+        const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
+        if (!zone) clearZoneSelection();
+    });
+    zonePopup?.addEventListener('click', (e) => e.stopPropagation());
+}
+
+// ===== 옥외 소화전 상태 표시 =====
+function setOutdoorHint(message, type){
+    if(!outdoorActionHint) return;
+    outdoorActionHint.textContent = message || '';
+    outdoorActionHint.classList.remove('error', 'success');
+    if(type === 'error') outdoorActionHint.classList.add('error');
+    if(type === 'success') outdoorActionHint.classList.add('success');
+}
+function setOutdoorToolMode(mode){
+    outdoorAddMode = mode === 'add';
+    outdoorMoveMode = mode === 'move';
+    if (!outdoorMoveMode) outdoorPendingCoord = null;
+    btnOutdoorAdd?.classList.toggle('is-active', outdoorAddMode);
+    btnOutdoorMove?.classList.toggle('is-active', outdoorMoveMode);
+    if (btnOutdoorMoveCancel) btnOutdoorMoveCancel.style.display = outdoorMoveMode ? '' : 'none';
+    if (btnOutdoorMoveSave) btnOutdoorMoveSave.style.display = outdoorMoveMode ? '' : 'none';
+    document.body.classList.toggle('move-armed', outdoorMoveMode);
+}
+
+async function saveOutdoorMove(){
+    if(!currentOutdoorId){
+        setOutdoorHint('먼저 이동할 소화전을 선택하세요.', 'error');
+        return;
+    }
+    if(!outdoorPendingCoord){
+        setOutdoorHint('새 위치를 먼저 클릭하세요.', 'error');
+        return;
+    }
+    const current = (outdoorHydrants || []).find(x => x.hydrantId === currentOutdoorId);
+    if(!current) throw new Error('선택한 소화전 정보를 찾을 수 없습니다.');
+    const res = await apiFetch('/fire-api/hydrants', {
+        method: 'POST',
+        body: JSON.stringify({
+            hydrantId: currentOutdoorId,
+            hydrantType: current.hydrantType || 'Outdoor',
+            operationType: current.operationType || 'Manual',
+            buildingId: current.buildingId || 99,
+            floorId: current.floorId || 1,
+            x: Number(outdoorPendingCoord.x),
+            y: Number(outdoorPendingCoord.y),
+            locationDescription: current.locationDescription || ''
+        })
+    });
+    const text = await res?.text().catch(() => '');
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
+    if (!res || !res.ok || data?.ok === false) {
+        throw new Error(data?.message || text || `HTTP ${res?.status}`);
+    }
+    const idx = outdoorHydrants.findIndex(h => h.hydrantId === currentOutdoorId);
+    if (idx >= 0) {
+        outdoorHydrants[idx].x = Number(outdoorPendingCoord.x);
+        outdoorHydrants[idx].y = Number(outdoorPendingCoord.y);
+    }
+    setOutdoorToolMode(null);
+    renderOutdoorMarkers();
+    setOutdoorHint('이동 저장 완료.', 'success');
+}
+
+// ===== 옥외 소화전 선택 카드 =====
+function hideOutdoorInfo(clearSelection = true){
+    if(outdoorSelect){
+        releaseFocus(outdoorSelect);
+        outdoorSelect.classList.remove('show');
+        outdoorSelect.setAttribute('aria-hidden', 'true');
+        outdoorSelect.setAttribute('inert', '');
+    }
+    if(clearSelection){
+        currentOutdoorId = null;
+        renderOutdoorMarkers();
+    }
+}
+function fillOutdoorSelectInfo(h){
+    if(!h) return;
+    if(osId) osId.textContent = `ID ${h.hydrantId}`;
+    if(osSerial) osSerial.textContent = h.serialNumber || '-';
+    if(osType) osType.textContent = (h.hydrantType === 'Indoor' ? '옥내' : (h.hydrantType === 'Outdoor' ? '옥외' : (h.hydrantType || '-')));
+    if(osOp) osOp.textContent = (h.operationType === 'Auto' ? '자동' : (h.operationType === 'Manual' ? '수동' : (h.operationType || '-')));
+    if(osCoord) osCoord.textContent = (h.x != null && h.y != null) ? `${Number(h.x).toFixed(2)}%, ${Number(h.y).toFixed(2)}%` : '-';
+    if(osLoc) osLoc.textContent = h.locationDescription || '-';
+}
+function positionOutdoorSelect(markerEl){
+    if(!outdoorSelect || !markerEl || !scene) return;
+    const sceneRect = scene.getBoundingClientRect();
+    const mkRect = markerEl.getBoundingClientRect();
+    const cardW = outdoorSelect.offsetWidth || 300;
+    const cardH = outdoorSelect.offsetHeight || 250;
+    let left = mkRect.right - sceneRect.left + 12;
+    let top = mkRect.top - sceneRect.top - 12;
+    const maxLeft = sceneRect.width - cardW - 12;
+    const maxTop = sceneRect.height - cardH - 12;
+    if (left > maxLeft) left = Math.max(12, mkRect.left - sceneRect.left - cardW - 12);
+    if (top > maxTop) top = maxTop;
+    if (top < 12) top = 12;
+    outdoorSelect.style.left = `${left}px`;
+    outdoorSelect.style.top = `${top}px`;
+    outdoorSelect.style.right = 'auto';
+    outdoorSelect.style.bottom = 'auto';
+}
+
+// ===== 옥외 소화전 마커 렌더링 =====
+function renderOutdoorMarkers(){
+    if(!outdoorMarkers) return;
+    outdoorMarkers.innerHTML = '';
+    outdoorByKey = new Map();
+    if(!outdoorMode) return;
+    const previewHydrants = (outdoorHydrants || []).map(h => {
+        if (outdoorMoveMode && outdoorPendingCoord && Number(h.hydrantId) === Number(currentOutdoorId)) {
+            return { ...h, x: outdoorPendingCoord.x, y: outdoorPendingCoord.y };
+        }
+        return h;
+    });
+    const coverFrame = (() => {
+        const sw = scene?.clientWidth || 0;
+        const sh = scene?.clientHeight || 0;
+        const nat = getNaturalSize();
+        const iw = nat.w || 0;
+        const ih = nat.h || 0;
+        if (!sw || !sh || !iw || !ih) return null;
+        const scale = Math.max(sw / iw, sh / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const ox = (sw - w) / 2;
+        const oy = (sh - h) / 2;
+        return { w, h, ox, oy };
+    })();
+    const iconUrl = '/images/outdoorfirehydrant.PNG';
+    previewHydrants.forEach(h => {
+        if(h.x == null || h.y == null) return;
+        const key = `${Number(h.x).toFixed(2)},${Number(h.y).toFixed(2)}`;
+        if(!outdoorByKey.has(key)) outdoorByKey.set(key, []);
+        outdoorByKey.get(key).push(h);
+    });
+    outdoorByKey.forEach((list, key) => {
+        const first = list[0];
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hmarker';
+        if(currentOutdoorId && list.some(x => x.hydrantId === currentOutdoorId)){
+            btn.classList.add('is-selected');
+        }
+        if (coverFrame){
+            const px = coverFrame.ox + (coverFrame.w * (Number(first.x) / 100));
+            const py = coverFrame.oy + (coverFrame.h * (Number(first.y) / 100));
+            btn.style.left = `${px}px`;
+            btn.style.top = `${py}px`;
+        } else {
+            btn.style.left = first.x + '%';
+            btn.style.top = first.y + '%';
+        }
+        btn.dataset.key = key;
+        btn.innerHTML = `<img class="icon" src="${iconUrl}" alt="">` + (list.length > 1 ? `<span class="badge">+${list.length}</span>` : '');
+        btn.addEventListener('click', (e)=>{
+            if (window.__mapDragLock || isPanning || panMoved) return;
+            e.stopPropagation();
+            const items = outdoorByKey.get(key) || [];
+            const selected = items.find(h => h.hydrantId === currentOutdoorId);
+            const chosen = selected || items[0] || null;
+            currentOutdoorId = chosen?.hydrantId ?? null;
+            if(outdoorMoveMode){
+                hideOutdoorInfo(false);
+                renderOutdoorMarkers();
+                setOutdoorHint('새 위치를 클릭한 뒤 좌표저장을 누르세요.');
+                return;
+            }
+            if(outdoorSelectList){
+                outdoorSelectList.innerHTML = '';
+                items.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = String(h.hydrantId);
+                    const label = h.serialNumber ? `${h.serialNumber} (ID ${h.hydrantId})` : `ID ${h.hydrantId}`;
+                    opt.textContent = label;
+                    outdoorSelectList.appendChild(opt);
+                });
+                outdoorSelectList.value = currentOutdoorId ? String(currentOutdoorId) : '';
+                fillOutdoorSelectInfo(chosen);
+            }
+            if(outdoorSelect){
+                outdoorSelect.removeAttribute('inert');
+                outdoorSelect.setAttribute('aria-hidden', 'false');
+                outdoorSelect.classList.add('show');
+                positionOutdoorSelect(btn);
+            }
+            renderOutdoorMarkers();
+        });
+        outdoorMarkers.appendChild(btn);
+    });
+}
+
+function renderOutdoorEquipmentMarkers(){
+    if(!outdoorEquipmentMarkers) return;
+    outdoorEquipmentMarkers.innerHTML = '';
+    if(!outdoorEquipmentMode) return;
+    const coverFrame = (() => {
+        const sw = scene?.clientWidth || 0;
+        const sh = scene?.clientHeight || 0;
+        const nat = getNaturalSize();
+        const iw = nat.w || 0;
+        const ih = nat.h || 0;
+        if (!sw || !sh || !iw || !ih) return null;
+        const scale = Math.max(sw / iw, sh / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const ox = (sw - w) / 2;
+        const oy = (sh - h) / 2;
+        return { w, h, ox, oy };
+    })();
+    const equipments = [
+        ...(outdoorReceivers || []).map(item => ({ ...item, type: 'receiver', label: '수신기' })),
+        ...(outdoorPumps || []).map(item => ({ ...item, type: 'pump', label: '펌프' }))
+    ];
+    equipments.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `eqmarker ${item.type}`;
+        const iconUrl = item.type === 'receiver' ? '/images/receiver.png' : '/images/pump.png';
+        if (coverFrame){
+            const px = coverFrame.ox + (coverFrame.w * (Number(item.x) / 100));
+            const py = coverFrame.oy + (coverFrame.h * (Number(item.y) / 100));
+            btn.style.left = `${px}px`;
+            btn.style.top = `${py}px`;
+        } else {
+            btn.style.left = item.x + '%';
+            btn.style.top = item.y + '%';
+        }
+        btn.title = `${item.label} - ${item.buildingName || '-'}`;
+        btn.innerHTML = `<img src="${iconUrl}" alt="${item.label}">`;
+        btn.addEventListener('click', (e) => {
+            if (window.__mapDragLock || isPanning || panMoved) return;
+            if (outdoorEquipmentAddType || outdoorEquipmentMoveMode) return;
+            e.stopPropagation();
+            currentOutdoorEquipment = item;
+            fillOutdoorEquipmentInfo(item);
+            if (outdoorEquipmentSelect) {
+                outdoorEquipmentSelect.removeAttribute('inert');
+                outdoorEquipmentSelect.setAttribute('aria-hidden', 'false');
+                outdoorEquipmentSelect.classList.add('show');
+                positionOutdoorEquipmentSelect(btn);
+            }
+        });
+        outdoorEquipmentMarkers.appendChild(btn);
+    });
+}
+
+function hideOutdoorEquipmentInfo(clearSelection = true){
+    if (outdoorEquipmentSelect) {
+        releaseFocus(outdoorEquipmentSelect);
+        outdoorEquipmentSelect.classList.remove('show');
+        outdoorEquipmentSelect.setAttribute('aria-hidden', 'true');
+        outdoorEquipmentSelect.setAttribute('inert', '');
+    }
+    if (clearSelection) currentOutdoorEquipment = null;
+}
+
+function setOutdoorEquipmentHint(message, tone){
+    if (!outdoorEquipmentHint) return;
+    outdoorEquipmentHint.textContent = message || '';
+    outdoorEquipmentHint.classList.remove('error', 'success');
+    if (tone) outdoorEquipmentHint.classList.add(tone);
+}
+
+function setOutdoorEquipmentAction(mode, type = ''){
+    outdoorEquipmentAddType = mode === 'add' ? type : '';
+    outdoorEquipmentMoveMode = mode === 'move';
+    btnOutdoorReceiverAdd?.classList.toggle('is-active', outdoorEquipmentAddType === 'receiver');
+    btnOutdoorPumpAdd?.classList.toggle('is-active', outdoorEquipmentAddType === 'pump');
+    btnOutdoorEquipmentMove?.classList.toggle('is-active', outdoorEquipmentMoveMode);
+    document.body.classList.toggle('move-armed', outdoorEquipmentMoveMode || !!outdoorEquipmentAddType);
+}
+
+function fillOutdoorEquipmentInfo(item){
+    if (!item) return;
+    if (oesType) oesType.textContent = item.type === 'receiver' ? '수신기' : '소방펌프';
+    if (oesBuilding) oesBuilding.textContent = item.buildingName || '-';
+    if (oesCoord) oesCoord.textContent = (item.x != null && item.y != null) ? `${Number(item.x).toFixed(2)}%, ${Number(item.y).toFixed(2)}%` : '-';
+    if (oesLocation) oesLocation.textContent = item.locationDescription || '-';
+    if (oesLastInspection) oesLastInspection.textContent = item.lastInspectionDate || '-';
+    if (btnOutdoorEquipmentInspect) btnOutdoorEquipmentInspect.style.display = isAdmin ? '' : 'none';
+    if (btnOutdoorEquipmentEdit) btnOutdoorEquipmentEdit.style.display = isAdmin ? '' : 'none';
+    setOutdoorEquipmentHint(`${item.type === 'receiver' ? '수신기' : '소방펌프'}가 선택되었습니다. 상세, 점검, 수정 모달을 열 수 있습니다.`, 'success');
+}
+
+function positionOutdoorEquipmentSelect(markerEl){
+    if(!outdoorEquipmentSelect || !markerEl || !scene) return;
+    const sceneRect = scene.getBoundingClientRect();
+    const mkRect = markerEl.getBoundingClientRect();
+    const cardW = outdoorEquipmentSelect.offsetWidth || 300;
+    const cardH = outdoorEquipmentSelect.offsetHeight || 220;
+    let left = mkRect.right - sceneRect.left + 12;
+    let top = mkRect.top - sceneRect.top - 12;
+    const maxLeft = sceneRect.width - cardW - 12;
+    const maxTop = sceneRect.height - cardH - 12;
+    if (left > maxLeft) left = Math.max(12, mkRect.left - sceneRect.left - cardW - 12);
+    if (top > maxTop) top = maxTop;
+    if (top < 12) top = 12;
+    outdoorEquipmentSelect.style.left = `${left}px`;
+    outdoorEquipmentSelect.style.top = `${top}px`;
+    outdoorEquipmentSelect.style.right = 'auto';
+    outdoorEquipmentSelect.style.bottom = 'auto';
+}
+
+function openOutdoorEquipmentModal(action, options = {}){
+    const type = options.type || currentOutdoorEquipment?.type;
+    if (!type || !outdoorEditHostEl || !outdoorEditFrame) return;
+    const page = type === 'receiver' ? '/receivers.html' : '/pumps.html';
+    const id = type === 'receiver'
+        ? (options.receiverId || currentOutdoorEquipment?.receiverId || 0)
+        : (options.pumpId || currentOutdoorEquipment?.pumpId || 0);
+    const params = new URLSearchParams();
+    if (action === 'details') {
+        if (!id) return;
+        params.set('embedDetails', '1');
+        params.set('details', String(id));
+    } else if (action === 'inspect') {
+        if (!id) return;
+        params.set('embedInspect', '1');
+        params.set('inspect', String(id));
+    } else {
+        params.set('embedEdit', '1');
+        if (action === 'add') {
+            params.set('add', '1');
+        } else {
+            if (!id) return;
+            params.set('edit', String(id));
+        }
+        params.set('buildingName', options.buildingName || currentOutdoorEquipment?.buildingName || '옥외');
+        params.set('floorName', options.floorName || currentOutdoorEquipment?.floorName || '옥외');
+        if (Number.isFinite(Number(options.x))) params.set('x', Number(options.x).toFixed(2));
+        if (Number.isFinite(Number(options.y))) params.set('y', Number(options.y).toFixed(2));
+    }
+    outdoorEditFrame.src = `${page}?${params.toString()}`;
+    resetOutdoorEditShellPosition();
+    outdoorEditHostEl.style.display = 'flex';
+}
+
+function resetOutdoorEditShellPosition(){}
+
+async function saveOutdoorEquipmentMove(point){
+    if (!currentOutdoorEquipment) {
+        setOutdoorEquipmentHint('이동할 설비를 먼저 선택하세요.', 'error');
+        return;
+    }
+    const apiBase = currentOutdoorEquipment.type === 'receiver' ? '/fire-api/receivers' : '/fire-api/pumps';
+    const payload = {
+        buildingName: currentOutdoorEquipment.buildingName || '옥외',
+        x: Number(point.x),
+        y: Number(point.y),
+        locationDescription: currentOutdoorEquipment.locationDescription || null,
+        note: currentOutdoorEquipment.note || null
+    };
+    if (currentOutdoorEquipment.type === 'receiver') {
+        payload.receiverId = currentOutdoorEquipment.receiverId;
+    } else {
+        payload.pumpId = currentOutdoorEquipment.pumpId;
+    }
+    const res = await apiFetch(apiBase, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+    const text = await res?.text().catch(() => '');
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) {}
+    if (!res || !res.ok || data?.ok === false) {
+        throw new Error(data?.message || text || `HTTP ${res?.status}`);
+    }
+    currentOutdoorEquipment.x = Number(point.x);
+    currentOutdoorEquipment.y = Number(point.y);
+    await loadOutdoorEquipment();
+    renderOutdoorEquipmentMarkers();
+    setOutdoorEquipmentAction(null);
+    setOutdoorEquipmentHint(`위치를 저장했습니다. X=${Number(point.x).toFixed(2)}%, Y=${Number(point.y).toFixed(2)}%`, 'success');
+}
+
+function openOutdoorEquipmentPage(action){
+    if (!currentOutdoorEquipment) {
+        setOutdoorEquipmentHint('먼저 수신기 또는 소방펌프 마커를 선택하세요.', 'error');
+        return;
+    }
+    openOutdoorEquipmentModal(action, currentOutdoorEquipment);
+}
+
+// ===== SVG 좌표 변환 =====
+function getSvgPoint(clientX, clientY){
+    const loc = clientToMapLocal(clientX, clientY);
+    if (!loc) return { xPct: 0, yPct: 0 };
+    const { w, h } = getNaturalSize();
+    const xPct = Math.max(0, Math.min(100, (loc.x / w) * 100));
+    const yPct = Math.max(0, Math.min(100, (loc.y / h) * 100));
+    return { xPct, yPct };
+}
+
+// ===== Zoom/Pan =====
+let mapScale = 1, mapTx = 0, mapTy = 0;
+let isPanning = false, panMoved = false;
+let panStart = { x: 0, y: 0, tx: 0, ty: 0 };
+let suppressZoneClickUntil = 0;
+let mapTransformFrame = 0;
+if (typeof window.__mapDragLock === 'undefined') window.__mapDragLock = false;
+
+function getMapBaseSize(){
+    if (!scene) return { sceneW: 0, sceneH: 0, baseW: 0, baseH: 0 };
+    const rect = scene.getBoundingClientRect();
+    const sceneW = Math.max(1, rect.width);
+    const sceneH = Math.max(1, rect.height);
+    const { w: naturalW, h: naturalH } = getNaturalSize();
+    const coverScale = Math.max(sceneW / naturalW, sceneH / naturalH);
+    return {
+        sceneW,
+        sceneH,
+        baseW: naturalW * coverScale,
+        baseH: naturalH * coverScale
+    };
+}
+function getMapDisplayRect(){
+    if (!scene) return null;
+    const { sceneW, sceneH, baseW, baseH } = getMapBaseSize();
+    const scaledW = baseW * mapScale;
+    const scaledH = baseH * mapScale;
+    return {
+        left: (sceneW - scaledW) / 2 + mapTx,
+        top: (sceneH - scaledH) / 2 + mapTy,
+        width: scaledW,
+        height: scaledH
+    };
+}
+function clientToMapLocal(clientX, clientY){
+    if (!scene) return null;
+    const sceneRect = scene.getBoundingClientRect();
+    const mapRect = getMapDisplayRect();
+    if (!mapRect) return null;
+    const { w, h } = getNaturalSize();
+    const localX = ((clientX - sceneRect.left) - mapRect.left) * (w / mapRect.width);
+    const localY = ((clientY - sceneRect.top) - mapRect.top) * (h / mapRect.height);
+    return { x: localX, y: localY };
+}
+function canPanMap(){
+    const { sceneW, sceneH, baseW, baseH } = getMapBaseSize();
+    return mapScale > 1.001 || baseW > sceneW + 1 || baseH > sceneH + 1;
+}
+function applyMapTransform(){
+    if (!mapStage) return;
+    const { sceneW, sceneH, baseW, baseH } = getMapBaseSize();
+    const scaledW = baseW * mapScale;
+    const scaledH = baseH * mapScale;
+    const baseLeft = (sceneW - scaledW) / 2;
+    const baseTop = (sceneH - scaledH) / 2;
+    mapStage.style.width = `${baseW}px`;
+    mapStage.style.height = `${baseH}px`;
+    mapStage.style.transform = `translate(${baseLeft + mapTx}px, ${baseTop + mapTy}px) scale(${mapScale})`;
+    scene?.classList.toggle('is-draggable', canPanMap() && !isPanning);
+}
+function requestMapTransform() {
+    if (mapTransformFrame) return;
+    mapTransformFrame = requestAnimationFrame(() => {
+        mapTransformFrame = 0;
+        applyMapTransform();
+        window.__pickRedraw?.();
+    });
+}
+function clampMap(){
+    if (!scene || !mapStage) return;
+    const { sceneW, sceneH, baseW, baseH } = getMapBaseSize();
+    const scaledW = baseW * mapScale;
+    const scaledH = baseH * mapScale;
+    if (scaledW <= sceneW + 0.5) {
+        mapTx = 0;
+    } else {
+        const baseLeft = (sceneW - scaledW) / 2;
+        mapTx = Math.max(Math.min(baseLeft, -baseLeft), Math.min(Math.max(baseLeft, -baseLeft), mapTx));
+    }
+    if (scaledH <= sceneH + 0.5) {
+        mapTy = 0;
+    } else {
+        const baseTop = (sceneH - scaledH) / 2;
+        mapTy = Math.max(Math.min(baseTop, -baseTop), Math.min(Math.max(baseTop, -baseTop), mapTy));
+    }
+}
+function resetMapTransform(smooth){
+    mapScale = 1; mapTx = 0; mapTy = 0;
+    if (mapStage && smooth){
+        mapStage.style.transition = 'transform 220ms ease';
+        applyMapTransform();
+        setTimeout(() => { if(mapStage) mapStage.style.transition = ''; }, 240);
+    } else { applyMapTransform(); }
+}
+function zoomAt(cx, cy, newScale){
+    const oldRect = getMapDisplayRect();
+    if (!oldRect || oldRect.width <= 0 || oldRect.height <= 0) return;
+    const relX = (cx - oldRect.left) / oldRect.width;
+    const relY = (cy - oldRect.top) / oldRect.height;
+    const nextScale = Math.max(1, Math.min(3, newScale));
+    const { sceneW, sceneH, baseW, baseH } = getMapBaseSize();
+    const nextWidth = baseW * nextScale;
+    const nextHeight = baseH * nextScale;
+    const nextBaseLeft = (sceneW - nextWidth) / 2;
+    const nextBaseTop = (sceneH - nextHeight) / 2;
+    mapScale = nextScale;
+    mapTx = cx - (relX * nextWidth) - nextBaseLeft;
+    mapTy = cy - (relY * nextHeight) - nextBaseTop;
+    clampMap();
+    requestMapTransform();
+}
+
+// ===== 옥외 소화전 편집 도구 =====
+function setOutdoorMode(on){
+    outdoorMode = !!on;
+    if (outdoorMode && outdoorEquipmentMode) {
+        setOutdoorEquipmentMode(false);
+    }
+    setOutdoorToolMode(null);
+    if (outdoorPanel) outdoorPanel.classList.toggle('show', outdoorMode);
+    document.body.classList.toggle('outdoor-mode', outdoorMode);
+    if (outdoorMode){
+        screen.classList.remove('menu-open');
+        closePopup();
+    } else {
+        hideOutdoorInfo();
+        resetMapTransform(true);
+    }
+    if (isAdmin) {
+        setOutdoorHint('마커를 선택하면 점검/수정/이동할 수 있습니다.');
+    } else {
+        setOutdoorHint('일반 사용자는 점검만 가능합니다.', 'error');
+    }
+    renderOutdoorMarkers();
+}
+window.setOutdoorMode = setOutdoorMode;
+
+function setOutdoorEquipmentMode(on){
+    outdoorEquipmentMode = !!on;
+    if (outdoorEquipmentMode && outdoorMode) {
+        outdoorToggle.checked = false;
+        sessionStorage.setItem('outdoorMode', '0');
+        setOutdoorMode(false);
+    }
+    document.body.classList.toggle('outdoor-equipment-mode', outdoorEquipmentMode);
+    if (outdoorEquipmentToggle) {
+        outdoorEquipmentToggle.checked = outdoorEquipmentMode;
+    }
+    if (outdoorEquipmentPanel) {
+        outdoorEquipmentPanel.classList.toggle('show', outdoorEquipmentMode && isAdmin);
+    }
+    if (outdoorEquipmentMode) {
+        screen.classList.remove('menu-open');
+        closePopup();
+        infoTitle.textContent = '옥외 설비';
+        infoSub.innerHTML = '<strong>수신기 / 소방펌프 관리</strong>';
+        infoBody.textContent = isAdmin
+            ? '추가는 위치를 먼저 찍고, 수정은 모달로, 이동은 도면에서 바로 저장합니다.'
+            : '관리자만 접근할 수 있는 기능입니다.';
+        setOutdoorEquipmentAction(null);
+        setOutdoorEquipmentHint('추가를 누른 뒤 도면을 클릭하면 등록 모달이 열립니다.');
+    } else {
+        setOutdoorEquipmentAction(null);
+        hideOutdoorEquipmentInfo();
+        resetMapTransform(true);
+    }
+    renderOutdoorEquipmentMarkers();
+}
+
+if (outdoorToggle){
+    const keep = sessionStorage.getItem('outdoorMode');
+    if (keep === '1'){
+        outdoorToggle.checked = true;
+        setOutdoorMode(true);
+    } else {
+        outdoorToggle.checked = false;
+        setOutdoorMode(false);
+    }
+    outdoorToggle.addEventListener('change', (e)=> {
+        sessionStorage.setItem('outdoorMode', e.target.checked ? '1' : '0');
+        setOutdoorMode(e.target.checked);
+    });
+}
+if (outdoorEquipmentToggle) {
+    outdoorEquipmentToggle.checked = false;
+    outdoorEquipmentToggle.addEventListener('change', async (e)=> {
+        const next = !!e.target.checked;
+        if (!isAdmin) {
+            e.target.checked = false;
+            setOutdoorEquipmentMode(false);
+            return;
+        }
+        setOutdoorEquipmentMode(next);
+        if (next && (!outdoorReceivers.length && !outdoorPumps.length)) {
+            await loadOutdoorEquipment();
+        }
+    });
+}
+btnOutdoorEquipmentDetail?.addEventListener('click', ()=> openOutdoorEquipmentPage('details'));
+btnOutdoorEquipmentInspect?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    openOutdoorEquipmentPage('inspect');
+});
+btnOutdoorEquipmentEdit?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    setOutdoorEquipmentAction(null);
+    openOutdoorEquipmentPage('edit');
+});
+btnOutdoorReceiverAdd?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    hideOutdoorEquipmentInfo(false);
+    setOutdoorEquipmentAction('add', 'receiver');
+    setOutdoorEquipmentHint('도면에서 수신기를 추가할 위치를 클릭하세요.');
+});
+btnOutdoorPumpAdd?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    hideOutdoorEquipmentInfo(false);
+    setOutdoorEquipmentAction('add', 'pump');
+    setOutdoorEquipmentHint('도면에서 소방펌프를 추가할 위치를 클릭하세요.');
+});
+btnOutdoorEquipmentEditPanel?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    setOutdoorEquipmentAction(null);
+    openOutdoorEquipmentPage('edit');
+});
+btnOutdoorEquipmentMove?.addEventListener('click', ()=> {
+    if (!isAdmin) return;
+    if (!currentOutdoorEquipment) {
+        setOutdoorEquipmentHint('이동할 설비를 먼저 선택하세요.', 'error');
+        return;
+    }
+    hideOutdoorEquipmentInfo(false);
+    setOutdoorEquipmentAction('move');
+    setOutdoorEquipmentHint('도면에서 새 위치를 클릭하면 바로 저장됩니다.');
+});
+btnOutdoorEquipmentSelectClose?.addEventListener('click', ()=> hideOutdoorEquipmentInfo(true));
+btnOutdoorEquipmentSelectCloseBtn?.addEventListener('click', ()=> hideOutdoorEquipmentInfo(true));
+mapImg?.addEventListener('load', () => {
+    clampMap();
+    requestMapTransform();
+    renderOutdoorEquipmentMarkers();
+});
+window.addEventListener('resize', () => {
+    clampMap();
+    requestMapTransform();
+    renderOutdoorEquipmentMarkers();
+    if (zonePopup && zonePopup.style.display === 'block') {
+        const pos = clampFloatingCardInScene(
+            zonePopup,
+            parseFloat(zonePopup.style.left || '0'),
+            parseFloat(zonePopup.style.top || '0')
+        );
+        zonePopup.style.left = `${pos.left}px`;
+        zonePopup.style.top = `${pos.top}px`;
+    }
+});
+clampMap();
+applyMapTransform();
+
+btnOutdoorAdd?.addEventListener('click', ()=>{
+    if(!isAdmin){ alert('관리자만 추가할 수 있습니다.'); return; }
+    hideOutdoorInfo(false);
+    setOutdoorToolMode('add');
+    setOutdoorHint('추가할 위치를 클릭하세요.');
+});
+btnOutdoorMove?.addEventListener('click', ()=>{
+    if(!isAdmin){ alert('관리자만 이동할 수 있습니다.'); return; }
+    if(!currentOutdoorId){ setOutdoorHint('먼저 이동할 소화전을 선택하세요.', 'error'); return; }
+    hideOutdoorInfo(false);
+    setOutdoorToolMode('move');
+    setOutdoorHint('새 위치를 클릭한 뒤 좌표저장을 누르세요.');
+});
+btnOutdoorMoveCancel?.addEventListener('click', ()=>{
+    setOutdoorToolMode(null);
+    renderOutdoorMarkers();
+    setOutdoorHint('이동을 취소했습니다.');
+});
+btnOutdoorMoveSave?.addEventListener('click', ()=>{
+    saveOutdoorMove().catch(err => {
+        setOutdoorHint('이동 저장 실패: ' + (err?.message || err), 'error');
+    });
+});
+btnOutdoorEdit?.addEventListener('click', ()=>{
+    if(!isAdmin){ alert('관리자만 수정할 수 있습니다.'); return; }
+    if(!currentOutdoorId){ setOutdoorHint('먼저 마커를 선택하세요.', 'error'); return; }
+    setOutdoorToolMode(null);
+    openOutdoorEditModal(currentOutdoorId);
+});
+btnOutdoorSelectEdit?.addEventListener('click', ()=>{
+    if(!isAdmin){ alert('관리자만 수정할 수 있습니다.'); return; }
+    if(!currentOutdoorId){ setOutdoorHint('먼저 마커를 선택하세요.', 'error'); return; }
+    setOutdoorToolMode(null);
+    openOutdoorEditModal(currentOutdoorId);
+});
+
+outdoorSelectList?.addEventListener('change', (e)=>{
+    const v = parseInt(e.target.value || '0', 10);
+    currentOutdoorId = v > 0 ? v : null;
+    if(currentOutdoorId){
+        const h = (outdoorHydrants || []).find(x => x.hydrantId === currentOutdoorId);
+        fillOutdoorSelectInfo(h);
+        renderOutdoorMarkers();
+    }
+});
+btnOutdoorSelectInspect?.addEventListener('click', ()=>{
+    if(currentOutdoorId) openInspectModal(currentOutdoorId);
+});
+btnOutdoorSelectDetail?.addEventListener('click', ()=>{
+    if(currentOutdoorId) openOutdoorDetailModal(currentOutdoorId);
+});
+btnOutdoorSelectClose?.addEventListener('click', ()=> hideOutdoorInfo(false));
+btnOutdoorSelectClose2?.addEventListener('click', ()=> hideOutdoorInfo(false));
+
+// 추가/이동 모드 종료
+scene.addEventListener('wheel', (e) => {
+    if (!outdoorMode && !outdoorEquipmentMode) return;
+    e.preventDefault();
+    const rect = scene.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    zoomAt(cx, cy, mapScale + delta);
+}, { passive: false });
+
+// 마커 기준 좌표 추출
+scene.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (e.target && e.target.closest && e.target.closest('.outdoor-panel, .outdoor-toggle, .outdoor-equipment-toggle, .outdoor-equipment-panel, #outdoorEquipmentMarkers, #outdoorEquipmentSelect, .info-panel, #pickPanel, #zonePopup')) return;
+    if (!outdoorMode && !canPanMap()) return;
+    isPanning = true;
+    panMoved = false;
+    window.__mapDragLock = true;
+    document.body.style.userSelect = 'none';
+    document.body.classList.add('map-panning');
+    panStart = { x: e.clientX, y: e.clientY, tx: mapTx, ty: mapTy };
+    e.preventDefault();
+});
+window.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) panMoved = true;
+    mapTx = panStart.tx + dx;
+    mapTy = panStart.ty + dy;
+    clampMap();
+    requestMapTransform();
+});
+window.addEventListener('mouseup', () => {
+    if (!isPanning) return;
+    if (panMoved) suppressZoneClickUntil = Date.now() + 120;
+    isPanning = false;
+    window.__mapDragLock = false;
+    document.body.style.userSelect = '';
+    document.body.classList.remove('map-panning');
+    scene?.classList.toggle('is-draggable', canPanMap());
+});
+
+scene.addEventListener('click', async (e)=>{
+    if(!outdoorMode && !outdoorEquipmentMode) return;
+    if (window.__mapDragLock || panMoved) { panMoved = false; return; }
+    if(outdoorAddMode){
+        const p = getSvgPoint(e.clientX, e.clientY);
+        setOutdoorToolMode(null);
+        openOutdoorEditModal({ id: 0, hydrantType: 'Outdoor', x: p.xPct, y: p.yPct });
+        setOutdoorHint('선택한 위치가 입력된 추가 모달을 열었습니다.');
+        return;
+    }
+    if(outdoorMoveMode){
+        if(!currentOutdoorId){
+            setOutdoorHint('먼저 이동할 소화전을 선택하세요.', 'error');
+            return;
+        }
+        const p = getSvgPoint(e.clientX, e.clientY);
+        outdoorPendingCoord = { x: p.xPct, y: p.yPct };
+        renderOutdoorMarkers();
+        setOutdoorHint(`새 위치 선택됨: X=${p.xPct.toFixed(2)}%, Y=${p.yPct.toFixed(2)}%. 좌표저장을 누르세요.`, 'success');
+        return;
+    }
+    if(outdoorEquipmentMode){
+        if (outdoorEquipmentAddType) {
+            const p = getSvgPoint(e.clientX, e.clientY);
+            const type = outdoorEquipmentAddType;
+            setOutdoorEquipmentAction(null);
+            openOutdoorEquipmentModal('add', { type, buildingName: '옥외', floorName: '옥외', x: p.xPct, y: p.yPct });
+            setOutdoorEquipmentHint(`${type === 'receiver' ? '수신기' : '소방펌프'} 등록 모달을 열었습니다. 나머지 정보를 입력하세요.`, 'success');
+            return;
+        }
+        if (outdoorEquipmentMoveMode) {
+            const p = getSvgPoint(e.clientX, e.clientY);
+            try {
+                await saveOutdoorEquipmentMove({ x: p.xPct, y: p.yPct });
+            } catch (error) {
+                setOutdoorEquipmentHint('위치 저장 실패: ' + (error?.message || error), 'error');
+            }
+            return;
+        }
+        hideOutdoorEquipmentInfo(true);
+        return;
+    }
+    hideOutdoorInfo(false);
+});
+
+// ===== 점검 모달 =====
+function openInspectModal(hydrantId) {
+    if (!hydrantId || !window.FireWebHydrantModal) return;
+    currentInspectHydrantId = hydrantId;
+    window.FireWebHydrantModal.open({
+        mode: 'inspect',
+        id: hydrantId,
+        onClose: async ({ reason }) => {
+            currentInspectHydrantId = null;
+            if (reason !== 'fireweb:hydrant-inspect-saved') return;
+            await loadOutdoorHydrants();
+            setOutdoorHint('점검 처리 완료', 'success');
+            const latest = (outdoorHydrants || []).find(x => x.hydrantId === hydrantId);
+            if (latest) {
+                currentOutdoorId = hydrantId;
+                fillOutdoorSelectInfo(latest);
+                renderOutdoorMarkers();
+            }
+        }
+    });
+}
+function closeInspectModal() {
+    currentInspectHydrantId = null;
+}
+async function submitInspect() {
+    return;
+    if (!currentInspectHydrantId) return;
+    const result = collectChecklistResultMain();
+    const isFaulty = result.isFaulty;
+    const faultReason = result.faultReason;
+    try {
+        const params = new URLSearchParams({ isFaulty: String(isFaulty) });
+        if (faultReason) params.append('faultReason', faultReason);
+        const res = await apiFetch(`/fire-api/hydrants/${currentInspectHydrantId}/inspect?${params.toString()}`, { method: 'POST' });
+        if (!res || !res.ok) throw new Error('점검 처리 실패');
+        closeInspectModal();
+        hideOutdoorInfo(false);
+        setOutdoorHint('점검 처리 완료', 'success');
+    } catch(err) {
+        alert('점검 처리 실패: ' + (err?.message || err));
+    }
+}
+
+function collectChecklistResultMain() {
+    const reasons = [];
+    document.querySelectorAll('#hydChecklistWrapMain .check-item').forEach(item => {
+        const checked = item.querySelector('input[type="radio"]:checked');
+        if (checked && checked.value === 'bad') {
+            const reason = item.getAttribute('data-reason') || '';
+            if (reason) reasons.push(reason);
+        }
+    });
+    return { isFaulty: reasons.length > 0, faultReason: reasons.join(', ') };
+}
+function updateChecklistReasonMain() {
+    const result = collectChecklistResultMain();
+    const input = document.getElementById('faultReasonInput');
+    if (input) input.value = result.faultReason;
+    const auto = document.getElementById('faultReasonAuto');
+    if (auto) {
+        auto.style.display = result.isFaulty ? 'block' : 'none';
+        auto.textContent = result.isFaulty ? ('자동 고장 사유: ' + result.faultReason) : '';
+    }
+}
+document.querySelectorAll('#hydChecklistWrapMain input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', updateChecklistReasonMain);
+});
+
+// ===== 위치 선택 패널(Pick) =====
+const Pick = (() => {
+    let enabled = false;
+    let pointsPct = [];
+    const panel = document.getElementById('pickPanel');
+    const handle = document.getElementById('pickPanelHandle');
+    const out = document.getElementById('pickOut');
+    const canvas = document.getElementById('pickCanvas');
+    const ctx = canvas?.getContext('2d');
+    let panelDragging = false;
+    let panelDragOffset = { x: 0, y: 0 };
+    let redrawFrame = 0;
+
+    function clampPanelPosition(left, top){
+        if (!panel || !scene) return { left, top };
+        const sceneRect = scene.getBoundingClientRect();
+        const panelW = Math.min(panel.offsetWidth || 0, Math.max(0, sceneRect.width - 24));
+        const panelH = Math.min(panel.offsetHeight || 0, Math.max(0, sceneRect.height - 24));
+        return {
+            left: Math.min(Math.max(12, left), Math.max(12, sceneRect.width - panelW - 12)),
+            top: Math.min(Math.max(12, top), Math.max(12, sceneRect.height - panelH - 12))
+        };
+    }
+    function movePanel(left, top){
+        if (!panel) return;
+        const pos = clampPanelPosition(left, top);
+        panel.style.left = `${pos.left}px`;
+        panel.style.top = `${pos.top}px`;
+        panel.style.right = 'auto';
+    }
+    function startPanelDrag(e){
+        if (!panel || !handle) return;
+        if (e.target && e.target.closest && e.target.closest('button')) return;
+        const panelRect = panel.getBoundingClientRect();
+        const sceneRect = scene?.getBoundingClientRect();
+        if (!sceneRect) return;
+        panelDragging = true;
+        panelDragOffset = {
+            x: e.clientX - panelRect.left,
+            y: e.clientY - panelRect.top
+        };
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    }
+    function onPanelDrag(e){
+        if (!panelDragging || !scene) return;
+        const sceneRect = scene.getBoundingClientRect();
+        movePanel(
+            e.clientX - sceneRect.left - panelDragOffset.x,
+            e.clientY - sceneRect.top - panelDragOffset.y
+        );
+    }
+    function endPanelDrag(){
+        if (!panelDragging) return;
+        panelDragging = false;
+        document.body.style.userSelect = '';
+    }
+
+    function syncCanvas(){
+        if (!canvas || !scene) return;
+        const r = scene.getBoundingClientRect();
+        canvas.width = Math.max(1, Math.round(r.width));
+        canvas.height = Math.max(1, Math.round(r.height));
+        if (panel && panel.style.display !== 'none') {
+            movePanel(parseFloat(panel.style.left || '16'), parseFloat(panel.style.top || '160'));
+        }
+        requestRedraw();
+    }
+    function clientToSvg(clientX, clientY){
+        return clientToMapLocal(clientX, clientY) || { x: 0, y: 0 };
+    }
+    function svgToPct(x, y){
+        const { w, h } = getNaturalSize();
+        const cx = Math.min(w, Math.max(0, x));
+        const cy = Math.min(h, Math.max(0, y));
+        return { xPct: (cx / w) * 100, yPct: (cy / h) * 100 };
+    }
+    function pctToSvg(p){
+        const { w, h } = getNaturalSize();
+        return { x: (p.xPct / 100) * w, y: (p.yPct / 100) * h };
+    }
+    function svgToCanvas(x, y){
+        if (!canvas || !scene) return { x: 0, y: 0 };
+        const mapRect = getMapDisplayRect();
+        const { w, h } = getNaturalSize();
+        if (!mapRect || !w || !h) return { x: 0, y: 0 };
+        return {
+            x: mapRect.left + (x / w) * mapRect.width,
+            y: mapRect.top + (y / h) * mapRect.height
+        };
+    }
+    function redraw(){
+        redrawFrame = 0;
+        if (!ctx || !canvas) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!pointsPct.length) return;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,0,0,0.95)';
+        const firstSvg = pctToSvg(pointsPct[0]);
+        const first = svgToCanvas(firstSvg.x, firstSvg.y);
+        ctx.beginPath();
+        ctx.moveTo(first.x, first.y);
+        for (let i = 1; i < pointsPct.length; i++) {
+            const sp = pctToSvg(pointsPct[i]);
+            const cp = svgToCanvas(sp.x, sp.y);
+            ctx.lineTo(cp.x, cp.y);
+        }
+        ctx.stroke();
+        for (const p of pointsPct) {
+            const sp = pctToSvg(p);
+            const cp = svgToCanvas(sp.x, sp.y);
+            ctx.beginPath();
+            ctx.arc(cp.x, cp.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,0,0,0.95)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+    function requestRedraw(){
+        if (redrawFrame) return;
+        redrawFrame = requestAnimationFrame(redraw);
+    }
+    function formatOut(mousePct){
+        if (!out) return;
+        const { w, h } = getNaturalSize();
+        const pctLine = pointsPct.map(p => `${p.xPct.toFixed(3)},${p.yPct.toFixed(3)}`).join(' ');
+        const pxLine = pointsPct.map(p => {
+            const x = (p.xPct/100)*w;
+            const y = (p.yPct/100)*h;
+            return `${Math.round(x)},${Math.round(y)}`;
+        }).join(' ');
+        const polyTag = `<polygon class="zone"\n  data-zone="C"\n  data-name="구역명"\n  data-floors="1층"\n  data-points-pct="${pctLine}" />`;
+        const m = mousePct
+            ? `\n현재 마우스 좌표(%): ${mousePct.xPct.toFixed(3)},${mousePct.yPct.toFixed(3)}  |  현재 좌표(px): ${Math.round((mousePct.xPct/100)*w)},${Math.round((mousePct.yPct/100)*h)}`
+            : '';
+        out.value = `원본 이미지: ${w} x ${h}\n점 개수: ${pointsPct.length}\n\n[% points]\n${pctLine}\n\n[원본(px) 참고]\n${pxLine}\n\n${polyTag}${m}`;
+    }
+    function onClick(e){
+        if (!enabled) return;
+        if (window.__suppressPickClickUntil && Date.now() < window.__suppressPickClickUntil) return;
+        if (panel && e.target && e.target.closest && e.target.closest('#pickPanel')) return;
+        if (e.shiftKey){ undo(); return; }
+        const sv = clientToSvg(e.clientX, e.clientY);
+        const pct = svgToPct(sv.x, sv.y);
+        pointsPct.push(pct);
+        requestRedraw();
+        formatOut(pct);
+    }
+    function onDblClick(e){
+        if (outdoorMode || outdoorEquipmentMode) return;
+        if (!enabled) return;
+        e.preventDefault();
+        finish();
+    }
+    function onMove(e){
+        if (!enabled) return;
+        const sv = clientToSvg(e.clientX, e.clientY);
+        const pct = svgToPct(sv.x, sv.y);
+        formatOut(pct);
+    }
+    function start(){
+        enabled = true;
+        window.__pickEnabled = true;
+        document.body.classList.add('pick-mode-active');
+        infoPanel?.classList.add('show');
+        if (panel) panel.style.display = 'block';
+        movePanel(parseFloat(panel?.style.left || '16'), parseFloat(panel?.style.top || '160'));
+        syncCanvas();
+        formatOut();
+    }
+    function end(){
+        enabled = false;
+        window.__pickEnabled = false;
+        pointsPct = [];
+        requestRedraw();
+        formatOut();
+        document.body.classList.remove('pick-mode-active');
+        infoPanel?.classList.remove('show');
+        if (panel) panel.style.display = 'none';
+        endPanelDrag();
+    }
+    function clear(){ pointsPct = []; requestRedraw(); formatOut(); }
+    function undo(){ pointsPct.pop(); requestRedraw(); formatOut(); }
+    function finish(){
+        if (!ctx || pointsPct.length < 3) {
+            formatOut();
+            alert('폴리곤 생성은 최소 3개 좌표가 필요합니다.');
+            return;
+        }
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = 'rgba(255,0,0,1)';
+        ctx.beginPath();
+        const firstSvg = pctToSvg(pointsPct[0]);
+        const first = svgToCanvas(firstSvg.x, firstSvg.y);
+        ctx.moveTo(first.x, first.y);
+        for (let i = 1; i < pointsPct.length; i++) {
+            const sp = pctToSvg(pointsPct[i]);
+            const cp = svgToCanvas(sp.x, sp.y);
+            ctx.lineTo(cp.x, cp.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        requestRedraw();
+        formatOut();
+    }
+    async function copy(){
+        if (!out) return;
+        try { await navigator.clipboard.writeText(out.value); } catch {}
+    }
+    if (zoneSvg){
+        zoneSvg.addEventListener('click', onClick);
+        zoneSvg.addEventListener('dblclick', onDblClick);
+        zoneSvg.addEventListener('mousemove', onMove);
+    }
+    handle?.addEventListener('mousedown', startPanelDrag);
+    window.addEventListener('mousemove', onPanelDrag);
+    window.addEventListener('mouseup', endPanelDrag);
+    window.addEventListener('resize', () => { syncCanvas(); setOverlayViewBox(); });
+    window.__pickRedraw = requestRedraw;
+    return { start, end, clear, undo, finish, copy };
+})();
+window.Pick = Pick;
+
+function openOutdoorEditModal(id){
+    if(!outdoorEditHostEl || !outdoorEditFrame) return;
+    const opts = (typeof id === 'object' && id !== null) ? id : { id };
+    const editId = Number(opts.id || 0);
+    const q = new URLSearchParams();
+    q.set('embedEdit', '1');
+    if (editId > 0) {
+        q.set('edit', String(editId));
+    } else {
+        q.set('add', '1');
+        q.set('hydrantType', 'Outdoor');
+        q.set('buildingName', '옥외');
+        q.set('floorName', '옥외');
+    }
+    if (Number.isFinite(Number(opts.x))) q.set('x', Number(opts.x).toFixed(2));
+    if (Number.isFinite(Number(opts.y))) q.set('y', Number(opts.y).toFixed(2));
+    if (opts.buildingId != null && /^\d+$/.test(String(opts.buildingId))) q.set('buildingId', String(opts.buildingId));
+    if (opts.floorId != null && /^\d+$/.test(String(opts.floorId))) q.set('floorId', String(opts.floorId));
+    outdoorEditFrame.src = `/hydrants.html?${q.toString()}`;
+    resetOutdoorEditShellPosition();
+    outdoorEditHostEl.style.display = 'flex';
+}
+
+function openOutdoorDetailModal(hydrantId){
+    if(!outdoorEditHostEl || !outdoorEditFrame || !hydrantId) return;
+    const q = new URLSearchParams();
+    q.set('embedDetails', '1');
+    q.set('details', String(hydrantId));
+    outdoorEditFrame.src = `/hydrants.html?${q.toString()}`;
+    resetOutdoorEditShellPosition();
+    outdoorEditHostEl.style.display = 'flex';
+}
+
+function closeOutdoorEditModal(){
+    if (outdoorEditHostEl) outdoorEditHostEl.style.display = 'none';
+    if (outdoorEditFrame) outdoorEditFrame.src = 'about:blank';
+    resetOutdoorEditShellPosition();
+}
+
+function beginOutdoorEditDrag(){}
+function moveOutdoorEditDrag(){}
+function endOutdoorEditDrag(){}
+
+openOutdoorEditModal = function(id){
+    const opts = (typeof id === 'object' && id !== null) ? id : { id };
+    window.FireWebHydrantModal?.open({
+        mode: 'edit',
+        id: Number(opts.id || 0) > 0 ? Number(opts.id) : undefined,
+        add: Number(opts.id || 0) <= 0,
+        hydrantType: 'Outdoor',
+        buildingName: '옥외',
+        floorName: '옥외',
+        x: Number.isFinite(Number(opts.x)) ? Number(opts.x).toFixed(2) : '',
+        y: Number.isFinite(Number(opts.y)) ? Number(opts.y).toFixed(2) : '',
+        buildingId: opts.buildingId != null && /^\d+$/.test(String(opts.buildingId)) ? String(opts.buildingId) : '',
+        floorId: opts.floorId != null && /^\d+$/.test(String(opts.floorId)) ? String(opts.floorId) : '',
+        onClose: async ({ reason }) => {
+            if (reason === 'dismiss') return;
+            await loadOutdoorHydrants();
+        }
+    });
+};
+
+openOutdoorDetailModal = function(hydrantId){
+    if (!hydrantId || !window.FireWebHydrantModal) return;
+    window.FireWebHydrantModal.open({ mode: 'details', id: hydrantId });
+};
+
+window.addEventListener('message', async (ev) => {
+    if (ev?.data === 'fireweb:outdoor-edit-close') {
+        closeOutdoorEditModal();
+        await loadOutdoorHydrants();
+        return;
+    }
+    if (ev?.data === 'fireweb:hydrant-details-close') {
+        closeOutdoorEditModal();
+        return;
+    }
+    if ([
+        'fireweb:equipment-edit-close',
+        'fireweb:equipment-inspect-close',
+        'fireweb:equipment-details-close'
+    ].includes(ev?.data)) {
+        closeOutdoorEditModal();
+        await loadOutdoorEquipment();
+        renderOutdoorEquipmentMarkers();
+        if (currentOutdoorEquipment) {
+            const latestItems = [
+                ...(outdoorReceivers || []).map(item => ({ ...item, type: 'receiver' })),
+                ...(outdoorPumps || []).map(item => ({ ...item, type: 'pump' }))
+            ];
+            const found = latestItems.find(item =>
+                (item.type === 'receiver' && currentOutdoorEquipment.type === 'receiver' && item.receiverId === currentOutdoorEquipment.receiverId) ||
+                (item.type === 'pump' && currentOutdoorEquipment.type === 'pump' && item.pumpId === currentOutdoorEquipment.pumpId)
+            );
+            currentOutdoorEquipment = found || null;
+        }
+        if (!currentOutdoorEquipment) hideOutdoorEquipmentInfo();
+    }
+});
+
+outdoorEditCloseBtn?.addEventListener('click', closeOutdoorEditModal);
+outdoorEditHostEl?.addEventListener('click', (e) => {
+    if (e.target === outdoorEditHostEl) closeOutdoorEditModal();
+});
+uiHideToggle?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.__suppressPickClickUntil = Date.now() + 250;
+    setUiHidden(!document.body.classList.contains('ui-hidden'));
+});
+uiHideToggle?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    window.__suppressPickClickUntil = Date.now() + 250;
+});
+window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey && e.altKey && String(e.key).toLowerCase() === 'p')) return;
+    e.preventDefault();
+    if (!window.Pick) return;
+    if (window.__pickEnabled) {
+        window.Pick.end();
+    } else {
+        window.Pick.start();
+    }
+});
+
+// ===== 초기 실행 =====
+window.addEventListener('load', () => {
+    if (mapImg && !mapImg.complete) {
+        mapImg.addEventListener('load', () => {
+            setOverlayViewBox();
+            bindZones();
+            renderOutdoorMarkers();
+            renderOutdoorEquipmentMarkers();
+        }, { once: true });
+    } else {
+        setOverlayViewBox();
+        bindZones();
+        renderOutdoorMarkers();
+        renderOutdoorEquipmentMarkers();
+    }
+    init();
+});
+</script>
+<script src="/js/common-nav.js"></script>
+</body>
+</html>
+
+
+
+
+
+

@@ -8,8 +8,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * 층 마스터 엔티티
- * <p>
- * 기존 ASP.NET: Floor (FloorId, FloorName, SortOrder)
  * 테이블명: floor
  */
 @Getter
@@ -20,13 +18,13 @@ public class Floor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "floor_id")
+    @Column(name = "FLOOR_ID")
     private Long floorId;
 
-    @Column(name = "floor_name", nullable = false, length = 100)
+    @Column(name = "FLOOR_NAME", nullable = false, length = 100)
     private String floorName;
 
-    @Column(name = "sort_order", nullable = false)
+    @Column(name = "SORT_ORDER", nullable = false)
     private int sortOrder;
 
     @Builder

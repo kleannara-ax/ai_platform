@@ -2,6 +2,7 @@ package com.company.module.fire.dto;
 
 import com.company.module.fire.entity.FirePump;
 import com.company.module.fire.entity.FirePumpInspection;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -11,7 +12,11 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 소방펌프 목록/상세 응답 DTO
+ */
 @Getter
+@Builder
 public class FirePumpResponse {
 
     private final Long pumpId;
@@ -32,21 +37,27 @@ public class FirePumpResponse {
     private String lastInspectorName;
     private String lastInspectionStatus;
     private String lastInspectionNote;
+    @Builder.Default
     private List<InspectionRow> inspections = List.of();
 
-    public FirePumpResponse(FirePump pump) {
-        this.pumpId = pump.getPumpId();
-        this.serialNumber = pump.getSerialNumber();
-        this.qrKey = pump.getQrKey();
-        this.buildingName = pump.getBuildingName();
-        this.floorId = pump.getFloor() != null ? pump.getFloor().getFloorId() : null;
-        this.floorName = pump.getFloor() != null ? pump.getFloor().getFloorName() : null;
-        this.x = pump.getX();
-        this.y = pump.getY();
-        this.locationDescription = pump.getLocationDescription();
-        this.note = pump.getNote();
-        this.isActive = pump.isActive();
-        this.createdAt = pump.getCreatedAt();
+    /**
+     * Entity → Response 변환 팩토리
+     */
+    public static FirePumpResponse from(FirePump pump) {
+        return FirePumpResponse.builder()
+                .pumpId(pump.getPumpId())
+                .serialNumber(pump.getSerialNumber())
+                .qrKey(pump.getQrKey())
+                .buildingName(pump.getBuildingName())
+                .floorId(pump.getFloor() != null ? pump.getFloor().getFloorId() : null)
+                .floorName(pump.getFloor() != null ? pump.getFloor().getFloorName() : null)
+                .x(pump.getX())
+                .y(pump.getY())
+                .locationDescription(pump.getLocationDescription())
+                .note(pump.getNote())
+                .isActive(pump.isActive())
+                .createdAt(pump.getCreatedAt())
+                .build();
     }
 
     public void setLastInspection(FirePumpInspection inspection) {

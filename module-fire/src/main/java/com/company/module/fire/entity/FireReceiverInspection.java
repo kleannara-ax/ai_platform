@@ -10,6 +10,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * 수신기 점검 이력 엔티티
+ * 테이블명: fire_receiver_inspection
+ */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -18,57 +22,57 @@ public class FireReceiverInspection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inspection_id")
+    @Column(name = "INSPECTION_ID")
     private Long inspectionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "receiver_id", nullable = false)
+    @JoinColumn(name = "RECEIVER_ID", nullable = false)
     private FireReceiver receiver;
 
-    @Column(name = "inspection_date", nullable = false)
+    @Column(name = "INSPECTION_DATE", nullable = false)
     private LocalDate inspectionDate;
 
-    @Column(name = "inspection_time")
+    @Column(name = "INSPECTION_TIME")
     private LocalTime inspectionTime;
 
-    @Column(name = "inspection_status", nullable = false, length = 30)
+    @Column(name = "INSPECTION_STATUS", nullable = false, length = 30)
     private String inspectionStatus;
 
     @Lob
-    @Column(name = "checklist_json", columnDefinition = "LONGTEXT")
+    @Column(name = "CHECKLIST_JSON", columnDefinition = "LONGTEXT")
     private String checklistJson;
 
-    @Column(name = "image_path", length = 600)
+    @Column(name = "IMAGE_PATH", length = 600)
     private String imagePath;
 
-    @Column(name = "note", length = 1000)
+    @Column(name = "NOTE", length = 1000)
     private String note;
 
-    @Column(name = "power_status", length = 30)
+    @Column(name = "POWER_STATUS", length = 30)
     private String powerStatus;
 
-    @Column(name = "switch_status", length = 30)
+    @Column(name = "SWITCH_STATUS", length = 30)
     private String switchStatus;
 
-    @Column(name = "transfer_device_status", length = 30)
+    @Column(name = "TRANSFER_DEVICE_STATUS", length = 30)
     private String transferDeviceStatus;
 
-    @Column(name = "zone_map_status", length = 30)
+    @Column(name = "ZONE_MAP_STATUS", length = 30)
     private String zoneMapStatus;
 
-    @Column(name = "continuity_test_status", length = 30)
+    @Column(name = "CONTINUITY_TEST_STATUS", length = 30)
     private String continuityTestStatus;
 
-    @Column(name = "operation_test_status", length = 30)
+    @Column(name = "OPERATION_TEST_STATUS", length = 30)
     private String operationTestStatus;
 
-    @Column(name = "inspected_by_user_id")
+    @Column(name = "INSPECTED_BY_USER_ID")
     private Long inspectedByUserId;
 
-    @Column(name = "inspected_by_name", length = 200)
+    @Column(name = "INSPECTED_BY_NAME", length = 200)
     private String inspectedByName;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

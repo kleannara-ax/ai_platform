@@ -13,8 +13,6 @@ import java.util.List;
 
 /**
  * 소화기 그룹 (도면 위치 단위 마커)
- * <p>
- * 기존 ASP.NET: ExtinguisherGroup (GroupId, BuildingId, FloorId, X, Y, Note, CreatedAt)
  * 테이블명: extinguisher_group
  */
 @Getter
@@ -25,29 +23,27 @@ public class ExtinguisherGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "group_id")
+    @Column(name = "GROUP_ID")
     private Long groupId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "building_id", nullable = false)
+    @JoinColumn(name = "BUILDING_ID", nullable = false)
     private Building building;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "floor_id", nullable = false)
+    @JoinColumn(name = "FLOOR_ID", nullable = false)
     private Floor floor;
 
-    /** 도면 X 좌표 (소수점 4자리) */
-    @Column(name = "x", precision = 9, scale = 4)
+    @Column(name = "X", precision = 9, scale = 4)
     private BigDecimal x;
 
-    /** 도면 Y 좌표 (소수점 4자리) */
-    @Column(name = "y", precision = 9, scale = 4)
+    @Column(name = "Y", precision = 9, scale = 4)
     private BigDecimal y;
 
-    @Column(name = "note", length = 400)
+    @Column(name = "NOTE", length = 400)
     private String note;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "group", fetch = FetchType.LAZY)
