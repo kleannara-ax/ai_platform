@@ -346,6 +346,7 @@ const menuIcons = {
   'MENU_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
   'PERM_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
   'CODE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l2-2-2-2"/><path d="M8 18l-2-2 2-2"/><line x1="12" y1="2" x2="12" y2="22"/></svg>',
+  'FIRE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c0 4-4 6-4 10a4 4 0 008 0c0-4-4-6-4-10z"/><path d="M12 22c-2.2 0-4-1.8-4-4 0-2 2-3.5 4-6 2 2.5 4 4 4 6 0 2.2-1.8 4-4 4z"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
 };
 const menuCodeToPage = {
@@ -353,7 +354,8 @@ const menuCodeToPage = {
   'USER_MGMT': 'users',
   'MENU_MGMT': 'menus',
   'PERM_MGMT': 'permissions',
-  'CODE_MGMT': 'codes'
+  'CODE_MGMT': 'codes',
+  'FIRE_MGMT': 'fire'
 };
 
 // IP → 32비트 정수 변환
@@ -443,8 +445,8 @@ function navigate(page, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if (el) el.classList.add('active');
   else document.querySelectorAll('.nav-item').forEach(n => { if(n.textContent.trim().toLowerCase().includes(page))n.classList.add('active'); });
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
@@ -453,6 +455,7 @@ function navigate(page, el) {
   else if(page==='menus')renderMenus();
   else if(page==='permissions')renderPermissions();
   else if(page==='codes')renderCodes();
+  else if(page==='fire')renderFire();
 }
 
 // ══ Dashboard ══
@@ -1207,6 +1210,96 @@ function showValidationErrors(res){
     toast(res.message||'처리 실패','error');
   }
 }
+// ══ 소방시설관리 ══
+async function renderFire(){
+  const el=document.getElementById('pageContent');
+  const canManage=currentUser?true:false;
+  el.innerHTML='<p style="color:var(--text3)">불러오는 중...</p>';
+
+  // 탭 상태
+  if(!window._fireTab) window._fireTab='extinguishers';
+  const tab=window._fireTab;
+
+  // 건물/층 목록 로드
+  let buildings=[], floors=[];
+  try{
+    const bRes=await api('GET','/fire-api/maps/buildings');
+    buildings=bRes.success?(bRes.data||[]):[];
+    const fRes=await api('GET','/fire-api/maps/floors');
+    floors=fRes.success?(fRes.data||[]):[];
+  }catch(e){}
+
+  // 탭별 데이터 로드
+  const endpoints={extinguishers:'/fire-api/extinguishers',hydrants:'/fire-api/hydrants',pumps:'/fire-api/pumps',receivers:'/fire-api/receivers'};
+  const tabLabels={extinguishers:'소화기',hydrants:'소화전',pumps:'소방펌프',receivers:'수신기'};
+  let items=[];
+  try{
+    const res=await api('GET',endpoints[tab]);
+    items=res.success?(res.data||[]):[];
+  }catch(e){items=[];}
+
+  // 탭 UI
+  let html='<div style="display:flex;gap:8px;margin-bottom:16px;">';
+  for(const[k,label] of Object.entries(tabLabels)){
+    const active=k===tab?'background:var(--primary);color:#fff;':'background:var(--surface2);color:var(--text2);';
+    html+=`<button onclick="window._fireTab='${k}';renderFire()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;${active}">${label} (${k===tab?items.length:'…'})</button>`;
+  }
+  html+='</div>';
+
+  // 추가 버튼
+  if(canManage){
+    html+=`<div style="margin-bottom:12px;"><button class="btn btn-primary btn-sm" onclick="openFireAddModal('${tab}')">+ ${tabLabels[tab]} 등록</button></div>`;
+  }
+
+  // 테이블
+  if(tab==='extinguishers'){
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>관리번호</th><th>건물</th><th>층</th><th>위치</th><th>종류</th><th>용량</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    for(const e of items){
+      html+=`<tr><td>${e.extinguisherId||e.id||''}</td><td>${esc(e.serialNo||e.managementNo||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.extinguisherType||'')}</td><td>${esc(e.capacity||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('extinguishers',${e.extinguisherId||e.id})">삭제</button></td>`:''}</tr>`;
+    }
+    html+='</tbody></table>';
+  } else if(tab==='hydrants'){
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>관리번호</th><th>건물</th><th>층</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    for(const e of items){
+      html+=`<tr><td>${e.hydrantId||e.id||''}</td><td>${esc(e.serialNo||e.managementNo||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.hydrantType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('hydrants',${e.hydrantId||e.id})">삭제</button></td>`:''}</tr>`;
+    }
+    html+='</tbody></table>';
+  } else if(tab==='pumps'){
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>펌프명</th><th>건물</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    for(const e of items){
+      html+=`<tr><td>${e.pumpId||e.id||''}</td><td>${esc(e.pumpName||e.name||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.pumpType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('pumps',${e.pumpId||e.id})">삭제</button></td>`:''}</tr>`;
+    }
+    html+='</tbody></table>';
+  } else if(tab==='receivers'){
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>수신기명</th><th>건물</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    for(const e of items){
+      html+=`<tr><td>${e.receiverId||e.id||''}</td><td>${esc(e.receiverName||e.name||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.receiverType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('receivers',${e.receiverId||e.id})">삭제</button></td>`:''}</tr>`;
+    }
+    html+='</tbody></table>';
+  }
+
+  if(items.length===0) html+='<p style="text-align:center;color:var(--text3);padding:40px 0;">등록된 데이터가 없습니다.</p>';
+  el.innerHTML=html;
+}
+
+async function deleteFireItem(type,id){
+  if(!confirm('정말 삭제하시겠습니까?'))return;
+  try{
+    const res=await api('DELETE',`/fire-api/${type}/${id}`);
+    if(res.success){toast('삭제되었습니다.','success');renderFire();}
+    else toast(res.message||'삭제 실패','error');
+  }catch(e){toast(e.message,'error');}
+}
+
+function openFireAddModal(type){
+  const labels={extinguishers:'소화기',hydrants:'소화전',pumps:'소방펌프',receivers:'수신기'};
+  const body=`<p style="color:var(--text3);padding:20px 0;text-align:center;">
+    ${labels[type]} 등록 기능은 모바일 점검 또는 API를 통해 이용하세요.<br><br>
+    <code style="background:var(--surface2);padding:4px 8px;border-radius:4px;">POST /fire-api/${type}</code>
+  </p>`;
+  openModal(labels[type]+' 등록',body,'<button class="btn" onclick="closeModal()">닫기</button>');
+}
+
 function roleBadge(role){
   if(!role)return'-';
   const badgeColors=['badge-admin','badge-manager','badge-user','badge-active','badge-inactive'];
