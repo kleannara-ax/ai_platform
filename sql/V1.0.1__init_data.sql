@@ -17,7 +17,7 @@
 --  1. 시스템 관리자 계정
 -- ============================================================
 -- 비밀번호 admin123! 의 BCrypt 해시
-INSERT INTO CORE_USER (LOGIN_ID, PASSWORD, USER_NAME, EMAIL, PHONE, ROLE, ENABLED, CREATED_AT, UPDATED_AT, CREATED_BY)
+INSERT INTO core_user (LOGIN_ID, PASSWORD, USER_NAME, EMAIL, PHONE, ROLE, ENABLED, CREATED_AT, UPDATED_AT, CREATED_BY)
 VALUES (
     'admin',
     '$2a$10$GKQBHCZW3fUd/bnINzscKuHAsHFU4YaH/oCqvhlzWWiMRkT5H8WqW',
@@ -42,7 +42,7 @@ VALUES (
 --           ├── 개발1팀 (DEV1)
 --           └── QA팀 (QA)
 
-INSERT INTO MOD_USER_DEPARTMENT (DEPT_NAME, DEPT_CODE, PARENT_DEPT_ID, SORT_ORDER, ENABLED, CREATED_AT, UPDATED_AT)
+INSERT INTO mod_user_department (DEPT_NAME, DEPT_CODE, PARENT_DEPT_ID, SORT_ORDER, ENABLED, CREATED_AT, UPDATED_AT)
 VALUES
     ('본사',         'HQ',    NULL, 1, 1, NOW(), NOW()),   -- DEPT_ID = 1
     ('경영지원본부', 'MGMT',  1,    2, 1, NOW(), NOW()),   -- DEPT_ID = 2
@@ -76,7 +76,7 @@ VALUES (
 --   3. 메뉴 관리     (/menus)
 --   4. 접근 권한     (/permissions) - 메뉴별 접근 권한 매트릭스
 
-INSERT INTO CORE_MENU (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
+INSERT INTO core_menu (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
 VALUES
     ('대시보드',    'DASHBOARD', NULL, '/dashboard',   'dashboard',  1, 'MENU', 1, 1, '대시보드'),
     ('사용자 관리', 'USER_MGMT', NULL, '/users',       'users',      2, 'MENU', 1, 1, '사용자 및 프로필 통합 관리'),
@@ -90,7 +90,7 @@ VALUES
 -- 활성 권한 8개 (사용자/메뉴/권한 관련)
 -- 비활성 권한 4개 (부서/프로필 – 메뉴 통합으로 비활성화)
 
-INSERT INTO CORE_PERMISSION (PERM_CODE, PERM_NAME, DESCRIPTION, IS_ACTIVE)
+INSERT INTO core_permission (PERM_CODE, PERM_NAME, DESCRIPTION, IS_ACTIVE)
 VALUES
     -- 사용자 관련 권한
     ('USER_READ',     '사용자 조회',     '사용자 목록/상세 조회',      1),  -- PERM_ID = 1
@@ -117,13 +117,13 @@ VALUES
 -- ROLE_MANAGER : 대시보드, 사용자관리
 -- ROLE_USER    : 대시보드만
 
-INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
+INSERT INTO core_role_menu (ROLE, MENU_ID) VALUES
     ('ROLE_ADMIN', 1), ('ROLE_ADMIN', 2), ('ROLE_ADMIN', 3), ('ROLE_ADMIN', 4);
 
-INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
+INSERT INTO core_role_menu (ROLE, MENU_ID) VALUES
     ('ROLE_MANAGER', 1), ('ROLE_MANAGER', 2);
 
-INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
+INSERT INTO core_role_menu (ROLE, MENU_ID) VALUES
     ('ROLE_USER', 1);
 
 
@@ -134,9 +134,9 @@ INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
 -- ROLE_MANAGER : USER_READ(1), MENU_READ(5), PERM_READ(7)
 -- ROLE_USER    : (권한 없음 – 대시보드만 접근)
 
-INSERT INTO CORE_ROLE_PERMISSION (ROLE, PERM_ID) VALUES
+INSERT INTO core_role_permission (ROLE, PERM_ID) VALUES
     ('ROLE_ADMIN', 1), ('ROLE_ADMIN', 2), ('ROLE_ADMIN', 3), ('ROLE_ADMIN', 4),
     ('ROLE_ADMIN', 5), ('ROLE_ADMIN', 6), ('ROLE_ADMIN', 7), ('ROLE_ADMIN', 8);
 
-INSERT INTO CORE_ROLE_PERMISSION (ROLE, PERM_ID) VALUES
+INSERT INTO core_role_permission (ROLE, PERM_ID) VALUES
     ('ROLE_MANAGER', 1), ('ROLE_MANAGER', 5), ('ROLE_MANAGER', 7);

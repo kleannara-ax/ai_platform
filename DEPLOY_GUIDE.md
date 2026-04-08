@@ -261,12 +261,12 @@ mariadb -u platform_user -p platform_db < /data/aiplatform/sql/V1.0.1__init_data
 생성되는 테이블 목록:
 | 테이블명 | 설명 |
 |----------|------|
-| `CORE_USER` | 사용자 계정 |
-| `CORE_MENU` | 메뉴 |
-| `CORE_PERMISSION` | 권한 |
-| `CORE_ROLE_MENU` | 역할-메뉴 매핑 |
-| `CORE_ROLE_PERMISSION` | 역할-권한 매핑 |
-| `MOD_USER_DEPARTMENT` | 부서 |
+| `core_user` | 사용자 계정 |
+| `core_menu` | 메뉴 |
+| `core_permission` | 권한 |
+| `core_role_menu` | 역할-메뉴 매핑 |
+| `core_role_permission` | 역할-권한 매핑 |
+| `mod_user_department` | 부서 |
 | `user_profile` | 사용자 프로필 |
 
 초기 데이터:

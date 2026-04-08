@@ -27,7 +27,7 @@ public class UserProfile {
     private Long profileId;
 
     @Column(name = "USER_ID", nullable = false, unique = true)
-    @Comment("사용자 ID (CORE_USER 참조)")
+    @Comment("사용자 ID (core_user 참조)")
     private Long userId;
 
     @Column(name = "DEPT_CODE", length = 50)

@@ -3,7 +3,7 @@
 --  MariaDB 10.11+ (utf8mb4)
 --
 --  원본: V1.0.1__init_data.sql (부서·프로필 섹션)
---  의존: CORE_USER, MOD_USER_DEPARTMENT 테이블
+--  의존: core_user, mod_user_department 테이블
 -- ============================================================
 
 -- ── 기본 부서 데이터 ──
@@ -15,7 +15,7 @@
 --           ├── 개발1팀 (DEV1)
 --           └── QA팀 (QA)
 
-INSERT INTO MOD_USER_DEPARTMENT (DEPT_NAME, DEPT_CODE, PARENT_DEPT_ID, SORT_ORDER, ENABLED, CREATED_AT, UPDATED_AT)
+INSERT INTO mod_user_department (DEPT_NAME, DEPT_CODE, PARENT_DEPT_ID, SORT_ORDER, ENABLED, CREATED_AT, UPDATED_AT)
 VALUES
     ('본사',         'HQ',    NULL, 1, 1, NOW(), NOW()),   -- DEPT_ID = 1
     ('경영지원본부', 'MGMT',  1,    2, 1, NOW(), NOW()),   -- DEPT_ID = 2
