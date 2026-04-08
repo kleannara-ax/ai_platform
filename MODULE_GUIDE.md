@@ -161,30 +161,30 @@ public class ModuleNoticeConfig {
 
 ```sql
 -- 1. 메뉴 추가
-INSERT INTO CORE_MENU (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
+INSERT INTO core_menu (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
 VALUES ('공지사항', 'NOTICE_MGMT', NULL, '/notices', 'notice', 5, 'MENU', 1, 1, '공지사항 관리');
 
 -- 추가된 메뉴 ID 확인
-SELECT MENU_ID FROM CORE_MENU WHERE MENU_CODE = 'NOTICE_MGMT';
+SELECT MENU_ID FROM core_menu WHERE MENU_CODE = 'NOTICE_MGMT';
 -- 예: MENU_ID = 5
 
 -- 2. 역할별 접근 권한 매핑
-INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
+INSERT INTO core_role_menu (ROLE, MENU_ID) VALUES
     ('ROLE_ADMIN', 5),     -- 관리자: 접근 가능
     ('ROLE_MANAGER', 5),   -- 매니저: 접근 가능
     ('ROLE_USER', 5);      -- 일반사용자: 접근 가능
 
 -- 3. (선택) 세부 권한 추가
-INSERT INTO CORE_PERMISSION (PERM_CODE, PERM_NAME, DESCRIPTION, IS_ACTIVE) VALUES
+INSERT INTO core_permission (PERM_CODE, PERM_NAME, DESCRIPTION, IS_ACTIVE) VALUES
     ('NOTICE_READ',  '공지사항 조회', '공지사항 목록/상세 조회', 1),
     ('NOTICE_WRITE', '공지사항 관리', '공지사항 등록/수정/삭제', 1);
 
 -- 4. (선택) 역할-권한 매핑
-INSERT INTO CORE_ROLE_PERMISSION (ROLE, PERM_ID) VALUES
-    ('ROLE_ADMIN',   (SELECT PERM_ID FROM CORE_PERMISSION WHERE PERM_CODE='NOTICE_READ')),
-    ('ROLE_ADMIN',   (SELECT PERM_ID FROM CORE_PERMISSION WHERE PERM_CODE='NOTICE_WRITE')),
-    ('ROLE_MANAGER', (SELECT PERM_ID FROM CORE_PERMISSION WHERE PERM_CODE='NOTICE_READ')),
-    ('ROLE_USER',    (SELECT PERM_ID FROM CORE_PERMISSION WHERE PERM_CODE='NOTICE_READ'));
+INSERT INTO core_role_permission (ROLE, PERM_ID) VALUES
+    ('ROLE_ADMIN',   (SELECT PERM_ID FROM core_permission WHERE PERM_CODE='NOTICE_READ')),
+    ('ROLE_ADMIN',   (SELECT PERM_ID FROM core_permission WHERE PERM_CODE='NOTICE_WRITE')),
+    ('ROLE_MANAGER', (SELECT PERM_ID FROM core_permission WHERE PERM_CODE='NOTICE_READ')),
+    ('ROLE_USER',    (SELECT PERM_ID FROM core_permission WHERE PERM_CODE='NOTICE_READ'));
 ```
 
 ---
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS MOD_NOTICE (
 
     PRIMARY KEY (NOTICE_ID),
     CONSTRAINT FK_MOD_NOTICE_USER FOREIGN KEY (CREATED_BY)
-        REFERENCES CORE_USER (USER_ID)
+        REFERENCES core_user (USER_ID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='공지사항';
 
@@ -601,11 +601,11 @@ public class NoticeController {
 
 ```sql
 -- 메뉴 등록
-INSERT INTO CORE_MENU (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
+INSERT INTO core_menu (MENU_NAME, MENU_CODE, PARENT_ID, MENU_URL, ICON, SORT_ORDER, MENU_TYPE, IS_VISIBLE, IS_ACTIVE, DESCRIPTION)
 VALUES ('공지사항', 'NOTICE_MGMT', NULL, '/notices', 'notice', 5, 'MENU', 1, 1, '공지사항 관리');
 
 -- 역할별 접근 권한 (MENU_ID는 위 INSERT 결과 확인)
-INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
+INSERT INTO core_role_menu (ROLE, MENU_ID) VALUES
     ('ROLE_ADMIN',   LAST_INSERT_ID()),
     ('ROLE_MANAGER', LAST_INSERT_ID()),
     ('ROLE_USER',    LAST_INSERT_ID());
@@ -633,10 +633,10 @@ INSERT INTO CORE_ROLE_MENU (ROLE, MENU_ID) VALUES
 
 ### 메뉴 등록
 
-- [ ] CORE_MENU에 메뉴 추가 (관리 화면 또는 SQL)
-- [ ] CORE_ROLE_MENU에 역할별 접근 권한 매핑
-- [ ] (선택) CORE_PERMISSION에 세부 권한 추가
-- [ ] (선택) CORE_ROLE_PERMISSION에 역할-권한 매핑
+- [ ] core_menu에 메뉴 추가 (관리 화면 또는 SQL)
+- [ ] core_role_menu에 역할별 접근 권한 매핑
+- [ ] (선택) core_permission에 세부 권한 추가
+- [ ] (선택) core_role_permission에 역할-권한 매핑
 
 ### 배포
 

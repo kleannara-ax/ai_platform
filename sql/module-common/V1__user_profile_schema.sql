@@ -3,11 +3,11 @@
 --  MariaDB 10.11+ (utf8mb4)
 --
 --  원본: V1.0.0__init_schema.sql (MOD_USER_ 섹션)
---  의존: CORE_USER 테이블 (core 모듈)
+--  의존: core_user 테이블 (core 모듈)
 -- ============================================================
 
 -- ── 부서 테이블 ──
-CREATE TABLE IF NOT EXISTS MOD_USER_DEPARTMENT (
+CREATE TABLE IF NOT EXISTS mod_user_department (
     DEPT_ID        BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '부서 ID (PK)',
     DEPT_NAME      VARCHAR(100) NOT NULL                 COMMENT '부서명',
     DEPT_CODE      VARCHAR(20)  NOT NULL                 COMMENT '부서 코드',
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS MOD_USER_DEPARTMENT (
     PRIMARY KEY (DEPT_ID),
     CONSTRAINT UK_MOD_USER_DEPT_CODE UNIQUE (DEPT_CODE),
     CONSTRAINT FK_MOD_USER_DEPT_PARENT FOREIGN KEY (PARENT_DEPT_ID)
-        REFERENCES MOD_USER_DEPARTMENT (DEPT_ID) ON DELETE SET NULL
+        REFERENCES mod_user_department (DEPT_ID) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='부서';
 
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS MOD_USER_DEPARTMENT (
 -- ── 사용자 프로필 테이블 ──
 CREATE TABLE IF NOT EXISTS user_profile (
     PROFILE_ID   BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '프로필 ID (PK)',
-    USER_ID      BIGINT       NOT NULL                 COMMENT '사용자 ID (CORE_USER 참조)',
-    DEPT_ID      BIGINT       NULL                     COMMENT '부서 ID (MOD_USER_DEPARTMENT 참조)',
+    USER_ID      BIGINT       NOT NULL                 COMMENT '사용자 ID (core_user 참조)',
+    DEPT_ID      BIGINT       NULL                     COMMENT '부서 ID (mod_user_department 참조)',
     POSITION     VARCHAR(50)  NULL                     COMMENT '직위',
     JOB_TITLE    VARCHAR(100) NULL                     COMMENT '직책',
     EMPLOYEE_NO  VARCHAR(20)  NULL                     COMMENT '사번',
@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS user_profile (
     PRIMARY KEY (PROFILE_ID),
     CONSTRAINT UK_USER_PROFILE_USER UNIQUE (USER_ID),
     CONSTRAINT FK_USER_PROFILE_USER FOREIGN KEY (USER_ID)
-        REFERENCES CORE_USER (USER_ID) ON DELETE CASCADE,
+        REFERENCES core_user (USER_ID) ON DELETE CASCADE,
     CONSTRAINT FK_USER_PROFILE_DEPT FOREIGN KEY (DEPT_ID)
-        REFERENCES MOD_USER_DEPARTMENT (DEPT_ID) ON DELETE SET NULL
+        REFERENCES mod_user_department (DEPT_ID) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='사용자 프로필';
 

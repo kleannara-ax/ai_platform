@@ -4,6 +4,6 @@
 --               NULL이면 제한 없음 (모든 IP 허용)
 -- ============================================================
 
-ALTER TABLE CORE_MENU
+ALTER TABLE core_menu
   ADD COLUMN ALLOWED_IPS VARCHAR(1000) DEFAULT NULL
   COMMENT '허용 IP 목록 (쉼표 구분, NULL=제한없음)';

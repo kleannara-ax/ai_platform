@@ -531,7 +531,7 @@ mariadb -u appuser -p'비밀번호' aiplatform
 SHOW TABLES;
 
 # 사용자 수 확인
-SELECT COUNT(*) FROM CORE_USER;
+SELECT COUNT(*) FROM core_user;
 
 # DB 연결 상태 확인
 SHOW PROCESSLIST;
@@ -606,7 +606,7 @@ sudo journalctl -u aiplatform --since "2026-04-03 18:00:00" --until "2026-04-03 
 ```bash
 # admin 비밀번호를 admin123! 로 초기화
 mariadb -u appuser -p'비밀번호' aiplatform -e \
-  "UPDATE CORE_USER SET PASSWORD='\$2a\$10\$GKQBHCZW3fUd/bnINzscKuHAsHFU4YaH/oCqvhlzWWiMRkT5H8WqW' WHERE LOGIN_ID='admin';"
+  "UPDATE core_user SET PASSWORD='\$2a\$10\$GKQBHCZW3fUd/bnINzscKuHAsHFU4YaH/oCqvhlzWWiMRkT5H8WqW' WHERE LOGIN_ID='admin';"
 ```
 
 초기화 후 로그인: **admin** / **admin123!**

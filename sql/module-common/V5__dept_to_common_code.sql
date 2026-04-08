@@ -17,7 +17,7 @@ ALTER TABLE user_profile ADD COLUMN DEPT_CODE VARCHAR(50) NULL COMMENT '부서 �
 
 -- 2. 기존 DEPT_ID 값을 DEPT_CODE 로 변환
 UPDATE user_profile p
-SET p.DEPT_CODE = (SELECT d.DEPT_CODE FROM MOD_USER_DEPARTMENT d WHERE d.DEPT_ID = p.DEPT_ID)
+SET p.DEPT_CODE = (SELECT d.DEPT_CODE FROM mod_user_department d WHERE d.DEPT_ID = p.DEPT_ID)
 WHERE p.DEPT_ID IS NOT NULL;
 
 -- 3. FK 제약 제거
