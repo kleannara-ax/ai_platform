@@ -1235,7 +1235,11 @@ async function renderFire(){
   let items=[];
   try{
     const res=await api('GET',endpoints[tab]);
-    items=res.success?(res.data||[]):[];
+    if(res.success){
+      const d=res.data||{};
+      items=d.content||d||[];
+      if(!Array.isArray(items))items=[];
+    }
   }catch(e){items=[];}
 
   // 탭 UI
@@ -1253,27 +1257,27 @@ async function renderFire(){
 
   // 테이블
   if(tab==='extinguishers'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>관리번호</th><th>건물</th><th>층</th><th>위치</th><th>종류</th><th>용량</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>종류</th><th>수량</th><th>최근점검</th><th>점검자</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
     for(const e of items){
-      html+=`<tr><td>${e.extinguisherId||e.id||''}</td><td>${esc(e.serialNo||e.managementNo||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.extinguisherType||'')}</td><td>${esc(e.capacity||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('extinguishers',${e.extinguisherId||e.id})">삭제</button></td>`:''}</tr>`;
+      html+=`<tr><td>${e.extinguisherId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.extinguisherType||'')}</td><td>${e.quantity||''}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('extinguishers',${e.extinguisherId})">삭제</button></td>`:''}</tr>`;
     }
     html+='</tbody></table>';
   } else if(tab==='hydrants'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>관리번호</th><th>건물</th><th>층</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>유형</th><th>작동방식</th><th>최근점검</th><th>점검자</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
     for(const e of items){
-      html+=`<tr><td>${e.hydrantId||e.id||''}</td><td>${esc(e.serialNo||e.managementNo||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.hydrantType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('hydrants',${e.hydrantId||e.id})">삭제</button></td>`:''}</tr>`;
+      html+=`<tr><td>${e.hydrantId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.hydrantType||'')}</td><td>${esc(e.operationType||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('hydrants',${e.hydrantId})">삭제</button></td>`:''}</tr>`;
     }
     html+='</tbody></table>';
   } else if(tab==='pumps'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>펌프명</th><th>건물</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>위치</th><th>최근점검</th><th>점검자</th><th>점검상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
     for(const e of items){
-      html+=`<tr><td>${e.pumpId||e.id||''}</td><td>${esc(e.pumpName||e.name||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.pumpType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('pumps',${e.pumpId||e.id})">삭제</button></td>`:''}</tr>`;
+      html+=`<tr><td>${e.pumpId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.locationDescription||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td><td>${esc(e.lastInspectionStatus||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('pumps',${e.pumpId})">삭제</button></td>`:''}</tr>`;
     }
     html+='</tbody></table>';
   } else if(tab==='receivers'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>수신기명</th><th>건물</th><th>위치</th><th>종류</th><th>상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
+    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>위치</th><th>최근점검</th><th>점검자</th><th>점검상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
     for(const e of items){
-      html+=`<tr><td>${e.receiverId||e.id||''}</td><td>${esc(e.receiverName||e.name||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.location||'')}</td><td>${esc(e.type||e.receiverType||'')}</td><td>${esc(e.status||'')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('receivers',${e.receiverId||e.id})">삭제</button></td>`:''}</tr>`;
+      html+=`<tr><td>${e.receiverId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.locationDescription||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td><td>${esc(e.lastInspectionStatus||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('receivers',${e.receiverId})">삭제</button></td>`:''}</tr>`;
     }
     html+='</tbody></table>';
   }
