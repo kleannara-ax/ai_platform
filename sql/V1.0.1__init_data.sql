@@ -55,7 +55,7 @@ VALUES
 -- ============================================================
 --  3. 관리자 프로필
 -- ============================================================
-INSERT INTO MOD_USER_PROFILE (USER_ID, DEPT_ID, POSITION, JOB_TITLE, EMPLOYEE_NO, JOIN_DATE, CREATED_AT, UPDATED_AT)
+INSERT INTO user_profile (USER_ID, DEPT_ID, POSITION, JOB_TITLE, EMPLOYEE_NO, JOIN_DATE, CREATED_AT, UPDATED_AT)
 VALUES (
     1,              -- admin 사용자
     1,              -- 본사
