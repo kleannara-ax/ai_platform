@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 점검자 정보 조회 - CORE_USER 테이블 참조
+ * 점검자 정보 조회 - core_user 테이블 참조
  *
  * <p>컬럼 매핑:
  * <ul>
@@ -30,7 +30,7 @@ public class InspectorNameResolver {
         try {
             Object result = entityManager.createNativeQuery("""
                             SELECT COALESCE(NULLIF(TRIM(USER_NAME), ''), LOGIN_ID)
-                            FROM CORE_USER
+                            FROM core_user
                             WHERE LOGIN_ID = :loginId
                             """)
                     .setParameter("loginId", normalized)
@@ -50,7 +50,7 @@ public class InspectorNameResolver {
         try {
             Object result = entityManager.createNativeQuery("""
                             SELECT USER_ID
-                            FROM CORE_USER
+                            FROM core_user
                             WHERE LOGIN_ID = :loginId
                             """)
                     .setParameter("loginId", normalized)
