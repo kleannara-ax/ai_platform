@@ -1,0 +1,431 @@
+/**
+ * SPA Theme Override for Fire Module Pages
+ * iframe 내부에서 로드될 때 AI Platform SPA 테마와 일관된 UI를 제공합니다.
+ */
+
+/* ===== CSS Variables (SPA 테마 토큰) ===== */
+:root {
+  --bg: #f1f5f9;
+  --surface: #fff;
+  --surface2: #f8fafc;
+  --border: #e2e8f0;
+  --border2: #cbd5e1;
+  --text: #0f172a;
+  --text2: #475569;
+  --text3: #94a3b8;
+  --primary: #3b82f6;
+  --primary-light: #dbeafe;
+  --primary-hover: #2563eb;
+  --primary-dark: #1e40af;
+  --green: #16a34a;
+  --green-light: #dcfce7;
+  --red: #dc2626;
+  --red-light: #fee2e2;
+  --yellow: #ca8a04;
+  --yellow-light: #fef9c3;
+  --orange: #ea580c;
+  --orange-light: #ffedd5;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ===== Base ===== */
+body {
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif !important;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Pretendard 폰트 로드 ===== */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+/* ===== Container padding 조정 (iframe 내부) ===== */
+main.container-fluid {
+  padding: 24px 32px !important;
+  max-width: 100% !important;
+}
+
+/* ===== 상단 헤더카드: 보라색 그라데이션 → SPA 스타일 깔끔한 카드 ===== */
+.summary-gradient-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow) !important;
+  overflow: hidden;
+}
+.summary-gradient-card .card-body {
+  background: var(--surface) !important;
+  border-radius: 0 !important;
+  padding: 20px 24px !important;
+}
+.summary-gradient-card .card-body h3,
+.summary-gradient-card .card-body .fw-bold {
+  color: var(--text) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+.summary-gradient-card .card-body .text-white-50,
+.summary-gradient-card .card-body .text-white {
+  color: var(--text2) !important;
+}
+.summary-gradient-card .card-body .small.text-white-50 {
+  color: var(--text3) !important;
+}
+
+/* ===== 상태 칩 그룹: SPA 스타일 badge/pill ===== */
+.status-chip-group {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+.status-chip-group .btn {
+  border-radius: 20px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 6px 14px !important;
+  box-shadow: none !important;
+  transition: all .15s !important;
+  letter-spacing: 0 !important;
+}
+.status-chip-group .btn:hover {
+  transform: none !important;
+  filter: brightness(0.95) !important;
+  box-shadow: none !important;
+}
+.status-chip-group .btn:active {
+  transform: none !important;
+  filter: brightness(0.9) !important;
+}
+
+/* 점검필요 (info) */
+.status-chip-group .btn.btn-info,
+#btnStatusInspect,
+#btnStatusWaiting {
+  background: var(--primary) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+/* 교체예정/요정비 (warning) */
+.status-chip-group .btn.btn-warning,
+#btnStatusPlanned,
+#btnStatusMaintenance {
+  background: var(--orange) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+/* 교체필요/불량/비정상 (danger) */
+.status-chip-group .btn.btn-danger,
+#btnStatusUrgent,
+#btnStatusFaulty {
+  background: var(--red) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+/* 추가 버튼 */
+.status-add-btn,
+.status-chip-group .btn.status-add-btn {
+  background: var(--primary) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+/* ===== 카드 (filter, table) ===== */
+.card,
+.filter-card,
+.table-card,
+.fw-main-list-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow) !important;
+}
+.card-body {
+  padding: 16px 20px;
+}
+
+/* ===== 테이블: 보라색 그라데이션 → SPA 밝은 회색 헤더 ===== */
+.table thead th,
+.table thead.table-dark th {
+  background: var(--surface2) !important;
+  background-image: none !important;
+  color: var(--text3) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 10px 16px !important;
+  border-bottom: 2px solid var(--border) !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  white-space: nowrap;
+}
+
+/* 그라데이션 오버레이 제거 */
+.table thead.table-dark::before {
+  display: none !important;
+}
+
+/* 테이블 헤더 첫/마지막 라운드 제거 (카드 안이므로) */
+.table thead th:first-child,
+.table thead.table-dark th:first-child {
+  border-top-left-radius: 0 !important;
+}
+.table thead th:last-child,
+.table thead.table-dark th:last-child {
+  border-top-right-radius: 0 !important;
+}
+
+.table td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-left: none !important;
+  border-right: none !important;
+  font-size: 13px !important;
+  color: var(--text) !important;
+  vertical-align: middle !important;
+}
+
+.table tbody tr:hover {
+  background: var(--surface2) !important;
+}
+.table tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+.clickable-row:hover {
+  background: var(--surface2) !important;
+}
+
+/* fw-table-wrap 라운딩 조정 */
+.fw-table-wrap {
+  border-radius: 0 !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+/* ===== 상태 badge: SPA pill 스타일 ===== */
+.fw-status {
+  display: inline-block;
+  padding: 3px 10px !important;
+  border-radius: 20px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+.fw-status.fw-ok { background: var(--green-light) !important; color: var(--green) !important; }
+.fw-status.fw-bad { background: var(--red-light) !important; color: var(--red) !important; }
+.fw-status.fw-maint { background: var(--yellow-light) !important; color: var(--yellow) !important; }
+.fw-status.fw-wait { background: #f1f5f9 !important; color: var(--text3) !important; }
+
+/* extinguishers/hydrants 상태 (텍스트 기반) */
+span.badge.bg-success,
+.badge.bg-success { background: var(--green-light) !important; color: var(--green) !important; }
+span.badge.bg-danger,
+.badge.bg-danger { background: var(--red-light) !important; color: var(--red) !important; }
+span.badge.bg-warning,
+.badge.bg-warning { background: var(--yellow-light) !important; color: var(--yellow) !important; }
+span.badge.bg-secondary,
+.badge.bg-secondary { background: #f1f5f9 !important; color: var(--text3) !important; }
+span.badge.bg-info,
+.badge.bg-info { background: var(--primary-light) !important; color: var(--primary) !important; }
+
+/* ===== 버튼: SPA 스타일 ===== */
+.btn-primary {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius) !important;
+}
+.btn-primary:hover {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+.btn-outline-secondary {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text2) !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius) !important;
+}
+.btn-outline-secondary:hover {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+  background: transparent !important;
+}
+.btn-success {
+  background: var(--green) !important;
+  border-color: var(--green) !important;
+  border-radius: var(--radius) !important;
+}
+.btn-danger {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  border-radius: var(--radius) !important;
+}
+
+/* 관리 버튼 (편집/점검/삭제) */
+.btn-fw-edit {
+  background: transparent !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+.btn-fw-edit:hover {
+  background: var(--primary-light) !important;
+  border-color: var(--primary) !important;
+}
+.btn-fw-inspect {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+.btn-fw-inspect:hover {
+  filter: brightness(0.95) !important;
+}
+.btn-fw-delete {
+  background: var(--red) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+.btn-fw-delete:hover {
+  filter: brightness(0.95) !important;
+}
+
+/* ===== 모달: SPA 스타일 ===== */
+.modal-content {
+  border: none !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+}
+.modal-header {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 20px 24px !important;
+}
+.modal-title {
+  color: var(--text) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+}
+.btn-close {
+  filter: none !important;
+}
+.modal-body {
+  background: var(--surface) !important;
+  padding: 24px !important;
+}
+.modal-footer {
+  background: var(--surface) !important;
+  border-top: 1px solid var(--border) !important;
+  padding: 16px 24px !important;
+}
+.modal-backdrop.show {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* ===== 폼 요소 ===== */
+.form-control,
+.form-select {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  font-size: 14px !important;
+  padding: 8px 14px !important;
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
+}
+.form-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--text2) !important;
+}
+
+/* ===== 상세 카드 (detail-card, detail-grid 등) ===== */
+.detail-card,
+.fw-detail-item {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+}
+.detail-label,
+.fw-detail-item-label {
+  color: var(--text3) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+.detail-value,
+.fw-detail-item-value {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+/* ===== 점검 항목 ===== */
+.inspect-row {
+  border-bottom-color: var(--border) !important;
+}
+.inspect-row-title {
+  color: var(--text) !important;
+}
+.inspect-row-desc {
+  color: var(--text3) !important;
+}
+
+/* ===== 토스트 ===== */
+#fwToast {
+  z-index: 2000;
+}
+
+/* ===== 기타 보라색 참조 제거 ===== */
+.fw-edit-section {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+}
+
+/* ===== 도면/맵 래퍼 ===== */
+.map-plan-wrap,
+.detail-map-wrap {
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+}
+
+/* ===== 반응형 ===== */
+@media (max-width: 1399.98px) {
+  .fw-list-table {
+    font-size: 12px;
+  }
+}
