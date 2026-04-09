@@ -17,9 +17,71 @@ import java.util.concurrent.TimeUnit;
 /**
  * module-fire 전용 페이지 컨트롤러.
  * 기존 core/MobilePageController에서 소방 모듈 관련 라우팅을 이관.
+ *
+ * <p>core_menu 테이블의 menuUrl (/fire/xxx) 경로와
+ * 실제 정적 HTML 파일 경로를 매핑합니다.</p>
  */
 @Controller
 public class FirePageController {
+
+    // ── /fire/* 메뉴 URL → 실제 HTML 페이지 서빙 ──
+
+    /** /fire/dashboard → SPA index.html (대시보드는 SPA 내부 렌더링) */
+    @GetMapping("/fire/dashboard")
+    public String fireDashboard() {
+        return "redirect:/index.html#fire_dashboard";
+    }
+
+    /** /fire/map → fire-map.html */
+    @GetMapping("/fire/map")
+    @ResponseBody
+    public ResponseEntity<String> fireMap() throws IOException {
+        return serveHtml("static/fire-map.html");
+    }
+
+    /** /fire/extinguishers → extinguishers.html */
+    @GetMapping("/fire/extinguishers")
+    @ResponseBody
+    public ResponseEntity<String> fireExtinguishers() throws IOException {
+        return serveHtml("static/extinguishers.html");
+    }
+
+    /** /fire/hydrants → hydrants.html */
+    @GetMapping("/fire/hydrants")
+    @ResponseBody
+    public ResponseEntity<String> fireHydrants() throws IOException {
+        return serveHtml("static/hydrants.html");
+    }
+
+    /** /fire/receivers → receivers.html */
+    @GetMapping("/fire/receivers")
+    @ResponseBody
+    public ResponseEntity<String> fireReceivers() throws IOException {
+        return serveHtml("static/receivers.html");
+    }
+
+    /** /fire/pumps → pumps.html */
+    @GetMapping("/fire/pumps")
+    @ResponseBody
+    public ResponseEntity<String> firePumps() throws IOException {
+        return serveHtml("static/pumps.html");
+    }
+
+    /** /fire/floor → maps/floor.html */
+    @GetMapping("/fire/floor")
+    @ResponseBody
+    public ResponseEntity<String> fireFloor() throws IOException {
+        return serveHtml("static/maps/floor.html");
+    }
+
+    /** /fire/qr → qr/index.html */
+    @GetMapping("/fire/qr")
+    @ResponseBody
+    public ResponseEntity<String> fireQr() throws IOException {
+        return serveHtml("static/qr/index.html");
+    }
+
+    // ── 모바일 점검 페이지 ──
 
     @GetMapping("/minspection/extinguishers/{serial}")
     @ResponseBody
