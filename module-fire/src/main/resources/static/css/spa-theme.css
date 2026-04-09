@@ -40,8 +40,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== Pretendard 폰트 로드 ===== */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+/* ===== Pretendard 폰트: 각 HTML <head>에서 <link> 태그로 로드 ===== */
 
 /* ===== Container padding 조정 (iframe 내부) ===== */
 main.container-fluid {
@@ -428,6 +427,14 @@ span.badge.bg-info,
   .fw-list-table {
     font-size: 12px;
   }
+}
+
+/* ===== 도면(메인) 페이지: 사이드 메뉴 / 로고 / 햄버거 숨김 (SPA 사이드바 사용) ===== */
+.side-menu,
+.overlay,
+.top-left,
+.hamburger {
+  display: none !important;
 }
 
 /* ===== FOUC 방지: 이 CSS가 로드되면 body를 표시 ===== */
