@@ -69,7 +69,7 @@ public class SecurityConfig {
                 .requestMatchers("/images/**", "/js/**", "/css/**", "/uploads/**").permitAll()
                 .requestMatchers("/account/**").permitAll()
                 // 소방 모듈 정적 리소스
-                .requestMatchers("/fire-map.html", "/dashboard.html").permitAll()
+                .requestMatchers("/fire-map.html").permitAll()
                 .requestMatchers("/extinguishers.html", "/hydrants.html", "/receivers.html", "/pumps.html").permitAll()
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
