@@ -429,3 +429,9 @@ span.badge.bg-info,
     font-size: 12px;
   }
 }
+
+/* ===== FOUC 방지: 이 CSS가 로드되면 body를 표시 ===== */
+body {
+  opacity: 1 !important;
+  transition: none !important;
+}
