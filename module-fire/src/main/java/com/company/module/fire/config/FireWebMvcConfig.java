@@ -14,18 +14,10 @@ public class FireWebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 소방 모듈 이미지/JS 리소스 명시 매핑 (nested JAR에서 확실히 서빙)
-        registry.addResourceHandler("/images/**")
-                .addResourceLocations("classpath:/static/images/")
-                .setCacheControl(CacheControl.maxAge(7, java.util.concurrent.TimeUnit.DAYS));
-
-        registry.addResourceHandler("/js/**")
-                .addResourceLocations("classpath:/static/js/")
-                .setCacheControl(CacheControl.noStore().mustRevalidate());
-
         // 소방 모듈 관련 HTML 페이지 캐시 방지
         registry.addResourceHandler(
-                        "/index.html",
+                        "/fire-map.html",
+                        "/dashboard.html",
                         "/extinguishers.html",
                         "/hydrants.html",
                         "/receivers.html",

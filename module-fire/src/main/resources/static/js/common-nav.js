@@ -55,8 +55,7 @@
     var defs = [
       { href: "/extinguishers.html", text: "\uC18C\uD654\uAE30" },
       { href: "/hydrants.html", text: "\uC18C\uD654\uC804" },
-      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uB3C4\uBA74" },
-      { href: "/maps/cheongju.html", text: "\uCCAD\uC8FC\uCC3D\uACE0" }
+      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uB3C4\uBA74" }
     ];
     if (isAdmin) {
       defs.splice(2, 0,
