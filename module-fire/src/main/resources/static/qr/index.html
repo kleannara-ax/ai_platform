@@ -202,7 +202,7 @@
     if (res.status === 401) {
       localStorage.removeItem('fireweb_user');
       localStorage.removeItem('fw_user');
-      window.location.href = '/login.html?returnUrl=' + encodeURIComponent('/qr');
+      window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return null;
     }
     if (res.status === 403) {
@@ -520,7 +520,7 @@
     if (!area) return;
     const username = currentUser?.displayName || currentUser?.username || '';
     if (!username) {
-      area.innerHTML = '<li class="nav-item"><a class="nav-link account-link" href="/login.html">로그인</a></li>';
+      area.innerHTML = '<li class="nav-item"><a class="nav-link account-link" href="#" onclick="(window.FireWebCsrf&&window.FireWebCsrf.goLogin||function(){location.href='/index.html'})();return false;">로그인</a></li>';
       return;
     }
     area.innerHTML = '' +
@@ -536,7 +536,7 @@
   async function init() {
     loadCurrentUser();
     if (!currentUser) {
-      window.location.href = '/login.html?returnUrl=' + encodeURIComponent('/qr');
+      window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
     if (!isAdminUser()) {

@@ -108,7 +108,9 @@
     const user = getUser();
     const role = String(user?.role || "").toUpperCase();
     if (role !== "ADMIN" && role !== "USER") {
-      location.replace("/login.html?returnUrl=" + encodeURIComponent(location.pathname));
+      if (window.FireWebNav?.goLogin) { window.FireWebNav.goLogin(); }
+      else if (window.FireWebNav?.isInIframe?.()) { try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch(_) {} }
+      else { location.replace('/index.html'); }
       return false;
     }
     return true;
@@ -152,7 +154,8 @@
     const opts = window.FireWebCsrf?.applyOptions(options || {}) || (options || {});
     const response = await fetch(path, opts);
     if (response.status === 401) {
-      location.replace("/login.html?returnUrl=" + encodeURIComponent(location.pathname));
+      if (window.FireWebNav?.goLogin) { window.FireWebNav.goLogin(); }
+      else { location.replace('/index.html'); }
       throw new Error("로그인이 필요합니다.");
     }
     if (response.status === 403) {

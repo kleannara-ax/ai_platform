@@ -802,7 +802,7 @@ const API = (() => {
     if (res.status === 401) {
       localStorage.removeItem('fireweb_user');
       localStorage.removeItem('fw_user');
-      window.location.href='/login.html';
+      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return null;
     }
     return res;
@@ -855,11 +855,11 @@ function renderNav() {
         </ul>
       </li>`;
   } else {
-    area.innerHTML='<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="/login.html">로그인</a></li>';
+    area.innerHTML='<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="#" onclick="(window.FireWebCsrf&&window.FireWebCsrf.goLogin||function(){location.href='/index.html'})();return false;">로그인</a></li>';
   }
 }
 function logout() {
-  window.FireWebNav?.logout?.() || (window.location.href = '/login.html');
+  window.FireWebNav?.logout?.() || (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
 }
 
 // ===== 건물/층 옵션 로드 =====
@@ -2225,7 +2225,7 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
   const embedDetailsMode = qs.get('embedDetails') === '1';
 
   const user = localStorage.getItem('fireweb_user') || localStorage.getItem('fw_user');
-  if(!user){ window.location.href='/login.html'; return; }
+  if(!user){ (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})(); return; }
   window.FireWebNav?.mount?.();
 
   if (embedEditMode || embedInspectMode || embedDetailsMode) {

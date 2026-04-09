@@ -270,7 +270,7 @@
   const navAccountArea = document.getElementById('navAccountArea');
 
   if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
-    location.href = '/login.html?returnUrl=' + encodeURIComponent(location.pathname + location.search);
+    (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
     return;
   }
   function authHeaders(extra = {}, method = 'GET') {
@@ -463,7 +463,7 @@
     const r = await fetch(url, { headers: authHeaders() });
     refreshTokenFromResponse(r);
     if (r.status === 401) {
-      location.href = '/login.html?returnUrl=' + encodeURIComponent(location.pathname + location.search);
+      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return null;
     }
     return r;
@@ -756,7 +756,7 @@
     btnLogout?.addEventListener('click', () => {
       localStorage.removeItem('fireweb_user');
       localStorage.removeItem('fw_user');
-      location.href = '/login.html';
+      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
     });
   }
 

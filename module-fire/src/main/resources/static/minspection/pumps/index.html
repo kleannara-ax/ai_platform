@@ -181,7 +181,7 @@
     ];
 
     if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
-      location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
 
@@ -207,7 +207,7 @@
       if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');
-        location.href = '/login.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+        (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
         throw new Error('unauthorized');
       }
       return res;

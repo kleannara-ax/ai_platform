@@ -30,6 +30,20 @@
     }
   }
 
+  /** iframe 내부인지 판별 */
+  function isInIframe() {
+    try { return window.self !== window.top; } catch(_) { return true; }
+  }
+
+  /** 로그인 페이지로 이동 (iframe이면 부모 SPA에 메시지 전달) */
+  function goLogin(returnUrl) {
+    if (isInIframe()) {
+      try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch(_) {}
+      return;
+    }
+    location.href = '/index.html';
+  }
+
   async function logout() {
     try {
       await window.FireWebCsrf?.ensureToken?.();
@@ -42,7 +56,7 @@
     localStorage.removeItem("fw_user");
     localStorage.removeItem("fireweb_token");
     localStorage.removeItem("fw_token");
-    location.href = "/login.html";
+    goLogin();
   }
 
   function setMenuLinks() {
@@ -87,7 +101,7 @@
     if (!area) return;
     var user = getUser();
     if (!user) {
-      area.innerHTML = '<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="/login.html">\uB85C\uADF8\uC778</a></li>';
+      area.innerHTML = '<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="#" onclick="FireWebNav.goLogin();return false;">\uB85C\uADF8\uC778</a></li>';
       return;
     }
     var isAdmin = String(user.role || "").toUpperCase() === "ADMIN";
@@ -108,14 +122,23 @@
     }
   }
 
+  /** iframe 내부이면 소방 모듈 자체 네비게이션 바 숨기기 (SPA 사이드바 사용) */
+  function hideNavIfIframe() {
+    if (!isInIframe()) return;
+    var style = document.createElement("style");
+    style.textContent = "header,.fireweb-navbar{display:none!important;} body{padding-top:0!important;} main,.container,.container-fluid{margin-top:0!important;padding-top:8px!important;}";
+    document.head.appendChild(style);
+  }
+
   function mount() {
+    hideNavIfIframe();
     ensureNavTheme();
     setMenuLinks();
     setAccountArea();
     syncVisibleLabels();
   }
 
-  window.FireWebNav = { mount: mount, logout: logout };
+  window.FireWebNav = { mount: mount, logout: logout, goLogin: goLogin, isInIframe: isInIframe };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mount);
   } else {
