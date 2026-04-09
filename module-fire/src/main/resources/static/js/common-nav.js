@@ -122,21 +122,12 @@
     }
   }
 
-  /** iframe 내부이면 소방 모듈 자체 네비게이션 바 숨기기 + SPA 테마 적용 */
+  /** iframe 내부이면 소방 모듈 자체 네비게이션 바 숨기기 */
   function hideNavIfIframe() {
     if (!isInIframe()) return;
     var style = document.createElement("style");
     style.textContent = "header,.fireweb-navbar{display:none!important;} body{padding-top:0!important;} main,.container,.container-fluid{margin-top:0!important;padding-top:8px!important;}";
     document.head.appendChild(style);
-
-    // SPA 테마 CSS 로드
-    if (!document.getElementById("fwSpaTheme")) {
-      var link = document.createElement("link");
-      link.id = "fwSpaTheme";
-      link.rel = "stylesheet";
-      link.href = "/css/spa-theme.css";
-      document.head.appendChild(link);
-    }
   }
 
   function mount() {
