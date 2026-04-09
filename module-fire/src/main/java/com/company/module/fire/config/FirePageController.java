@@ -57,6 +57,16 @@ public class FirePageController {
         return serveHtml("static/qr/index.html");
     }
 
+    /**
+     * /login.html → SPA(index.html)로 리다이렉트.
+     * 소방 모듈 HTML 페이지에서 인증 실패 시 /login.html로 이동하는데,
+     * AI Platform에서는 index.html이 SPA 로그인을 담당하므로 리다이렉트 처리.
+     */
+    @GetMapping({"/login.html", "/login"})
+    public String loginRedirect() {
+        return "redirect:/index.html";
+    }
+
     @GetMapping({"/maps/floor", "/maps/floor/", "/maps/floor.html", "/maps/floor-v2", "/maps/floor-v2.html"})
     @ResponseBody
     public ResponseEntity<String> floorPage() throws IOException {

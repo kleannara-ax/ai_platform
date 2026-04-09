@@ -1025,7 +1025,7 @@ async function apiFetch(url, options = {}) {
     if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');
-        window.location.href = '/login.html';
+        (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
         return null;
     }
     return res;
@@ -1033,7 +1033,7 @@ async function apiFetch(url, options = {}) {
 
 // ===== 로그아웃 =====
 function logout() {
-    window.FireWebNav?.logout?.() || (window.location.href = '/login.html');
+    window.FireWebNav?.logout?.() || (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
 }
 
 // ===== 초기 사용자/권한 정보 로드 =====
@@ -1041,7 +1041,7 @@ async function init() {
     const savedUser = localStorage.getItem('fireweb_user');
     const fallbackUser = localStorage.getItem('fw_user');
     if (!savedUser && !fallbackUser) {
-        window.location.href = '/login.html';
+        (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
         return;
     }
     try {

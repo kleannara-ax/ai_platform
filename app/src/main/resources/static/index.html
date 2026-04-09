@@ -72,6 +72,8 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .topbar h1{font-size:20px;font-weight:700;}
 .topbar .breadcrumb{font-size:12px;color:var(--text3);}
 .page{flex:1;overflow-y:auto;padding:24px 32px;}
+.page.fire-iframe-mode{padding:0;overflow:hidden;}
+.fire-iframe{width:100%;height:100%;border:none;display:block;}
 
 .card{background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:20px;}
 .card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -201,6 +203,14 @@ const BASE = window.location.origin;
 let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
 let allDepts = [], allRoles = [], userMenus = [], clientIp = '';
 let isRefreshing = false;
+
+// ══ 소방 모듈 iframe 메시지 수신 (인증 만료 시 SPA 로그인으로 복귀) ══
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'FIRE_AUTH_EXPIRED') {
+    toast('세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
+    doLogout();
+  }
+});
 
 // ══ Session Storage 관리 ══
 function saveSession() {
@@ -466,6 +476,9 @@ function navigate(page, el) {
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
+  // 소방 iframe 모드 해제 (소방 외 페이지 전환 시)
+  var pc=document.getElementById('pageContent');
+  if(!page.startsWith('fire_') || page==='fire' || page==='fire_dashboard') { pc.className='page'; }
   if(page==='dashboard')renderDashboard();
   else if(page==='users')renderUsers();
   else if(page==='menus')renderMenus();
@@ -1378,7 +1391,7 @@ async function deleteCodeDetail(codeId){
 
 // ══ 소방시설관리 모듈 ══
 function navigateToFirePage(path) {
-  // 소방 모듈 페이지로 직접 이동 (JWT 토큰을 localStorage에 저장하여 전달)
+  // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
@@ -1387,7 +1400,9 @@ function navigateToFirePage(path) {
       token: token
     }));
   }
-  window.location.href = path;
+  var el = document.getElementById('pageContent');
+  el.className = 'page fire-iframe-mode';
+  el.innerHTML = '<iframe class="fire-iframe" id="fireIframe" src="' + path + '"></iframe>';
 }
 
 async function renderFireIndex() {
