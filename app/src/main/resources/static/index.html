@@ -346,8 +346,13 @@ const menuIcons = {
   'MENU_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
   'PERM_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
   'CODE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l2-2-2-2"/><path d="M8 18l-2-2 2-2"/><line x1="12" y1="2" x2="12" y2="22"/></svg>',
-  'FIRE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c0 4-4 6-4 10a4 4 0 008 0c0-4-4-6-4-10z"/><path d="M12 22c-2.2 0-4-1.8-4-4 0-2 2-3.5 4-6 2 2.5 4 4 4 6 0 2.2-1.8 4-4 4z"/></svg>',
-  'FIRE_EQUIP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>',
+  'FIRE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c-2 4-6 6-6 10a6 6 0 0012 0c0-4-4-6-6-10z"/><path d="M12 22a3 3 0 01-3-3c0-2 3-4 3-4s3 2 3 4a3 3 0 01-3 3z"/></svg>',
+  'FIRE_DASHBOARD': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  'FIRE_MAP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
+  'FIRE_EXTINGUISHER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="6" width="8" height="16" rx="2"/><path d="M10 6V4h4v2"/><path d="M14 4l3-2"/><line x1="12" y1="10" x2="12" y2="14"/></svg>',
+  'FIRE_HYDRANT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="4" width="8" height="14" rx="2"/><line x1="4" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="20" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/><circle cx="12" cy="8" r="2"/></svg>',
+  'FIRE_RECEIVER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="6" width="4" height="3" rx="0.5"/><rect x="6" y="11" width="4" height="3" rx="0.5"/><line x1="14" y1="7" x2="18" y2="7"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="14" y1="17" x2="18" y2="17"/></svg>',
+  'FIRE_PUMP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M12 6V2"/><path d="M12 22v-4"/><path d="M6 12H2"/><path d="M22 12h-4"/><circle cx="12" cy="12" r="2"/></svg>',
   'FIRE_FLOOR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>',
   'FIRE_QR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="21" x2="21" y2="21"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
@@ -359,9 +364,14 @@ const menuCodeToPage = {
   'PERM_MGMT': 'permissions',
   'CODE_MGMT': 'codes',
   'FIRE_MGMT': 'fire',
-  'FIRE_EQUIP': 'fire_equip',
+  'FIRE_DASHBOARD': 'fire_dashboard',
+  'FIRE_MAP': 'fire_map',
+  'FIRE_EXTINGUISHER': 'fire_extinguisher',
+  'FIRE_HYDRANT': 'fire_hydrant',
+  'FIRE_RECEIVER': 'fire_receiver',
+  'FIRE_PUMP': 'fire_pump',
   'FIRE_FLOOR': 'fire_floor',
-  'FIRE_QR': 'fire_qr'
+  'FIRE_QR': 'fire_qr',
 };
 
 // IP → 32비트 정수 변환
@@ -451,8 +461,8 @@ function navigate(page, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if (el) el.classList.add('active');
   else document.querySelectorAll('.nav-item').forEach(n => { if(n.textContent.trim().toLowerCase().includes(page))n.classList.add('active'); });
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_equip:'품목 등록',fire_floor:'소방 도면',fire_qr:'QR 관리'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_equip:'모듈 > 소방시설관리 > 품목 등록',fire_floor:'모듈 > 소방시설관리 > 소방 도면',fire_qr:'모듈 > 소방시설관리 > QR 관리'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_dashboard:'모듈 > 소방시설관리 > 대시보드',fire_map:'모듈 > 소방시설관리 > 도면',fire_extinguisher:'모듈 > 소방시설관리 > 소화기',fire_hydrant:'모듈 > 소방시설관리 > 소화전',fire_receiver:'모듈 > 소방시설관리 > 수신기',fire_pump:'모듈 > 소방시설관리 > 소방펌프',fire_floor:'모듈 > 소방시설관리 > 층별 도면',fire_qr:'모듈 > 소방시설관리 > QR코드'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
@@ -462,9 +472,14 @@ function navigate(page, el) {
   else if(page==='permissions')renderPermissions();
   else if(page==='codes')renderCodes();
   else if(page==='fire')renderFireIndex();
-  else if(page==='fire_equip')renderFire();
-  else if(page==='fire_floor')renderFireFloor();
-  else if(page==='fire_qr')renderFireQr();
+  else if(page==='fire_dashboard')navigateToFirePage('/dashboard.html');
+  else if(page==='fire_map')navigateToFirePage('/fire-map.html');
+  else if(page==='fire_extinguisher')navigateToFirePage('/extinguishers.html');
+  else if(page==='fire_hydrant')navigateToFirePage('/hydrants.html');
+  else if(page==='fire_receiver')navigateToFirePage('/receivers.html');
+  else if(page==='fire_pump')navigateToFirePage('/pumps.html');
+  else if(page==='fire_floor')navigateToFirePage('/maps/floor.html');
+  else if(page==='fire_qr')navigateToFirePage('/qr');
 }
 
 // ══ Dashboard ══
@@ -1361,6 +1376,73 @@ async function deleteCodeDetail(codeId){
   }catch(e){toast(e.message,'error');}
 }
 
+// ══ 소방시설관리 모듈 ══
+function navigateToFirePage(path) {
+  // 소방 모듈 페이지로 직접 이동 (JWT 토큰을 localStorage에 저장하여 전달)
+  if (token && currentUser) {
+    localStorage.setItem('fireweb_user', JSON.stringify({
+      loginId: currentUser.loginId,
+      userName: currentUser.userName,
+      role: currentUser.role,
+      token: token
+    }));
+  }
+  window.location.href = path;
+}
+
+async function renderFireIndex() {
+  const el = document.getElementById('pageContent');
+  el.innerHTML = '<p style="color:var(--text3)">소방시설 현황을 불러오는 중...</p>';
+  try {
+    var stats = null;
+    try {
+      var statsRes = await api('GET', '/fire-api/dashboard/stats');
+      if (statsRes.success) stats = statsRes.data;
+    } catch(e) {}
+    var extCount=0, hydCount=0, pumpCount=0, recvCount=0;
+    try {
+      var results = await Promise.all([
+        api('GET', '/fire-api/extinguishers?page=0&size=1'),
+        api('GET', '/fire-api/hydrants?page=0&size=1'),
+        api('GET', '/fire-api/pumps?page=0&size=1'),
+        api('GET', '/fire-api/receivers?page=0&size=1')
+      ]);
+      extCount = results[0].success ? (results[0].data?.totalElements || results[0].data?.length || 0) : 0;
+      hydCount = results[1].success ? (results[1].data?.totalElements || results[1].data?.length || 0) : 0;
+      pumpCount = results[2].success ? (results[2].data?.totalElements || results[2].data?.length || 0) : 0;
+      recvCount = results[3].success ? (results[3].data?.totalElements || results[3].data?.length || 0) : 0;
+    } catch(e) {}
+    var totalEquip = (stats && stats.totalEquipment) || (extCount + hydCount + pumpCount + recvCount);
+    var extV = stats ? (stats.extinguisherCount != null ? stats.extinguisherCount : extCount) : extCount;
+    var hydV = stats ? (stats.hydrantCount != null ? stats.hydrantCount : hydCount) : hydCount;
+    var recvV = stats ? (stats.receiverCount != null ? stats.receiverCount : recvCount) : recvCount;
+    var pumpV = stats ? (stats.pumpCount != null ? stats.pumpCount : pumpCount) : pumpCount;
+    var bldgV = stats ? (stats.buildingCount != null ? stats.buildingCount : '-') : '-';
+    el.innerHTML = '<div class="stats-grid">'
+      + '<div class="stat-card blue"><div class="label">소화기</div><div class="value">'+extV+'</div><div class="sub">등록된 소화기</div></div>'
+      + '<div class="stat-card green"><div class="label">소화전</div><div class="value">'+hydV+'</div><div class="sub">등록된 소화전</div></div>'
+      + '<div class="stat-card orange"><div class="label">수신기</div><div class="value">'+recvV+'</div><div class="sub">등록된 수신기</div></div>'
+      + '<div class="stat-card red"><div class="label">소방펌프</div><div class="value">'+pumpV+'</div><div class="sub">등록된 소방펌프</div></div>'
+      + '</div>'
+      + '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr);">'
+      + '<div class="stat-card" style="border-left:3px solid var(--primary);"><div class="label">전체 장비</div><div class="value" style="color:var(--primary);">'+totalEquip+'</div><div class="sub">소방시설 총 수량</div></div>'
+      + '<div class="stat-card" style="border-left:3px solid var(--green);"><div class="label">건물 수</div><div class="value" style="color:var(--green);">'+bldgV+'</div><div class="sub">관리 건물</div></div>'
+      + '</div>'
+      + '<div class="card"><div class="card-header"><h3>소방시설 바로가기</h3></div><div class="card-body">'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/fire-map.html\')" style="padding:16px;">'+(menuIcons['FIRE_MAP']||'')+'<br>도면 (메인)</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/extinguishers.html\')" style="padding:16px;">'+(menuIcons['FIRE_EXTINGUISHER']||'')+'<br>소화기 목록</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/hydrants.html\')" style="padding:16px;">'+(menuIcons['FIRE_HYDRANT']||'')+'<br>소화전 목록</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/receivers.html\')" style="padding:16px;">'+(menuIcons['FIRE_RECEIVER']||'')+'<br>수신기 목록</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/pumps.html\')" style="padding:16px;">'+(menuIcons['FIRE_PUMP']||'')+'<br>소방펌프 목록</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/maps/floor.html\')" style="padding:16px;">'+(menuIcons['FIRE_FLOOR']||'')+'<br>층별 도면</button>'
+      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/qr\')" style="padding:16px;">'+(menuIcons['FIRE_QR']||'')+'<br>QR코드</button>'
+      + '</div></div></div>';
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--red)">오류: '+esc(e.message)+'</p>';
+  }
+}
+
 // ══ UI Helpers ══
 function showValidationErrors(res){
   if(res.data && typeof res.data==='object'){
@@ -1369,457 +1451,6 @@ function showValidationErrors(res){
   } else {
     toast(res.message||'처리 실패','error');
   }
-}
-// ══ 소방시설관리 - 대시보드(Index) ══
-async function renderFireIndex(){
-  const el=document.getElementById('pageContent');
-  el.innerHTML='<p style="color:var(--text3)">소방시설 현황을 불러오는 중...</p>';
-  try{
-    const [bRes,fRes,extRes,hydRes,pmpRes,rcvRes]=await Promise.all([
-      api('GET','/fire-api/maps/buildings'),
-      api('GET','/fire-api/maps/floors'),
-      api('GET','/fire-api/extinguishers'),
-      api('GET','/fire-api/hydrants'),
-      api('GET','/fire-api/pumps'),
-      api('GET','/fire-api/receivers')
-    ]);
-    const buildings=bRes.success?(bRes.data||[]):[];
-    const floors=fRes.success?(fRes.data||[]):[];
-    const extData=extRes.success?(extRes.data||{}):{};
-    const hydData=hydRes.success?(hydRes.data||{}):{};
-    const pmpData=pmpRes.success?(pmpRes.data||{}):{};
-    const rcvData=rcvRes.success?(rcvRes.data||{}):{};
-    const extList=extData.content||extData||[];
-    const hydList=hydData.content||hydData||[];
-    const pmpList=pmpData.content||pmpData||[];
-    const rcvList=rcvData.content||rcvData||[];
-    const extCount=Array.isArray(extList)?extList.length:0;
-    const hydCount=Array.isArray(hydList)?hydList.length:0;
-    const pmpCount=Array.isArray(pmpList)?pmpList.length:0;
-    const rcvCount=Array.isArray(rcvList)?rcvList.length:0;
-    const totalEquip=extCount+hydCount+pmpCount+rcvCount;
-
-    el.innerHTML=`
-      <div class="stats-grid">
-        <div class="stat-card blue"><div class="label">전체 장비</div><div class="value">${totalEquip}</div><div class="sub">등록된 소방장비 총 수</div></div>
-        <div class="stat-card green"><div class="label">건물</div><div class="value">${buildings.length}</div><div class="sub">등록된 건물 수</div></div>
-        <div class="stat-card orange"><div class="label">층</div><div class="value">${floors.length}</div><div class="sub">등록된 층 수</div></div>
-        <div class="stat-card red"><div class="label">장비 유형</div><div class="value">4</div><div class="sub">소화기/소화전/펌프/수신기</div></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
-        <div class="card">
-          <div class="card-header"><h3>장비별 현황</h3></div>
-          <div class="card-body" style="padding:0;">
-            <table>
-              <thead><tr><th>장비 유형</th><th class="text-right">수량</th><th class="text-right">비율</th></tr></thead>
-              <tbody>
-                <tr><td><span style="color:var(--red);">&#9679;</span> 소화기</td><td class="text-right"><b>${extCount}</b></td><td class="text-right">${totalEquip>0?Math.round(extCount/totalEquip*100):0}%</td></tr>
-                <tr><td><span style="color:var(--primary);">&#9679;</span> 소화전</td><td class="text-right"><b>${hydCount}</b></td><td class="text-right">${totalEquip>0?Math.round(hydCount/totalEquip*100):0}%</td></tr>
-                <tr><td><span style="color:var(--orange);">&#9679;</span> 소방펌프</td><td class="text-right"><b>${pmpCount}</b></td><td class="text-right">${totalEquip>0?Math.round(pmpCount/totalEquip*100):0}%</td></tr>
-                <tr><td><span style="color:var(--green);">&#9679;</span> 수신기</td><td class="text-right"><b>${rcvCount}</b></td><td class="text-right">${totalEquip>0?Math.round(rcvCount/totalEquip*100):0}%</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3>건물 목록</h3></div>
-          <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
-            <table>
-              <thead><tr><th>ID</th><th>건물명</th></tr></thead>
-              <tbody>${buildings.map(b=>`<tr><td>${b.buildingId}</td><td><b>${esc(b.buildingName)}</b></td></tr>`).join('')||'<tr><td colspan="2" class="text-center" style="padding:20px;color:var(--text3);">등록된 건물이 없습니다.</td></tr>'}</tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3>빠른 이동</h3></div>
-        <div class="card-body">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-            <div onclick="navigate('fire_equip')" style="cursor:pointer;padding:24px;border:1px solid var(--border);border-radius:12px;text-align:center;transition:all .15s;" onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='transparent'">
-              <div style="font-size:32px;margin-bottom:8px;">&#128221;</div>
-              <div style="font-weight:700;margin-bottom:4px;">품목 등록</div>
-              <div style="font-size:12px;color:var(--text3);">소화기/소화전/펌프/수신기 관리</div>
-            </div>
-            <div onclick="navigate('fire_floor')" style="cursor:pointer;padding:24px;border:1px solid var(--border);border-radius:12px;text-align:center;transition:all .15s;" onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='transparent'">
-              <div style="font-size:32px;margin-bottom:8px;">&#128506;</div>
-              <div style="font-weight:700;margin-bottom:4px;">소방 도면</div>
-              <div style="font-size:12px;color:var(--text3);">건물/층별 소방시설 배치도</div>
-            </div>
-            <div onclick="navigate('fire_qr')" style="cursor:pointer;padding:24px;border:1px solid var(--border);border-radius:12px;text-align:center;transition:all .15s;" onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='transparent'">
-              <div style="font-size:32px;margin-bottom:8px;">&#128274;</div>
-              <div style="font-weight:700;margin-bottom:4px;">QR 관리</div>
-              <div style="font-size:12px;color:var(--text3);">QR 코드 생성 및 장비 조회</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }catch(e){el.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;}
-}
-
-// ══ 소방시설관리 - 소방 도면 (Floor Map) ══
-async function renderFireFloor(){
-  const el=document.getElementById('pageContent');
-  el.innerHTML='<p style="color:var(--text3)">건물/층 정보를 불러오는 중...</p>';
-  let buildings=[], floors=[];
-  try{
-    const [bRes,fRes]=await Promise.all([
-      api('GET','/fire-api/maps/buildings'),
-      api('GET','/fire-api/maps/floors')
-    ]);
-    buildings=bRes.success?(bRes.data||[]):[];
-    floors=fRes.success?(fRes.data||[]):[];
-  }catch(e){el.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;return;}
-
-  el.innerHTML=`
-    <div class="card">
-      <div class="card-header">
-        <h3>소방 도면 조회</h3>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <select id="floor_building" onchange="onFloorBuildingChange()" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;">
-            <option value="">건물 선택</option>
-            ${buildings.map(b=>`<option value="${b.buildingId}">${esc(b.buildingName)}</option>`).join('')}
-          </select>
-          <select id="floor_floor" onchange="loadFloorData()" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;">
-            <option value="">층 선택</option>
-            ${floors.map(f=>`<option value="${f.floorId}">${esc(f.floorName)}</option>`).join('')}
-          </select>
-          <button class="btn btn-sm btn-primary" onclick="loadFloorData()">조회</button>
-        </div>
-      </div>
-      <div class="card-body" id="floorMapContent">
-        <div style="text-align:center;padding:60px 20px;color:var(--text3);">
-          <div style="font-size:48px;margin-bottom:16px;">&#128506;</div>
-          <p style="font-size:15px;font-weight:600;">건물과 층을 선택해주세요</p>
-          <p style="font-size:13px;margin-top:8px;">선택하면 해당 층의 소방시설 배치도를 확인할 수 있습니다.</p>
-        </div>
-      </div>
-    </div>
-    <div id="floorEquipList" style="margin-top:20px;"></div>
-  `;
-}
-
-function onFloorBuildingChange(){/* 건물 변경 시 필요하면 층 필터링 가능 */}
-
-async function loadFloorData(){
-  const buildingId=document.getElementById('floor_building')?.value;
-  const floorId=document.getElementById('floor_floor')?.value;
-  const mapEl=document.getElementById('floorMapContent');
-  const listEl=document.getElementById('floorEquipList');
-  if(!buildingId||!floorId){
-    toast('건물과 층을 모두 선택해주세요.','info');
-    return;
-  }
-  mapEl.innerHTML='<p style="text-align:center;padding:40px;color:var(--text3)">불러오는 중...</p>';
-  try{
-    const res=await api('GET',`/fire-api/maps/floor-data?buildingId=${buildingId}&floorId=${floorId}`);
-    if(!res.success){mapEl.innerHTML=`<p style="color:var(--red);text-align:center;padding:40px;">${esc(res.message||'조회 실패')}</p>`;return;}
-    const d=res.data;
-    const extinguishers=d.extinguishers||[];
-    const hydrants=d.hydrants||[];
-    const planPath=d.planImagePath||'';
-
-    let mapHtml=`<div style="margin-bottom:16px;">
-      <span class="badge badge-admin" style="margin-right:8px;">${esc(d.buildingName)}</span>
-      <span class="badge badge-user">${esc(d.floorName)}</span>
-    </div>`;
-
-    if(planPath){
-      mapHtml+=`<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#f8f9fa;text-align:center;">
-        <img src="${esc(planPath)}" alt="도면" style="max-width:100%;max-height:600px;" onerror="this.parentElement.innerHTML='<div style=\'padding:60px;color:var(--text3);\'>도면 이미지를 불러올 수 없습니다.<br><code>${esc(planPath)}</code></div>'">
-      </div>`;
-    } else {
-      mapHtml+=`<div style="text-align:center;padding:60px;color:var(--text3);border:1px dashed var(--border);border-radius:8px;">
-        <p>이 층에 대한 도면 이미지가 없습니다.</p>
-      </div>`;
-    }
-    mapEl.innerHTML=mapHtml;
-
-    // 장비 목록 표시
-    let listHtml='';
-    if(extinguishers.length>0){
-      listHtml+=`<div class="card"><div class="card-header"><h3>소화기 (${extinguishers.length})</h3></div>
-        <div class="card-body" style="padding:0;"><table><thead><tr><th>ID</th><th>X</th><th>Y</th></tr></thead>
-        <tbody>${extinguishers.map(e=>`<tr><td>${e.extinguisherId}</td><td>${e.x||'-'}</td><td>${e.y||'-'}</td></tr>`).join('')}</tbody></table></div></div>`;
-    }
-    if(hydrants.length>0){
-      listHtml+=`<div class="card" style="margin-top:16px;"><div class="card-header"><h3>옥내소화전 (${hydrants.length})</h3></div>
-        <div class="card-body" style="padding:0;"><table><thead><tr><th>ID</th><th>유형</th><th>X</th><th>Y</th></tr></thead>
-        <tbody>${hydrants.map(h=>`<tr><td>${h.hydrantId}</td><td>${esc(h.hydrantType||'')}</td><td>${h.x||'-'}</td><td>${h.y||'-'}</td></tr>`).join('')}</tbody></table></div></div>`;
-    }
-    if(extinguishers.length===0&&hydrants.length===0){
-      listHtml='<div class="card"><div class="card-body text-center" style="padding:40px;color:var(--text3);">이 층에 등록된 소방장비가 없습니다.</div></div>';
-    }
-    listEl.innerHTML=listHtml;
-  }catch(e){mapEl.innerHTML=`<p style="color:var(--red);text-align:center;padding:40px;">오류: ${esc(e.message)}</p>`;}
-}
-
-// ══ 소방시설관리 - QR 관리 ══
-async function renderFireQr(){
-  const el=document.getElementById('pageContent');
-  el.innerHTML='<p style="color:var(--text3)">QR 관리 정보를 불러오는 중...</p>';
-  let buildings=[], floors=[];
-  try{
-    const [bRes,fRes]=await Promise.all([
-      api('GET','/fire-api/qr/buildings'),
-      api('GET','/fire-api/qr/floors')
-    ]);
-    buildings=bRes.success?(bRes.data||[]):[];
-    floors=fRes.success?(fRes.data||[]):[];
-  }catch(e){}
-
-  el.innerHTML=`
-    <div class="card">
-      <div class="card-header">
-        <h3>QR 코드 관리</h3>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <select id="qr_building" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;">
-            <option value="">전체 건물</option>
-            ${buildings.map(b=>`<option value="${b.buildingId}">${esc(b.buildingName)}</option>`).join('')}
-          </select>
-          <select id="qr_floor" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);font-size:13px;">
-            <option value="">전체 층</option>
-            ${floors.map(f=>`<option value="${f.floorId}">${esc(f.floorName)}</option>`).join('')}
-          </select>
-          <button class="btn btn-sm btn-primary" onclick="loadQrList()">조회</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="qrTabArea" style="margin-top:16px;">
-      <div style="text-align:center;padding:60px 20px;color:var(--text3);">
-        <div style="font-size:48px;margin-bottom:16px;">&#128274;</div>
-        <p style="font-size:15px;font-weight:600;">조회 버튼을 클릭하여 장비 목록과 QR 코드를 확인하세요</p>
-        <p style="font-size:13px;margin-top:8px;">건물/층을 선택하지 않으면 전체 장비를 조회합니다.</p>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:20px;">
-      <div class="card-header">
-        <h3>미등록 시리얼 생성</h3>
-        <span style="font-size:12px;color:var(--text3);">새로운 QR 키를 미리 생성합니다</span>
-      </div>
-      <div class="card-body">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-          <div class="form-group"><label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px;">소화기 수량</label><input type="number" id="qr_extCount" value="0" min="0" max="500" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius);"></div>
-          <div class="form-group"><label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px;">소화전 수량</label><input type="number" id="qr_hydCount" value="0" min="0" max="500" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius);"></div>
-          <div class="form-group"><label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px;">수신기 수량</label><input type="number" id="qr_rcvCount" value="0" min="0" max="500" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius);"></div>
-          <div class="form-group"><label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px;">펌프 수량</label><input type="number" id="qr_pmpCount" value="0" min="0" max="500" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--radius);"></div>
-        </div>
-        <button class="btn btn-sm btn-primary" onclick="generateUnregisteredSerials()">시리얼 생성</button>
-        <div id="qrSerialResult" style="margin-top:16px;"></div>
-      </div>
-    </div>
-  `;
-}
-
-let qrCurrentTab='extinguishers';
-async function loadQrList(){
-  const buildingId=document.getElementById('qr_building')?.value||'';
-  const floorId=document.getElementById('qr_floor')?.value||'';
-  const area=document.getElementById('qrTabArea');
-  area.innerHTML='<p style="text-align:center;padding:40px;color:var(--text3)">불러오는 중...</p>';
-  try{
-    let url='/fire-api/qr/list';
-    const params=[];
-    if(buildingId)params.push('buildingId='+buildingId);
-    if(floorId)params.push('floorId='+floorId);
-    if(params.length)url+='?'+params.join('&');
-    const res=await api('GET',url);
-    if(!res.success){area.innerHTML=`<p style="color:var(--red);text-align:center;padding:40px;">${esc(res.message||'조회 실패')}</p>`;return;}
-    const d=res.data;
-    window._qrData=d;
-    qrCurrentTab='extinguishers';
-    renderQrTabs();
-  }catch(e){area.innerHTML=`<p style="color:var(--red);text-align:center;padding:40px;">오류: ${esc(e.message)}</p>`;}
-}
-
-function renderQrTabs(){
-  const d=window._qrData||{};
-  const area=document.getElementById('qrTabArea');
-  const tabs=[{key:'extinguishers',label:'소화기',items:d.extinguishers||[]},{key:'hydrants',label:'소화전',items:d.hydrants||[]},{key:'receivers',label:'수신기',items:d.receivers||[]},{key:'pumps',label:'펌프',items:d.pumps||[]}];
-
-  let tabHtml='<div style="display:flex;gap:8px;margin-bottom:16px;">';
-  tabs.forEach(t=>{
-    const active=t.key===qrCurrentTab?'background:var(--primary);color:#fff;':'background:var(--surface2);color:var(--text2);';
-    tabHtml+=`<button onclick="qrCurrentTab='${t.key}';renderQrTabs()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;${active}">${t.label} (${t.items.length})</button>`;
-  });
-  tabHtml+='</div>';
-
-  const cur=tabs.find(t=>t.key===qrCurrentTab)||tabs[0];
-  const items=cur.items;
-
-  let tableHtml='';
-  if(cur.key==='extinguishers'){
-    tableHtml=`<div class="card"><div class="card-body" style="padding:0;overflow-x:auto;"><table>
-      <thead><tr><th>ID</th><th>일련번호</th><th>QR 키</th><th>건물</th><th>층</th><th>종류</th><th>제조일</th><th>QR</th></tr></thead>
-      <tbody>${items.map(e=>`<tr>
-        <td>${e.extinguisherId||''}</td><td>${esc(e.serialNumber||'')}</td><td><code style="font-size:11px;">${esc(e.qrKey||'')}</code></td>
-        <td>${esc(e.buildingName||'-')}</td><td>${esc(e.floorName||'-')}</td><td>${esc(e.extinguisherType||'')}</td><td>${esc(e.manufactureDate||'-')}</td>
-        <td>${e.qrKey?`<img src="/fire-api/qr/image?type=ext&id=${encodeURIComponent(e.qrKey)}" width="48" height="48" alt="QR" style="cursor:pointer;border-radius:4px;" onclick="openQrModal('ext','${esc(e.qrKey)}','소화기 #${e.extinguisherId}')">`:'<span style="color:var(--text3);">-</span>'}</td>
-      </tr>`).join('')||'<tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text3);">데이터 없음</td></tr>'}</tbody></table></div></div>`;
-  } else if(cur.key==='hydrants'){
-    tableHtml=`<div class="card"><div class="card-body" style="padding:0;overflow-x:auto;"><table>
-      <thead><tr><th>ID</th><th>일련번호</th><th>QR 키</th><th>건물</th><th>층</th><th>유형</th><th>작동방식</th><th>위치</th><th>QR</th></tr></thead>
-      <tbody>${items.map(h=>`<tr>
-        <td>${h.hydrantId||''}</td><td>${esc(h.serialNumber||'')}</td><td><code style="font-size:11px;">${esc(h.qrKey||'')}</code></td>
-        <td>${esc(h.buildingName||'-')}</td><td>${esc(h.floorName||'-')}</td><td>${esc(h.hydrantType||'')}</td><td>${esc(h.operationType||'')}</td><td>${esc(h.locationDescription||'-')}</td>
-        <td>${h.qrKey?`<img src="/fire-api/qr/image?type=hyd&id=${encodeURIComponent(h.qrKey)}" width="48" height="48" alt="QR" style="cursor:pointer;border-radius:4px;" onclick="openQrModal('hyd','${esc(h.qrKey)}','소화전 #${h.hydrantId}')">`:'<span style="color:var(--text3);">-</span>'}</td>
-      </tr>`).join('')||'<tr><td colspan="9" class="text-center" style="padding:40px;color:var(--text3);">데이터 없음</td></tr>'}</tbody></table></div></div>`;
-  } else if(cur.key==='receivers'){
-    tableHtml=`<div class="card"><div class="card-body" style="padding:0;overflow-x:auto;"><table>
-      <thead><tr><th>ID</th><th>QR 키</th><th>건물</th><th>층</th><th>QR</th></tr></thead>
-      <tbody>${items.map(r=>`<tr>
-        <td>${r.receiverId||''}</td><td><code style="font-size:11px;">${esc(r.qrKey||'')}</code></td>
-        <td>${esc(r.buildingName||'-')}</td><td>${esc(r.floorName||'-')}</td>
-        <td>${r.qrKey?`<img src="/fire-api/qr/image?type=rcv&id=${encodeURIComponent(r.qrKey)}" width="48" height="48" alt="QR" style="cursor:pointer;border-radius:4px;" onclick="openQrModal('rcv','${esc(r.qrKey)}','수신기 #${r.receiverId}')">`:'<span style="color:var(--text3);">-</span>'}</td>
-      </tr>`).join('')||'<tr><td colspan="5" class="text-center" style="padding:40px;color:var(--text3);">데이터 없음</td></tr>'}</tbody></table></div></div>`;
-  } else if(cur.key==='pumps'){
-    tableHtml=`<div class="card"><div class="card-body" style="padding:0;overflow-x:auto;"><table>
-      <thead><tr><th>ID</th><th>QR 키</th><th>건물</th><th>층</th><th>QR</th></tr></thead>
-      <tbody>${items.map(p=>`<tr>
-        <td>${p.pumpId||''}</td><td><code style="font-size:11px;">${esc(p.qrKey||'')}</code></td>
-        <td>${esc(p.buildingName||'-')}</td><td>${esc(p.floorName||'-')}</td>
-        <td>${p.qrKey?`<img src="/fire-api/qr/image?type=pmp&id=${encodeURIComponent(p.qrKey)}" width="48" height="48" alt="QR" style="cursor:pointer;border-radius:4px;" onclick="openQrModal('pmp','${esc(p.qrKey)}','펌프 #${p.pumpId}')">`:'<span style="color:var(--text3);">-</span>'}</td>
-      </tr>`).join('')||'<tr><td colspan="5" class="text-center" style="padding:40px;color:var(--text3);">데이터 없음</td></tr>'}</tbody></table></div></div>`;
-  }
-
-  area.innerHTML=tabHtml+tableHtml;
-}
-
-function openQrModal(type,qrKey,title){
-  const imgUrl=`/fire-api/qr/image?type=${type}&id=${encodeURIComponent(qrKey)}`;
-  openModal('QR 코드 - '+title,`
-    <div style="text-align:center;">
-      <img src="${imgUrl}" width="240" height="240" alt="QR Code" style="border:1px solid var(--border);border-radius:8px;">
-      <div style="margin-top:16px;">
-        <code style="font-size:12px;background:var(--surface2);padding:6px 12px;border-radius:6px;">${esc(qrKey)}</code>
-      </div>
-      <div style="margin-top:12px;font-size:12px;color:var(--text3);">이미지를 우클릭하여 저장하거나 인쇄할 수 있습니다.</div>
-    </div>
-  `,'<button class="btn btn-sm btn-outline" onclick="closeModal()">닫기</button>');
-}
-
-async function generateUnregisteredSerials(){
-  const extCount=parseInt(document.getElementById('qr_extCount')?.value)||0;
-  const hydCount=parseInt(document.getElementById('qr_hydCount')?.value)||0;
-  const rcvCount=parseInt(document.getElementById('qr_rcvCount')?.value)||0;
-  const pmpCount=parseInt(document.getElementById('qr_pmpCount')?.value)||0;
-  if(extCount+hydCount+rcvCount+pmpCount===0){toast('최소 1개 이상 수량을 입력해주세요.','info');return;}
-  const resultEl=document.getElementById('qrSerialResult');
-  resultEl.innerHTML='<p style="color:var(--text3)">생성 중...</p>';
-  try{
-    const res=await api('GET',`/fire-api/qr/unregistered-serials?extCount=${extCount}&hydCount=${hydCount}&receiverCount=${rcvCount}&pumpCount=${pmpCount}`);
-    if(!res.success){resultEl.innerHTML=`<p style="color:var(--red);">${esc(res.message||'생성 실패')}</p>`;return;}
-    const d=res.data;
-    let html='';
-    const sections=[{key:'unregisteredExtSerials',label:'소화기 시리얼'},{key:'unregisteredHydSerials',label:'소화전 시리얼'},{key:'unregisteredReceiverSerials',label:'수신기 시리얼'},{key:'unregisteredPumpSerials',label:'펌프 시리얼'}];
-    sections.forEach(s=>{
-      const arr=d[s.key]||[];
-      if(arr.length>0){
-        html+=`<div style="margin-bottom:12px;"><b>${s.label} (${arr.length}개)</b><div style="margin-top:6px;max-height:200px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:12px;">`;
-        arr.forEach(serial=>{html+=`<div style="font-family:monospace;font-size:12px;padding:2px 0;">${esc(serial)}</div>`;});
-        html+='</div></div>';
-      }
-    });
-    if(!html)html='<p style="color:var(--text3)">생성된 시리얼이 없습니다.</p>';
-    resultEl.innerHTML=html;
-    toast('미등록 시리얼이 생성되었습니다.','success');
-  }catch(e){resultEl.innerHTML=`<p style="color:var(--red)">오류: ${esc(e.message)}</p>`;}
-}
-
-// ══ 소방시설관리 - 품목 등록 ══
-async function renderFire(){
-  const el=document.getElementById('pageContent');
-  const canManage=currentUser?true:false;
-  el.innerHTML='<p style="color:var(--text3)">불러오는 중...</p>';
-
-  // 탭 상태
-  if(!window._fireTab) window._fireTab='extinguishers';
-  const tab=window._fireTab;
-
-  // 건물/층 목록 로드
-  let buildings=[], floors=[];
-  try{
-    const bRes=await api('GET','/fire-api/maps/buildings');
-    buildings=bRes.success?(bRes.data||[]):[];
-    const fRes=await api('GET','/fire-api/maps/floors');
-    floors=fRes.success?(fRes.data||[]):[];
-  }catch(e){}
-
-  // 탭별 데이터 로드
-  const endpoints={extinguishers:'/fire-api/extinguishers',hydrants:'/fire-api/hydrants',pumps:'/fire-api/pumps',receivers:'/fire-api/receivers'};
-  const tabLabels={extinguishers:'소화기',hydrants:'소화전',pumps:'소방펌프',receivers:'수신기'};
-  let items=[];
-  try{
-    const res=await api('GET',endpoints[tab]);
-    if(res.success){
-      const d=res.data||{};
-      items=d.content||d||[];
-      if(!Array.isArray(items))items=[];
-    }
-  }catch(e){items=[];}
-
-  // 탭 UI
-  let html='<div style="display:flex;gap:8px;margin-bottom:16px;">';
-  for(const[k,label] of Object.entries(tabLabels)){
-    const active=k===tab?'background:var(--primary);color:#fff;':'background:var(--surface2);color:var(--text2);';
-    html+=`<button onclick="window._fireTab='${k}';renderFire()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;${active}">${label} (${k===tab?items.length:'…'})</button>`;
-  }
-  html+='</div>';
-
-  // 추가 버튼
-  if(canManage){
-    html+=`<div style="margin-bottom:12px;"><button class="btn btn-primary btn-sm" onclick="openFireAddModal('${tab}')">+ ${tabLabels[tab]} 등록</button></div>`;
-  }
-
-  // 테이블
-  if(tab==='extinguishers'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>종류</th><th>수량</th><th>최근점검</th><th>점검자</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
-    for(const e of items){
-      html+=`<tr><td>${e.extinguisherId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.extinguisherType||'')}</td><td>${e.quantity||''}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('extinguishers',${e.extinguisherId})">삭제</button></td>`:''}</tr>`;
-    }
-    html+='</tbody></table>';
-  } else if(tab==='hydrants'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>유형</th><th>작동방식</th><th>최근점검</th><th>점검자</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
-    for(const e of items){
-      html+=`<tr><td>${e.hydrantId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.hydrantType||'')}</td><td>${esc(e.operationType||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('hydrants',${e.hydrantId})">삭제</button></td>`:''}</tr>`;
-    }
-    html+='</tbody></table>';
-  } else if(tab==='pumps'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>위치</th><th>최근점검</th><th>점검자</th><th>점검상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
-    for(const e of items){
-      html+=`<tr><td>${e.pumpId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.locationDescription||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td><td>${esc(e.lastInspectionStatus||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('pumps',${e.pumpId})">삭제</button></td>`:''}</tr>`;
-    }
-    html+='</tbody></table>';
-  } else if(tab==='receivers'){
-    html+=`<table class="data-table"><thead><tr><th>ID</th><th>일련번호</th><th>건물</th><th>층</th><th>위치</th><th>최근점검</th><th>점검자</th><th>점검상태</th>${canManage?'<th>관리</th>':''}</tr></thead><tbody>`;
-    for(const e of items){
-      html+=`<tr><td>${e.receiverId||''}</td><td>${esc(e.serialNumber||'')}</td><td>${esc(e.buildingName||'')}</td><td>${esc(e.floorName||'')}</td><td>${esc(e.locationDescription||'')}</td><td>${esc(e.lastInspectionDate||'-')}</td><td>${esc(e.lastInspectorName||'-')}</td><td>${esc(e.lastInspectionStatus||'-')}</td>${canManage?`<td><button class="btn btn-sm" onclick="deleteFireItem('receivers',${e.receiverId})">삭제</button></td>`:''}</tr>`;
-    }
-    html+='</tbody></table>';
-  }
-
-  if(items.length===0) html+='<p style="text-align:center;color:var(--text3);padding:40px 0;">등록된 데이터가 없습니다.</p>';
-  el.innerHTML=html;
-}
-
-async function deleteFireItem(type,id){
-  if(!confirm('정말 삭제하시겠습니까?'))return;
-  try{
-    const res=await api('DELETE',`/fire-api/${type}/${id}`);
-    if(res.success){toast('삭제되었습니다.','success');renderFire();}
-    else toast(res.message||'삭제 실패','error');
-  }catch(e){toast(e.message,'error');}
-}
-
-function openFireAddModal(type){
-  const labels={extinguishers:'소화기',hydrants:'소화전',pumps:'소방펌프',receivers:'수신기'};
-  const body=`<p style="color:var(--text3);padding:20px 0;text-align:center;">
-    ${labels[type]} 등록 기능은 모바일 점검 또는 API를 통해 이용하세요.<br><br>
-    <code style="background:var(--surface2);padding:4px 8px;border-radius:4px;">POST /fire-api/${type}</code>
-  </p>`;
-  openModal(labels[type]+' 등록',body,'<button class="btn" onclick="closeModal()">닫기</button>');
 }
 
 function roleBadge(role){
