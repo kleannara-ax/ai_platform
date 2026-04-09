@@ -162,7 +162,7 @@
       throw new Error("관리자만 수행할 수 있습니다.");
     }
     const json = await response.json().catch(() => null);
-    if (!response.ok || !json?.ok) {
+    if (!response.ok || !json?.success) {
       throw new Error(json?.message || "요청 처리에 실패했습니다.");
     }
     return json.data;
