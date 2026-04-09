@@ -1366,7 +1366,11 @@ function openPopupNearEvent(e, zoneName, floorsCsv) {
             const b = (zoneName || '').trim();
             const f = (floor || '').trim();
             const url = `/maps/floor.html?buildingName=${encodeURIComponent(b)}&floorName=${encodeURIComponent(f)}`;
-            window.location.href = url;
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'FIRE_NAVIGATE', path: url }, '*');
+            } else {
+                window.location.href = url;
+            }
         });
     });
 }

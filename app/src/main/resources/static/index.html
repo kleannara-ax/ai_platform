@@ -205,11 +205,16 @@ let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
 let allDepts = [], allRoles = [], userMenus = [], clientIp = '';
 let isRefreshing = false;
 
-// ══ 소방 모듈 iframe 메시지 수신 (인증 만료 시 SPA 로그인으로 복귀) ══
+// ══ 소방 모듈 iframe 메시지 수신 ══
 window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'FIRE_AUTH_EXPIRED') {
+  if (!e.data || !e.data.type) return;
+  if (e.data.type === 'FIRE_AUTH_EXPIRED') {
     toast('세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
     doLogout();
+  }
+  // 도면(메인)에서 층 선택 시 → SPA가 iframe src를 층별도면으로 전환
+  if (e.data.type === 'FIRE_NAVIGATE' && e.data.path) {
+    navigateToFirePage(e.data.path);
   }
 });
 
