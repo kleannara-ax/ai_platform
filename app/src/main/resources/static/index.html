@@ -323,6 +323,15 @@ async function enterApp() {
   try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; }catch(e){ allRoles=[]; }
   // 현재 접속자 IP 조회
   try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
+  // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
+  if (token && currentUser) {
+    localStorage.setItem('fireweb_user', JSON.stringify({
+      loginId: currentUser.loginId,
+      userName: currentUser.userName,
+      role: (currentUser.role||'').replace('ROLE_',''),
+      token: token
+    }));
+  }
   await loadUserMenus();
   navigate(currentPage || 'dashboard');
   saveSession();
@@ -1396,7 +1405,7 @@ function navigateToFirePage(path) {
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
-      role: currentUser.role,
+      role: (currentUser.role||'').replace('ROLE_',''),
       token: token
     }));
   }

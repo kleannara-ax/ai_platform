@@ -222,7 +222,7 @@
   }
 
   function isAdminUser() {
-    return String(currentUser?.role || '').toUpperCase() === 'ADMIN';
+    return String(currentUser?.role || '').toUpperCase().replace('ROLE_','') === 'ADMIN';
   }
 
   function qrImgUrl(type, id) {

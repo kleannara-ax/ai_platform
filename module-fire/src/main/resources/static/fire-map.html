@@ -1047,7 +1047,7 @@ async function init() {
     try {
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            isAdmin = currentUser.role === 'ADMIN';
+            isAdmin = String(currentUser.role||'').replace('ROLE_','') === 'ADMIN';
         } else if (fallbackUser) {
             currentUser = { username: fallbackUser, displayName: fallbackUser, role: 'USER' };
         }

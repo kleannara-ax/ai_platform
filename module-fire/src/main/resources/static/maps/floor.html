@@ -283,7 +283,7 @@
     try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); }
     catch (_) { return null; }
   })();
-  const isAdmin = String(currentUser?.role || '').toUpperCase() === 'ADMIN';
+  const isAdmin = String(currentUser?.role || '').toUpperCase().replace('ROLE_','') === 'ADMIN';
 
   const state = {
     zoom: 1, panX: 0, panY: 0, dragging: false,
