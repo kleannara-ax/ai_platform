@@ -47,6 +47,11 @@ public class SecurityConfig {
             // CSRF 비활성화 (Stateless REST API)
             .csrf(AbstractHttpConfigurer::disable)
 
+            // X-Frame-Options: 같은 도메인 iframe 허용 (소방 모듈 SPA 내 임베딩)
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+            )
+
             // 세션 미사용
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -68,7 +73,8 @@ public class SecurityConfig {
                 .requestMatchers("/", "/index.html", "/favicon.ico", "/static/**").permitAll()
                 .requestMatchers("/images/**", "/js/**", "/css/**", "/uploads/**").permitAll()
                 .requestMatchers("/account/**").permitAll()
-                // 소방 모듈 정적 리소스
+                // 소방 모듈 정적 리소스 및 메뉴 URL (/fire/**)
+                .requestMatchers("/fire/**").permitAll()
                 .requestMatchers("/fire-map.html").permitAll()
                 .requestMatchers("/extinguishers.html", "/hydrants.html", "/receivers.html", "/pumps.html").permitAll()
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
