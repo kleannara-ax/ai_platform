@@ -33,7 +33,7 @@
     initialActionHandled: false
   };
 
-  const canManage = String(getUser()?.role || "").toUpperCase() === "ADMIN";
+  const canManage = String(getUser()?.role || "").toUpperCase().replace("ROLE_", "") === "ADMIN";
 
   function getPendingAction() {
     if (query.get("add") === "1") return { type: "add", id: "" };
@@ -106,7 +106,7 @@
 
   function ensureAuthenticated() {
     const user = getUser();
-    const role = String(user?.role || "").toUpperCase();
+    const role = String(user?.role || "").toUpperCase().replace("ROLE_", "");
     if (role !== "ADMIN" && role !== "USER") {
       if (window.FireWebNav?.goLogin) { window.FireWebNav.goLogin(); }
       else if (window.FireWebNav?.isInIframe?.()) { try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch(_) {} }
