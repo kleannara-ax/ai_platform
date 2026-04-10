@@ -3,6 +3,7 @@ package com.company.core.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -92,8 +93,10 @@ public class JwtTokenProvider {
             log.warn("지원하지 않는 JWT 토큰: {}", e.getMessage());
         } catch (MalformedJwtException e) {
             log.warn("잘못된 JWT 토큰 형식: {}", e.getMessage());
-        } catch (SecurityException e) {
+        } catch (SignatureException e) {
             log.warn("JWT 서명 검증 실패: {}", e.getMessage());
+        } catch (SecurityException e) {
+            log.warn("JWT 보안 예외: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
             log.warn("JWT 토큰이 비어 있음: {}", e.getMessage());
         }
