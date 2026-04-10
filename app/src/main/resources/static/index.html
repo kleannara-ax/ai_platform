@@ -99,6 +99,7 @@ table tr:last-child td{border-bottom:none;}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
 .badge-admin{background:var(--primary-light);color:var(--primary-dark);}
 .badge-manager{background:var(--orange-light);color:var(--orange);}
+.badge-fire-manager{background:#ede9fe;color:#7c3aed;}
 .badge-user{background:var(--green-light);color:var(--green);}
 .badge-active{background:var(--green-light);color:var(--green);}
 .badge-inactive{background:var(--red-light);color:var(--red);}
@@ -1549,13 +1550,18 @@ function showValidationErrors(res){
   }
 }
 
+const _roleBadgeMap={'ROLE_ADMIN':'badge-admin','ROLE_MANAGER':'badge-manager','ROLE_FIRE_MANAGER':'badge-fire-manager','ROLE_USER':'badge-user'};
+const _roleBadgeFallback=['badge-admin','badge-manager','badge-fire-manager','badge-user'];
 function roleBadge(role){
   if(!role)return'-';
-  const badgeColors=['badge-admin','badge-manager','badge-user','badge-active','badge-inactive'];
-  const idx=allRoles.findIndex(r=>r.code===role);
-  const cls=idx>=0&&idx<badgeColors.length?badgeColors[idx]:(idx>=0?'badge-active':'');
   const r=allRoles.find(r=>r.code===role);
   const label=r?r.codeName:role.replace('ROLE_','');
+  let cls=_roleBadgeMap[role];
+  if(!cls){
+    const ev1=r&&r.extraValue1?r.extraValue1.toLowerCase():'';
+    if(ev1==='admin')cls='badge-admin'; else if(ev1==='manager')cls='badge-manager'; else if(ev1==='fire_manager')cls='badge-fire-manager'; else if(ev1==='user')cls='badge-user';
+    else { const idx=allRoles.findIndex(x=>x.code===role); cls=idx>=0&&idx<_roleBadgeFallback.length?_roleBadgeFallback[idx]:'badge-active'; }
+  }
   return `<span class="badge ${cls}">${esc(label)}</span>`;
 }
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
