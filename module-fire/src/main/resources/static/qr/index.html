@@ -224,8 +224,8 @@
     return currentUser;
   }
 
-  function isAdminUser() {
-    return String(currentUser?.role || '').toUpperCase().replace('ROLE_','') === 'ADMIN';
+  function canManageUser() {
+    return currentUser?.canManage === true;
   }
 
   function qrImgUrl(type, id) {
@@ -543,7 +543,7 @@
       window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
-    if (!isAdminUser()) {
+    if (!canManageUser()) {
       window.location.href = '/fire-map.html';
       return;
     }

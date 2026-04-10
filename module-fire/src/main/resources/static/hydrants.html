@@ -789,7 +789,7 @@
 // ===== JWT & 공용 API =====
 const API = (() => {
   const getUser  = () => { try{ return JSON.parse(localStorage.getItem('fireweb_user')||'null'); }catch{ return null; } };
-  const isAdmin  = () => { const u=getUser(); return u && String(u.role||'').replace('ROLE_','') === 'ADMIN'; };
+  const canManage = () => { const u=getUser(); return u && u.canManage === true; };
   async function req(url, opts={}) {
     const requestOpts = { ...opts };
     const headers = {...(requestOpts.headers||{})};
@@ -810,12 +810,12 @@ const API = (() => {
     }
     return res;
   }
-  return { req, getUser, isAdmin };
+  return { req, getUser, canManage };
 })();
 
 let allItems = [];
 let currentStatusType = null;
-const isAdmin = API.isAdmin();
+const canManage = API.canManage();
 const EMBED_MODAL_MODE = (() => {
   const qs = new URLSearchParams(window.location.search);
   return qs.get('embedEdit') === '1' || qs.get('embedInspect') === '1' || qs.get('embedDetails') === '1';
@@ -852,7 +852,7 @@ function renderNav() {
         </a>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><a class="dropdown-item" href="/account/index.html">내 정보</a></li>
-          ${isAdmin ? '<li><a class="dropdown-item" href="/account/users.html">계정관리</a></li>' : ''}
+          ${canManage ? '<li><a class="dropdown-item" href="/account/users.html">계정관리</a></li>' : ''}
           <li><hr class="dropdown-divider" /></li>
           <li class="px-3 pb-2"><button type="button" class="btn btn-sm btn-danger w-100" onclick="logout()">로그아웃</button></li>
         </ul>
@@ -997,9 +997,9 @@ function renderTable(items) {
         <td class="text-truncate">${x.lastIsFaulty===true?(x.lastFaultReason||'-'):'-'}</td>
         <td class="text-center">
           <div class="hyd-actions">
-            ${isAdmin?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
+            ${canManage?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
             <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
-            ${isAdmin?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
+            ${canManage?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
           </div>
         </td>
       </tr>`;
@@ -1087,9 +1087,9 @@ function renderStatusPanel(type) {
       <td class="text-truncate">${x.lastIsFaulty===true?(x.lastFaultReason||'-'):'-'}</td>
       <td class="text-center">
         <div class="hyd-actions">
-          ${isAdmin?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
+          ${canManage?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
           <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
-          ${isAdmin?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
+          ${canManage?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -1116,8 +1116,8 @@ function renderStatusPanel(type) {
 }
 
 async function deleteHydrant(id, serialNumber='') {
-  if (!isAdmin) {
-    alert('관리자만 삭제 가능합니다.');
+  if (!canManage) {
+    alert('삭제 권한이 없습니다.');
     return;
   }
   const label = serialNumber ? `일련번호 ${serialNumber}` : `ID ${id}`;
@@ -1560,12 +1560,12 @@ window.openHydrantDetails = openHydrantDetails;
     return `
       <tr class="${isNew ? 'fw-history-new' : ''}">
         <td>
-          ${isAdmin
+          ${canManage
             ? `<input type="date" class="form-control form-control-sm js-hyd-hist-date" data-inspection-id="${inspectionId}" value="${inspectionDate}" />`
             : (inspectionDate || '-')}
         </td>
         <td>
-          ${isAdmin
+          ${canManage
             ? `<select class="form-select form-select-sm js-hyd-hist-result" data-inspection-id="${inspectionId}">
                 <option value="ok" ${resultValue === 'ok' ? 'selected' : ''}>정상</option>
                 <option value="bad" ${resultValue === 'bad' ? 'selected' : ''}>비정상</option>
@@ -1574,12 +1574,12 @@ window.openHydrantDetails = openHydrantDetails;
         </td>
         <td><span class="fw-history-name">${row.inspectorName || '-'}</span></td>
         <td>
-          ${isAdmin
+          ${canManage
             ? `<input type="text" class="form-control form-control-sm js-hyd-hist-reason" data-inspection-id="${inspectionId}" value="${reasonValue}" ${reasonDisabled} placeholder="고장 사유" />`
             : (isFaulty ? (row.faultReason || '-') : '-')}
         </td>
         <td>
-          ${isAdmin
+          ${canManage
             ? `<div class="fw-history-actions">
                  <button type="button" class="btn btn-sm btn-fw-edit js-hyd-hist-save" data-inspection-id="${inspectionId}">${saveLabel}</button>
                  ${deleteBtn}
@@ -1596,7 +1596,7 @@ window.openHydrantDetails = openHydrantDetails;
       markup.push('<tr class="fw-history-empty"><td colspan="5" class="text-muted text-center">점검 이력이 없습니다.</td></tr>');
     }
     rows.forEach((row) => markup.push(historyRowMarkup(row)));
-    if (isAdmin && rows.length < 12 && currentEditingHydId > 0) {
+    if (canManage && rows.length < 12 && currentEditingHydId > 0) {
       markup.push(historyRowMarkup({
         inspectionId: '',
         inspectionDate: '',
@@ -2035,7 +2035,7 @@ window.openHydrantDetails = openHydrantDetails;
     }
   });
   histBody?.addEventListener('click', async (ev) => {
-    if (!isAdmin) return alert('관리자만 수정 가능합니다.');
+    if (!canManage) return alert('수정 권한이 없습니다.');
     const saveBtnEl = ev.target.closest('.js-hyd-hist-save');
     const deleteBtnEl = ev.target.closest('.js-hyd-hist-delete');
     const actionBtn = saveBtnEl || deleteBtnEl;
@@ -2256,7 +2256,7 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
     document.head.appendChild(embedStyle);
   }
 
-  if(isAdmin){
+  if(canManage){
     const addBtn=document.getElementById('btnHydAdd');
     if(addBtn) addBtn.style.display='';
   }
@@ -2272,11 +2272,11 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
     return;
   }
   const editId = qs.get('edit');
-  if(editId && isAdmin) {
+  if(editId && canManage) {
     window.openHydrantUpsertModal?.({ id: parseInt(editId,10) });
     return;
   }
-  if (isAdmin && qs.get('add') === '1') {
+  if (canManage && qs.get('add') === '1') {
     const bIdQ = qs.get('buildingId') || '';
     const fIdQ = qs.get('floorId') || '';
     const bName = qs.get('buildingName') || '';

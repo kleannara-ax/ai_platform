@@ -335,7 +335,8 @@ async function enterApp() {
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: (currentUser.role||'').replace('ROLE_',''),
-      token: token
+      token: token,
+      canManage: true
     }));
   }
   await loadUserMenus();
@@ -1412,7 +1413,8 @@ function navigateToFirePage(path) {
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: (currentUser.role||'').replace('ROLE_',''),
-      token: token
+      token: token,
+      canManage: true
     }));
   }
   var el = document.getElementById('pageContent');

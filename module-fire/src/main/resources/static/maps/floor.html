@@ -286,7 +286,7 @@
     try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); }
     catch (_) { return null; }
   })();
-  const isAdmin = String(currentUser?.role || '').toUpperCase().replace('ROLE_','') === 'ADMIN';
+  const canManage = currentUser?.canManage === true;
 
   const state = {
     zoom: 1, panX: 0, panY: 0, dragging: false,
@@ -538,7 +538,7 @@
     return b.includes('\uc625\uc678') || b.includes('outdoor') || f === '\uc625\uc678' || p.includes('drone_photo');
   }
   function updateActionButtons(){
-    if (!isAdmin) return;
+    if (!canManage) return;
     const addExtBtn = document.getElementById('addExtBtn');
     const addHydBtn = document.getElementById('addHydBtn');
     if (!addExtBtn || !addHydBtn) return;
@@ -700,8 +700,8 @@
     });
   }
   function openSelectedEditModal(){
-    if (!isAdmin) {
-      alert('Admin only');
+    if (!canManage) {
+      alert('권한이 필요합니다.');
       return;
     }
     if (state.selectedHydrantId) {
@@ -715,8 +715,8 @@
     alert('먼저 수정할 소화기 또는 소화전을 선택하세요.');
   }
   function openAddModal(kind){
-    if (!isAdmin) {
-      alert('Admin only');
+    if (!canManage) {
+      alert('권한이 필요합니다.');
       return;
     }
     const current = state.current;
@@ -862,11 +862,11 @@
             openExtinguisherActionModal({ mode: 'details', id: cur.extinguisherId });
           };
           document.getElementById('miEditBtn').onclick = () => {
-            if (!isAdmin) return;
+            if (!canManage) return;
             openExtinguisherActionModal({ mode: 'edit', id: cur.extinguisherId });
           };
           document.getElementById('miAddHereBtn').onclick = () => {
-            if (!isAdmin) return;
+            if (!canManage) return;
             openExtinguisherActionModal({
               mode: 'edit',
               add: true,
@@ -923,7 +923,7 @@
           openHydrantActionModal({ mode: 'details', id: h.hydrantId });
         };
         document.getElementById('hiEditBtn').onclick = () => {
-          if (!isAdmin) return;
+          if (!canManage) return;
           openHydrantActionModal({ mode: 'edit', id: h.hydrantId });
         };
         document.getElementById('hiCloseBtn').onclick = hideHydrantInfo;
@@ -1072,25 +1072,25 @@
     syncCurrentFloor(false);
 
     window.FireWebNav?.mount?.();
-    document.getElementById('saveBtn').disabled = !isAdmin;
-    document.getElementById('clearBtn').disabled = !isAdmin;
-    document.getElementById('addExtBtn').disabled = !isAdmin;
-    document.getElementById('delExtBtn').disabled = !isAdmin;
-    document.getElementById('addHydBtn').disabled = !isAdmin;
-    document.getElementById('delHydBtn').disabled = !isAdmin;
-    if (!isAdmin) {
-      document.getElementById('saveBtn').title = '관리자 권한이 필요합니다.';
-      document.getElementById('clearBtn').title = '관리자 권한이 필요합니다.';
-      document.getElementById('addExtBtn').title = '관리자 권한이 필요합니다.';
-      document.getElementById('delExtBtn').title = '관리자 권한이 필요합니다.';
-      document.getElementById('addHydBtn').title = '관리자 권한이 필요합니다.';
-      document.getElementById('delHydBtn').title = '관리자 권한이 필요합니다.';
+    document.getElementById('saveBtn').disabled = !canManage;
+    document.getElementById('clearBtn').disabled = !canManage;
+    document.getElementById('addExtBtn').disabled = !canManage;
+    document.getElementById('delExtBtn').disabled = !canManage;
+    document.getElementById('addHydBtn').disabled = !canManage;
+    document.getElementById('delHydBtn').disabled = !canManage;
+    if (!canManage) {
+      document.getElementById('saveBtn').title = '권한이 필요합니다.';
+      document.getElementById('clearBtn').title = '권한이 필요합니다.';
+      document.getElementById('addExtBtn').title = '권한이 필요합니다.';
+      document.getElementById('delExtBtn').title = '권한이 필요합니다.';
+      document.getElementById('addHydBtn').title = '권한이 필요합니다.';
+      document.getElementById('delHydBtn').title = '권한이 필요합니다.';
       document.getElementById('miEditBtn').disabled = true;
       document.getElementById('hiEditBtn').disabled = true;
       document.getElementById('miAddHereBtn').disabled = true;
-      document.getElementById('miEditBtn').title = '관리자만 위치를 수정할 수 있습니다.';
-      document.getElementById('hiEditBtn').title = '관리자만 위치를 수정할 수 있습니다.';
-      document.getElementById('miAddHereBtn').title = '관리자만 추가할 수 있습니다.';
+      document.getElementById('miEditBtn').title = '수정 권한이 필요합니다.';
+      document.getElementById('hiEditBtn').title = '수정 권한이 필요합니다.';
+      document.getElementById('miAddHereBtn').title = '추가 권한이 필요합니다.';
     }
     renderList();
     renderMarkers();
@@ -1121,7 +1121,7 @@
   });
 
   planImg.addEventListener('click', (e) => {
-    if (!isAdmin) return;
+    if (!canManage) return;
     if (state.addMode === 'ext') {
       const rect = planImg.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
@@ -1151,7 +1151,7 @@
   });
 
   document.getElementById('clearBtn').onclick = () => {
-    if (!isAdmin) return alert('Admin only');
+    if (!canManage) return alert('권한이 필요합니다.');
     state.moveArmed = false;
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) saveBtn.textContent = '\uC120\uD0DD \uC124\uBE44 \uC218\uC815';
@@ -1172,7 +1172,7 @@
     openAddModal('ext');
   };
   document.getElementById('delExtBtn').onclick = async () => {
-    if (!isAdmin) return alert('Admin only');
+    if (!canManage) return alert('권한이 필요합니다.');
     if (!state.selectedExtId) return alert('\uC0AD\uC81C\uD560 \uC18C\uD654\uAE30\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.');
     if (!confirm(`\uC18C\uD654\uAE30 #${state.selectedExtId}\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return;
     const r = await fetch(`/fire-api/extinguishers/${encodeURIComponent(state.selectedExtId)}`, { method:'DELETE', headers: authHeaders({}, 'DELETE') });
@@ -1189,7 +1189,7 @@
     openAddModal('hyd');
   };
   document.getElementById('delHydBtn').onclick = async () => {
-    if (!isAdmin) return alert('Admin only');
+    if (!canManage) return alert('권한이 필요합니다.');
     if (!state.selectedHydrantId) return alert('\uC0AD\uC81C\uD560 \uC18C\uD654\uC804\uC744 \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.');
     if (!confirm(`\uC18C\uD654\uC804 #${state.selectedHydrantId}\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return;
     const r = await fetch(`/fire-api/hydrants/${encodeURIComponent(state.selectedHydrantId)}`, { method:'DELETE', headers: authHeaders({}, 'DELETE') });
