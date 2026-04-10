@@ -67,12 +67,17 @@ public class AuthService {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
 
-        Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
-        String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
-        String newRefreshToken = jwtTokenProvider.createRefreshToken(authentication);
+        try {
+            Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
+            String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+            String newRefreshToken = jwtTokenProvider.createRefreshToken(authentication);
 
-        log.info("토큰 갱신 완료: loginId={}", authentication.getName());
+            log.info("토큰 갱신 완료: loginId={}", authentication.getName());
 
-        return TokenResponse.of(newAccessToken, newRefreshToken, accessTokenExpiration / 1000);
+            return TokenResponse.of(newAccessToken, newRefreshToken, accessTokenExpiration / 1000);
+        } catch (Exception e) {
+            log.warn("토큰 갱신 중 오류 발생: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
     }
 }
