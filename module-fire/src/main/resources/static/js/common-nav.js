@@ -62,22 +62,17 @@
   function setMenuLinks() {
     var nav = document.querySelector(".fireweb-navbar");
     if (!nav) return;
-    var user = getUser();
-    var isAdmin = String(user && user.role || "").toUpperCase().replace("ROLE_", "") === "ADMIN";
     var menu = nav.querySelector(".navbar-nav.ms-3");
     if (!menu) return;
+    // SPA 권한관리 기준: SPA에서 접근 허용된 사용자만 iframe에 도달하므로 모든 메뉴 표시
     var defs = [
       { href: "/extinguishers.html", text: "\uC18C\uD654\uAE30" },
       { href: "/hydrants.html", text: "\uC18C\uD654\uC804" },
-      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uB3C4\uBA74" }
+      { href: "/receivers.html", text: "\uC218\uC2E0\uAE30" },
+      { href: "/pumps.html", text: "\uC18C\uBC29\uD38C\uD504" },
+      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uB3C4\uBA74" },
+      { href: "/qr", text: "QR\uCF54\uB4DC" }
     ];
-    if (isAdmin) {
-      defs.splice(2, 0,
-        { href: "/receivers.html", text: "\uC218\uC2E0\uAE30" },
-        { href: "/pumps.html", text: "\uC18C\uBC29\uD38C\uD504" }
-      );
-      defs.push({ href: "/qr", text: "QR\uCF54\uB4DC" });
-    }
     menu.innerHTML = defs.map(function (item) {
       return '<li class="nav-item"><a class="nav-link fw-semibold" href="' + item.href + '">' + item.text + '</a></li>';
     }).join("");
@@ -104,7 +99,7 @@
       area.innerHTML = '<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="#" onclick="FireWebNav.goLogin();return false;">\uB85C\uADF8\uC778</a></li>';
       return;
     }
-    var isAdmin = String(user.role || "").toUpperCase().replace("ROLE_", "") === "ADMIN";
+    var canManage = user.canManage === true;
     area.innerHTML =
       '<li class="nav-item dropdown">' +
       '<a class="nav-link dropdown-toggle fw-semibold account-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">' +
@@ -112,7 +107,7 @@
       "</a>" +
       '<ul class="dropdown-menu dropdown-menu-end">' +
       '<li><a class="dropdown-item" href="/account/index.html">\uB0B4 \uC815\uBCF4</a></li>' +
-      (isAdmin ? '<li><a class="dropdown-item" href="/account/users.html">\uACC4\uC815\uAD00\uB9AC</a></li>' : "") +
+      (canManage ? '<li><a class="dropdown-item" href="/account/users.html">\uACC4\uC815\uAD00\uB9AC</a></li>' : "") +
       '<li><hr class="dropdown-divider"></li>' +
       '<li><button type="button" class="dropdown-item text-danger" id="fwCommonLogoutBtn">\uB85C\uADF8\uC544\uC6C3</button></li>' +
       "</ul></li>";

@@ -33,7 +33,7 @@
     initialActionHandled: false
   };
 
-  const canManage = String(getUser()?.role || "").toUpperCase().replace("ROLE_", "") === "ADMIN";
+  const canManage = getUser()?.canManage === true;
 
   function getPendingAction() {
     if (query.get("add") === "1") return { type: "add", id: "" };
@@ -106,8 +106,7 @@
 
   function ensureAuthenticated() {
     const user = getUser();
-    const role = String(user?.role || "").toUpperCase().replace("ROLE_", "");
-    if (role !== "ADMIN" && role !== "USER") {
+    if (!user || !user.token) {
       if (window.FireWebNav?.goLogin) { window.FireWebNav.goLogin(); }
       else if (window.FireWebNav?.isInIframe?.()) { try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch(_) {} }
       else { location.replace('/index.html'); }

@@ -1000,7 +1000,7 @@
 <script>
 // ===== 전역 상태 =====
 let currentUser = null;
-let isAdmin = false;
+let canManage = false;
 let outdoorHydrants = [];
 let currentOutdoorId = null;
 let outdoorMode = false;
@@ -1050,7 +1050,7 @@ async function init() {
     try {
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            isAdmin = String(currentUser.role||'').replace('ROLE_','') === 'ADMIN';
+            canManage = currentUser.canManage === true;
         } else if (fallbackUser) {
             currentUser = { username: fallbackUser, displayName: fallbackUser, role: 'USER' };
         }
@@ -1059,8 +1059,8 @@ async function init() {
             accountBtn.textContent = currentUser.username || '사용자';
         }
         const qrMenuBtn = document.querySelector('.side-menu a[href="/qr"]');
-        if (qrMenuBtn) qrMenuBtn.style.display = isAdmin ? 'block' : 'none';
-        if (isAdmin) {
+        if (qrMenuBtn) qrMenuBtn.style.display = canManage ? 'block' : 'none';
+        if (canManage) {
             const adminLi = document.getElementById('adminMenuLi');
             if (adminLi) adminLi.style.display = '';
             const adminQuickBtn = document.getElementById('adminQuickBtn');
@@ -1075,7 +1075,7 @@ async function init() {
                 outdoorEquipmentToggle.parentElement.parentElement.style.display = 'flex';
             }
         } else {
-            setOutdoorHint('일반 사용자는 점검만 가능합니다.', 'error');
+            setOutdoorHint('점검만 가능합니다.', 'error');
             if (outdoorEquipmentToggle) outdoorEquipmentToggle.checked = false;
             if (outdoorEquipmentToggle?.parentElement?.parentElement) {
                 outdoorEquipmentToggle.parentElement.parentElement.style.display = 'none';
@@ -1701,8 +1701,8 @@ function fillOutdoorEquipmentInfo(item){
     if (oesCoord) oesCoord.textContent = (item.x != null && item.y != null) ? `${Number(item.x).toFixed(2)}%, ${Number(item.y).toFixed(2)}%` : '-';
     if (oesLocation) oesLocation.textContent = item.locationDescription || '-';
     if (oesLastInspection) oesLastInspection.textContent = item.lastInspectionDate || '-';
-    if (btnOutdoorEquipmentInspect) btnOutdoorEquipmentInspect.style.display = isAdmin ? '' : 'none';
-    if (btnOutdoorEquipmentEdit) btnOutdoorEquipmentEdit.style.display = isAdmin ? '' : 'none';
+    if (btnOutdoorEquipmentInspect) btnOutdoorEquipmentInspect.style.display = canManage ? '' : 'none';
+    if (btnOutdoorEquipmentEdit) btnOutdoorEquipmentEdit.style.display = canManage ? '' : 'none';
     setOutdoorEquipmentHint(`${item.type === 'receiver' ? '수신기' : '소방펌프'}가 선택되었습니다. 상세, 점검, 수정 모달을 열 수 있습니다.`, 'success');
 }
 
@@ -1943,7 +1943,7 @@ function setOutdoorMode(on){
         hideOutdoorInfo();
         resetMapTransform(true);
     }
-    if (isAdmin) {
+    if (canManage) {
         setOutdoorHint('마커를 선택하면 점검/수정/이동할 수 있습니다.');
     } else {
         setOutdoorHint('일반 사용자는 점검만 가능합니다.', 'error');
@@ -1964,16 +1964,16 @@ function setOutdoorEquipmentMode(on){
         outdoorEquipmentToggle.checked = outdoorEquipmentMode;
     }
     if (outdoorEquipmentPanel) {
-        outdoorEquipmentPanel.classList.toggle('show', outdoorEquipmentMode && isAdmin);
+        outdoorEquipmentPanel.classList.toggle('show', outdoorEquipmentMode && canManage);
     }
     if (outdoorEquipmentMode) {
         screen.classList.remove('menu-open');
         closePopup();
         infoTitle.textContent = '옥외 설비';
         infoSub.innerHTML = '<strong>수신기 / 소방펌프 관리</strong>';
-        infoBody.textContent = isAdmin
+        infoBody.textContent = canManage
             ? '추가는 위치를 먼저 찍고, 수정은 모달로, 이동은 도면에서 바로 저장합니다.'
-            : '관리자만 접근할 수 있는 기능입니다.';
+            : '권한이 필요합니다.';
         setOutdoorEquipmentAction(null);
         setOutdoorEquipmentHint('추가를 누른 뒤 도면을 클릭하면 등록 모달이 열립니다.');
     } else {
@@ -2002,7 +2002,7 @@ if (outdoorEquipmentToggle) {
     outdoorEquipmentToggle.checked = false;
     outdoorEquipmentToggle.addEventListener('change', async (e)=> {
         const next = !!e.target.checked;
-        if (!isAdmin) {
+        if (!canManage) {
             e.target.checked = false;
             setOutdoorEquipmentMode(false);
             return;
@@ -2015,33 +2015,33 @@ if (outdoorEquipmentToggle) {
 }
 btnOutdoorEquipmentDetail?.addEventListener('click', ()=> openOutdoorEquipmentPage('details'));
 btnOutdoorEquipmentInspect?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     openOutdoorEquipmentPage('inspect');
 });
 btnOutdoorEquipmentEdit?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     setOutdoorEquipmentAction(null);
     openOutdoorEquipmentPage('edit');
 });
 btnOutdoorReceiverAdd?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     hideOutdoorEquipmentInfo(false);
     setOutdoorEquipmentAction('add', 'receiver');
     setOutdoorEquipmentHint('도면에서 수신기를 추가할 위치를 클릭하세요.');
 });
 btnOutdoorPumpAdd?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     hideOutdoorEquipmentInfo(false);
     setOutdoorEquipmentAction('add', 'pump');
     setOutdoorEquipmentHint('도면에서 소방펌프를 추가할 위치를 클릭하세요.');
 });
 btnOutdoorEquipmentEditPanel?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     setOutdoorEquipmentAction(null);
     openOutdoorEquipmentPage('edit');
 });
 btnOutdoorEquipmentMove?.addEventListener('click', ()=> {
-    if (!isAdmin) return;
+    if (!canManage) return;
     if (!currentOutdoorEquipment) {
         setOutdoorEquipmentHint('이동할 설비를 먼저 선택하세요.', 'error');
         return;
@@ -2075,13 +2075,13 @@ clampMap();
 applyMapTransform();
 
 btnOutdoorAdd?.addEventListener('click', ()=>{
-    if(!isAdmin){ alert('관리자만 추가할 수 있습니다.'); return; }
+    if(!canManage){ alert('추가 권한이 없습니다.'); return; }
     hideOutdoorInfo(false);
     setOutdoorToolMode('add');
     setOutdoorHint('추가할 위치를 클릭하세요.');
 });
 btnOutdoorMove?.addEventListener('click', ()=>{
-    if(!isAdmin){ alert('관리자만 이동할 수 있습니다.'); return; }
+    if(!canManage){ alert('이동 권한이 없습니다.'); return; }
     if(!currentOutdoorId){ setOutdoorHint('먼저 이동할 소화전을 선택하세요.', 'error'); return; }
     hideOutdoorInfo(false);
     setOutdoorToolMode('move');
@@ -2098,13 +2098,13 @@ btnOutdoorMoveSave?.addEventListener('click', ()=>{
     });
 });
 btnOutdoorEdit?.addEventListener('click', ()=>{
-    if(!isAdmin){ alert('관리자만 수정할 수 있습니다.'); return; }
+    if(!canManage){ alert('수정 권한이 없습니다.'); return; }
     if(!currentOutdoorId){ setOutdoorHint('먼저 마커를 선택하세요.', 'error'); return; }
     setOutdoorToolMode(null);
     openOutdoorEditModal(currentOutdoorId);
 });
 btnOutdoorSelectEdit?.addEventListener('click', ()=>{
-    if(!isAdmin){ alert('관리자만 수정할 수 있습니다.'); return; }
+    if(!canManage){ alert('수정 권한이 없습니다.'); return; }
     if(!currentOutdoorId){ setOutdoorHint('먼저 마커를 선택하세요.', 'error'); return; }
     setOutdoorToolMode(null);
     openOutdoorEditModal(currentOutdoorId);
