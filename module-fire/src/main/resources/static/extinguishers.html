@@ -250,8 +250,12 @@
     #btnStatusUrgent {
       background: linear-gradient(135deg,#f43f5e 0%,#be123c 100%) !important;
     }
-    .status-chip-group .btn.status-add-btn {
+    .btn.status-add-btn {
       background: linear-gradient(135deg,#22c55e 0%,#15803d 100%) !important;
+      color: #fff !important;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 6px 16px;
     }
     #extUpsertModal .modal-dialog,
     #detailsModal .modal-dialog { max-width: 1180px; }
@@ -486,8 +490,8 @@
           <button type="button" class="btn btn-danger text-white" id="btnStatusUrgent">
             교체필요 <span id="countUrgent">(0)</span>
           </button>
-                  <button type="button" class="btn status-add-btn" id="btnExtAdd" style="display:none;">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
         </div>
+        <button type="button" class="btn status-add-btn" id="btnExtAdd">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
       </div>
     </div>
   </div>
@@ -2176,9 +2180,9 @@ function _normFloorCompat(v) {
     ].join('\n');
     document.head.appendChild(embedStyle);
   }
-  if (canManage) {
+  if (!canManage) {
     const addBtn = document.getElementById('btnExtAdd');
-    if (addBtn) addBtn.style.display = '';
+    if (addBtn) addBtn.style.display = 'none';
   }
   await loadExtinguishers();
 
