@@ -1440,10 +1440,10 @@ async function renderFireIndex() {
     var extItems=[], hydItems=[], pumpItems=[], recvItems=[];
     try {
       var results = await Promise.all([
-        api('GET', '/fire-api/extinguishers?page=0&size=5&sort=updatedAt,desc'),
-        api('GET', '/fire-api/hydrants?page=0&size=5&sort=updatedAt,desc'),
-        api('GET', '/fire-api/pumps?page=0&size=5&sort=updatedAt,desc'),
-        api('GET', '/fire-api/receivers?page=0&size=5&sort=updatedAt,desc')
+        api('GET', '/fire-api/extinguishers?page=0&size=500&sort=updatedAt,desc'),
+        api('GET', '/fire-api/hydrants?page=0&size=500&sort=updatedAt,desc'),
+        api('GET', '/fire-api/pumps?page=0&size=500&sort=updatedAt,desc'),
+        api('GET', '/fire-api/receivers?page=0&size=500&sort=updatedAt,desc')
       ]);
       extCount = results[0].success ? (results[0].data?.totalElements || 0) : 0;
       hydCount = results[1].success ? (results[1].data?.totalElements || 0) : 0;
@@ -1460,6 +1460,22 @@ async function renderFireIndex() {
     var recvV = stats ? (stats.receiverCount != null ? stats.receiverCount : recvCount) : recvCount;
     var pumpV = stats ? (stats.pumpCount != null ? stats.pumpCount : pumpCount) : pumpCount;
     var bldgV = stats ? (stats.buildingCount != null ? stats.buildingCount : '-') : '-';
+
+    // 이상 상태 수량 카운트
+    var today = new Date(); today.setHours(0,0,0,0);
+    var threshold30 = new Date(today.getTime() + 30*24*3600*1000);
+    // 소화기 교체필요: lastIsFaulty===true 또는 replacementDueDate ≤ 오늘+30일
+    var extAlertCount = extItems.filter(function(it) {
+      var isFaulty = it.lastIsFaulty === true;
+      var dueDate = it.replacementDueDate ? new Date(it.replacementDueDate) : null;
+      return isFaulty || (dueDate && dueDate <= threshold30);
+    }).length;
+    // 소화전 비정상: lastIsFaulty===true
+    var hydAlertCount = hydItems.filter(function(it) { return it.lastIsFaulty === true; }).length;
+    // 수신기 불량: lastInspectionStatus === "FAULTY"
+    var recvAlertCount = recvItems.filter(function(it) { return String(it.lastInspectionStatus||'').toUpperCase() === 'FAULTY'; }).length;
+    // 소방펌프 불량: lastInspectionStatus === "FAULTY"
+    var pumpAlertCount = pumpItems.filter(function(it) { return String(it.lastInspectionStatus||'').toUpperCase() === 'FAULTY'; }).length;
 
     // 상태 badge 헬퍼
     function fireBadge(s) {
@@ -1483,22 +1499,28 @@ async function renderFireIndex() {
     recentItems.sort(function(a,b) { return (b.date||'') > (a.date||'') ? 1 : -1; });
     recentItems = recentItems.slice(0, 8);
 
+    // sub 텍스트에 이상 수량 포함
+    var extSub = extAlertCount > 0 ? '<span style="color:var(--red);font-weight:700;">교체필요 '+extAlertCount+'</span>' : '이상 없음';
+    var hydSub = hydAlertCount > 0 ? '<span style="color:var(--red);font-weight:700;">비정상 '+hydAlertCount+'</span>' : '이상 없음';
+    var recvSub = recvAlertCount > 0 ? '<span style="color:var(--red);font-weight:700;">불량 '+recvAlertCount+'</span>' : '이상 없음';
+    var pumpSub = pumpAlertCount > 0 ? '<span style="color:var(--red);font-weight:700;">불량 '+pumpAlertCount+'</span>' : '이상 없음';
+
     el.innerHTML = '<div class="stats-grid">'
-      + '<div class="stat-card blue"><div class="label">소화기</div><div class="value">'+extV+'</div><div class="sub">등록된 소화기</div></div>'
-      + '<div class="stat-card green"><div class="label">소화전</div><div class="value">'+hydV+'</div><div class="sub">등록된 소화전</div></div>'
-      + '<div class="stat-card orange"><div class="label">수신기</div><div class="value">'+recvV+'</div><div class="sub">등록된 수신기</div></div>'
-      + '<div class="stat-card red"><div class="label">소방펌프</div><div class="value">'+pumpV+'</div><div class="sub">등록된 소방펌프</div></div>'
+      + '<div class="stat-card blue"><div class="label">소화기</div><div class="value">'+extV+'</div><div class="sub">'+extSub+'</div></div>'
+      + '<div class="stat-card green"><div class="label">소화전</div><div class="value">'+hydV+'</div><div class="sub">'+hydSub+'</div></div>'
+      + '<div class="stat-card orange"><div class="label">수신기</div><div class="value">'+recvV+'</div><div class="sub">'+recvSub+'</div></div>'
+      + '<div class="stat-card red"><div class="label">소방펌프</div><div class="value">'+pumpV+'</div><div class="sub">'+pumpSub+'</div></div>'
       + '</div>'
       + '<div class="stats-grid" style="grid-template-columns:repeat(2,1fr);">'
       + '<div class="stat-card" style="border-left:3px solid var(--primary);"><div class="label">전체 장비</div><div class="value" style="color:var(--primary);">'+totalEquip+'</div><div class="sub">소방시설 총 수량</div></div>'
       + '<div class="stat-card" style="border-left:3px solid var(--green);"><div class="label">건물 수</div><div class="value" style="color:var(--green);">'+bldgV+'</div><div class="sub">관리 건물</div></div>'
       + '</div>'
       + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3></div><div class="card-body" style="padding:0;">'
-      + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>비율</th><th></th></tr></thead><tbody>'
-      + '<tr><td><b>소화기</b></td><td>'+extV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--primary);height:100%;width:'+(totalEquip?Math.round(extV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_extinguisher\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>소화전</b></td><td>'+hydV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--green);height:100%;width:'+(totalEquip?Math.round(hydV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_hydrant\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>수신기</b></td><td>'+recvV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--orange);height:100%;width:'+(totalEquip?Math.round(recvV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_receiver\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>소방펌프</b></td><td>'+pumpV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--red);height:100%;width:'+(totalEquip?Math.round(pumpV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_pump\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상</th><th>비율</th><th></th></tr></thead><tbody>'
+      + '<tr><td><b>소화기</b></td><td>'+extV+'</td><td>'+(extAlertCount>0?'<span class="badge badge-admin">교체필요 '+extAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--primary);height:100%;width:'+(totalEquip?Math.round(extV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_extinguisher\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소화전</b></td><td>'+hydV+'</td><td>'+(hydAlertCount>0?'<span class="badge badge-admin">비정상 '+hydAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--green);height:100%;width:'+(totalEquip?Math.round(hydV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_hydrant\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>수신기</b></td><td>'+recvV+'</td><td>'+(recvAlertCount>0?'<span class="badge badge-admin">불량 '+recvAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--orange);height:100%;width:'+(totalEquip?Math.round(recvV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_receiver\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소방펌프</b></td><td>'+pumpV+'</td><td>'+(pumpAlertCount>0?'<span class="badge badge-admin">불량 '+pumpAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--red);height:100%;width:'+(totalEquip?Math.round(pumpV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_pump\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
       + '</tbody></table></div></div>'
       + '<div class="card"><div class="card-header"><h3>최근 등록/수정 장비</h3></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>이름/모델</th><th>위치</th><th>상태</th><th>날짜</th></tr></thead>'
