@@ -99,7 +99,7 @@
       area.innerHTML = '<li class="nav-item"><a class="btn btn-sm btn-outline-light" href="#" onclick="FireWebNav.goLogin();return false;">\uB85C\uADF8\uC778</a></li>';
       return;
     }
-    var canManage = user.canManage === true;
+    var canManage = user.canManage !== false;
     area.innerHTML =
       '<li class="nav-item dropdown">' +
       '<a class="nav-link dropdown-toggle fw-semibold account-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">' +
