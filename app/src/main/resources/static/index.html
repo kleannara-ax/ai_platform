@@ -331,12 +331,14 @@ async function enterApp() {
   try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
   if (token && currentUser) {
+    const fireRole = (currentUser.role||'').replace('ROLE_','');
+    const fireCanManage = fireRole === 'ADMIN' || fireRole === 'FIRE_MANAGER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
-      role: (currentUser.role||'').replace('ROLE_',''),
+      role: fireRole,
       token: token,
-      canManage: true
+      canManage: fireCanManage
     }));
   }
   await loadUserMenus();
@@ -1409,12 +1411,14 @@ async function deleteCodeDetail(codeId){
 function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
+    const fireRole = (currentUser.role||'').replace('ROLE_','');
+    const fireCanManage = fireRole === 'ADMIN' || fireRole === 'FIRE_MANAGER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
-      role: (currentUser.role||'').replace('ROLE_',''),
+      role: fireRole,
       token: token,
-      canManage: true
+      canManage: fireCanManage
     }));
   }
   var el = document.getElementById('pageContent');

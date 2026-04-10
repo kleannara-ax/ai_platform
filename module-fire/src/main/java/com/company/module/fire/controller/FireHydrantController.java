@@ -63,7 +63,7 @@ public class FireHydrantController {
 
     /** 소화전 등록/수정 (ADMIN) */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<FireHydrantResponse>> save(
             @Valid @RequestBody FireHydrantSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(fireHydrantService.saveHydrant(request)));
@@ -169,7 +169,7 @@ public class FireHydrantController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateInspection(
             @PathVariable("id") Long hydrantId,
             @PathVariable Long inspectionId,
@@ -187,7 +187,7 @@ public class FireHydrantController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> addInspection(
             @PathVariable("id") Long hydrantId,
             @Valid @RequestBody FireHydrantInspectionUpdateRequest request,
@@ -204,7 +204,7 @@ public class FireHydrantController {
     }
 
     @DeleteMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> deleteInspection(
             @PathVariable("id") Long hydrantId,
             @PathVariable Long inspectionId) {
@@ -214,7 +214,7 @@ public class FireHydrantController {
 
     /** 소화전 삭제 (ADMIN) */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         fireHydrantService.deleteHydrant(id);
         return ResponseEntity.ok(ApiResponse.success());
