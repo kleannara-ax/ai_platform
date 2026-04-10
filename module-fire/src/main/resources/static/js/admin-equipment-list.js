@@ -33,7 +33,7 @@
     initialActionHandled: false
   };
 
-  const canManage = getUser()?.canManage === true;
+  const canManage = getUser()?.canManage !== false;
 
   function getPendingAction() {
     if (query.get("add") === "1") return { type: "add", id: "" };

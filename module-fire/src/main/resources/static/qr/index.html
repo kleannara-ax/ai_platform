@@ -225,7 +225,7 @@
   }
 
   function canManageUser() {
-    return currentUser?.canManage === true;
+    return currentUser?.canManage !== false;
   }
 
   function qrImgUrl(type, id) {

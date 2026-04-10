@@ -773,7 +773,7 @@
  // ===== JWT & 공용 API =====
 const API = (() => {
   const getUser  = () => { try{ return JSON.parse(localStorage.getItem('fireweb_user')||'null'); }catch{ return null; } };
-  const canManage = () => { const u = getUser(); return u && u.canManage === true; };
+  const canManage = () => { const u = getUser(); return u && u.canManage !== false; };
 
   async function req(url, opts = {}) {
     const requestOpts = { ...opts };

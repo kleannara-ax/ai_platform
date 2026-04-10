@@ -286,7 +286,7 @@
     try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); }
     catch (_) { return null; }
   })();
-  const canManage = currentUser?.canManage === true;
+  const canManage = currentUser?.canManage !== false;
 
   const state = {
     zoom: 1, panX: 0, panY: 0, dragging: false,

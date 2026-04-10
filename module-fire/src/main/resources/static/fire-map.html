@@ -1050,7 +1050,7 @@ async function init() {
     try {
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            canManage = currentUser.canManage === true;
+            canManage = currentUser.canManage !== false;
         } else if (fallbackUser) {
             currentUser = { username: fallbackUser, displayName: fallbackUser, role: 'USER' };
         }
