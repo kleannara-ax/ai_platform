@@ -1437,17 +1437,22 @@ async function renderFireIndex() {
       if (statsRes.success) stats = statsRes.data;
     } catch(e) {}
     var extCount=0, hydCount=0, pumpCount=0, recvCount=0;
+    var extItems=[], hydItems=[], pumpItems=[], recvItems=[];
     try {
       var results = await Promise.all([
-        api('GET', '/fire-api/extinguishers?page=0&size=1'),
-        api('GET', '/fire-api/hydrants?page=0&size=1'),
-        api('GET', '/fire-api/pumps?page=0&size=1'),
-        api('GET', '/fire-api/receivers?page=0&size=1')
+        api('GET', '/fire-api/extinguishers?page=0&size=5&sort=updatedAt,desc'),
+        api('GET', '/fire-api/hydrants?page=0&size=5&sort=updatedAt,desc'),
+        api('GET', '/fire-api/pumps?page=0&size=5&sort=updatedAt,desc'),
+        api('GET', '/fire-api/receivers?page=0&size=5&sort=updatedAt,desc')
       ]);
-      extCount = results[0].success ? (results[0].data?.totalElements || results[0].data?.length || 0) : 0;
-      hydCount = results[1].success ? (results[1].data?.totalElements || results[1].data?.length || 0) : 0;
-      pumpCount = results[2].success ? (results[2].data?.totalElements || results[2].data?.length || 0) : 0;
-      recvCount = results[3].success ? (results[3].data?.totalElements || results[3].data?.length || 0) : 0;
+      extCount = results[0].success ? (results[0].data?.totalElements || 0) : 0;
+      hydCount = results[1].success ? (results[1].data?.totalElements || 0) : 0;
+      pumpCount = results[2].success ? (results[2].data?.totalElements || 0) : 0;
+      recvCount = results[3].success ? (results[3].data?.totalElements || 0) : 0;
+      extItems = results[0].success ? (results[0].data?.content || []) : [];
+      hydItems = results[1].success ? (results[1].data?.content || []) : [];
+      pumpItems = results[2].success ? (results[2].data?.content || []) : [];
+      recvItems = results[3].success ? (results[3].data?.content || []) : [];
     } catch(e) {}
     var totalEquip = (stats && stats.totalEquipment) || (extCount + hydCount + pumpCount + recvCount);
     var extV = stats ? (stats.extinguisherCount != null ? stats.extinguisherCount : extCount) : extCount;
@@ -1455,6 +1460,29 @@ async function renderFireIndex() {
     var recvV = stats ? (stats.receiverCount != null ? stats.receiverCount : recvCount) : recvCount;
     var pumpV = stats ? (stats.pumpCount != null ? stats.pumpCount : pumpCount) : pumpCount;
     var bldgV = stats ? (stats.buildingCount != null ? stats.buildingCount : '-') : '-';
+
+    // 상태 badge 헬퍼
+    function fireBadge(s) {
+      if (!s) return '<span class="badge badge-inactive">-</span>';
+      var map = { NORMAL:'정상', FAULTY:'불량', MAINTENANCE:'정비중', ACTIVE:'사용중', INACTIVE:'미사용', EXPIRED:'만료', PENDING:'대기' };
+      var cls = { NORMAL:'badge-active', FAULTY:'badge-admin', MAINTENANCE:'badge-manager', ACTIVE:'badge-active', INACTIVE:'badge-inactive', EXPIRED:'badge-admin', PENDING:'badge-manager' };
+      return '<span class="badge '+(cls[s]||'badge-inactive')+'">'+(map[s]||s)+'</span>';
+    }
+    function fireDate(d) {
+      if (!d) return '-';
+      if (Array.isArray(d)) { var p = d; return p[0]+'-'+String(p[1]).padStart(2,'0')+'-'+String(p[2]).padStart(2,'0'); }
+      return String(d).substring(0,10);
+    }
+
+    // 최근 등록 장비 통합 목록 (최대 8개)
+    var recentItems = [];
+    extItems.forEach(function(it) { recentItems.push({ type:'소화기', name: it.modelName||it.location||'-', location: it.buildingName||it.location||'-', status: it.status, date: it.updatedAt||it.createdAt }); });
+    hydItems.forEach(function(it) { recentItems.push({ type:'소화전', name: it.modelName||it.location||'-', location: it.buildingName||it.location||'-', status: it.status, date: it.updatedAt||it.createdAt }); });
+    recvItems.forEach(function(it) { recentItems.push({ type:'수신기', name: it.modelName||it.name||'-', location: it.buildingName||it.location||'-', status: it.status, date: it.updatedAt||it.createdAt }); });
+    pumpItems.forEach(function(it) { recentItems.push({ type:'소방펌프', name: it.modelName||it.name||'-', location: it.buildingName||it.location||'-', status: it.status, date: it.updatedAt||it.createdAt }); });
+    recentItems.sort(function(a,b) { return (b.date||'') > (a.date||'') ? 1 : -1; });
+    recentItems = recentItems.slice(0, 8);
+
     el.innerHTML = '<div class="stats-grid">'
       + '<div class="stat-card blue"><div class="label">소화기</div><div class="value">'+extV+'</div><div class="sub">등록된 소화기</div></div>'
       + '<div class="stat-card green"><div class="label">소화전</div><div class="value">'+hydV+'</div><div class="sub">등록된 소화전</div></div>'
@@ -1465,16 +1493,19 @@ async function renderFireIndex() {
       + '<div class="stat-card" style="border-left:3px solid var(--primary);"><div class="label">전체 장비</div><div class="value" style="color:var(--primary);">'+totalEquip+'</div><div class="sub">소방시설 총 수량</div></div>'
       + '<div class="stat-card" style="border-left:3px solid var(--green);"><div class="label">건물 수</div><div class="value" style="color:var(--green);">'+bldgV+'</div><div class="sub">관리 건물</div></div>'
       + '</div>'
-      + '<div class="card"><div class="card-header"><h3>소방시설 바로가기</h3></div><div class="card-body">'
-      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/fire-map.html\')" style="padding:16px;">'+(menuIcons['FIRE_MAP']||'')+'<br>도면 (메인)</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/extinguishers.html\')" style="padding:16px;">'+(menuIcons['FIRE_EXTINGUISHER']||'')+'<br>소화기 목록</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/hydrants.html\')" style="padding:16px;">'+(menuIcons['FIRE_HYDRANT']||'')+'<br>소화전 목록</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/receivers.html\')" style="padding:16px;">'+(menuIcons['FIRE_RECEIVER']||'')+'<br>수신기 목록</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/pumps.html\')" style="padding:16px;">'+(menuIcons['FIRE_PUMP']||'')+'<br>소방펌프 목록</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/maps/floor.html\')" style="padding:16px;">'+(menuIcons['FIRE_FLOOR']||'')+'<br>층별 도면</button>'
-      + '<button class="btn btn-outline" onclick="navigateToFirePage(\'/qr\')" style="padding:16px;">'+(menuIcons['FIRE_QR']||'')+'<br>QR코드</button>'
-      + '</div></div></div>';
+      + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3></div><div class="card-body" style="padding:0;">'
+      + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>비율</th><th></th></tr></thead><tbody>'
+      + '<tr><td><b>소화기</b></td><td>'+extV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--primary);height:100%;width:'+(totalEquip?Math.round(extV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_extinguisher\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소화전</b></td><td>'+hydV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--green);height:100%;width:'+(totalEquip?Math.round(hydV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_hydrant\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>수신기</b></td><td>'+recvV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--orange);height:100%;width:'+(totalEquip?Math.round(recvV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_receiver\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소방펌프</b></td><td>'+pumpV+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--red);height:100%;width:'+(totalEquip?Math.round(pumpV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_pump\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '</tbody></table></div></div>'
+      + '<div class="card"><div class="card-header"><h3>최근 등록/수정 장비</h3></div><div class="card-body" style="padding:0;">'
+      + '<table><thead><tr><th>유형</th><th>이름/모델</th><th>위치</th><th>상태</th><th>날짜</th></tr></thead>'
+      + '<tbody>'+(recentItems.length ? recentItems.map(function(it) {
+          return '<tr><td>'+esc(it.type)+'</td><td><b>'+esc(it.name)+'</b></td><td>'+esc(it.location)+'</td><td>'+fireBadge(it.status)+'</td><td>'+fireDate(it.date)+'</td></tr>';
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px;">등록된 장비가 없습니다.</td></tr>')+'</tbody></table>'
+      + '</div></div>';
   } catch(e) {
     el.innerHTML = '<p style="color:var(--red)">오류: '+esc(e.message)+'</p>';
   }
