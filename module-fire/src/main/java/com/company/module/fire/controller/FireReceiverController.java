@@ -56,14 +56,14 @@ public class FireReceiverController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> save(
             @Valid @RequestBody FireReceiverSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(fireReceiverService.save(request)));
     }
 
     @PostMapping("/{id}/inspect")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> inspect(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionRequest request,
@@ -78,7 +78,7 @@ public class FireReceiverController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> updateInspection(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -89,7 +89,7 @@ public class FireReceiverController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> addInspection(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionUpdateRequest request) {
@@ -112,7 +112,7 @@ public class FireReceiverController {
     }
 
     @GetMapping("/inspections/export-all")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<byte[]> exportAllInspections(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -125,7 +125,7 @@ public class FireReceiverController {
     }
 
     @PostMapping("/{id}/inspections/{inspectionId}/image")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadInspectionImage(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -197,7 +197,7 @@ public class FireReceiverController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         fireReceiverService.delete(id);
         return ResponseEntity.ok(ApiResponse.success());

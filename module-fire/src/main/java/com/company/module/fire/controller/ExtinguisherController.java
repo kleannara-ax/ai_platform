@@ -67,7 +67,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<ExtinguisherResponse>> save(
             @Valid @RequestBody ExtinguisherSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(extinguisherService.saveExtinguisher(request)));
@@ -169,7 +169,7 @@ public class ExtinguisherController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateInspectionDate(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId,
@@ -187,7 +187,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> addInspection(
             @PathVariable("id") Long extinguisherId,
             @Valid @RequestBody ExtinguisherInspectionUpdateRequest request,
@@ -204,7 +204,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> deleteInspection(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId) {
@@ -213,7 +213,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         extinguisherService.deleteExtinguisher(id);
         return ResponseEntity.ok(ApiResponse.success());
