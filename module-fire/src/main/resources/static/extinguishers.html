@@ -2374,15 +2374,15 @@ if (!EMBED_MODAL_MODE) {
   };
 
   window.openExtinguisherUpsertModal = function(opts) {
-    if (!window.FireWebExtinguisherModal) {
-      return localOpenExtinguisherUpsertModal(opts);
-    }
     const hasId = Number(opts?.id || 0) > 0;
-    const options = hasId
-      ? { mode: 'edit', id: Number(opts.id) }
+    const mergedOpts = hasId
+      ? opts
       : { ...buildListAddOptions(), ...(opts || {}) };
+    if (!window.FireWebExtinguisherModal) {
+      return localOpenExtinguisherUpsertModal(mergedOpts);
+    }
     window.FireWebExtinguisherModal.open({
-      ...options,
+      ...mergedOpts,
       onClose: ({ reason }) => {
         if (reason !== 'dismiss') refreshCurrentList();
       }
