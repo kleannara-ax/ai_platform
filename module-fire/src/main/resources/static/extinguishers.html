@@ -868,6 +868,9 @@ function logout() {
 }
 
 // ===== 건물/층 옵션 로드 =====
+// 건물→층 매핑: { buildingId: [{ floorId, floorName }] }
+let extBuildingFloorMap = {};
+
 async function loadBuildingOptions() {
   let buildings = [];
   let floors = [];
@@ -899,6 +902,24 @@ async function loadBuildingOptions() {
   optionBuildings = buildings;
   optionFloors = floors;
 
+  // 건물→층 매핑 구축 (allItems 기반)
+  extBuildingFloorMap = {};
+  (allItems || []).forEach(it => {
+    if (it?.buildingId != null && it?.floorId != null) {
+      const bKey = String(it.buildingId);
+      if (!extBuildingFloorMap[bKey]) extBuildingFloorMap[bKey] = new Map();
+      if (!extBuildingFloorMap[bKey].has(String(it.floorId))) {
+        extBuildingFloorMap[bKey].set(String(it.floorId), {
+          floorId: it.floorId,
+          floorName: it.floorName || String(it.floorId)
+        });
+      }
+    }
+  });
+  Object.keys(extBuildingFloorMap).forEach(k => {
+    extBuildingFloorMap[k] = Array.from(extBuildingFloorMap[k].values());
+  });
+
   const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
   bSel.innerHTML = '<option value="">-- 건물 전체 --</option>' +
@@ -917,6 +938,20 @@ async function loadBuildingOptions() {
       floors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   }
 
+}
+
+/** 모달 층 드롭다운을 건물에 맞게 필터링 */
+function updateExtModalFloorOptions(buildingId) {
+  const efSel = document.getElementById('extFloorSel');
+  if (!efSel) return;
+  const prevVal = efSel.value;
+  const bKey = String(buildingId || '');
+  const floorList = (bKey && extBuildingFloorMap[bKey]) ? extBuildingFloorMap[bKey] : optionFloors;
+  efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
+    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+  if (prevVal && Array.from(efSel.options).some(o => o.value === prevVal)) {
+    efSel.value = prevVal;
+  }
 }
 
 // ===== 소화기목록 로드 =====
@@ -1851,6 +1886,7 @@ async function openDetails(id) {
       const ff = document.getElementById('filterFloorId')?.value || '';
       if (buildingSel) {
         selectOptionSmart(buildingSel, (opts?.buildingId ?? fb ?? ''), (opts?.buildingName ?? ''));
+        updateExtModalFloorOptions(buildingSel.value);
       }
       if (floorSel) {
         selectOptionSmart(floorSel, (opts?.floorId ?? ff ?? ''), (opts?.floorName ?? ''));
@@ -1875,6 +1911,7 @@ async function openDetails(id) {
       const json = await res.json();
       const data = json.data;
       selectOptionSmart(buildingSel, data.buildingId, data.buildingName);
+      updateExtModalFloorOptions(buildingSel?.value);
       selectOptionSmart(floorSel, data.floorId, data.floorName);
       syncHiddenFromSelect();
       setVal('extBuildingId', data.buildingId);
@@ -2019,6 +2056,7 @@ async function openDetails(id) {
   });
 
   buildingSel?.addEventListener('change', async () => {
+    updateExtModalFloorOptions(buildingSel.value);
     syncHiddenFromSelect();
     await loadPlanImage();
   });
