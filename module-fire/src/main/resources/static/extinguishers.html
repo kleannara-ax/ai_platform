@@ -805,7 +805,15 @@ let currentExtinguisherId = null;
 let optionBuildings = [];
 let optionFloors = [];
 const canManage = API.canManage();
-const canEdit = true; // 소화기 목록 접근권한이 있으면 추가/수정/삭제 가능
+// 메뉴 접근권한 기반: FIRE_EXTINGUISHER 메뉴가 할당된 사용자만 추가/수정/삭제 가능
+const canEdit = (() => {
+  const u = API.getUser();
+  if (!u) return false;
+  // menuCodes 배열이 있으면 FIRE_EXTINGUISHER 포함 여부 확인
+  if (Array.isArray(u.menuCodes)) return u.menuCodes.includes('FIRE_EXTINGUISHER');
+  // menuCodes가 아직 없는 경우 (호환성): 페이지에 접근 가능하면 권한 있음
+  return true;
+})();
 const EMBED_MODAL_MODE = (() => {
   const qs = new URLSearchParams(window.location.search);
   return qs.get('embedEdit') === '1' || qs.get('embedInspect') === '1' || qs.get('embedDetails') === '1';
@@ -1025,9 +1033,9 @@ function renderTable(items) {
         <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
         <td class="text-center">
           <div class="ext-actions">
-            <button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>
+            ${canEdit ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
             <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
-            <button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>
+            ${canEdit ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -1130,9 +1138,9 @@ function renderStatusPanel(type) {
       <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
       <td class="text-center">
         <div class="ext-actions">
-          <button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>
+          ${canEdit ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
           <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
-          <button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>
+          ${canEdit ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
@@ -2174,10 +2182,16 @@ function _normFloorCompat(v) {
     document.head.appendChild(embedStyle);
   }
 
+  // 메뉴 접근권한이 없으면 추가 버튼 숨김
+  if (!canEdit) {
+    const addBtn = document.getElementById('btnExtAdd');
+    if (addBtn) addBtn.style.display = 'none';
+  }
+
   await loadExtinguishers();
 
   const editId = parseInt(qs.get('edit') || '0', 10);
-  if (editId > 0) {
+  if (editId > 0 && canEdit) {
     window.openExtinguisherUpsertModal({ id: editId });
     return;
   }
@@ -2195,7 +2209,7 @@ function _normFloorCompat(v) {
   }
 
   const add = qs.get('add');
-  if (add === '1') {
+  if (canEdit && add === '1') {
     const bIdQ = qs.get('buildingId') || '';
     const fIdQ = qs.get('floorId') || '';
     const bx = qs.get('buildingName') || '';

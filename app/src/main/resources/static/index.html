@@ -390,6 +390,8 @@ async function enterApp() {
     }));
   }
   await loadUserMenus();
+  // 메뉴 로드 후 fireweb_user에 접근 가능 메뉴 코드 목록 추가
+  updateFirewebUserMenuCodes();
   navigate(currentPage || 'dashboard');
   saveSession();
 }
@@ -1507,6 +1509,26 @@ async function deleteCodeDetail(codeId){
 }
 
 // ══ 소방시설관리 모듈 ══
+// 메뉴 트리에서 모든 menuCode를 수집
+function collectMenuCodes(menus) {
+  const codes = [];
+  (menus || []).forEach(m => {
+    if (m.menuCode) codes.push(m.menuCode);
+    if (m.children && m.children.length > 0) codes.push(...collectMenuCodes(m.children));
+  });
+  return codes;
+}
+// fireweb_user에 메뉴 코드 목록 업데이트
+function updateFirewebUserMenuCodes() {
+  try {
+    const raw = localStorage.getItem('fireweb_user');
+    if (!raw) return;
+    const u = JSON.parse(raw);
+    u.menuCodes = collectMenuCodes(userMenus);
+    localStorage.setItem('fireweb_user', JSON.stringify(u));
+  } catch(e) { /* ignore */ }
+}
+
 function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
@@ -1517,7 +1539,8 @@ function navigateToFirePage(path) {
       userName: currentUser.userName,
       role: fireRole,
       token: token,
-      canManage: fireCanManage
+      canManage: fireCanManage,
+      menuCodes: collectMenuCodes(userMenus)
     }));
   }
   var el = document.getElementById('pageContent');
