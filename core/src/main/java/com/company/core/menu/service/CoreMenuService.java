@@ -24,6 +24,20 @@ public class CoreMenuService {
     private final CoreMenuRepository menuRepository;
     private final CoreRoleMenuRepository roleMenuRepository;
 
+    /**
+     * 특정 역할이 지정된 메뉴 코드에 접근 가능한지 확인
+     * @param role 역할 (예: ROLE_FIRE_MANAGER)
+     * @param menuCode 메뉴 코드 (예: FIRE_EXTINGUISHER)
+     * @return 접근 가능 여부
+     */
+    public boolean hasMenuAccess(String role, String menuCode) {
+        Optional<CoreMenu> menuOpt = menuRepository.findByMenuCode(menuCode);
+        if (menuOpt.isEmpty()) return false;
+        Long menuId = menuOpt.get().getMenuId();
+        return roleMenuRepository.findByRole(role).stream()
+                .anyMatch(rm -> rm.getMenuId().equals(menuId));
+    }
+
     /** 전체 메뉴 목록 (플랫 리스트) */
     public List<MenuResponse> getAllMenus() {
         return menuRepository.findByIsActiveTrueOrderBySortOrder().stream()
