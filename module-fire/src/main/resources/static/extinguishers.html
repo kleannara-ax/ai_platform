@@ -868,7 +868,7 @@ function logout() {
 }
 
 // ===== 건물/층 옵션 로드 =====
-// 건물→층 매핑: { buildingId: [{ floorId, floorName }] }
+// 건물→도면등록층 매핑: { buildingId: [{ floorId, floorName }] }
 let extBuildingFloorMap = {};
 
 async function loadBuildingOptions() {
@@ -902,23 +902,18 @@ async function loadBuildingOptions() {
   optionBuildings = buildings;
   optionFloors = floors;
 
-  // 건물→층 매핑 구축 (allItems 기반)
-  extBuildingFloorMap = {};
-  (allItems || []).forEach(it => {
-    if (it?.buildingId != null && it?.floorId != null) {
-      const bKey = String(it.buildingId);
-      if (!extBuildingFloorMap[bKey]) extBuildingFloorMap[bKey] = new Map();
-      if (!extBuildingFloorMap[bKey].has(String(it.floorId))) {
-        extBuildingFloorMap[bKey].set(String(it.floorId), {
-          floorId: it.floorId,
-          floorName: it.floorName || String(it.floorId)
-        });
-      }
-    }
-  });
-  Object.keys(extBuildingFloorMap).forEach(k => {
-    extBuildingFloorMap[k] = Array.from(extBuildingFloorMap[k].values());
-  });
+  // 건물→도면등록층 매핑 (building-floors API 기반)
+  try {
+    const bfr = await API.req('/fire-api/maps/building-floors');
+    const bfj = bfr && bfr.ok ? await bfr.json().catch(()=>null) : null;
+    const bfData = Array.isArray(bfj?.data) ? bfj.data : [];
+    extBuildingFloorMap = {};
+    bfData.forEach(b => {
+      extBuildingFloorMap[String(b.buildingId)] = Array.isArray(b.floors) ? b.floors : [];
+    });
+  } catch {
+    extBuildingFloorMap = {};
+  }
 
   const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
@@ -935,19 +930,21 @@ async function loadBuildingOptions() {
   }
   if (efSel) {
     efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
-      floors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+      optionFloors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   }
 
 }
 
-/** 모달 층 드롭다운 갱신 - 항상 DB 전체 층 목록 표시 */
+/** 모달 층 드롭다운 갱신 - 도면이 등록된 층만 표시 */
 function updateExtModalFloorOptions(buildingId) {
   const efSel = document.getElementById('extFloorSel');
   if (!efSel) return;
   const prevVal = efSel.value;
-  // 항상 optionFloors(DB 전체 층)를 표시
+  const bKey = String(buildingId || '');
+  // 도면 등록된 층이 있으면 해당 목록만, 없으면 DB 전체 층 표시
+  const floorList = (bKey && extBuildingFloorMap[bKey]?.length) ? extBuildingFloorMap[bKey] : optionFloors;
   efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    optionFloors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   if (prevVal && Array.from(efSel.options).some(o => o.value === prevVal)) {
     efSel.value = prevVal;
   }
