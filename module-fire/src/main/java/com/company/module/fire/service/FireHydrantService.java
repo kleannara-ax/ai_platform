@@ -109,13 +109,10 @@ public class FireHydrantService {
 
         if ("Outdoor".equals(hydrantType)) {
             building = buildingRepository.findById(99L)
-                    .orElseGet(() -> buildingRepository.findById(1L)
-                            .orElseThrow(() -> new BusinessException("Outdoor building(id=99) is missing.")));
-            // 옥외용 층: "옥외" 이름 → 첫 번째 층 → ID 지정순 폴백
-            floor = floorRepository.findFirstByFloorNameContainingIgnoreCase("옥외")
-                    .or(() -> floorRepository.findById(1L))
-                    .orElseGet(() -> floorRepository.findAll().stream().findFirst()
-                            .orElseThrow(() -> new BusinessException("No floor data exists.")));
+                    .orElseThrow(() -> new BusinessException("Outdoor building(id=99) is missing."));
+            // 옥외용 층: id=99 '옥외' 고정
+            floor = floorRepository.findById(99L)
+                    .orElseThrow(() -> new BusinessException("Outdoor floor(id=99) is missing."));
 
             if (req.getX() == null || req.getY() == null) {
                 throw new BusinessException("Coordinates are required for outdoor hydrants.");

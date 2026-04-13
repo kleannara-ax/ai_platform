@@ -940,15 +940,14 @@ async function loadBuildingOptions() {
 
 }
 
-/** 모달 층 드롭다운을 건물에 맞게 필터링 */
+/** 모달 층 드롭다운 갱신 - 항상 DB 전체 층 목록 표시 */
 function updateExtModalFloorOptions(buildingId) {
   const efSel = document.getElementById('extFloorSel');
   if (!efSel) return;
   const prevVal = efSel.value;
-  const bKey = String(buildingId || '');
-  const floorList = (bKey && extBuildingFloorMap[bKey]) ? extBuildingFloorMap[bKey] : optionFloors;
+  // 항상 optionFloors(DB 전체 층)를 표시
   efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    optionFloors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   if (prevVal && Array.from(efSel.options).some(o => o.value === prevVal)) {
     efSel.value = prevVal;
   }
