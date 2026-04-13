@@ -12,7 +12,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * PS 커버리지 검사 모듈 Web MVC 설정
+ * PS 지분 검사 모듈 Web MVC 설정
  *
  * <p>/ps-insp-api/** 경로에 대한 CORS 설정
  * <p>이미지 업로드 경로 리소스 핸들링 (/uploads/**)

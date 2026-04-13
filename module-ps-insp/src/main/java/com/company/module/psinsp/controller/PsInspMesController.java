@@ -38,10 +38,10 @@ public class PsInspMesController {
     /**
      * MES에 검사 결과 전송
      *
-     * @param request IND_BCD(개별바코드) + ResultData(커버리지 ppm 값)
+     * @param request IND_BCD(개별바코드) + ResultData(지분 커버리지 ppm 값)
      * @return ApiResponse 래핑된 전송 결과
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @PostMapping("/send-result")
     public ResponseEntity<ApiResponse<PsInspMesSendResponse>> sendResult(
             @Valid @RequestBody PsInspMesSendRequest request) {

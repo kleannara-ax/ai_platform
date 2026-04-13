@@ -1,5 +1,5 @@
 // ============================================================
-// module-ps-insp: PS 커버리지 검사 (점보롤 지분 검사) 모듈
+// module-ps-insp: PS 지분 검사 (점보롤 지분 검사) 모듈
 // 패키지: com.company.module.psinsp
 // URL Prefix: /ps-insp-api/**
 // DB Table: ps_insp_inspection (소문자 snake_case)

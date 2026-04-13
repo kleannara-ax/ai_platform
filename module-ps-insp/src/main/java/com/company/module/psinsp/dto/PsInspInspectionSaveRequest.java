@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * PS 커버리지 검사 결과 저장 요청 DTO
+ * PS 지분 검사 결과 저장 요청 DTO
  */
 @Getter
 @Setter
