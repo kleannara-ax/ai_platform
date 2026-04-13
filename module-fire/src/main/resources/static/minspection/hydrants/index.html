@@ -517,7 +517,7 @@
       })
     });
     const json = await res.json();
-    if (!json.ok && json.message) { errEl.textContent = json.message; return; }
+    if ((!res.ok && !json.success) && json.message) { errEl.textContent = json.message; return; }
     if (json.data?.hydrantId) {
       hydData = { exists: true, hydrantId: json.data.hydrantId };
       showAddCompleted();

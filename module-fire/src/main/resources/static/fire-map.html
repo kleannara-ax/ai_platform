@@ -1095,7 +1095,7 @@ async function loadOutdoorHydrants() {
         const res = await apiFetch('/fire-api/hydrants?size=200&page=0');
         if (!res) return;
         const json = await res.json();
-        if (json.ok && json.data && json.data.content) {
+        if ((res.ok || json.success) && json.data && json.data.content) {
             outdoorHydrants = json.data.content
                 .filter(h => h.hydrantType === 'Outdoor' && h.active !== false);
         }

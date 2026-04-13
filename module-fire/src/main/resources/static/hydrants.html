@@ -932,7 +932,7 @@ async function loadHydrants(q='', buildingId='', floorId='') {
   const res = await API.req(`/fire-api/hydrants?${params}`);
   if (!res) return;
   const json = await res.json();
-  if (json.ok && json.data) {
+  if ((res.ok || json.success) && json.data) {
     allItems = (json.data.content || []).slice().sort((a, b) => {
       const left = String(a?.serialNumber || '');
       const right = String(b?.serialNumber || '');
@@ -1288,7 +1288,7 @@ async function openHydrantDetails(id) {
   const res = await API.req(`/fire-api/hydrants/${id}`);
   if (!res) return;
   const json = await res.json();
-  if (!json.ok || !json.data) { alert('상세 정보를 불러오지 못했습니다.'); return; }
+  if ((!res.ok && !json.success) || !json.data) { alert('상세 정보를 불러오지 못했습니다.'); return; }
   const d = json.data;
   const planImagePath = await fetchDetailPlanImagePathHyd(d);
   const qrId = (d.qrKey || '').trim();

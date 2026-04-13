@@ -475,7 +475,7 @@
       })
     });
     const json = await res.json();
-    if (!json.ok && json.message) { errEl.textContent = json.message; return; }
+    if ((!res.ok && !json.success) && json.message) { errEl.textContent = json.message; return; }
     if (json.data?.extinguisherId) {
       extData = { exists: true, extinguisherId: json.data.extinguisherId };
       await uploadImageAfterRegister(json.data.extinguisherId, imageFile, errEl);

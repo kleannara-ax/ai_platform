@@ -920,7 +920,7 @@ async function loadExtinguishers(q='', buildingId='', floorId='') {
   const res = await API.req(`/fire-api/extinguishers?${params}`);
   if (!res) return;
   const json = await res.json();
-  if (json.ok && json.data) {
+  if ((res.ok || json.success) && json.data) {
     allItems = (json.data.content || []).slice().sort((a, b) => {
       const left = String(a?.serialNumber || '');
       const right = String(b?.serialNumber || '');
@@ -1293,7 +1293,7 @@ async function openDetails(id) {
   const res = await API.req(`/fire-api/extinguishers/${id}`);
   if (!res) return;
   const json = await res.json();
-  if (!json.ok || !json.data) { alert('상세 정보를 불러오지 못했습니다.'); return; }
+  if ((!res.ok && !json.success) || !json.data) { alert('상세 정보를 불러오지 못했습니다.'); return; }
   const d = json.data;
   const planImagePath = await fetchDetailPlanImagePathExt(d);
   const qrId = (d.qrKey || '').trim();
