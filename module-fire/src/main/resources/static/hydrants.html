@@ -876,7 +876,7 @@ function logout() {
 }
 
 // ===== 건물/층 옵션 로드 =====
-// 건물→층 매핑: { buildingId: [{ floorId, floorName }] }
+// 건물→도면등록층 매핑: { buildingId: [{ floorId, floorName }] }
 let buildingFloorMap = {};
 let allFloorOptions = [];
 let allBuildingOptions = [];
@@ -912,24 +912,18 @@ async function loadBuildingFloorOptions() {
   allBuildingOptions = buildings;
   allFloorOptions = floors;
 
-  // 건물→층 매핑 구축 (allItems 기반)
-  buildingFloorMap = {};
-  (allItems || []).forEach(it => {
-    if (it?.buildingId != null && it?.floorId != null) {
-      const bKey = String(it.buildingId);
-      if (!buildingFloorMap[bKey]) buildingFloorMap[bKey] = new Map();
-      if (!buildingFloorMap[bKey].has(String(it.floorId))) {
-        buildingFloorMap[bKey].set(String(it.floorId), {
-          floorId: it.floorId,
-          floorName: it.floorName || String(it.floorId)
-        });
-      }
-    }
-  });
-  // Map → Array 변환
-  Object.keys(buildingFloorMap).forEach(k => {
-    buildingFloorMap[k] = Array.from(buildingFloorMap[k].values());
-  });
+  // 건물→도면등록층 매핑 (building-floors API 기반)
+  try {
+    const bfr = await API.req('/fire-api/maps/building-floors');
+    const bfj = bfr && bfr.ok ? await bfr.json().catch(()=>null) : null;
+    const bfData = Array.isArray(bfj?.data) ? bfj.data : [];
+    buildingFloorMap = {};
+    bfData.forEach(b => {
+      buildingFloorMap[String(b.buildingId)] = Array.isArray(b.floors) ? b.floors : [];
+    });
+  } catch {
+    buildingFloorMap = {};
+  }
 
   const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
@@ -939,17 +933,19 @@ async function loadBuildingFloorOptions() {
   const hb = document.getElementById('hydBuildingSel');
   const hf = document.getElementById('hydFloorSel');
   if (hb) hb.innerHTML='<option value="">-- 건물 선택 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
-  if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+floors.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
+  if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+allFloorOptions.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
 }
 
-/** 모달 층 드롭다운 갱신 - 항상 DB 전체 층 목록 표시 */
+/** 모달 층 드롭다운 갱신 - 도면이 등록된 층만 표시 */
 function updateModalFloorOptions(buildingId) {
   const hf = document.getElementById('hydFloorSel');
   if (!hf) return;
   const prevVal = hf.value;
-  // 항상 allFloorOptions(DB 전체 층)를 표시
+  const bKey = String(buildingId || '');
+  // 도면 등록된 층이 있으면 해당 목록만, 없으면 DB 전체 층 표시
+  const floorList = (bKey && buildingFloorMap[bKey]?.length) ? buildingFloorMap[bKey] : allFloorOptions;
   hf.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    allFloorOptions.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   // 이전 선택값 복원 시도
   if (prevVal && Array.from(hf.options).some(o => o.value === prevVal)) {
     hf.value = prevVal;

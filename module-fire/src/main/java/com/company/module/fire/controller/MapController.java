@@ -31,6 +31,49 @@ public class MapController {
     private final ExtinguisherRepository extinguisherRepository;
     private final FireHydrantRepository fireHydrantRepository;
 
+    /**
+     * 건물별 도면이 등록된 층 목록 조회
+     * GET /fire-api/maps/building-floors
+     *
+     * 응답 예:
+     * [
+     *   { "buildingId":1, "buildingName":"복지관",
+     *     "floors":[{"floorId":1,"floorName":"지하1층(B1)"},{"floorId":2,"floorName":"1층"}, ...] },
+     *   ...
+     * ]
+     */
+    @GetMapping("/building-floors")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getBuildingFloors() {
+        List<Building> buildings = buildingRepository.findAllByOrderByBuildingNameAsc();
+        List<Floor> floors = floorRepository.findAllByOrderBySortOrderAscFloorNameAsc();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Building b : buildings) {
+            String bName = b.getBuildingName() == null ? "" : b.getBuildingName();
+            List<Map<String, Object>> matchedFloors = new ArrayList<>();
+
+            for (Floor f : floors) {
+                String fName = f.getFloorName() == null ? "" : f.getFloorName();
+                String path = resolvePlanImagePath(bName, fName);
+                if (!path.isEmpty()) {
+                    Map<String, Object> fm = new LinkedHashMap<>();
+                    fm.put("floorId", f.getFloorId());
+                    fm.put("floorName", fName);
+                    matchedFloors.add(fm);
+                }
+            }
+
+            if (!matchedFloors.isEmpty()) {
+                Map<String, Object> bm = new LinkedHashMap<>();
+                bm.put("buildingId", b.getBuildingId());
+                bm.put("buildingName", bName);
+                bm.put("floors", matchedFloors);
+                result.add(bm);
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     @GetMapping("/floor-data")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFloorData(
             @RequestParam Long buildingId,
