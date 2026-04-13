@@ -2424,15 +2424,15 @@ if (!EMBED_MODAL_MODE) {
   };
 
   window.openHydrantUpsertModal = function(opts) {
-    if (!window.FireWebHydrantModal) {
-      return localOpenHydrantUpsertModal(opts);
-    }
     const hasId = Number(opts?.id || 0) > 0;
-    const options = hasId
-      ? { mode: 'edit', id: Number(opts.id) }
+    const mergedOpts = hasId
+      ? opts
       : { ...buildListHydrantAddOptions(), ...(opts || {}) };
+    if (!window.FireWebHydrantModal) {
+      return localOpenHydrantUpsertModal(mergedOpts);
+    }
     window.FireWebHydrantModal.open({
-      ...options,
+      ...mergedOpts,
       onClose: ({ reason }) => {
         if (reason !== 'dismiss') refreshCurrentList();
       }
