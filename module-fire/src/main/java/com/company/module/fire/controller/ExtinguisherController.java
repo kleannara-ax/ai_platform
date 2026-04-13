@@ -16,7 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -67,7 +67,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    // 소화기 목록 접근권한이 있는 사용자는 모두 추가/수정/삭제 가능 (인증만 필요)
     public ResponseEntity<ApiResponse<ExtinguisherResponse>> save(
             @Valid @RequestBody ExtinguisherSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(extinguisherService.saveExtinguisher(request)));
@@ -169,7 +169,7 @@ public class ExtinguisherController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    // 소화기 목록 접근권한이 있는 사용자는 모두 추가/수정/삭제 가능 (인증만 필요)
     public ResponseEntity<ApiResponse<Void>> updateInspectionDate(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId,
@@ -187,7 +187,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    // 소화기 목록 접근권한이 있는 사용자는 모두 추가/수정/삭제 가능 (인증만 필요)
     public ResponseEntity<ApiResponse<Void>> addInspection(
             @PathVariable("id") Long extinguisherId,
             @Valid @RequestBody ExtinguisherInspectionUpdateRequest request,
@@ -204,7 +204,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    // 소화기 목록 접근권한이 있는 사용자는 모두 추가/수정/삭제 가능 (인증만 필요)
     public ResponseEntity<ApiResponse<Void>> deleteInspection(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId) {
@@ -213,7 +213,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    // 소화기 목록 접근권한이 있는 사용자는 모두 추가/수정/삭제 가능 (인증만 필요)
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         extinguisherService.deleteExtinguisher(id);
         return ResponseEntity.ok(ApiResponse.success());
