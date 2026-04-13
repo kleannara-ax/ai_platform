@@ -228,6 +228,12 @@
     return currentUser?.canManage !== false;
   }
 
+  function canAccessQr() {
+    return Array.isArray(currentUser?.menuCodes)
+      ? currentUser.menuCodes.includes('FIRE_QR')
+      : canManageUser();
+  }
+
   function qrImgUrl(type, id) {
     return API_BASE + '/qr/image?type=' + encodeURIComponent(type) + '&id=' + encodeURIComponent(id);
   }
@@ -543,7 +549,7 @@
       window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
-    if (!canManageUser()) {
+    if (!canAccessQr()) {
       window.location.href = '/fire-map.html';
       return;
     }
