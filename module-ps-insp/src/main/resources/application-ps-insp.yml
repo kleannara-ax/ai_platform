@@ -1,0 +1,21 @@
+# ============================================================
+# module-ps-insp 모듈 설정
+# company-platform 통합 시 application.yml에 아래 설정을 병합하세요.
+#
+# JPA Entity Scan 범위에 com.company.module.psinsp 가 포함되어야 합니다.
+# DB 스키마: sql/module-ps-insp/01_schema.sql 실행 필요
+# ============================================================
+
+# --- 아래 내용을 core 의 application.yml 에 병합하세요 ---
+
+# PS-INSP 모듈 설정
+ps-insp:
+  upload:
+    dir: /data/upload/ps_cov_ins   # 이미지 저장 경로
+  mes:
+    endpoint-url:                   # MES 전송 URL (비어있으면 mock 모드)
+
+# 로깅 설정 (core application.yml에 추가)
+# logging:
+#   level:
+#     com.company.module.psinsp: DEBUG

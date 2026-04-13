@@ -80,6 +80,11 @@ public class SecurityConfig {
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
                 .requestMatchers("/fire-api/qr/image").permitAll()
+                // PS-INSP 모듈: 헬스체크·페이지(iframe)·정적리소스만 공개
+                // API(/ps-insp-api/inspections/**, /ps-insp-api/mes/**)는 인증+메뉴접근권한 필요
+                .requestMatchers("/ps-insp-api/health").permitAll()
+                .requestMatchers("/ps-insp-api/page", "/ps-insp-api/page/**").permitAll()
+                .requestMatchers("/ps-insp/**").permitAll()
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()
             )

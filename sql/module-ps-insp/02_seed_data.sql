@@ -1,0 +1,49 @@
+-- ============================================================
+-- module-ps-insp: PS 커버리지 검사 초기 데이터 (Seed Data)
+-- 운영 환경에서는 필요 시에만 실행
+-- ============================================================
+
+-- 테스트용 샘플 검사 데이터 (3건)
+INSERT INTO ps_insp_inspection (
+    SEQ, INSP_ITEM_GRP_CD, MATNR, MATNR_NM, WERKS, MSRM_DATE, PRC_SEQNO,
+    LOTNR, IND_BCD, IND_BCD_SEQ, INSPECTED_AT,
+    THRESHOLD_MAX, TOTAL_COUNT, COVERAGE_RATIO, DENSITY_COUNT, DENSITY_RATIO,
+    SIZE_UNIFORMITY_SCORE, DISTRIBUTION_UNIFORMITY_SCORE, MEAN_SIZE, STD_SIZE,
+    AUTO_COUNT, MANUAL_COUNT, REMOVED_AUTO_COUNT,
+    BUCKET_UP_TO_3, BUCKET_UP_TO_5, BUCKET_UP_TO_7, BUCKET_OVER_7,
+    QUADRANT_TOP_LEFT, QUADRANT_TOP_RIGHT, QUADRANT_BOTTOM_LEFT, QUADRANT_BOTTOM_RIGHT,
+    OBJECT_PIXEL_COUNT, TOTAL_PIXELS, MANUAL_ADDED_COUNT, MANUAL_REMOVED_COUNT,
+    OPERATOR_ID, OPERATOR_NM, DEVICE_ID, STATUS
+) VALUES
+-- 샘플 1: 일반 검사 결과
+(1, 'COV_INS', 'F2A11220-04600845A', '점보롤 A타입', '1000', NOW(), 1,
+ 'LOT-2026-04-001', '26228J0039', '1', NOW(),
+ 115, 42, 0.265300, 28, 0.6667,
+ 0.8500, 0.7200, 5.2300, 1.8400,
+ 40, 2, 0,
+ 12, 15, 10, 5,
+ 11, 10, 12, 9,
+ 2780, 1048576, 2, 0,
+ 'inspector01', '홍길동', 'DEVICE-001', 'COMPLETED'),
+
+-- 샘플 2: 다른 자재 검사
+(2, 'COV_INS', 'F2A11220-04600846B', '점보롤 B타입', '1000', NOW(), 1,
+ 'LOT-2026-04-002', '26228J0040', '1', NOW(),
+ 120, 35, 0.198500, 22, 0.6286,
+ 0.9100, 0.8000, 4.8700, 1.5200,
+ 33, 2, 0,
+ 10, 12, 8, 5,
+ 9, 8, 10, 8,
+ 2100, 1048576, 2, 0,
+ 'inspector02', '김철수', 'DEVICE-002', 'COMPLETED'),
+
+-- 샘플 3: 재검사 (차수 2)
+(3, 'COV_INS', 'F2A11220-04600847C', '점보롤 C타입', '2000', NOW(), 2,
+ 'LOT-2026-04-003', '26228J0041', '2', NOW(),
+ 110, 58, 0.342100, 38, 0.6552,
+ 0.7800, 0.6500, 6.1200, 2.3100,
+ 55, 3, 0,
+ 15, 20, 14, 9,
+ 14, 16, 15, 13,
+ 3950, 1048576, 3, 0,
+ 'inspector01', '홍길동', 'DEVICE-001', 'COMPLETED');
