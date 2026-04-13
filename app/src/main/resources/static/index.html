@@ -65,6 +65,11 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#94a3b8;cursor:pointer;transition:all .15s;border-left:3px solid transparent;font-size:13px;white-space:nowrap;overflow:hidden;}
 .nav-item:hover{background:#334155;color:#e2e8f0;}
 .nav-child{padding-left:44px;font-size:12px;}
+.nav-parent{justify-content:space-between;}
+.nav-parent .chevron{width:14px;height:14px;flex-shrink:0;transition:transform .2s;color:#64748b;}
+.nav-parent.open .chevron{transform:rotate(90deg);color:#94a3b8;}
+.nav-group{max-height:0;overflow:hidden;transition:max-height .25s cubic-bezier(.4,0,.2,1);}
+.nav-group.open{max-height:500px;}
 .nav-item.active{background:#334155;color:#fff;border-left-color:#3b82f6;}
 .nav-item svg{width:18px;height:18px;flex-shrink:0;}
 .sidebar-footer{padding:16px 24px;border-top:1px solid #334155;transition:padding .25s;}
@@ -79,6 +84,8 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .sidebar.collapsed .sidebar-user .info{display:none;}
 .sidebar.collapsed .nav-section{font-size:0;padding:8px 0;}
 .sidebar.collapsed .nav-item{padding:10px 0!important;justify-content:center;font-size:0!important;gap:0;border-left-width:0;}
+.sidebar.collapsed .nav-parent .chevron{display:none;}
+.sidebar.collapsed .nav-group{max-height:0!important;}
 .sidebar.collapsed .nav-item svg{width:22px;height:22px;}
 .sidebar.collapsed .sidebar-footer{padding:16px 10px;}
 .sidebar.collapsed .sidebar-footer button{font-size:0;padding:8px;display:flex;align-items:center;justify-content:center;}
@@ -362,6 +369,7 @@ function doLogout() {
 async function enterApp() {
   document.getElementById('loginPage').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');
   restoreSidebarState();
+  restoreMenuGroupState();
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
   document.getElementById('userRole').textContent=currentUser.role||'';
@@ -508,18 +516,40 @@ function renderSidebarMenus() {
     if (idx === 0) html += '<div class="nav-section">메뉴</div>';
     const page = menuCodeToPage[menu.menuCode] || menu.menuCode.toLowerCase();
     const icon = menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
-    const active = (idx === 0) ? ' active' : '';
-    html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
-    // 하위 메뉴 렌더링 (DB 기반 children)
-    if (menu.children && menu.children.length > 0) {
+    const hasChildren = menu.children && menu.children.length > 0;
+    const groupId = 'grp_' + menu.menuCode;
+    const isOpen = menuGroupState[groupId] === true;
+    if (hasChildren) {
+      // 하위 메뉴가 있는 상위 메뉴 — 클릭 시 접기/펼치기
+      const chevron = '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+      html += `<div class="nav-item nav-parent${isOpen?' open':''}" onclick="toggleMenuGroup('${esc(groupId)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}"><span style="display:flex;align-items:center;gap:10px;overflow:hidden;">${icon} ${esc(menu.menuName)}</span>${chevron}</div>`;
+      html += `<div class="nav-group${isOpen?' open':''}" id="${esc(groupId)}">`;
       menu.children.forEach(child => {
         const childPage = menuCodeToPage[child.menuCode] || child.menuCode.toLowerCase();
         const childIcon = menuIcons[child.menuCode] || menuIcons['_DEFAULT'];
         html += `<div class="nav-item nav-child" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" data-tooltip="${esc(child.menuName)}">${childIcon} ${esc(child.menuName)}</div>`;
       });
+      html += '</div>';
+    } else {
+      // 하위 메뉴 없는 단독 메뉴
+      const active = (idx === 0) ? ' active' : '';
+      html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
     }
   });
   nav.innerHTML = html;
+}
+
+let menuGroupState = {};
+function toggleMenuGroup(groupId, parentEl) {
+  const grp = document.getElementById(groupId);
+  if (!grp) return;
+  const isOpen = grp.classList.toggle('open');
+  if (parentEl) parentEl.classList.toggle('open', isOpen);
+  menuGroupState[groupId] = isOpen;
+  localStorage.setItem('menu_group_state', JSON.stringify(menuGroupState));
+}
+function restoreMenuGroupState() {
+  try { menuGroupState = JSON.parse(localStorage.getItem('menu_group_state')) || {}; } catch(e) { menuGroupState = {}; }
 }
 
 // ══ Navigation ══
@@ -527,8 +557,37 @@ function navigate(page, el) {
   currentPage = page;
   saveSession();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  if (el) el.classList.add('active');
-  else document.querySelectorAll('.nav-item').forEach(n => { if(n.textContent.trim().toLowerCase().includes(page))n.classList.add('active'); });
+  if (el) {
+    el.classList.add('active');
+    // 하위 메뉴 클릭 시 부모 그룹을 자동으로 열기
+    const grp = el.closest('.nav-group');
+    if (grp && !grp.classList.contains('open')) {
+      grp.classList.add('open');
+      const parentNav = grp.previousElementSibling;
+      if (parentNav) parentNav.classList.add('open');
+      menuGroupState[grp.id] = true;
+      localStorage.setItem('menu_group_state', JSON.stringify(menuGroupState));
+    }
+  } else {
+    // 세션 복원 시 — 메뉴 코드로 매칭하여 active 설정
+    const matched = document.querySelector(`.nav-item[data-menu-code]`) ? 
+      Array.from(document.querySelectorAll('.nav-item')).find(n => {
+        const code = n.dataset.menuCode || '';
+        const p = menuCodeToPage[code] || code.toLowerCase();
+        return p === page;
+      }) : null;
+    if (matched) {
+      matched.classList.add('active');
+      const grp = matched.closest('.nav-group');
+      if (grp && !grp.classList.contains('open')) {
+        grp.classList.add('open');
+        const parentNav = grp.previousElementSibling;
+        if (parentNav) parentNav.classList.add('open');
+        menuGroupState[grp.id] = true;
+        localStorage.setItem('menu_group_state', JSON.stringify(menuGroupState));
+      }
+    }
+  }
   const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드'};
   const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_dashboard:'모듈 > 소방시설관리 > 대시보드',fire_map:'모듈 > 소방시설관리 > 도면',fire_extinguisher:'모듈 > 소방시설관리 > 소화기',fire_hydrant:'모듈 > 소방시설관리 > 소화전',fire_receiver:'모듈 > 소방시설관리 > 수신기',fire_pump:'모듈 > 소방시설관리 > 소방펌프',fire_floor:'모듈 > 소방시설관리 > 층별 도면',fire_qr:'모듈 > 소방시설관리 > QR코드'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
