@@ -48,24 +48,44 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .btn-icon:hover{background:var(--primary-light);color:var(--primary);}
 
 .app{display:flex;height:100vh;overflow:hidden;}
-.sidebar{width:260px;background:#1e293b;color:#e2e8f0;display:flex;flex-direction:column;flex-shrink:0;}
-.sidebar-brand{padding:20px 24px;border-bottom:1px solid #334155;}
-.sidebar-brand h2{font-size:18px;font-weight:800;color:#fff;}
-.sidebar-brand span{font-size:11px;color:#94a3b8;}
-.sidebar-user{padding:16px 24px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:12px;}
-.sidebar-user .avatar{width:36px;height:36px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;}
-.sidebar-user .info{flex:1;}
-.sidebar-user .info .name{font-size:13px;font-weight:600;color:#fff;}
-.sidebar-user .info .role{font-size:11px;color:#94a3b8;}
+.sidebar{width:260px;background:#1e293b;color:#e2e8f0;display:flex;flex-direction:column;flex-shrink:0;transition:width .25s cubic-bezier(.4,0,.2,1);overflow:hidden;}
+.sidebar-brand{padding:20px 24px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;min-height:65px;}
+.sidebar-brand .brand-text h2{font-size:18px;font-weight:800;color:#fff;white-space:nowrap;}
+.sidebar-brand .brand-text span{font-size:11px;color:#94a3b8;white-space:nowrap;}
+.sidebar-toggle{background:none;border:none;color:#94a3b8;cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.sidebar-toggle:hover{background:#334155;color:#fff;}
+.sidebar-toggle svg{width:20px;height:20px;transition:transform .25s;}
+.sidebar-user{padding:16px 24px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:12px;transition:padding .25s;}
+.sidebar-user .avatar{width:36px;height:36px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;}
+.sidebar-user .info{flex:1;overflow:hidden;}
+.sidebar-user .info .name{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;}
+.sidebar-user .info .role{font-size:11px;color:#94a3b8;white-space:nowrap;}
 .nav-menu{flex:1;overflow-y:auto;padding:12px 0;}
-.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;padding:16px 24px 6px;font-weight:700;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#94a3b8;cursor:pointer;transition:all .15s;border-left:3px solid transparent;font-size:13px;}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;padding:16px 24px 6px;font-weight:700;white-space:nowrap;overflow:hidden;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#94a3b8;cursor:pointer;transition:all .15s;border-left:3px solid transparent;font-size:13px;white-space:nowrap;overflow:hidden;}
 .nav-item:hover{background:#334155;color:#e2e8f0;}
 .nav-item.active{background:#334155;color:#fff;border-left-color:#3b82f6;}
 .nav-item svg{width:18px;height:18px;flex-shrink:0;}
-.sidebar-footer{padding:16px 24px;border-top:1px solid #334155;}
-.sidebar-footer button{width:100%;padding:8px;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:6px;font-size:13px;cursor:pointer;}
+.sidebar-footer{padding:16px 24px;border-top:1px solid #334155;transition:padding .25s;}
+.sidebar-footer button{width:100%;padding:8px;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;}
 .sidebar-footer button:hover{border-color:#ef4444;color:#ef4444;}
+/* ── Sidebar Collapsed ── */
+.sidebar.collapsed{width:68px;}
+.sidebar.collapsed .brand-text{display:none;}
+.sidebar.collapsed .sidebar-brand{padding:20px 0;justify-content:center;}
+.sidebar.collapsed .sidebar-toggle svg{transform:rotate(180deg);}
+.sidebar.collapsed .sidebar-user{padding:16px 0;justify-content:center;}
+.sidebar.collapsed .sidebar-user .info{display:none;}
+.sidebar.collapsed .nav-section{font-size:0;padding:8px 0;}
+.sidebar.collapsed .nav-item{padding:10px 0!important;justify-content:center;font-size:0;gap:0;border-left-width:0;}
+.sidebar.collapsed .nav-item svg{width:22px;height:22px;}
+.sidebar.collapsed .sidebar-footer{padding:16px 10px;}
+.sidebar.collapsed .sidebar-footer button{font-size:0;padding:8px;display:flex;align-items:center;justify-content:center;}
+.sidebar.collapsed .sidebar-footer button::before{content:'\2192';font-size:16px;color:#ef4444;}
+/* ── Tooltip on collapsed hover ── */
+.sidebar.collapsed .nav-item{position:relative;}
+.sidebar.collapsed .nav-item::after{content:attr(data-tooltip);position:absolute;left:68px;top:50%;transform:translateY(-50%);background:#1e293b;color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+.sidebar.collapsed .nav-item:hover::after{opacity:1;}
 
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .topbar{padding:16px 32px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -170,8 +190,13 @@ table tr:last-child td{border-bottom:none;}
 
 <!-- App Shell -->
 <div id="appShell" class="app hidden">
-  <aside class="sidebar">
-    <div class="sidebar-brand"><h2>AI Platform</h2><span>서비스 콘솔 v1.0</span></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-text"><h2>AI Platform</h2><span>서비스 콘솔 v1.0</span></div>
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+      </button>
+    </div>
     <div class="sidebar-user">
       <div class="avatar" id="userAvatar">A</div>
       <div class="info"><div class="name" id="userName">Admin</div><div class="role" id="userRole">ROLE_ADMIN</div></div>
@@ -292,6 +317,18 @@ async function api(method, path, body) {
   return await res.json();
 }
 
+// ══ Sidebar Toggle ══
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('collapsed');
+  localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+}
+function restoreSidebarState() {
+  if (localStorage.getItem('sidebar_collapsed') === '1') {
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
+}
+
 // ══ Auth ══
 async function doLogin() {
   const id = document.getElementById('loginId').value.trim();
@@ -323,6 +360,7 @@ function doLogout() {
 }
 async function enterApp() {
   document.getElementById('loginPage').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');
+  restoreSidebarState();
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
   document.getElementById('userRole').textContent=currentUser.role||'';
@@ -470,13 +508,13 @@ function renderSidebarMenus() {
     const page = menuCodeToPage[menu.menuCode] || menu.menuCode.toLowerCase();
     const icon = menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
     const active = (idx === 0) ? ' active' : '';
-    html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}">${icon} ${esc(menu.menuName)}</div>`;
+    html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
     // 하위 메뉴 렌더링 (DB 기반 children)
     if (menu.children && menu.children.length > 0) {
       menu.children.forEach(child => {
         const childPage = menuCodeToPage[child.menuCode] || child.menuCode.toLowerCase();
         const childIcon = menuIcons[child.menuCode] || menuIcons['_DEFAULT'];
-        html += `<div class="nav-item" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" style="padding-left:44px;font-size:12px;">${childIcon} ${esc(child.menuName)}</div>`;
+        html += `<div class="nav-item" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" data-tooltip="${esc(child.menuName)}" style="padding-left:44px;font-size:12px;">${childIcon} ${esc(child.menuName)}</div>`;
       });
     }
   });
