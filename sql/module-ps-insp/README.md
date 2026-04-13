@@ -1,6 +1,6 @@
 # module-ps-insp SQL Scripts
 
-## PS Coverage Inspection (점보롤 지분 검사) 모듈 DB 스크립트
+## PS 지분 검사 (점보롤 지분 검사) 모듈 DB 스크립트
 
 ### 파일 위치
 
@@ -8,6 +8,8 @@
 sql/module-ps-insp/
 ├── 01_schema.sql            # DDL (테이블 + 인덱스) - 필수
 ├── 02_seed_data.sql         # 초기 샘플 데이터 (3건) - 선택
+├── 03_menu_data.sql         # 메뉴 등록 (core_menu + core_role_menu) - 필수
+├── 04_rename_menu.sql       # 메뉴 명칭 변경 마이그레이션 - 기배포 환경용
 └── README.md                # 이 문서
 ```
 

@@ -26,7 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 /**
- * PS 커버리지 검사 비즈니스 로직 서비스
+ * PS 지분 검사 비즈니스 로직 서비스
  *
  * <p>@Transactional(readOnly = true) 기본, 쓰기 메서드만 @Transactional
  */

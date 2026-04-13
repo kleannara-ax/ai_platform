@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
- * PS 커버리지 검사 결과 Repository
+ * PS 지분 검사 결과 Repository
  *
  * <p>Table: ps_insp_inspection
  */

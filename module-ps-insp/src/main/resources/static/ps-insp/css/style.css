@@ -440,6 +440,24 @@ table tr:last-child td { border-bottom: none; }
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ===== Detail Table (이력 테이블) ===== */
+.detail-table th,
+.detail-table td {
+  font-size: 11px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.detail-table th {
+  font-size: 10px;
+  letter-spacing: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.detail-table code {
+  font-size: 10px;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .form-grid { grid-template-columns: 1fr; }

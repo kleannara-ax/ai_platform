@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * PS 커버리지 검사 모듈 Health Check API
+ * PS 지분 검사 모듈 Health Check API
  *
  * <p>GET /ps-insp-api/health
  */
@@ -25,7 +25,7 @@ public class PsInspHealthController {
         return ResponseEntity.ok(ApiResponse.success(Map.of(
                 "status", "ok",
                 "module", "module-ps-insp",
-                "application", "PSCoverageInspection",
+                "application", "PSPartInspection",
                 "version", "7.0.0",
                 "timestamp", LocalDateTime.now().toString()
         )));

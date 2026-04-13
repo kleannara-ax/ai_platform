@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * PS 커버리지 검사 프론트엔드 페이지 라우팅
+ * PS 지분 검사 프론트엔드 페이지 라우팅
  *
  * <p>/ps-insp-api/page/** -> index.html (Thymeleaf 렌더링)
  * <p>context-path 없이 사용하므로 Prefix로 분리

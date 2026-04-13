@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * PS 커버리지 검사 결과 엔티티 (점보롤 지분 검사)
+ * PS 지분 검사 결과 엔티티 (점보롤 지분 검사)
  *
  * <p>Table: ps_insp_inspection (소문자 snake_case)
  * <p>Column: UPPER_SNAKE_CASE

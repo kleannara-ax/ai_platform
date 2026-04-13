@@ -1,5 +1,5 @@
 /**
- * PS Coverage Inspection Tool - Application JavaScript
+ * PS 지분 검사 도구 - Application JavaScript
  * AI Platform PS-INSP Module Frontend (v7.0.0)
  *
  * iframe 내부에서 동작하며, 부모 SPA(index.html)에서 JWT 토큰을 URL 파라미터로 전달받습니다.
@@ -15,6 +15,8 @@
   var token = '';
   var currentHistoryPage = 0;
   var historyPageSize = 20;
+  var currentDetailPage = 0;
+  var detailPageSize = 20;
 
   // ══════════════════════════════════════════════
   // Token Extraction (URL 파라미터 _t 에서 JWT 추출)
@@ -112,6 +114,9 @@
     if (tabContent) tabContent.classList.add('active');
     if (tabName === 'history') {
       loadHistory();
+    }
+    if (tabName === 'detail-table') {
+      loadDetailTable();
     }
   };
 
@@ -325,7 +330,7 @@
     body.innerHTML = '<div class="result-summary">'
       + '<div class="result-item"><div class="label">검사 ID</div><div class="value blue">' + data.inspectionId + '</div></div>'
       + '<div class="result-item"><div class="label">총 지분수</div><div class="value green">' + (data.totalCount || 0) + '</div></div>'
-      + '<div class="result-item"><div class="label">커버리지</div><div class="value orange">' + covPct + '</div></div>'
+      + '<div class="result-item"><div class="label">지분 커버리지</div><div class="value orange">' + covPct + '</div></div>'
       + '</div>'
       + '<div style="font-size:13px;color:var(--text2);">'
       + '<b>자재코드:</b> ' + esc(data.matnr || '-') + ' | '
@@ -450,6 +455,133 @@
       })
       .catch(function (e) { toast('삭제 오류: ' + e.message, 'error'); });
   };
+
+  // ══════════════════════════════════════════════
+  // Detail Table - Load (이력 테이블)
+  // ══════════════════════════════════════════════
+  window.loadDetailTable = function (page) {
+    if (page === undefined) page = 0;
+    currentDetailPage = page;
+    var tbody = document.getElementById('detailTableBody');
+    var pag = document.getElementById('dtPagination');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">불러오는 중...</td></tr>';
+    if (pag) pag.innerHTML = '';
+
+    api('GET', '/ps-insp-api/inspections?page=' + page + '&size=' + detailPageSize)
+      .then(function (res) {
+        if (res.success && res.data) {
+          var items = res.data.content || [];
+          var totalPages = res.data.totalPages || 0;
+          renderDetailRows(items, tbody);
+          renderDetailPagination(totalPages, page, pag);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">조회 실패</td></tr>';
+        }
+      })
+      .catch(function (e) {
+        tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">오류: ' + esc(e.message) + '</td></tr>';
+      });
+  };
+
+  // Detail Table - Search
+  window.searchDetailTable = function () {
+    var keyword = val('dt_keyword');
+    var type = document.getElementById('dt_searchType') ? document.getElementById('dt_searchType').value : 'indBcd';
+    if (!keyword) { loadDetailTable(); return; }
+    var tbody = document.getElementById('detailTableBody');
+    var pag = document.getElementById('dtPagination');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">검색 중...</td></tr>';
+    if (pag) pag.innerHTML = '';
+
+    api('GET', '/ps-insp-api/inspections/search?type=' + enc(type) + '&keyword=' + enc(keyword) + '&page=0&size=50')
+      .then(function (res) {
+        if (res.success && res.data) {
+          var items = res.data.content || [];
+          renderDetailRows(items, tbody);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">검색 결과 없음</td></tr>';
+        }
+      })
+      .catch(function (e) {
+        tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">오류: ' + esc(e.message) + '</td></tr>';
+      });
+  };
+
+  function renderDetailRows(items, tbody) {
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="38" class="empty-msg">검사 이력이 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(function (i) {
+      var covPct = i.coverageRatio != null ? (i.coverageRatio * 100).toFixed(4) + '%' : '-';
+      var dt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
+      var ct = i.createdAt ? String(i.createdAt).replace('T', ' ').substring(0, 19) : '-';
+      var stBadge = i.status === 'COMPLETED'
+        ? '<span class="badge badge-active">완료</span>'
+        : '<span class="badge badge-inactive">' + esc(i.status || '-') + '</span>';
+      return '<tr>'
+        + '<td>' + i.inspectionId + '</td>'
+        + '<td>' + (i.seq != null ? i.seq : '-') + '</td>'
+        + '<td><code>' + esc(i.inspItemGrpCd || '-') + '</code></td>'
+        + '<td><code>' + esc(i.matnr || '-') + '</code></td>'
+        + '<td>' + esc(i.matnrNm || '-') + '</td>'
+        + '<td>' + esc(i.werks || '-') + '</td>'
+        + '<td>' + esc(i.lotnr || '-') + '</td>'
+        + '<td><code>' + esc(i.indBcd || '-') + '</code></td>'
+        + '<td>' + esc(i.indBcdSeq || '-') + '</td>'
+        + '<td>' + (i.thresholdMax != null ? i.thresholdMax : '-') + '</td>'
+        + '<td><b>' + (i.totalCount || 0) + '</b></td>'
+        + '<td>' + covPct + '</td>'
+        + '<td>' + (i.densityCount || 0) + '</td>'
+        + '<td>' + fmtDec(i.densityRatio) + '</td>'
+        + '<td>' + fmtDec(i.sizeUniformityScore) + '</td>'
+        + '<td>' + fmtDec(i.distributionUniformityScore) + '</td>'
+        + '<td>' + fmtDec(i.meanSize) + '</td>'
+        + '<td>' + fmtDec(i.stdSize) + '</td>'
+        + '<td>' + (i.autoCount || 0) + '</td>'
+        + '<td>' + (i.manualCount || 0) + '</td>'
+        + '<td>' + (i.removedAutoCount || 0) + '</td>'
+        + '<td>' + (i.bucketUpTo3 || 0) + '</td>'
+        + '<td>' + (i.bucketUpTo5 || 0) + '</td>'
+        + '<td>' + (i.bucketUpTo7 || 0) + '</td>'
+        + '<td>' + (i.bucketOver7 || 0) + '</td>'
+        + '<td>' + (i.quadrantTopLeft || 0) + '</td>'
+        + '<td>' + (i.quadrantTopRight || 0) + '</td>'
+        + '<td>' + (i.quadrantBottomLeft || 0) + '</td>'
+        + '<td>' + (i.quadrantBottomRight || 0) + '</td>'
+        + '<td>' + (i.objectPixelCount || 0) + '</td>'
+        + '<td>' + (i.totalPixels || 0) + '</td>'
+        + '<td>' + (i.manualAddedCount || 0) + '</td>'
+        + '<td>' + (i.manualRemovedCount || 0) + '</td>'
+        + '<td>' + esc(i.operatorId || '-') + '</td>'
+        + '<td>' + esc(i.operatorNm || '-') + '</td>'
+        + '<td>' + stBadge + '</td>'
+        + '<td style="font-size:12px;white-space:nowrap;">' + dt + '</td>'
+        + '<td style="font-size:12px;white-space:nowrap;">' + ct + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function renderDetailPagination(totalPages, currentPage, container) {
+    if (!container || totalPages <= 1) return;
+    var html = '';
+    html += '<button ' + (currentPage === 0 ? 'disabled' : '') + ' onclick="loadDetailTable(' + (currentPage - 1) + ')">&laquo; 이전</button>';
+    var start = Math.max(0, currentPage - 3);
+    var end = Math.min(totalPages, start + 7);
+    for (var p = start; p < end; p++) {
+      html += '<button class="' + (p === currentPage ? 'active' : '') + '" onclick="loadDetailTable(' + p + ')">' + (p + 1) + '</button>';
+    }
+    html += '<button ' + (currentPage >= totalPages - 1 ? 'disabled' : '') + ' onclick="loadDetailTable(' + (currentPage + 1) + ')">다음 &raquo;</button>';
+    container.innerHTML = html;
+  }
+
+  function fmtDec(v) {
+    if (v == null) return '-';
+    var n = parseFloat(v);
+    return isNaN(n) ? '-' : n.toFixed(4);
+  }
 
   // ══════════════════════════════════════════════
   // Utilities

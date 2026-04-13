@@ -20,12 +20,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 /**
- * PS 커버리지 검사 REST API 컨트롤러
+ * PS 지분 검사 REST API 컨트롤러
  *
  * <p>URL API Prefix: /ps-insp-api/inspections
  * <p>응답은 ApiResponse&lt;T&gt;로 감싸서 반환
- * <p>쓰기 API(POST/DELETE): 메뉴 접근 권한 PS_INSP_PAGE 기반 인가
- * <p>읽기 API(GET): 메뉴 접근 권한 PS_INSP_MGMT 기반 인가 (검사도구/이력 공통)
+ * <p>모든 API: 메뉴 접근 권한 PS_INSP_MGMT 기반 인가
  */
 @Slf4j
 @RestController
@@ -45,7 +44,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 저장 (JSON)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspection(
             @Valid @RequestBody PsInspInspectionSaveRequest request) {
@@ -56,7 +55,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 저장 (Multipart: 이미지 바이너리 직접 업로드)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspectionMultipart(
             @RequestPart("metadata") String metadata,
@@ -119,7 +118,7 @@ public class PsInspInspectionApiController {
     /**
      * 기존 레코드 존재 여부 확인 (Upsert 사전 체크)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @GetMapping("/check-exists")
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkExists(
             @RequestParam(required = false) String matnr,
@@ -136,7 +135,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 삭제
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Map<String, String>>> deleteInspection(@PathVariable("id") Long id) {
         inspectionService.deleteInspection(id);
@@ -146,7 +145,7 @@ public class PsInspInspectionApiController {
     /**
      * 전체 삭제
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_PAGE')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
     @DeleteMapping
     public ResponseEntity<ApiResponse<Map<String, String>>> deleteAllInspections() {
         inspectionService.deleteAllInspections();

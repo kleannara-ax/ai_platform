@@ -1,5 +1,5 @@
 -- ============================================================
--- module-ps-insp: PS 커버리지 검사 (점보롤 지분 검사) DDL
+-- module-ps-insp: PS 지분 검사 (점보롤 지분 검사) DDL
 -- Database: MariaDB 10.11+ (utf8mb4)
 -- Naming: table = lower_snake_case, column = UPPER_SNAKE_CASE
 -- ============================================================
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS ps_insp_inspection (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_general_ci
-  COMMENT='[module-ps-insp] PS 커버리지 검사 결과 (점보롤 지분 검사)';
+  COMMENT='[module-ps-insp] PS 지분 검사 결과 (점보롤 지분 검사)';
 
 -- ── 인덱스 ──
 CREATE INDEX IDX_PS_INSP_IND_BCD       ON ps_insp_inspection (IND_BCD);
