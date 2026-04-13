@@ -530,7 +530,7 @@
     if (!area) return;
     const username = currentUser?.displayName || currentUser?.username || '';
     if (!username) {
-      area.innerHTML = '<li class="nav-item"><a class="nav-link account-link" href="#" onclick="(window.FireWebCsrf&&window.FireWebCsrf.goLogin||function(){location.href='/index.html'})();return false;">로그인</a></li>';
+      area.innerHTML = '<li class="nav-item"><a class="nav-link account-link" href="#" onclick="(window.FireWebCsrf&amp;&amp;window.FireWebCsrf.goLogin||function(){location.href=&#39;/index.html&#39;})();return false;">로그인</a></li>';
       return;
     }
     area.innerHTML = '' +
