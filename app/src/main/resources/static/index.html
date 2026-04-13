@@ -433,6 +433,9 @@ const menuIcons = {
   'FIRE_PUMP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M12 6V2"/><path d="M12 22v-4"/><path d="M6 12H2"/><path d="M22 12h-4"/><circle cx="12" cy="12" r="2"/></svg>',
   'FIRE_FLOOR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>',
   'FIRE_QR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="21" x2="21" y2="21"/></svg>',
+  'PS_INSP_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/></svg>',
+  'PS_INSP_PAGE': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/><path d="M3 12h5"/><path d="M16 12h5"/><path d="M12 3v5"/><path d="M12 16v5"/></svg>',
+  'PS_INSP_HISTORY': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
 };
 const menuCodeToPage = {
@@ -450,6 +453,9 @@ const menuCodeToPage = {
   'FIRE_PUMP': 'fire_pump',
   'FIRE_FLOOR': 'fire_floor',
   'FIRE_QR': 'fire_qr',
+  'PS_INSP_MGMT': 'ps_insp',
+  'PS_INSP_PAGE': 'ps_insp_page',
+  'PS_INSP_HISTORY': 'ps_insp_history',
 };
 
 // IP → 32비트 정수 변환
@@ -590,14 +596,14 @@ function navigate(page, el) {
       }
     }
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_dashboard:'모듈 > 소방시설관리 > 대시보드',fire_map:'모듈 > 소방시설관리 > 도면',fire_extinguisher:'모듈 > 소방시설관리 > 소화기',fire_hydrant:'모듈 > 소방시설관리 > 소화전',fire_receiver:'모듈 > 소방시설관리 > 수신기',fire_pump:'모듈 > 소방시설관리 > 소방펌프',fire_floor:'모듈 > 소방시설관리 > 층별 도면',fire_qr:'모듈 > 소방시설관리 > QR코드'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',ps_insp:'PS 커버리지 검사',ps_insp_page:'PS 검사 도구',ps_insp_history:'PS 검사 이력'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_dashboard:'모듈 > 소방시설관리 > 대시보드',fire_map:'모듈 > 소방시설관리 > 도면',fire_extinguisher:'모듈 > 소방시설관리 > 소화기',fire_hydrant:'모듈 > 소방시설관리 > 소화전',fire_receiver:'모듈 > 소방시설관리 > 수신기',fire_pump:'모듈 > 소방시설관리 > 소방펌프',fire_floor:'모듈 > 소방시설관리 > 층별 도면',fire_qr:'모듈 > 소방시설관리 > QR코드',ps_insp:'모듈 > PS 커버리지 검사',ps_insp_page:'모듈 > PS 커버리지 검사 > 검사 도구',ps_insp_history:'모듈 > PS 커버리지 검사 > 검사 이력'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
-  // 소방 iframe 모드 해제 (소방 외 페이지 전환 시)
+  // iframe 모드 해제 (소방/PS-INSP 외 페이지 전환 시)
   var pc=document.getElementById('pageContent');
-  if(!page.startsWith('fire_') || page==='fire' || page==='fire_dashboard') { pc.className='page'; }
+  if((!page.startsWith('fire_') && !page.startsWith('ps_insp_')) || page==='fire' || page==='fire_dashboard' || page==='ps_insp') { pc.className='page'; }
   if(page==='dashboard')renderDashboard();
   else if(page==='users')renderUsers();
   else if(page==='menus')renderMenus();
@@ -612,6 +618,9 @@ function navigate(page, el) {
   else if(page==='fire_pump')navigateToFirePage('/pumps.html');
   else if(page==='fire_floor')navigateToFirePage('/maps/floor.html');
   else if(page==='fire_qr')navigateToFirePage('/qr');
+  else if(page==='ps_insp')renderPsInspIndex();
+  else if(page==='ps_insp_page')navigateToPsInspPage('/ps-insp-api/page');
+  else if(page==='ps_insp_history')renderPsInspHistory();
 }
 
 // ══ Dashboard ══
@@ -1689,6 +1698,155 @@ function esc(s){if(!s)return'';const d=document.createElement('div');d.textConte
 function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
 function toast(msg,type='info'){const c=document.getElementById('toasts');const t=document.createElement('div');t.className='toast toast-'+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3000);}
+
+// ══ PS 커버리지 검사 모듈 ══
+function navigateToPsInspPage(path) {
+  // PS-INSP 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 URL 파라미터로 전달)
+  var el = document.getElementById('pageContent');
+  el.className = 'page fire-iframe-mode';
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3)"><span>불러오는 중...</span></div>';
+  var iframe = document.createElement('iframe');
+  iframe.className = 'fire-iframe';
+  iframe.id = 'psInspIframe';
+  iframe.onload = function() { iframe.classList.add('loaded'); };
+  // 토큰을 URL 해시로 전달
+  iframe.src = path + (path.includes('?') ? '&' : '?') + '_t=' + encodeURIComponent(token);
+  el.innerHTML = '';
+  el.appendChild(iframe);
+}
+
+async function renderPsInspIndex() {
+  const el = document.getElementById('pageContent');
+  el.innerHTML = '<p style="color:var(--text3)">PS 커버리지 검사 현황을 불러오는 중...</p>';
+  try {
+    // 헬스체크 조회
+    var healthOk = false;
+    try {
+      var hRes = await api('GET', '/ps-insp-api/health');
+      healthOk = hRes.success;
+    } catch(e) {}
+    // 최근 검사 이력 조회
+    var inspections = [], totalCount = 0;
+    try {
+      var iRes = await api('GET', '/ps-insp-api/inspections?page=0&size=10');
+      if (iRes.success && iRes.data) {
+        inspections = iRes.data.content || [];
+        totalCount = iRes.data.totalElements || 0;
+      }
+    } catch(e) {}
+
+    var completedCount = inspections.filter(function(i){ return i.status === 'COMPLETED'; }).length;
+
+    el.innerHTML = `
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-card blue"><div class="label">전체 검사</div><div class="value">${totalCount}</div><div class="sub">등록된 검사 결과</div></div>
+        <div class="stat-card green"><div class="label">최근 완료</div><div class="value">${completedCount}</div><div class="sub">최근 10건 중 완료</div></div>
+        <div class="stat-card" style="border-left:3px solid ${healthOk ? 'var(--green)' : 'var(--red)'};">
+          <div class="label">모듈 상태</div>
+          <div class="value" style="color:${healthOk ? 'var(--green)' : 'var(--red)'};">${healthOk ? 'ON' : 'OFF'}</div>
+          <div class="sub">${healthOk ? '정상 운영 중' : '연결 실패'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="card" style="cursor:pointer;" onclick="navigate('ps_insp_page')">
+          <div class="card-body text-center" style="padding:40px;">
+            <div style="font-size:48px;margin-bottom:12px;">&#128300;</div>
+            <h3 style="margin-bottom:8px;">PS 검사 도구</h3>
+            <p style="color:var(--text2);font-size:13px;">이미지를 분석하여 PS 커버리지를 검사합니다.</p>
+          </div>
+        </div>
+        <div class="card" style="cursor:pointer;" onclick="navigate('ps_insp_history')">
+          <div class="card-body text-center" style="padding:40px;">
+            <div style="font-size:48px;margin-bottom:12px;">&#128203;</div>
+            <h3 style="margin-bottom:8px;">PS 검사 이력</h3>
+            <p style="color:var(--text2);font-size:13px;">과거 검사 결과를 조회하고 관리합니다.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header"><h3>최근 검사 이력</h3></div>
+        <div class="card-body" style="padding:0;">
+          <table>
+            <thead><tr><th>ID</th><th>자재코드</th><th>LOT</th><th>바코드</th><th>총 지분수</th><th>커버리지</th><th>상태</th><th>검사일시</th></tr></thead>
+            <tbody>${inspections.length > 0 ? inspections.map(function(i){
+              var covPct = i.coverageRatio != null ? (i.coverageRatio * 100).toFixed(2) + '%' : '-';
+              var dt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
+              var stBadge = i.status === 'COMPLETED' ? '<span class="badge badge-active">완료</span>' : '<span class="badge badge-inactive">' + esc(i.status || '-') + '</span>';
+              return '<tr><td>' + i.inspectionId + '</td><td><code>' + esc(i.matnr || '-') + '</code></td><td>' + esc(i.lotnr || '-') + '</td><td><code>' + esc(i.indBcd || '-') + '</code></td><td><b>' + (i.totalCount || 0) + '</b></td><td>' + covPct + '</td><td>' + stBadge + '</td><td>' + dt + '</td></tr>';
+            }).join('') : '<tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text3);">검사 이력이 없습니다.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--red)">오류: ' + esc(e.message) + '</p>';
+  }
+}
+
+async function renderPsInspHistory() {
+  const el = document.getElementById('pageContent');
+  el.innerHTML = '<p style="color:var(--text3)">PS 검사 이력을 불러오는 중...</p>';
+  document.getElementById('topbarActions').innerHTML = '';
+  try {
+    var page = 0, size = 20;
+    var res = await api('GET', '/ps-insp-api/inspections?page=' + page + '&size=' + size);
+    var inspections = [], totalElements = 0, totalPages = 0;
+    if (res.success && res.data) {
+      inspections = res.data.content || [];
+      totalElements = res.data.totalElements || 0;
+      totalPages = res.data.totalPages || 0;
+    }
+
+    el.innerHTML = `
+      <div class="toolbar">
+        <input type="text" id="psInspSearch" placeholder="바코드, LOT, 자재코드로 검색..." style="width:300px;">
+        <select id="psInspSearchType" style="padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);">
+          <option value="indBcd">바코드</option>
+          <option value="lotnr">LOT</option>
+          <option value="matnr">자재코드</option>
+        </select>
+        <button class="btn btn-sm btn-primary" onclick="doPsInspSearch()">검색</button>
+        <button class="btn btn-sm btn-outline" onclick="renderPsInspHistory()">초기화</button>
+        <span style="flex:1"></span>
+        <span style="font-size:12px;color:var(--text3);">총 ${totalElements}건 (${totalPages}페이지)</span>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+          <table>
+            <thead><tr><th>ID</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th><th>차수</th><th>총 지분수</th><th>커버리지</th><th>자동</th><th>수동</th><th>상태</th><th>검사자</th><th>검사일시</th></tr></thead>
+            <tbody id="psInspTableBody">${inspections.length > 0 ? inspections.map(function(i){
+              return psInspRow(i);
+            }).join('') : '<tr><td colspan="13" class="text-center" style="padding:40px;color:var(--text3);">검사 이력이 없습니다.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--red)">오류: ' + esc(e.message) + '</p>';
+  }
+}
+
+function psInspRow(i) {
+  var covPct = i.coverageRatio != null ? (i.coverageRatio * 100).toFixed(2) + '%' : '-';
+  var dt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
+  var stBadge = i.status === 'COMPLETED' ? '<span class="badge badge-active">완료</span>' : '<span class="badge badge-inactive">' + esc(i.status || '-') + '</span>';
+  return '<tr><td>' + i.inspectionId + '</td><td><code>' + esc(i.matnr || '-') + '</code></td><td>' + esc(i.matnrNm || '-') + '</td><td>' + esc(i.lotnr || '-') + '</td><td><code>' + esc(i.indBcd || '-') + '</code></td><td>' + esc(i.indBcdSeq || '-') + '</td><td><b>' + (i.totalCount || 0) + '</b></td><td>' + covPct + '</td><td>' + (i.autoCount || 0) + '</td><td>' + (i.manualCount || 0) + '</td><td>' + stBadge + '</td><td>' + esc(i.operatorNm || '-') + '</td><td style="font-size:12px;">' + dt + '</td></tr>';
+}
+
+async function doPsInspSearch() {
+  var keyword = (document.getElementById('psInspSearch')?.value || '').trim();
+  var type = document.getElementById('psInspSearchType')?.value || 'indBcd';
+  if (!keyword) { renderPsInspHistory(); return; }
+  try {
+    var res = await api('GET', '/ps-insp-api/inspections/search?type=' + type + '&keyword=' + encodeURIComponent(keyword) + '&page=0&size=50');
+    var inspections = [];
+    if (res.success && res.data) {
+      inspections = res.data.content || [];
+    }
+    var tbody = document.getElementById('psInspTableBody');
+    if (tbody) {
+      tbody.innerHTML = inspections.length > 0 ? inspections.map(function(i){ return psInspRow(i); }).join('') : '<tr><td colspan="13" class="text-center" style="padding:40px;color:var(--text3);">검색 결과가 없습니다.</td></tr>';
+    }
+  } catch(e) { toast('검색 오류: ' + e.message, 'error'); }
+}
 </script>
 </body>
 </html>

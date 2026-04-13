@@ -73,11 +73,19 @@ jwt:
   # Refresh Token 유효시간: 7일 (밀리초)
   refresh-token-expiration: 604800000
 
+# ── PS-INSP 모듈 설정 ──
+ps-insp:
+  upload:
+    dir: /data/upload/ps_cov_ins   # 이미지 저장 경로
+  mes:
+    endpoint-url:                   # MES 전송 URL (비어있으면 mock 모드)
+
 # ── 로깅 ──
 logging:
   level:
     root: INFO
     com.company: DEBUG
+    com.company.module.psinsp: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   file:
