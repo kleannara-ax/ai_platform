@@ -876,6 +876,11 @@ function logout() {
 }
 
 // ===== 건물/층 옵션 로드 =====
+// 건물→층 매핑: { buildingId: [{ floorId, floorName }] }
+let buildingFloorMap = {};
+let allFloorOptions = [];
+let allBuildingOptions = [];
+
 async function loadBuildingFloorOptions() {
   let buildings = [];
   let floors = [];
@@ -904,6 +909,28 @@ async function loadBuildingFloorOptions() {
     if (!floors.length) floors = Array.from(fMap.values());
   }
 
+  allBuildingOptions = buildings;
+  allFloorOptions = floors;
+
+  // 건물→층 매핑 구축 (allItems 기반)
+  buildingFloorMap = {};
+  (allItems || []).forEach(it => {
+    if (it?.buildingId != null && it?.floorId != null) {
+      const bKey = String(it.buildingId);
+      if (!buildingFloorMap[bKey]) buildingFloorMap[bKey] = new Map();
+      if (!buildingFloorMap[bKey].has(String(it.floorId))) {
+        buildingFloorMap[bKey].set(String(it.floorId), {
+          floorId: it.floorId,
+          floorName: it.floorName || String(it.floorId)
+        });
+      }
+    }
+  });
+  // Map → Array 변환
+  Object.keys(buildingFloorMap).forEach(k => {
+    buildingFloorMap[k] = Array.from(buildingFloorMap[k].values());
+  });
+
   const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
   bSel.innerHTML='<option value="">-- 건물 전체 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
@@ -913,6 +940,21 @@ async function loadBuildingFloorOptions() {
   const hf = document.getElementById('hydFloorSel');
   if (hb) hb.innerHTML='<option value="">-- 건물 선택 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
   if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+floors.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
+}
+
+/** 모달 층 드롭다운을 건물에 맞게 필터링 */
+function updateModalFloorOptions(buildingId) {
+  const hf = document.getElementById('hydFloorSel');
+  if (!hf) return;
+  const prevVal = hf.value;
+  const bKey = String(buildingId || '');
+  const floorList = (bKey && buildingFloorMap[bKey]) ? buildingFloorMap[bKey] : allFloorOptions;
+  hf.innerHTML = '<option value="">-- 층 선택 --</option>' +
+    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+  // 이전 선택값 복원 시도
+  if (prevVal && Array.from(hf.options).some(o => o.value === prevVal)) {
+    hf.value = prevVal;
+  }
 }
 
 async function ensureHydModalOptions() {
@@ -1717,7 +1759,7 @@ window.openHydrantDetails = openHydrantDetails;
     const indoor=t==='Indoor';
     if(buildingSel) buildingSel.disabled=!indoor;
     if(floorSel) floorSel.disabled=!indoor;
-    if(!indoor){ setVal('hydBuildingId',99); setVal('hydFloorId',1); }
+    if(!indoor){ setVal('hydBuildingId',''); setVal('hydFloorId',''); }
   }
 
   function normName(v){ return String(v||'').replace(/\s+/g,'').toLowerCase(); }
@@ -1892,6 +1934,7 @@ window.openHydrantDetails = openHydrantDetails;
       setVal('hydType',t); setVal('hydTypeHidden',t);
       if (buildingSel) {
         selectOptionSmart(buildingSel, opts?.buildingId, opts?.buildingName);
+        updateModalFloorOptions(buildingSel.value);
       }
       if (floorSel) {
         selectOptionSmart(floorSel, opts?.floorId, opts?.floorName);
@@ -1918,6 +1961,7 @@ window.openHydrantDetails = openHydrantDetails;
       renderHistory(data.inspections || []);
       if(buildingSel) {
         selectOptionSmart(buildingSel, data.buildingId, data.buildingName);
+        updateModalFloorOptions(buildingSel.value);
       }
       if(floorSel) {
         selectOptionSmart(floorSel, data.floorId, data.floorName);
@@ -1938,7 +1982,10 @@ window.openHydrantDetails = openHydrantDetails;
   };
 
   typeEl?.addEventListener('change', async()=>{ setVal('hydTypeHidden',typeEl.value||'Indoor'); await loadMapData(); });
-  buildingSel?.addEventListener('change', () => loadMapData());
+  buildingSel?.addEventListener('change', () => {
+    updateModalFloorOptions(buildingSel.value);
+    loadMapData();
+  });
   floorSel?.addEventListener('change', () => loadMapData());
   window.addEventListener('resize', renderMarkers);
   modalEl.addEventListener('shown.bs.modal', renderMarkers);
@@ -2009,14 +2056,15 @@ window.openHydrantDetails = openHydrantDetails;
         if(!b||!f){ alert('옥내 소화전은 건물/층을 선택해야 합니다.'); return; }
         setVal('hydBuildingId',b); setVal('hydFloorId',f);
       } else {
-        setVal('hydBuildingId',99); setVal('hydFloorId',1);
+        // 옥외: buildingId/floorId는 서버에서 결정
+        setVal('hydBuildingId',''); setVal('hydFloorId','');
       }
       const id=Number(document.getElementById('hydId')?.value||0);
       const body={
         hydrantId: id||undefined,
         hydrantType: typeVal,
-        buildingId: parseInt(document.getElementById('hydBuildingId')?.value||'0'),
-        floorId: parseInt(document.getElementById('hydFloorId')?.value||'0'),
+        buildingId: parseInt(document.getElementById('hydBuildingId')?.value||'0') || null,
+        floorId: parseInt(document.getElementById('hydFloorId')?.value||'0') || null,
         operationType: document.getElementById('hydOp')?.value||'Manual',
         x: Number.isFinite(x) ? x : null,
         y: Number.isFinite(y) ? y : null,
