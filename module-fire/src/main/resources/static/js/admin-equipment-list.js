@@ -33,7 +33,13 @@
     initialActionHandled: false
   };
 
-  const canManage = getUser()?.canManage !== false;
+  const _menuCodeMap = { receiverId: 'FIRE_RECEIVER', pumpId: 'FIRE_PUMP' };
+  const _requiredMenu = _menuCodeMap[config.idField] || '';
+  const _user = getUser();
+  const canEdit = _requiredMenu && Array.isArray(_user?.menuCodes)
+    ? _user.menuCodes.includes(_requiredMenu)
+    : _user?.canManage !== false;
+  const canManage = _user?.canManage !== false;
 
   function getPendingAction() {
     if (query.get("add") === "1") return { type: "add", id: "" };
@@ -254,7 +260,7 @@
         '<td>' + statusBadge(item.lastInspectionStatus) + '</td>' +
         '<td class="text-truncate" style="max-width:240px;" title="' + escapeHtml(item.locationDescription || "") + '">' + escapeHtml(item.locationDescription || "-") + '</td>' +
         '<td class="text-end"><div class="action-group">' +
-        (canManage
+        (canEdit
           ? '<button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="' + escapeHtml(id) + '">점검</button>' +
             '<button type="button" class="btn btn-sm btn-fw-edit js-edit" data-id="' + escapeHtml(id) + '">수정</button>' +
             '<button type="button" class="btn btn-sm btn-fw-delete js-delete" data-id="' + escapeHtml(id) + '">삭제</button>'
@@ -576,8 +582,8 @@
       '  <input type="date" class="form-control form-control-sm" id="exportFromDate" style="max-width:160px;" />' +
       '  <input type="date" class="form-control form-control-sm" id="exportToDate" style="max-width:160px;" />' +
       '  <button type="button" class="btn btn-outline-success" id="detailExportBtn">CSV 다운로드</button>' +
-      '  <button type="button" class="btn btn-primary" id="detailInspectBtn"' + (canManage ? "" : ' style="display:none;"') + '>점검</button>' +
-      '  <button type="button" class="btn btn-outline-primary" id="detailEditBtn"' + (canManage ? "" : ' style="display:none;"') + '>수정</button>' +
+      '  <button type="button" class="btn btn-primary" id="detailInspectBtn"' + (canEdit ? "" : ' style="display:none;"') + '>점검</button>' +
+      '  <button type="button" class="btn btn-outline-primary" id="detailEditBtn"' + (canEdit ? "" : ' style="display:none;"') + '>수정</button>' +
       '</div>' +
       '<div class="container-fluid px-0">' +
       '  <div class="row g-4">' +
@@ -643,11 +649,11 @@
     renderHistory(detail.inspections || []);
     document.getElementById("detailExportBtn")?.addEventListener("click", downloadInspectionCsv);
     document.getElementById("detailInspectBtn")?.addEventListener("click", function () {
-      if (!canManage || !state.selectedDetailId) return;
+      if (!canEdit || !state.selectedDetailId) return;
       openInspectModal(state.selectedDetailId);
     });
     document.getElementById("detailEditBtn")?.addEventListener("click", function () {
-      if (!canManage) return;
+      if (!canEdit) return;
       const current = state.items.find(function (item) { return String(item[config.idField]) === String(state.selectedDetailId); });
       if (current) {
         state.detailModal.hide();
@@ -675,7 +681,7 @@
     const historySection = document.getElementById("itemHistorySection");
     const historyBody = document.getElementById("itemHistoryBody");
     if (item?.[config.idField]) {
-      if (historySection) historySection.style.display = canManage ? "" : "none";
+      if (historySection) historySection.style.display = canEdit ? "" : "none";
       apiFetch(config.apiBase + "/" + encodeURIComponent(item[config.idField]), { method: "GET" })
         .then(function (detail) {
           renderEditableHistory(detail.inspections || []);
@@ -749,8 +755,8 @@
     const exportToDate = document.getElementById("exportToDate");
     const detailInspectBtn = document.getElementById("detailInspectBtn");
     const detailEditBtn = document.getElementById("detailEditBtn");
-    if (detailInspectBtn) detailInspectBtn.style.display = canManage ? "" : "none";
-    if (detailEditBtn) detailEditBtn.style.display = canManage ? "" : "none";
+    if (detailInspectBtn) detailInspectBtn.style.display = canEdit ? "" : "none";
+    if (detailEditBtn) detailEditBtn.style.display = canEdit ? "" : "none";
     if (exportFromDate && !exportFromDate.value) {
       exportFromDate.value = detail.inspections?.length ? (detail.inspections[detail.inspections.length - 1]?.inspectionDate || "") : "";
     }
@@ -915,7 +921,7 @@
     const pendingAction = getPendingAction();
     if (!pendingAction) return;
     if (pendingAction.type === "add") {
-      if (!canManage) return;
+      if (!canEdit) return;
       openItemModal(null);
       return;
     }
@@ -925,7 +931,7 @@
       return;
     }
     if (pendingAction.type === "inspect") {
-      if (canManage) {
+      if (canEdit) {
         openInspectModal(pendingAction.id);
       } else {
         await openDetail(pendingAction.id);
@@ -934,7 +940,7 @@
     }
     if (pendingAction.type === "edit") {
       const current = state.items.find(item => String(item[config.idField]) === String(pendingAction.id));
-      if (canManage && current) {
+      if (canEdit && current) {
         openItemModal(current);
       } else if (current) {
         await openDetail(pendingAction.id);
@@ -963,7 +969,7 @@
   }
 
   function exportAllCsv() {
-    if (!canManage) return;
+    if (!canEdit) return;
     const from = document.getElementById("filterDateFrom")?.value || "";
     const to = document.getElementById("filterDateTo")?.value || "";
     if (!from || !to) {
@@ -1030,14 +1036,14 @@
         if (pendingAction.type === "details") {
           await openDetail(pendingAction.id);
         } else if (pendingAction.type === "inspect") {
-          if (canManage) {
+          if (canEdit) {
             openInspectModal(pendingAction.id);
           } else {
             await openDetail(pendingAction.id);
           }
         } else if (pendingAction.type === "edit") {
           const current = state.items.find(item => String(item[config.idField]) === String(pendingAction.id));
-          if (canManage && current) {
+          if (canEdit && current) {
             openItemModal(current);
           } else if (current) {
             await openDetail(pendingAction.id);
@@ -1118,7 +1124,7 @@
       renderTable();
     });
     document.getElementById("addBtn")?.addEventListener("click", function () {
-      if (!canManage) return;
+      if (!canEdit) return;
       openItemModal(null);
     });
     document.getElementById("saveBtn")?.addEventListener("click", async function () {
@@ -1129,11 +1135,11 @@
       }
     });
     document.getElementById("detailInspectBtn")?.addEventListener("click", function () {
-      if (!canManage) return;
+      if (!canEdit) return;
       if (state.selectedDetailId) openInspectModal(state.selectedDetailId);
     });
     document.getElementById("detailEditBtn")?.addEventListener("click", function () {
-      if (!canManage) return;
+      if (!canEdit) return;
       const current = state.items.find(item => String(item[config.idField]) === String(state.selectedDetailId));
       if (current) {
         state.detailModal.hide();
@@ -1151,14 +1157,14 @@
     document.getElementById("listBody")?.addEventListener("click", async function (event) {
       const inspectBtn = event.target.closest(".js-inspect");
       if (inspectBtn) {
-        if (!canManage) return;
+        if (!canEdit) return;
         event.stopPropagation();
         openInspectModal(inspectBtn.dataset.id);
         return;
       }
       const editBtn = event.target.closest(".js-edit");
       if (editBtn) {
-        if (!canManage) return;
+        if (!canEdit) return;
         event.stopPropagation();
         const current = state.items.find(item => String(item[config.idField]) === String(editBtn.dataset.id));
         openItemModal(current || null);
@@ -1166,7 +1172,7 @@
       }
       const deleteBtn = event.target.closest(".js-delete");
       if (deleteBtn) {
-        if (!canManage) return;
+        if (!canEdit) return;
         event.stopPropagation();
         try {
           await deleteItem(deleteBtn.dataset.id);
@@ -1183,7 +1189,7 @@
     document.getElementById("itemHistoryBody")?.addEventListener("click", async function (event) {
       const saveBtn = event.target.closest(".js-history-save");
       if (!saveBtn) return;
-      if (!canManage) return;
+      if (!canEdit) return;
       try {
         await saveHistoryRow(saveBtn);
       } catch (error) {
@@ -1221,9 +1227,9 @@
     document.getElementById("pageLead").textContent = config.title + "의 위치와 점검 이력을 관리합니다.";
     document.getElementById("singularLabel").textContent = config.singular;
     const addBtn = document.getElementById("addBtn");
-    if (addBtn && !canManage) addBtn.style.display = "none";
+    if (addBtn && !canEdit) addBtn.style.display = "none";
     const exportAllBtn = document.getElementById("btnExportAll");
-    if (exportAllBtn && !canManage) exportAllBtn.style.display = "none";
+    if (exportAllBtn && !canEdit) exportAllBtn.style.display = "none";
     applyEmbeddedShell();
     bindEvents();
     try {

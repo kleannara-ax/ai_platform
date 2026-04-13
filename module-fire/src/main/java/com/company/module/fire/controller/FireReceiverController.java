@@ -41,6 +41,7 @@ public class FireReceiverController {
 
     private final FireReceiverService fireReceiverService;
     private final com.company.module.fire.service.InspectorNameResolver inspectorNameResolver;
+    private final com.company.core.menu.service.CoreMenuService coreMenuService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<FireReceiverResponse>>> getList(
@@ -56,14 +57,14 @@ public class FireReceiverController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> save(
             @Valid @RequestBody FireReceiverSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(fireReceiverService.save(request)));
     }
 
     @PostMapping("/{id}/inspect")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> inspect(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionRequest request,
@@ -78,7 +79,7 @@ public class FireReceiverController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> updateInspection(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -89,7 +90,7 @@ public class FireReceiverController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<FireReceiverResponse>> addInspection(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionUpdateRequest request) {
@@ -112,7 +113,7 @@ public class FireReceiverController {
     }
 
     @GetMapping("/inspections/export-all")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<byte[]> exportAllInspections(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -125,7 +126,7 @@ public class FireReceiverController {
     }
 
     @PostMapping("/{id}/inspections/{inspectionId}/image")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadInspectionImage(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -197,7 +198,7 @@ public class FireReceiverController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','FIRE_MANAGER')")
+    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         fireReceiverService.delete(id);
         return ResponseEntity.ok(ApiResponse.success());
