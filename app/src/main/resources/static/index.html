@@ -64,6 +64,7 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;padding:16px 24px 6px;font-weight:700;white-space:nowrap;overflow:hidden;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#94a3b8;cursor:pointer;transition:all .15s;border-left:3px solid transparent;font-size:13px;white-space:nowrap;overflow:hidden;}
 .nav-item:hover{background:#334155;color:#e2e8f0;}
+.nav-child{padding-left:44px;font-size:12px;}
 .nav-item.active{background:#334155;color:#fff;border-left-color:#3b82f6;}
 .nav-item svg{width:18px;height:18px;flex-shrink:0;}
 .sidebar-footer{padding:16px 24px;border-top:1px solid #334155;transition:padding .25s;}
@@ -77,7 +78,7 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .sidebar.collapsed .sidebar-user{padding:16px 0;justify-content:center;}
 .sidebar.collapsed .sidebar-user .info{display:none;}
 .sidebar.collapsed .nav-section{font-size:0;padding:8px 0;}
-.sidebar.collapsed .nav-item{padding:10px 0!important;justify-content:center;font-size:0;gap:0;border-left-width:0;}
+.sidebar.collapsed .nav-item{padding:10px 0!important;justify-content:center;font-size:0!important;gap:0;border-left-width:0;}
 .sidebar.collapsed .nav-item svg{width:22px;height:22px;}
 .sidebar.collapsed .sidebar-footer{padding:16px 10px;}
 .sidebar.collapsed .sidebar-footer button{font-size:0;padding:8px;display:flex;align-items:center;justify-content:center;}
@@ -514,7 +515,7 @@ function renderSidebarMenus() {
       menu.children.forEach(child => {
         const childPage = menuCodeToPage[child.menuCode] || child.menuCode.toLowerCase();
         const childIcon = menuIcons[child.menuCode] || menuIcons['_DEFAULT'];
-        html += `<div class="nav-item" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" data-tooltip="${esc(child.menuName)}" style="padding-left:44px;font-size:12px;">${childIcon} ${esc(child.menuName)}</div>`;
+        html += `<div class="nav-item nav-child" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" data-tooltip="${esc(child.menuName)}">${childIcon} ${esc(child.menuName)}</div>`;
       });
     }
   });
