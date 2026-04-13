@@ -942,15 +942,14 @@ async function loadBuildingFloorOptions() {
   if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+floors.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
 }
 
-/** 모달 층 드롭다운을 건물에 맞게 필터링 */
+/** 모달 층 드롭다운 갱신 - 항상 DB 전체 층 목록 표시 */
 function updateModalFloorOptions(buildingId) {
   const hf = document.getElementById('hydFloorSel');
   if (!hf) return;
   const prevVal = hf.value;
-  const bKey = String(buildingId || '');
-  const floorList = (bKey && buildingFloorMap[bKey]) ? buildingFloorMap[bKey] : allFloorOptions;
+  // 항상 allFloorOptions(DB 전체 층)를 표시
   hf.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    allFloorOptions.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   // 이전 선택값 복원 시도
   if (prevVal && Array.from(hf.options).some(o => o.value === prevVal)) {
     hf.value = prevVal;
@@ -1759,7 +1758,12 @@ window.openHydrantDetails = openHydrantDetails;
     const indoor=t==='Indoor';
     if(buildingSel) buildingSel.disabled=!indoor;
     if(floorSel) floorSel.disabled=!indoor;
-    if(!indoor){ setVal('hydBuildingId',''); setVal('hydFloorId',''); }
+    if(!indoor){
+      // 옥외: buildingId=99, floorId=99 고정
+      setVal('hydBuildingId',99); setVal('hydFloorId',99);
+      if(buildingSel) selectOptionSmart(buildingSel, 99, '옥외');
+      if(floorSel) selectOptionSmart(floorSel, 99, '옥외');
+    }
   }
 
   function normName(v){ return String(v||'').replace(/\s+/g,'').toLowerCase(); }
@@ -2056,8 +2060,8 @@ window.openHydrantDetails = openHydrantDetails;
         if(!b||!f){ alert('옥내 소화전은 건물/층을 선택해야 합니다.'); return; }
         setVal('hydBuildingId',b); setVal('hydFloorId',f);
       } else {
-        // 옥외: buildingId/floorId는 서버에서 결정
-        setVal('hydBuildingId',''); setVal('hydFloorId','');
+        // 옥외: buildingId=99, floorId=99 고정
+        setVal('hydBuildingId',99); setVal('hydFloorId',99);
       }
       const id=Number(document.getElementById('hydId')?.value||0);
       const body={
