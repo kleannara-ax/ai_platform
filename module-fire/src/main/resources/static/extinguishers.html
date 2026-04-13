@@ -805,6 +805,7 @@ let currentExtinguisherId = null;
 let optionBuildings = [];
 let optionFloors = [];
 const canManage = API.canManage();
+const canEdit = true; // 소화기 목록 접근권한이 있으면 추가/수정/삭제 가능
 const EMBED_MODAL_MODE = (() => {
   const qs = new URLSearchParams(window.location.search);
   return qs.get('embedEdit') === '1' || qs.get('embedInspect') === '1' || qs.get('embedDetails') === '1';
@@ -1024,9 +1025,9 @@ function renderTable(items) {
         <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
         <td class="text-center">
           <div class="ext-actions">
-            ${canManage ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
+            <button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>
             <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
-            ${canManage ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
+            <button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>
           </div>
         </td>
       </tr>`;
@@ -1129,9 +1130,9 @@ function renderStatusPanel(type) {
       <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
       <td class="text-center">
         <div class="ext-actions">
-          ${canManage ? `<button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>` : ''}
+          <button type="button" class="btn btn-sm btn-fw-edit js-ext-edit" data-id="${item.extinguisherId}">수정</button>
           <button type="button" class="btn btn-sm btn-fw-inspect js-inspect" data-id="${item.extinguisherId}">점검</button>
-          ${canManage ? `<button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>` : ''}
+          <button type="button" class="btn btn-sm btn-fw-delete js-ext-delete" data-id="${item.extinguisherId}" data-serial="${item.serialNumber||''}">&#49325;&#51228;</button>
         </div>
       </td>
     </tr>`).join('');
@@ -1783,31 +1784,23 @@ async function openDetails(id) {
     return `
       <tr class="${isNew ? 'fw-history-new' : ''}">
         <td>
-          ${canManage
-            ? `<input type="date" class="form-control form-control-sm js-ext-hist-date" data-inspection-id="${inspectionId}" value="${inspectionDate}" />`
-            : (inspectionDate || '-')}
+          <input type="date" class="form-control form-control-sm js-ext-hist-date" data-inspection-id="${inspectionId}" value="${inspectionDate}" />
         </td>
         <td>
-          ${canManage
-            ? `<select class="form-select form-select-sm js-ext-hist-result" data-inspection-id="${inspectionId}">
+          <select class="form-select form-select-sm js-ext-hist-result" data-inspection-id="${inspectionId}">
                 <option value="ok" ${resultValue === 'ok' ? 'selected' : ''}>정상</option>
                 <option value="bad" ${resultValue === 'bad' ? 'selected' : ''}>비정상</option>
-              </select>`
-            : (isFaulty ? '<span class="fw-status fw-bad">비정상</span>' : '<span class="fw-status fw-ok">정상</span>')}
+              </select>
         </td>
         <td><span class="fw-history-name">${row.inspectorName || '-'}</span></td>
         <td>
-          ${canManage
-            ? `<input type="text" class="form-control form-control-sm js-ext-hist-reason" data-inspection-id="${inspectionId}" value="${reasonValue}" ${reasonDisabled} placeholder="고장 사유" />`
-            : (isFaulty ? (row.faultReason || '-') : '-')}
+          <input type="text" class="form-control form-control-sm js-ext-hist-reason" data-inspection-id="${inspectionId}" value="${reasonValue}" ${reasonDisabled} placeholder="고장 사유" />
         </td>
         <td>
-          ${canManage
-            ? `<div class="fw-history-actions">
+          <div class="fw-history-actions">
                  <button type="button" class="btn btn-sm btn-fw-edit js-ext-hist-save" data-inspection-id="${inspectionId}">${saveLabel}</button>
                  ${deleteBtn}
-               </div>`
-            : '-'}
+               </div>
         </td>
       </tr>`;
   }
@@ -1819,7 +1812,7 @@ async function openDetails(id) {
       markup.push('<tr class="fw-history-empty"><td colspan="5" class="text-muted text-center">점검 이력이 없습니다.</td></tr>');
     }
     rows.forEach((row) => markup.push(historyRowMarkup(row)));
-    if (canManage && rows.length < 12 && currentEditingExtId > 0) {
+    if (rows.length < 12 && currentEditingExtId > 0) {
       markup.push(historyRowMarkup({
         inspectionId: '',
         inspectionDate: '',
@@ -1938,7 +1931,7 @@ async function openDetails(id) {
   });
 
   histBody?.addEventListener('click', async (ev) => {
-    if (!canManage) return alert('수정 권한이 없습니다.');
+
     const saveBtnEl = ev.target.closest('.js-ext-hist-save');
     const deleteBtnEl = ev.target.closest('.js-ext-hist-delete');
     const actionBtn = saveBtnEl || deleteBtnEl;
@@ -2180,14 +2173,11 @@ function _normFloorCompat(v) {
     ].join('\n');
     document.head.appendChild(embedStyle);
   }
-  if (!canManage) {
-    const addBtn = document.getElementById('btnExtAdd');
-    if (addBtn) addBtn.style.display = 'none';
-  }
+
   await loadExtinguishers();
 
   const editId = parseInt(qs.get('edit') || '0', 10);
-  if (canManage && editId > 0) {
+  if (editId > 0) {
     window.openExtinguisherUpsertModal({ id: editId });
     return;
   }
@@ -2205,7 +2195,7 @@ function _normFloorCompat(v) {
   }
 
   const add = qs.get('add');
-  if (canManage && add === '1') {
+  if (add === '1') {
     const bIdQ = qs.get('buildingId') || '';
     const fIdQ = qs.get('floorId') || '';
     const bx = qs.get('buildingName') || '';
