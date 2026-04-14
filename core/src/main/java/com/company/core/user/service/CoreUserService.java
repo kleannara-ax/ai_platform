@@ -7,9 +7,7 @@ import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserResponse;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.CoreUser;
-import com.company.core.user.entity.CoreUserRole;
 import com.company.core.user.repository.CoreUserRepository;
-import com.company.core.user.repository.CoreUserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CoreUserService {
 
     private final CoreUserRepository coreUserRepository;
-    private final CoreUserRoleRepository coreUserRoleRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -36,31 +33,18 @@ public class CoreUserService {
         if (coreUserRepository.existsByLoginId(request.getLoginId())) {
             throw new BusinessException(ErrorCode.USER_LOGIN_ID_DUPLICATED);
         }
-        // 다중 역할 처리: roles 우선, 없으면 role 사용
-        java.util.List<String> roles = request.getRoles();
-        String primaryRole;
-        if (roles != null && !roles.isEmpty()) {
-            primaryRole = roles.get(0);
-        } else {
-            primaryRole = request.getRole() != null && !request.getRole().isBlank() ? request.getRole() : "ROLE_USER";
-            roles = java.util.List.of(primaryRole);
-        }
+        String role = request.getRole() != null && !request.getRole().isBlank() ? request.getRole() : "ROLE_USER";
         CoreUser user = CoreUser.builder()
                 .loginId(request.getLoginId())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userName(request.getUserName())
                 .email(request.getEmail())
                 .phone(request.getPhone())
-                .role(primaryRole)
+                .role(role)
                 .enabled(true)
                 .build();
         CoreUser saved = coreUserRepository.save(user);
-        // core_user_role 테이블에 다중 역할 저장
-        for (String r : roles) {
-            coreUserRoleRepository.save(CoreUserRole.builder().userId(saved.getUserId()).role(r).build());
-        }
-        saved.setRoles(roles);
-        log.info("사용자 생성 완료: loginId={}, roles={}", saved.getLoginId(), roles);
+        log.info("사용자 생성 완료: loginId={}, role={}", saved.getLoginId(), role);
         return saved;
     }
 
@@ -77,23 +61,15 @@ public class CoreUserService {
     }
 
     public Page<UserResponse> getUsers(Pageable pageable) {
-        return coreUserRepository.findAll(pageable).map(u -> {
-            u.setRoles(coreUserRoleRepository.findRolesByUserId(u.getUserId()));
-            return UserResponse.from(u);
-        });
+        return coreUserRepository.findAll(pageable).map(UserResponse::from);
     }
 
     public Page<CoreUser> getUserEntities(Pageable pageable) {
-        return coreUserRepository.findAll(pageable).map(u -> {
-            u.setRoles(coreUserRoleRepository.findRolesByUserId(u.getUserId()));
-            return u;
-        });
+        return coreUserRepository.findAll(pageable);
     }
 
     public CoreUser getUserEntity(Long userId) {
-        CoreUser user = findUserById(userId);
-        user.setRoles(coreUserRoleRepository.findRolesByUserId(userId));
-        return user;
+        return findUserById(userId);
     }
 
     @Transactional
@@ -128,34 +104,7 @@ public class CoreUserService {
     public UserResponse changeRole(Long userId, String role) {
         CoreUser user = findUserById(userId);
         user.changeRole(role);
-        // core_user_role 테이블도 동기화 (단일 역할)
-        coreUserRoleRepository.deleteByUserId(userId);
-        coreUserRoleRepository.flush();
-        coreUserRoleRepository.save(CoreUserRole.builder().userId(userId).role(role).build());
-        user.setRoles(java.util.List.of(role));
         log.info("사용자 역할 변경: userId={}, role={}", userId, role);
-        return UserResponse.from(user);
-    }
-
-    /**
-     * 다중 역할 변경
-     */
-    @Transactional
-    public UserResponse changeRoles(Long userId, java.util.List<String> roles) {
-        CoreUser user = findUserById(userId);
-        if (roles == null || roles.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "최소 1개 이상의 역할을 선택해야 합니다.");
-        }
-        // 대표 역할 설정 (core_user.ROLE)
-        user.changeRole(roles.get(0));
-        // core_user_role 테이블 갱신
-        coreUserRoleRepository.deleteByUserId(userId);
-        coreUserRoleRepository.flush();
-        for (String r : roles) {
-            coreUserRoleRepository.save(CoreUserRole.builder().userId(userId).role(r).build());
-        }
-        user.setRoles(roles);
-        log.info("사용자 다중 역할 변경: userId={}, roles={}", userId, roles);
         return UserResponse.from(user);
     }
 

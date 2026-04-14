@@ -8,7 +8,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Spring Security UserDetails 구현체
@@ -29,15 +28,7 @@ public class CustomUserDetails implements UserDetails {
         this.password = user.getPassword();
         this.userName = user.getUserName();
         this.enabled = user.getEnabled();
-        // 다중 역할 지원: core_user_role 테이블의 모든 역할을 GrantedAuthority로 변환
-        List<String> roles = user.getRoles();
-        if (roles != null && !roles.isEmpty()) {
-            this.authorities = roles.stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .collect(Collectors.toUnmodifiableList());
-        } else {
-            this.authorities = List.of(new SimpleGrantedAuthority(user.getRole()));
-        }
+        this.authorities = List.of(new SimpleGrantedAuthority(user.getRole()));
     }
 
     /** UserDetails 인터페이스 구현 - Spring Security 인증 시 사용 */

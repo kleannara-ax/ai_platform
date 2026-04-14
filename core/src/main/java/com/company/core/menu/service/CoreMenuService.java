@@ -101,26 +101,6 @@ public class CoreMenuService {
         return buildTree(menus);
     }
 
-    /**
-     * 다중 역할 기반 메뉴 트리 (IP 필터링 포함)
-     * 모든 역할의 메뉴를 병합(union)하여 반환
-     */
-    public List<MenuResponse> getMenuTreeByRoles(Collection<String> roles, String clientIp) {
-        if (roles == null || roles.isEmpty()) return Collections.emptyList();
-        Set<Long> menuIdSet = new LinkedHashSet<>();
-        for (String role : roles) {
-            roleMenuRepository.findByRole(role).forEach(rm -> menuIdSet.add(rm.getMenuId()));
-        }
-        if (menuIdSet.isEmpty()) return Collections.emptyList();
-        List<CoreMenu> menus = menuRepository.findByMenuIdInAndIsActiveTrueOrderBySortOrder(new ArrayList<>(menuIdSet));
-        if (clientIp != null && !clientIp.isBlank()) {
-            menus = menus.stream()
-                    .filter(m -> isIpAllowed(m.getAllowedIps(), clientIp))
-                    .collect(Collectors.toList());
-        }
-        return buildTree(menus);
-    }
-
     /** 메뉴 상세 */
     public MenuResponse getMenu(Long menuId) {
         CoreMenu menu = menuRepository.findById(menuId)
