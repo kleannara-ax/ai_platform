@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 
 /**
  * PS 지분 검사 결과 저장 요청 DTO
+ *
+ * <p>필수값: matnr(자재코드), lotnr(LOT번호), indBcd(개별바코드)
  */
 @Getter
 @Setter
@@ -16,6 +18,7 @@ public class PsInspectionSaveRequest {
     @Size(max = 100)
     private String inspItemGrpCd;
 
+    @NotBlank(message = "자재코드(MATNR)는 필수입니다.")
     @Size(max = 100)
     private String matnr;
 
@@ -29,9 +32,11 @@ public class PsInspectionSaveRequest {
 
     private Integer prcSeqno;
 
+    @NotBlank(message = "LOT 번호는 필수입니다.")
     @Size(max = 200)
     private String lotnr;
 
+    @NotBlank(message = "개별바코드(IND_BCD)는 필수입니다.")
     @Size(max = 200)
     private String indBcd;
 
