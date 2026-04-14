@@ -1,9 +1,9 @@
 package com.company.module.psinsp.controller;
 
 import com.company.core.common.response.ApiResponse;
-import com.company.module.psinsp.dto.PsInspInspectionResponse;
-import com.company.module.psinsp.dto.PsInspInspectionSaveRequest;
-import com.company.module.psinsp.service.PsInspInspectionService;
+import com.company.module.psinsp.dto.PsInspectionResponse;
+import com.company.module.psinsp.dto.PsInspectionSaveRequest;
+import com.company.module.psinsp.service.PsInspectionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -29,13 +29,13 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/ps-insp-api/inspections")
-public class PsInspInspectionApiController {
+public class PsInspectionApiController {
 
-    private final PsInspInspectionService inspectionService;
+    private final PsInspectionService inspectionService;
     private final ObjectMapper objectMapper;
 
-    public PsInspInspectionApiController(
-            PsInspInspectionService inspectionService,
+    public PsInspectionApiController(
+            PsInspectionService inspectionService,
             @Qualifier("psInspObjectMapper") ObjectMapper objectMapper) {
         this.inspectionService = inspectionService;
         this.objectMapper = objectMapper;
@@ -46,8 +46,8 @@ public class PsInspInspectionApiController {
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspection(
-            @Valid @RequestBody PsInspInspectionSaveRequest request) {
+    public ResponseEntity<ApiResponse<PsInspectionResponse>> saveInspection(
+            @Valid @RequestBody PsInspectionSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.created(
                 inspectionService.saveInspection(request, null, null)));
     }
@@ -57,12 +57,12 @@ public class PsInspInspectionApiController {
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspectionMultipart(
+    public ResponseEntity<ApiResponse<PsInspectionResponse>> saveInspectionMultipart(
             @RequestPart("metadata") String metadata,
             @RequestPart(value = "originalImage", required = false) MultipartFile originalImage,
             @RequestPart(value = "resultImage", required = false) MultipartFile resultImage) {
         try {
-            PsInspInspectionSaveRequest request = objectMapper.readValue(metadata, PsInspInspectionSaveRequest.class);
+            PsInspectionSaveRequest request = objectMapper.readValue(metadata, PsInspectionSaveRequest.class);
             return ResponseEntity.ok(ApiResponse.created(
                     inspectionService.saveInspection(request, originalImage, resultImage)));
         } catch (Exception e) {
@@ -76,7 +76,7 @@ public class PsInspInspectionApiController {
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PsInspInspectionResponse>> getInspection(@PathVariable("id") Long id) {
+    public ResponseEntity<ApiResponse<PsInspectionResponse>> getInspection(@PathVariable("id") Long id) {
         return ResponseEntity.ok(ApiResponse.success(inspectionService.getInspection(id)));
     }
 
@@ -85,7 +85,7 @@ public class PsInspInspectionApiController {
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<PsInspInspectionResponse>>> listInspections(
+    public ResponseEntity<ApiResponse<Page<PsInspectionResponse>>> listInspections(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String dateFrom,
@@ -101,13 +101,13 @@ public class PsInspInspectionApiController {
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<Page<PsInspInspectionResponse>>> searchInspections(
+    public ResponseEntity<ApiResponse<Page<PsInspectionResponse>>> searchInspections(
             @RequestParam(defaultValue = "indBcd") String type,
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<PsInspInspectionResponse> result = switch (type.toLowerCase()) {
+        Page<PsInspectionResponse> result = switch (type.toLowerCase()) {
             case "lotnr" -> inspectionService.searchByLotnr(keyword, pageable);
             case "matnr" -> inspectionService.searchByMatnr(keyword, pageable);
             default -> inspectionService.searchByIndBcd(keyword, pageable);

@@ -5,9 +5,9 @@
 -- ============================================================
 
 -- 기존 테이블 존재 시 DROP (최초 설치만 해당, 운영 환경에서는 주석 처리)
--- DROP TABLE IF EXISTS ps_insp_inspection;
+-- DROP TABLE IF EXISTS ps_inspection;
 
-CREATE TABLE IF NOT EXISTS ps_insp_inspection (
+CREATE TABLE IF NOT EXISTS ps_inspection (
     INSPECTION_ID   BIGINT          NOT NULL AUTO_INCREMENT  COMMENT '검사 결과 PK (자동 증가)',
     SEQ             INT             NOT NULL DEFAULT 0       COMMENT '글로벌 시퀀스 번호 (INSERT 시 증가)',
     INSP_ITEM_GRP_CD VARCHAR(100)   NULL                     COMMENT '검사항목그룹코드',
@@ -65,11 +65,11 @@ CREATE TABLE IF NOT EXISTS ps_insp_inspection (
   COMMENT='[module-ps-insp] PS 지분 검사 결과 (점보롤 지분 검사)';
 
 -- ── 인덱스 ──
-CREATE INDEX IDX_PS_INSP_IND_BCD       ON ps_insp_inspection (IND_BCD);
-CREATE INDEX IDX_PS_INSP_LOTNR         ON ps_insp_inspection (LOTNR);
-CREATE INDEX IDX_PS_INSP_MATNR         ON ps_insp_inspection (MATNR);
-CREATE INDEX IDX_PS_INSP_WERKS         ON ps_insp_inspection (WERKS);
-CREATE INDEX IDX_PS_INSP_MSRM_DATE     ON ps_insp_inspection (MSRM_DATE DESC);
-CREATE INDEX IDX_PS_INSP_INSPECTED_AT  ON ps_insp_inspection (INSPECTED_AT DESC);
-CREATE INDEX IDX_PS_INSP_OPERATOR_ID   ON ps_insp_inspection (OPERATOR_ID);
-CREATE INDEX IDX_PS_INSP_STATUS        ON ps_insp_inspection (STATUS);
+CREATE INDEX IDX_PS_INSP_IND_BCD       ON ps_inspection (IND_BCD);
+CREATE INDEX IDX_PS_INSP_LOTNR         ON ps_inspection (LOTNR);
+CREATE INDEX IDX_PS_INSP_MATNR         ON ps_inspection (MATNR);
+CREATE INDEX IDX_PS_INSP_WERKS         ON ps_inspection (WERKS);
+CREATE INDEX IDX_PS_INSP_MSRM_DATE     ON ps_inspection (MSRM_DATE DESC);
+CREATE INDEX IDX_PS_INSP_INSPECTED_AT  ON ps_inspection (INSPECTED_AT DESC);
+CREATE INDEX IDX_PS_INSP_OPERATOR_ID   ON ps_inspection (OPERATOR_ID);
+CREATE INDEX IDX_PS_INSP_STATUS        ON ps_inspection (STATUS);

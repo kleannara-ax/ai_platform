@@ -1,9 +1,9 @@
 package com.company.module.psinsp.service;
 
-import com.company.module.psinsp.dto.PsInspInspectionResponse;
-import com.company.module.psinsp.dto.PsInspInspectionSaveRequest;
-import com.company.module.psinsp.entity.PsInspInspection;
-import com.company.module.psinsp.repository.PsInspInspectionRepository;
+import com.company.module.psinsp.dto.PsInspectionResponse;
+import com.company.module.psinsp.dto.PsInspectionSaveRequest;
+import com.company.module.psinsp.entity.PsInspection;
+import com.company.module.psinsp.repository.PsInspectionRepository;
 import com.company.core.common.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +34,9 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class PsInspInspectionService {
+public class PsInspectionService {
 
-    private final PsInspInspectionRepository inspectionRepository;
+    private final PsInspectionRepository inspectionRepository;
 
     @Value("${ps-insp.upload.dir:/data/upload/ps_cov_ins}")
     private String uploadDir;
@@ -44,7 +44,7 @@ public class PsInspInspectionService {
     // ──────────── 저장 (Upsert) ────────────
 
     @Transactional
-    public PsInspInspectionResponse saveInspection(PsInspInspectionSaveRequest request,
+    public PsInspectionResponse saveInspection(PsInspectionSaveRequest request,
                                                     MultipartFile originalImage,
                                                     MultipartFile resultImage) {
         log.info("[PS-INSP] 검사 결과 저장 요청 - indBcd: {}, lotnr: {}, matnr: {}",
@@ -53,7 +53,7 @@ public class PsInspInspectionService {
         String matnrSafe = safeName(request.getMatnr());
         String indBcdSafe = safeName(request.getIndBcd());
         boolean isUpdate = false;
-        PsInspInspection inspection = null;
+        PsInspection inspection = null;
 
         // Upsert: 동일 자재+LOT+바코드 조합 조회
         if (hasText(request.getMatnr()) && hasText(request.getLotnr()) && hasText(request.getIndBcd())) {
@@ -109,7 +109,7 @@ public class PsInspInspectionService {
                 indBcdSeq = String.valueOf(count + 1);
             }
 
-            inspection = PsInspInspection.builder()
+            inspection = PsInspection.builder()
                     .seq(seq)
                     .inspItemGrpCd(request.getInspItemGrpCd())
                     .matnr(request.getMatnr())
@@ -175,23 +175,23 @@ public class PsInspInspectionService {
                 isUpdate ? "갱신(UPDATE)" : "신규(INSERT)",
                 inspection.getInspectionId(), inspection.getSeq(), inspection.getIndBcd());
 
-        return PsInspInspectionResponse.from(inspection, isUpdate);
+        return PsInspectionResponse.from(inspection, isUpdate);
     }
 
     // ──────────── 조회 ────────────
 
-    public PsInspInspectionResponse getInspection(Long id) {
-        PsInspInspection inspection = inspectionRepository.findById(id)
+    public PsInspectionResponse getInspection(Long id) {
+        PsInspection inspection = inspectionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("검사 결과를 찾을 수 없습니다. ID: " + id));
-        return PsInspInspectionResponse.from(inspection);
+        return PsInspectionResponse.from(inspection);
     }
 
-    public Page<PsInspInspectionResponse> listInspections(Pageable pageable) {
+    public Page<PsInspectionResponse> listInspections(Pageable pageable) {
         return inspectionRepository.findAllByOrderByInspectedAtDesc(pageable)
-                .map(PsInspInspectionResponse::from);
+                .map(PsInspectionResponse::from);
     }
 
-    public Page<PsInspInspectionResponse> searchInspections(String indBcd, String dateFrom, String dateTo, Pageable pageable) {
+    public Page<PsInspectionResponse> searchInspections(String indBcd, String dateFrom, String dateTo, Pageable pageable) {
         boolean hasIndBcd = hasText(indBcd);
         boolean hasDateFrom = hasText(dateFrom);
         boolean hasDateTo = hasText(dateTo);
@@ -205,23 +205,23 @@ public class PsInspInspectionService {
 
         if (hasIndBcd) {
             return inspectionRepository.searchByIndBcdAndDateRange(indBcd, from, to, pageable)
-                    .map(PsInspInspectionResponse::from);
+                    .map(PsInspectionResponse::from);
         } else {
             return inspectionRepository.findByDateRange(from, to, pageable)
-                    .map(PsInspInspectionResponse::from);
+                    .map(PsInspectionResponse::from);
         }
     }
 
-    public Page<PsInspInspectionResponse> searchByIndBcd(String keyword, Pageable pageable) {
-        return inspectionRepository.searchByIndBcd(keyword, pageable).map(PsInspInspectionResponse::from);
+    public Page<PsInspectionResponse> searchByIndBcd(String keyword, Pageable pageable) {
+        return inspectionRepository.searchByIndBcd(keyword, pageable).map(PsInspectionResponse::from);
     }
 
-    public Page<PsInspInspectionResponse> searchByLotnr(String keyword, Pageable pageable) {
-        return inspectionRepository.searchByLotnr(keyword, pageable).map(PsInspInspectionResponse::from);
+    public Page<PsInspectionResponse> searchByLotnr(String keyword, Pageable pageable) {
+        return inspectionRepository.searchByLotnr(keyword, pageable).map(PsInspectionResponse::from);
     }
 
-    public Page<PsInspInspectionResponse> searchByMatnr(String keyword, Pageable pageable) {
-        return inspectionRepository.searchByMatnr(keyword, pageable).map(PsInspInspectionResponse::from);
+    public Page<PsInspectionResponse> searchByMatnr(String keyword, Pageable pageable) {
+        return inspectionRepository.searchByMatnr(keyword, pageable).map(PsInspectionResponse::from);
     }
 
     public Map<String, Object> checkExists(String matnr, String lotnr, String indBcd) {

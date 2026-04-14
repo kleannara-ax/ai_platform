@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 @Getter
 @Setter
-public class PsInspInspectionSaveRequest {
+public class PsInspectionSaveRequest {
 
     @Size(max = 100)
     private String inspItemGrpCd;

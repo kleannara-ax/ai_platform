@@ -1,6 +1,6 @@
 package com.company.module.psinsp.dto;
 
-import com.company.module.psinsp.entity.PsInspInspection;
+import com.company.module.psinsp.entity.PsInspection;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class PsInspInspectionResponse {
+public class PsInspectionResponse {
 
     private Long inspectionId;
     private Integer seq;
@@ -69,15 +69,15 @@ public class PsInspInspectionResponse {
     /**
      * Entity -> Response DTO 변환 (static 팩토리 메서드)
      */
-    public static PsInspInspectionResponse from(PsInspInspection entity) {
+    public static PsInspectionResponse from(PsInspection entity) {
         return from(entity, null);
     }
 
     /**
      * Entity -> Response DTO 변환 (isUpdate 포함)
      */
-    public static PsInspInspectionResponse from(PsInspInspection entity, Boolean isUpdate) {
-        return PsInspInspectionResponse.builder()
+    public static PsInspectionResponse from(PsInspection entity, Boolean isUpdate) {
+        return PsInspectionResponse.builder()
                 .inspectionId(entity.getInspectionId())
                 .seq(entity.getSeq())
                 .inspItemGrpCd(entity.getInspItemGrpCd())
