@@ -63,21 +63,6 @@ public class CoreMenuController {
         return ResponseEntity.ok(ApiResponse.success(menus));
     }
 
-    /**
-     * 다중 역할 기반 메뉴 트리 (IP 필터링 포함)
-     * roles 파라미터로 쉼표 구분 역할 목록 전달 (예: ROLE_ADMIN,ROLE_MANAGER)
-     */
-    @GetMapping("/roles-menu")
-    public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRoles(
-            @RequestParam List<String> roles, HttpServletRequest request) {
-        LogUtil.logAllIpHeaders(request, "메뉴조회(다중역할)");
-        String clientIp = LogUtil.getClientIp(request);
-        log.info("[메뉴조회] roles={}, clientIp={}", roles, clientIp);
-        List<MenuResponse> menus = menuService.getMenuTreeByRoles(roles, clientIp);
-        log.info("[메뉴조회] 반환 메뉴 수={}", menus.size());
-        return ResponseEntity.ok(ApiResponse.success(menus));
-    }
-
     /** 메뉴 상세 */
     @GetMapping("/{menuId}")
     public ResponseEntity<ApiResponse<MenuResponse>> getMenu(@PathVariable Long menuId) {

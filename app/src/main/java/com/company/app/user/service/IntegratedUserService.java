@@ -127,20 +127,11 @@ public class IntegratedUserService {
     }
 
     /**
-     * 역할 변경 (단일 역할 - 하위호환)
+     * 역할 변경
      */
     @Transactional
     public IntegratedUserResponse changeRole(Long userId, String role) {
         coreUserService.changeRole(userId, role);
-        return getUser(userId);
-    }
-
-    /**
-     * 다중 역할 변경
-     */
-    @Transactional
-    public IntegratedUserResponse changeRoles(Long userId, List<String> roles) {
-        coreUserService.changeRoles(userId, roles);
         return getUser(userId);
     }
 

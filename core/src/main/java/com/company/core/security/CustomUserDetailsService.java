@@ -2,7 +2,6 @@ package com.company.core.security;
 
 import com.company.core.user.entity.CoreUser;
 import com.company.core.user.repository.CoreUserRepository;
-import com.company.core.user.repository.CoreUserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -19,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final CoreUserRepository coreUserRepository;
-    private final CoreUserRoleRepository coreUserRoleRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -27,12 +25,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         CoreUser user = coreUserRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "사용자를 찾을 수 없습니다: " + loginId));
-
-        // 다중 역할 로드 (core_user_role 테이블)
-        java.util.List<String> roles = coreUserRoleRepository.findRolesByUserId(user.getUserId());
-        if (roles != null && !roles.isEmpty()) {
-            user.setRoles(roles);
-        }
 
         return new CustomUserDetails(user);
     }

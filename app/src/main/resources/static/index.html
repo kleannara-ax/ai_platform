@@ -350,7 +350,7 @@ async function doLogin() {
       if (meRes.success && meRes.data) {
         currentUser = meRes.data;
       } else {
-        currentUser = {loginId:id,userName:id,role:'ROLE_USER',roles:['ROLE_USER']};
+        currentUser = {loginId:id,userName:id,role:'ROLE_USER'};
       }
       saveSession();
       enterApp();
@@ -369,16 +369,15 @@ async function enterApp() {
   restoreMenuGroupState();
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
-  document.getElementById('userRole').textContent=(currentUser.roles||[currentUser.role]).join(', ')||'';
+  document.getElementById('userRole').textContent=currentUser.role||'';
   // 공통코드에서 역할 목록 로드
   try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; Object.keys(_roleColorCache).forEach(k=>delete _roleColorCache[k]); }catch(e){ allRoles=[]; }
   // 현재 접속자 IP 조회
   try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
   if (token && currentUser) {
-    const userRoles = currentUser.roles || [currentUser.role];
-    const fireRole = userRoles.map(r=>(r||'').replace('ROLE_','')).join(',');
-    const fireCanManage = userRoles.some(r => r === 'ROLE_ADMIN' || r === 'ROLE_FIRE_MANAGER');
+    const fireRole = (currentUser.role||'').replace('ROLE_','');
+    const fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
@@ -497,9 +496,8 @@ function filterMenusByIp(menus){
 async function loadUserMenus() {
   const nav = document.getElementById('sidebarMenu');
   try {
-    const roles = currentUser.roles || [currentUser.role || 'ROLE_USER'];
-    // 다중 역할 기반 메뉴 병합 로드
-    const res = await api('GET', '/api/core/menus/roles-menu?roles=' + roles.join('&roles='));
+    const role = currentUser.role || 'ROLE_USER';
+    const res = await api('GET', '/api/core/menus/role/' + encodeURIComponent(role));
     let menus = res.success ? (res.data || []) : [];
     userMenus = filterMenusByIp(menus);
     renderSidebarMenus();
@@ -624,7 +622,7 @@ async function renderDashboard() {
     const usersRes = await api('GET','/api/integrated/users?page=0&size=100');
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     const activeUsers=users.filter(u=>u.enabled);
-    const admins=users.filter(u=>(u.roles||[u.role]).includes('ROLE_ADMIN'));
+    const admins=users.filter(u=>u.role==='ROLE_ADMIN');
     const withProfile=users.filter(u=>u.deptCode||u.position||u.employeeNo);
 
     el.innerHTML=`
@@ -644,7 +642,7 @@ async function renderDashboard() {
               <td>${esc(u.loginId)}</td>
               <td>${esc(u.deptName||'-')}</td>
               <td>${esc(u.position||'-')}</td>
-              <td>${roleBadges(u)}</td>
+              <td>${roleBadge(u.role)}</td>
               <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
             </tr>`).join('')}</tbody>
           </table>
@@ -711,7 +709,7 @@ function userRow(u,canManage){
     <td>${esc(u.deptName||'-')}</td>
     <td>${esc(posJob||'-')}</td>
     <td><code>${esc(u.employeeNo||'-')}</code></td>
-    <td>${roleBadges(u)}</td>
+    <td>${roleBadge(u.role)}</td>
     <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
     ${canManage?`<td class="text-center" onclick="event.stopPropagation()">
       <button class="btn-icon" title="수정" onclick="openEditUser(${u.userId})">&#9998;</button>
@@ -729,7 +727,7 @@ function filterUsers(){
   const status=document.getElementById('statusFilter')?.value||'';
   let filtered=allUsers.filter(u=>{
     if(q&&!u.userName.toLowerCase().includes(q)&&!u.loginId.toLowerCase().includes(q)&&!(u.deptName||'').toLowerCase().includes(q)&&!(u.employeeNo||'').toLowerCase().includes(q))return false;
-    if(role&&!(u.roles||[u.role]).includes(role))return false;
+    if(role&&u.role!==role)return false;
     if(status==='active'&&!u.enabled)return false;
     if(status==='inactive'&&u.enabled)return false;
     return true;
@@ -749,7 +747,7 @@ function showUserDetail(userId){
         <div class="detail-row"><div class="lbl">이름</div><div class="val"><b>${esc(u.userName)}</b></div></div>
         <div class="detail-row"><div class="lbl">이메일</div><div class="val">${esc(u.email||'-')}</div></div>
         <div class="detail-row"><div class="lbl">전화번호</div><div class="val">${esc(u.phone||'-')}</div></div>
-        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadges(u)}</div></div>
+        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadge(u.role)}</div></div>
         <div class="detail-row"><div class="lbl">상태</div><div class="val">${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</div></div>
       </div>
       <div class="detail-section">
@@ -778,7 +776,7 @@ function openCreateUser(){
     </div>
     <div class="form-row">
       <div class="form-group"><label>이름 *</label><input id="m_userName" placeholder="이름 입력"></div>
-      <div class="form-group"><label>역할 (1개 이상 선택)</label><div id="m_roles_wrap" style="display:flex;flex-wrap:wrap;gap:8px;">${allRoles.slice().reverse().map(r=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="m_role_cb" value="${esc(r.code)}" ${r.code==='ROLE_USER'?'checked':''}>${esc(r.codeName)}</label>`).join('')}</div></div>
+      <div class="form-group"><label>역할</label><select id="m_role">${allRoles.slice().reverse().map(r=>`<option value="${esc(r.code)}" ${r.code==='ROLE_USER'?'selected':''}>${esc(r.codeName)}</option>`).join('')}</select></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>이메일</label><input id="m_email" type="email" placeholder="email@example.com"></div>
@@ -808,8 +806,7 @@ async function submitCreateUser(){
     userName:document.getElementById('m_userName').value.trim(),
     email:document.getElementById('m_email').value.trim()||null,
     phone:document.getElementById('m_phone').value.trim()||null,
-    roles:[...document.querySelectorAll('.m_role_cb:checked')].map(cb=>cb.value),
-    role:([...document.querySelectorAll('.m_role_cb:checked')].map(cb=>cb.value)[0])||'ROLE_USER',
+    role:document.getElementById('m_role').value||'ROLE_USER',
     deptCode:document.getElementById('m_deptCode').value||null,
     position:document.getElementById('m_position').value||null,
     jobTitle:document.getElementById('m_jobTitle').value||null,
@@ -877,23 +874,20 @@ async function submitEditUser(id){
 
 function openRoleChange(id){
   const u=allUsers.find(x=>x.userId===id);if(!u)return;
-  const userRoles=u.roles||[u.role];
-  const curLabels=userRoles.map(r=>(allRoles.find(ar=>ar.code===r)||{}).codeName||r).join(', ');
+  const curLabel=(allRoles.find(ar=>ar.code===u.role)||{}).codeName||u.role;
   openModal('역할 변경 - '+(u?u.loginId:id),`
-    <div class="form-group"><label>현재 역할</label><input value="${esc(curLabels)}" disabled></div>
-    <div class="form-group"><label>변경할 역할 (1개 이상 선택)</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${allRoles.map(r=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="m_newRole_cb" value="${esc(r.code)}" ${userRoles.includes(r.code)?'checked':''}>${esc(r.codeName)}</label>`).join('')}
-      </div>
+    <div class="form-group"><label>현재 역할</label><input value="${esc(curLabel)}" disabled></div>
+    <div class="form-group"><label>변경할 역할</label>
+      <select id="m_newRole">${allRoles.map(r=>`<option value="${esc(r.code)}" ${u.role===r.code?'selected':''}>${esc(r.codeName)}</option>`).join('')}</select>
     </div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitRoleChange(${id})">역할 변경</button>`);
 }
 
 async function submitRoleChange(id){
   try{
-    const roles=[...document.querySelectorAll('.m_newRole_cb:checked')].map(cb=>cb.value);
-    if(roles.length===0){toast('최소 1개 이상의 역할을 선택해주세요.','error');return;}
-    const res=await api('PATCH',`/api/integrated/users/${id}/roles`,roles);
+    const role=document.getElementById('m_newRole').value;
+    if(!role){toast('역할을 선택해주세요.','error');return;}
+    const res=await api('PATCH',`/api/integrated/users/${id}/role?role=${encodeURIComponent(role)}`);
     if(res.success){toast('역할이 변경되었습니다.','success');closeModal();renderUsers();}
     else toast(res.message||'변경 실패','error');
   }catch(e){toast(e.message,'error');}
@@ -1552,9 +1546,8 @@ function updateFirewebUserMenuCodes() {
 function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
-    const userRoles2 = currentUser.roles || [currentUser.role];
-    const fireRole2 = userRoles2.map(r=>(r||'').replace('ROLE_','')).join(',');
-    const fireCanManage2 = userRoles2.some(r => r === 'ROLE_ADMIN' || r === 'ROLE_FIRE_MANAGER');
+    const fireRole2 = (currentUser.role||'').replace('ROLE_','');
+    const fireCanManage2 = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
@@ -1737,12 +1730,7 @@ function roleBadge(role){
   const c=roleColor(role);
   return `<span class="badge" style="background:${c.bg};color:${c.fg};">${esc(label)}</span>`;
 }
-/** 다중 역할 배지 표시 */
-function roleBadges(u){
-  const roles=u.roles||[u.role];
-  if(!roles||roles.length===0)return'-';
-  return roles.map(r=>roleBadge(r)).join(' ');
-}
+
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}

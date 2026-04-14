@@ -5,8 +5,6 @@ import lombok.*;
 import org.hibernate.annotations.Comment;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 플랫폼 사용자 엔티티 (Core)
@@ -50,12 +48,8 @@ public class CoreUser {
     private String phone;
 
     @Column(name = "ROLE", nullable = false, length = 30)
-    @Comment("대표 역할 코드 (하위호환용, 실제 역할은 core_user_role 테이블에서 관리)")
+    @Comment("역할 코드")
     private String role;
-
-    /** 다중 역할 목록 (core_user_role 테이블 연동, 런타임에 서비스에서 주입) */
-    @Transient
-    private List<String> roles = new ArrayList<>();
 
     @Column(name = "ENABLED", nullable = false)
     @Comment("활성화 여부")
@@ -105,23 +99,6 @@ public class CoreUser {
 
     public void changeRole(String role) {
         this.role = role;
-    }
-
-    /** 다중 역할 설정 (Transient) */
-    public void setRoles(List<String> roles) {
-        this.roles = roles != null ? new ArrayList<>(roles) : new ArrayList<>();
-        // 대표 역할도 동기화: 첫 번째 역할 또는 기존 유지
-        if (!this.roles.isEmpty() && (this.role == null || !this.roles.contains(this.role))) {
-            this.role = this.roles.get(0);
-        }
-    }
-
-    /** 다중 역할 반환 (비어있으면 기존 role 필드 기반으로 반환) */
-    public List<String> getRoles() {
-        if (roles == null || roles.isEmpty()) {
-            return role != null ? List.of(role) : List.of();
-        }
-        return roles;
     }
 
     public void disable() {
