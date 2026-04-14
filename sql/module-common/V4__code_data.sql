@@ -66,7 +66,7 @@ INSERT INTO code_group (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORD
 SET @g5 = LAST_INSERT_ID();
 INSERT INTO code_detail (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, EXTRA_VALUE1, IS_ACTIVE, SORT_ORDER) VALUES
 (@g5, 'ROLE_ADMIN',   '관리자',     '시스템 전체 관리 권한',  'admin',   1, 1),
-(@g5, 'ROLE_MANAGER', '매니저',     '부서/팀 관리 권한',      'manager', 1, 2),
+(@g5, 'ROLE_MANAGER', 'PS 지분 검사 매니저', 'PS 지분 검사 관리 권한', 'manager', 1, 2),
 (@g5, 'ROLE_USER',    '일반 사용자', '기본 사용자 권한',       'user',    1, 3);
 
 
