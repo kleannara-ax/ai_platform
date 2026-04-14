@@ -9,17 +9,17 @@ import java.time.LocalDateTime;
 /**
  * PS 지분 검사 결과 엔티티 (점보롤 지분 검사)
  *
- * <p>Table: ps_insp_inspection (소문자 snake_case)
+ * <p>Table: ps_inspection (소문자 snake_case)
  * <p>Column: UPPER_SNAKE_CASE
  * <p>PK: INSPECTION_ID (BIGINT, AUTO_INCREMENT)
  */
 @Entity
-@Table(name = "ps_insp_inspection")
+@Table(name = "ps_inspection")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class PsInspInspection {
+public class PsInspection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

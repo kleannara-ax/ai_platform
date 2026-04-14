@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- 테스트용 샘플 검사 데이터 (3건)
-INSERT INTO ps_insp_inspection (
+INSERT INTO ps_inspection (
     SEQ, INSP_ITEM_GRP_CD, MATNR, MATNR_NM, WERKS, MSRM_DATE, PRC_SEQNO,
     LOTNR, IND_BCD, IND_BCD_SEQ, INSPECTED_AT,
     THRESHOLD_MAX, TOTAL_COUNT, COVERAGE_RATIO, DENSITY_COUNT, DENSITY_RATIO,
