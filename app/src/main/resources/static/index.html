@@ -1743,7 +1743,6 @@ function roleBadges(u){
   if(!roles||roles.length===0)return'-';
   return roles.map(r=>roleBadge(r)).join(' ');
 }
-}
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
