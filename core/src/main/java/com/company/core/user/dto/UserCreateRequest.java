@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 사용자 생성 요청 DTO (프로필 정보 포함)
@@ -38,7 +39,8 @@ public class UserCreateRequest {
 
     private String phone;
 
-    private String role;
+    private String role;           // 하위호환용 단일 역할
+    private List<String> roles;     // 다중 역할 목록
 
     // ── 프로필 정보 ──
     private String deptCode;

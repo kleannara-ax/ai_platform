@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import lombok.extern.slf4j.Slf4j;
 import java.util.*;
+import java.util.Collection;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -36,6 +37,36 @@ public class CoreMenuService {
         Long menuId = menuOpt.get().getMenuId();
         return roleMenuRepository.findByRole(role).stream()
                 .anyMatch(rm -> rm.getMenuId().equals(menuId));
+    }
+
+    /**
+     * 다중 역할 중 하나라도 해당 메뉴에 접근 가능한지 확인
+     * @param roles 역할 목록
+     * @param menuCode 메뉴 코드
+     * @return 접근 가능 여부
+     */
+    public boolean hasMenuAccessMultiRole(Collection<String> roles, String menuCode) {
+        if (roles == null || roles.isEmpty()) return false;
+        Optional<CoreMenu> menuOpt = menuRepository.findByMenuCode(menuCode);
+        if (menuOpt.isEmpty()) return false;
+        Long menuId = menuOpt.get().getMenuId();
+        return roles.stream().anyMatch(role ->
+                roleMenuRepository.findByRole(role).stream()
+                        .anyMatch(rm -> rm.getMenuId().equals(menuId)));
+    }
+
+    /**
+     * Spring Security 인증 객체의 모든 GrantedAuthority를 기반으로 메뉴 접근 체크
+     * SpEL: @coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'MENU_CODE')
+     */
+    public boolean hasMenuAccessByAuth(
+            Collection<? extends org.springframework.security.core.GrantedAuthority> authorities,
+            String menuCode) {
+        if (authorities == null || authorities.isEmpty()) return false;
+        List<String> roles = authorities.stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+        return hasMenuAccessMultiRole(roles, menuCode);
     }
 
     /** 전체 메뉴 목록 (플랫 리스트) */
@@ -62,6 +93,26 @@ public class CoreMenuService {
         if (menuIds.isEmpty()) return Collections.emptyList();
         List<CoreMenu> menus = menuRepository.findByMenuIdInAndIsActiveTrueOrderBySortOrder(menuIds);
         // IP 필터링: allowedIps가 설정된 메뉴는 clientIp가 허용 목록에 포함되어야 함
+        if (clientIp != null && !clientIp.isBlank()) {
+            menus = menus.stream()
+                    .filter(m -> isIpAllowed(m.getAllowedIps(), clientIp))
+                    .collect(Collectors.toList());
+        }
+        return buildTree(menus);
+    }
+
+    /**
+     * 다중 역할 기반 메뉴 트리 (IP 필터링 포함)
+     * 모든 역할의 메뉴를 병합(union)하여 반환
+     */
+    public List<MenuResponse> getMenuTreeByRoles(Collection<String> roles, String clientIp) {
+        if (roles == null || roles.isEmpty()) return Collections.emptyList();
+        Set<Long> menuIdSet = new LinkedHashSet<>();
+        for (String role : roles) {
+            roleMenuRepository.findByRole(role).forEach(rm -> menuIdSet.add(rm.getMenuId()));
+        }
+        if (menuIdSet.isEmpty()) return Collections.emptyList();
+        List<CoreMenu> menus = menuRepository.findByMenuIdInAndIsActiveTrueOrderBySortOrder(new ArrayList<>(menuIdSet));
         if (clientIp != null && !clientIp.isBlank()) {
             menus = menus.stream()
                     .filter(m -> isIpAllowed(m.getAllowedIps(), clientIp))

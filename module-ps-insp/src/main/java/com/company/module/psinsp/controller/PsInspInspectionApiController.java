@@ -44,7 +44,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 저장 (JSON)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspection(
             @Valid @RequestBody PsInspInspectionSaveRequest request) {
@@ -55,7 +55,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 저장 (Multipart: 이미지 바이너리 직접 업로드)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<PsInspInspectionResponse>> saveInspectionMultipart(
             @RequestPart("metadata") String metadata,
@@ -74,7 +74,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 단건 조회
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PsInspInspectionResponse>> getInspection(@PathVariable("id") Long id) {
         return ResponseEntity.ok(ApiResponse.success(inspectionService.getInspection(id)));
@@ -83,7 +83,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 목록 조회 (페이징 + 필터)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<PsInspInspectionResponse>>> listInspections(
             @RequestParam(defaultValue = "0") int page,
@@ -99,7 +99,7 @@ public class PsInspInspectionApiController {
     /**
      * 검색
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<PsInspInspectionResponse>>> searchInspections(
             @RequestParam(defaultValue = "indBcd") String type,
@@ -118,7 +118,7 @@ public class PsInspInspectionApiController {
     /**
      * 기존 레코드 존재 여부 확인 (Upsert 사전 체크)
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @GetMapping("/check-exists")
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkExists(
             @RequestParam(required = false) String matnr,
@@ -135,7 +135,7 @@ public class PsInspInspectionApiController {
     /**
      * 검사 결과 삭제
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Map<String, String>>> deleteInspection(@PathVariable("id") Long id) {
         inspectionService.deleteInspection(id);
@@ -145,7 +145,7 @@ public class PsInspInspectionApiController {
     /**
      * 전체 삭제
      */
-    @PreAuthorize("@coreMenuService.hasMenuAccess(authentication.authorities.iterator().next().authority, 'PS_INSP_MGMT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @DeleteMapping
     public ResponseEntity<ApiResponse<Map<String, String>>> deleteAllInspections() {
         inspectionService.deleteAllInspections();

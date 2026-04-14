@@ -125,12 +125,9 @@ table tr:hover{background:var(--surface2);}
 table tr:last-child td{border-bottom:none;}
 
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
-.badge-admin{background:var(--primary-light);color:var(--primary-dark);}
-.badge-manager{background:var(--orange-light);color:var(--orange);}
-.badge-fire-manager{background:#ede9fe;color:#7c3aed;}
-.badge-user{background:var(--green-light);color:var(--green);}
 .badge-active{background:var(--green-light);color:var(--green);}
 .badge-inactive{background:var(--red-light);color:var(--red);}
+/* 역할 배지 색상은 roleColor() 함수에서 동적 생성 (badge-admin, badge-manager 등 하드코딩 제거) */
 
 .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
 .toolbar input[type="text"]{padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius);width:260px;background:var(--surface2);}
@@ -353,7 +350,7 @@ async function doLogin() {
       if (meRes.success && meRes.data) {
         currentUser = meRes.data;
       } else {
-        currentUser = {loginId:id,userName:id,role:'ROLE_USER'};
+        currentUser = {loginId:id,userName:id,role:'ROLE_USER',roles:['ROLE_USER']};
       }
       saveSession();
       enterApp();
@@ -372,15 +369,16 @@ async function enterApp() {
   restoreMenuGroupState();
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
-  document.getElementById('userRole').textContent=currentUser.role||'';
+  document.getElementById('userRole').textContent=(currentUser.roles||[currentUser.role]).join(', ')||'';
   // 공통코드에서 역할 목록 로드
-  try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; }catch(e){ allRoles=[]; }
+  try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; Object.keys(_roleColorCache).forEach(k=>delete _roleColorCache[k]); }catch(e){ allRoles=[]; }
   // 현재 접속자 IP 조회
   try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
   if (token && currentUser) {
-    const fireRole = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage = fireRole === 'ADMIN' || fireRole === 'FIRE_MANAGER';
+    const userRoles = currentUser.roles || [currentUser.role];
+    const fireRole = userRoles.map(r=>(r||'').replace('ROLE_','')).join(',');
+    const fireCanManage = userRoles.some(r => r === 'ROLE_ADMIN' || r === 'ROLE_FIRE_MANAGER');
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
@@ -499,8 +497,9 @@ function filterMenusByIp(menus){
 async function loadUserMenus() {
   const nav = document.getElementById('sidebarMenu');
   try {
-    const role = currentUser.role || 'ROLE_USER';
-    const res = await api('GET', '/api/core/menus/role/' + role);
+    const roles = currentUser.roles || [currentUser.role || 'ROLE_USER'];
+    // 다중 역할 기반 메뉴 병합 로드
+    const res = await api('GET', '/api/core/menus/roles-menu?roles=' + roles.join('&roles='));
     let menus = res.success ? (res.data || []) : [];
     userMenus = filterMenusByIp(menus);
     renderSidebarMenus();
@@ -625,7 +624,7 @@ async function renderDashboard() {
     const usersRes = await api('GET','/api/integrated/users?page=0&size=100');
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     const activeUsers=users.filter(u=>u.enabled);
-    const admins=users.filter(u=>u.role==='ROLE_ADMIN');
+    const admins=users.filter(u=>(u.roles||[u.role]).includes('ROLE_ADMIN'));
     const withProfile=users.filter(u=>u.deptCode||u.position||u.employeeNo);
 
     el.innerHTML=`
@@ -645,7 +644,7 @@ async function renderDashboard() {
               <td>${esc(u.loginId)}</td>
               <td>${esc(u.deptName||'-')}</td>
               <td>${esc(u.position||'-')}</td>
-              <td>${roleBadge(u.role)}</td>
+              <td>${roleBadges(u)}</td>
               <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
             </tr>`).join('')}</tbody>
           </table>
@@ -712,11 +711,11 @@ function userRow(u,canManage){
     <td>${esc(u.deptName||'-')}</td>
     <td>${esc(posJob||'-')}</td>
     <td><code>${esc(u.employeeNo||'-')}</code></td>
-    <td>${roleBadge(u.role)}</td>
+    <td>${roleBadges(u)}</td>
     <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
     ${canManage?`<td class="text-center" onclick="event.stopPropagation()">
       <button class="btn-icon" title="수정" onclick="openEditUser(${u.userId})">&#9998;</button>
-      <button class="btn-icon" title="역할 변경" onclick="openRoleChange(${u.userId},'${u.role}')">&#128100;</button>
+      <button class="btn-icon" title="역할 변경" onclick="openRoleChange(${u.userId})">&#128100;</button>
       ${u.enabled
         ?`<button class="btn-icon" title="비활성화" onclick="toggleUser(${u.userId},false)" style="color:var(--red)">&#10007;</button>`
         :`<button class="btn-icon" title="활성화" onclick="toggleUser(${u.userId},true)" style="color:var(--green)">&#10003;</button>`}
@@ -730,7 +729,7 @@ function filterUsers(){
   const status=document.getElementById('statusFilter')?.value||'';
   let filtered=allUsers.filter(u=>{
     if(q&&!u.userName.toLowerCase().includes(q)&&!u.loginId.toLowerCase().includes(q)&&!(u.deptName||'').toLowerCase().includes(q)&&!(u.employeeNo||'').toLowerCase().includes(q))return false;
-    if(role&&u.role!==role)return false;
+    if(role&&!(u.roles||[u.role]).includes(role))return false;
     if(status==='active'&&!u.enabled)return false;
     if(status==='inactive'&&u.enabled)return false;
     return true;
@@ -750,7 +749,7 @@ function showUserDetail(userId){
         <div class="detail-row"><div class="lbl">이름</div><div class="val"><b>${esc(u.userName)}</b></div></div>
         <div class="detail-row"><div class="lbl">이메일</div><div class="val">${esc(u.email||'-')}</div></div>
         <div class="detail-row"><div class="lbl">전화번호</div><div class="val">${esc(u.phone||'-')}</div></div>
-        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadge(u.role)}</div></div>
+        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadges(u)}</div></div>
         <div class="detail-row"><div class="lbl">상태</div><div class="val">${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</div></div>
       </div>
       <div class="detail-section">
@@ -779,7 +778,7 @@ function openCreateUser(){
     </div>
     <div class="form-row">
       <div class="form-group"><label>이름 *</label><input id="m_userName" placeholder="이름 입력"></div>
-      <div class="form-group"><label>역할</label><select id="m_role">${allRoles.slice().reverse().map(r=>`<option value="${esc(r.code)}">${esc(r.codeName)}</option>`).join('')}</select></div>
+      <div class="form-group"><label>역할 (1개 이상 선택)</label><div id="m_roles_wrap" style="display:flex;flex-wrap:wrap;gap:8px;">${allRoles.slice().reverse().map(r=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="m_role_cb" value="${esc(r.code)}" ${r.code==='ROLE_USER'?'checked':''}>${esc(r.codeName)}</label>`).join('')}</div></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>이메일</label><input id="m_email" type="email" placeholder="email@example.com"></div>
@@ -809,7 +808,8 @@ async function submitCreateUser(){
     userName:document.getElementById('m_userName').value.trim(),
     email:document.getElementById('m_email').value.trim()||null,
     phone:document.getElementById('m_phone').value.trim()||null,
-    role:document.getElementById('m_role').value,
+    roles:[...document.querySelectorAll('.m_role_cb:checked')].map(cb=>cb.value),
+    role:([...document.querySelectorAll('.m_role_cb:checked')].map(cb=>cb.value)[0])||'ROLE_USER',
     deptCode:document.getElementById('m_deptCode').value||null,
     position:document.getElementById('m_position').value||null,
     jobTitle:document.getElementById('m_jobTitle').value||null,
@@ -875,23 +875,25 @@ async function submitEditUser(id){
   }catch(e){toast(e.message,'error');}
 }
 
-function openRoleChange(id,currentRole){
-  const u=allUsers.find(x=>x.userId===id);
-  const curLabel=(allRoles.find(r=>r.code===currentRole)||{}).codeName||currentRole;
+function openRoleChange(id){
+  const u=allUsers.find(x=>x.userId===id);if(!u)return;
+  const userRoles=u.roles||[u.role];
+  const curLabels=userRoles.map(r=>(allRoles.find(ar=>ar.code===r)||{}).codeName||r).join(', ');
   openModal('역할 변경 - '+(u?u.loginId:id),`
-    <div class="form-group"><label>현재 역할</label><input value="${esc(curLabel)} (${currentRole})" disabled></div>
-    <div class="form-group"><label>변경할 역할</label>
-      <select id="m_newRole">
-        ${allRoles.map(r=>`<option value="${esc(r.code)}" ${r.code===currentRole?'selected':''}>${esc(r.codeName)}</option>`).join('')}
-      </select>
+    <div class="form-group"><label>현재 역할</label><input value="${esc(curLabels)}" disabled></div>
+    <div class="form-group"><label>변경할 역할 (1개 이상 선택)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${allRoles.map(r=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="m_newRole_cb" value="${esc(r.code)}" ${userRoles.includes(r.code)?'checked':''}>${esc(r.codeName)}</label>`).join('')}
+      </div>
     </div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitRoleChange(${id})">역할 변경</button>`);
 }
 
 async function submitRoleChange(id){
   try{
-    const role=document.getElementById('m_newRole').value;
-    const res=await api('PATCH',`/api/integrated/users/${id}/role?role=${role}`);
+    const roles=[...document.querySelectorAll('.m_newRole_cb:checked')].map(cb=>cb.value);
+    if(roles.length===0){toast('최소 1개 이상의 역할을 선택해주세요.','error');return;}
+    const res=await api('PATCH',`/api/integrated/users/${id}/roles`,roles);
     if(res.success){toast('역할이 변경되었습니다.','success');closeModal();renderUsers();}
     else toast(res.message||'변경 실패','error');
   }catch(e){toast(e.message,'error');}
@@ -977,7 +979,7 @@ function renderMenuTableRows(nodes,level,canManage){
       </td>
       <td><code style="font-size:12px;">${esc(n.menuCode)}</code></td>
       <td style="font-size:12px;">${esc(n.menuUrl||'-')}</td>
-      <td><span class="badge ${n.menuType==='MENU'?'badge-admin':'badge-user'}" style="font-size:10px;padding:2px 8px;">${n.menuType}</span></td>
+      <td><span class="badge" style="font-size:10px;padding:2px 8px;${n.menuType==='MENU'?'background:var(--primary-light);color:var(--primary-dark);':'background:var(--green-light);color:var(--green);'}">${n.menuType}</span></td>
       <td>${n.sortOrder}</td>
       <td style="max-width:150px;">${n.allowedIps?`<span style="font-size:11px;color:var(--text2);word-break:break-all;">${esc(n.allowedIps)}</span>`:'<span style="font-size:11px;color:var(--text3);">-</span>'}</td>
       <td>${n.isVisible?'<span style="color:var(--green);">&#10003;</span>':'<span style="color:var(--text3);">-</span>'}</td>
@@ -1172,9 +1174,9 @@ async function renderPermissions(){
         const icon=n.menuType==='BUTTON'?'<span style="color:var(--text3);font-size:9px;">&#9679;</span>':(hasKids?'<span style="color:var(--text3);font-size:10px;">&#9660;</span>':'<span style="color:var(--text3);font-size:10px;">&#9654;</span>');
         const indent=level*24;
         const bg=isTop?'background:var(--surface2);font-weight:600;':'';
-        const typeBadge=n.menuType==='MENU'?'<span class="badge badge-admin" style="font-size:10px;padding:1px 6px;margin-left:6px;">메뉴</span>':'<span class="badge badge-user" style="font-size:10px;padding:1px 6px;margin-left:6px;">기능</span>';
+        const typeBadge=n.menuType==='MENU'?'<span class="badge" style="font-size:10px;padding:1px 6px;margin-left:6px;background:var(--primary-light);color:var(--primary-dark);">메뉴</span>':'<span class="badge" style="font-size:10px;padding:1px 6px;margin-left:6px;background:var(--green-light);color:var(--green);">기능</span>';
         html+=`<tr style="${bg}">`;
-        html+=`<td style="padding-left:${16+indent}px;white-space:nowrap;">${icon} ${esc(n.menuName)}${typeBadge}</td>`;
+        html+=`<td style="padding-left:${16+indent}px;white-space:nowrap;position:sticky;left:0;background:${isTop?'var(--surface2)':'var(--surface1)'};z-index:1;">${icon} ${esc(n.menuName)}${typeBadge}</td>`;
         roles.forEach(role=>{
           const checked=roleMaps[role]&&roleMaps[role].has(n.menuId)?'checked':'';
           const disabled=canManage?'':'disabled';
@@ -1186,33 +1188,48 @@ async function renderPermissions(){
       return html;
     }
 
-    // Summary cards — 동적 색상 배열
-    const roleColors=['var(--primary)','var(--orange)','var(--green)','#8b5cf6','#ec4899','#06b6d4','#f59e0b','#10b981'];
-    const summaryCards=roles.map((role,i)=>{
+    // Summary cards — roleColor() 기반 통합 색상
+    const summaryCards=roles.map((role)=>{
       const rm=allRoleMappings.find(r=>r.role===role);
       const cnt=rm?rm.menuIds.length:0;
       const total=allMenus.length;
       const pct=total>0?Math.round(cnt/total*100):0;
-      const color=roleColors[i%roleColors.length];
-      return `<div class="stat-card" style="border-left:4px solid ${color};">
-        <div class="label">${roleBadge(role)} ${esc(roleLabels[role])}</div>
-        <div class="value" style="color:${color};">${cnt}<span style="font-size:14px;font-weight:400;color:var(--text3);"> / ${total}</span></div>
+      const c=roleColor(role);
+      return `<div class="stat-card" style="border-left:4px solid ${c.accent};">
+        <div class="label">${roleBadge(role)}</div>
+        <div class="value" style="color:${c.accent};">${cnt}<span style="font-size:14px;font-weight:400;color:var(--text3);"> / ${total}</span></div>
         <div class="sub">메뉴 접근 ${pct}%</div>
       </div>`;
     }).join('');
 
+    // 역할 수에 따라 그리드 컬럼 자동 조절 (최대 5열)
+    const gridCols=Math.min(roles.length,5);
+    // 매트릭스 헤더에서 역할 열 — roleColor() 기반 하단 라인 색상
+    const matrixHeaders=roles.map(r=>{
+      const c=roleColor(r);
+      return `<th class="text-center" style="min-width:90px;border-bottom:3px solid ${c.accent};padding:8px 6px;">
+        ${roleBadge(r)}<br><span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);">${esc(roleLabels[r])}</span>
+      </th>`;
+    }).join('');
+
     el.innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(${Math.min(roles.length,4)},1fr);gap:16px;margin-bottom:24px;">${summaryCards}</div>
+      <div style="display:grid;grid-template-columns:repeat(${gridCols},1fr);gap:12px;margin-bottom:24px;">${summaryCards}</div>
       <div class="card">
-        <div class="card-header">
-          <h3>메뉴별 접근 권한</h3>
-          <span style="font-size:12px;color:var(--text3);">각 역할이 접근할 수 있는 메뉴를 체크하세요</span>
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            <h3 style="margin:0;">메뉴별 접근 권한</h3>
+            <span style="font-size:12px;color:var(--text3);">각 역할이 접근할 수 있는 메뉴를 체크하세요 (${roles.length}개 역할)</span>
+          </div>
+          ${canManage?`<div style="display:flex;gap:8px;">
+            <button class="btn btn-sm btn-outline" onclick="resetAcl()">초기화</button>
+            <button class="btn btn-sm btn-primary" onclick="saveAcl()">변경사항 저장</button>
+          </div>`:''}
         </div>
         <div class="card-body" style="padding:0;overflow-x:auto;">
-          <table>
-            <thead><tr>
-              <th style="min-width:220px;">메뉴</th>
-              ${roles.map(r=>`<th class="text-center" style="min-width:100px;">${roleBadge(r)}<br><span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;">${esc(roleLabels[r])}</span></th>`).join('')}
+          <table style="min-width:${220+roles.length*90}px;">
+            <thead style="position:sticky;top:0;z-index:1;"><tr>
+              <th style="min-width:220px;position:sticky;left:0;z-index:2;background:var(--surface2);">메뉴</th>
+              ${matrixHeaders}
             </tr></thead>
             <tbody>${buildMatrixRows(tree,0)}</tbody>
           </table>
@@ -1535,14 +1552,15 @@ function updateFirewebUserMenuCodes() {
 function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
-    const fireRole = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage = fireRole === 'ADMIN' || fireRole === 'FIRE_MANAGER';
+    const userRoles2 = currentUser.roles || [currentUser.role];
+    const fireRole2 = userRoles2.map(r=>(r||'').replace('ROLE_','')).join(',');
+    const fireCanManage2 = userRoles2.some(r => r === 'ROLE_ADMIN' || r === 'ROLE_FIRE_MANAGER');
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
-      role: fireRole,
+      role: fireRole2,
       token: token,
-      canManage: fireCanManage,
+      canManage: fireCanManage2,
       menuCodes: collectMenuCodes(userMenus)
     }));
   }
@@ -1612,8 +1630,9 @@ async function renderFireIndex() {
     function fireBadge(s) {
       if (!s) return '<span class="badge badge-inactive">-</span>';
       var map = { NORMAL:'정상', FAULTY:'불량', MAINTENANCE:'정비중', ACTIVE:'사용중', INACTIVE:'미사용', EXPIRED:'만료', PENDING:'대기' };
-      var cls = { NORMAL:'badge-active', FAULTY:'badge-admin', MAINTENANCE:'badge-manager', ACTIVE:'badge-active', INACTIVE:'badge-inactive', EXPIRED:'badge-admin', PENDING:'badge-manager' };
-      return '<span class="badge '+(cls[s]||'badge-inactive')+'">'+(map[s]||s)+'</span>';
+      var cls = { NORMAL:'badge-active', FAULTY:'badge-inactive', MAINTENANCE:'badge-inactive', ACTIVE:'badge-active', INACTIVE:'badge-inactive', EXPIRED:'badge-inactive', PENDING:'badge-inactive' };
+      var stl = { FAULTY:'background:var(--red-light);color:var(--red);', MAINTENANCE:'background:var(--orange-light);color:var(--orange);', EXPIRED:'background:var(--red-light);color:var(--red);', PENDING:'background:var(--orange-light);color:var(--orange);' };
+      return '<span class="badge '+(cls[s]||'badge-inactive')+'" style="'+(stl[s]||'')+'">'+(map[s]||s)+'</span>';
     }
     function fireDate(d) {
       if (!d) return '-';
@@ -1648,10 +1667,10 @@ async function renderFireIndex() {
       + '</div>'
       + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상</th><th>비율</th><th></th></tr></thead><tbody>'
-      + '<tr><td><b>소화기</b></td><td>'+extV+'</td><td>'+(extAlertCount>0?'<span class="badge badge-admin">교체필요 '+extAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--primary);height:100%;width:'+(totalEquip?Math.round(extV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_extinguisher\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>소화전</b></td><td>'+hydV+'</td><td>'+(hydAlertCount>0?'<span class="badge badge-admin">비정상 '+hydAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--green);height:100%;width:'+(totalEquip?Math.round(hydV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_hydrant\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>수신기</b></td><td>'+recvV+'</td><td>'+(recvAlertCount>0?'<span class="badge badge-admin">불량 '+recvAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--orange);height:100%;width:'+(totalEquip?Math.round(recvV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_receiver\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
-      + '<tr><td><b>소방펌프</b></td><td>'+pumpV+'</td><td>'+(pumpAlertCount>0?'<span class="badge badge-admin">불량 '+pumpAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--red);height:100%;width:'+(totalEquip?Math.round(pumpV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_pump\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소화기</b></td><td>'+extV+'</td><td>'+(extAlertCount>0?'<span class="badge" style="background:var(--red-light);color:var(--red);">교체필요 '+extAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--primary);height:100%;width:'+(totalEquip?Math.round(extV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_extinguisher\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소화전</b></td><td>'+hydV+'</td><td>'+(hydAlertCount>0?'<span class="badge" style="background:var(--red-light);color:var(--red);">비정상 '+hydAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--green);height:100%;width:'+(totalEquip?Math.round(hydV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_hydrant\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>수신기</b></td><td>'+recvV+'</td><td>'+(recvAlertCount>0?'<span class="badge" style="background:var(--red-light);color:var(--red);">불량 '+recvAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--orange);height:100%;width:'+(totalEquip?Math.round(recvV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_receiver\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
+      + '<tr><td><b>소방펌프</b></td><td>'+pumpV+'</td><td>'+(pumpAlertCount>0?'<span class="badge" style="background:var(--red-light);color:var(--red);">불량 '+pumpAlertCount+'</span>':'<span class="badge badge-active">정상</span>')+'</td><td><div style="background:var(--border);border-radius:4px;height:8px;width:120px;overflow:hidden;"><div style="background:var(--red);height:100%;width:'+(totalEquip?Math.round(pumpV/totalEquip*100):0)+'%;"></div></div></td><td style="text-align:right;"><a href="#" onclick="navigate(\'fire_pump\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>'
       + '</tbody></table></div></div>'
       + '<div class="card"><div class="card-header"><h3>최근 등록/수정 장비</h3></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>이름/모델</th><th>위치</th><th>상태</th><th>날짜</th></tr></thead>'
@@ -1674,19 +1693,56 @@ function showValidationErrors(res){
   }
 }
 
-const _roleBadgeMap={'ROLE_ADMIN':'badge-admin','ROLE_MANAGER':'badge-manager','ROLE_FIRE_MANAGER':'badge-fire-manager','ROLE_USER':'badge-user'};
-const _roleBadgeFallback=['badge-admin','badge-manager','badge-fire-manager','badge-user'];
+// ══ 역할 색상 시스템 (Role Color System) ══
+// HSL 기반 자동 색상 생성 — 역할이 아무리 많아도 고유 색상 자동 할당
+// 배지, 카드, 접근권한 매트릭스 헤더 등 전체에서 동일한 색상 사용
+const _roleColorCache={};
+const _roleColorPalette=[
+  {h:220,s:72,l:52}, // 파랑 (ADMIN)
+  {h:28,s:87,l:55},  // 오렌지 (MANAGER)
+  {h:152,s:60,l:42}, // 초록 (USER)
+  {h:270,s:60,l:52}, // 보라
+  {h:340,s:72,l:52}, // 핑크
+  {h:190,s:72,l:42}, // 시안
+  {h:45,s:87,l:50},  // 앰버
+  {h:0,s:72,l:52},   // 레드
+  {h:300,s:50,l:50}, // 마젠타
+  {h:170,s:60,l:40}, // 틸
+  {h:60,s:70,l:45},  // 올리브
+  {h:240,s:50,l:60}, // 인디고
+];
+function _genHsl(idx){
+  if(idx<_roleColorPalette.length) return _roleColorPalette[idx];
+  // 팔레트 초과 시 골든앵글 기반 자동 생성
+  const h=((idx-_roleColorPalette.length)*137.508)%360;
+  return {h:Math.round(h),s:65,l:48};
+}
+function roleColor(role){
+  if(!role)return{fg:'#64748b',bg:'#f1f5f9',accent:'#64748b'};
+  if(_roleColorCache[role])return _roleColorCache[role];
+  const idx=allRoles.findIndex(r=>r.code===role);
+  const ci=idx>=0?idx:Object.keys(_roleColorCache).length;
+  const c=_genHsl(ci);
+  _roleColorCache[role]={
+    fg:`hsl(${c.h},${c.s}%,${c.l}%)`,
+    bg:`hsl(${c.h},${Math.round(c.s*0.6)}%,${95}%)`,
+    accent:`hsl(${c.h},${c.s}%,${c.l}%)`
+  };
+  return _roleColorCache[role];
+}
 function roleBadge(role){
   if(!role)return'-';
   const r=allRoles.find(r=>r.code===role);
   const label=r?r.codeName:role.replace('ROLE_','');
-  let cls=_roleBadgeMap[role];
-  if(!cls){
-    const ev1=r&&r.extraValue1?r.extraValue1.toLowerCase():'';
-    if(ev1==='admin')cls='badge-admin'; else if(ev1==='manager')cls='badge-manager'; else if(ev1==='fire_manager')cls='badge-fire-manager'; else if(ev1==='user')cls='badge-user';
-    else { const idx=allRoles.findIndex(x=>x.code===role); cls=idx>=0&&idx<_roleBadgeFallback.length?_roleBadgeFallback[idx]:'badge-active'; }
-  }
-  return `<span class="badge ${cls}">${esc(label)}</span>`;
+  const c=roleColor(role);
+  return `<span class="badge" style="background:${c.bg};color:${c.fg};">${esc(label)}</span>`;
+}
+/** 다중 역할 배지 표시 */
+function roleBadges(u){
+  const roles=u.roles||[u.role];
+  if(!roles||roles.length===0)return'-';
+  return roles.map(r=>roleBadge(r)).join(' ');
+}
 }
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}

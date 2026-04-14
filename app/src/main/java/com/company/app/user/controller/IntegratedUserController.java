@@ -77,7 +77,7 @@ public class IntegratedUserController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    /** 역할 변경 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
+    /** 역할 변경 (단일 - 하위호환) */
     @PatchMapping("/{userId}/role")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> changeRole(
@@ -85,5 +85,11 @@ public class IntegratedUserController {
         return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRole(userId, role)));
     }
 
-
+    /** 다중 역할 변경 */
+    @PatchMapping("/{userId}/roles")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<IntegratedUserResponse>> changeRoles(
+            @PathVariable Long userId, @RequestBody java.util.List<String> roles) {
+        return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRoles(userId, roles)));
+    }
 }

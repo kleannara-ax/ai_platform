@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 사용자 + 프로필 통합 응답 DTO
@@ -20,7 +21,8 @@ public class IntegratedUserResponse {
     private String userName;
     private String email;
     private String phone;
-    private String role;
+    private String role;           // 하위호환용
+    private List<String> roles;     // 다중 역할 목록
     private Boolean enabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -43,6 +45,7 @@ public class IntegratedUserResponse {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .roles(user.getRoles())
                 .enabled(user.getEnabled())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt());
