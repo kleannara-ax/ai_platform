@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PS 지분 검사 도구</title>
+<title>PS 후면 지분 검사 도구</title>
 <link rel="stylesheet" th:href="@{/ps-insp/css/style.css}" href="/ps-insp/css/style.css">
 </head>
 <body>
@@ -11,10 +11,11 @@
   <!-- 헤더 -->
   <header class="header">
     <div class="header-left">
-      <h1>PS 지분 검사 도구</h1>
+      <h1>PS 후면 지분 검사 도구</h1>
       <span class="version">v8.2.0</span>
     </div>
     <div class="header-right">
+      <button class="btn btn-sm btn-outline" onclick="openAdminSettings()" title="관리자 설정">&#9881; 설정</button>
       <span class="health-badge" id="healthBadge">연결 확인 중...</span>
     </div>
   </header>
@@ -74,19 +75,35 @@
         <h3>이미지 업로드 & 검사</h3>
         <!-- 임계값: 최솟값은 0 고정, 최댓값만 사용자가 조절 (디폴트 115) -->
         <div class="threshold-control">
-          <label>임계값 (최소 0 고정 ~ 최대 조절 가능, 디폴트 115)</label>
-          <span class="threshold-range-label">0 ~</span>
-          <input type="range" id="thresholdSlider" min="1" max="255" value="115">
-          <input type="number" id="thresholdValue" min="1" max="255" value="115" class="threshold-num">
+          <span class="threshold-lock-badge locked" id="thresholdLockStatus">&#128274; 잠금</span>
+          <label>임계값</label>
+          <span class="threshold-range-label" id="thresholdDisplay">0 ~ 115</span>
+          <button type="button" class="btn-threshold-adj" id="btnThresholdMinus" onclick="adjustThreshold(-1)" disabled>&#8722;</button>
+          <input type="range" id="thresholdSlider" min="1" max="255" value="115" disabled>
+          <button type="button" class="btn-threshold-adj" id="btnThresholdPlus" onclick="adjustThreshold(+1)" disabled>&#43;</button>
+          <input type="number" id="thresholdNumInput" min="1" max="255" value="115" class="threshold-num" disabled placeholder="직접 입력">
+          <button type="button" class="btn-threshold-lock" id="thresholdLockButton" onclick="toggleThresholdLock()">&#128275; 잠금 해제</button>
         </div>
       </div>
       <div class="card-body">
         <div class="upload-area" id="uploadArea">
-          <input type="file" id="f_imageUpload" accept="image/*" capture="environment">
+          <!-- 숨겨진 file input 2개: 카메라용 / 갤러리용 -->
+          <input type="file" id="f_imageCamera" accept="image/*" capture="environment" style="display:none;">
+          <input type="file" id="f_imageGallery" accept="image/*" style="display:none;">
           <div class="upload-placeholder" id="uploadPlaceholder">
-            <span class="upload-icon">&#128247;</span>
-            <p>이미지를 선택하면 자동으로 검사를 시작합니다</p>
-            <small>카메라 촬영 또는 갤러리 선택 (최대 900MB)</small>
+            <div class="upload-buttons">
+              <button type="button" class="btn-upload" id="btnCamera" onclick="document.getElementById('f_imageCamera').click()">
+                <span class="upload-btn-icon">&#128247;</span>
+                <span class="upload-btn-label">카메라 촬영</span>
+                <span class="upload-btn-desc">카메라로 직접 촬영합니다</span>
+              </button>
+              <button type="button" class="btn-upload" id="btnGallery" onclick="document.getElementById('f_imageGallery').click()">
+                <span class="upload-btn-icon">&#128193;</span>
+                <span class="upload-btn-label">갤러리에서 선택</span>
+                <span class="upload-btn-desc">저장된 이미지를 불러옵니다</span>
+              </button>
+            </div>
+            <small class="upload-hint">이미지를 선택하면 자동으로 검사를 시작합니다 (최대 900MB)</small>
           </div>
         </div>
         <div class="canvas-area" id="canvasArea" style="display:none;">
@@ -123,10 +140,10 @@
             <dl class="annotation-list">
               <dt>총 지분</dt>
               <dd>자동 검출된 지분에서 제외하지 않은 개수와 수동으로 추가한 지분을 합산한 값입니다.</dd>
+              <dt>후면 지분 값</dt>
+              <dd>전체 이미지 픽셀 대비 지분 픽셀 비율(PPM)입니다.</dd>
               <dt>밀도</dt>
               <dd>지름이 약 3px 이상 7px 이하로 추정되는 지분의 개수입니다.</dd>
-              <dt>총 커버리지</dt>
-              <dd>전체 이미지 픽셀 대비 지분 픽셀 비율(ppm)입니다.</dd>
               <dt>크기 균일도</dt>
               <dd>지분 픽셀 면적의 평균과 표준편차로 계산한 0~100점 지표입니다.</dd>
               <dt>분포 균등도</dt>
@@ -220,14 +237,13 @@
               <th colspan="6">관리 정보</th>
               <th colspan="2">상태</th>
               <th colspan="6">이미지</th>
-              <th colspan="1">삭제</th>
             </tr>
             <!-- 상세 컬럼 헤더 -->
             <tr>
               <!-- 식별 정보 (7) -->
               <th>ID</th><th>차수</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th><th>바코드차수</th>
               <!-- 핵심 지표 (4) -->
-              <th>커버리지(PPM)</th><th>총 지분</th><th>밀도(개)</th><th>밀도(%)</th>
+              <th>후면 지분 값(PPM)</th><th>총 지분</th><th>밀도(개)</th><th>밀도(%)</th>
               <!-- 카운트 상세 (5) -->
               <th>자동</th><th>수동</th><th>제외</th><th>수동+</th><th>수동-</th>
               <!-- 균일도 · 통계 (4) -->
@@ -247,12 +263,10 @@
               <!-- 이미지 (6) -->
               <th>원본</th><th>원본 파일명</th><th>원본 저장경로</th>
               <th>결과</th><th>결과 파일명</th><th>결과 저장경로</th>
-              <!-- 삭제 (1) -->
-              <th>삭제</th>
             </tr>
           </thead>
           <tbody id="detailTableBody">
-            <tr><td colspan="48" class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</td></tr>
+            <tr><td colspan="47" class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -266,6 +280,45 @@
   <div class="modal-content">
     <img id="modalImage" src="" alt="확대 이미지">
     <button class="modal-close" onclick="document.getElementById('imageModal').style.display='none'">&times;</button>
+  </div>
+</div>
+
+<!-- PPM 기준 초과 알림 모달 -->
+<div class="modal-overlay" id="ppmAlertModal" style="display:none;">
+  <div class="ppm-alert-dialog">
+    <div class="ppm-alert-icon">&#9888;</div>
+    <h3 class="ppm-alert-title">기준값 초과</h3>
+    <p class="ppm-alert-msg" id="ppmAlertMsg"></p>
+    <div class="ppm-alert-detail" id="ppmAlertDetail"></div>
+    <div class="ppm-alert-actions">
+      <button class="btn btn-primary" id="ppmAlertSend" onclick="ppmAlertAction('send')">전송 (저장)</button>
+      <button class="btn btn-outline" id="ppmAlertRetry" onclick="ppmAlertAction('retry')">재측정</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN 기준값 설정 모달 -->
+<div class="modal-overlay" id="adminSettingsModal" style="display:none;" onclick="if(event.target===this)closeAdminSettings()">
+  <div class="admin-settings-dialog">
+    <div class="admin-settings-header">
+      <h3>&#9881; 관리자 설정</h3>
+      <button class="modal-close" onclick="closeAdminSettings()">&times;</button>
+    </div>
+    <div class="admin-settings-body">
+      <div class="form-group">
+        <label>후면 지분 값(PPM) 기준값</label>
+        <input type="number" id="adminPpmLimit" min="0" step="0.1" placeholder="예: 300">
+        <small style="color:var(--text3);">검사 결과가 이 값을 초과하면 기준 초과 알림이 표시됩니다. (0 = 비활성)</small>
+      </div>
+      <div class="form-group">
+        <label>관리자 비밀번호</label>
+        <input type="password" id="adminPassword" placeholder="비밀번호 입력">
+      </div>
+    </div>
+    <div class="admin-settings-footer">
+      <button class="btn btn-primary" onclick="saveAdminSettings()">저장</button>
+      <button class="btn btn-outline" onclick="closeAdminSettings()">취소</button>
+    </div>
   </div>
 </div>
 
