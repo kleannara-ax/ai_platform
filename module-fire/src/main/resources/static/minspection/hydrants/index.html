@@ -258,7 +258,7 @@
   const API_BASE = '/fire-api/minspection/hydrants';
   const RETURN_URL = location.pathname + location.search;
   if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
-    (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+    location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
     return;
   }
 
@@ -275,7 +275,7 @@
     if (res.status === 401) {
       localStorage.removeItem('fireweb_user');
       localStorage.removeItem('fw_user');
-      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+      location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
       throw new Error('unauthorized');
     }
     return res;

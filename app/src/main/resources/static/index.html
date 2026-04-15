@@ -360,10 +360,32 @@ async function doLogin() {
 function doLogout() {
   token=''; refreshTk=''; currentUser=null;
   clearSession();
+  localStorage.removeItem('fireweb_user');
+  localStorage.removeItem('fw_user');
   document.getElementById('appShell').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
 }
 async function enterApp() {
+  // 로그인 후 returnUrl이 있으면 해당 페이지로 직접 이동
+  var returnUrl = new URLSearchParams(window.location.search).get('returnUrl');
+  if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('/index.html')) {
+    // fireweb_user 저장 후 returnUrl로 이동
+    if (token && currentUser) {
+      var fireRole = (currentUser.role||'').replace('ROLE_','');
+      var fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
+      localStorage.setItem('fireweb_user', JSON.stringify({
+        loginId: currentUser.loginId,
+        userName: currentUser.userName,
+        role: fireRole,
+        token: token,
+        canManage: fireCanManage
+      }));
+    }
+    // URL에서 returnUrl 파라미터 제거
+    window.history.replaceState({}, '', '/index.html');
+    window.location.href = returnUrl;
+    return;
+  }
   document.getElementById('loginPage').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');
   restoreSidebarState();
   restoreMenuGroupState();

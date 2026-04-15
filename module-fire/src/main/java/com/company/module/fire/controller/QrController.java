@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -97,6 +98,7 @@ public class QrController {
      * GET /fire-api/qr/list?buildingId=1&floorId=2
      */
     @GetMapping("/list")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getList(
             @RequestParam(required = false) Long buildingId,
             @RequestParam(required = false) Long floorId) {

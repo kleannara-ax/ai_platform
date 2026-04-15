@@ -441,7 +441,7 @@ public class MobileInspectionController {
 
         if ("Outdoor".equals(hydrantType)) {
             buildingId = 99L;
-            floorId = 1L;
+            floorId = 99L;
         } else {
             buildingId = getLong(body, "buildingId");
             floorId = getLong(body, "floorId");
@@ -634,6 +634,9 @@ public class MobileInspectionController {
         if (opt.isEmpty()) {
             result.put("exists", false);
             result.put("qrKey", qrKey);
+            result.put("buildings", getBuildingList());
+            result.put("floors", getFloorList());
+            result.put("mapOptions", getMappableBuildingFloorList());
         } else {
             FireReceiver receiver = opt.get();
             result.put("exists", true);
@@ -647,6 +650,61 @@ public class MobileInspectionController {
             result.put("y", receiver.getY());
         }
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/receivers/register")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerReceiver(
+            @RequestBody Map<String, Object> body) {
+
+        String qrKey = getString(body, "qrKey");
+        if (qrKey == null || qrKey.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_EMPTY_SERIAL));
+        }
+
+        Optional<FireReceiver> existing = fireReceiverRepository.findByQrKey(qrKey.trim());
+        if (existing.isPresent()) {
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("receiverId", existing.get().getReceiverId());
+            res.put("alreadyExists", true);
+            return ResponseEntity.ok(ApiResponse.success(res));
+        }
+
+        Long buildingId = getLong(body, "buildingId");
+        Long floorId = getLong(body, "floorId");
+        String locationDescription = getString(body, "locationDescription");
+        BigDecimal x = getBigDecimal(body, "x");
+        BigDecimal y = getBigDecimal(body, "y");
+
+        if (buildingId == null || buildingId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (floorId == null || floorId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+
+        Building building = buildingRepository.findById(buildingId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        Floor floor = floorRepository.findById(floorId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        String serialNumber = generateNextReceiverSerialNumber();
+
+        FireReceiver entity = FireReceiver.builder()
+                .serialNumber(serialNumber)
+                .buildingName(building.getBuildingName())
+                .floor(floor)
+                .x(x)
+                .y(y)
+                .locationDescription(locationDescription)
+                .build();
+        entity.assignQrKey(qrKey.trim());
+
+        fireReceiverRepository.save(entity);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("receiverId", entity.getReceiverId());
+        res.put("qrKey", entity.getQrKey());
+        res.put("alreadyExists", false);
+        return ResponseEntity.ok(ApiResponse.success(res));
     }
 
     @GetMapping("/receivers/{id}")
@@ -764,6 +822,9 @@ public class MobileInspectionController {
         if (opt.isEmpty()) {
             result.put("exists", false);
             result.put("qrKey", qrKey);
+            result.put("buildings", getBuildingList());
+            result.put("floors", getFloorList());
+            result.put("mapOptions", getMappableBuildingFloorList());
         } else {
             FirePump pump = opt.get();
             result.put("exists", true);
@@ -777,6 +838,61 @@ public class MobileInspectionController {
             result.put("y", pump.getY());
         }
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/pumps/register")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerPump(
+            @RequestBody Map<String, Object> body) {
+
+        String qrKey = getString(body, "qrKey");
+        if (qrKey == null || qrKey.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_EMPTY_SERIAL));
+        }
+
+        Optional<FirePump> existing = firePumpRepository.findByQrKey(qrKey.trim());
+        if (existing.isPresent()) {
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("pumpId", existing.get().getPumpId());
+            res.put("alreadyExists", true);
+            return ResponseEntity.ok(ApiResponse.success(res));
+        }
+
+        Long buildingId = getLong(body, "buildingId");
+        Long floorId = getLong(body, "floorId");
+        String locationDescription = getString(body, "locationDescription");
+        BigDecimal x = getBigDecimal(body, "x");
+        BigDecimal y = getBigDecimal(body, "y");
+
+        if (buildingId == null || buildingId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (floorId == null || floorId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+
+        Building building = buildingRepository.findById(buildingId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        Floor floor = floorRepository.findById(floorId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        String serialNumber = generateNextPumpSerialNumber();
+
+        FirePump entity = FirePump.builder()
+                .serialNumber(serialNumber)
+                .buildingName(building.getBuildingName())
+                .floor(floor)
+                .x(x)
+                .y(y)
+                .locationDescription(locationDescription)
+                .build();
+        entity.assignQrKey(qrKey.trim());
+
+        firePumpRepository.save(entity);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("pumpId", entity.getPumpId());
+        res.put("qrKey", entity.getQrKey());
+        res.put("alreadyExists", false);
+        return ResponseEntity.ok(ApiResponse.success(res));
     }
 
     @GetMapping("/pumps/{id}")
@@ -1234,6 +1350,38 @@ public class MobileInspectionController {
                 .max()
                 .orElse(0);
         return String.format("HYD-%06d", max + 1);
+    }
+
+    private String generateNextReceiverSerialNumber() {
+        int max = fireReceiverRepository.findAll().stream()
+                .map(FireReceiver::getSerialNumber)
+                .filter(s -> s != null && s.startsWith("RCV-"))
+                .mapToInt(s -> {
+                    try {
+                        return Integer.parseInt(s.substring(4));
+                    } catch (NumberFormatException ignored) {
+                        return 0;
+                    }
+                })
+                .max()
+                .orElse(0);
+        return String.format("RCV-%06d", max + 1);
+    }
+
+    private String generateNextPumpSerialNumber() {
+        int max = firePumpRepository.findAll().stream()
+                .map(FirePump::getSerialNumber)
+                .filter(s -> s != null && s.startsWith("PMP-"))
+                .mapToInt(s -> {
+                    try {
+                        return Integer.parseInt(s.substring(4));
+                    } catch (NumberFormatException ignored) {
+                        return 0;
+                    }
+                })
+                .max()
+                .orElse(0);
+        return String.format("PMP-%06d", max + 1);
     }
 
     private String resolveInspectorName() {
