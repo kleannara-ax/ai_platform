@@ -12,7 +12,7 @@
   <header class="header">
     <div class="header-left">
       <h1>PS 지분 검사 도구</h1>
-      <span class="version">v7.0.0</span>
+      <span class="version">v8.2.0</span>
     </div>
     <div class="header-right">
       <span class="health-badge" id="healthBadge">연결 확인 중...</span>
@@ -37,31 +37,23 @@
       <div class="card-body">
         <div class="form-grid">
           <div class="form-group">
-            <label>자재코드 (MATNR)</label>
+            <label>자재코드 (MATNR) <span class="required">*</span></label>
             <input type="text" id="f_matnr" placeholder="예: F2A11220-04600845A">
           </div>
           <div class="form-group">
             <label>자재명</label>
-            <input type="text" id="f_matnrNm" placeholder="예: 점보롤 A타입">
+            <input type="text" id="f_matnrNm" placeholder="예: Blanq-HBP 370GSM 1091*0788 Ream">
           </div>
           <div class="form-group">
-            <label>LOT 번호</label>
+            <label>LOT 번호 <span class="required">*</span></label>
             <input type="text" id="f_lotnr" placeholder="예: LOT-2026-04-001">
           </div>
           <div class="form-group">
-            <label>개별바코드 (IND_BCD)</label>
+            <label>개별바코드 (IND_BCD) <span class="required">*</span></label>
             <input type="text" id="f_indBcd" placeholder="예: 26228J0039">
           </div>
           <div class="form-group">
-            <label>플랜트 (WERKS)</label>
-            <input type="text" id="f_werks" placeholder="예: 1000">
-          </div>
-          <div class="form-group">
-            <label>검사항목그룹코드</label>
-            <input type="text" id="f_inspItemGrpCd" value="COV_INS" placeholder="COV_INS">
-          </div>
-          <div class="form-group">
-            <label>검사자 ID</label>
+            <label>검사자 ID <span class="required">*</span></label>
             <input type="text" id="f_operatorId" placeholder="예: inspector01">
           </div>
           <div class="form-group">
@@ -69,168 +61,99 @@
             <input type="text" id="f_operatorNm" placeholder="예: 홍길동">
           </div>
         </div>
+        <!-- hidden fields: URL 파라미터로만 수신 -->
+        <input type="hidden" id="f_werks" value="">
+        <input type="hidden" id="f_inspItemGrpCd" value="COV_INS">
         <div class="exists-check" id="existsCheck" style="display:none;"></div>
       </div>
     </div>
 
-    <!-- 이미지 업로드 -->
+    <!-- 이미지 업로드 & 검사 -->
     <div class="card">
-      <div class="card-header"><h3>이미지 업로드</h3></div>
+      <div class="card-header">
+        <h3>이미지 업로드 & 검사</h3>
+        <!-- 임계값: 최솟값은 0 고정, 최댓값만 사용자가 조절 (디폴트 115) -->
+        <div class="threshold-control">
+          <label>임계값 (최소 0 고정 ~ 최대 조절 가능, 디폴트 115)</label>
+          <span class="threshold-range-label">0 ~</span>
+          <input type="range" id="thresholdSlider" min="1" max="255" value="115">
+          <input type="number" id="thresholdValue" min="1" max="255" value="115" class="threshold-num">
+        </div>
+      </div>
       <div class="card-body">
-        <div class="image-upload-grid">
-          <div class="upload-box" id="origDropZone">
-            <input type="file" id="f_origImage" accept="image/*" onchange="previewImage(this,'origPreview')">
-            <div class="upload-placeholder" id="origPlaceholder">
-              <span class="upload-icon">&#128247;</span>
-              <p>원본 이미지</p>
-              <small>클릭 또는 드래그&드롭</small>
-            </div>
-            <img id="origPreview" class="preview-img" style="display:none;">
+        <div class="upload-area" id="uploadArea">
+          <input type="file" id="f_imageUpload" accept="image/*" capture="environment">
+          <div class="upload-placeholder" id="uploadPlaceholder">
+            <span class="upload-icon">&#128247;</span>
+            <p>이미지를 선택하면 자동으로 검사를 시작합니다</p>
+            <small>카메라 촬영 또는 갤러리 선택 (최대 900MB)</small>
           </div>
-          <div class="upload-box" id="resultDropZone">
-            <input type="file" id="f_resultImage" accept="image/*" onchange="previewImage(this,'resultPreview')">
-            <div class="upload-placeholder" id="resultPlaceholder">
-              <span class="upload-icon">&#128200;</span>
-              <p>결과 이미지</p>
-              <small>클릭 또는 드래그&드롭</small>
+        </div>
+        <div class="canvas-area" id="canvasArea" style="display:none;">
+          <div class="canvas-panels">
+            <div class="canvas-panel">
+              <div class="panel-title">원본 이미지</div>
+              <div class="canvas-wrapper" id="originalWrapper"><canvas id="originalCanvas"></canvas></div>
             </div>
-            <img id="resultPreview" class="preview-img" style="display:none;">
+            <div class="canvas-panel">
+              <div class="panel-title">검사 결과 <span class="manual-mode-badge" id="manualModeBadge" style="display:none;">수동 추가 모드</span></div>
+              <div class="canvas-wrapper" id="canvasWrapper"><canvas id="binaryCanvas"></canvas><canvas id="markerCanvas"></canvas></div>
+            </div>
+          </div>
+          <div class="canvas-toolbar">
+            <button class="btn btn-sm btn-outline" onclick="toggleManualAddMode()" id="btnManualAdd">수동 추가</button>
+            <button class="btn btn-sm btn-outline" onclick="resetImage()">이미지 변경</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 검사 수치 입력 -->
-    <div class="card">
-      <div class="card-header"><h3>검사 수치</h3></div>
+    <!-- 품질 지표 -->
+    <div class="card" id="qualityCard" style="display:none;">
+      <div class="card-header"><h3>검사 결과 (품질 지표)</h3></div>
       <div class="card-body">
-        <div class="section-title">기본 수치</div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>임계값 (Threshold)</label>
-            <input type="number" id="f_thresholdMax" value="115" min="0" max="255">
-          </div>
-          <div class="form-group">
-            <label>총 지분수</label>
-            <input type="number" id="f_totalCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>지분 커버리지 비율 (%)</label>
-            <input type="number" id="f_coverageRatio" step="0.000001" value="0">
-          </div>
-          <div class="form-group">
-            <label>밀도 지분수</label>
-            <input type="number" id="f_densityCount" value="0" min="0">
-          </div>
-        </div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>밀도 비율</label>
-            <input type="number" id="f_densityRatio" step="0.0001" value="0">
-          </div>
-          <div class="form-group">
-            <label>크기 균일도</label>
-            <input type="number" id="f_sizeUniformityScore" step="0.0001" value="0">
-          </div>
-          <div class="form-group">
-            <label>분포 균일도</label>
-            <input type="number" id="f_distributionUniformityScore" step="0.0001" value="0">
-          </div>
-          <div class="form-group">
-            <label>평균 크기 (px)</label>
-            <input type="number" id="f_meanSize" step="0.0001" value="0">
-          </div>
-        </div>
+        <div class="quality-summary" id="qualitySummary"></div>
 
-        <div class="section-title">검출 카운트</div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>자동 검출</label>
-            <input type="number" id="f_autoCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>수동 보정</label>
-            <input type="number" id="f_manualCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>삭제 자동검출</label>
-            <input type="number" id="f_removedAutoCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>표준편차 (px)</label>
-            <input type="number" id="f_stdSize" step="0.0001" value="0">
+        <!-- 지표 주석 (접기/펼치기) -->
+        <div class="metric-annotation">
+          <button class="annotation-toggle" id="annotationToggle" onclick="toggleAnnotation()">
+            <span class="annotation-icon" id="annotationIcon">&#9662;</span> 지표 설명 보기
+          </button>
+          <div class="annotation-body" id="annotationBody">
+            <dl class="annotation-list">
+              <dt>총 지분</dt>
+              <dd>자동 검출된 지분에서 제외하지 않은 개수와 수동으로 추가한 지분을 합산한 값입니다.</dd>
+              <dt>밀도</dt>
+              <dd>지름이 약 3px 이상 7px 이하로 추정되는 지분의 개수입니다.</dd>
+              <dt>총 커버리지</dt>
+              <dd>전체 이미지 픽셀 대비 지분 픽셀 비율(ppm)입니다.</dd>
+              <dt>크기 균일도</dt>
+              <dd>지분 픽셀 면적의 평균과 표준편차로 계산한 0~100점 지표입니다.</dd>
+              <dt>분포 균등도</dt>
+              <dd>이미지를 4분면으로 나누었을 때의 지분 분포 균형도입니다.</dd>
+            </dl>
           </div>
         </div>
 
         <div class="section-title">크기 버킷 분포</div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>~3px 이하</label>
-            <input type="number" id="f_bucketUpTo3" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>~5px 이하</label>
-            <input type="number" id="f_bucketUpTo5" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>~7px 이하</label>
-            <input type="number" id="f_bucketUpTo7" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>7px 초과</label>
-            <input type="number" id="f_bucketOver7" value="0" min="0">
-          </div>
-        </div>
-
-        <div class="section-title">사분면 분포</div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>좌상</label>
-            <input type="number" id="f_quadrantTopLeft" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>우상</label>
-            <input type="number" id="f_quadrantTopRight" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>좌하</label>
-            <input type="number" id="f_quadrantBottomLeft" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>우하</label>
-            <input type="number" id="f_quadrantBottomRight" value="0" min="0">
-          </div>
-        </div>
-
-        <div class="section-title">픽셀 / 수동 보정</div>
-        <div class="form-grid cols-4">
-          <div class="form-group">
-            <label>지분 픽셀 수</label>
-            <input type="number" id="f_objectPixelCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>전체 픽셀 수</label>
-            <input type="number" id="f_totalPixels" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>수동 추가</label>
-            <input type="number" id="f_manualAddedCount" value="0" min="0">
-          </div>
-          <div class="form-group">
-            <label>수동 삭제</label>
-            <input type="number" id="f_manualRemovedCount" value="0" min="0">
-          </div>
+        <div class="bucket-bar" id="bucketBar"></div>
+        <div class="section-title">4분면 분포</div>
+        <div class="quadrant-grid" id="quadrantGrid"></div>
+        <div class="section-title">검출 객체 목록</div>
+        <div class="component-list-wrapper">
+          <table class="component-table">
+            <thead><tr><th>#</th><th>타입</th><th>위치 (X, Y)</th><th>크기 (px)</th><th>관리</th></tr></thead>
+            <tbody id="componentListBody"><tr><td colspan="5" class="empty-msg">검사를 실행하면 표시됩니다.</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <!-- 저장 버튼 -->
-    <div class="action-bar">
+    <div class="action-bar" id="actionBar" style="display:none;">
       <button class="btn btn-outline" onclick="checkExists()">중복 체크</button>
       <button class="btn btn-primary btn-lg" onclick="saveInspection()" id="btnSave">검사 결과 저장</button>
     </div>
 
-    <!-- 저장 결과 -->
     <div class="card" id="saveResult" style="display:none;">
       <div class="card-header"><h3>저장 결과</h3></div>
       <div class="card-body" id="saveResultBody"></div>
@@ -253,19 +176,8 @@
           <button class="btn btn-sm btn-outline" onclick="loadHistory()">전체</button>
         </div>
       </div>
-      <div class="card-body" style="padding:0;overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th>
-              <th>차수</th><th>총 지분수</th><th>지분 커버리지</th><th>자동</th><th>수동</th>
-              <th>상태</th><th>검사자</th><th>검사일시</th><th>관리</th>
-            </tr>
-          </thead>
-          <tbody id="historyTableBody">
-            <tr><td colspan="14" class="empty-msg">불러오는 중...</td></tr>
-          </tbody>
-        </table>
+      <div class="card-body" id="historyCardsBody">
+        <div class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</div>
       </div>
     </div>
     <div class="pagination" id="pagination"></div>
@@ -276,39 +188,71 @@
     <div class="card">
       <div class="card-header">
         <h3>검사 이력 상세 테이블</h3>
-        <div class="toolbar-inline">
-          <select id="dt_searchType">
-            <option value="indBcd">바코드</option>
-            <option value="lotnr">LOT</option>
-            <option value="matnr">자재코드</option>
-          </select>
-          <input type="text" id="dt_keyword" placeholder="검색어 입력..." onkeydown="if(event.key==='Enter')searchDetailTable()">
-          <button class="btn btn-sm btn-primary" onclick="searchDetailTable()">검색</button>
-          <button class="btn btn-sm btn-outline" onclick="loadDetailTable()">전체</button>
+        <div class="toolbar-inline toolbar-wrap">
+          <div class="toolbar-row">
+            <label class="toolbar-label">바코드</label>
+            <input type="text" id="dt_keyword" placeholder="부분일치 검색" onkeydown="if(event.key==='Enter')searchDetailTable()">
+            <label class="toolbar-label">시작일</label>
+            <input type="date" id="dt_dateFrom">
+            <label class="toolbar-label">종료일</label>
+            <input type="date" id="dt_dateTo">
+            <button class="btn btn-sm btn-primary" onclick="searchDetailTable()">검색</button>
+            <button class="btn btn-sm btn-outline" onclick="resetDetailSearch()">초기화</button>
+          </div>
+          <div class="toolbar-row">
+            <button class="btn btn-sm btn-excel" onclick="exportExcel()">&#128196; 엑셀 내보내기 (.xlsx)</button>
+          </div>
         </div>
       </div>
       <div class="card-body" style="padding:0;overflow-x:auto;">
-        <table class="detail-table">
+        <table class="detail-table" id="detailTable">
           <thead>
+            <!-- 상위 카테고리 헤더 -->
+            <tr class="category-header">
+              <th colspan="7">식별 정보</th>
+              <th colspan="4">핵심 지표</th>
+              <th colspan="5">카운트 상세</th>
+              <th colspan="4">균일도 · 통계</th>
+              <th colspan="4">크기 버킷</th>
+              <th colspan="4">사분면</th>
+              <th colspan="2">픽셀</th>
+              <th colspan="3">검사 조건</th>
+              <th colspan="6">관리 정보</th>
+              <th colspan="2">상태</th>
+              <th colspan="6">이미지</th>
+              <th colspan="1">삭제</th>
+            </tr>
+            <!-- 상세 컬럼 헤더 -->
             <tr>
-              <th>ID</th><th>차수</th><th>검사그룹</th>
-              <th>자재코드</th><th>자재명</th><th>플랜트</th>
-              <th>LOT</th><th>바코드</th><th>바코드차수</th>
-              <th>임계값</th><th>총 지분수</th><th>커버리지(%)</th>
-              <th>밀도수</th><th>밀도비율</th>
-              <th>크기균일도</th><th>분포균일도</th>
-              <th>평균크기</th><th>표준편차</th>
-              <th>자동검출</th><th>수동보정</th><th>삭제자동</th>
-              <th>~3px</th><th>~5px</th><th>~7px</th><th>>7px</th>
+              <!-- 식별 정보 (7) -->
+              <th>ID</th><th>차수</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th><th>바코드차수</th>
+              <!-- 핵심 지표 (4) -->
+              <th>커버리지(PPM)</th><th>총 지분</th><th>밀도(개)</th><th>밀도(%)</th>
+              <!-- 카운트 상세 (5) -->
+              <th>자동</th><th>수동</th><th>제외</th><th>수동+</th><th>수동-</th>
+              <!-- 균일도 · 통계 (4) -->
+              <th>크기균일</th><th>분포균등</th><th>평균크기</th><th>표준편차</th>
+              <!-- 크기 버킷 (4) -->
+              <th>≤3px</th><th>≤5px</th><th>≤7px</th><th>&gt;7px</th>
+              <!-- 사분면 (4) -->
               <th>좌상</th><th>우상</th><th>좌하</th><th>우하</th>
-              <th>지분픽셀</th><th>전체픽셀</th>
-              <th>수동추가</th><th>수동삭제</th>
-              <th>검사자ID</th><th>검사자명</th>
-              <th>상태</th><th>검사일시</th><th>등록일시</th>
+              <!-- 픽셀 (2) -->
+              <th>객체px</th><th>전체px</th>
+              <!-- 검사 조건 (3) -->
+              <th>임계값</th><th>검사일시</th><th>측정일시</th>
+              <!-- 관리 정보 (6) -->
+              <th>검사자ID</th><th>검사자명</th><th>플랜트</th><th>처리순번</th><th>검사항목</th><th>장치ID</th>
+              <!-- 상태 (2) -->
+              <th>상태</th><th>등록일시</th>
+              <!-- 이미지 (6) -->
+              <th>원본</th><th>원본 파일명</th><th>원본 저장경로</th>
+              <th>결과</th><th>결과 파일명</th><th>결과 저장경로</th>
+              <!-- 삭제 (1) -->
+              <th>삭제</th>
             </tr>
           </thead>
           <tbody id="detailTableBody">
-            <tr><td colspan="38" class="empty-msg">불러오는 중...</td></tr>
+            <tr><td colspan="48" class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -317,9 +261,19 @@
   </div>
 </div>
 
+<!-- 이미지 모달 -->
+<div class="modal-overlay" id="imageModal" style="display:none;" onclick="closeImageModal(event)">
+  <div class="modal-content">
+    <img id="modalImage" src="" alt="확대 이미지">
+    <button class="modal-close" onclick="document.getElementById('imageModal').style.display='none'">&times;</button>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div class="toast-wrap" id="toasts"></div>
 
+<!-- SheetJS (xlsx export) CDN -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script th:src="@{/ps-insp/js/app.js}" src="/ps-insp/js/app.js"></script>
 </body>
 </html>
