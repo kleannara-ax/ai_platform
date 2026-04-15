@@ -197,22 +197,27 @@
   }
 
   async function apiFetch(url, opts = {}) {
-    if (window.FireWebCsrf?.isMutation?.(opts.method)) {
-      await window.FireWebCsrf.ensureToken();
-    }
-    const headers = window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers);
-    const res = await fetch(url, { ...opts, headers });
-    if (res.status === 401) {
-      localStorage.removeItem('fireweb_user');
-      localStorage.removeItem('fw_user');
-      window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+    try {
+      if (window.FireWebCsrf?.isMutation?.(opts.method)) {
+        await window.FireWebCsrf.ensureToken();
+      }
+      const headers = window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers);
+      const res = await fetch(url, { ...opts, headers });
+      if (res.status === 401) {
+        localStorage.removeItem('fireweb_user');
+        localStorage.removeItem('fw_user');
+        (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+        return null;
+      }
+      if (res.status === 403) {
+        window.location.href = '/fire-map.html';
+        return null;
+      }
+      return res.json();
+    } catch (err) {
+      console.error('[QR] apiFetch error:', url, err);
       return null;
     }
-    if (res.status === 403) {
-      window.location.href = '/fire-map.html';
-      return null;
-    }
-    return res.json();
   }
 
   function loadCurrentUser() {
@@ -381,62 +386,72 @@
   }
 
   async function loadFilters() {
-    const [bRes, fRes] = await Promise.all([
-      apiFetch(API_BASE + '/qr/buildings'),
-      apiFetch(API_BASE + '/qr/floors')
-    ]);
-    if (!bRes || !fRes) return false;
-    buildings = bRes.data || [];
-    floors = fRes.data || [];
-    const buildingSel = document.getElementById('filterBuilding');
-    const floorSel = document.getElementById('filterFloor');
-    buildings.forEach((building) => {
-      const opt = document.createElement('option');
-      opt.value = building.buildingId;
-      opt.textContent = building.buildingName;
-      buildingSel.appendChild(opt);
-    });
-    floors.forEach((floor) => {
-      const opt = document.createElement('option');
-      opt.value = floor.floorId;
-      opt.textContent = floor.floorName;
-      floorSel.appendChild(opt);
-    });
+    try {
+      const [bRes, fRes] = await Promise.all([
+        apiFetch(API_BASE + '/qr/buildings'),
+        apiFetch(API_BASE + '/qr/floors')
+      ]);
+      buildings = (bRes && bRes.data) ? bRes.data : [];
+      floors = (fRes && fRes.data) ? fRes.data : [];
+      const buildingSel = document.getElementById('filterBuilding');
+      const floorSel = document.getElementById('filterFloor');
+      buildings.forEach((building) => {
+        const opt = document.createElement('option');
+        opt.value = building.buildingId;
+        opt.textContent = building.buildingName;
+        buildingSel.appendChild(opt);
+      });
+      floors.forEach((floor) => {
+        const opt = document.createElement('option');
+        opt.value = floor.floorId;
+        opt.textContent = floor.floorName;
+        floorSel.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('[QR] loadFilters error:', err);
+    }
     return true;
   }
 
   async function loadData() {
-    const buildingId = document.getElementById('filterBuilding').value;
-    const floorId = document.getElementById('filterFloor').value;
-    const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
-    const listParams = new URLSearchParams();
-    if (!isTextSearchEquip()) {
-      if (buildingId) listParams.set('buildingId', buildingId);
-      if (floorId) listParams.set('floorId', floorId);
-    }
-    const listRes = await apiFetch(API_BASE + '/qr/list' + (listParams.toString() ? ('?' + listParams.toString()) : ''));
-    if (!listRes) return;
-    latestListData = listRes.data || {};
-    renderMenu();
-
-    let unregisteredList = [];
-    if (unregisteredCount > 0) {
-      const countParams = new URLSearchParams({
-        extCount: currentEquip === 'ext' ? String(unregisteredCount) : '0',
-        hydCount: currentEquip === 'hyd' ? String(unregisteredCount) : '0',
-        receiverCount: currentEquip === 'rcv' ? String(unregisteredCount) : '0',
-        pumpCount: currentEquip === 'pmp' ? String(unregisteredCount) : '0'
-      });
-      const unregisteredRes = await apiFetch(API_BASE + '/qr/unregistered-serials?' + countParams.toString());
-      if (unregisteredRes?.data) {
-        if (currentEquip === 'ext') unregisteredList = unregisteredRes.data.unregisteredExtSerials || [];
-        if (currentEquip === 'hyd') unregisteredList = unregisteredRes.data.unregisteredHydSerials || [];
-        if (currentEquip === 'rcv') unregisteredList = unregisteredRes.data.unregisteredReceiverSerials || [];
-        if (currentEquip === 'pmp') unregisteredList = unregisteredRes.data.unregisteredPumpSerials || [];
+    try {
+      const buildingId = document.getElementById('filterBuilding').value;
+      const floorId = document.getElementById('filterFloor').value;
+      const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
+      const listParams = new URLSearchParams();
+      if (!isTextSearchEquip()) {
+        if (buildingId) listParams.set('buildingId', buildingId);
+        if (floorId) listParams.set('floorId', floorId);
       }
-    }
+      const listRes = await apiFetch(API_BASE + '/qr/list' + (listParams.toString() ? ('?' + listParams.toString()) : ''));
+      if (listRes && listRes.data) {
+        latestListData = listRes.data;
+      }
+      renderMenu();
 
-    renderCurrentSection(unregisteredList);
+      let unregisteredList = [];
+      if (unregisteredCount > 0) {
+        const countParams = new URLSearchParams({
+          extCount: currentEquip === 'ext' ? String(unregisteredCount) : '0',
+          hydCount: currentEquip === 'hyd' ? String(unregisteredCount) : '0',
+          receiverCount: currentEquip === 'rcv' ? String(unregisteredCount) : '0',
+          pumpCount: currentEquip === 'pmp' ? String(unregisteredCount) : '0'
+        });
+        const unregisteredRes = await apiFetch(API_BASE + '/qr/unregistered-serials?' + countParams.toString());
+        if (unregisteredRes?.data) {
+          if (currentEquip === 'ext') unregisteredList = unregisteredRes.data.unregisteredExtSerials || [];
+          if (currentEquip === 'hyd') unregisteredList = unregisteredRes.data.unregisteredHydSerials || [];
+          if (currentEquip === 'rcv') unregisteredList = unregisteredRes.data.unregisteredReceiverSerials || [];
+          if (currentEquip === 'pmp') unregisteredList = unregisteredRes.data.unregisteredPumpSerials || [];
+        }
+      }
+
+      renderCurrentSection(unregisteredList);
+    } catch (err) {
+      console.error('[QR] loadData error:', err);
+      renderMenu();
+      renderCurrentSection([]);
+    }
   }
 
   function openQrDetails(type, id) {
@@ -546,7 +561,7 @@
   async function init() {
     loadCurrentUser();
     if (!currentUser) {
-      window.(window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
     if (!canAccessQr()) {
@@ -554,9 +569,9 @@
       return;
     }
     renderNav();
+    renderMenu();
     bindEvents();
-    const ok = await loadFilters();
-    if (!ok) return;
+    await loadFilters();
     updateFilterMode();
     await loadData();
   }

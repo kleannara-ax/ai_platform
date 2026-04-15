@@ -82,6 +82,10 @@ public class FireReceiver {
         return active;
     }
 
+    public void assignQrKey(String qrKey) {
+        this.qrKey = qrKey;
+    }
+
     public void update(String buildingName, Floor floor, BigDecimal x, BigDecimal y,
                        String locationDescription, String note) {
         this.buildingName = buildingName;

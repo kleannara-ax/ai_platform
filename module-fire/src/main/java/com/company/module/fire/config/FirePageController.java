@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
@@ -123,9 +124,14 @@ public class FirePageController {
      * /login.html → SPA(index.html)로 리다이렉트.
      * 소방 모듈 HTML 페이지에서 인증 실패 시 /login.html로 이동하는데,
      * AI Platform에서는 index.html이 SPA 로그인을 담당하므로 리다이렉트 처리.
+     * returnUrl 파라미터가 있으면 그대로 전달하여 로그인 후 원래 페이지로 복귀.
      */
     @GetMapping({"/login.html", "/login"})
-    public String loginRedirect() {
+    public String loginRedirect(HttpServletRequest request) {
+        String returnUrl = request.getParameter("returnUrl");
+        if (returnUrl != null && !returnUrl.isBlank()) {
+            return "redirect:/index.html?returnUrl=" + java.net.URLEncoder.encode(returnUrl.trim(), java.nio.charset.StandardCharsets.UTF_8);
+        }
         return "redirect:/index.html";
     }
 

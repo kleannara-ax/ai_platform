@@ -74,7 +74,9 @@
       try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch(_) {}
       return;
     }
-    location.href = '/index.html';
+    // returnUrl 파라미터로 현재 페이지 경로를 전달하여 로그인 후 복귀
+    var returnUrl = location.pathname + location.search;
+    location.href = '/index.html?returnUrl=' + encodeURIComponent(returnUrl);
   }
 
   window.FireWebCsrf = {

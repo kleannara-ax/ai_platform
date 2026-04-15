@@ -181,7 +181,7 @@
     ];
 
     if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
-      (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+      location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
       return;
     }
 
@@ -207,7 +207,7 @@
       if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');
-        (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
+        location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
         throw new Error('unauthorized');
       }
       return res;
@@ -381,10 +381,103 @@
         return;
       }
       if (!pumpData.exists) {
-        mainView.innerHTML = '<div class="card"><div class="err">등록되지 않은 소방펌프 QR입니다.</div></div>';
+        renderRegisterForm(pumpData);
         return;
       }
       renderExistsView(pumpData);
+    }
+
+    function renderRegisterForm(data) {
+      const mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
+      mainView.innerHTML = `
+        <div class="card">
+          <div class="title-lg">소방펌프 등록</div>
+          <div class="sub">QR Key: ${escHtml(data.qrKey || qrKey)}</div>
+        </div>
+        <div class="card">
+          <form id="regForm" style="display:grid;gap:12px;">
+            <div id="regErr" class="err"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">건물</label>
+                <select id="regBuilding" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;">
+                  <option value="">-- 건물 선택 --</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">층</label>
+                <select id="regFloor" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;">
+                  <option value="">-- 층 선택 --</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">상세 위치</label>
+              <input type="text" id="regLocation" placeholder="예: 지하1층 펌프실" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;" />
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button type="submit" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;">등록</button>
+            </div>
+          </form>
+        </div>`;
+
+      bindMappableOptions(mapOptions);
+      document.getElementById('regForm').addEventListener('submit', submitRegister);
+      document.getElementById('regBuilding').addEventListener('change', () => onRegBuildingChanged());
+    }
+
+    function bindMappableOptions(mapOptions) {
+      const bSel = document.getElementById('regBuilding');
+      const fSel = document.getElementById('regFloor');
+      if (!bSel || !fSel) return;
+      const buildingMap = new Map();
+      (mapOptions || []).forEach(o => {
+        const bid = String(o.buildingId || '');
+        if (!bid) return;
+        if (!buildingMap.has(bid)) buildingMap.set(bid, { buildingId: o.buildingId, buildingName: o.buildingName || '', floors: [] });
+        buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '' });
+      });
+      const buildings = Array.from(buildingMap.values());
+      bSel.innerHTML = '<option value="">-- 건물 선택 --</option>' + buildings.map(b => `<option value="${b.buildingId}">${escHtml(b.buildingName)}</option>`).join('');
+      bSel.dataset.mapOptions = JSON.stringify(buildings);
+      onRegBuildingChanged();
+    }
+
+    function onRegBuildingChanged() {
+      const bSel = document.getElementById('regBuilding');
+      const fSel = document.getElementById('regFloor');
+      if (!bSel || !fSel) return;
+      let buildings = [];
+      try { buildings = JSON.parse(bSel.dataset.mapOptions || '[]'); } catch {}
+      const selected = buildings.find(b => String(b.buildingId) === String(bSel.value));
+      const floors = selected?.floors || [];
+      fSel.innerHTML = '<option value="">-- 층 선택 --</option>' + floors.map(f => `<option value="${f.floorId}">${escHtml(f.floorName)}</option>`).join('');
+      if (floors.length) fSel.value = String(floors[0].floorId);
+    }
+
+    async function submitRegister(e) {
+      e.preventDefault();
+      const buildingId = document.getElementById('regBuilding').value;
+      const floorId = document.getElementById('regFloor').value;
+      const locationDescription = document.getElementById('regLocation').value.trim();
+      const errEl = document.getElementById('regErr');
+      errEl.textContent = '';
+      if (!buildingId) { errEl.textContent = '건물을 선택하세요.'; return; }
+      if (!floorId) { errEl.textContent = '층을 선택하세요.'; return; }
+      const res = await apiFetch(API_BASE + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrKey, buildingId: parseInt(buildingId, 10), floorId: parseInt(floorId, 10), locationDescription: locationDescription || null, x: null, y: null })
+      });
+      const json = await res.json();
+      if ((!res.ok && !json.success) && json.message) { errEl.textContent = json.message; return; }
+      if (json.data?.pumpId) {
+        document.querySelector('header').style.display = 'none';
+        mainView.style.display = 'none';
+        completeView.querySelector('.ctitle').textContent = '소방펌프 등록이 완료되었습니다!';
+        completeView.querySelector('.csub').textContent = '창을 닫아주세요.';
+        completeView.style.display = 'block';
+      }
     }
 
     document.getElementById('btnCancelInspect').addEventListener('click', () => {
