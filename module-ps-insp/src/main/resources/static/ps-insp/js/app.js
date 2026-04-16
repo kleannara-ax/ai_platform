@@ -1,5 +1,5 @@
 /**
- * PS 지분 검사 도구 - Application JavaScript v8.1.0
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.1.0
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -47,6 +47,42 @@
   var MAX_IMAGE_DIMENSION = 2200;
   var RESIZE_TARGET = 1600;
   var MAX_FILE_SIZE = 900 * 1024 * 1024; // 900MB
+  var DEFAULT_THRESHOLD = 115;
+  var THRESHOLD_STORAGE_KEY = 'jri_threshold';
+  var PPM_LIMIT_STORAGE_KEY = 'jri_ppm_limit';
+  var ADMIN_PWD_HASH_KEY = 'jri_admin_pwd';
+  var DEFAULT_PPM_LIMIT = 0; // 0 = 비활성 (기준값 미설정)
+
+  // 임계값 잠금 상태
+  var thresholdLocked = true;
+  var lastThreshold = DEFAULT_THRESHOLD;
+
+  // PPM 기준값
+  function getPpmLimit() {
+    try {
+      var v = localStorage.getItem(PPM_LIMIT_STORAGE_KEY);
+      if (v !== null) { var n = parseFloat(v); if (!isNaN(n) && n > 0) return n; }
+    } catch (e) { }
+    return DEFAULT_PPM_LIMIT;
+  }
+  function savePpmLimit(val) {
+    try { localStorage.setItem(PPM_LIMIT_STORAGE_KEY, String(val)); } catch (e) { }
+  }
+
+  // ── localStorage 임계값 저장/복원 ──
+  function saveThresholdToStorage(val) {
+    try { localStorage.setItem(THRESHOLD_STORAGE_KEY, String(val)); } catch (e) { }
+  }
+  function loadThresholdFromStorage() {
+    try {
+      var stored = localStorage.getItem(THRESHOLD_STORAGE_KEY);
+      if (stored !== null) {
+        var v = parseInt(stored);
+        if (v >= 1 && v <= 255) return v;
+      }
+    } catch (e) { }
+    return null; // 저장값 없음 → 호출부에서 DEFAULT_THRESHOLD 사용
+  }
 
   // ══════════════════════════════════════════════
   // Token Extraction
@@ -93,7 +129,24 @@
     setupImageUpload();
     setupThresholdControls();
     applyUrlParams();
+    restoreThreshold();   // URL 파라미터 → localStorage → 115 우선순위
     autoFillOperator();
+  }
+
+  /**
+   * 임계값 복원 우선순위:
+   *   1) URL ?THRESHOLD=xxx  (applyUrlParams에서 이미 적용됨)
+   *   2) localStorage 저장값
+   *   3) DEFAULT_THRESHOLD (115)
+   */
+  function restoreThreshold() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('THRESHOLD')) return; // URL 파라미터 우선 → 이미 적용됨
+    var stored = loadThresholdFromStorage();
+    if (stored !== null) {
+      syncThresholdUI(stored);
+      lastThreshold = stored;
+    }
   }
 
   // ══════════════════════════════════════════════
@@ -111,22 +164,68 @@
       'USERID':    'f_operatorId',
       'USERNM':    'f_operatorNm',
       'INSP_ITEM_GRP_CD': 'f_inspItemGrpCd', // hidden field에 저장
-      'THRESHOLD': 'thresholdValue'  // 최대 임계값 (최소 임계값은 0 고정)
+      'THRESHOLD': null  // 별도 처리 (아래 참조)
     };
 
     Object.keys(mapping).forEach(function (paramKey) {
       var value = params.get(paramKey);
-      if (value) {
+      if (value && mapping[paramKey]) {
         var el = document.getElementById(mapping[paramKey]);
         if (el) el.value = value;
       }
     });
 
-    // THRESHOLD → 슬라이더도 동기화 (최소 임계값은 0 고정, THRESHOLD 파라미터는 최대값만 설정)
+    // THRESHOLD → 슬라이더 + 숫자입력 + 표시값 모두 동기화
     var thVal = params.get('THRESHOLD');
     if (thVal) {
-      var slider = document.getElementById('thresholdSlider');
-      if (slider) slider.value = thVal;
+      var v = syncThresholdUI(thVal);
+      lastThreshold = v;
+    }
+
+    // ── tab 파라미터: 지정된 탭으로 자동 전환 ──
+    // 예: ?tab=history-table → 이력 테이블 탭 활성화
+    //     ?tab=history       → 검사 이력 탭 활성화
+    //     ?tab=inspection    → 검사 실행 탭 활성화 (기본값)
+    var tabParam = params.get('tab');
+    if (tabParam) {
+      // 사용자 편의를 위한 탭 별칭 매핑
+      var tabAliasMap = {
+        'history-table': 'detail-table',  // ?tab=history-table → 이력 테이블
+        'detail-table':  'detail-table',
+        'detail':        'detail-table',
+        'table':         'detail-table',
+        'history':       'history',
+        'inspection':    'inspection'
+      };
+      var resolvedTab = tabAliasMap[tabParam] || tabParam;
+      // 유효한 탭인지 확인 후 전환
+      var tabContent = document.getElementById('tab-' + resolvedTab);
+      if (tabContent) {
+        switchTab(resolvedTab);
+      }
+    }
+
+    // ── search 파라미터: 검색어 자동 입력 & 검색 실행 ──
+    // 예: ?tab=history-table&search=26228J0039 → 이력 테이블에서 바코드 자동 검색
+    //     ?tab=history&search=26228J0039       → 검사 이력에서 바코드 자동 검색
+    var searchParam = params.get('search');
+    if (searchParam) {
+      var activeTabName = tabParam ? (({ 'history-table': 'detail-table', 'detail-table': 'detail-table', 'detail': 'detail-table', 'table': 'detail-table', 'history': 'history', 'inspection': 'inspection' })[tabParam] || tabParam) : null;
+
+      if (activeTabName === 'detail-table') {
+        // 이력 테이블 탭: 바코드 검색 필드에 자동 입력 후 검색
+        var dtKeyword = document.getElementById('dt_keyword');
+        if (dtKeyword) dtKeyword.value = searchParam;
+        dtSearchParams.indBcd = searchParam;
+        // 탭 전환 시 이미 loadDetailTable()이 호출되므로 별도 호출 불필요
+        // (dtSearchParams가 설정되었으므로 필터링된 결과를 반환)
+      } else if (activeTabName === 'history') {
+        // 검사 이력 탭: 검색어 입력 후 검색
+        var hKeyword = document.getElementById('h_keyword');
+        if (hKeyword) hKeyword.value = searchParam;
+        // searchHistory()는 switchTab('history') 이후 로드된 데이터와 별개로 실행
+        setTimeout(function () { searchHistory(); }, 200);
+      }
     }
   }
 
@@ -173,16 +272,23 @@
   // 1단계: Image Upload & Preprocessing
   // ══════════════════════════════════════════════
   function setupImageUpload() {
-    var fileInput = document.getElementById('f_imageUpload');
-    if (!fileInput) return;
+    // 카메라 촬영 input
+    var cameraInput = document.getElementById('f_imageCamera');
+    if (cameraInput) {
+      cameraInput.addEventListener('change', function () {
+        if (this.files && this.files[0]) handleImageUpload(this.files[0]);
+      });
+    }
 
-    fileInput.addEventListener('change', function () {
-      if (this.files && this.files[0]) {
-        handleImageUpload(this.files[0]);
-      }
-    });
+    // 갤러리 선택 input
+    var galleryInput = document.getElementById('f_imageGallery');
+    if (galleryInput) {
+      galleryInput.addEventListener('change', function () {
+        if (this.files && this.files[0]) handleImageUpload(this.files[0]);
+      });
+    }
 
-    // Drag & drop
+    // Drag & drop (업로드 영역 전체)
     var uploadArea = document.getElementById('uploadArea');
     if (uploadArea) {
       ['dragenter', 'dragover'].forEach(function (ev) {
@@ -255,8 +361,9 @@
     document.getElementById('qualityCard').style.display = 'block';
     document.getElementById('actionBar').style.display = 'flex';
 
-    // 3단계: Apply threshold
-    applyThreshold();
+    // ❼ 새 이미지 업로드 시: 잠금 ON + force로 1회 실행
+    setThresholdLocked(true);
+    applyThreshold(true);
   }
 
   // ══════════════════════════════════════════════
@@ -294,31 +401,195 @@
   }
 
   // ══════════════════════════════════════════════
-  // 3단계: Threshold Binarization
+  // 3단계: Threshold Binarization + 잠금 기능
   // 임계값 범위: 최솟값 0 고정, 최댓값만 사용자 조절 (디폴트 115)
   // → 밝기 0 ~ thresholdMax 인 픽셀을 객체(지분)로 검출
+  //
+  // 잠금 5중 방어:
+  //   1층: HTML disabled 속성 (슬라이더 & ±1 버튼 & 숫자입력)
+  //   2층: CSS pointer-events:none + cursor-not-allowed
+  //   3층: slider input/change 이벤트 → 값 원복
+  //   4층: adjustThreshold() → return
+  //   5층: applyThreshold() → force 없으면 return
   // ══════════════════════════════════════════════
-  function setupThresholdControls() {
-    var slider = document.getElementById('thresholdSlider');
-    var numInput = document.getElementById('thresholdValue');
-    if (!slider || !numInput) return;
 
-    slider.addEventListener('input', function () {
-      numInput.value = this.value;
-      if (grayscaleData) applyThreshold();
-    });
-    numInput.addEventListener('change', function () {
-      var v = Math.max(1, Math.min(255, parseInt(this.value) || 115));
-      this.value = v;
-      slider.value = v;
-      if (grayscaleData) applyThreshold();
-    });
+  // 현재 임계값 읽기 (슬라이더 기준)
+  function getThresholdValue() {
+    var slider = document.getElementById('thresholdSlider');
+    return slider ? (parseInt(slider.value) || DEFAULT_THRESHOLD) : DEFAULT_THRESHOLD;
   }
 
-  function applyThreshold() {
+  // 모든 임계값 UI 동기화 (슬라이더, 숫자입력, 표시값)
+  function syncThresholdUI(val) {
+    var v = Math.max(1, Math.min(255, parseInt(val) || DEFAULT_THRESHOLD));
+    var slider = document.getElementById('thresholdSlider');
+    var numInput = document.getElementById('thresholdNumInput');
+    if (slider) slider.value = v;
+    if (numInput) numInput.value = v;
+    updateThresholdDisplay(v);
+    return v;
+  }
+
+  function setupThresholdControls() {
+    var slider = document.getElementById('thresholdSlider');
+    var numInput = document.getElementById('thresholdNumInput');
+    if (!slider) return;
+
+    // 방어 3층: slider input 이벤트
+    slider.addEventListener('input', function (e) {
+      if (thresholdLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        slider.value = lastThreshold;
+        updateThresholdLockUI();
+        toast('임계값이 잠금 상태입니다. 잠금 해제 후 조정하세요.', 'error');
+        return;
+      }
+      var sv = syncThresholdUI(this.value);
+      saveThresholdToStorage(sv);
+      if (grayscaleData) applyThreshold();
+    });
+
+    // 방어 3층: slider change 이벤트
+    slider.addEventListener('change', function (e) {
+      if (thresholdLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        slider.value = lastThreshold;
+        updateThresholdLockUI();
+        return;
+      }
+    });
+
+    // 숫자 직접 입력
+    if (numInput) {
+      numInput.addEventListener('change', function () {
+        if (thresholdLocked) {
+          numInput.value = lastThreshold;
+          return;
+        }
+        var v = syncThresholdUI(this.value);
+        saveThresholdToStorage(v);
+        if (grayscaleData) applyThreshold();
+      });
+      numInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (thresholdLocked) {
+            numInput.value = lastThreshold;
+            return;
+          }
+          var v = syncThresholdUI(this.value);
+          saveThresholdToStorage(v);
+          if (grayscaleData) applyThreshold();
+        }
+      });
+    }
+
+    // 초기 잠금 UI 적용
+    updateThresholdLockUI();
+  }
+
+  // ── 임계값 표시 업데이트 ──
+  function updateThresholdDisplay(val) {
+    var el = document.getElementById('thresholdDisplay');
+    if (el) el.textContent = '0 ~ ' + val;
+  }
+
+  // ── ±1 버튼 핸들러 (방어 4층) ──
+  window.adjustThreshold = function (delta) {
+    if (thresholdLocked) {
+      updateThresholdLockUI();
+      toast('임계값이 잠겨 있어 조정할 수 없습니다.', 'error');
+      return;
+    }
+    var cur = getThresholdValue();
+    var v = syncThresholdUI(cur + delta);
+    saveThresholdToStorage(v);
+    if (grayscaleData) applyThreshold();
+  };
+
+  // ── 잠금 토글 (❸) ──
+  window.toggleThresholdLock = function () {
+    // 이미지 없이 잠금 해제 시도 → 안내 메시지
+    if (thresholdLocked && !grayscaleData) {
+      toast('이미지를 먼저 업로드한 후 잠금 해제하세요.', 'error');
+      return;
+    }
+    thresholdLocked = !thresholdLocked;
+    updateThresholdLockUI();
+    if (thresholdLocked) {
+      lastThreshold = getThresholdValue();
+      saveThresholdToStorage(lastThreshold);
+      toast('임계값이 잠금 처리되었습니다. (값: 0 ~ ' + lastThreshold + ')', 'info');
+    } else {
+      toast('임계값 조절이 잠금 해제되었습니다. 슬라이더 또는 숫자 입력으로 조절하세요.', 'success');
+    }
+  };
+
+  // ── 잠금 강제 설정 (이미지 업로드 시 호출) ──
+  function setThresholdLocked(locked) {
+    thresholdLocked = locked;
+    if (locked) lastThreshold = getThresholdValue();
+    updateThresholdLockUI();
+  }
+
+  // ── 잠금 UI 전체 업데이트 ──
+  function updateThresholdLockUI() {
+    var badge = document.getElementById('thresholdLockStatus');
+    var btn = document.getElementById('thresholdLockButton');
+    var slider = document.getElementById('thresholdSlider');
+    var numInput = document.getElementById('thresholdNumInput');
+    var btnMinus = document.getElementById('btnThresholdMinus');
+    var btnPlus = document.getElementById('btnThresholdPlus');
+    var hasImage = !!grayscaleData;
+    var canAdjust = !thresholdLocked && hasImage;
+
+    // 상태 뱃지
+    if (badge) {
+      if (thresholdLocked) {
+        badge.className = 'threshold-lock-badge locked';
+        badge.innerHTML = '&#128274; 잠금';
+      } else {
+        badge.className = 'threshold-lock-badge unlocked';
+        badge.innerHTML = '&#128275; 변경 가능';
+      }
+    }
+
+    // 토글 버튼
+    if (btn) {
+      if (thresholdLocked) {
+        btn.className = 'btn-threshold-lock locked';
+        btn.innerHTML = '&#128275; 잠금 해제';
+      } else {
+        btn.className = 'btn-threshold-lock unlocked';
+        btn.innerHTML = '&#128274; 잠금';
+      }
+    }
+
+    // 방어 1층 + 2층
+    if (slider) slider.disabled = !canAdjust;
+    if (numInput) numInput.disabled = !canAdjust;
+    if (btnMinus) btnMinus.disabled = !canAdjust;
+    if (btnPlus) btnPlus.disabled = !canAdjust;
+
+    // 디스플레이 값 동기화
+    updateThresholdDisplay(getThresholdValue());
+  }
+
+  function applyThreshold(force) {
     if (!grayscaleData || !originalImageData) return;
 
-    var thresholdMax = parseInt(document.getElementById('thresholdValue').value) || 115; // 사용자 조절 가능 (디폴트 115)
+    // 방어 5층: 잠금 상태에서 force 없으면 차단
+    if (thresholdLocked && !force) {
+      var slider0 = document.getElementById('thresholdSlider');
+      if (slider0) slider0.value = lastThreshold;
+      updateThresholdDisplay(lastThreshold);
+      updateThresholdLockUI();
+      return;
+    }
+
+    var thresholdMax = getThresholdValue();
     var thresholdMin = 0; // 최솟값 0 고정 (변경 불가)
     var w = canvasWidth;
     var h = canvasHeight;
@@ -561,7 +832,7 @@
 
     // Store metrics for saving
     window._lastMetrics = {
-      thresholdMax: parseInt(document.getElementById('thresholdValue').value) || 115,
+      thresholdMax: getThresholdValue(),
       totalCount: totalCount,
       coverageRatio: coverageRatio,
       densityCount: densityCount,
@@ -595,7 +866,7 @@
     if (!summary) return;
     summary.innerHTML = ''
       + qItem('총 지분수', m.totalCount, 'blue')
-      + qItem('지분 커버리지 (PPM)', ppm.toFixed(1), 'orange')
+      + qItem('후면 지분 값(PPM)', ppm.toFixed(1), 'orange')
       + qItem('밀도 지분수', m.densityCount, 'green')
       + qItem('자동 / 수동', m.autoCount + ' / ' + m.manualCount, 'blue')
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
@@ -721,8 +992,10 @@
     document.getElementById('qualityCard').style.display = 'none';
     document.getElementById('actionBar').style.display = 'none';
     document.getElementById('saveResult').style.display = 'none';
-    var fi = document.getElementById('f_imageUpload');
-    if (fi) fi.value = '';
+    var fi1 = document.getElementById('f_imageCamera');
+    var fi2 = document.getElementById('f_imageGallery');
+    if (fi1) fi1.value = '';
+    if (fi2) fi2.value = '';
     grayscaleData = null;
     originalImageData = null;
     autoComponents = [];
@@ -730,6 +1003,8 @@
     removedAutoIds = new Set();
     isManualMode = false;
     updateManualModeUI();
+    // 잠금 초기 상태로 복원
+    setThresholdLocked(true);
   };
 
   // ══════════════════════════════════════════════
@@ -790,8 +1065,11 @@
     var grpEl = document.getElementById('f_inspItemGrpCd');
     if (grpEl) grpEl.value = 'COV_INS';
 
-    document.getElementById('thresholdSlider').value = 115;
-    document.getElementById('thresholdValue').value = 115;
+    // 초기화 시에도 localStorage 임계값은 유지 (검사자가 조정한 값 보존)
+    var restoredTh = loadThresholdFromStorage() || DEFAULT_THRESHOLD;
+    syncThresholdUI(restoredTh);
+    lastThreshold = restoredTh;
+    setThresholdLocked(true);
     resetImage();
     var ec = document.getElementById('existsCheck');
     if (ec) ec.style.display = 'none';
@@ -843,6 +1121,46 @@
 
     var m = window._lastMetrics;
     if (!m) { toast('검사 결과가 없습니다. 이미지를 먼저 분석해주세요.', 'error'); return; }
+
+    // PPM 기준값 초과 체크
+    var ppmValue = m.coverageRatio * 1000000;
+    var ppmLimit = getPpmLimit();
+    if (ppmLimit > 0 && ppmValue > ppmLimit) {
+      showPpmAlert(ppmValue, ppmLimit);
+      return; // 팝업에서 전송/재측정 선택 대기
+    }
+
+    doSaveInspection();
+  };
+
+  // PPM 기준 초과 알림 표시
+  function showPpmAlert(ppmValue, ppmLimit) {
+    var modal = document.getElementById('ppmAlertModal');
+    var msg = document.getElementById('ppmAlertMsg');
+    var detail = document.getElementById('ppmAlertDetail');
+    if (!modal) return;
+    msg.innerHTML = '후면 지분 값이 기준값을 <strong>초과</strong>했습니다.';
+    detail.innerHTML = ''
+      + '<div class="ppm-alert-row"><span>측정값</span><strong style="color:var(--red);">' + ppmValue.toFixed(1) + ' PPM</strong></div>'
+      + '<div class="ppm-alert-row"><span>기준값</span><strong>' + ppmLimit.toFixed(1) + ' PPM</strong></div>'
+      + '<div class="ppm-alert-row"><span>초과량</span><strong style="color:var(--red);">+' + (ppmValue - ppmLimit).toFixed(1) + ' PPM</strong></div>';
+    modal.style.display = 'flex';
+  }
+
+  window.ppmAlertAction = function (action) {
+    document.getElementById('ppmAlertModal').style.display = 'none';
+    if (action === 'send') {
+      doSaveInspection(); // 기준 초과 인지 후 저장 진행
+    } else {
+      toast('재측정을 진행해 주세요. 이미지를 변경하거나 임계값을 조정하세요.', 'info');
+    }
+  };
+
+  function doSaveInspection() {
+    var m = window._lastMetrics;
+    var matnr = val('f_matnr');
+    var lotnr = val('f_lotnr');
+    var indBcd = val('f_indBcd');
 
     var btnSave = document.getElementById('btnSave');
     if (btnSave) { btnSave.disabled = true; btnSave.textContent = '저장 중...'; }
@@ -898,6 +1216,8 @@
         if (res.success && res.data) {
           toast('검사 결과가 저장되었습니다. (ID: ' + res.data.inspectionId + ')', 'success');
           showSaveResult(res.data);
+          // 저장 성공 시 현재 임계값을 localStorage에 확정 저장
+          saveThresholdToStorage(getThresholdValue());
           // 10단계: MES 전송
           sendToMes(res.data);
           // 저장 후 이력 데이터 갱신 (캐시 초기화)
@@ -936,10 +1256,12 @@
     var body = document.getElementById('saveResultBody');
     if (!el || !body) return;
     var covPPM = data.coverageRatio != null ? (data.coverageRatio * 1000000).toFixed(1) + ' PPM' : '-';
+    var thMax = data.thresholdMax != null ? data.thresholdMax : getThresholdValue();
     body.innerHTML = '<div class="result-summary">'
       + '<div class="result-item"><div class="label">검사 ID</div><div class="value blue">' + data.inspectionId + '</div></div>'
       + '<div class="result-item"><div class="label">총 지분수</div><div class="value green">' + (data.totalCount || 0) + '</div></div>'
-      + '<div class="result-item"><div class="label">지분 커버리지 (PPM)</div><div class="value orange">' + covPPM + '</div></div>'
+      + '<div class="result-item"><div class="label">후면 지분 값(PPM)</div><div class="value orange">' + covPPM + '</div></div>'
+      + '<div class="result-item"><div class="label">최대 임계값</div><div class="value blue">' + thMax + '</div></div>'
       + '</div>'
       + '<div style="font-size:13px;color:var(--text2);">'
       + '<b>자재코드:</b> ' + esc(data.matnr || '-') + ' | '
@@ -1046,13 +1368,12 @@
         + '<div class="hci-row"><b>LOT:</b> ' + esc(i.lotnr || '-') + '</div>'
         + '<div class="hci-row"><b>바코드:</b> ' + esc(i.indBcd || '-') + ' (차수: ' + esc(i.indBcdSeq || '-') + ')</div>'
         + '<div class="hci-row"><b>총 지분수:</b> <strong>' + (i.totalCount || 0) + '</strong></div>'
-        + '<div class="hci-row"><b>커버리지 (PPM):</b> <strong style="color:var(--orange);">' + covPPM + '</strong></div>'
+        + '<div class="hci-row"><b>후면 지분 값(PPM):</b> <strong style="color:var(--orange);">' + covPPM + '</strong></div>'
         + '<div class="hci-row"><b>자동:</b> ' + (i.autoCount || 0) + ' | <b>수동:</b> ' + (i.manualCount || 0) + '</div>'
+        + '<div class="hci-row"><b>최대임계값:</b> ' + (i.thresholdMax != null ? i.thresholdMax : '-') + '</div>'
         + '<div class="hci-row"><b>검사자:</b> ' + esc(i.operatorNm || '-') + '</div>'
         + '<div class="hci-row" style="font-size:12px;color:var(--text3);">' + dt + '</div>'
-        + '<div class="history-card-actions">'
-        + '<button class="btn-icon" title="삭제" onclick="deleteInspection(' + i.inspectionId + ')" style="color:var(--red);">&#128465;</button>'
-        + '</div>'
+
         + '</div>'
         + '</div>';
     }).join('');
@@ -1071,20 +1392,7 @@
     container.innerHTML = html;
   }
 
-  window.deleteInspection = function (id) {
-    if (!confirm('검사 결과 (ID: ' + id + ')를 삭제하시겠습니까?')) return;
-    api('DELETE', '/ps-insp-api/inspections/' + id)
-      .then(function (res) {
-        if (res.success) {
-          toast('삭제되었습니다.', 'success');
-          loadHistory(currentHistoryPage);
-          loadDetailTable(currentDetailPage);
-        } else {
-          toast(res.message || '삭제 실패', 'error');
-        }
-      })
-      .catch(function (e) { toast('삭제 오류: ' + e.message, 'error'); });
-  };
+
 
   // ══════════════════════════════════════════════
   // 이력 테이블 탭 (Detail Table)
@@ -1092,7 +1400,7 @@
   // - 기간 미설정 시 전체 기간 조회
   // - 전체 48 컬럼 (요구사항 완전 일치)
   // ══════════════════════════════════════════════
-  var DETAIL_COLSPAN = 48; // thead colspan 합계
+  var DETAIL_COLSPAN = 47; // thead colspan 합계 (삭제 컬럼 제거됨)
 
   window.loadDetailTable = function (page) {
     if (page === undefined) page = 0;
@@ -1220,8 +1528,7 @@
         + '<td>' + resLink + '</td>'
         + '<td style="font-size:10px;">' + esc(i.resultImageName || '-') + '</td>'
         + '<td style="font-size:10px;">' + esc(i.resultImageDir || '-') + '</td>'
-        // ── 삭제 (1) ──
-        + '<td><button class="btn-icon" title="삭제" onclick="deleteInspection(' + i.inspectionId + ')" style="color:var(--red);">&#128465;</button></td>'
+
         + '</tr>';
     }).join('');
   }
@@ -1263,7 +1570,7 @@
 
     var headerRow = [
       'ID','차수','자재코드','자재명','LOT','바코드','바코드차수',
-      '커버리지(PPM)','총 지분','밀도(개)','밀도(%)',
+      '후면 지분 값(PPM)','총 지분','밀도(개)','밀도(%)',
       '자동','수동','제외','수동+','수동-',
       '크기균일','분포균등','평균크기','표준편차',
       '≤3px','≤5px','≤7px','>7px',
@@ -1321,7 +1628,7 @@
     ws['!cols'] = colWidths;
 
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'PS 지분검사 이력');
+    XLSX.utils.book_append_sheet(wb, ws, 'PS 후면 지분검사 이력');
 
     var now = new Date();
     var dateStr = now.getFullYear()
@@ -1330,7 +1637,7 @@
       + '_' + ('0' + now.getHours()).slice(-2)
       + ('0' + now.getMinutes()).slice(-2);
 
-    XLSX.writeFile(wb, 'PS_지분검사_이력_' + dateStr + '.xlsx');
+    XLSX.writeFile(wb, 'PS_후면지분검사_이력_' + dateStr + '.xlsx');
     toast('엑셀 파일(.xlsx)이 다운로드됩니다.', 'success');
   };
 
@@ -1368,6 +1675,61 @@
   window.closeImageModal = function (e) {
     if (e.target.id === 'imageModal') {
       document.getElementById('imageModal').style.display = 'none';
+    }
+  };
+
+  // ══════════════════════════════════════════════
+  // ADMIN 설정 (PPM 기준값 관리)
+  // ══════════════════════════════════════════════
+  var ADMIN_DEFAULT_PWD = '1234'; // 초기 비밀번호
+
+  function hashPwd(pwd) {
+    // 간단한 해시 (보안보다는 실수 방지 목적)
+    var h = 0;
+    for (var i = 0; i < pwd.length; i++) {
+      h = ((h << 5) - h) + pwd.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  }
+
+  window.openAdminSettings = function () {
+    var modal = document.getElementById('adminSettingsModal');
+    var ppmInput = document.getElementById('adminPpmLimit');
+    var pwdInput = document.getElementById('adminPassword');
+    if (!modal) return;
+    // 현재 저장된 기준값 로드
+    var cur = getPpmLimit();
+    if (ppmInput) ppmInput.value = cur > 0 ? cur : '';
+    if (pwdInput) pwdInput.value = '';
+    modal.style.display = 'flex';
+  };
+
+  window.closeAdminSettings = function () {
+    document.getElementById('adminSettingsModal').style.display = 'none';
+  };
+
+  window.saveAdminSettings = function () {
+    var pwd = val('adminPassword');
+    if (!pwd) { toast('비밀번호를 입력해주세요.', 'error'); return; }
+
+    // 비밀번호 확인
+    var storedHash = null;
+    try { storedHash = localStorage.getItem(ADMIN_PWD_HASH_KEY); } catch (e) { }
+    var expectedHash = storedHash || hashPwd(ADMIN_DEFAULT_PWD);
+    if (hashPwd(pwd) !== expectedHash) {
+      toast('비밀번호가 일치하지 않습니다.', 'error');
+      return;
+    }
+
+    var ppmVal = parseFloat(val('adminPpmLimit')) || 0;
+    savePpmLimit(ppmVal);
+
+    closeAdminSettings();
+    if (ppmVal > 0) {
+      toast('기준값이 ' + ppmVal.toFixed(1) + ' PPM으로 설정되었습니다.', 'success');
+    } else {
+      toast('PPM 기준값 알림이 비활성화되었습니다.', 'info');
     }
   };
 

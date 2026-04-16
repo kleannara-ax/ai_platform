@@ -262,7 +262,15 @@ public class PsInspection {
     }
 
     /**
-     * 차수(indBcdSeq) 증가 - 재검사 시 호출
+     * 차수(seq) 증가 - 재검사(UPDATE) 시 호출
+     * seq는 동일 자재+LOT+바코드 조합의 검사 횟수를 의미합니다.
+     */
+    public void incrementSeq() {
+        this.seq = (this.seq != null ? this.seq : 1) + 1;
+    }
+
+    /**
+     * 바코드차수(indBcdSeq) 증가 - 재검사 시 호출
      */
     public void incrementIndBcdSeq() {
         int current = 1;

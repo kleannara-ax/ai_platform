@@ -94,7 +94,8 @@ public class PsInspectionService {
                     resPath != null ? fileName(resPath) : inspection.getResultImageName(),
                     resPath != null ? uploadDir + "/result/" + yearMonth : inspection.getResultImageDir());
             inspection.updateMatnrNm(request.getMatnrNm());
-            inspection.incrementIndBcdSeq();
+            inspection.incrementSeq();       // 차수(seq) 증가: 1→2→3…
+            inspection.incrementIndBcdSeq(); // 바코드차수(indBcdSeq) 증가
 
         } else {
             // ── INSERT ──
