@@ -388,7 +388,8 @@
     }
 
     function renderRegisterForm(data) {
-      const mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
+      const buildings = Array.isArray(data.buildings) ? data.buildings : [];
+      const floors = Array.isArray(data.floors) ? data.floors : [];
       mainView.innerHTML = `
         <div class="card">
           <div class="title-lg">수신기 등록</div>
@@ -421,38 +422,24 @@
           </form>
         </div>`;
 
-      bindMappableOptions(mapOptions);
+      bindBuildingFloorOptions(buildings, floors);
       document.getElementById('regForm').addEventListener('submit', submitRegister);
       document.getElementById('regBuilding').addEventListener('change', () => onRegBuildingChanged());
     }
 
-    function bindMappableOptions(mapOptions) {
+    let allFloors = [];
+
+    function bindBuildingFloorOptions(buildings, floors) {
       const bSel = document.getElementById('regBuilding');
       const fSel = document.getElementById('regFloor');
       if (!bSel || !fSel) return;
-      const buildingMap = new Map();
-      (mapOptions || []).forEach(o => {
-        const bid = String(o.buildingId || '');
-        if (!bid) return;
-        if (!buildingMap.has(bid)) buildingMap.set(bid, { buildingId: o.buildingId, buildingName: o.buildingName || '', floors: [] });
-        buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '' });
-      });
-      const buildings = Array.from(buildingMap.values());
-      bSel.innerHTML = '<option value="">-- 건물 선택 --</option>' + buildings.map(b => `<option value="${b.buildingId}">${escHtml(b.buildingName)}</option>`).join('');
-      bSel.dataset.mapOptions = JSON.stringify(buildings);
-      onRegBuildingChanged();
+      allFloors = floors || [];
+      bSel.innerHTML = '<option value="">-- 건물 선택 --</option>' + (buildings || []).map(b => `<option value="${b.buildingId}">${escHtml(b.buildingName)}</option>`).join('');
+      fSel.innerHTML = '<option value="">-- 층 선택 --</option>' + allFloors.map(f => `<option value="${f.floorId}">${escHtml(f.floorName)}</option>`).join('');
     }
 
     function onRegBuildingChanged() {
-      const bSel = document.getElementById('regBuilding');
-      const fSel = document.getElementById('regFloor');
-      if (!bSel || !fSel) return;
-      let buildings = [];
-      try { buildings = JSON.parse(bSel.dataset.mapOptions || '[]'); } catch {}
-      const selected = buildings.find(b => String(b.buildingId) === String(bSel.value));
-      const floors = selected?.floors || [];
-      fSel.innerHTML = '<option value="">-- 층 선택 --</option>' + floors.map(f => `<option value="${f.floorId}">${escHtml(f.floorName)}</option>`).join('');
-      if (floors.length) fSel.value = String(floors[0].floorId);
+      // floors are independent of building selection for receivers
     }
 
     async function submitRegister(e) {
