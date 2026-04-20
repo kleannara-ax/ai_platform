@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 /**
  * PS 지분 검사 설정 서비스 (공통코드 기반)
  *
- * <p>code_group 'PS_INSP_PPM_LIMIT' 하위 code_detail을 읽고 수정합니다.
+ * <p>code_group 'PS_INSP_DEFAULT' 하위 code_detail을 읽고 수정합니다.
  *
  * <p>코드 구조:
  * <ul>
@@ -30,7 +30,7 @@ public class PsInspConfigService {
     private final PsInspCodeDetailRepository codeDetailRepository;
 
     /** 공통코드 그룹 코드 */
-    private static final String GROUP_CODE = "PS_INSP_PPM_LIMIT";
+    private static final String GROUP_CODE = "PS_INSP_DEFAULT";
 
     /** 코드 키 상수 */
     public static final String CODE_PPM_LIMIT = "PPM_LIMIT";
@@ -140,7 +140,7 @@ public class PsInspConfigService {
     // ──────────── 전체 설정 조회 ────────────
 
     /**
-     * PS_INSP_PPM_LIMIT 그룹의 모든 설정 조회
+     * PS_INSP_DEFAULT 그룹의 모든 설정 조회
      */
     public List<Map<String, Object>> getAllConfigs() {
         return codeDetailRepository.findAllByGroupCode(GROUP_CODE).stream()

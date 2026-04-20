@@ -11,13 +11,13 @@ import java.util.Optional;
 /**
  * 공통코드 상세(code_detail) 접근 Repository (PS-INSP 전용)
  *
- * <p>code_group.GROUP_CODE = 'PS_INSP_PPM_LIMIT' 하위 코드만 조회합니다.
+ * <p>code_group.GROUP_CODE = 'PS_INSP_DEFAULT' 하위 코드만 조회합니다.
  */
 public interface PsInspCodeDetailRepository extends JpaRepository<PsInspCodeDetail, Long> {
 
     /**
      * 그룹 코드 + 코드로 단건 조회
-     * 예: groupCode='PS_INSP_PPM_LIMIT', code='PPM_LIMIT'
+     * 예: groupCode='PS_INSP_DEFAULT', code='PPM_LIMIT'
      */
     @Query("SELECT d FROM PsInspCodeDetail d WHERE d.groupId = " +
            "(SELECT g.groupId FROM com.company.module.psinsp.entity.PsInspCodeGroup g WHERE g.groupCode = :groupCode) " +
