@@ -32,29 +32,29 @@
     .filter-box[hidden] { display:none !important; }
     .filter-actions { display:flex; gap:10px; align-items:flex-end; }
     .summary-bar { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:18px; }
-    .summary-title { font-size:24px; font-weight:900; margin:0; }
-    .summary-sub { color:#64748b; font-size:14px; margin-top:6px; }
+    .summary-title { display:none; }
+    .summary-sub { display:none; }
     .section-block + .section-block { margin-top:24px; }
-    .section-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
-    .section-head h3 { font-size:18px; font-weight:900; margin:0; }
-    .section-head .meta { font-size:13px; color:#64748b; }
-    .qr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-    .qr-grid.large { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
+    .section-head { display:none; }
+    /* 소화기: 4x4 grid */
+    .qr-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    /* 소화전/수신기/소방펌프: 2x3 grid */
+    .qr-grid.large { grid-template-columns:repeat(2,1fr); gap:14px; }
     .qr-card {
-      background:#fff; border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px;
-      box-shadow:0 10px 22px rgba(15,23,42,.06); cursor:pointer; transition:transform .15s ease, box-shadow .15s ease;
+      background:#fff; border:1px solid rgba(148,163,184,.18); border-radius:14px; padding:8px;
+      display:flex; align-items:center; justify-content:center;
     }
-    .qr-card:hover { transform:translateY(-2px); box-shadow:0 16px 28px rgba(15,23,42,.12); }
-    .qr-card-row { display:flex; flex-direction:column; gap:12px; align-items:center; }
+    .qr-card-row { display:flex; flex-direction:column; align-items:center; }
     .qr-img {
-      width:120px; height:120px; border-radius:14px; border:1px solid rgba(148,163,184,.18); background:#fff;
+      border-radius:8px; background:#fff;
       display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;
     }
-    .qr-grid.large .qr-img { width:200px; height:200px; }
+    /* 소화기 QR 이미지: 작게 */
+    .qr-grid:not(.large) .qr-img { width:100px; height:100px; }
+    /* 소화전/수신기/소방펌프 QR 이미지: 동일 크기 */
+    .qr-grid.large .qr-img { width:220px; height:220px; }
     .qr-img img { width:100%; height:100%; object-fit:contain; display:block; }
-    .qr-meta { width:100%; min-width:0; font-size:14px; color:#334155; line-height:1.6; text-align:center; }
-    .qr-meta .line { overflow:hidden; text-overflow:ellipsis; }
-    .manual-fill { display:inline-block; min-width:110px; height:16px; border-bottom:1px solid #94a3b8; vertical-align:bottom; }
+    .qr-meta { display:none; }
     .empty-state { padding:22px; border-radius:18px; background:#f8fafc; color:#64748b; text-align:center; }
     body.modal-open { overflow:hidden !important; padding-right:0 !important; }
     #qrDetailsFrame { width:100%; height:min(90vh,1200px); border:0; display:block; background:transparent; }
@@ -66,9 +66,12 @@
     }
     @media (max-width: 767px) {
       .filter-grid { grid-template-columns:1fr; }
-      .qr-grid, .qr-grid.large { grid-template-columns:1fr; }
-      .qr-card-row { align-items:center; }
+      .qr-grid { grid-template-columns:repeat(2,1fr); }
+      .qr-grid.large { grid-template-columns:1fr; }
     }
+    /* 페이지별 높이 맞춤 (인쇄 최적화) */
+    .qr-grid.large .qr-card { min-height:230px; }
+    .qr-grid:not(.large) .qr-card { min-height:110px; }
   </style>
 </head>
 <body>
@@ -273,68 +276,16 @@
     }
   }
 
-  function registeredCardHtml(type, item) {
-    if (type === 'ext') {
-      return '' +
-        '<div class="qr-card" data-qr-type="ext" data-qr-id="' + escHtml(item.extinguisherId) + '">' +
-        '  <div class="qr-card-row">' +
-        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('ext', item.qrKey) + '" loading="lazy" /></div>' +
-        '    <div class="qr-meta">' +
-        '      <div class="line">건물: ' + escHtml(item.buildingName) + '</div>' +
-        '      <div class="line">소화기 종류: ' + escHtml(item.extinguisherType) + '</div>' +
-        '      <div class="line">제조일: ' + escHtml(item.manufactureDate) + '</div>' +
-        '    </div>' +
-        '  </div>' +
-        '</div>';
-    }
-    if (type === 'hyd') {
-      const opText = String(item.operationType || '').toLowerCase() === 'auto' ? '자동식'
-        : String(item.operationType || '').toLowerCase() === 'manual' ? '수동식'
-        : (item.operationType || '-');
-      return '' +
-        '<div class="qr-card" data-qr-type="hyd" data-qr-id="' + escHtml(item.hydrantId) + '">' +
-        '  <div class="qr-card-row">' +
-        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('hyd', item.qrKey) + '" loading="lazy" /></div>' +
-        '    <div class="qr-meta">' +
-        '      <div class="line">건물: ' + escHtml(item.buildingName) + '</div>' +
-        '      <div class="line">작동방식: ' + escHtml(opText) + '</div>' +
-        '      <div class="line">상세위치: ' + escHtml(item.locationDescription || '-') + '</div>' +
-        '    </div>' +
-        '  </div>' +
-        '</div>';
-    }
-    if (type === 'rcv') {
-      return '' +
-        '<div class="qr-card" data-qr-type="rcv" data-qr-id="' + escHtml(item.receiverId) + '">' +
-        '  <div class="qr-card-row">' +
-        '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('rcv', item.qrKey) + '" loading="lazy" /></div>' +
-        '    <div class="qr-meta"><div class="line">건물: ' + escHtml(item.buildingName) + '</div></div>' +
-        '  </div>' +
-        '</div>';
-    }
-    return '' +
-      '<div class="qr-card" data-qr-type="pmp" data-qr-id="' + escHtml(item.pumpId) + '">' +
-      '  <div class="qr-card-row">' +
-      '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl('pmp', item.qrKey) + '" loading="lazy" /></div>' +
-      '    <div class="qr-meta"><div class="line">건물: ' + escHtml(item.buildingName) + '</div></div>' +
-      '  </div>' +
-      '</div>';
-  }
-
-  function unregisteredCardHtml(type, qrKey) {
-    const meta = type === 'ext'
-      ? '<div class="line">건물: <span class="manual-fill"></span></div><div class="line">소화기 종류: <span class="manual-fill"></span></div><div class="line">제조일: <span class="manual-fill"></span></div>'
-      : type === 'hyd'
-        ? '<div class="line">건물: <span class="manual-fill"></span></div><div class="line">작동방식: <span class="manual-fill"></span></div><div class="line">상세위치: <span class="manual-fill"></span></div>'
-        : '<div class="line">건물: <span class="manual-fill"></span></div>';
+  function qrOnlyCardHtml(type, qrKey) {
     return '' +
       '<div class="qr-card">' +
       '  <div class="qr-card-row">' +
       '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl(type, qrKey) + '" loading="lazy" /></div>' +
-      '    <div class="qr-meta">' + meta + '</div>' +
       '  </div>' +
       '</div>';
   }
+
+  /* unregisteredCardHtml removed - using qrOnlyCardHtml instead */
 
   function renderMenu() {
     const menu = document.getElementById('equipMenu');
@@ -351,37 +302,37 @@
 
   function renderCurrentSection(unregisteredList) {
     const conf = EQUIPMENT[currentEquip];
-    const rawItems = Array.isArray(latestListData[conf.listKey]) ? latestListData[conf.listKey] : [];
-    const keyword = getKeywordValue();
-    const items = isTextSearchEquip() ? rawItems.filter((item) => matchesKeyword(item, keyword)) : rawItems;
     const registeredWrap = document.getElementById('registeredWrap');
-    const registeredTitle = document.getElementById('registeredTitle');
-    const registeredMeta = document.getElementById('registeredMeta');
     const unregisteredSection = document.getElementById('unregisteredSection');
-    const unregisteredTitle = document.getElementById('unregisteredTitle');
     const unregisteredWrap = document.getElementById('unregisteredWrap');
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
 
-    document.getElementById('pageTitle').textContent = conf.label + ' QR';
-    document.getElementById('pageSub').textContent = conf.label + ' 등록/미등록 QR을 한 화면에서 관리합니다.';
-    registeredTitle.textContent = '등록 ' + conf.label + ' QR';
-    registeredMeta.textContent = '총 ' + items.length + '건';
-    if (!items.length) {
-      registeredWrap.className = 'empty-state';
-      registeredWrap.innerHTML = '조회된 ' + conf.label + ' QR이 없습니다.';
-    } else {
-      registeredWrap.className = gridClass;
-      registeredWrap.innerHTML = items.map((item) => registeredCardHtml(conf.key, item)).join('');
-    }
-
+    /* 미등록 QR이 있으면 미등록만 표시, 등록된 설비는 숨김 */
     if (Array.isArray(unregisteredList) && unregisteredList.length) {
+      registeredWrap.className = '';
+      registeredWrap.style.display = 'none';
+      registeredWrap.innerHTML = '';
       unregisteredSection.style.display = '';
-      unregisteredTitle.textContent = '미등록 ' + conf.label + ' QR';
       unregisteredWrap.className = gridClass;
-      unregisteredWrap.innerHTML = unregisteredList.map((qrKey) => unregisteredCardHtml(conf.key, qrKey)).join('');
+      unregisteredWrap.innerHTML = unregisteredList.map(function (qrKey) { return qrOnlyCardHtml(conf.key, qrKey); }).join('');
     } else {
+      /* 미등록 QR 수량 0이면 등록된 설비 QR 표시 */
+      const rawItems = Array.isArray(latestListData[conf.listKey]) ? latestListData[conf.listKey] : [];
+      const keyword = getKeywordValue();
+      const items = isTextSearchEquip() ? rawItems.filter(function (item) { return matchesKeyword(item, keyword); }) : rawItems;
+      registeredWrap.style.display = '';
       unregisteredSection.style.display = 'none';
       unregisteredWrap.innerHTML = '';
+      if (!items.length) {
+        registeredWrap.className = 'empty-state';
+        registeredWrap.innerHTML = '조회된 ' + conf.label + ' QR이 없습니다.';
+      } else {
+        registeredWrap.className = gridClass;
+        registeredWrap.innerHTML = items.map(function (item) {
+          var qrKey = item.qrKey || item.noteKey || '';
+          return qrOnlyCardHtml(conf.key, qrKey);
+        }).join('');
+      }
     }
   }
 
@@ -473,33 +424,33 @@
 
   function buildPrintHtml() {
     const conf = EQUIPMENT[currentEquip];
-    const registeredTitle = document.getElementById('registeredTitle')?.textContent || '';
-    const unregisteredTitle = document.getElementById('unregisteredTitle')?.textContent || '';
-    const registeredHtml = document.getElementById('registeredWrap')?.innerHTML || '';
-    const unregisteredVisible = document.getElementById('unregisteredSection')?.style.display !== 'none';
-    const unregisteredHtml = unregisteredVisible ? (document.getElementById('unregisteredWrap')?.innerHTML || '') : '';
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
+    /* 현재 보이는 QR 영역의 HTML을 수집 */
+    var contentHtml = '';
+    var regWrap = document.getElementById('registeredWrap');
+    var unregWrap = document.getElementById('unregisteredWrap');
+    var unregSection = document.getElementById('unregisteredSection');
+    if (unregSection && unregSection.style.display !== 'none' && unregWrap) {
+      contentHtml = unregWrap.innerHTML || '';
+    } else if (regWrap && regWrap.style.display !== 'none') {
+      contentHtml = regWrap.innerHTML || '';
+    }
     return '' +
       '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8" />' +
       '<title>' + escHtml(conf.label) + ' QR 인쇄</title>' +
       '<style>' +
       'body{margin:0;padding:24px;font-family:\"Malgun Gothic\",\"Apple SD Gothic Neo\",sans-serif;color:#111827;background:#fff;}' +
-      '.print-title{font-size:24px;font-weight:800;margin:0 0 18px;}' +
-      '.section{margin-top:24px;}' +
-      '.section h2{font-size:18px;margin:0 0 12px;}' +
-      '.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}' +
-      '.qr-grid.large{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}' +
-      '.qr-card{break-inside:avoid;border:1px solid #cbd5e1;border-radius:18px;padding:16px;}' +
-      '.qr-card-row{display:flex;flex-direction:column;gap:12px;align-items:center;}' +
-      '.qr-img{width:120px;height:120px;border:1px solid #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;}' +
-      '.qr-grid.large .qr-img{width:200px;height:200px;}' +
+      '.qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}' +
+      '.qr-grid.large{grid-template-columns:repeat(2,1fr);gap:14px;}' +
+      '.qr-card{break-inside:avoid;border:1px solid #cbd5e1;border-radius:14px;padding:8px;display:flex;align-items:center;justify-content:center;}' +
+      '.qr-card-row{display:flex;flex-direction:column;align-items:center;}' +
+      '.qr-grid:not(.large) .qr-img{width:100px;height:100px;}' +
+      '.qr-grid.large .qr-img{width:220px;height:220px;}' +
+      '.qr-img{border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;}' +
       '.qr-img img{width:100%;height:100%;object-fit:contain;display:block;}' +
-      '.qr-meta{width:100%;text-align:center;font-size:14px;line-height:1.6;color:#334155;}' +
-      '.manual-fill{display:inline-block;min-width:110px;height:16px;border-bottom:1px solid #94a3b8;vertical-align:bottom;}' +
+      '.qr-meta{display:none;}' +
       '</style></head><body>' +
-      '<h1 class="print-title">' + escHtml(conf.label) + ' QR</h1>' +
-      '<div class="section"><h2>' + escHtml(registeredTitle) + '</h2><div class="' + gridClass + '">' + registeredHtml + '</div></div>' +
-      (unregisteredHtml ? ('<div class="section"><h2>' + escHtml(unregisteredTitle) + '</h2><div class="' + gridClass + '">' + unregisteredHtml + '</div></div>') : '') +
+      '<div class="' + gridClass + '">' + contentHtml + '</div>' +
       '</body></html>';
   }
 
