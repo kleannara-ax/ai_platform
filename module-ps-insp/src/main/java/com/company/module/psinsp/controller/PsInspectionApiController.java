@@ -62,11 +62,25 @@ public class PsInspectionApiController {
             @RequestPart(value = "originalImage", required = false) MultipartFile originalImage,
             @RequestPart(value = "resultImage", required = false) MultipartFile resultImage) {
         try {
+            log.debug("[PS-INSP] Multipart 저장 요청 - metadata 길이: {}, originalImage: {}, resultImage: {}",
+                    metadata != null ? metadata.length() : 0,
+                    originalImage != null ? originalImage.getSize() : "null",
+                    resultImage != null ? resultImage.getSize() : "null");
+
             PsInspectionSaveRequest request = objectMapper.readValue(metadata, PsInspectionSaveRequest.class);
-            return ResponseEntity.ok(ApiResponse.created(
-                    inspectionService.saveInspection(request, originalImage, resultImage)));
+
+            log.debug("[PS-INSP] Metadata 파싱 완료 - matnr: {}, lotnr: {}, indBcd: {}, totalCount: {}, coverageRatio: {}",
+                    request.getMatnr(), request.getLotnr(), request.getIndBcd(),
+                    request.getTotalCount(), request.getCoverageRatio());
+
+            PsInspectionResponse response = inspectionService.saveInspection(request, originalImage, resultImage);
+
+            log.info("[PS-INSP] Multipart 저장 완료 - id: {}, totalCount: {}, coverageRatio: {}",
+                    response.getInspectionId(), response.getTotalCount(), response.getCoverageRatio());
+
+            return ResponseEntity.ok(ApiResponse.created(response));
         } catch (Exception e) {
-            log.error("[PS-INSP] Multipart 검사 결과 저장 실패", e);
+            log.error("[PS-INSP] Multipart 검사 결과 저장 실패 - metadata: {}", metadata, e);
             throw new RuntimeException("검사 결과 저장 중 오류: " + e.getMessage());
         }
     }

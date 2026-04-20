@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
@@ -35,6 +36,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PsInspectionService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final PsInspectionRepository inspectionRepository;
 
@@ -283,7 +286,7 @@ public class PsInspectionService {
             if (originalName != null && originalName.contains(".")) {
                 ext = originalName.substring(originalName.lastIndexOf('.') + 1);
             }
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
+            String timestamp = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
             String idSuffix = String.valueOf(inspectionId);
             if (idSuffix.length() > 8) idSuffix = idSuffix.substring(0, 8);
             String filename = String.format("%s_%s_%s_%s_%s.%s",

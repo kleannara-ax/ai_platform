@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * PS 지분 검사 결과 엔티티 (점보롤 지분 검사)
@@ -167,20 +168,22 @@ public class PsInspection {
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(KST);
         if (this.inspectedAt == null) {
-            this.inspectedAt = LocalDateTime.now();
+            this.inspectedAt = LocalDateTime.now(KST);
         }
         if (this.msrmDate == null) {
-            this.msrmDate = LocalDateTime.now();
+            this.msrmDate = LocalDateTime.now(KST);
         }
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now(KST);
     }
 
     /**
@@ -200,8 +203,8 @@ public class PsInspection {
             Integer manualAddedCount, Integer manualRemovedCount,
             String operatorId, String operatorNm, String deviceId, String status) {
 
-        this.inspectedAt = inspectedAt != null ? inspectedAt : LocalDateTime.now();
-        this.msrmDate = msrmDate != null ? msrmDate : LocalDateTime.now();
+        this.inspectedAt = inspectedAt != null ? inspectedAt : LocalDateTime.now(KST);
+        this.msrmDate = msrmDate != null ? msrmDate : LocalDateTime.now(KST);
         this.thresholdMax = thresholdMax;
         this.totalCount = totalCount != null ? totalCount : 0;
         this.coverageRatio = coverageRatio;
