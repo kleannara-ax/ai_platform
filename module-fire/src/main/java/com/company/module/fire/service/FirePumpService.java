@@ -40,7 +40,7 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class FirePumpService {
 
-    private static final long DEFAULT_OUTDOOR_FLOOR_ID = 7L;
+    private static final long DEFAULT_OUTDOOR_FLOOR_ID = 99L;
     private static final int MAX_INSPECTION_HISTORY = 12;
 
     private final FirePumpRepository firePumpRepository;

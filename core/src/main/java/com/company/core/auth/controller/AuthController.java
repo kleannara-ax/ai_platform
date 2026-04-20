@@ -55,4 +55,13 @@ public class AuthController {
         MeResponse response = MeResponse.from(userDetails);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    /**
+     * CSRF 토큰 엔드포인트 (JWT 기반이므로 CSRF 비활성화 상태)
+     * 소방 모듈 프론트엔드(csrf.js)가 호출하므로 404 방지를 위해 빈 응답 반환
+     */
+    @GetMapping("/csrf")
+    public ResponseEntity<ApiResponse<Void>> csrf() {
+        return ResponseEntity.ok(ApiResponse.success());
+    }
 }

@@ -19,9 +19,9 @@ public class InspectorNameResolver {
 
         try {
             Object result = entityManager.createNativeQuery("""
-                            SELECT COALESCE(NULLIF(TRIM(display_name), ''), username)
-                            FROM web_user
-                            WHERE username = :username
+                            SELECT COALESCE(NULLIF(TRIM(USER_NAME), ''), LOGIN_ID)
+                            FROM core_user
+                            WHERE LOGIN_ID = :username
                             """)
                     .setParameter("username", normalized)
                     .getSingleResult();
@@ -39,9 +39,9 @@ public class InspectorNameResolver {
 
         try {
             Object result = entityManager.createNativeQuery("""
-                            SELECT user_id
-                            FROM web_user
-                            WHERE username = :username
+                            SELECT USER_ID
+                            FROM core_user
+                            WHERE LOGIN_ID = :username
                             """)
                     .setParameter("username", normalized)
                     .getSingleResult();

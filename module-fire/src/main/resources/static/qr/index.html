@@ -480,8 +480,7 @@
     const unregisteredHtml = unregisteredVisible ? (document.getElementById('unregisteredWrap')?.innerHTML || '') : '';
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
     return '' +
-      '<!DOCTYPE html><html lang="ko"><head>
-<style>body{opacity:0!important;transition:none!important;}</style><meta charset="utf-8" />' +
+      '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8" />' +
       '<title>' + escHtml(conf.label) + ' QR 인쇄</title>' +
       '<style>' +
       'body{margin:0;padding:24px;font-family:\"Malgun Gothic\",\"Apple SD Gothic Neo\",sans-serif;color:#111827;background:#fff;}' +
