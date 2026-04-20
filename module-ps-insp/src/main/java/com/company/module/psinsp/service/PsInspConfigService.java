@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * PS 지분 검사 설정 서비스 (공통코드 기반)
  *
  * <p>PPM 기준값: code_group 'PS_INSP_DEFAULT' > code 'PPM_LIMIT'
- * <p>PPM 수정 권한자: code_group 'PS_INSP_ADMIN' > code 'PPM_ADMIN' (extraValue1에 콤마 구분 ID 목록)
+ * <p>PPM 수정 권한자: code_group 'PS_INSP_AUTH' > code 'PPM_ADMIN' (extraValue1에 콤마 구분 ID 목록)
  */
 @Slf4j
 @Service
@@ -27,7 +27,7 @@ public class PsInspConfigService {
     /** PPM 기준값 그룹 */
     private static final String GROUP_DEFAULT = "PS_INSP_DEFAULT";
     /** PPM 수정 권한자 그룹 */
-    private static final String GROUP_ADMIN = "PS_INSP_ADMIN";
+    private static final String GROUP_ADMIN = "PS_INSP_AUTH";
 
     /** 코드 키 상수 */
     public static final String CODE_PPM_LIMIT = "PPM_LIMIT";
@@ -74,7 +74,7 @@ public class PsInspConfigService {
         );
     }
 
-    // ──────────── 권한자 관리 (PS_INSP_ADMIN > PPM_ADMIN 콤마 구분) ────────────
+    // ──────────── 권한자 관리 (PS_INSP_AUTH > PPM_ADMIN 콤마 구분) ────────────
 
     /**
      * PPM 수정 권한자 ID 목록 조회

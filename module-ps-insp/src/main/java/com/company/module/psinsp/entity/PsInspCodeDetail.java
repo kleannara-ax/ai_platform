@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * <ul>
  *   <li>PPM_LIMIT    - extraValue1: PPM 기준값 (0 = 비활성)</li>
  * </ul>
- * <p>PS_INSP_ADMIN 그룹 하위 코드:
+ * <p>PS_INSP_AUTH 그룹 하위 코드:
  * <ul>
  *   <li>PPM_ADMIN    - extraValue1: 수정 권한자 ID 목록 (콤마 구분)</li>
  * </ul>
