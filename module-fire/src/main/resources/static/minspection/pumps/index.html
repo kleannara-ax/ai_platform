@@ -130,6 +130,47 @@
       font-size: 16px;
       font-weight: 800;
     }
+    /* map */
+    .mapWrap {
+      position: relative;
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .mapCanvas {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .mapInner { position: absolute; inset: 0; transform-origin: 0 0; }
+    .mapCanvas img { width: 100%; height: 100%; object-fit: fill; display: block; background: #f0f0f0; }
+    .markerLayer { position: absolute; inset: 0; pointer-events: none; }
+    .markerIcon {
+      position: absolute;
+      width: 20px; height: 20px;
+      transform: translate(-50%, -50%);
+      background: #dc2626; border-radius: 50%; border: 2px solid #fff;
+      pointer-events: none;
+      box-shadow: 0 0 6px rgba(220,38,38,.6);
+    }
+    .markerIcon.selected {
+      width: 24px; height: 24px;
+      background: #dc2626; border: 3px solid #fff;
+      box-shadow: 0 0 10px rgba(220,38,38,.8);
+    }
+    .coord { font-size: 12px; color: #555; margin-top: 4px; }
+    .outdoor-note {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #991b1b;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -171,6 +212,9 @@
   (function () {
     const API_BASE = '/fire-api/minspection/pumps';
     const RETURN_URL = location.pathname + location.search;
+    const OUTDOOR_BUILDING_ID = 99;
+    const OUTDOOR_FLOOR_ID = 99;
+    const OUTDOOR_PLAN_IMAGE = '/images/drone_photo.JPG';
     const CHECK_ITEMS = [
       { key: 'pump_operation', label: '펌프 운전 상태' },
       { key: 'panel', label: '제어반 상태' },
@@ -373,48 +417,56 @@
         return;
       }
 
-      const res = await apiFetch(API_BASE + '/by-key?key=' + encodeURIComponent(qrKey));
-      const json = await res.json();
-      pumpData = json?.data || null;
-      if (!pumpData) {
-        mainView.innerHTML = '<div class="card"><div class="err">데이터를 불러오지 못했습니다.</div></div>';
-        return;
+      try {
+        const res = await apiFetch(API_BASE + '/by-key?key=' + encodeURIComponent(qrKey));
+        const json = await res.json();
+        pumpData = json?.data || null;
+        if (!pumpData) {
+          mainView.innerHTML = '<div class="card"><div class="err">데이터를 불러오지 못했습니다. 서버 응답을 확인해주세요.</div></div>';
+          return;
+        }
+        if (!pumpData.exists) {
+          renderRegisterForm(pumpData);
+          return;
+        }
+        renderExistsView(pumpData);
+      } catch (err) {
+        if (err.message !== 'unauthorized') {
+          mainView.innerHTML = '<div class="card"><div class="err">데이터 로드 실패: ' + escHtml(err.message) + '</div></div>';
+        }
       }
-      if (!pumpData.exists) {
-        renderRegisterForm(pumpData);
-        return;
-      }
-      renderExistsView(pumpData);
     }
 
+    /* ===== 등록 폼 (옥외 전용 + 도면 좌표 선택) ===== */
+    let scale = 1, pan = { x: 0, y: 0 }, isDragging = false, dragStart = { x: 0, y: 0 };
+    const pointers = new Map();
+    let pinchStartDist = null, pinchStartScale = 1, pinchMidStart = { x: 0, y: 0 };
+    let selectedPoint = null;
+
     function renderRegisterForm(data) {
-      const buildings = Array.isArray(data.buildings) ? data.buildings : [];
-      const floors = Array.isArray(data.floors) ? data.floors : [];
       mainView.innerHTML = `
         <div class="card">
           <div class="title-lg">소방펌프 등록</div>
           <div class="sub">QR Key: ${escHtml(data.qrKey || qrKey)}</div>
         </div>
         <div class="card">
-          <form id="regForm" style="display:grid;gap:12px;">
+          <div class="outdoor-note">소방펌프는 옥외 설비입니다. 아래 항공사진에서 설치 위치를 터치하세요.</div>
+          <form id="regForm" style="display:grid;gap:12px;margin-top:12px;">
             <div id="regErr" class="err"></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div>
-                <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">건물</label>
-                <select id="regBuilding" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;">
-                  <option value="">-- 건물 선택 --</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">층</label>
-                <select id="regFloor" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;">
-                  <option value="">-- 층 선택 --</option>
-                </select>
+            <div class="mapWrap">
+              <div class="mapCanvas" id="mapCanvas">
+                <div class="mapInner" id="mapInner">
+                  <img id="planImg" alt="옥외 항공사진" src="${OUTDOOR_PLAN_IMAGE}" />
+                  <div class="markerLayer" id="markerLayer"></div>
+                </div>
               </div>
             </div>
+            <div class="coord">좌표: X <span id="coordX">-</span> / Y <span id="coordY">-</span></div>
+            <input type="hidden" id="inputX" />
+            <input type="hidden" id="inputY" />
             <div>
               <label style="font-weight:700;font-size:13px;display:block;margin-bottom:4px;">상세 위치</label>
-              <input type="text" id="regLocation" placeholder="예: 지하1층 펌프실" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;" />
+              <input type="text" id="regLocation" placeholder="예: 제지1호기 옆 펌프실" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;" />
             </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button type="submit" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;">등록</button>
@@ -422,48 +474,159 @@
           </form>
         </div>`;
 
-      bindBuildingFloorOptions(buildings, floors);
+      initMap();
       document.getElementById('regForm').addEventListener('submit', submitRegister);
-      document.getElementById('regBuilding').addEventListener('change', () => onRegBuildingChanged());
     }
 
-    let allFloors = [];
+    function initMap() {
+      setTimeout(() => {
+        const mapCanvas = document.getElementById('mapCanvas');
+        const mapInner = document.getElementById('mapInner');
+        if (!mapCanvas || !mapInner) return;
 
-    function bindBuildingFloorOptions(buildings, floors) {
-      const bSel = document.getElementById('regBuilding');
-      const fSel = document.getElementById('regFloor');
-      if (!bSel || !fSel) return;
-      allFloors = floors || [];
-      bSel.innerHTML = '<option value="">-- 건물 선택 --</option>' + (buildings || []).map(b => `<option value="${b.buildingId}">${escHtml(b.buildingName)}</option>`).join('');
-      fSel.innerHTML = '<option value="">-- 층 선택 --</option>' + allFloors.map(f => `<option value="${f.floorId}">${escHtml(f.floorName)}</option>`).join('');
-    }
+        function setTransform() { mapInner.style.transform = `translate(${pan.x}px,${pan.y}px) scale(${scale})`; }
+        function clampPan() {
+          const rect = mapCanvas.getBoundingClientRect();
+          const cw = rect.width, ch = rect.height;
+          pan.x = Math.max(Math.min(0, cw - cw * scale), Math.min(0, pan.x));
+          pan.y = Math.max(Math.min(0, ch - ch * scale), Math.min(0, pan.y));
+        }
+        function zoomAround(cx, cy, ns) {
+          const rect = mapCanvas.getBoundingClientRect();
+          const px = cx - rect.left, py = cy - rect.top;
+          const prev = scale, next = Math.max(1, Math.min(4, ns));
+          if (Math.abs(next - prev) < 0.0001) return;
+          const ox = (px - pan.x) / prev, oy = (py - pan.y) / prev;
+          scale = next; pan.x = px - ox * scale; pan.y = py - oy * scale;
+          clampPan(); setTransform();
+        }
+        function getDist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+        function getMid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+        function computeFit() {
+          const rect = mapCanvas.getBoundingClientRect();
+          return rect.width && rect.height ? { ox: 0, oy: 0, w: rect.width, h: rect.height } : null;
+        }
 
-    function onRegBuildingChanged() {
-      // floors are independent of building selection for pumps
+        function renderMarkers() {
+          const markerLayer = document.getElementById('markerLayer'); if (!markerLayer) return;
+          markerLayer.innerHTML = '';
+          const f = computeFit(); if (!f) return;
+          if (selectedPoint) {
+            const sel = document.createElement('div');
+            sel.className = 'markerIcon selected';
+            sel.style.left = (f.ox + f.w * (selectedPoint.x / 100)) + 'px';
+            sel.style.top = (f.oy + f.h * (selectedPoint.y / 100)) + 'px';
+            markerLayer.appendChild(sel);
+          }
+        }
+
+        mapCanvas.addEventListener('click', (e) => {
+          const rect = mapCanvas.getBoundingClientRect();
+          const px = e.clientX - rect.left, py = e.clientY - rect.top;
+          const f = computeFit(); if (!f) return;
+          const localX = (px - pan.x) / scale;
+          const localY = (py - pan.y) / scale;
+          const x = Math.max(0, Math.min(100, ((localX - f.ox) / f.w) * 100));
+          const y = Math.max(0, Math.min(100, ((localY - f.oy) / f.h) * 100));
+          selectedPoint = { x, y };
+          document.getElementById('coordX').textContent = x.toFixed(2);
+          document.getElementById('coordY').textContent = y.toFixed(2);
+          document.getElementById('inputX').value = x.toFixed(2);
+          document.getElementById('inputY').value = y.toFixed(2);
+          renderMarkers();
+        });
+
+        mapCanvas.addEventListener('pointerdown', (e) => {
+          pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          mapCanvas.setPointerCapture(e.pointerId);
+          if (pointers.size === 1) { isDragging = true; dragStart = { x: e.clientX - pan.x, y: e.clientY - pan.y }; }
+          else if (pointers.size === 2) {
+            const pts = Array.from(pointers.values());
+            pinchStartDist = getDist(pts[0], pts[1]); pinchStartScale = scale;
+            pinchMidStart = getMid(pts[0], pts[1]); isDragging = false;
+          }
+        });
+        mapCanvas.addEventListener('pointermove', (e) => {
+          if (!pointers.has(e.pointerId)) return;
+          pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pointers.size === 1 && isDragging) {
+            pan.x = e.clientX - dragStart.x; pan.y = e.clientY - dragStart.y;
+            clampPan(); setTransform(); return;
+          }
+          if (pointers.size === 2) {
+            const pts = Array.from(pointers.values());
+            if (!pinchStartDist || pinchStartDist < 1) return;
+            const dist = getDist(pts[0], pts[1]), mid = getMid(pts[0], pts[1]);
+            zoomAround(mid.x, mid.y, pinchStartScale * (dist / pinchStartDist));
+            pan.x += (mid.x - pinchMidStart.x); pan.y += (mid.y - pinchMidStart.y);
+            pinchMidStart = mid; clampPan(); setTransform();
+          }
+        });
+        function endPointer(e) {
+          pointers.delete(e.pointerId);
+          try { mapCanvas.releasePointerCapture(e.pointerId); } catch {}
+          if (pointers.size === 0) { isDragging = false; pinchStartDist = null; }
+          else if (pointers.size === 1) {
+            const pt = Array.from(pointers.values())[0];
+            isDragging = true; dragStart = { x: pt.x - pan.x, y: pt.y - pan.y }; pinchStartDist = null;
+          }
+        }
+        mapCanvas.addEventListener('pointerup', endPointer);
+        mapCanvas.addEventListener('pointercancel', endPointer);
+        window.addEventListener('resize', () => { clampPan(); setTransform(); renderMarkers(); });
+      }, 50);
     }
 
     async function submitRegister(e) {
       e.preventDefault();
-      const buildingId = document.getElementById('regBuilding').value;
-      const floorId = document.getElementById('regFloor').value;
       const locationDescription = document.getElementById('regLocation').value.trim();
+      const xVal = document.getElementById('inputX').value;
+      const yVal = document.getElementById('inputY').value;
       const errEl = document.getElementById('regErr');
       errEl.textContent = '';
-      if (!buildingId) { errEl.textContent = '건물을 선택하세요.'; return; }
-      if (!floorId) { errEl.textContent = '층을 선택하세요.'; return; }
-      const res = await apiFetch(API_BASE + '/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrKey, buildingId: parseInt(buildingId, 10), floorId: parseInt(floorId, 10), locationDescription: locationDescription || null, x: null, y: null })
-      });
-      const json = await res.json();
-      if ((!res.ok && !json.success) && json.message) { errEl.textContent = json.message; return; }
-      if (json.data?.pumpId) {
-        document.querySelector('header').style.display = 'none';
-        mainView.style.display = 'none';
-        completeView.querySelector('.ctitle').textContent = '소방펌프 등록이 완료되었습니다!';
-        completeView.querySelector('.csub').textContent = '창을 닫아주세요.';
-        completeView.style.display = 'block';
+
+      if (!xVal || !yVal) { errEl.textContent = '항공사진에서 설치 위치를 터치하세요.'; return; }
+
+      const x = parseFloat(xVal);
+      const y = parseFloat(yVal);
+      const submitBtn = document.querySelector('#regForm button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '등록 중...'; }
+
+      try {
+        const res = await apiFetch(API_BASE + '/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            qrKey,
+            buildingId: OUTDOOR_BUILDING_ID,
+            floorId: OUTDOOR_FLOOR_ID,
+            locationDescription: locationDescription || null,
+            x: x,
+            y: y
+          })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          errEl.textContent = json.message || '등록에 실패했습니다. (HTTP ' + res.status + ')';
+          return;
+        }
+        if (json.data?.pumpId) {
+          document.querySelector('header').style.display = 'none';
+          mainView.style.display = 'none';
+          completeView.querySelector('.ctitle').textContent = '소방펌프 등록이 완료되었습니다!';
+          completeView.querySelector('.csub').textContent = '창을 닫아주세요.';
+          completeView.style.display = 'block';
+        } else if (json.data?.alreadyExists) {
+          errEl.textContent = '이미 등록된 소방펌프입니다.';
+        } else {
+          errEl.textContent = '등록 응답이 올바르지 않습니다.';
+        }
+      } catch (err) {
+        if (err.message !== 'unauthorized') {
+          errEl.textContent = '등록 중 오류: ' + err.message;
+        }
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '등록'; }
       }
     }
 

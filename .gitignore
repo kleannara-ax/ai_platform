@@ -27,3 +27,7 @@ logs/
 .env
 *.env.local
 _preview
+node_modules/
+test_*.js
+package*.json
+app.log
