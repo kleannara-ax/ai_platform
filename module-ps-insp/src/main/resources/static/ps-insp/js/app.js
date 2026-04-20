@@ -60,6 +60,7 @@
   var MAX_FILE_SIZE = 900 * 1024 * 1024; // 900MB
   var DEFAULT_THRESHOLD = 115;
   var THRESHOLD_STORAGE_KEY = 'jri_threshold';
+  var THRESHOLD_DATE_KEY = 'jri_threshold_date'; // 임계값 저장 날짜 (YYYY-MM-DD)
   var DEFAULT_PPM_LIMIT = 0; // 0 = 비활성 (기준값 미설정)
 
   // 임계값 잠금 상태
@@ -155,11 +156,33 @@
   }
 
   // ── localStorage 임계값 저장/복원 ──
-  function saveThresholdToStorage(val) {
-    try { localStorage.setItem(THRESHOLD_STORAGE_KEY, String(val)); } catch (e) { }
+  // 자정(00:00) 지나면 자동 리셋 → DEFAULT_THRESHOLD(115)
+  function getTodayKST() {
+    var now = new Date();
+    var kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return kst.toISOString().substring(0, 10); // 'YYYY-MM-DD'
   }
+
+  function saveThresholdToStorage(val) {
+    try {
+      localStorage.setItem(THRESHOLD_STORAGE_KEY, String(val));
+      localStorage.setItem(THRESHOLD_DATE_KEY, getTodayKST());
+    } catch (e) { }
+  }
+
   function loadThresholdFromStorage() {
     try {
+      var savedDate = localStorage.getItem(THRESHOLD_DATE_KEY);
+      var today = getTodayKST();
+
+      // 자정 리셋: 저장 날짜가 오늘이 아니면 임계값 초기화
+      if (savedDate && savedDate !== today) {
+        localStorage.removeItem(THRESHOLD_STORAGE_KEY);
+        localStorage.removeItem(THRESHOLD_DATE_KEY);
+        console.log('[PS-INSP] 자정 경과 → 임계값 리셋 (저장일: ' + savedDate + ', 오늘: ' + today + ')');
+        return null;
+      }
+
       var stored = localStorage.getItem(THRESHOLD_STORAGE_KEY);
       if (stored !== null) {
         var v = parseInt(stored);
