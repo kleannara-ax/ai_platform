@@ -1,38 +1,18 @@
 -- ============================================================
--- module-ps-insp: PS 지분 검사 공통코드 등록
--- Database: MariaDB 10.11+ (utf8mb4)
+-- module-ps-insp: 권한자 관리 분리 마이그레이션
+-- 기존: PS_INSP_DEFAULT > PPM_ADMIN (콤마 구분 문자열)
+-- 변경: PS_INSP_ADMIN 코드 그룹에 권한자 개별 행으로 관리
 --
--- 공통코드 테이블(code_group + code_detail)을 활용합니다.
---
--- code_group: PS_INSP_DEFAULT
---   └─ PPM_LIMIT       : 후면 지분 값(PPM) 기준값 (extraValue1에 값 저장)
---
--- code_group: PS_INSP_ADMIN
---   ├─ admin            : PPM 기준값 수정 권한자
---   ├─ ykcho            : PPM 기준값 수정 권한자
---   ├─ hsjeong          : PPM 기준값 수정 권한자
---   ├─ jwlee2           : PPM 기준값 수정 권한자
---   ├─ deyang           : PPM 기준값 수정 권한자
---   └─ bwyoo            : PPM 기준값 수정 권한자
+-- 기존에 배포된 운영 환경에서 실행 (02_config_schema.sql 이후)
 -- ============================================================
 
--- ── 1) PS_INSP_DEFAULT 코드 그룹 등록 ──
-INSERT INTO code_group (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER)
-VALUES ('PS_INSP_DEFAULT', 'PS 지분검사 PPM 기준값', 'PS 후면 지분 검사 모듈 PPM 기준값 설정', 1, 100)
-ON DUPLICATE KEY UPDATE GROUP_NAME = VALUES(GROUP_NAME), DESCRIPTION = VALUES(DESCRIPTION);
-
--- PPM_LIMIT: 후면 지분 값(PPM) 기준값. extraValue1 = 기준값 (0 = 비활성)
-INSERT INTO code_detail (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, EXTRA_VALUE1, EXTRA_VALUE2, IS_ACTIVE, SORT_ORDER)
-SELECT g.GROUP_ID, 'PPM_LIMIT', 'PPM 기준값', '후면 지분 값(PPM) 기준값. 0 = 비활성 (기준값 미설정)', '0', NULL, 1, 1
-FROM code_group g WHERE g.GROUP_CODE = 'PS_INSP_DEFAULT'
-ON DUPLICATE KEY UPDATE CODE_NAME = VALUES(CODE_NAME);
-
--- ── 2) PS_INSP_ADMIN 코드 그룹 등록 (PPM 기준값 수정 권한자) ──
+-- 1) PS_INSP_ADMIN 코드 그룹 생성
 INSERT INTO code_group (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER)
 VALUES ('PS_INSP_ADMIN', 'PS 지분검사 관리자', 'PS 후면 지분 검사 PPM 기준값 수정 권한자 목록', 1, 101)
 ON DUPLICATE KEY UPDATE GROUP_NAME = VALUES(GROUP_NAME), DESCRIPTION = VALUES(DESCRIPTION);
 
--- 권한자 개별 등록 (CODE = 사용자 ID)
+-- 2) 기존 PPM_ADMIN 콤마 구분 값에서 권한자 개별 등록
+--    (운영 환경의 실제 권한자에 맞게 수정 후 실행하세요)
 INSERT INTO code_detail (GROUP_ID, CODE, CODE_NAME, DESCRIPTION, EXTRA_VALUE1, IS_ACTIVE, SORT_ORDER)
 SELECT g.GROUP_ID, 'admin', 'admin', 'PPM 기준값 수정 권한자', NULL, 1, 1
 FROM code_group g WHERE g.GROUP_CODE = 'PS_INSP_ADMIN'
@@ -63,16 +43,8 @@ SELECT g.GROUP_ID, 'bwyoo', 'bwyoo', 'PPM 기준값 수정 권한자', NULL, 1, 
 FROM code_group g WHERE g.GROUP_CODE = 'PS_INSP_ADMIN'
 ON DUPLICATE KEY UPDATE CODE_NAME = VALUES(CODE_NAME);
 
--- ── 3) 기존 레거시 정리 ──
--- PPM_ADMIN 콤마구분 코드 제거 (있으면)
+-- 3) 기존 PPM_ADMIN 콤마구분 코드 제거
 DELETE d FROM code_detail d
 JOIN code_group g ON d.GROUP_ID = g.GROUP_ID
-WHERE g.GROUP_CODE = 'PS_INSP_DEFAULT' AND d.CODE = 'PPM_ADMIN';
-
--- ADMIN_PWD_HASH 코드 제거 (있으면)
-DELETE d FROM code_detail d
-JOIN code_group g ON d.GROUP_ID = g.GROUP_ID
-WHERE g.GROUP_CODE = 'PS_INSP_DEFAULT' AND d.CODE = 'ADMIN_PWD_HASH';
-
--- 기존 전용 테이블 제거 (있으면)
-DROP TABLE IF EXISTS ps_insp_config;
+WHERE g.GROUP_CODE IN ('PS_INSP_DEFAULT', 'PS_INSP_CONFIG', 'PS_INSP_PPM_LIMIT')
+  AND d.CODE = 'PPM_ADMIN';

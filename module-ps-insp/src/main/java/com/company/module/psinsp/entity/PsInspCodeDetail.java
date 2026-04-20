@@ -14,8 +14,10 @@ import java.time.LocalDateTime;
  * <p>PS_INSP_DEFAULT 그룹 하위 코드:
  * <ul>
  *   <li>PPM_LIMIT    - extraValue1: PPM 기준값 (0 = 비활성)</li>
- *   <li>PPM_ADMIN    - extraValue1: 권한자 ID 목록 (콤마 구분)</li>
- *   <li>ADMIN_PWD_HASH - extraValue1: 관리자 비밀번호 해시</li>
+ * </ul>
+ * <p>PS_INSP_ADMIN 그룹 하위 코드:
+ * <ul>
+ *   <li>CODE = 사용자 ID (admin, ykcho 등) - 각 행이 PPM 수정 권한자 1명</li>
  * </ul>
  */
 @Entity

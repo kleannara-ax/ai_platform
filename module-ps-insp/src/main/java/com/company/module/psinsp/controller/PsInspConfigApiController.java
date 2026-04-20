@@ -16,12 +16,13 @@ import java.util.Map;
  * PS 지분 검사 설정 REST API 컨트롤러 (공통코드 기반)
  *
  * <p>URL API Prefix: /ps-insp-api/config
- * <p>PPM 기준값 및 권한자 ID를 공통코드 테이블(code_group/code_detail)로 관리합니다.
+ * <p>PPM 기준값: code_group 'PS_INSP_DEFAULT' > 'PPM_LIMIT'
+ * <p>PPM 수정 권한자: code_group 'PS_INSP_ADMIN' > 각 행 CODE = 사용자 ID
  *
  * <p>권한 체계:
  * <ul>
  *   <li>조회: PS_INSP_MGMT 메뉴 권한</li>
- *   <li>수정: PS_INSP_MGMT 메뉴 권한 + PPM_ADMIN 코드에 등록된 사용자 ID</li>
+ *   <li>수정: PS_INSP_MGMT 메뉴 권한 + PS_INSP_ADMIN 그룹에 등록된 사용자 ID</li>
  * </ul>
  */
 @Slf4j
@@ -53,7 +54,7 @@ public class PsInspConfigApiController {
     }
 
     /**
-     * PPM 기준값 저장 (PPM_ADMIN에 등록된 사용자만 가능)
+     * PPM 기준값 저장 (PS_INSP_ADMIN 에 등록된 사용자만 가능)
      * POST /ps-insp-api/config/ppm-limit
      * Body: { "ppmLimit": 300.0 }
      */
@@ -101,9 +102,9 @@ public class PsInspConfigApiController {
     }
 
     /**
-     * PPM 수정 권한자 목록 업데이트 (기존 권한자만 가능)
+     * PPM 수정 권한자 목록 업데이트 (전체 교체 - 기존 프론트엔드 호환)
      * POST /ps-insp-api/config/ppm-admins
-     * Body: { "adminIds": ["admin", "inspector01", "user02"] }
+     * Body: { "adminIds": ["admin", "ykcho", "hsjeong"] }
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
     @PostMapping("/ppm-admins")
@@ -126,6 +127,56 @@ public class PsInspConfigApiController {
             )));
         } catch (IllegalArgumentException e) {
             log.warn("[PS-INSP-CONFIG] 권한자 목록 업데이트 실패: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /**
+     * PPM 수정 권한자 개별 추가
+     * POST /ps-insp-api/config/ppm-admins/add
+     * Body: { "adminId": "newuser" }
+     */
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
+    @PostMapping("/ppm-admins/add")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> addPpmAdmin(
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+        try {
+            String newAdminId = (String) body.get("adminId");
+            String operatorId = authentication != null ? authentication.getName() : "unknown";
+            List<String> result = configService.addPpmAdmin(newAdminId, operatorId);
+
+            return ResponseEntity.ok(ApiResponse.success("권한자가 추가되었습니다.", Map.of(
+                    "adminIds", result,
+                    "addedId", newAdminId.trim()
+            )));
+        } catch (IllegalArgumentException e) {
+            log.warn("[PS-INSP-CONFIG] 권한자 추가 실패: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /**
+     * PPM 수정 권한자 개별 삭제
+     * POST /ps-insp-api/config/ppm-admins/remove
+     * Body: { "adminId": "targetuser" }
+     */
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
+    @PostMapping("/ppm-admins/remove")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> removePpmAdmin(
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+        try {
+            String targetAdminId = (String) body.get("adminId");
+            String operatorId = authentication != null ? authentication.getName() : "unknown";
+            List<String> result = configService.removePpmAdmin(targetAdminId, operatorId);
+
+            return ResponseEntity.ok(ApiResponse.success("권한자가 삭제되었습니다.", Map.of(
+                    "adminIds", result,
+                    "removedId", targetAdminId.trim()
+            )));
+        } catch (IllegalArgumentException e) {
+            log.warn("[PS-INSP-CONFIG] 권한자 삭제 실패: {}", e.getMessage());
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
         }
     }
