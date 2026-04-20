@@ -12,7 +12,7 @@
   <header class="header">
     <div class="header-left">
       <h1>PS 후면 지분 검사 도구</h1>
-      <span class="version">v8.2.0</span>
+      <span class="version">v8.6.0</span>
     </div>
     <div class="header-right">
       <button class="btn btn-sm btn-outline" onclick="openAdminSettings()" title="관리자 설정">&#9881; 설정</button>
@@ -297,7 +297,7 @@
   </div>
 </div>
 
-<!-- ADMIN 기준값 설정 모달 -->
+<!-- ADMIN 기준값 + 권한자 설정 모달 (공통코드 DB 연동) -->
 <div class="modal-overlay" id="adminSettingsModal" style="display:none;" onclick="if(event.target===this)closeAdminSettings()">
   <div class="admin-settings-dialog">
     <div class="admin-settings-header">
@@ -305,19 +305,43 @@
       <button class="modal-close" onclick="closeAdminSettings()">&times;</button>
     </div>
     <div class="admin-settings-body">
+      <!-- 현재 사용자 정보 -->
+      <div class="form-group" style="margin-bottom:12px;">
+        <label style="font-size:12px;color:var(--text3);">현재 로그인 사용자</label>
+        <div id="adminCurrentUser" style="font-size:14px;"></div>
+      </div>
+
+      <!-- 비권한자 안내 메시지 -->
+      <div id="adminNoAuthMsg" class="admin-no-auth-msg" style="display:none;">
+        <p>&#128274; PPM 기준값 수정 권한이 없습니다.</p>
+        <small>아래에 등록된 권한자에게 추가를 요청하세요.</small>
+      </div>
+
+      <!-- PPM 기준값 설정 -->
       <div class="form-group">
         <label>후면 지분 값(PPM) 기준값</label>
-        <input type="number" id="adminPpmLimit" min="0" step="0.1" placeholder="예: 300">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="adminPpmLimit" min="0" step="0.1" placeholder="예: 300" style="flex:1;">
+          <button class="btn btn-primary btn-sm" id="btnSavePpm" onclick="saveAdminPpmLimit()">저장</button>
+        </div>
         <small style="color:var(--text3);">검사 결과가 이 값을 초과하면 기준 초과 알림이 표시됩니다. (0 = 비활성)</small>
       </div>
-      <div class="form-group">
-        <label>관리자 비밀번호</label>
-        <input type="password" id="adminPassword" placeholder="비밀번호 입력">
+
+      <!-- 권한자 관리 -->
+      <div class="form-group" style="margin-top:16px;">
+        <label>PPM 기준값 수정 권한자</label>
+        <div id="adminListContainer" class="admin-list-container">
+          <div class="empty-msg">불러오는 중...</div>
+        </div>
+        <!-- 권한자 추가 입력 (권한자만 표시) -->
+        <div id="adminAddSection" class="admin-add-section" style="display:none;">
+          <input type="text" id="adminAddId" placeholder="추가할 사용자 ID" onkeydown="if(event.key==='Enter')addAdminId()">
+          <button class="btn btn-sm btn-outline" onclick="addAdminId()">+ 추가</button>
+        </div>
       </div>
     </div>
     <div class="admin-settings-footer">
-      <button class="btn btn-primary" onclick="saveAdminSettings()">저장</button>
-      <button class="btn btn-outline" onclick="closeAdminSettings()">취소</button>
+      <button class="btn btn-outline" onclick="closeAdminSettings()">닫기</button>
     </div>
   </div>
 </div>

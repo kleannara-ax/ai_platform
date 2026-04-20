@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.1.0
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.0
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -44,29 +44,114 @@
   var msrmDate = null;
 
   var MANUAL_COMPONENT_RADIUS = 8;
+
+  // ── 한국 시간(KST) 유틸리티 ──
+  function toKSTISOString(date) {
+    if (!date) date = new Date();
+    var kst = new Date(date.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    return kst.toISOString().replace('Z', '');
+  }
+  function nowKST() {
+    return toKSTISOString(new Date());
+  }
+
   var MAX_IMAGE_DIMENSION = 2200;
   var RESIZE_TARGET = 1600;
   var MAX_FILE_SIZE = 900 * 1024 * 1024; // 900MB
   var DEFAULT_THRESHOLD = 115;
   var THRESHOLD_STORAGE_KEY = 'jri_threshold';
-  var PPM_LIMIT_STORAGE_KEY = 'jri_ppm_limit';
-  var ADMIN_PWD_HASH_KEY = 'jri_admin_pwd';
   var DEFAULT_PPM_LIMIT = 0; // 0 = 비활성 (기준값 미설정)
 
   // 임계값 잠금 상태
   var thresholdLocked = true;
   var lastThreshold = DEFAULT_THRESHOLD;
 
-  // PPM 기준값
+  // PPM 기준값 (DB에서 로드하여 캐시)
+  var _cachedPpmLimit = null; // null = 아직 로드하지 않음
+
+  /**
+   * PPM 기준값 조회 (캐시 우선, DB에서 비동기 로드)
+   * 동기적으로 캐시된 값을 반환합니다.
+   * 최초 호출 시 서버에서 로드합니다.
+   */
   function getPpmLimit() {
+    if (_cachedPpmLimit !== null) return _cachedPpmLimit;
+    // 캐시 미스: localStorage 폴백 (서버 로드 전까지 임시)
     try {
-      var v = localStorage.getItem(PPM_LIMIT_STORAGE_KEY);
+      var v = localStorage.getItem('jri_ppm_limit');
       if (v !== null) { var n = parseFloat(v); if (!isNaN(n) && n > 0) return n; }
     } catch (e) { }
     return DEFAULT_PPM_LIMIT;
   }
-  function savePpmLimit(val) {
-    try { localStorage.setItem(PPM_LIMIT_STORAGE_KEY, String(val)); } catch (e) { }
+
+  /**
+   * 서버에서 PPM 기준값 로드 (비동기)
+   * 앱 초기화 시 호출됩니다.
+   */
+  function loadPpmLimitFromServer() {
+    api('GET', '/ps-insp-api/config/ppm-limit')
+      .then(function (res) {
+        if (res.success && res.data) {
+          var limit = parseFloat(res.data.ppmLimit) || 0;
+          _cachedPpmLimit = limit;
+          // localStorage에도 동기화 (오프라인 폴백용)
+          try { localStorage.setItem('jri_ppm_limit', String(limit)); } catch (e) { }
+          console.log('[PS-INSP] PPM 기준값 서버에서 로드:', limit);
+        }
+      })
+      .catch(function (e) {
+        console.warn('[PS-INSP] PPM 기준값 서버 로드 실패 (localStorage 폴백 사용):', e.message);
+      });
+  }
+
+  /**
+   * PPM 기준값을 서버(DB)에 저장
+   * 권한 검증은 서버에서 로그인 사용자 ID 기반으로 수행 (PPM_ADMIN 코드)
+   * @param {number} val PPM 기준값
+   * @returns {Promise}
+   */
+  function savePpmLimitToServer(val) {
+    return api('POST', '/ps-insp-api/config/ppm-limit', {
+      ppmLimit: val
+    }).then(function (res) {
+      if (res.success) {
+        _cachedPpmLimit = val;
+        // localStorage에도 동기화
+        try { localStorage.setItem('jri_ppm_limit', String(val)); } catch (e) { }
+        console.log('[PS-INSP] PPM 기준값 서버 저장 완료:', val);
+      }
+      return res;
+    });
+  }
+
+  // ══════════════════════════════════════════════
+  // PPM 권한자 관리 API
+  // ══════════════════════════════════════════════
+
+  /**
+   * PPM 수정 권한자 목록 조회
+   * @returns {Promise<{adminIds: string[], isAdmin: boolean, currentUser: string}>}
+   */
+  function loadPpmAdmins() {
+    return api('GET', '/ps-insp-api/config/ppm-admins')
+      .then(function (res) {
+        if (res.success && res.data) return res.data;
+        return { adminIds: [], isAdmin: false, currentUser: '' };
+      })
+      .catch(function () {
+        return { adminIds: [], isAdmin: false, currentUser: '' };
+      });
+  }
+
+  /**
+   * PPM 수정 권한자 목록 업데이트
+   * @param {string[]} adminIds 권한자 ID 배열
+   * @returns {Promise}
+   */
+  function savePpmAdmins(adminIds) {
+    return api('POST', '/ps-insp-api/config/ppm-admins', {
+      adminIds: adminIds
+    });
   }
 
   // ── localStorage 임계값 저장/복원 ──
@@ -111,12 +196,25 @@
       opts.body = body;
     }
     return fetch(BASE + path, opts).then(function (res) {
-      if (res.status === 401) {
+      var httpStatus = res.status;
+      if (httpStatus === 401) {
         toast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
         try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch (e) { }
         throw new Error('Unauthorized');
       }
-      return res.json();
+      if (httpStatus === 403) {
+        toast('접근 권한이 없습니다. 관리자에게 PS_INSP_MGMT 권한을 요청하세요.', 'error');
+        throw new Error('Forbidden: PS_INSP_MGMT 권한 필요');
+      }
+      return res.json().then(function (json) {
+        if (httpStatus >= 400) {
+          console.error('[PS-INSP] API 에러 (HTTP ' + httpStatus + '):', method, path, json);
+        }
+        return json;
+      }).catch(function (parseErr) {
+        console.error('[PS-INSP] API 응답 파싱 실패 (HTTP ' + httpStatus + '):', method, path, parseErr);
+        throw new Error('서버 응답 파싱 실패 (HTTP ' + httpStatus + ')');
+      });
     });
   }
 
@@ -131,6 +229,7 @@
     applyUrlParams();
     restoreThreshold();   // URL 파라미터 → localStorage → 115 우선순위
     autoFillOperator();
+    loadPpmLimitFromServer(); // DB에서 PPM 기준값 로드
   }
 
   /**
@@ -324,8 +423,8 @@
       return;
     }
 
-    inspectionStartedAt = new Date().toISOString();
-    msrmDate = new Date().toISOString();
+    inspectionStartedAt = nowKST();
+    msrmDate = nowKST();
 
     var reader = new FileReader();
     reader.onload = function (e) {
@@ -1172,8 +1271,8 @@
       werks: val('f_werks'),
       lotnr: lotnr,
       indBcd: indBcd,
-      inspectedAt: inspectionStartedAt || new Date().toISOString(),
-      msrmDate: msrmDate || new Date().toISOString(),
+      inspectedAt: inspectionStartedAt || nowKST(),
+      msrmDate: msrmDate || nowKST(),
       thresholdMax: m.thresholdMax,
       totalCount: m.totalCount,
       coverageRatio: m.coverageRatio,
@@ -1213,25 +1312,52 @@
         return api('POST', '/ps-insp-api/inspections', fd);
       })
       .then(function (res) {
+        console.log('[PS-INSP] 저장 API 응답:', JSON.stringify(res));
         if (res.success && res.data) {
-          toast('검사 결과가 저장되었습니다. (ID: ' + res.data.inspectionId + ')', 'success');
-          showSaveResult(res.data);
+          // 서버 응답 데이터를 메인으로 사용 (DB에서 생성된 실제 값)
+          var serverData = res.data;
+          var displayId = serverData.inspectionId;
+          toast('검사 결과가 저장되었습니다. (ID: ' + displayId + ')', 'success');
+          showSaveResult(serverData);
           // 저장 성공 시 현재 임계값을 localStorage에 확정 저장
           saveThresholdToStorage(getThresholdValue());
           // 10단계: MES 전송
-          sendToMes(res.data);
+          sendToMes(serverData);
           // 저장 후 이력 데이터 갱신 (캐시 초기화)
           refreshHistoryData();
+        } else if (res.success && !res.data) {
+          // 서버가 success=true지만 data가 없는 경우 (비정상)
+          console.warn('[PS-INSP] 서버 응답에 data 필드 누락:', res);
+          var fallbackData = {};
+          Object.keys(metadata).forEach(function(k) { fallbackData[k] = metadata[k]; });
+          if (m) {
+            fallbackData.totalCount = m.totalCount;
+            fallbackData.coverageRatio = m.coverageRatio;
+            fallbackData.autoCount = m.autoCount;
+            fallbackData.manualCount = m.manualCount;
+            fallbackData.thresholdMax = m.thresholdMax;
+          }
+          toast('검사 결과가 저장되었습니다. (서버 응답 확인 필요)', 'success');
+          showSaveResult(fallbackData);
+          saveThresholdToStorage(getThresholdValue());
+          sendToMes(fallbackData);
+          refreshHistoryData();
         } else {
+          // 저장 실패
           var msg = res.message || '저장 실패';
+          if (res.code) msg = '[' + res.code + '] ' + msg;
           if (res.data && typeof res.data === 'object') {
             var errs = Object.entries(res.data).map(function (e) { return e[0] + ': ' + e[1]; });
-            if (errs.length) msg = errs.join(', ');
+            if (errs.length) msg += ' (' + errs.join(', ') + ')';
           }
+          console.error('[PS-INSP] 저장 실패:', res);
           toast(msg, 'error');
         }
       })
-      .catch(function (e) { toast('저장 오류: ' + e.message, 'error'); })
+      .catch(function (e) {
+        console.error('[PS-INSP] 저장 오류:', e);
+        toast('저장 오류: ' + e.message, 'error');
+      })
       .finally(function () {
         if (btnSave) { btnSave.disabled = false; btnSave.textContent = '검사 결과 저장'; }
       });
@@ -1255,10 +1381,17 @@
     var el = document.getElementById('saveResult');
     var body = document.getElementById('saveResultBody');
     if (!el || !body) return;
-    var covPPM = data.coverageRatio != null ? (data.coverageRatio * 1000000).toFixed(1) + ' PPM' : '-';
+    // coverageRatio가 0~1 소수인 경우와 이미 PPM 단위인 경우 모두 처리
+    var covRatio = data.coverageRatio;
+    var covPPM = '-';
+    if (covRatio != null) {
+      var ppmVal = covRatio < 1 ? covRatio * 1000000 : covRatio;
+      covPPM = ppmVal.toFixed(1) + ' PPM';
+    }
     var thMax = data.thresholdMax != null ? data.thresholdMax : getThresholdValue();
+    var displayId = data.inspectionId != null ? data.inspectionId : '(저장 완료)';
     body.innerHTML = '<div class="result-summary">'
-      + '<div class="result-item"><div class="label">검사 ID</div><div class="value blue">' + data.inspectionId + '</div></div>'
+      + '<div class="result-item"><div class="label">검사 ID</div><div class="value blue">' + displayId + '</div></div>'
       + '<div class="result-item"><div class="label">총 지분수</div><div class="value green">' + (data.totalCount || 0) + '</div></div>'
       + '<div class="result-item"><div class="label">후면 지분 값(PPM)</div><div class="value orange">' + covPPM + '</div></div>'
       + '<div class="result-item"><div class="label">최대 임계값</div><div class="value blue">' + thMax + '</div></div>'
@@ -1363,10 +1496,10 @@
         + '<div>' + origImg + '<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:4px;">검사 전 (원본)</div></div>'
         + '<div>' + resImg + '<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:4px;">검사 후 (마킹)</div></div>'
         + '<div class="history-card-info">'
-        + '<div class="hci-title">' + esc(i.matnr || '-') + ' ' + stBadge + '</div>'
+        + '<div class="hci-title">' + esc(i.indBcd || '-') + ' ' + stBadge + '</div>'
+        + '<div class="hci-row"><b>자재코드:</b> ' + esc(i.matnr || '-') + '</div>'
         + '<div class="hci-row"><b>자재명:</b> ' + esc(i.matnrNm || '-') + '</div>'
-        + '<div class="hci-row"><b>LOT:</b> ' + esc(i.lotnr || '-') + '</div>'
-        + '<div class="hci-row"><b>바코드:</b> ' + esc(i.indBcd || '-') + ' (차수: ' + esc(i.indBcdSeq || '-') + ')</div>'
+        + '<div class="hci-row"><b>LOT:</b> ' + esc(i.lotnr || '-') + ' (차수: ' + esc(i.indBcdSeq || '-') + ')</div>'
         + '<div class="hci-row"><b>총 지분수:</b> <strong>' + (i.totalCount || 0) + '</strong></div>'
         + '<div class="hci-row"><b>후면 지분 값(PPM):</b> <strong style="color:var(--orange);">' + covPPM + '</strong></div>'
         + '<div class="hci-row"><b>자동:</b> ' + (i.autoCount || 0) + ' | <b>수동:</b> ' + (i.manualCount || 0) + '</div>'
@@ -1630,14 +1763,14 @@
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'PS 후면 지분검사 이력');
 
-    var now = new Date();
-    var dateStr = now.getFullYear()
-      + ('0' + (now.getMonth() + 1)).slice(-2)
-      + ('0' + now.getDate()).slice(-2)
-      + '_' + ('0' + now.getHours()).slice(-2)
-      + ('0' + now.getMinutes()).slice(-2);
 
-    XLSX.writeFile(wb, 'PS_후면지분검사_이력_' + dateStr + '.xlsx');
+    var now_kst = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+    var dateStr_kst = now_kst.getUTCFullYear()
+      + ('0' + (now_kst.getUTCMonth() + 1)).slice(-2)
+      + ('0' + now_kst.getUTCDate()).slice(-2)
+      + '_' + ('0' + now_kst.getUTCHours()).slice(-2)
+      + ('0' + now_kst.getUTCMinutes()).slice(-2);
+    XLSX.writeFile(wb, 'PS_후면지분검사_이력_' + dateStr_kst + '.xlsx');
     toast('엑셀 파일(.xlsx)이 다운로드됩니다.', 'success');
   };
 
@@ -1679,58 +1812,218 @@
   };
 
   // ══════════════════════════════════════════════
-  // ADMIN 설정 (PPM 기준값 관리)
+  // ADMIN 설정 (PPM 기준값 + 권한자 관리 - 공통코드 DB 연동)
+  //
+  // 권한 체계:
+  //   - PPM_ADMIN 코드에 등록된 사용자만 기준값/권한자 수정 가능
+  //   - 로그인 토큰으로 자동 인증 (비밀번호 불필요)
   // ══════════════════════════════════════════════
-  var ADMIN_DEFAULT_PWD = '1234'; // 초기 비밀번호
 
-  function hashPwd(pwd) {
-    // 간단한 해시 (보안보다는 실수 방지 목적)
-    var h = 0;
-    for (var i = 0; i < pwd.length; i++) {
-      h = ((h << 5) - h) + pwd.charCodeAt(i);
-      h |= 0;
-    }
-    return String(h);
-  }
+  // 관리자 설정 모달 내부 상태
+  var _adminModalState = {
+    isAdmin: false,
+    currentUser: '',
+    adminIds: []
+  };
 
   window.openAdminSettings = function () {
     var modal = document.getElementById('adminSettingsModal');
-    var ppmInput = document.getElementById('adminPpmLimit');
-    var pwdInput = document.getElementById('adminPassword');
     if (!modal) return;
-    // 현재 저장된 기준값 로드
-    var cur = getPpmLimit();
-    if (ppmInput) ppmInput.value = cur > 0 ? cur : '';
-    if (pwdInput) pwdInput.value = '';
     modal.style.display = 'flex';
+
+    // 로딩 표시
+    var adminListEl = document.getElementById('adminListContainer');
+    if (adminListEl) adminListEl.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+
+    // PPM 기준값 + 권한자 정보를 동시에 로드
+    Promise.all([
+      api('GET', '/ps-insp-api/config/ppm-limit'),
+      loadPpmAdmins()
+    ]).then(function (results) {
+      var ppmRes = results[0];
+      var adminData = results[1];
+
+      // PPM 기준값 반영
+      var ppmInput = document.getElementById('adminPpmLimit');
+      if (ppmRes.success && ppmRes.data) {
+        var cur = parseFloat(ppmRes.data.ppmLimit) || 0;
+        _cachedPpmLimit = cur;
+        if (ppmInput) ppmInput.value = cur > 0 ? cur : '';
+        _adminModalState.isAdmin = !!ppmRes.data.isAdmin;
+      } else {
+        var cur2 = getPpmLimit();
+        if (ppmInput) ppmInput.value = cur2 > 0 ? cur2 : '';
+      }
+
+      // 권한자 목록 반영
+      _adminModalState.currentUser = adminData.currentUser || '';
+      _adminModalState.adminIds = adminData.adminIds || [];
+      _adminModalState.isAdmin = adminData.isAdmin || _adminModalState.isAdmin;
+
+      renderAdminSettingsUI();
+    }).catch(function (e) {
+      console.warn('[PS-INSP] 관리자 설정 로드 실패:', e);
+      var ppmInput = document.getElementById('adminPpmLimit');
+      var cur3 = getPpmLimit();
+      if (ppmInput) ppmInput.value = cur3 > 0 ? cur3 : '';
+      renderAdminSettingsUI();
+    });
   };
+
+  /**
+   * 관리자 설정 모달 UI 렌더링
+   * 권한자인 경우: 편집 가능 / 비권한자: 읽기 전용
+   */
+  function renderAdminSettingsUI() {
+    var isAdmin = _adminModalState.isAdmin;
+    var adminIds = _adminModalState.adminIds;
+    var currentUser = _adminModalState.currentUser;
+
+    // 현재 사용자 표시
+    var userInfoEl = document.getElementById('adminCurrentUser');
+    if (userInfoEl) {
+      if (currentUser) {
+        userInfoEl.innerHTML = '<b>' + esc(currentUser) + '</b>'
+          + (isAdmin
+            ? ' <span class="badge badge-active">권한자</span>'
+            : ' <span class="badge badge-inactive">조회 전용</span>');
+      } else {
+        userInfoEl.innerHTML = '<span style="color:var(--text3);">로그인 정보 없음</span>';
+      }
+    }
+
+    // PPM 입력 필드 권한 처리
+    var ppmInput = document.getElementById('adminPpmLimit');
+    var btnSavePpm = document.getElementById('btnSavePpm');
+    if (ppmInput) ppmInput.disabled = !isAdmin;
+    if (btnSavePpm) btnSavePpm.disabled = !isAdmin;
+
+    // 권한자 목록 렌더링
+    var adminListEl = document.getElementById('adminListContainer');
+    if (!adminListEl) return;
+
+    if (adminIds.length === 0) {
+      adminListEl.innerHTML = '<div class="empty-msg">등록된 권한자가 없습니다.</div>';
+    } else {
+      var html = '<ul class="admin-id-list">';
+      adminIds.forEach(function (id) {
+        var isSelf = (id === currentUser);
+        html += '<li class="admin-id-item">';
+        html += '<span class="admin-id-name">' + esc(id) + '</span>';
+        if (isSelf) html += ' <span class="badge badge-active" style="font-size:10px;">나</span>';
+        if (isAdmin && !isSelf) {
+          html += ' <button class="btn-icon admin-id-remove" title="삭제" onclick="removeAdminId(\'' + esc(id) + '\')">&times;</button>';
+        }
+        html += '</li>';
+      });
+      html += '</ul>';
+      adminListEl.innerHTML = html;
+    }
+
+    // 권한자 추가 입력 영역
+    var addSection = document.getElementById('adminAddSection');
+    if (addSection) addSection.style.display = isAdmin ? 'flex' : 'none';
+
+    // 비권한자 안내 메시지
+    var noAuthMsg = document.getElementById('adminNoAuthMsg');
+    if (noAuthMsg) noAuthMsg.style.display = isAdmin ? 'none' : 'block';
+  }
 
   window.closeAdminSettings = function () {
     document.getElementById('adminSettingsModal').style.display = 'none';
+    // 입력 필드 초기화
+    var addInput = document.getElementById('adminAddId');
+    if (addInput) addInput.value = '';
   };
 
-  window.saveAdminSettings = function () {
-    var pwd = val('adminPassword');
-    if (!pwd) { toast('비밀번호를 입력해주세요.', 'error'); return; }
-
-    // 비밀번호 확인
-    var storedHash = null;
-    try { storedHash = localStorage.getItem(ADMIN_PWD_HASH_KEY); } catch (e) { }
-    var expectedHash = storedHash || hashPwd(ADMIN_DEFAULT_PWD);
-    if (hashPwd(pwd) !== expectedHash) {
-      toast('비밀번호가 일치하지 않습니다.', 'error');
+  /** PPM 기준값 저장 (권한자 인증은 서버에서 토큰으로 자동 수행) */
+  window.saveAdminPpmLimit = function () {
+    if (!_adminModalState.isAdmin) {
+      toast('PPM 기준값 수정 권한이 없습니다.', 'error');
       return;
     }
 
     var ppmVal = parseFloat(val('adminPpmLimit')) || 0;
-    savePpmLimit(ppmVal);
+    var btnSave = document.getElementById('btnSavePpm');
+    if (btnSave) { btnSave.disabled = true; btnSave.textContent = '저장 중...'; }
 
-    closeAdminSettings();
-    if (ppmVal > 0) {
-      toast('기준값이 ' + ppmVal.toFixed(1) + ' PPM으로 설정되었습니다.', 'success');
-    } else {
-      toast('PPM 기준값 알림이 비활성화되었습니다.', 'info');
+    savePpmLimitToServer(ppmVal)
+      .then(function (res) {
+        if (res.success) {
+          if (ppmVal > 0) {
+            toast('기준값이 ' + ppmVal.toFixed(1) + ' PPM으로 설정되었습니다.', 'success');
+          } else {
+            toast('PPM 기준값 알림이 비활성화되었습니다.', 'info');
+          }
+        } else {
+          toast(res.message || '기준값 저장 실패', 'error');
+        }
+      })
+      .catch(function (e) {
+        toast('기준값 저장 오류: ' + e.message, 'error');
+      })
+      .finally(function () {
+        if (btnSave) { btnSave.disabled = false; btnSave.textContent = '저장'; }
+      });
+  };
+
+  /** 권한자 ID 추가 */
+  window.addAdminId = function () {
+    var input = document.getElementById('adminAddId');
+    var newId = input ? input.value.trim() : '';
+    if (!newId) { toast('추가할 사용자 ID를 입력해주세요.', 'error'); return; }
+    if (_adminModalState.adminIds.indexOf(newId) >= 0) {
+      toast('이미 등록된 권한자입니다: ' + newId, 'error');
+      return;
     }
+
+    var newList = _adminModalState.adminIds.slice();
+    newList.push(newId);
+
+    savePpmAdmins(newList)
+      .then(function (res) {
+        if (res.success && res.data) {
+          _adminModalState.adminIds = res.data.adminIds || newList;
+          renderAdminSettingsUI();
+          if (input) input.value = '';
+          toast('권한자가 추가되었습니다: ' + newId, 'success');
+        } else {
+          toast(res.message || '권한자 추가 실패', 'error');
+        }
+      })
+      .catch(function (e) {
+        toast('권한자 추가 오류: ' + e.message, 'error');
+      });
+  };
+
+  /** 권한자 ID 삭제 */
+  window.removeAdminId = function (id) {
+    if (id === _adminModalState.currentUser) {
+      toast('자기 자신은 삭제할 수 없습니다.', 'error');
+      return;
+    }
+    if (!confirm('권한자 "' + id + '"를 삭제하시겠습니까?')) return;
+
+    var newList = _adminModalState.adminIds.filter(function (a) { return a !== id; });
+
+    savePpmAdmins(newList)
+      .then(function (res) {
+        if (res.success && res.data) {
+          _adminModalState.adminIds = res.data.adminIds || newList;
+          renderAdminSettingsUI();
+          toast('권한자가 삭제되었습니다: ' + id, 'success');
+        } else {
+          toast(res.message || '권한자 삭제 실패', 'error');
+        }
+      })
+      .catch(function (e) {
+        toast('권한자 삭제 오류: ' + e.message, 'error');
+      });
+  };
+
+  /** 하위호환: saveAdminSettings (이전 버전 호출 시 PPM 저장으로 리다이렉트) */
+  window.saveAdminSettings = function () {
+    window.saveAdminPpmLimit();
   };
 
   // ══════════════════════════════════════════════
