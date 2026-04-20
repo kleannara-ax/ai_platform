@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * </ul>
  * <p>PS_INSP_ADMIN 그룹 하위 코드:
  * <ul>
- *   <li>CODE = 사용자 ID (admin, ykcho 등) - 각 행이 PPM 수정 권한자 1명</li>
+ *   <li>PPM_ADMIN    - extraValue1: 수정 권한자 ID 목록 (콤마 구분)</li>
  * </ul>
  */
 @Entity
