@@ -30,6 +30,11 @@ jwt:
   access-token-expiration: 3600000
   refresh-token-expiration: 604800000
 
+# ── PS-INSP 모듈 설정 ──
+ps-insp:
+  upload:
+    dir: ${PS_INSP_UPLOAD_DIR:/data/upload/ps_cov_ins}
+
 logging:
   level:
     root: WARN

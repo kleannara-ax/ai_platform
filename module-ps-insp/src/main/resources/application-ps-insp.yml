@@ -11,7 +11,7 @@
 # PS-INSP 모듈 설정
 ps-insp:
   upload:
-    dir: /data/upload/ps_cov_ins   # 이미지 저장 경로
+    dir: ${PS_INSP_UPLOAD_DIR:/data/upload/ps_cov_ins}   # 이미지 저장 경로 (환경변수로 재정의 가능)
   mes:
     endpoint-url:                   # MES 전송 URL (비어있으면 mock 모드)
 

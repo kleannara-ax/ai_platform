@@ -44,6 +44,9 @@ public class PsInspectionService {
     @Value("${ps-insp.upload.dir:/data/upload/ps_cov_ins}")
     private String uploadDir;
 
+    /** 실제로 사용되는 (검증된) 업로드 경로 – 최초 저장 시 한 번만 결정 */
+    private volatile String resolvedUploadDir;
+
     // ──────────── 저장 (Upsert) ────────────
 
     @Transactional
@@ -91,11 +94,11 @@ public class PsInspectionService {
             inspection.updateOriginalImage(
                     origPath != null ? origPath : request.getOriginalImagePath(),
                     origPath != null ? fileName(origPath) : inspection.getOriginalImageName(),
-                    origPath != null ? uploadDir + "/original/" + yearMonth : inspection.getOriginalImageDir());
+                    origPath != null ? getResolvedUploadDir() + "/original/" + yearMonth : inspection.getOriginalImageDir());
             inspection.updateResultImage(
                     resPath != null ? resPath : request.getResultImagePath(),
                     resPath != null ? fileName(resPath) : inspection.getResultImageName(),
-                    resPath != null ? uploadDir + "/result/" + yearMonth : inspection.getResultImageDir());
+                    resPath != null ? getResolvedUploadDir() + "/result/" + yearMonth : inspection.getResultImageDir());
             inspection.updateMatnrNm(request.getMatnrNm());
             inspection.incrementSeq();       // 차수(seq) 증가: 1→2→3…
             inspection.incrementIndBcdSeq(); // 바코드차수(indBcdSeq) 증가
@@ -166,11 +169,11 @@ public class PsInspectionService {
             inspection.updateOriginalImage(
                     origPath != null ? origPath : request.getOriginalImagePath(),
                     origPath != null ? fileName(origPath) : null,
-                    origPath != null ? uploadDir + "/original/" + yearMonth : null);
+                    origPath != null ? getResolvedUploadDir() + "/original/" + yearMonth : null);
             inspection.updateResultImage(
                     resPath != null ? resPath : request.getResultImagePath(),
                     resPath != null ? fileName(resPath) : null,
-                    resPath != null ? uploadDir + "/result/" + yearMonth : null);
+                    resPath != null ? getResolvedUploadDir() + "/result/" + yearMonth : null);
         }
 
         inspection = inspectionRepository.save(inspection);
@@ -263,13 +266,58 @@ public class PsInspectionService {
 
     // ──────────── 이미지 저장 ────────────
 
+    /**
+     * 쓰기 가능한 업로드 디렉토리를 결정한다.
+     * 1) application.yml 의 ps-insp.upload.dir (환경변수 PS_INSP_UPLOAD_DIR)
+     * 2) 1번 경로 생성 실패 시 → 시스템 임시 디렉토리(java.io.tmpdir)/ps_cov_ins
+     *
+     * 한 번 결정되면 resolvedUploadDir 에 캐시.
+     */
+    private String getResolvedUploadDir() {
+        if (resolvedUploadDir != null) return resolvedUploadDir;
+
+        synchronized (this) {
+            if (resolvedUploadDir != null) return resolvedUploadDir;
+
+            // 1차 시도: 설정된 경로
+            Path primary = Paths.get(uploadDir);
+            try {
+                if (!Files.exists(primary)) Files.createDirectories(primary);
+                if (Files.isWritable(primary)) {
+                    resolvedUploadDir = uploadDir;
+                    log.info("[PS-INSP] 이미지 업로드 디렉토리 확인 완료: {}", resolvedUploadDir);
+                    return resolvedUploadDir;
+                }
+                log.warn("[PS-INSP] 설정된 업로드 경로가 쓰기 불가 (Read-only): {}", uploadDir);
+            } catch (IOException e) {
+                log.warn("[PS-INSP] 설정된 업로드 경로 생성 실패: {} → {}", uploadDir, e.getMessage());
+            }
+
+            // 2차 시도: 시스템 임시 디렉토리
+            String tmpBase = System.getProperty("java.io.tmpdir", "/tmp");
+            String fallback = tmpBase + "/ps_cov_ins";
+            Path fallbackPath = Paths.get(fallback);
+            try {
+                if (!Files.exists(fallbackPath)) Files.createDirectories(fallbackPath);
+                resolvedUploadDir = fallback;
+                log.warn("[PS-INSP] 임시 업로드 디렉토리로 전환: {} (운영서버에서는 PS_INSP_UPLOAD_DIR 환경변수를 쓰기 가능한 경로로 설정하세요)", resolvedUploadDir);
+            } catch (IOException e2) {
+                // 최후 수단: java.io.tmpdir 자체
+                resolvedUploadDir = tmpBase;
+                log.error("[PS-INSP] fallback 디렉토리도 생성 실패. java.io.tmpdir 사용: {}", resolvedUploadDir, e2);
+            }
+            return resolvedUploadDir;
+        }
+    }
+
     private Path getImageSubDir(String category) {
         String yearMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM"));
-        Path dir = Paths.get(uploadDir, category, yearMonth);
+        String baseDir = getResolvedUploadDir();
+        Path dir = Paths.get(baseDir, category, yearMonth);
         try {
             if (!Files.exists(dir)) Files.createDirectories(dir);
         } catch (IOException e) {
-            log.error("[PS-INSP] 이미지 디렉토리 생성 실패 - dir: {}", dir, e);
+            log.error("[PS-INSP] 이미지 디렉토리 생성 실패 - dir: {} (원인: {})", dir, e.getMessage());
         }
         return dir;
     }
@@ -293,11 +341,13 @@ public class PsInspectionService {
                     prefix, matnrSafe, indBcdSafe, timestamp, idSuffix, ext);
             Path filePath = dir.resolve(filename);
             file.transferTo(filePath.toFile());
+            log.info("[PS-INSP] 이미지 저장 완료 - path: {}, size: {} bytes", filePath, file.getSize());
 
             String yearMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM"));
             return String.format("/uploads/%s/%s/%s", category, yearMonth, filename);
         } catch (IOException e) {
-            log.error("[PS-INSP] 이미지 저장 실패 - prefix: {}", prefix, e);
+            log.error("[PS-INSP] 이미지 저장 실패 - prefix: {}, dir: {}, resolvedUploadDir: {}, 원인: {}",
+                    prefix, getResolvedUploadDir(), uploadDir, e.getMessage(), e);
             return null;
         }
     }
