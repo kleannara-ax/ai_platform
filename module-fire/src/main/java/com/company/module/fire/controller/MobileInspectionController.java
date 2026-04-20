@@ -55,6 +55,7 @@ public class MobileInspectionController {
     private static final String MSG_EMPTY_SERIAL = "QR \uD0A4\uAC00 \uBE44\uC5B4 \uC788\uC2B5\uB2C8\uB2E4.";
 
     @GetMapping("/extinguishers/by-key")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExtByKey(
             @RequestParam String key) {
 
@@ -83,6 +84,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/extinguishers/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExtById(@PathVariable Long id) {
         Extinguisher e = extinguisherRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
@@ -317,6 +319,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/extinguishers/mapdata")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExtMapData(
             @RequestParam Long buildingId,
             @RequestParam Long floorId) {
@@ -350,6 +353,7 @@ public class MobileInspectionController {
 
 
     @GetMapping("/hydrants/by-key")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getHydByKey(
             @RequestParam String key) {
 
@@ -380,6 +384,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/hydrants/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getHydById(@PathVariable Long id) {
         FireHydrant h = fireHydrantRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
@@ -593,6 +598,7 @@ public class MobileInspectionController {
         }
     }
     @GetMapping("/hydrants/mapdata")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getHydMapData(
             @RequestParam Long buildingId,
             @RequestParam Long floorId) {
@@ -626,6 +632,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/receivers/by-key")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getReceiverByKey(@RequestParam String key) {
         String qrKey = key == null ? "" : key.trim();
         Optional<FireReceiver> opt = fireReceiverRepository.findByQrKey(qrKey);
@@ -708,6 +715,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/receivers/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getReceiverById(@PathVariable Long id) {
         FireReceiver receiver = fireReceiverRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
@@ -814,6 +822,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/pumps/by-key")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getPumpByKey(@RequestParam String key) {
         String qrKey = key == null ? "" : key.trim();
         Optional<FirePump> opt = firePumpRepository.findByQrKey(qrKey);
@@ -896,6 +905,7 @@ public class MobileInspectionController {
     }
 
     @GetMapping("/pumps/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getPumpById(@PathVariable Long id) {
         FirePump pump = firePumpRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
