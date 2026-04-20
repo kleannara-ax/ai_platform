@@ -1,8 +1,8 @@
 (function(){
-  const HOST_ID = 'fwExtModalHost';
-  const FRAME_ID = 'fwExtModalFrame';
-  const CLOSE_ID = 'fwExtModalClose';
-  const CLOSE_RE = /^fireweb:ext-(edit|details|inspect)-close$/;
+  const HOST_ID = 'fwPmpModalHost';
+  const FRAME_ID = 'fwPmpModalFrame';
+  const CLOSE_ID = 'fwPmpModalClose';
+  const CLOSE_RE = /^fireweb:(equipment-(details|inspect|edit)-close|outdoor-edit-close)$/;
   let activeRequest = null;
   let closingReason = null;
 
@@ -17,7 +17,7 @@
       console.error(err);
     }
 
-    document.dispatchEvent(new CustomEvent('fireweb:ext-modal-close', {
+    document.dispatchEvent(new CustomEvent('fireweb:pump-modal-close', {
       detail: {
         reason,
         mode: request.mode,
@@ -43,7 +43,7 @@
       `  <div class="modal-content" style="position:relative;height:100%;background:transparent;border:0;box-shadow:none;border-radius:18px;overflow:hidden;">`,
       `    <button type="button" id="${CLOSE_ID}" aria-label="닫기" style="position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border:0;border-radius:999px;background:transparent;color:#475569;font-size:20px;line-height:1;cursor:pointer;">\u00d7</button>`,
       '    <div class="modal-body" style="padding:0;height:100%;background:transparent;overflow:hidden;">',
-      `      <iframe id="${FRAME_ID}" title="소화기 작업" style="width:100%;height:100%;border:0;background:transparent;display:block;"></iframe>`,
+      `      <iframe id="${FRAME_ID}" title="소방펌프 작업" style="width:100%;height:100%;border:0;background:transparent;display:block;"></iframe>`,
       '    </div>',
       '  </div>',
       '</div>'
@@ -73,7 +73,6 @@
       closingReason = 'dismiss';
       bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     });
-
     return modalEl;
   }
 
@@ -100,12 +99,13 @@
       query.set('edit', String(options.id));
     }
 
-    ['buildingId', 'floorId', 'buildingName', 'floorName', 'x', 'y', 'noMap'].forEach((key) => {
-      const value = options?.[key];
-      if (value !== undefined && value !== null && value !== '') {
-        query.set(key, String(value));
-      }
-    });
+    ['buildingId', 'floorId', 'buildingName', 'floorName', 'x', 'y', 'noMap']
+      .forEach((key) => {
+        const value = options?.[key];
+        if (value !== undefined && value !== null && value !== '') {
+          query.set(key, String(value));
+        }
+      });
 
     return query;
   }
@@ -116,7 +116,7 @@
     if (!frame) return;
 
     closingReason = null;
-    frame.src = `/extinguishers.html?${buildQuery(options).toString()}`;
+    frame.src = `/pumps.html?${buildQuery(options).toString()}`;
     activeRequest = {
       mode: options?.mode || 'details',
       options: { ...(options || {}) },
@@ -126,5 +126,5 @@
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
 
-  window.FireWebExtinguisherModal = { open };
+  window.FireWebPumpModal = { open };
 })();
