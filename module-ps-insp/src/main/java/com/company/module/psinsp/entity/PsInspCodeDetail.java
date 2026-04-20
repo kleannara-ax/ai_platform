@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * <p>module-ps-insp는 module-common에 직접 의존하지 않으므로,
  * code_detail 테이블을 읽고 쓰기 위한 독립적인 Entity를 정의합니다.
  *
- * <p>PS_INSP_CONFIG 그룹 하위 코드:
+ * <p>PS_INSP_PPM_LIMIT 그룹 하위 코드:
  * <ul>
  *   <li>PPM_LIMIT    - extraValue1: PPM 기준값 (0 = 비활성)</li>
  *   <li>PPM_ADMIN    - extraValue1: 권한자 ID 목록 (콤마 구분)</li>
