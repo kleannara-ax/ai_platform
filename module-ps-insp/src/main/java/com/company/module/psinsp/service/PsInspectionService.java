@@ -15,9 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -286,11 +289,14 @@ public class PsInspectionService {
                 if (Files.isWritable(primary)) {
                     resolvedUploadDir = uploadDir;
                     log.info("[PS-INSP] 이미지 업로드 디렉토리 확인 완료: {}", resolvedUploadDir);
+                    logPathDiagnostics(primary);
                     return resolvedUploadDir;
                 }
                 log.warn("[PS-INSP] 설정된 업로드 경로가 쓰기 불가 (Read-only): {}", uploadDir);
+                logPathDiagnostics(primary);
             } catch (IOException e) {
-                log.warn("[PS-INSP] 설정된 업로드 경로 생성 실패: {} → {}", uploadDir, e.getMessage());
+                log.warn("[PS-INSP] 설정된 업로드 경로 생성 실패: {} → {}", uploadDir, e.getMessage(), e);
+                logPathDiagnostics(primary);
             }
 
             // 2차 시도: 시스템 임시 디렉토리
@@ -315,11 +321,77 @@ public class PsInspectionService {
         String baseDir = getResolvedUploadDir();
         Path dir = Paths.get(baseDir, category, yearMonth);
         try {
-            if (!Files.exists(dir)) Files.createDirectories(dir);
+            if (!Files.exists(dir)) {
+                log.info("[PS-INSP] 디렉토리 생성 시도 - target: {}", dir);
+                // 상위 디렉토리 존재 여부 및 권한 진단
+                Path parent = dir.getParent();
+                if (parent != null) {
+                    log.info("[PS-INSP] 상위 디렉토리 상태 - path: {}, exists: {}, writable: {}",
+                            parent, Files.exists(parent), Files.exists(parent) && Files.isWritable(parent));
+                    if (Files.exists(parent)) logPathDiagnostics(parent);
+                }
+                Files.createDirectories(dir);
+                log.info("[PS-INSP] 디렉토리 생성 완료 - dir: {}", dir);
+            }
         } catch (IOException e) {
-            log.error("[PS-INSP] 이미지 디렉토리 생성 실패 - dir: {} (원인: {})", dir, e.getMessage());
+            log.error("[PS-INSP] ============ 이미지 디렉토리 생성 실패 상세 ============");
+            log.error("[PS-INSP] 대상 경로: {}", dir);
+            log.error("[PS-INSP] Exception 클래스: {}", e.getClass().getName());
+            log.error("[PS-INSP] Exception 메시지: {}", e.getMessage());
+            log.error("[PS-INSP] 설정된 uploadDir: {}", uploadDir);
+            log.error("[PS-INSP] resolvedUploadDir: {}", resolvedUploadDir);
+            log.error("[PS-INSP] Java 실행 계정: {}", System.getProperty("user.name"));
+            log.error("[PS-INSP] java.io.tmpdir: {}", System.getProperty("java.io.tmpdir"));
+            // 경로 각 단계별 진단
+            Path current = dir;
+            while (current != null) {
+                logPathDiagnostics(current);
+                if (current.equals(Paths.get("/"))) break;
+                current = current.getParent();
+            }
+            log.error("[PS-INSP] 전체 스택트레이스:", e);
+            log.error("[PS-INSP] ============ 진단 끝 ============");
         }
         return dir;
+    }
+
+    /**
+     * 경로의 존재여부, 권한, 소유자, 파일시스템 정보를 로그로 출력
+     */
+    private void logPathDiagnostics(Path path) {
+        try {
+            if (!Files.exists(path)) {
+                log.info("[PS-INSP] 경로 진단 - path: {} → 존재하지 않음", path);
+                return;
+            }
+            boolean readable = Files.isReadable(path);
+            boolean writable = Files.isWritable(path);
+            boolean executable = Files.isExecutable(path);
+            log.info("[PS-INSP] 경로 진단 - path: {}, readable: {}, writable: {}, executable: {}",
+                    path, readable, writable, executable);
+
+            // POSIX 권한 (Linux)
+            try {
+                PosixFileAttributes attrs = Files.readAttributes(path, PosixFileAttributes.class);
+                log.info("[PS-INSP] 경로 POSIX - path: {}, owner: {}, group: {}, permissions: {}",
+                        path, attrs.owner().getName(), attrs.group().getName(),
+                        PosixFilePermissions.toString(attrs.permissions()));
+            } catch (Exception ignore) {
+                // Windows 등 POSIX 미지원
+            }
+
+            // 파일시스템 정보
+            try {
+                FileStore store = Files.getFileStore(path);
+                log.info("[PS-INSP] 파일시스템 - path: {}, type: {}, name: {}, readOnly: {}, totalSpace: {}MB, usableSpace: {}MB",
+                        path, store.type(), store.name(), store.isReadOnly(),
+                        store.getTotalSpace() / 1024 / 1024, store.getUsableSpace() / 1024 / 1024);
+            } catch (Exception e) {
+                log.warn("[PS-INSP] 파일시스템 정보 조회 실패 - path: {}, 원인: {}", path, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("[PS-INSP] 경로 진단 실패 - path: {}, 원인: {}", path, e.getMessage());
+        }
     }
 
     private String saveUploadedImage(MultipartFile file, String prefix, Long inspectionId,
