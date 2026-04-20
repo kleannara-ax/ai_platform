@@ -827,35 +827,41 @@
       var cy = comp.centroid.y;
 
       if (comp.source === 'auto') {
-        // Red marker for auto-detected
-        var r = Math.max(4, Math.min(12, Math.sqrt(comp.size)));
+        // Red marker - fit to actual detected size
+        var eqR = Math.sqrt(comp.size / Math.PI); // 실제 등가 반지름
+        var r = Math.max(1.5, Math.min(6, eqR));  // 최소 1.5px, 최대 6px
+
+        // 바운딩 박스 대신 검출 영역에 딱 맞는 원 테두리만 표시
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(220,38,38,0.55)';
-        ctx.fill();
-
-        // Bounding box
-        if (comp.bbox) {
-          ctx.strokeStyle = 'rgba(185,28,28,0.9)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(comp.bbox.minX, comp.bbox.minY,
-            comp.bbox.maxX - comp.bbox.minX, comp.bbox.maxY - comp.bbox.minY);
-        }
-      } else {
-        // Green marker for manual
-        ctx.beginPath();
-        ctx.arc(cx, cy, MANUAL_COMPONENT_RADIUS, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(16,185,129,0.65)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(5,150,105,0.9)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(220,38,38,0.85)';
+        ctx.lineWidth = 1;
         ctx.stroke();
+
+        // 중심점 (작은 점)
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(0.8, r * 0.35), 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(220,38,38,0.7)';
+        ctx.fill();
+      } else {
+        // Green marker for manual (also smaller)
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(5,150,105,0.9)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 1, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(16,185,129,0.8)';
+        ctx.fill();
       }
 
-      // Number label
-      ctx.fillStyle = '#000';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(String(idx + 1), cx + (comp.source === 'auto' ? 6 : 10), cy - 4);
+      // Number label (smaller, only show for small count)
+      if (combined.length <= 50) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(String(idx + 1), cx + (comp.source === 'auto' ? 4 : 6), cy - 3);
+      }
     });
   }
 
