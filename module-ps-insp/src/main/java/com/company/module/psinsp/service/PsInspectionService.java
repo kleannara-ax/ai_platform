@@ -282,20 +282,20 @@ public class PsInspectionService {
         synchronized (this) {
             if (resolvedUploadDir != null) return resolvedUploadDir;
 
-            // 1차 시도: 설정된 경로
+            // 1차 시도: 설정된 경로 (실제 파일 쓰기로 검증 — Files.isWritable()은 XFS 등에서 부정확)
             Path primary = Paths.get(uploadDir);
             try {
                 if (!Files.exists(primary)) Files.createDirectories(primary);
-                if (Files.isWritable(primary)) {
-                    resolvedUploadDir = uploadDir;
-                    log.info("[PS-INSP] 이미지 업로드 디렉토리 확인 완료: {}", resolvedUploadDir);
-                    logPathDiagnostics(primary);
-                    return resolvedUploadDir;
-                }
-                log.warn("[PS-INSP] 설정된 업로드 경로가 쓰기 불가 (Read-only): {}", uploadDir);
+                // 실제 임시 파일 생성/삭제로 쓰기 가능 여부 검증
+                Path testFile = primary.resolve(".write_test_" + System.currentTimeMillis());
+                Files.createFile(testFile);
+                Files.delete(testFile);
+                resolvedUploadDir = uploadDir;
+                log.info("[PS-INSP] 이미지 업로드 디렉토리 확인 완료 (쓰기 테스트 성공): {}", resolvedUploadDir);
                 logPathDiagnostics(primary);
+                return resolvedUploadDir;
             } catch (IOException e) {
-                log.warn("[PS-INSP] 설정된 업로드 경로 생성 실패: {} → {}", uploadDir, e.getMessage(), e);
+                log.warn("[PS-INSP] 설정된 업로드 경로 쓰기 불가: {} → {}", uploadDir, e.getMessage(), e);
                 logPathDiagnostics(primary);
             }
 
