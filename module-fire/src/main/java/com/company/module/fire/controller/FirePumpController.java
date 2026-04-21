@@ -57,14 +57,14 @@ public class FirePumpController {
     }
 
     @PostMapping
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<FirePumpResponse>> save(
             @Valid @RequestBody FirePumpSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(firePumpService.save(request)));
     }
 
     @PostMapping("/{id}/inspect")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<FirePumpResponse>> inspect(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionRequest request,
@@ -79,7 +79,7 @@ public class FirePumpController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<FirePumpResponse>> updateInspection(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -90,7 +90,7 @@ public class FirePumpController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<FirePumpResponse>> addInspection(
             @PathVariable Long id,
             @Valid @RequestBody EquipmentInspectionUpdateRequest request) {
@@ -113,7 +113,7 @@ public class FirePumpController {
     }
 
     @GetMapping("/inspections/export-all")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<byte[]> exportAllInspections(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -126,7 +126,7 @@ public class FirePumpController {
     }
 
     @PostMapping("/{id}/inspections/{inspectionId}/image")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadInspectionImage(
             @PathVariable Long id,
             @PathVariable Long inspectionId,
@@ -198,7 +198,7 @@ public class FirePumpController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_PUMP')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         firePumpService.delete(id);
         return ResponseEntity.ok(ApiResponse.success());

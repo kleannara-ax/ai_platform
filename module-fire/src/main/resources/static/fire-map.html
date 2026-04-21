@@ -1001,6 +1001,7 @@
 // ===== 전역 상태 =====
 let currentUser = null;
 let canManage = false;
+let isFireUser = false;
 let outdoorHydrants = [];
 let currentOutdoorId = null;
 let outdoorMode = false;
@@ -1050,7 +1051,8 @@ async function init() {
     try {
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            canManage = currentUser.canManage !== false;
+            isFireUser = currentUser.isFireUser === true;
+            canManage = isFireUser ? false : (currentUser.canManage !== false);
         } else if (fallbackUser) {
             currentUser = { username: fallbackUser, displayName: fallbackUser, role: 'USER' };
         }
@@ -1075,12 +1077,19 @@ async function init() {
                 outdoorEquipmentToggle.parentElement.parentElement.style.display = 'flex';
             }
         } else {
-            setOutdoorHint('점검만 가능합니다.', 'error');
+            setOutdoorHint(isFireUser ? '읽기 전용 권한입니다.' : '점검만 가능합니다.', 'error');
             if (outdoorEquipmentToggle) outdoorEquipmentToggle.checked = false;
             if (outdoorEquipmentToggle?.parentElement?.parentElement) {
                 outdoorEquipmentToggle.parentElement.parentElement.style.display = 'none';
             }
             if (outdoorEquipmentPanel) outdoorEquipmentPanel.classList.remove('show');
+            // FIRE_USER: 옥외 점검 버튼도 disabled
+            if (isFireUser) {
+                const osInspect = document.getElementById('btnOutdoorSelectInspect');
+                if (osInspect) { osInspect.disabled = true; osInspect.title = '읽기 전용 권한입니다'; }
+                const oesInspect = document.getElementById('btnOutdoorEquipmentInspect');
+                if (oesInspect) { oesInspect.disabled = true; oesInspect.title = '읽기 전용 권한입니다'; }
+            }
         }
         await loadOutdoorHydrants();
         await loadOutdoorEquipment();

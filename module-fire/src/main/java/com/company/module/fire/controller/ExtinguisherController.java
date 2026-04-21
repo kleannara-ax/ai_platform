@@ -68,14 +68,14 @@ public class ExtinguisherController {
     }
 
     @PostMapping
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<ExtinguisherResponse>> save(
             @Valid @RequestBody ExtinguisherSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(extinguisherService.saveExtinguisher(request)));
     }
 
     @PostMapping("/{id}/image")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImage(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
@@ -159,7 +159,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping("/inspect")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Void>> inspect(
             @Valid @RequestBody ExtinguisherInspectRequest request,
             Principal principal) {
@@ -172,7 +172,7 @@ public class ExtinguisherController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Void>> updateInspectionDate(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId,
@@ -190,7 +190,7 @@ public class ExtinguisherController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Void>> addInspection(
             @PathVariable("id") Long extinguisherId,
             @Valid @RequestBody ExtinguisherInspectionUpdateRequest request,
@@ -207,7 +207,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Void>> deleteInspection(
             @PathVariable("id") Long extinguisherId,
             @PathVariable Long inspectionId) {
@@ -216,7 +216,7 @@ public class ExtinguisherController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_EXTINGUISHER')")
+    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_EXTINGUISHER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         extinguisherService.deleteExtinguisher(id);
         return ResponseEntity.ok(ApiResponse.success());
