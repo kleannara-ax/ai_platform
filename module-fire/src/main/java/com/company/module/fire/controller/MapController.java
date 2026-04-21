@@ -134,33 +134,39 @@ public class MapController {
             if (floor.contains("1")) return "/images/bokji_1F.png";
         }
         if (containsAny(building, "\uAD00\uB9AC\uB3D9", "gwanri")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/gwanri_2F.PNG";
             if (floor.contains("1")) return "/images/gwanri_1F.png";
         }
         if (containsAny(building, "\uC625\uC678", "outdoor")) {
             return "/images/drone_photo.JPG";
         }
-        if (containsAny(building, "\uC81C\uC9C01,2\uD638\uAE30", "\uC81C\uC9C012", "jeji12", "jeji2")) {
+        if (containsAny(building, "\uC81C\uC9C01,2\uD638\uAE30", "\uC81C\uC9C012", "\uC800\uC7A51,2\uD638\uAE30", "\uC800\uC7A512", "jeji12", "jeji2")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/jeji1,2_2F.PNG";
             if (floor.contains("1")) return "/images/jeji1,2_1F.PNG";
         }
-        if (containsAny(building, "\uC81C\uC9C03\uD638\uAE30", "jeji3")) {
+        if (containsAny(building, "\uC81C\uC9C03\uD638\uAE30", "\uC800\uC7A53\uD638\uAE30", "jeji3")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/jeji3_2F.PNG";
             if (floor.contains("1")) return "/images/jeji3_1F.PNG";
         }
         if (containsAny(building, "\uC2EC\uBA74\uD384\uD37C", "palpa", "pulper")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/palpa_2F.PNG";
             if (floor.contains("1")) return "/images/palpa_1F.PNG";
         }
         if (containsAny(building, "\uD328\uB4DC\uB3D9", "pad")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/pad_2F.PNG";
             if (floor.contains("1")) return "/images/pad_1F.PNG";
         }
-        if (containsAny(building, "\uD654\uC7A5\uC9C0 3,6\uD638\uAE30", "\uD654\uC7A5\uC9C03,6\uD638\uAE30", "tissue36", "tissue13")) {
+        if (containsAny(building, "\uD654\uC7A5\uC9C0 3,6\uD638\uAE30", "\uD654\uC7A5\uC9C03,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A53,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A536", "tissue36", "tissue13")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/tissue1,3_2F.PNG";
             if (floor.contains("1")) return "/images/tissue1,3_1F.PNG";
         }
-        if (containsAny(building, "\uD654\uC7A5\uC9C0 4,5\uD638\uAE30", "\uD654\uC7A5\uC9C04,5\uD638\uAE30", "tissue45")) {
+        if (containsAny(building, "\uD654\uC7A5\uC9C0 4,5\uD638\uAE30", "\uD654\uC7A5\uC9C04,5\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A54,5\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A545", "tissue45")) {
             if (isBasement(floor)) return "/images/tissue4,5_B1.PNG";
             if (floor.contains("3")) return "/images/tissue4,5_3F.PNG";
             if (floor.contains("2")) return "/images/tissue4,5_2F.PNG";
