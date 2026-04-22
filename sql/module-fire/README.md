@@ -2,12 +2,26 @@
 
 소방 설비 관리 모듈(module-fire)의 DDL 및 초기 데이터 스크립트입니다.
 
+## 파일 목록
+
+| 파일 | 설명 |
+|------|------|
+| `01_schema.sql` | 소방 모듈 테이블, 인덱스, 뷰 생성 |
+| `02_seed_data.sql` | 관리자 계정 + 건물/층 마스터 초기 데이터 |
+| `02_menu_data.sql` | 소방 모듈 메뉴 데이터 |
+| `V8__add_fire_manager_role.sql` | ROLE_FIRE_MANAGER(소방시설관리) 역할 및 메뉴 권한 추가 |
+| `V9__rename_manager_role.sql` | ROLE_MANAGER 역할명 변경 (PS 지분 검사 매니저) |
+| `V10__add_fire_user_role.sql` | ROLE_FIRE_USER(소방시설사용자) 읽기 전용 역할 및 메뉴 권한 추가 |
+
 ## 실행 순서
 
 ```
 1. ../01_ddl_core.sql   -- 데이터베이스 생성 + web_user 테이블
 2. 01_schema.sql        -- 소방 모듈 테이블, 인덱스, 뷰 생성
 3. 02_seed_data.sql     -- 관리자 계정 + 건물/층 마스터 초기 데이터
+4. V8__add_fire_manager_role.sql   -- 소방시설관리 매니저 역할 추가
+5. V9__rename_manager_role.sql     -- ROLE_MANAGER 이름 변경
+6. V10__add_fire_user_role.sql     -- 소방시설사용자 역할 추가
 ```
 
 ## 사전 조건
@@ -26,6 +40,11 @@ mysql -u platform_user -p platform_db < sql/module-fire/01_schema.sql
 
 # 3. 초기 데이터 입력
 mysql -u platform_user -p platform_db < sql/module-fire/02_seed_data.sql
+
+# 4. 역할 추가 (소방시설관리 매니저 + 소방시설사용자)
+mysql -u platform_user -p platform_db < sql/module-fire/V8__add_fire_manager_role.sql
+mysql -u platform_user -p platform_db < sql/module-fire/V9__rename_manager_role.sql
+mysql -u platform_user -p platform_db < sql/module-fire/V10__add_fire_user_role.sql
 ```
 
 ## 테이블 구조
