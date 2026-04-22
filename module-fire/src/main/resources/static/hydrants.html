@@ -819,19 +819,22 @@ const API = (() => {
 let allItems = [];
 let currentStatusType = null;
 const canManage = API.canManage();
-// FIRE_USER 읽기전용 판별: 버튼은 보이되 disabled 처리
-const isFireUser = (() => { const u = API.getUser(); return u && u.isFireUser === true; })();
-// 메뉴 접근권한 기반: FIRE_HYDRANT 메뉴가 할당된 사용자만 추가/수정/삭제 가능
-// FIRE_USER는 canEdit=false (쓰기 불가) 이지만 버튼은 disabled 상태로 렌더링
-const canEdit = (() => {
-  if (isFireUser) return false;
-  const u = API.getUser();
-  if (!u) return false;
-  if (Array.isArray(u.menuCodes)) return u.menuCodes.includes('FIRE_HYDRANT');
-  return true;
-})();
-// FIRE_USER는 버튼을 보여주되 disabled
-const disabledAttr = isFireUser ? 'disabled title="읽기 전용 권한입니다"' : '';
+// FIRE_ADMIN 아이디 기반 권한
+let canEdit = false;
+async function loadFireAdminPermission() {
+  try {
+    const u = API.getUser();
+    if (!u || !u.loginId) return;
+    const res = await (await API.req('/api/codes/lookup/FIRE_PERM')).json();
+    if (res.success && Array.isArray(res.data)) {
+      const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
+      if (fireAdmin && fireAdmin.extraValue1) {
+        const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
+        canEdit = ids.includes(u.loginId);
+      }
+    }
+  } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+}
 const EMBED_MODAL_MODE = (() => {
   const qs = new URLSearchParams(window.location.search);
   return qs.get('embedEdit') === '1' || qs.get('embedInspect') === '1' || qs.get('embedDetails') === '1';
@@ -1050,9 +1053,9 @@ function renderTable(items) {
         <td class="text-truncate">${x.lastIsFaulty===true?(x.lastFaultReason||'-'):'-'}</td>
         <td class="text-center">
           <div class="hyd-actions">
-            ${(canEdit || isFireUser)?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}" ${disabledAttr}>수정</button>`:''}
-            <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}" ${disabledAttr}>점검</button>
-            ${(canEdit || isFireUser)?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}" ${disabledAttr}>삭제</button>`:''}
+            ${canEdit?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
+            <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
+            ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
           </div>
         </td>
       </tr>`;
@@ -1140,9 +1143,9 @@ function renderStatusPanel(type) {
       <td class="text-truncate">${x.lastIsFaulty===true?(x.lastFaultReason||'-'):'-'}</td>
       <td class="text-center">
         <div class="hyd-actions">
-          ${(canEdit || isFireUser)?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}" ${disabledAttr}>수정</button>`:''}
-          <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}" ${disabledAttr}>점검</button>
-          ${(canEdit || isFireUser)?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}" ${disabledAttr}>삭제</button>`:''}
+          ${canEdit?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
+          <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
+          ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -2320,17 +2323,12 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
     document.head.appendChild(embedStyle);
   }
 
-  // 메뉴 접근권한이 없으면 추가 버튼 숨김, FIRE_USER는 disabled 처리
+  // FIRE_ADMIN 권한 로드
+  await loadFireAdminPermission();
+
   if(!canEdit){
     const addBtn=document.getElementById('btnHydAdd');
-    if(addBtn) {
-      if (isFireUser) {
-        addBtn.disabled = true;
-        addBtn.title = '읽기 전용 권한입니다';
-      } else {
-        addBtn.style.display='none';
-      }
-    }
+    if(addBtn) addBtn.style.display='none';
   }
   await loadHydrants();
   const inspectId = parseInt(qs.get('inspect') || '0', 10);

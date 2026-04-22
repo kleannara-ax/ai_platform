@@ -69,31 +69,6 @@ public class CoreMenuService {
         return hasMenuAccessMultiRole(roles, menuCode);
     }
 
-    /**
-     * 쓰기 권한 체크 – 메뉴 접근 + 읽기전용 역할이 아닌지 확인
-     * ROLE_FIRE_USER는 메뉴 접근은 가능하지만 웹에서의 쓰기(등록/수정/삭제/점검)는 불가.
-     * (모바일 QR 점검은 별도 컨트롤러이므로 이 체크를 사용하지 않음)
-     * SpEL: @coreMenuService.hasWriteAccess(authentication.authorities, 'MENU_CODE')
-     */
-    public boolean hasWriteAccess(
-            Collection<? extends org.springframework.security.core.GrantedAuthority> authorities,
-            String menuCode) {
-        if (authorities == null || authorities.isEmpty()) return false;
-        List<String> roles = authorities.stream()
-                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
-                .collect(Collectors.toList());
-        // ROLE_FIRE_USER는 읽기전용 – 웹 쓰기 차단
-        if (roles.contains("ROLE_FIRE_USER") && roles.size() == 1) return false;
-        // 다른 역할도 함께 가지고 있으면 그 역할의 메뉴 접근으로 판단
-        if (roles.contains("ROLE_FIRE_USER")) {
-            List<String> writableRoles = roles.stream()
-                    .filter(r -> !"ROLE_FIRE_USER".equals(r))
-                    .collect(Collectors.toList());
-            return hasMenuAccessMultiRole(writableRoles, menuCode);
-        }
-        return hasMenuAccessMultiRole(roles, menuCode);
-    }
-
     /** 전체 메뉴 목록 (플랫 리스트) */
     public List<MenuResponse> getAllMenus() {
         return menuRepository.findByIsActiveTrueOrderBySortOrder().stream()

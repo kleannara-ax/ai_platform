@@ -1,4 +1,4 @@
-(function () {
+(async function () {
   const root = document.getElementById("adminEquipmentPage");
   if (!root) return;
 
@@ -33,13 +33,25 @@
     initialActionHandled: false
   };
 
-  const _menuCodeMap = { receiverId: 'FIRE_RECEIVER', pumpId: 'FIRE_PUMP' };
-  const _requiredMenu = _menuCodeMap[config.idField] || '';
   const _user = getUser();
-  const canEdit = _requiredMenu && Array.isArray(_user?.menuCodes)
-    ? _user.menuCodes.includes(_requiredMenu)
-    : _user?.canManage !== false;
   const canManage = _user?.canManage !== false;
+  // FIRE_ADMIN 아이디 기반 권한: FIRE_PERM > FIRE_ADMIN의 extraValue1(콤마 구분 ID)에 포함된 사용자만 추가/수정/삭제/점검 가능
+  let canEdit = false;
+  try {
+    if (_user && _user.loginId) {
+      const token = _user.token;
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const resp = await fetch('/api/codes/lookup/FIRE_PERM', { headers });
+      const json = await resp.json();
+      if (json.success && Array.isArray(json.data)) {
+        const fireAdmin = json.data.find(d => d.code === 'FIRE_ADMIN');
+        if (fireAdmin && fireAdmin.extraValue1) {
+          const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
+          canEdit = ids.includes(_user.loginId);
+        }
+      }
+    }
+  } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
 
   function getPendingAction() {
     if (query.get("add") === "1") return { type: "add", id: "" };

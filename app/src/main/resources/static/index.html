@@ -373,14 +373,12 @@ async function enterApp() {
     if (token && currentUser) {
       var fireRole = (currentUser.role||'').replace('ROLE_','');
       var fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
-      var fireIsFireUser = currentUser.role === 'ROLE_FIRE_USER';
       localStorage.setItem('fireweb_user', JSON.stringify({
         loginId: currentUser.loginId,
         userName: currentUser.userName,
         role: fireRole,
         token: token,
-        canManage: fireCanManage,
-        isFireUser: fireIsFireUser
+        canManage: fireCanManage
       }));
     }
     // URL에서 returnUrl 파라미터 제거
@@ -402,14 +400,12 @@ async function enterApp() {
   if (token && currentUser) {
     const fireRole = (currentUser.role||'').replace('ROLE_','');
     const fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
-    const fireIsFireUser = currentUser.role === 'ROLE_FIRE_USER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: fireRole,
       token: token,
-      canManage: fireCanManage,
-      isFireUser: fireIsFireUser
+      canManage: fireCanManage
     }));
   }
   await loadUserMenus();
@@ -1574,14 +1570,12 @@ function navigateToFirePage(path) {
   if (token && currentUser) {
     const fireRole2 = (currentUser.role||'').replace('ROLE_','');
     const fireCanManage2 = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
-    const fireIsFireUser2 = currentUser.role === 'ROLE_FIRE_USER';
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: fireRole2,
       token: token,
       canManage: fireCanManage2,
-      isFireUser: fireIsFireUser2,
       menuCodes: collectMenuCodes(userMenus)
     }));
   }
