@@ -140,11 +140,12 @@
 
       <div class="toolbar">
         <button id="saveBtn" class="btn btn-primary">선택 설비 수정</button>
-        <button id="inspNeedBtn" class="btn btn-outline-warning" style="border-color:#ca8a04;color:#ca8a04;">🔍 점검 필요 설비</button>
+        <button id="clearBtn" class="btn btn-outline-danger">좌표 초기화</button>
         <button id="addExtBtn" class="btn btn-info text-white">소화기 추가</button>
         <button id="delExtBtn" class="btn btn-outline-danger">소화기 삭제</button>
         <button id="addHydBtn" class="btn btn-success">소화전 추가</button>
         <button id="delHydBtn" class="btn btn-outline-danger">소화전 삭제</button>
+        <button id="btnNeedInspect" class="btn btn-warning" title="최종 점검일로부터 한달이 지난 설비만 표시">점검 필요 설비</button>
       </div>
 
       <div class="mb-2">
@@ -287,16 +288,22 @@
     catch (_) { return null; }
   })();
   const canManage = currentUser?.canManage !== false;
-  const isFireUser = currentUser?.isFireUser === true;
-  const canEdit = (() => {
-    if (isFireUser) return false;
-    return Array.isArray(currentUser?.menuCodes)
-      ? currentUser.menuCodes.includes('FIRE_FLOOR')
-      : canManage;
-  })();
-
-  // 점검 필요 설비 필터 상태 (최종 점검일로부터 한 달 경과)
-  let inspNeedFilterActive = false;
+  // FIRE_ADMIN 아이디 기반 권한 (비동기 로드 후 설정)
+  let canEdit = false;
+  async function loadFireAdminPermission() {
+    try {
+      if (!currentUser || !currentUser.loginId) return;
+      const res = await fetch('/api/codes/lookup/FIRE_PERM', { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const fireAdmin = json.data.find(d => d.code === 'FIRE_ADMIN');
+        if (fireAdmin && fireAdmin.extraValue1) {
+          const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
+          canEdit = ids.includes(currentUser.loginId);
+        }
+      }
+    } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+  }
 
   const state = {
     zoom: 1, panX: 0, panY: 0, dragging: false,
@@ -304,7 +311,8 @@
     moveArmed: false,
     addMode: null,
     selectedExtId: null, selectedHydrantId: null,
-    floors: [], buildings: [], current: null, exts: [], hyds: []
+    floors: [], buildings: [], current: null, exts: [], hyds: [],
+    needInspectMode: false
   };
   const activePointers = new Map();
   let pinchStartDistance = 0;
@@ -808,11 +816,10 @@
     }
   }
 
-  // 점검 필요 판별: 최종 점검일로부터 한 달 이상 경과 또는 점검 이력 없음
-  function isInspectionOverdue(item) {
-    const lastDate = item.lastInspectionDate;
-    if (!lastDate) return true; // 점검 이력 없음
-    const d = new Date(String(lastDate).slice(0, 10));
+  function needsInspection(item) {
+    const lastDate = item.lastInspectionDate || item.lastInspection;
+    if (!lastDate) return true; // 점검 기록 없음
+    const d = new Date(lastDate);
     if (isNaN(d.getTime())) return true;
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -831,10 +838,10 @@
       ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && x.x != null && x.y != null)
       : state.hyds.filter(x => isCurrentFloor(x) && x.x != null && x.y != null);
 
-    // 점검 필요 설비 필터 적용
-    if (inspNeedFilterActive) {
-      exts = exts.filter(isInspectionOverdue);
-      hyds = hyds.filter(isInspectionOverdue);
+    // 점검 필요 설비 필터
+    if (state.needInspectMode) {
+      exts = exts.filter(needsInspection);
+      hyds = hyds.filter(needsInspection);
     }
 
     for (const it of exts) {
@@ -962,6 +969,9 @@
   }
 
   async function load(){
+    // FIRE_ADMIN 권한 로드
+    await loadFireAdminPermission();
+
     const qsNow = new URLSearchParams(location.search);
     const qBuilding = (qsNow.get('buildingName') || '').trim();
     const qFloor = (qsNow.get('floorName') || '').trim();
@@ -1100,52 +1110,36 @@
 
     window.FireWebNav?.mount?.();
     document.getElementById('saveBtn').disabled = !canEdit;
+    document.getElementById('clearBtn').disabled = !canEdit;
     document.getElementById('addExtBtn').disabled = !canEdit;
     document.getElementById('delExtBtn').disabled = !canEdit;
     document.getElementById('addHydBtn').disabled = !canEdit;
     document.getElementById('delHydBtn').disabled = !canEdit;
-
-    // 점검 필요 설비 토글 버튼 이벤트
-    const inspNeedBtn = document.getElementById('inspNeedBtn');
-    if (inspNeedBtn) {
-      inspNeedBtn.addEventListener('click', () => {
-        inspNeedFilterActive = !inspNeedFilterActive;
-        if (inspNeedFilterActive) {
-          inspNeedBtn.style.background = '#ca8a04';
-          inspNeedBtn.style.color = '#fff';
-          inspNeedBtn.style.borderColor = '#ca8a04';
-          inspNeedBtn.textContent = '\u2705 \uc810\uac80 \ud544\uc694 \uc124\ube44';
-        } else {
-          inspNeedBtn.style.background = '';
-          inspNeedBtn.style.color = '#ca8a04';
-          inspNeedBtn.style.borderColor = '#ca8a04';
-          inspNeedBtn.textContent = '\ud83d\udd0d \uc810\uac80 \ud544\uc694 \uc124\ube44';
-        }
-        renderMarkers();
-      });
-    }
-
     if (!canEdit) {
-      const readOnlyTitle = isFireUser ? '\uc77d\uae30 \uc804\uc6a9 \uad8c\ud55c\uc785\ub2c8\ub2e4.' : '\uad8c\ud55c\uc774 \ud544\uc694\ud569\ub2c8\ub2e4.';
-      document.getElementById('saveBtn').title = readOnlyTitle;
-      document.getElementById('addExtBtn').title = readOnlyTitle;
-      document.getElementById('delExtBtn').title = readOnlyTitle;
-      document.getElementById('addHydBtn').title = readOnlyTitle;
-      document.getElementById('delHydBtn').title = readOnlyTitle;
-      document.getElementById('miEditBtn').disabled = true;
-      document.getElementById('hiEditBtn').disabled = true;
-      document.getElementById('miAddHereBtn').disabled = true;
-      document.getElementById('miEditBtn').title = readOnlyTitle;
-      document.getElementById('hiEditBtn').title = readOnlyTitle;
-      document.getElementById('miAddHereBtn').title = readOnlyTitle;
-      if (isFireUser) {
-        // FIRE_USER: 점검 버튼도 disabled
-        document.getElementById('miInspectBtn').disabled = true;
-        document.getElementById('hiInspectBtn').disabled = true;
-        document.getElementById('miInspectBtn').title = readOnlyTitle;
-        document.getElementById('hiInspectBtn').title = readOnlyTitle;
-      }
+      document.getElementById('saveBtn').title = '권한이 필요합니다.';
+      document.getElementById('clearBtn').title = '권한이 필요합니다.';
+      document.getElementById('addExtBtn').title = '권한이 필요합니다.';
+      document.getElementById('delExtBtn').title = '권한이 필요합니다.';
+      document.getElementById('addHydBtn').title = '권한이 필요합니다.';
+      document.getElementById('delHydBtn').title = '권한이 필요합니다.';
+      // 마커 모달 버튼 숨김 (FIRE_ADMIN 아이디가 아닌 경우)
+      document.getElementById('miEditBtn').style.display = 'none';
+      document.getElementById('hiEditBtn').style.display = 'none';
+      document.getElementById('miAddHereBtn').style.display = 'none';
+      document.getElementById('miInspectBtn').style.display = 'none';
+      document.getElementById('hiInspectBtn').style.display = 'none';
     }
+
+    // 점검 필요 설비 토글 (모든 사용자에게 표시)
+    const btnNeedInspect = document.getElementById('btnNeedInspect');
+    btnNeedInspect.addEventListener('click', () => {
+      state.needInspectMode = !state.needInspectMode;
+      btnNeedInspect.classList.toggle('active', state.needInspectMode);
+      btnNeedInspect.style.background = state.needInspectMode ? '#ffc107' : '';
+      btnNeedInspect.style.color = state.needInspectMode ? '#000' : '';
+      renderMarkers();
+    });
+
     renderList();
     renderMarkers();
   }
@@ -1204,7 +1198,22 @@
     openSelectedEditModal();
   });
 
-  // clearBtn 제거됨 - 점검 필요 설비 버튼으로 대체 (이벤트는 init에서 설정)
+  document.getElementById('clearBtn').onclick = () => {
+    if (!canEdit) return alert('권한이 필요합니다.');
+    state.moveArmed = false;
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.textContent = '\uC120\uD0DD \uC124\uBE44 \uC218\uC815';
+    if (state.selectedHydrantId) {
+      const hyd = state.hyds.find(x => x.hydrantId === state.selectedHydrantId);
+      if (!hyd) return;
+      hyd.x = null; hyd.y = null; renderMarkers();
+      return;
+    }
+    if (!state.selectedExtId) return;
+    const ext = state.exts.find(x => x.extinguisherId === state.selectedExtId);
+    if (!ext) return;
+    ext.x = null; ext.y = null; renderMarkers();
+  };
 
   document.getElementById('addExtBtn').onclick = () => {
     resetMoveArm();
@@ -1410,6 +1419,7 @@
 
     const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
     set('saveBtn', '\uC120\uD0DD \uC124\uBE44 \uC218\uC815');
+    set('clearBtn', '\uC88C\uD45C \uCD08\uAE30\uD654');
     set('addExtBtn', '\uC18C\uD654\uAE30 \uCD94\uAC00');
     set('delExtBtn', '\uC18C\uD654\uAE30 \uC0AD\uC81C');
     set('addHydBtn', '\uC18C\uD654\uC804 \uCD94\uAC00');

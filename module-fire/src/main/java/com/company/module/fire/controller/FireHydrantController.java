@@ -63,14 +63,14 @@ public class FireHydrantController {
 
     /** 소화전 등록/수정 (메뉴 접근권한 기반) */
     @PostMapping
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<FireHydrantResponse>> save(
             @Valid @RequestBody FireHydrantSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(fireHydrantService.saveHydrant(request)));
     }
 
     @PostMapping("/{id}/image")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImage(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
@@ -154,7 +154,7 @@ public class FireHydrantController {
 
     /** 소화전 점검 등록 */
     @PostMapping("/{id}/inspect")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Void>> inspect(
             @PathVariable Long id,
             @RequestParam boolean isFaulty,
@@ -171,7 +171,7 @@ public class FireHydrantController {
     }
 
     @PatchMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Void>> updateInspection(
             @PathVariable("id") Long hydrantId,
             @PathVariable Long inspectionId,
@@ -189,7 +189,7 @@ public class FireHydrantController {
     }
 
     @PostMapping("/{id}/inspections")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Void>> addInspection(
             @PathVariable("id") Long hydrantId,
             @Valid @RequestBody FireHydrantInspectionUpdateRequest request,
@@ -206,7 +206,7 @@ public class FireHydrantController {
     }
 
     @DeleteMapping("/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Void>> deleteInspection(
             @PathVariable("id") Long hydrantId,
             @PathVariable Long inspectionId) {
@@ -216,7 +216,7 @@ public class FireHydrantController {
 
     /** 소화전 삭제 (메뉴 접근권한 기반) */
     @DeleteMapping("/{id}")
-    @PreAuthorize("@coreMenuService.hasWriteAccess(authentication.authorities, 'FIRE_HYDRANT')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_HYDRANT')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         fireHydrantService.deleteHydrant(id);
         return ResponseEntity.ok(ApiResponse.success());
