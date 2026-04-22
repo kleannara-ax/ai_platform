@@ -8,7 +8,7 @@ public enum Role {
 
     ROLE_ADMIN("관리자"),
     ROLE_MANAGER("매니저"),
-    ROLE_FIRE_MANAGER("소방관리자"),
+    ROLE_FIRE_MANAGER("소방시설관리"),
     ROLE_FIRE_USER("소방시설사용자"),
     ROLE_USER("일반 사용자");
 
