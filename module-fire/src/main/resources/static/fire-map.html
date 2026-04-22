@@ -1127,10 +1127,10 @@ async function loadOutdoorEquipment() {
         const receiverJson = receiverRes ? await receiverRes.json() : null;
         const pumpJson = pumpRes ? await pumpRes.json() : null;
         outdoorReceivers = Array.isArray(receiverJson?.data?.content)
-            ? receiverJson.data.content.filter(item => item?.floorId === 7 && item?.x != null && item?.y != null)
+            ? receiverJson.data.content.filter(item => item?.floorId === 99 && item?.x != null && item?.y != null)
             : [];
         outdoorPumps = Array.isArray(pumpJson?.data?.content)
-            ? pumpJson.data.content.filter(item => item?.floorId === 7 && item?.x != null && item?.y != null)
+            ? pumpJson.data.content.filter(item => item?.floorId === 99 && item?.x != null && item?.y != null)
             : [];
         renderOutdoorEquipmentMarkers();
     } catch (e) {
