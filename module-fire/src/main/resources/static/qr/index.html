@@ -181,6 +181,7 @@
   let currentEquip = 'ext';
   let latestListData = {};
   let buildingFloors = [];  /* [{buildingId, buildingName, floors:[{floorId,floorName},...]}] */
+  let isFireAdmin = false; /* FIRE_ADMIN 아이디 기반 권한 */
 
   function escHtml(str) {
     if (str == null) return '';
@@ -229,9 +230,20 @@
   }
 
   function canAccessQr() {
-    return Array.isArray(currentUser?.menuCodes)
-      ? currentUser.menuCodes.includes('FIRE_QR')
-      : canManageUser();
+    return isFireAdmin;
+  }
+
+  async function loadFireAdminPermission() {
+    try {
+      const res = await apiFetch('/api/codes/lookup/FIRE_PERM');
+      if (res?.data) {
+        const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
+        if (fireAdmin?.extraValue1) {
+          const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
+          isFireAdmin = ids.includes(currentUser?.loginId);
+        }
+      }
+    } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
   }
 
   function qrImgUrl(type, id) {
@@ -535,6 +547,7 @@
       (window.FireWebCsrf?.goLogin||function(){location.href='/index.html'})();
       return;
     }
+    await loadFireAdminPermission();
     if (!canAccessQr()) {
       window.location.href = '/fire-map.html';
       return;

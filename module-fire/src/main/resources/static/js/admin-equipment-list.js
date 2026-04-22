@@ -630,11 +630,11 @@
                ? '<div class="fw-media-box text-center"><img src="' + escapeHtml(photoPath) + '" alt="photo" class="img-fluid rounded shadow js-detail-zoomable" data-zoom-src="' + escapeHtml(photoPath) + '" style="max-width:100%;max-height:260px;object-fit:contain;" /></div>'
                : '<div class="fw-empty-box">등록된 사진이 없습니다.</div>') +
       '      </div>' +
-      '      <div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong></div>' +
+      (canEdit ? '      <div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong></div>' +
              (qrUrl
                ? '<div class="fw-media-box text-center"><img src="' + escapeHtml(qrUrl) + '" alt="qr" class="img-fluid rounded shadow js-detail-zoomable" data-zoom-src="' + escapeHtml(qrUrl) + '" style="max-width:220px;max-height:220px;object-fit:contain;" /></div>'
                : '<div class="fw-empty-box">QR 정보가 없습니다.</div>') +
-      '      </div>' +
+      '      </div>' : '') +
       '      <div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면상 위치</strong></div>' +
              (planImagePath
                ? '<div id="detailPlanWrap" class="fw-media-box position-relative" style="height:260px;overflow:hidden;">' +

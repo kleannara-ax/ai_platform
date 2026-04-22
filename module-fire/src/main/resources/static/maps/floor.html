@@ -1128,6 +1128,11 @@
       document.getElementById('miAddHereBtn').style.display = 'none';
       document.getElementById('miInspectBtn').style.display = 'none';
       document.getElementById('hiInspectBtn').style.display = 'none';
+      // QR코드 네비게이션 링크 숨김 (FIRE_ADMIN만 접근 가능)
+      document.querySelectorAll('a[href*="/qr"]').forEach(el => {
+        const li = el.closest('li.nav-item');
+        if (li) li.style.display = 'none'; else el.style.display = 'none';
+      });
     }
 
     // 점검 필요 설비 토글 (모든 사용자에게 표시)

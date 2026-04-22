@@ -1059,7 +1059,20 @@ async function init() {
             accountBtn.textContent = currentUser.username || '사용자';
         }
         const qrMenuBtn = document.querySelector('.side-menu a[href="/qr"]');
-        if (qrMenuBtn) qrMenuBtn.style.display = canManage ? 'block' : 'none';
+        // QR 메뉴는 FIRE_ADMIN 아이디만 접근 가능
+        let isFireAdmin = false;
+        try {
+            const permRes = await apiFetch('/api/codes/lookup/FIRE_PERM');
+            const permJson = await permRes.json();
+            if (permJson?.data) {
+                const fireAdmin = permJson.data.find(d => d.code === 'FIRE_ADMIN');
+                if (fireAdmin?.extraValue1) {
+                    const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
+                    isFireAdmin = ids.includes(currentUser?.loginId);
+                }
+            }
+        } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+        if (qrMenuBtn) qrMenuBtn.style.display = isFireAdmin ? 'block' : 'none';
         if (canManage) {
             const adminLi = document.getElementById('adminMenuLi');
             if (adminLi) adminLi.style.display = '';

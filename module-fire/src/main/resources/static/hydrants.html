@@ -1054,8 +1054,7 @@ function renderTable(items) {
         <td class="text-center">
           <div class="hyd-actions">
             ${canEdit?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
-            <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
-            ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
+            ${canEdit?`<button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>`:''}            ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
           </div>
         </td>
       </tr>`;
@@ -1144,8 +1143,7 @@ function renderStatusPanel(type) {
       <td class="text-center">
         <div class="hyd-actions">
           ${canEdit?`<button type="button" class="btn btn-sm btn-fw-edit js-hydrant-edit" data-id="${x.hydrantId}">수정</button>`:''}
-          <button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>
-          ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
+          ${canEdit?`<button type="button" class="btn btn-sm btn-fw-inspect js-hydrant-inspect" data-id="${x.hydrantId}">점검</button>`:''}          ${canEdit?`<button type="button" class="btn btn-sm btn-fw-delete js-hydrant-delete" data-id="${x.hydrantId}" data-serial="${x.serialNumber||''}">삭제</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -1432,14 +1430,12 @@ async function openHydrantDetails(id) {
                  </div>`
               : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}
           </div>
-          <div class="fw-edit-section">
-            <div class="fw-edit-section-title">
-              <strong>QR코드</strong>
-            </div>
-            ${qrUrl
-              ? `<div class="fw-media-box text-center"><img src="${qrUrl}" alt="소화전 QR" class="img-fluid rounded shadow js-zoomable" style="max-width:220px;max-height:220px;object-fit:contain;" /></div>`
-              : '<div class="fw-empty-box">QR 정보가 없습니다.</div>'}
-          </div>
+          ${canEdit ? (() => {
+            const qrHtml = qrUrl
+              ? '<div class="fw-media-box text-center"><img src="' + qrUrl + '" alt="소화전 QR" class="img-fluid rounded shadow js-zoomable" style="max-width:220px;max-height:220px;object-fit:contain;" /></div>'
+              : '<div class="fw-empty-box">QR 정보가 없습니다.</div>';
+            return '<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong></div>' + qrHtml + '</div>';
+          })() : ''}
         </div>
       </div>
     </div>
@@ -2329,6 +2325,11 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
   if(!canEdit){
     const addBtn=document.getElementById('btnHydAdd');
     if(addBtn) addBtn.style.display='none';
+    // QR코드 네비게이션 링크 숨김 (FIRE_ADMIN만 접근 가능)
+    document.querySelectorAll('a[href*="/qr"]').forEach(el => {
+      const li = el.closest('li.nav-item');
+      if (li) li.style.display = 'none'; else el.style.display = 'none';
+    });
   }
   await loadHydrants();
   const inspectId = parseInt(qs.get('inspect') || '0', 10);
