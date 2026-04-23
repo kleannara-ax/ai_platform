@@ -960,6 +960,35 @@
     }
   }
 
+  async function fetchCsvDownload(url, fallbackFilename) {
+    try {
+      const opts = window.FireWebCsrf?.applyOptions({ method: "GET" }) || { method: "GET" };
+      const res = await fetch(url, opts);
+      if (res.status === 401) {
+        if (window.FireWebNav?.goLogin) window.FireWebNav.goLogin();
+        else location.replace("/index.html");
+        return;
+      }
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        alert("CSV 다운로드 실패: " + (t || "HTTP " + res.status));
+        return;
+      }
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^";\n]+)"?/);
+      const filename = match ? match[1] : fallbackFilename;
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+    } catch (e) {
+      alert("CSV 다운로드 실패: " + (e.message || e));
+    }
+  }
+
   function downloadInspectionCsv() {
     if (!state.selectedDetailId) {
       alert("상세 데이터를 먼저 선택해 주세요.");
@@ -977,7 +1006,7 @@
     }
     const url = config.apiBase + "/" + encodeURIComponent(state.selectedDetailId) + "/inspections/export?from=" +
       encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
-    window.open(url, "_blank");
+    fetchCsvDownload(url, "inspections-" + state.selectedDetailId + ".csv");
   }
 
   function exportAllCsv() {
@@ -993,7 +1022,7 @@
       return;
     }
     const url = config.apiBase + "/inspections/export-all?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
-    window.open(url, "_blank");
+    fetchCsvDownload(url, "inspections-all.csv");
   }
 
   async function saveHistoryRow(button) {

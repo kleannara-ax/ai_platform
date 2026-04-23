@@ -1940,6 +1940,20 @@ function zoomAt(cx, cy, newScale){
     requestMapTransform();
 }
 
+// ===== 마우스 휠 확대/축소 =====
+if (scene) {
+    scene.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const rect = scene.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const delta = e.deltaY > 0 ? -0.15 : 0.15;
+        const newScale = Math.max(1, Math.min(5, mapScale + delta));
+        if (Math.abs(newScale - mapScale) < 0.001) return;
+        zoomAt(cx, cy, newScale);
+    }, { passive: false });
+}
+
 // ===== 옥외 소화전 편집 도구 =====
 function setOutdoorMode(on){
     outdoorMode = !!on;

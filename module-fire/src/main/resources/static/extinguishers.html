@@ -1967,7 +1967,23 @@ async function openDetails(id) {
 
       const r = await API.req('/fire-api/extinguishers', { method:'POST', body });
       if (!r || !r.ok) { const t=await r?.text().catch(()=>''); alert('저장 실패: '+t); return; }
-      await r.json().catch(() => null);
+      const saved = await r.json().catch(() => null);
+      const savedId = Number(saved?.data?.extinguisherId || body.extinguisherId || id || 0);
+
+      // 사진 업로드
+      const photoFile = document.getElementById('extPhoto')?.files?.[0];
+      if (photoFile && savedId) {
+        const fd = new FormData();
+        fd.append('file', photoFile);
+        const up = await API.req('/fire-api/extinguishers/' + encodeURIComponent(savedId) + '/image', {
+          method: 'POST', body: fd
+        });
+        if (!up || !up.ok) {
+          const ut = await up?.text().catch(() => '');
+          alert('이미지 업로드 실패: ' + (ut || 'HTTP ' + (up?.status || '')));
+        }
+      }
+
       bootstrap.Modal.getInstance(modalEl)?.hide();
       document.dispatchEvent(new CustomEvent('extinguisher:upsertCompleted'));
     } finally {
