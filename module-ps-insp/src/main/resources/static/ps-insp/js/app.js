@@ -327,10 +327,10 @@
       }
     }
 
-    // ── search 파라미터: 검색어 자동 입력 & 검색 실행 ──
-    // 예: ?tab=history-table&search=26228J0039 → 이력 테이블에서 바코드 자동 검색
-    //     ?tab=history&search=26228J0039       → 검사 이력에서 바코드 자동 검색
-    var searchParam = params.get('search');
+    // ── IND_BCD 파라미터: 개별바코드로 자동 검색 ──
+    // 예: ?tab=history-table&IND_BCD=26228J0039 → 이력 테이블에서 바코드 자동 검색
+    //     ?tab=history&IND_BCD=26228J0039       → 검사 이력에서 바코드 자동 검색
+    var searchParam = params.get('IND_BCD') || params.get('search'); // IND_BCD 우선, search 하위호환
     if (searchParam) {
       var activeTabName = tabParam ? (({ 'history-table': 'detail-table', 'detail-table': 'detail-table', 'detail': 'detail-table', 'table': 'detail-table', 'history': 'history', 'inspection': 'inspection' })[tabParam] || tabParam) : null;
 
