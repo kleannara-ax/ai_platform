@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * 플랫폼 메인 애플리케이션
@@ -25,6 +26,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * </ol>
  */
 @SpringBootApplication
+@EnableAsync
 @ComponentScan(basePackages = {
         "com.company.core",     // Core 모듈
         "com.company.module",   // 모든 업무 모듈 (하위 패키지 자동 포함)
