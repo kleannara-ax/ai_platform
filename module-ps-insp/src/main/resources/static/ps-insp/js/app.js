@@ -23,6 +23,7 @@
   // ══════════════════════════════════════════════
   var BASE = window.location.origin;
   var token = '';
+  var urlUserId = '';   // USERID 파라미터 (MES 등 외부 연동 시 로그인 생략용)
   var currentHistoryPage = 0;
   var historyPageSize = 20;
   var currentDetailPage = 0;
@@ -204,11 +205,18 @@
         if (raw) { var u = JSON.parse(raw); if (u && u.token) token = u.token; }
       } catch (e) { }
     }
+    // USERID 파라미터 추출 (MES 등 외부 시스템 연동 시 JWT 없이 인증)
+    if (params.has('USERID')) urlUserId = params.get('USERID').trim();
   }
 
   // ══════════════════════════════════════════════
   // API Helper
   // ══════════════════════════════════════════════
+  /**
+   * API 호출 헬퍼
+   * - JWT 토큰이 있으면 Authorization 헤더에 포함
+   * - USERID 파라미터가 URL에 있으면 API 경로에 쿼리로 추가 (서버 자동 인증)
+   */
   function api(method, path, body) {
     var opts = { method: method, headers: {} };
     if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -218,10 +226,23 @@
     } else if (body instanceof FormData) {
       opts.body = body;
     }
-    return fetch(BASE + path, opts).then(function (res) {
+
+    // USERID 파라미터가 있고 JWT 토큰이 없으면 → API URL에 USERID 쿼리 추가
+    var apiUrl = BASE + path;
+    if (urlUserId && !token) {
+      var sep = path.indexOf('?') >= 0 ? '&' : '?';
+      apiUrl = BASE + path + sep + 'USERID=' + encodeURIComponent(urlUserId);
+    }
+
+    return fetch(apiUrl, opts).then(function (res) {
       var httpStatus = res.status;
       if (httpStatus === 401) {
-        toast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        // USERID 모드에서는 "로그인" 안내 대신 사용자 ID 오류 안내
+        if (urlUserId && !token) {
+          toast('USERID 인증에 실패했습니다. 사용자 ID를 확인해주세요.', 'error');
+        } else {
+          toast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        }
         try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch (e) { }
         throw new Error('Unauthorized');
       }
