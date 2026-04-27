@@ -1463,11 +1463,16 @@
   // ══════════════════════════════════════════════
   function sendToMes(data) {
     if (!data.indBcd || data.coverageRatio == null) return;
-    var ppmValue = data.coverageRatio * 1000000;
-    api('POST', '/ps-insp-api/mes/send-result', { IND_BCD: data.indBcd, ResultData: ppmValue })
+    var ppmValue = Math.round(data.coverageRatio * 1000000);
+    api('POST', '/ps-insp-api/mes/send-result', { IND_BCD: data.indBcd, RST_VAL: ppmValue })
       .then(function (res) {
-        if (res.success) toast('MES 전송 완료', 'info');
-        else toast('MES 전송 실패: ' + (res.message || ''), 'error');
+        if (res.success) {
+          var rsMsg = (res.data && res.data.rsMsg) ? ' (' + res.data.rsMsg + ')' : '';
+          toast('MES 전송 완료' + rsMsg, 'info');
+        } else {
+          var detail = (res.data && res.data.rsMsg) ? res.data.rsMsg : (res.message || '');
+          toast('MES 전송 실패: ' + detail, 'error');
+        }
       })
       .catch(function () { /* silently ignore */ });
   }

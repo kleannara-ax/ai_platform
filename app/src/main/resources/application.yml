@@ -78,7 +78,9 @@ ps-insp:
   upload:
     dir: ${PS_INSP_UPLOAD_DIR:/data/upload/ps_cov_ins}   # 이미지 저장 경로 (환경변수로 재정의 가능)
   mes:
-    endpoint-url:                   # MES 전송 URL (비어있으면 mock 모드)
+    # MES 전송 URL (비어있으면 mock 모드)
+    # 운영: https://mesdev.kleannara.com:444/mobile/saveDustInspectionResult.data
+    endpoint-url: ${MES_ENDPOINT_URL:}
 
 # ── 로깅 ──
 logging:
