@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 
 /**
@@ -36,43 +37,50 @@ public class PsInspApiLogService {
         try {
             apiLogRepository.save(logEntity);
         } catch (Exception e) {
-            log.warn("[PS-INSP-LOG] API 로그 저장 실패 (무시) - apiType: {}, uri: {}, error: {}",
-                    logEntity.getApiType(), logEntity.getRequestUri(), e.getMessage());
+            log.warn("[PS-INSP-LOG] API 로그 저장 실패 (무시) - api: {}, error: {}",
+                    logEntity.getApi(), e.getMessage());
         }
     }
 
     /**
-     * Inbound API 로그 빌더 (컨트롤러 → 서버)
+     * 성공 로그 빌더
      */
-    public PsInspApiLog.PsInspApiLogBuilder inbound(String apiType, String httpMethod, String requestUri) {
+    public PsInspApiLog.PsInspApiLogBuilder success(String api) {
         return PsInspApiLog.builder()
-                .direction("IN")
-                .apiType(apiType)
-                .httpMethod(httpMethod)
-                .requestUri(requestUri)
-                .requestedAt(LocalDateTime.now(KST))
-                .success(true);
+                .api(api)
+                .comstat("S")
+                .credat(LocalDate.now(KST))
+                .cretim(LocalTime.now(KST));
     }
 
     /**
-     * Outbound API 로그 빌더 (서버 → MES 등 외부)
+     * 에러 로그 빌더
      */
-    public PsInspApiLog.PsInspApiLogBuilder outbound(String apiType, String httpMethod, String targetUrl) {
+    public PsInspApiLog.PsInspApiLogBuilder error(String api, String inerrat) {
         return PsInspApiLog.builder()
-                .direction("OUT")
-                .apiType(apiType)
-                .httpMethod(httpMethod)
-                .requestUri("/ps-insp-api/mes/send-result")
-                .targetUrl(targetUrl)
-                .requestedAt(LocalDateTime.now(KST))
-                .success(true);
+                .api(api)
+                .comstat("E")
+                .inerrat(inerrat)
+                .credat(LocalDate.now(KST))
+                .cretim(LocalTime.now(KST));
     }
 
     /**
-     * 응답 Body를 최대 길이로 잘라서 반환 (TEXT 컬럼 보호)
+     * 처리 중 로그 빌더
+     */
+    public PsInspApiLog.PsInspApiLogBuilder processing(String api) {
+        return PsInspApiLog.builder()
+                .api(api)
+                .comstat("P")
+                .credat(LocalDate.now(KST))
+                .cretim(LocalTime.now(KST));
+    }
+
+    /**
+     * 텍스트를 최대 길이로 잘라서 반환
      */
     public static String truncate(String text, int maxLength) {
         if (text == null) return null;
-        return text.length() > maxLength ? text.substring(0, maxLength) + "...(truncated)" : text;
+        return text.length() > maxLength ? text.substring(0, maxLength) + "..." : text;
     }
 }

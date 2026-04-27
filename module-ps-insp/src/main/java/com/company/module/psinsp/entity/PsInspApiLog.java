@@ -3,30 +3,50 @@ package com.company.module.psinsp.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 
 /**
  * PS 지분검사 API 통신 로그 엔티티
  *
  * <p>Table: ps_insp_api_log
- * <p>모든 PS-INSP API 호출(Inbound) 및 MES 전송(Outbound) 이력을 기록한다.
  *
- * <p>API_TYPE 코드:
+ * <p>API 코드:
  * <ul>
- *   <li>INSPECTION_SAVE - 검사 결과 저장 (POST /inspections)</li>
- *   <li>INSPECTION_GET - 검사 단건 조회 (GET /inspections/{id})</li>
- *   <li>INSPECTION_LIST - 검사 목록 조회 (GET /inspections)</li>
- *   <li>INSPECTION_SEARCH - 검사 검색 (GET /inspections/search)</li>
- *   <li>INSPECTION_CHECK - 중복 체크 (GET /inspections/check-exists)</li>
- *   <li>INSPECTION_DELETE - 검사 삭제 (DELETE /inspections/{id})</li>
- *   <li>INSPECTION_DELETE_ALL - 전체 삭제 (DELETE /inspections)</li>
- *   <li>MES_SEND - MES 결과 전송 (POST /mes/send-result → 외부 MES)</li>
- *   <li>CONFIG_PPM_GET - PPM 기준값 조회 (GET /config/ppm-limit)</li>
- *   <li>CONFIG_PPM_SAVE - PPM 기준값 저장 (POST /config/ppm-limit)</li>
- *   <li>CONFIG_ADMIN_GET - 권한자 조회 (GET /config/ppm-admins)</li>
- *   <li>CONFIG_ADMIN_SAVE - 권한자 수정 (POST /config/ppm-admins)</li>
- *   <li>CONFIG_ALL - 전체 설정 조회 (GET /config)</li>
+ *   <li>INSPECTION_SAVE - 검사 결과 저장</li>
+ *   <li>INSPECTION_GET - 검사 단건 조회</li>
+ *   <li>INSPECTION_LIST - 검사 목록 조회</li>
+ *   <li>INSPECTION_SEARCH - 검사 검색</li>
+ *   <li>INSPECTION_CHECK - 중복 체크</li>
+ *   <li>INSPECTION_DELETE - 검사 삭제</li>
+ *   <li>INSPECTION_DELETE_ALL - 전체 삭제</li>
+ *   <li>MES_SEND - MES 결과 전송 요청 (Inbound)</li>
+ *   <li>MES_SEND_OUT - MES 외부 서버 전송 (Outbound)</li>
+ *   <li>CONFIG_PPM_GET - PPM 기준값 조회</li>
+ *   <li>CONFIG_PPM_SAVE - PPM 기준값 저장</li>
+ *   <li>CONFIG_ADMIN_GET - 권한자 조회</li>
+ *   <li>CONFIG_ADMIN_SAVE - 권한자 수정</li>
+ *   <li>CONFIG_ALL - 전체 설정 조회</li>
+ * </ul>
+ *
+ * <p>COMSTAT 코드:
+ * <ul>
+ *   <li>S - Success (성공)</li>
+ *   <li>E - Error (에러)</li>
+ *   <li>P - Processing (처리 중)</li>
+ * </ul>
+ *
+ * <p>INERRAT 내부 에러 코드:
+ * <ul>
+ *   <li>AUTH_FAIL - 인증 실패</li>
+ *   <li>DB_ERROR - 데이터베이스 오류</li>
+ *   <li>VALIDATION_ERROR - 입력값 검증 실패</li>
+ *   <li>MES_TIMEOUT - MES 전송 타임아웃</li>
+ *   <li>MES_CONN_FAIL - MES 연결 실패</li>
+ *   <li>MES_RESP_ERROR - MES 응답 오류</li>
+ *   <li>FILE_ERROR - 파일 처리 오류</li>
+ *   <li>UNKNOWN_ERROR - 알 수 없는 오류</li>
  * </ul>
  */
 @Entity
@@ -42,76 +62,66 @@ public class PsInspApiLog {
     @Column(name = "LOG_ID")
     private Long logId;
 
-    /** 통신 방향: IN(수신), OUT(외부 발신) */
-    @Column(name = "DIRECTION", nullable = false, length = 10)
-    private String direction;
-
     /** API 유형 코드 (INSPECTION_SAVE, MES_SEND 등) */
-    @Column(name = "API_TYPE", nullable = false, length = 50)
-    private String apiType;
+    @Column(name = "API", nullable = false, length = 50)
+    private String api;
 
-    @Column(name = "HTTP_METHOD", nullable = false, length = 10)
-    private String httpMethod;
+    /** 클라이언트 IP */
+    @Column(name = "IP", length = 100)
+    private String ip;
 
-    @Column(name = "REQUEST_URI", nullable = false, length = 1000)
-    private String requestUri;
+    /** 통신 상태: S=Success, E=Error, P=Processing */
+    @Column(name = "COMSTAT", nullable = false, length = 1)
+    private String comstat;
 
-    @Column(name = "QUERY_STRING", length = 2000)
-    private String queryString;
+    /** 에러 메시지 (COMSTAT=E 일 때) */
+    @Column(name = "ERRTXT", length = 2000)
+    private String errtxt;
 
-    /** 외부 전송 대상 URL (OUT일 때만) */
-    @Column(name = "TARGET_URL", length = 2000)
-    private String targetUrl;
+    /** 생성 날짜 */
+    @Column(name = "CREDAT", nullable = false)
+    private LocalDate credat;
 
-    @Column(name = "REQUEST_BODY", columnDefinition = "TEXT")
-    private String requestBody;
+    /** 생성 시간 */
+    @Column(name = "CRETIM", nullable = false)
+    private LocalTime cretim;
 
-    @Column(name = "HTTP_STATUS")
-    private Integer httpStatus;
+    /** 생성자 (요청 사용자 ID) */
+    @Column(name = "CREUSR", length = 200)
+    private String creusr;
 
-    @Column(name = "SUCCESS", nullable = false)
-    private Boolean success;
+    /** 비고/메모 */
+    @Column(name = "REMARK", length = 2000)
+    private String remark;
 
-    @Column(name = "RESPONSE_BODY", columnDefinition = "TEXT")
-    private String responseBody;
+    /** 내부 에러 코드 (AUTH_FAIL, DB_ERROR, MES_TIMEOUT 등) */
+    @Column(name = "INERRAT", length = 50)
+    private String inerrat;
 
-    @Column(name = "ERROR_MESSAGE", length = 2000)
-    private String errorMessage;
+    /** 내부 에러 상세 메시지 */
+    @Column(name = "INERRTXT", length = 2000)
+    private String inerrtxt;
 
-    /** 개별바코드 (검사 식별용, 빠른 필터링) */
-    @Column(name = "IND_BCD", length = 200)
-    private String indBcd;
+    /** INPUT 파라미터 (요청 데이터, JSON) */
+    @Column(name = "IN_PARAMETER", columnDefinition = "TEXT")
+    private String inParameter;
 
-    @Column(name = "MATNR", length = 100)
-    private String matnr;
-
-    @Column(name = "LOTNR", length = 200)
-    private String lotnr;
-
-    /** 요청 사용자 ID */
-    @Column(name = "USER_ID", length = 200)
-    private String userId;
-
-    @Column(name = "CLIENT_IP", length = 100)
-    private String clientIp;
-
-    /** 처리 시간 (밀리초) */
-    @Column(name = "ELAPSED_MS")
-    private Long elapsedMs;
-
-    @Column(name = "REQUESTED_AT", nullable = false)
-    private LocalDateTime requestedAt;
-
-    @Column(name = "CREATED_AT", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    /** OUTPUT 파라미터 (응답 데이터, JSON) */
+    @Column(name = "OUT_PARAMETER", columnDefinition = "TEXT")
+    private String outParameter;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @PrePersist
     protected void onCreate() {
-        if (this.requestedAt == null) {
-            this.requestedAt = LocalDateTime.now(KST);
+        if (this.credat == null) {
+            this.credat = LocalDate.now(KST);
         }
-        this.createdAt = LocalDateTime.now(KST);
+        if (this.cretim == null) {
+            this.cretim = LocalTime.now(KST);
+        }
+        if (this.comstat == null) {
+            this.comstat = "S";
+        }
     }
 }

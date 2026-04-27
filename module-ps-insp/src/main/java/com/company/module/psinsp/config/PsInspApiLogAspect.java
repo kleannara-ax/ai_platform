@@ -2,6 +2,7 @@ package com.company.module.psinsp.config;
 
 import com.company.module.psinsp.entity.PsInspApiLog;
 import com.company.module.psinsp.service.PsInspApiLogService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 
 /**
@@ -31,6 +33,7 @@ import java.time.ZoneId;
 public class PsInspApiLogAspect {
 
     private final PsInspApiLogService apiLogService;
+    private final ObjectMapper objectMapper;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
@@ -41,72 +44,87 @@ public class PsInspApiLogAspect {
             "execution(* com.company.module.psinsp.controller.PsInspConfigApiController.*(..)) || " +
             "execution(* com.company.module.psinsp.controller.PsInspMesController.*(..))")
     public Object logApiCall(ProceedingJoinPoint joinPoint) throws Throwable {
-        LocalDateTime requestedAt = LocalDateTime.now(KST);
-        long startMs = System.currentTimeMillis();
 
-        // 요청 정보 추출
         HttpServletRequest request = getHttpRequest();
-        String httpMethod = request != null ? request.getMethod() : "UNKNOWN";
-        String requestUri = request != null ? request.getRequestURI() : "UNKNOWN";
-        String queryString = request != null ? request.getQueryString() : null;
-        String clientIp = extractClientIp(request);
-        String userId = extractUserId(request);
         String apiType = resolveApiType(joinPoint.getSignature().getName());
+        String ip = extractClientIp(request);
+        String creusr = extractUserId(request);
+        String parameterIn = buildInputParameter(request);
 
         Object result = null;
-        Integer httpStatus = 200;
-        boolean success = true;
-        String errorMessage = null;
-        String responseBody = null;
+        String comstat = "S";
+        String errtxt = null;
+        String inerrat = null;
+        String inerrtxt = null;
+        String parameterOut = null;
+        String remark = null;
 
         try {
             result = joinPoint.proceed();
 
-            // ResponseEntity에서 상태 코드 추출
+            // ResponseEntity에서 응답 추출
             if (result instanceof ResponseEntity<?> re) {
-                httpStatus = re.getStatusCode().value();
-                success = re.getStatusCode().is2xxSuccessful();
+                int status = re.getStatusCode().value();
+                if (!re.getStatusCode().is2xxSuccessful()) {
+                    comstat = "E";
+                    inerrat = "HTTP_" + status;
+                    errtxt = "HTTP " + status + " 응답";
+                }
                 try {
                     Object body = re.getBody();
                     if (body != null) {
-                        responseBody = PsInspApiLogService.truncate(body.toString(), 4000);
+                        parameterOut = PsInspApiLogService.truncate(
+                                objectMapper.writeValueAsString(body), 60000);
                     }
                 } catch (Exception ignored) {}
             }
 
             return result;
 
+        } catch (org.springframework.security.access.AccessDeniedException ex) {
+            comstat = "E";
+            inerrat = "AUTH_FAIL";
+            errtxt = "접근 권한 없음";
+            inerrtxt = PsInspApiLogService.truncate(ex.getMessage(), 2000);
+            throw ex;
+
+        } catch (org.springframework.web.bind.MethodArgumentNotValidException ex) {
+            comstat = "E";
+            inerrat = "VALIDATION_ERROR";
+            errtxt = "입력값 검증 실패";
+            inerrtxt = PsInspApiLogService.truncate(ex.getMessage(), 2000);
+            throw ex;
+
+        } catch (org.springframework.dao.DataAccessException ex) {
+            comstat = "E";
+            inerrat = "DB_ERROR";
+            errtxt = "데이터베이스 오류";
+            inerrtxt = PsInspApiLogService.truncate(ex.getMessage(), 2000);
+            throw ex;
+
         } catch (Throwable ex) {
-            success = false;
-            httpStatus = 500;
-            errorMessage = PsInspApiLogService.truncate(ex.getMessage(), 2000);
+            comstat = "E";
+            inerrat = "UNKNOWN_ERROR";
+            errtxt = PsInspApiLogService.truncate(ex.getMessage(), 2000);
+            inerrtxt = PsInspApiLogService.truncate(ex.getClass().getSimpleName() + ": " + ex.getMessage(), 2000);
             throw ex;
 
         } finally {
-            long elapsedMs = System.currentTimeMillis() - startMs;
-
-            // 검사 연관 정보 추출 (파라미터에서)
-            String indBcd = extractParam(request, "indBcd", "IND_BCD");
-            String matnr = extractParam(request, "matnr", "MATNR");
-            String lotnr = extractParam(request, "lotnr", "LOTNR");
+            remark = buildRemark(apiType, comstat);
 
             PsInspApiLog logEntity = PsInspApiLog.builder()
-                    .direction("IN")
-                    .apiType(apiType)
-                    .httpMethod(httpMethod)
-                    .requestUri(requestUri)
-                    .queryString(PsInspApiLogService.truncate(queryString, 2000))
-                    .httpStatus(httpStatus)
-                    .success(success)
-                    .responseBody(responseBody)
-                    .errorMessage(errorMessage)
-                    .indBcd(indBcd)
-                    .matnr(matnr)
-                    .lotnr(lotnr)
-                    .userId(userId)
-                    .clientIp(clientIp)
-                    .elapsedMs(elapsedMs)
-                    .requestedAt(requestedAt)
+                    .api(apiType)
+                    .ip(ip)
+                    .comstat(comstat)
+                    .errtxt(errtxt)
+                    .credat(LocalDate.now(KST))
+                    .cretim(LocalTime.now(KST))
+                    .creusr(creusr)
+                    .remark(remark)
+                    .inerrat(inerrat)
+                    .inerrtxt(inerrtxt)
+                    .inParameter(PsInspApiLogService.truncate(parameterIn, 60000))
+                    .outParameter(PsInspApiLogService.truncate(parameterOut, 60000))
                     .build();
 
             apiLogService.saveLog(logEntity);
@@ -114,11 +132,10 @@ public class PsInspApiLogAspect {
     }
 
     /**
-     * 컨트롤러 메서드명 → API_TYPE 매핑
+     * 컨트롤러 메서드명 → API 코드 매핑
      */
     private String resolveApiType(String methodName) {
         return switch (methodName) {
-            // PsInspectionApiController
             case "saveInspection", "saveInspectionMultipart" -> "INSPECTION_SAVE";
             case "getInspection"        -> "INSPECTION_GET";
             case "listInspections"      -> "INSPECTION_LIST";
@@ -126,9 +143,7 @@ public class PsInspApiLogAspect {
             case "checkExists"          -> "INSPECTION_CHECK";
             case "deleteInspection"     -> "INSPECTION_DELETE";
             case "deleteAllInspections" -> "INSPECTION_DELETE_ALL";
-            // PsInspMesController
             case "sendResult"           -> "MES_SEND";
-            // PsInspConfigApiController
             case "getPpmLimit"          -> "CONFIG_PPM_GET";
             case "savePpmLimit"         -> "CONFIG_PPM_SAVE";
             case "getPpmAdmins"         -> "CONFIG_ADMIN_GET";
@@ -136,6 +151,73 @@ public class PsInspApiLogAspect {
             case "getAllConfigs"         -> "CONFIG_ALL";
             default -> "UNKNOWN_" + methodName;
         };
+    }
+
+    /**
+     * INPUT 파라미터 조합 (쿼리 파라미터 + URI)
+     */
+    private String buildInputParameter(HttpServletRequest request) {
+        if (request == null) return null;
+
+        StringBuilder sb = new StringBuilder();
+        String method = request.getMethod();
+        String uri = request.getRequestURI();
+        String qs = request.getQueryString();
+
+        sb.append(method).append(" ").append(uri);
+        if (qs != null && !qs.isBlank()) {
+            // USERID, _t 파라미터는 인증용이므로 제외
+            String filtered = filterAuthParams(qs);
+            if (!filtered.isBlank()) {
+                sb.append("?").append(filtered);
+            }
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * 인증 관련 파라미터 필터링 (로그에 토큰 노출 방지)
+     */
+    private String filterAuthParams(String queryString) {
+        if (queryString == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String param : queryString.split("&")) {
+            String key = param.split("=")[0];
+            if ("_t".equals(key)) continue;  // JWT 토큰 제외
+            if (sb.length() > 0) sb.append("&");
+            sb.append(param);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 자동 비고 생성
+     */
+    private String buildRemark(String apiType, String comstat) {
+        String desc = switch (apiType) {
+            case "INSPECTION_SAVE"       -> "검사 결과 저장";
+            case "INSPECTION_GET"        -> "검사 단건 조회";
+            case "INSPECTION_LIST"       -> "검사 목록 조회";
+            case "INSPECTION_SEARCH"     -> "검사 검색";
+            case "INSPECTION_CHECK"      -> "검사 중복 체크";
+            case "INSPECTION_DELETE"     -> "검사 삭제";
+            case "INSPECTION_DELETE_ALL" -> "검사 전체 삭제";
+            case "MES_SEND"              -> "MES 결과 전송 요청";
+            case "CONFIG_PPM_GET"        -> "PPM 기준값 조회";
+            case "CONFIG_PPM_SAVE"       -> "PPM 기준값 저장";
+            case "CONFIG_ADMIN_GET"      -> "권한자 목록 조회";
+            case "CONFIG_ADMIN_SAVE"     -> "권한자 목록 수정";
+            case "CONFIG_ALL"            -> "전체 설정 조회";
+            default -> apiType;
+        };
+        String statusText = switch (comstat) {
+            case "S" -> "성공";
+            case "E" -> "실패";
+            case "P" -> "처리 중";
+            default -> comstat;
+        };
+        return desc + " - " + statusText;
     }
 
     private HttpServletRequest getHttpRequest() {
@@ -149,14 +231,12 @@ public class PsInspApiLogAspect {
     }
 
     private String extractUserId(HttpServletRequest request) {
-        // 1) USERID 파라미터 우선
         if (request != null) {
             String userIdParam = request.getParameter("USERID");
             if (userIdParam != null && !userIdParam.isBlank()) {
                 return userIdParam.trim();
             }
         }
-        // 2) Spring Security 인증 정보
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated()) {
@@ -175,17 +255,5 @@ public class PsInspApiLogAspect {
         ip = request.getHeader("X-Real-IP");
         if (ip != null && !ip.isBlank()) return ip;
         return request.getRemoteAddr();
-    }
-
-    /**
-     * 요청 파라미터에서 값 추출 (여러 파라미터명 우선순위)
-     */
-    private String extractParam(HttpServletRequest request, String... paramNames) {
-        if (request == null) return null;
-        for (String name : paramNames) {
-            String value = request.getParameter(name);
-            if (value != null && !value.isBlank()) return value.trim();
-        }
-        return null;
     }
 }

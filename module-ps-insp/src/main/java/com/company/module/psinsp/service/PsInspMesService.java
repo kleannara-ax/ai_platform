@@ -8,9 +8,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -54,7 +57,8 @@ public class PsInspMesService {
         }
 
         // Mock 모드: Outbound 로그 기록
-        saveMesOutboundLog(indBcd, resultData, "MOCK", null, 200, true, null, 0);
+        saveMesOutboundLog(indBcd, resultData, null, "S",
+                null, null, null, "MES mock 모드 전송 성공");
 
         log.info("[PS-INSP][MES][MOCK] 전송 성공 - IND_BCD: {}, ResultData: {} ppm", indBcd, resultData);
         return PsInspMesSendResponse.success(
@@ -64,7 +68,6 @@ public class PsInspMesService {
 
     private PsInspMesSendResponse sendToMesServer(PsInspMesSendRequest request,
                                                     String transmissionId, String timestamp) {
-        long startMs = System.currentTimeMillis();
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -79,7 +82,6 @@ public class PsInspMesService {
             ResponseEntity<String> response = restTemplate.exchange(
                     mesEndpointUrl, HttpMethod.POST, entity, String.class);
 
-            long elapsedMs = System.currentTimeMillis() - startMs;
             boolean success = response.getStatusCode().is2xxSuccessful();
             String msg = success
                     ? "MES 전송 완료 (IND_BCD: " + request.getIndBcd() + ")"
@@ -87,49 +89,68 @@ public class PsInspMesService {
 
             // Outbound 로그 기록
             saveMesOutboundLog(request.getIndBcd(), request.getResultData(),
-                    mesEndpointUrl, response.getBody(),
-                    response.getStatusCode().value(), success, null, elapsedMs);
+                    response.getBody(),
+                    success ? "S" : "E",
+                    success ? null : "MES_RESP_ERROR",
+                    success ? null : msg,
+                    null,
+                    success ? "MES 전송 성공" : "MES 응답 오류 - HTTP " + response.getStatusCode());
 
             return success
                     ? PsInspMesSendResponse.success(msg, transmissionId, timestamp)
                     : PsInspMesSendResponse.fail(msg, transmissionId, timestamp);
 
-        } catch (Exception e) {
-            long elapsedMs = System.currentTimeMillis() - startMs;
-            log.error("[PS-INSP][MES] 전송 오류 - IND_BCD: {}", request.getIndBcd(), e);
-
-            // 오류 Outbound 로그 기록
+        } catch (ResourceAccessException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof java.net.SocketTimeoutException) {
+                log.error("[PS-INSP][MES] 전송 타임아웃 - IND_BCD: {}", request.getIndBcd(), e);
+                saveMesOutboundLog(request.getIndBcd(), request.getResultData(),
+                        null, "E", "MES_TIMEOUT", "MES 전송 타임아웃",
+                        cause.getMessage(), "MES 전송 타임아웃");
+                return PsInspMesSendResponse.fail("MES 전송 타임아웃: " + cause.getMessage(), transmissionId, timestamp);
+            } else if (cause instanceof java.net.ConnectException) {
+                log.error("[PS-INSP][MES] 연결 실패 - IND_BCD: {}", request.getIndBcd(), e);
+                saveMesOutboundLog(request.getIndBcd(), request.getResultData(),
+                        null, "E", "MES_CONN_FAIL", "MES 서버 연결 실패",
+                        cause.getMessage(), "MES 서버 연결 실패");
+                return PsInspMesSendResponse.fail("MES 연결 실패: " + cause.getMessage(), transmissionId, timestamp);
+            }
+            log.error("[PS-INSP][MES] 통신 오류 - IND_BCD: {}", request.getIndBcd(), e);
             saveMesOutboundLog(request.getIndBcd(), request.getResultData(),
-                    mesEndpointUrl, null, 0, false, e.getMessage(), elapsedMs);
+                    null, "E", "MES_CONN_FAIL", e.getMessage(),
+                    e.getClass().getSimpleName() + ": " + e.getMessage(), "MES 통신 오류");
+            return PsInspMesSendResponse.fail("MES 통신 오류: " + e.getMessage(), transmissionId, timestamp);
 
+        } catch (Exception e) {
+            log.error("[PS-INSP][MES] 전송 오류 - IND_BCD: {}", request.getIndBcd(), e);
+            saveMesOutboundLog(request.getIndBcd(), request.getResultData(),
+                    null, "E", "UNKNOWN_ERROR", e.getMessage(),
+                    e.getClass().getSimpleName() + ": " + e.getMessage(), "MES 전송 오류");
             return PsInspMesSendResponse.fail("MES 전송 오류: " + e.getMessage(), transmissionId, timestamp);
         }
     }
 
     /**
-     * MES Outbound 통신 로그 저장
+     * MES Outbound 통신 로그 저장 (새 스키마)
      */
     private void saveMesOutboundLog(String indBcd, Double resultData,
-                                     String targetUrl, String responseBody,
-                                     int httpStatus, boolean success,
-                                     String errorMessage, long elapsedMs) {
+                                     String responseBody,
+                                     String comstat, String inerrat, String errtxt,
+                                     String inerrtxt, String remark) {
         try {
-            String requestBodyJson = "{\"IND_BCD\":\"" + indBcd + "\",\"ResultData\":" + resultData + "}";
+            String paramIn = "{\"IND_BCD\":\"" + indBcd + "\",\"ResultData\":" + resultData + "}";
 
             PsInspApiLog logEntity = PsInspApiLog.builder()
-                    .direction("OUT")
-                    .apiType("MES_SEND_OUT")
-                    .httpMethod("POST")
-                    .requestUri("/ps-insp-api/mes/send-result")
-                    .targetUrl(targetUrl)
-                    .requestBody(requestBodyJson)
-                    .httpStatus(httpStatus)
-                    .success(success)
-                    .responseBody(PsInspApiLogService.truncate(responseBody, 4000))
-                    .errorMessage(PsInspApiLogService.truncate(errorMessage, 2000))
-                    .indBcd(indBcd)
-                    .elapsedMs(elapsedMs)
-                    .requestedAt(LocalDateTime.now(KST))
+                    .api("MES_SEND_OUT")
+                    .comstat(comstat)
+                    .errtxt(PsInspApiLogService.truncate(errtxt, 2000))
+                    .credat(LocalDate.now(KST))
+                    .cretim(LocalTime.now(KST))
+                    .remark(remark)
+                    .inerrat(inerrat)
+                    .inerrtxt(PsInspApiLogService.truncate(inerrtxt, 2000))
+                    .inParameter(paramIn)
+                    .outParameter(PsInspApiLogService.truncate(responseBody, 4000))
                     .build();
 
             apiLogService.saveLog(logEntity);
