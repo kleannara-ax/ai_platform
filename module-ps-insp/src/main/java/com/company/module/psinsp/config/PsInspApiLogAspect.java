@@ -136,20 +136,20 @@ public class PsInspApiLogAspect {
      */
     private String resolveApiType(String methodName) {
         return switch (methodName) {
-            case "saveInspection", "saveInspectionMultipart" -> "INSPECTION_SAVE";
-            case "getInspection"        -> "INSPECTION_GET";
-            case "listInspections"      -> "INSPECTION_LIST";
-            case "searchInspections"    -> "INSPECTION_SEARCH";
-            case "checkExists"          -> "INSPECTION_CHECK";
-            case "deleteInspection"     -> "INSPECTION_DELETE";
-            case "deleteAllInspections" -> "INSPECTION_DELETE_ALL";
-            case "sendResult"           -> "MES_SEND";
-            case "getPpmLimit"          -> "CONFIG_PPM_GET";
-            case "savePpmLimit"         -> "CONFIG_PPM_SAVE";
-            case "getPpmAdmins"         -> "CONFIG_ADMIN_GET";
-            case "updatePpmAdmins"      -> "CONFIG_ADMIN_SAVE";
-            case "getAllConfigs"         -> "CONFIG_ALL";
-            default -> "UNKNOWN_" + methodName;
+            case "saveInspection", "saveInspectionMultipart" -> "saveInspection";
+            case "getInspection"        -> "getInspection";
+            case "listInspections"      -> "listInspections";
+            case "searchInspections"    -> "searchInspections";
+            case "checkExists"          -> "checkExists";
+            case "deleteInspection"     -> "deleteInspection";
+            case "deleteAllInspections" -> "deleteAllInspections";
+            case "sendResult"           -> "sendResult";
+            case "getPpmLimit"          -> "getPpmLimit";
+            case "savePpmLimit"         -> "savePpmLimit";
+            case "getPpmAdmins"         -> "getPpmAdmins";
+            case "updatePpmAdmins"      -> "updatePpmAdmins";
+            case "getAllConfigs"         -> "getAllConfigs";
+            default -> methodName;
         };
     }
 
@@ -196,19 +196,20 @@ public class PsInspApiLogAspect {
      */
     private String buildRemark(String apiType, String comstat) {
         String desc = switch (apiType) {
-            case "INSPECTION_SAVE"       -> "검사 결과 저장";
-            case "INSPECTION_GET"        -> "검사 단건 조회";
-            case "INSPECTION_LIST"       -> "검사 목록 조회";
-            case "INSPECTION_SEARCH"     -> "검사 검색";
-            case "INSPECTION_CHECK"      -> "검사 중복 체크";
-            case "INSPECTION_DELETE"     -> "검사 삭제";
-            case "INSPECTION_DELETE_ALL" -> "검사 전체 삭제";
-            case "MES_SEND"              -> "MES 결과 전송 요청";
-            case "CONFIG_PPM_GET"        -> "PPM 기준값 조회";
-            case "CONFIG_PPM_SAVE"       -> "PPM 기준값 저장";
-            case "CONFIG_ADMIN_GET"      -> "권한자 목록 조회";
-            case "CONFIG_ADMIN_SAVE"     -> "권한자 목록 수정";
-            case "CONFIG_ALL"            -> "전체 설정 조회";
+            case "saveInspection"        -> "검사 결과 저장";
+            case "getInspection"         -> "검사 단건 조회";
+            case "listInspections"       -> "검사 목록 조회";
+            case "searchInspections"     -> "검사 검색";
+            case "checkExists"           -> "검사 중복 체크";
+            case "deleteInspection"      -> "검사 삭제";
+            case "deleteAllInspections"  -> "검사 전체 삭제";
+            case "sendResult"            -> "MES 결과 전송 요청";
+            case "saveDustInspectionResult" -> "MES 외부 전송";
+            case "getPpmLimit"           -> "PPM 기준값 조회";
+            case "savePpmLimit"          -> "PPM 기준값 저장";
+            case "getPpmAdmins"          -> "권한자 목록 조회";
+            case "updatePpmAdmins"       -> "권한자 목록 수정";
+            case "getAllConfigs"          -> "전체 설정 조회";
             default -> apiType;
         };
         String statusText = switch (comstat) {

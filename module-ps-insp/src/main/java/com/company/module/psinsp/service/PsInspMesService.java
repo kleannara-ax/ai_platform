@@ -244,7 +244,7 @@ public class PsInspMesService {
                     + "}";
 
             PsInspApiLog logEntity = PsInspApiLog.builder()
-                    .api("MES_SEND_OUT")
+                    .api("saveDustInspectionResult")
                     .comstat(comstat)
                     .errtxt(PsInspApiLogService.truncate(errtxt, 2000))
                     .credat(LocalDate.now(KST))

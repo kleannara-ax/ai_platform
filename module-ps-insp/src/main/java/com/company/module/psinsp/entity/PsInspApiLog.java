@@ -12,22 +12,22 @@ import java.time.ZoneId;
  *
  * <p>Table: ps_insp_api_log
  *
- * <p>API 코드:
+ * <p>API명 (실제 메서드/엔드포인트명 기록):
  * <ul>
- *   <li>INSPECTION_SAVE - 검사 결과 저장</li>
- *   <li>INSPECTION_GET - 검사 단건 조회</li>
- *   <li>INSPECTION_LIST - 검사 목록 조회</li>
- *   <li>INSPECTION_SEARCH - 검사 검색</li>
- *   <li>INSPECTION_CHECK - 중복 체크</li>
- *   <li>INSPECTION_DELETE - 검사 삭제</li>
- *   <li>INSPECTION_DELETE_ALL - 전체 삭제</li>
- *   <li>MES_SEND - MES 결과 전송 요청 (Inbound)</li>
- *   <li>MES_SEND_OUT - MES 외부 서버 전송 (Outbound)</li>
- *   <li>CONFIG_PPM_GET - PPM 기준값 조회</li>
- *   <li>CONFIG_PPM_SAVE - PPM 기준값 저장</li>
- *   <li>CONFIG_ADMIN_GET - 권한자 조회</li>
- *   <li>CONFIG_ADMIN_SAVE - 권한자 수정</li>
- *   <li>CONFIG_ALL - 전체 설정 조회</li>
+ *   <li>saveInspection - 검사 결과 저장</li>
+ *   <li>getInspection - 검사 단건 조회</li>
+ *   <li>listInspections - 검사 목록 조회</li>
+ *   <li>searchInspections - 검사 검색</li>
+ *   <li>checkExists - 중복 체크</li>
+ *   <li>deleteInspection - 검사 삭제</li>
+ *   <li>deleteAllInspections - 전체 삭제</li>
+ *   <li>sendResult - MES 결과 전송 요청 (프론트→백엔드)</li>
+ *   <li>saveDustInspectionResult - MES 외부 전송 (백엔드→MES서버)</li>
+ *   <li>getPpmLimit - PPM 기준값 조회</li>
+ *   <li>savePpmLimit - PPM 기준값 저장</li>
+ *   <li>getPpmAdmins - 권한자 조회</li>
+ *   <li>updatePpmAdmins - 권한자 수정</li>
+ *   <li>getAllConfigs - 전체 설정 조회</li>
  * </ul>
  *
  * <p>COMSTAT 코드:
@@ -44,7 +44,9 @@ import java.time.ZoneId;
  *   <li>VALIDATION_ERROR - 입력값 검증 실패</li>
  *   <li>MES_TIMEOUT - MES 전송 타임아웃</li>
  *   <li>MES_CONN_FAIL - MES 연결 실패</li>
- *   <li>MES_RESP_ERROR - MES 응답 오류</li>
+ *   <li>MES_RESP_ERROR - MES 응답 오류 (RS_CODE=E)</li>
+ *   <li>MES_SESSION_EXPIRED - MES 세션 만료 (HTML 리다이렉트)</li>
+ *   <li>MES_PARSE_ERROR - MES 응답 파싱 실패</li>
  *   <li>FILE_ERROR - 파일 처리 오류</li>
  *   <li>UNKNOWN_ERROR - 알 수 없는 오류</li>
  * </ul>
