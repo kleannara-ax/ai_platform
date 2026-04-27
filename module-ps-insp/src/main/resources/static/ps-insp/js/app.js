@@ -1367,7 +1367,11 @@
           // 서버 응답 데이터를 메인으로 사용 (DB에서 생성된 실제 값)
           var serverData = res.data;
           var displayId = serverData.inspectionId;
-          toast('검사 결과가 저장되었습니다. (ID: ' + displayId + ')', 'success');
+          if (serverData.isUpdate) {
+            toast('기존 검사 결과가 갱신되었습니다. (ID: ' + displayId + ', 차수: ' + (serverData.seq || '-') + ')', 'success');
+          } else {
+            toast('검사 결과가 저장되었습니다. (ID: ' + displayId + ')', 'success');
+          }
           showSaveResult(serverData);
           // 저장 성공 시 현재 임계값을 localStorage에 확정 저장
           saveThresholdToStorage(getThresholdValue());

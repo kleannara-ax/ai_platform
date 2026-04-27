@@ -13,7 +13,8 @@ ps-insp:
   upload:
     dir: ${PS_INSP_UPLOAD_DIR:/data/upload/ps_cov_ins}   # 이미지 저장 경로 (환경변수로 재정의 가능)
   mes:
-    endpoint-url:                   # MES 전송 URL (비어있으면 mock 모드)
+    # MES 전송 URL은 코드에 하드코딩됨 (https://mesdev.kleannara.com:444/mobile/saveDustInspectionResult.data)
+    # 타임아웃: Connect 60초 / Read 60초
 
 # 로깅 설정 (core application.yml에 추가)
 # logging:

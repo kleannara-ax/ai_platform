@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -63,10 +64,14 @@ public class PsInspWebConfig implements WebMvcConfigurer {
 
     /**
      * RestTemplate 빈 (MES 연동용)
-     * core에 이미 등록된 경우 @ConditionalOnMissingBean으로 대체 가능
+     * - Connect Timeout: 60초
+     * - Read Timeout: 60초
      */
     @Bean("psInspRestTemplate")
     public RestTemplate psInspRestTemplate() {
-        return new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(60_000);  // 60초
+        factory.setReadTimeout(60_000);     // 60초
+        return new RestTemplate(factory);
     }
 }

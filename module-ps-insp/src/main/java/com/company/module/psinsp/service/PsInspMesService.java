@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -34,8 +33,9 @@ import java.util.UUID;
  *   세션만료: HTTP 200 + HTML (/index.jsp 리다이렉트)
  * </pre>
  *
- * <p>mesEndpointUrl이 설정되지 않으면 mock 모드로 동작합니다.
+ * <p>항상 실제 MES 서버와 연동합니다. (mock 모드 없음)
  * <p>MES 외부 전송(Outbound) 통신 로그를 ps_insp_api_log 테이블에 기록합니다.
+ * <p>타임아웃: Connect 60초 / Read 60초 (PsInspWebConfig에서 설정)
  */
 @Slf4j
 @Service
@@ -43,8 +43,9 @@ public class PsInspMesService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    @Value("${ps-insp.mes.endpoint-url:}")
-    private String mesEndpointUrl;
+    /** MES 서버 엔드포인트 URL (고정) */
+    private static final String MES_ENDPOINT_URL =
+            "https://mesdev.kleannara.com:444/mobile/saveDustInspectionResult.data";
 
     private final RestTemplate restTemplate;
     private final PsInspApiLogService apiLogService;
@@ -69,32 +70,20 @@ public class PsInspMesService {
         String transmissionId = UUID.randomUUID().toString();
         String timestamp = LocalDateTime.now(KST).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
-        if (mesEndpointUrl != null && !mesEndpointUrl.isBlank()) {
-            return sendToMesServer(indBcd, rstValStr, transmissionId, timestamp);
-        }
-
-        // ── Mock 모드 ──
-        saveMesOutboundLog(indBcd, rstValStr, null,
-                "{\"RS_CODE\":\"S\",\"RS_MSG\":\"저장 성공 [mock]\"}",
-                "S", null, null, null, "MES mock 모드 전송 성공");
-
-        log.info("[PS-INSP][MES][MOCK] 전송 성공 - IND_BCD: {}, RST_VAL: {}", indBcd, rstValStr);
-        return PsInspMesSendResponse.success(
-                "MES 전송 완료 [mock 모드] (IND_BCD: " + indBcd + ", RST_VAL: " + rstValStr + ")",
-                transmissionId, timestamp, "S", "저장 성공 [mock]");
+        return sendToMesServer(indBcd, rstValStr, transmissionId, timestamp);
     }
 
     /**
      * MES 서버로 GET 요청 전송
      *
      * <pre>
-     *   GET {mesEndpointUrl}?IND_BCD=xxx&RST_VAL=yyy
+     *   GET {MES_ENDPOINT_URL}?IND_BCD=xxx&RST_VAL=yyy
      * </pre>
      */
     private PsInspMesSendResponse sendToMesServer(String indBcd, String rstVal,
                                                     String transmissionId, String timestamp) {
         // GET URL 조립
-        String fullUrl = UriComponentsBuilder.fromHttpUrl(mesEndpointUrl)
+        String fullUrl = UriComponentsBuilder.fromHttpUrl(MES_ENDPOINT_URL)
                 .queryParam("IND_BCD", indBcd)
                 .queryParam("RST_VAL", rstVal)
                 .toUriString();
@@ -124,12 +113,12 @@ public class PsInspMesService {
         } catch (ResourceAccessException e) {
             Throwable cause = e.getCause();
             if (cause instanceof java.net.SocketTimeoutException) {
-                log.error("[PS-INSP][MES] 전송 타임아웃 - IND_BCD: {}", indBcd, e);
+                log.error("[PS-INSP][MES] 전송 타임아웃 (60초 초과) - IND_BCD: {}", indBcd, e);
                 saveMesOutboundLog(indBcd, rstVal, fullUrl, null,
-                        "E", "MES_TIMEOUT", "MES 전송 타임아웃",
+                        "E", "MES_TIMEOUT", "MES 전송 타임아웃 (60초 초과)",
                         cause.getMessage(), "MES 전송 타임아웃");
                 return PsInspMesSendResponse.fail(
-                        "MES 전송 타임아웃: " + cause.getMessage(), transmissionId, timestamp);
+                        "MES 전송 타임아웃 (60초 초과): " + cause.getMessage(), transmissionId, timestamp);
             } else if (cause instanceof java.net.ConnectException) {
                 log.error("[PS-INSP][MES] 연결 실패 - IND_BCD: {}", indBcd, e);
                 saveMesOutboundLog(indBcd, rstVal, fullUrl, null,
