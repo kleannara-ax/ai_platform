@@ -93,17 +93,17 @@
       /* 소화기 그리드 */
       .qr-grid { gap:6px !important; }
       /* 소화전/수신기/소방펌프: 2열 고정, 3행이 한 페이지에 들어가도록 */
-      .qr-grid.large { grid-template-columns:repeat(2,1fr) !important; gap:4px 6px !important; }
+      .qr-grid.large { grid-template-columns:repeat(2,1fr) !important; gap:2px 6px !important; }
       .qr-grid.large .qr-card {
         break-inside:avoid; page-break-inside:avoid;
         padding:2px !important; border:1px solid #cbd5e1 !important;
-        height:calc((100vh - 16mm) / 3 - 4px);
+        height:calc((100vh - 16mm) / 3 - 2px);
         box-sizing:border-box;
         display:flex; align-items:center; justify-content:center;
       }
       .qr-grid.large .qr-card .qr-card-row { align-items:center; }
-      .qr-grid.large .qr-img { width:calc((100vh - 16mm) / 3 - 30px) !important; height:calc((100vh - 16mm) / 3 - 30px) !important; max-width:88mm !important; max-height:88mm !important; }
-      .qr-grid.large .qr-meta { font-size:10px !important; margin-top:1px !important; line-height:1.2; }
+      .qr-grid.large .qr-img { width:calc((100vh - 16mm) / 3 - 18px) !important; height:calc((100vh - 16mm) / 3 - 18px) !important; max-width:92mm !important; max-height:92mm !important; }
+      .qr-grid.large .qr-meta { font-size:9px !important; margin-top:0px !important; line-height:1.1; }
       /* 6개마다 페이지 나눔 */
       .qr-grid.large .qr-card:nth-child(6n+1) { break-before:page; }
       .qr-grid.large .qr-card:nth-child(1) { break-before:auto; }
