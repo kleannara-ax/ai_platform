@@ -39,7 +39,7 @@
     /* 소화기: 4x4 grid */
     .qr-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
     /* 소화전/수신기/소방펌프: 2x3 grid */
-    .qr-grid.large { grid-template-columns:repeat(2,1fr); gap:14px; }
+    .qr-grid.large { grid-template-columns:repeat(2,1fr); gap:8px; }
     .qr-card {
       background:#fff; border:1px solid rgba(148,163,184,.18); border-radius:14px; padding:8px;
       display:flex; align-items:center; justify-content:center;
@@ -51,8 +51,8 @@
     }
     /* 소화기 QR 이미지: 작게 */
     .qr-grid:not(.large) .qr-img { width:100px; height:100px; }
-    /* 소화전/수신기/소방펌프 QR 이미지 */
-    .qr-grid.large .qr-img { width:220px; height:220px; }
+    /* 소화전/수신기/소방펌프 QR 이미지 – 화면에서도 카드에 맞게 */
+    .qr-grid.large .qr-img { width:260px; height:260px; }
     .qr-img img { width:100%; height:100%; object-fit:contain; display:block; }
     .qr-meta {
       margin-top:6px; font-size:12px; font-weight:700; color:#334155; text-align:center;
@@ -78,7 +78,7 @@
       .qr-grid.large { grid-template-columns:1fr; }
     }
     /* 페이지별 높이 맞춤 (인쇄 최적화) */
-    .qr-grid.large .qr-card { min-height:auto; padding:6px; }
+    .qr-grid.large .qr-card { min-height:auto; padding:4px; }
     .qr-grid:not(.large) .qr-card { min-height:140px; }
 
     /* === 인쇄 모드 === */
@@ -93,15 +93,17 @@
       /* 소화기 그리드 */
       .qr-grid { gap:6px !important; }
       /* 소화전/수신기/소방펌프: 2열 고정, 3행이 한 페이지에 들어가도록 */
-      .qr-grid.large { grid-template-columns:repeat(2,1fr) !important; gap:8px 12px !important; }
+      .qr-grid.large { grid-template-columns:repeat(2,1fr) !important; gap:4px 6px !important; }
       .qr-grid.large .qr-card {
         break-inside:avoid; page-break-inside:avoid;
-        padding:4px !important; border:1px solid #cbd5e1 !important;
-        height:calc((100vh - 16mm) / 3 - 8px);
+        padding:2px !important; border:1px solid #cbd5e1 !important;
+        height:calc((100vh - 16mm) / 3 - 4px);
         box-sizing:border-box;
+        display:flex; align-items:center; justify-content:center;
       }
-      .qr-grid.large .qr-img { width:200px !important; height:200px !important; }
-      .qr-grid.large .qr-meta { font-size:12px !important; margin-top:4px !important; }
+      .qr-grid.large .qr-card .qr-card-row { align-items:center; }
+      .qr-grid.large .qr-img { width:calc((100vh - 16mm) / 3 - 30px) !important; height:calc((100vh - 16mm) / 3 - 30px) !important; max-width:88mm !important; max-height:88mm !important; }
+      .qr-grid.large .qr-meta { font-size:10px !important; margin-top:1px !important; line-height:1.2; }
       /* 6개마다 페이지 나눔 */
       .qr-grid.large .qr-card:nth-child(6n+1) { break-before:page; }
       .qr-grid.large .qr-card:nth-child(1) { break-before:auto; }
