@@ -43,6 +43,24 @@ public class FireDataInitializer implements ApplicationRunner {
         insertIgnoreFloor(99, "옥외",       99);
 
         log.info("[FireDataInitializer] 필수 건물/층 마스터 데이터 확인 완료");
+
+        // ── 데이터 보정: IS_ACTIVE=0 인 수신기/소방펌프 활성화 ──
+        // QR 미등록 등록 시 isActive 누락 버그로 IS_ACTIVE=0 저장된 데이터 보정
+        fixInactiveEquipment();
+    }
+
+    private void fixInactiveEquipment() {
+        int receiverFixed = jdbc.update(
+                "UPDATE fire_receiver SET IS_ACTIVE = 1 WHERE IS_ACTIVE = 0");
+        if (receiverFixed > 0) {
+            log.info("[FireDataInitializer] 비활성 수신기 {}건 활성화 완료", receiverFixed);
+        }
+
+        int pumpFixed = jdbc.update(
+                "UPDATE fire_pump SET IS_ACTIVE = 1 WHERE IS_ACTIVE = 0");
+        if (pumpFixed > 0) {
+            log.info("[FireDataInitializer] 비활성 소방펌프 {}건 활성화 완료", pumpFixed);
+        }
     }
 
     // ----------------------------------------------------------------
