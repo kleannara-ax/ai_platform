@@ -702,6 +702,7 @@ public class MobileInspectionController {
                 .x(x)
                 .y(y)
                 .locationDescription(locationDescription)
+                .isActive(true)
                 .build();
         entity.assignQrKey(qrKey.trim());
 
@@ -892,6 +893,7 @@ public class MobileInspectionController {
                 .x(x)
                 .y(y)
                 .locationDescription(locationDescription)
+                .isActive(true)
                 .build();
         entity.assignQrKey(qrKey.trim());
 
