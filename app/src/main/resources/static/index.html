@@ -641,32 +641,85 @@ async function renderDashboard() {
   const el=document.getElementById('pageContent');
   el.innerHTML='<p style="color:var(--text3)">불러오는 중...</p>';
   try {
-    const usersRes = await api('GET','/api/integrated/users?page=0&size=100');
+    // 사용자 목록 + 메뉴 트리 동시 로드
+    const [usersRes, menuTreeRes] = await Promise.all([
+      api('GET','/api/integrated/users?page=0&size=100'),
+      api('GET','/api/core/menus/tree')
+    ]);
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
-    const activeUsers=users.filter(u=>u.enabled);
-    const admins=users.filter(u=>u.role==='ROLE_ADMIN');
-    const withProfile=users.filter(u=>u.deptCode||u.position||u.employeeNo);
+    const menuTree2 = menuTreeRes.success?(menuTreeRes.data||[]):[];
 
-    el.innerHTML=`
-      <div class="stats-grid">
-        <div class="stat-card blue"><div class="label">전체 사용자</div><div class="value">${users.length}</div><div class="sub">등록된 계정 수</div></div>
-        <div class="stat-card green"><div class="label">활성 사용자</div><div class="value">${activeUsers.length}</div><div class="sub">${users.length-activeUsers.length}명 비활성</div></div>
-        <div class="stat-card orange"><div class="label">프로필 등록</div><div class="value">${withProfile.length}</div><div class="sub">${users.length-withProfile.length}명 미등록</div></div>
-        <div class="stat-card red"><div class="label">관리자</div><div class="value">${admins.length}</div><div class="sub">ROLE_ADMIN 계정</div></div>
+    // ── 접근권한별 사용자 수 ──
+    const roleCounts = {};
+    users.forEach(u => { const r = u.role || 'UNKNOWN'; roleCounts[r] = (roleCounts[r]||0) + 1; });
+    // allRoles 순서대로 + 미등록 역할도 포함
+    const roleKeys = allRoles.map(r=>r.code);
+    Object.keys(roleCounts).forEach(r => { if (!roleKeys.includes(r)) roleKeys.push(r); });
+
+    const gridCols = Math.min(roleKeys.length, 4);
+    const roleCardsHtml = roleKeys.map(role => {
+      const cnt = roleCounts[role] || 0;
+      const c = roleColor(role);
+      return `<div class="stat-card" style="border-left:4px solid ${c.accent};">
+        <div class="label">${roleBadge(role)}</div>
+        <div class="value" style="color:${c.accent};">${cnt}<span style="font-size:14px;font-weight:400;color:var(--text3);"> 명</span></div>
+        <div class="sub">전체 ${users.length}명 중 ${users.length>0?Math.round(cnt/users.length*100):0}%</div>
+      </div>`;
+    }).join('');
+
+    // ── 현재 메뉴 정보 (트리 테이블) ──
+    function countMenuNodes(nodes) {
+      let c = 0;
+      (nodes||[]).forEach(n => { c++; if(n.children) c += countMenuNodes(n.children); });
+      return c;
+    }
+    function renderDashMenuRows(nodes, level) {
+      let html = '';
+      (nodes||[]).forEach(n => {
+        const hasKids = n.children && n.children.length > 0;
+        const indent = level * 24;
+        const isTop = level === 0;
+        const bg = isTop ? 'background:var(--surface2);font-weight:600;' : '';
+        const icon = menuIcons[n.menuCode] || menuIcons['_DEFAULT'];
+        const typeBadge = n.menuType==='MENU'
+          ? '<span class="badge" style="font-size:10px;padding:2px 8px;background:var(--primary-light);color:var(--primary-dark);">메뉴</span>'
+          : '<span class="badge" style="font-size:10px;padding:2px 8px;background:var(--green-light);color:var(--green);">기능</span>';
+        const childCount = hasKids ? `<span style="font-size:10px;color:var(--primary);margin-left:4px;">(${n.children.length})</span>` : '';
+        const ipTag = n.allowedIps ? `<span style="font-size:9px;color:var(--orange);margin-left:4px;" title="${esc(n.allowedIps)}">&#128274;</span>` : '';
+        html += `<tr style="${bg}">
+          <td style="padding-left:${16+indent}px;white-space:nowrap;">
+            <span style="display:inline-block;width:20px;vertical-align:middle;opacity:0.5;">${icon}</span>
+            <span style="margin-left:4px;">${esc(n.menuName)}</span>${childCount}${ipTag}
+          </td>
+          <td><code style="font-size:12px;">${esc(n.menuCode)}</code></td>
+          <td>${typeBadge}</td>
+          <td style="font-size:12px;">${esc(n.menuUrl||'-')}</td>
+          <td>${n.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
+          <td>${n.isVisible?'<span style="color:var(--green);">&#10003;</span>':'<span style="color:var(--text3);">-</span>'}</td>
+        </tr>`;
+        if (hasKids) html += renderDashMenuRows(n.children, level + 1);
+      });
+      return html;
+    }
+    const totalMenuCount = countMenuNodes(menuTree2);
+    const topMenuCount = menuTree2.length;
+    const activeMenuCount = (function countActive(nodes){ let c=0; (nodes||[]).forEach(n=>{if(n.isActive)c++; if(n.children)c+=countActive(n.children);}); return c; })(menuTree2);
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(${gridCols},1fr);gap:16px;margin-bottom:24px;">
+        ${roleCardsHtml}
+      </div>
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
+        <div class="stat-card blue"><div class="label">전체 메뉴</div><div class="value">${totalMenuCount}</div><div class="sub">등록된 메뉴 수</div></div>
+        <div class="stat-card green"><div class="label">최상위 메뉴</div><div class="value">${topMenuCount}</div><div class="sub">1레벨 메뉴</div></div>
+        <div class="stat-card" style="border-left:3px solid var(--green);"><div class="label">활성 메뉴</div><div class="value" style="color:var(--green);">${activeMenuCount}</div><div class="sub">${totalMenuCount - activeMenuCount}개 비활성</div></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>사용자 현황</h3></div>
-        <div class="card-body" style="padding:0;">
+        <div class="card-header"><h3>현재 메뉴 구조</h3><span style="font-size:12px;color:var(--text3);">${totalMenuCount}개 메뉴</span></div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
           <table>
-            <thead><tr><th>이름</th><th>아이디</th><th>부서</th><th>직급</th><th>역할</th><th>상태</th></tr></thead>
-            <tbody>${users.slice(0,8).map(u=>`<tr>
-              <td><b>${esc(u.userName)}</b></td>
-              <td>${esc(u.loginId)}</td>
-              <td>${esc(u.deptName||'-')}</td>
-              <td>${esc(u.position||'-')}</td>
-              <td>${roleBadge(u.role)}</td>
-              <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
-            </tr>`).join('')}</tbody>
+            <thead><tr><th style="min-width:250px;">메뉴명</th><th>코드</th><th>유형</th><th>URL</th><th>상태</th><th>표시</th></tr></thead>
+            <tbody>${renderDashMenuRows(menuTree2, 0)}</tbody>
           </table>
         </div>
       </div>`;
