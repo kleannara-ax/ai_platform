@@ -39,6 +39,7 @@ public class SsoValidateResponse {
     public static class Head {
         private String returnCode;
         private String returnMessage;
+        private String returnDesc;
     }
 
     @Getter

@@ -126,6 +126,28 @@ function serveFile(filePath, res) {
   return true;
 }
 
+// ── Helper: Build SSO Error HTML (에러 안내 + 로그인 페이지 자동 이동) ──
+function buildErrorHtml(errorMessage) {
+  const escaped = (errorMessage || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SSO 로그인 실패</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;background:linear-gradient(135deg,#1e3a5f 0%,#3b82f6 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;}.card{background:#fff;border-radius:16px;padding:48px 40px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;color:#0f172a;}.card h2{font-size:20px;font-weight:700;margin-bottom:12px;color:#dc2626;}.error-msg{color:#475569;font-size:15px;font-weight:500;margin-bottom:20px;word-break:break-word;line-height:1.6;}.countdown{color:#94a3b8;font-size:13px;margin-bottom:24px;}.btn{display:inline-block;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;background:#3b82f6;color:#fff;}.btn:hover{background:#2563eb;}</style>
+</head><body>
+<div class="card">
+  <h2>SSO 로그인 실패</h2>
+  <p class="error-msg">${escaped}</p>
+  <p class="countdown" id="countdown">3초 후 로그인 페이지로 이동합니다...</p>
+  <a class="btn" href="/index.html">로그인 페이지로 바로 이동</a>
+</div>
+<script>
+(function(){
+  var sec=3;var el=document.getElementById('countdown');
+  var timer=setInterval(function(){sec--;if(sec<=0){clearInterval(timer);window.location.replace('/index.html');}else{el.textContent=sec+'초 후 로그인 페이지로 이동합니다...';}},1000);
+})();
+</script></body></html>`;
+}
+
 // ── HTTP Server ──
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
@@ -150,7 +172,7 @@ const server = http.createServer((req, res) => {
     // ══════════════════════════════════════════
 
     // ── /api/login/sendEncData (application/x-www-form-urlencoded) ──
-    // SSO 검증 → sproId로 사용자 조회 → JWT 토큰 발급 Mock
+    // SSO 검증 성공 Mock → 인라인 HTML 직접 반환 (토큰 저장 + 메인페이지 이동)
     if (pathname === '/api/login/sendEncData' && method === 'POST') {
       let encData = null;
       // form-urlencoded 파싱
@@ -165,21 +187,50 @@ const server = http.createServer((req, res) => {
       if (!encData || !encData.trim()) {
         return apiErr(res, 'encData는 필수입니다.', 400);
       }
-      // Mock: SSO 검증 성공으로 가정 → admin 사용자로 로그인 처리
-      return jsonRes(res, {
-        success: true,
-        code: 200,
-        message: 'SSO 인증 및 로그인 처리 완료',
-        data: {
-          accessToken: 'mock-sso-access-token-' + Date.now(),
-          refreshToken: 'mock-sso-refresh-token-' + Date.now(),
-          tokenType: 'Bearer',
-          expiresIn: 3600,
-          sproId: 'admin',
-          resultMessage: 'SSO 인증 및 로그인 처리 완료'
-        },
-        timestamp: new Date().toISOString()
-      });
+
+      // Mock: encData 값에 따라 다양한 시나리오 테스트
+      // - 'error:...' → SSO 검증 실패 (returnCode ≠ 0, returnDesc 안내 후 로그인 페이지 이동)
+      // - 'unknown_user' → SSO 검증 성공이나 아이디 미존재 (로그인 페이지 이동)
+      // - 그 외 → SSO 검증 성공 + 로그인 처리
+      if (encData.startsWith('error:')) {
+        const returnDesc = encData.substring(6) || 'SSO 인증 세션이 만료되었습니다.';
+        const errorHtml = buildErrorHtml(returnDesc);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(errorHtml);
+      }
+      if (encData === 'unknown_user') {
+        const errorHtml = buildErrorHtml('아이디가 존재하지 않습니다');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(errorHtml);
+      }
+
+      // Mock: SSO 검증 성공 → 인라인 HTML로 토큰 전달 (302 리다이렉트 대신)
+      const mockToken = 'mock-sso-access-token-' + Date.now();
+      const mockRefresh = 'mock-sso-refresh-token-' + Date.now();
+      const mockSproId = 'admin';
+      const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>SSO 로그인 처리 중...</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#1e3a5f,#3b82f6);display:flex;align-items:center;justify-content:center;min-height:100vh;}.card{background:#fff;border-radius:16px;padding:48px 40px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;color:#0f172a;}.card h2{font-size:20px;font-weight:700;margin-bottom:8px;}.card p{font-size:14px;color:#475569;}.spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #3b82f6;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px;}@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}</style>
+</head><body>
+<div class="card"><div class="spinner"></div><h2>SSO 로그인 처리 중</h2><p id="s">인증 정보를 확인하고 있습니다...</p></div>
+<script>
+(async function(){
+  var T='${mockToken}',R='${mockRefresh}',S='${mockSproId}';
+  try {
+    document.getElementById('s').textContent='사용자 정보를 조회하는 중...';
+    var u=null;
+    try{var r=await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+T}});var d=await r.json();if(d.success&&d.data)u=d.data;}catch(e){}
+    if(!u)u={loginId:S,userName:S,role:'ROLE_USER'};
+    sessionStorage.setItem('auth',JSON.stringify({token:T,refreshTk:R,currentUser:u,currentPage:'dashboard'}));
+    var fr=(u.role||'').replace('ROLE_','');
+    localStorage.setItem('fireweb_user',JSON.stringify({loginId:u.loginId,userName:u.userName,role:fr,token:T,canManage:u.role==='ROLE_ADMIN'||u.role==='ROLE_FIRE_MANAGER'}));
+    document.getElementById('s').textContent='로그인 완료! 메인 페이지로 이동합니다...';
+    window.location.replace('/index.html');
+  }catch(e){document.getElementById('s').textContent='오류: '+e.message;}
+})();
+</script></body></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
     }
 
     // Health
@@ -366,6 +417,11 @@ const server = http.createServer((req, res) => {
     // Root → SPA index.html
     if (pathname === '/' || pathname === '/index.html') {
       return serveFile(path.join(STATIC_DIRS[0], 'index.html'), res);
+    }
+
+    // SSO Callback
+    if (pathname === '/sso-callback.html') {
+      return serveFile(path.join(STATIC_DIRS[0], 'sso-callback.html'), res);
     }
 
     // Test UI

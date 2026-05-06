@@ -71,10 +71,20 @@ public class EncDataService {
         if (!ssoResponse.isSuccess()) {
             String returnCode = ssoResponse.getHead() != null
                     ? ssoResponse.getHead().getReturnCode() : "null";
+            String returnDesc = ssoResponse.getHead() != null
+                    ? ssoResponse.getHead().getReturnDesc() : null;
             String returnMessage = ssoResponse.getHead() != null
                     ? ssoResponse.getHead().getReturnMessage() : "응답 없음";
-            log.warn("SSO 검증 실패: returnCode={}, returnMessage={}", returnCode, returnMessage);
-            throw new BusinessException(ErrorCode.SSO_VALIDATION_FAILED);
+            log.warn("SSO 검증 실패: returnCode={}, returnDesc={}, returnMessage={}",
+                    returnCode, returnDesc, returnMessage);
+
+            // returnDesc가 있으면 해당 내용을 에러 메시지로 사용, 없으면 returnMessage 사용
+            String errorMsg = (returnDesc != null && !returnDesc.isBlank())
+                    ? returnDesc
+                    : (returnMessage != null && !returnMessage.isBlank())
+                            ? returnMessage
+                            : ErrorCode.SSO_VALIDATION_FAILED.getMessage();
+            throw new BusinessException(ErrorCode.SSO_VALIDATION_FAILED, errorMsg);
         }
 
         // ── 3. sproId 추출 ──
@@ -88,8 +98,8 @@ public class EncDataService {
         // ── 4. sproId(=loginId)로 사용자 조회 ──
         CoreUser user = coreUserRepository.findByLoginId(sproId)
                 .orElseThrow(() -> {
-                    log.warn("SSO 인증된 사용자를 찾을 수 없습니다: sproId={}", sproId);
-                    return new BusinessException(ErrorCode.SSO_USER_NOT_FOUND);
+                    log.warn("아이디가 존재하지 않습니다: sproId={}", sproId);
+                    return new BusinessException(ErrorCode.SSO_USER_NOT_FOUND, "아이디가 존재하지 않습니다");
                 });
 
         if (!user.getEnabled()) {
