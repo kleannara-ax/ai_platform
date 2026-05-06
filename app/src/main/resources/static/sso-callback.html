@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSO 로그인 처리 중...</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;background:linear-gradient(135deg,#1e3a5f 0%,#3b82f6 100%);color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;-webkit-font-smoothing:antialiased;}
+.card{background:#fff;border-radius:16px;padding:48px 40px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.2);text-align:center;color:#0f172a;}
+.card h2{font-size:20px;font-weight:700;margin-bottom:8px;}
+.card p{font-size:14px;color:#475569;margin-bottom:24px;}
+.spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #3b82f6;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.error-icon{font-size:48px;margin-bottom:12px;}
+.error-msg{color:#dc2626;font-size:14px;font-weight:500;margin-bottom:20px;word-break:break-word;}
+.btn{display:inline-block;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:#3b82f6;color:#fff;}
+.btn-primary:hover{background:#2563eb;}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<!-- 로딩 상태 -->
+<div class="card" id="loadingCard">
+  <div class="spinner"></div>
+  <h2>SSO 로그인 처리 중</h2>
+  <p id="statusMsg">인증 정보를 확인하고 있습니다...</p>
+</div>
+
+<!-- 에러 상태 -->
+<div class="card hidden" id="errorCard">
+  <div class="error-icon">⚠️</div>
+  <h2>SSO 로그인 실패</h2>
+  <p class="error-msg" id="errorMsg"></p>
+  <a class="btn btn-primary" href="/index.html">로그인 페이지로 이동</a>
+</div>
+
+<script>
+(async function handleSsoCallback() {
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token');
+  var refreshToken = params.get('refreshToken');
+  var sproId = params.get('sproId');
+  var error = params.get('error');
+
+  // ── 에러 파라미터가 있으면 실패 화면 표시 ──
+  if (error) {
+    showError(decodeURIComponent(error));
+    return;
+  }
+
+  // ── 토큰 파라미터 검증 ──
+  if (!token) {
+    showError('인증 토큰이 전달되지 않았습니다.');
+    return;
+  }
+
+  try {
+    updateStatus('사용자 정보를 조회하는 중...');
+
+    // ── /api/auth/me 호출하여 사용자 정보 조회 ──
+    var meRes = await fetch(window.location.origin + '/api/auth/me', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var meData = await meRes.json();
+
+    var currentUser = null;
+    if (meData.success && meData.data) {
+      currentUser = meData.data;
+    } else {
+      // /api/auth/me 실패 시 sproId 기반 기본 사용자 정보 생성
+      currentUser = {
+        loginId: sproId || 'unknown',
+        userName: sproId || '사용자',
+        role: 'ROLE_USER'
+      };
+    }
+
+    // ── sessionStorage에 SPA와 동일한 형식으로 세션 저장 ──
+    // index.html의 loadSession()이 읽는 형식: {token, refreshTk, currentUser, currentPage}
+    sessionStorage.setItem('auth', JSON.stringify({
+      token: token,
+      refreshTk: refreshToken || '',
+      currentUser: currentUser,
+      currentPage: 'dashboard'
+    }));
+
+    // ── 소방 모듈 연동용 localStorage 저장 ──
+    if (currentUser) {
+      var fireRole = (currentUser.role || '').replace('ROLE_', '');
+      var fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
+      localStorage.setItem('fireweb_user', JSON.stringify({
+        loginId: currentUser.loginId,
+        userName: currentUser.userName,
+        role: fireRole,
+        token: token,
+        canManage: fireCanManage
+      }));
+    }
+
+    updateStatus('로그인 완료! 메인 페이지로 이동합니다...');
+
+    // ── 메인 SPA로 리다이렉트 ──
+    // index.html의 restoreSession()이 sessionStorage에서 세션을 복원하여 enterApp() 호출
+    window.location.replace('/index.html');
+
+  } catch (e) {
+    showError('로그인 처리 중 오류가 발생했습니다: ' + (e.message || e));
+  }
+})();
+
+function updateStatus(msg) {
+  var el = document.getElementById('statusMsg');
+  if (el) el.textContent = msg;
+}
+
+function showError(msg) {
+  document.getElementById('loadingCard').classList.add('hidden');
+  document.getElementById('errorCard').classList.remove('hidden');
+  document.getElementById('errorMsg').textContent = msg;
+}
+</script>
+</body>
+</html>

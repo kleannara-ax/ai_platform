@@ -71,7 +71,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/health").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 // 정적 리소스 (HTML, JS, CSS, 이미지 등)
-                .requestMatchers("/", "/index.html", "/favicon.ico", "/static/**").permitAll()
+                .requestMatchers("/", "/index.html", "/sso-callback.html", "/favicon.ico", "/static/**").permitAll()
                 .requestMatchers("/images/**", "/js/**", "/css/**", "/uploads/**").permitAll()
                 .requestMatchers("/account/**").permitAll()
                 // 소방 모듈 정적 리소스 및 메뉴 URL (/fire/**)
