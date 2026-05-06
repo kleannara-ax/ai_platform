@@ -149,9 +149,18 @@ const server = http.createServer((req, res) => {
     //  Mock API Endpoints
     // ══════════════════════════════════════════
 
-    // ── /api/login/sendEncData ──
+    // ── /api/login/sendEncData (application/x-www-form-urlencoded) ──
     if (pathname === '/api/login/sendEncData' && method === 'POST') {
-      const encData = (jsonBody && jsonBody.encData) ? jsonBody.encData : null;
+      let encData = null;
+      // form-urlencoded 파싱
+      if (body && !jsonBody) {
+        const params = new URLSearchParams(body);
+        encData = params.get('encData');
+      }
+      // JSON도 하위호환 지원
+      if (!encData && jsonBody && jsonBody.encData) {
+        encData = jsonBody.encData;
+      }
       if (!encData || !encData.trim()) {
         return apiErr(res, 'encData는 필수입니다.', 400);
       }
