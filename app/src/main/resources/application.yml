@@ -73,6 +73,13 @@ jwt:
   # Refresh Token 유효시간: 7일 (밀리초)
   refresh-token-expiration: 604800000
 
+# ── SSO 연동 설정 ──
+sso:
+  validate-url: ${SSO_VALIDATE_URL:https://sso.kleannara.com/rest/security/encValidateProduct}
+  product-id: ${SSO_PRODUCT_ID:PRO_000643}
+  connect-timeout: ${SSO_CONNECT_TIMEOUT:10000}
+  read-timeout: ${SSO_READ_TIMEOUT:10000}
+
 # ── PS-INSP 모듈 설정 ──
 ps-insp:
   upload:
