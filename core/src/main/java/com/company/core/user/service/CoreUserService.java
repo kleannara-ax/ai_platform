@@ -33,7 +33,9 @@ public class CoreUserService {
         if (coreUserRepository.existsByLoginId(request.getLoginId())) {
             throw new BusinessException(ErrorCode.USER_LOGIN_ID_DUPLICATED);
         }
-        String role = request.getRole() != null && !request.getRole().isBlank() ? request.getRole() : "ROLE_USER";
+        // 신규 사용자는 항상 ROLE_USER(사용자) 역할로 생성
+        // 접근 권한 관리에서 ROLE_USER에 설정된 메뉴 권한이 적용됨
+        String role = "ROLE_USER";
         CoreUser user = CoreUser.builder()
                 .loginId(request.getLoginId())
                 .password(passwordEncoder.encode(request.getPassword()))
