@@ -24,8 +24,8 @@ spring:
   # ── DataSource (MariaDB 10.11.15) ──
   datasource:
     url: jdbc:mariadb://localhost:3306/platform_db?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul
-    username: platform_user
-    password: ${DB_PASSWORD:platform_pass}
+    username: ${DB_USERNAME:platform_user}
+    password: ${DB_PASSWORD}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       pool-name: PlatformHikariPool
@@ -67,7 +67,7 @@ spring:
 # ── JWT 설정 ──
 jwt:
   # Base64 인코딩된 256비트 이상의 시크릿 키 (운영 환경에서는 환경변수로 관리)
-  secret: ${JWT_SECRET:Y29tcGFueS1wbGF0Zm9ybS1zZWNyZXQta2V5LWZvci1qd3QtdG9rZW4tZ2VuZXJhdGlvbi0yMDI0LW11c3QtYmUtbG9uZy1lbm91Z2g=}
+  secret: ${JWT_SECRET}
   # Access Token 유효시간: 1시간 (밀리초)
   access-token-expiration: 3600000
   # Refresh Token 유효시간: 7일 (밀리초)

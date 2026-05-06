@@ -1470,15 +1470,26 @@
     var ppmValue = Math.round(data.coverageRatio * 1000000);
     api('POST', '/ps-insp-api/mes/send-result', { IND_BCD: data.indBcd, RST_VAL: ppmValue })
       .then(function (res) {
-        if (res.success) {
-          var rsMsg = (res.data && res.data.rsMsg) ? ' (' + res.data.rsMsg + ')' : '';
+        // res.success = 우리 백엔드 API 응답 성공 여부
+        // res.data.success = MES 서버 실제 전송 결과 (RS_CODE=S이면 true)
+        if (res.success && res.data && res.data.success) {
+          var rsMsg = res.data.rsMsg ? ' (' + res.data.rsMsg + ')' : '';
           toast('MES 전송 완료' + rsMsg, 'info');
         } else {
-          var detail = (res.data && res.data.rsMsg) ? res.data.rsMsg : (res.message || '');
+          var detail = '';
+          if (res.data && res.data.rsMsg) {
+            detail = res.data.rsMsg;
+          } else if (res.data && res.data.message) {
+            detail = res.data.message;
+          } else {
+            detail = res.message || '알 수 없는 오류';
+          }
           toast('MES 전송 실패: ' + detail, 'error');
         }
       })
-      .catch(function () { /* silently ignore */ });
+      .catch(function (e) {
+        toast('MES 전송 오류: 서버 통신 실패', 'error');
+      });
   }
 
   // ══════════════════════════════════════════════
