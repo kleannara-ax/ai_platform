@@ -349,7 +349,27 @@ const server = http.createServer((req, res) => {
       return apiOk(res, { content: mockUsers, totalElements: mockUsers.length });
     }
     if (pathname === '/api/integrated/users' && method === 'POST') {
-      return apiOk(res, { userId: 100, ...jsonBody });
+      // 신규 사용자는 항상 ROLE_USER(사용자) 역할로 생성
+      const newUserId = 100 + mockUsers.length;
+      const newUser = {
+        userId: newUserId,
+        loginId: jsonBody.loginId,
+        userName: jsonBody.userName,
+        email: jsonBody.email || null,
+        phone: jsonBody.phone || null,
+        role: 'ROLE_USER',
+        enabled: true,
+        deptCode: jsonBody.deptCode || null,
+        deptName: jsonBody.deptCode ? (mockDepts.find(d => d.code === jsonBody.deptCode) || {}).codeName || jsonBody.deptCode : null,
+        position: jsonBody.position || null,
+        jobTitle: jsonBody.jobTitle || null,
+        employeeNo: jsonBody.employeeNo || null,
+        joinDate: jsonBody.joinDate || null,
+        officePhone: jsonBody.officePhone || null,
+        internalExt: jsonBody.internalExt || null
+      };
+      mockUsers.push(newUser);
+      return apiOk(res, newUser);
     }
     if (pathname.match(/^\/api\/integrated\/users\/\d+$/) && method === 'PUT') {
       return apiOk(res, jsonBody);
