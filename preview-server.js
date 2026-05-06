@@ -150,6 +150,7 @@ const server = http.createServer((req, res) => {
     // ══════════════════════════════════════════
 
     // ── /api/login/sendEncData (application/x-www-form-urlencoded) ──
+    // SSO 검증 → sproId로 사용자 조회 → JWT 토큰 발급 Mock
     if (pathname === '/api/login/sendEncData' && method === 'POST') {
       let encData = null;
       // form-urlencoded 파싱
@@ -164,9 +165,20 @@ const server = http.createServer((req, res) => {
       if (!encData || !encData.trim()) {
         return apiErr(res, 'encData는 필수입니다.', 400);
       }
-      return apiOk(res, {
-        receivedEncData: encData,
-        resultMessage: 'encData 수신 및 처리 완료'
+      // Mock: SSO 검증 성공으로 가정 → admin 사용자로 로그인 처리
+      return jsonRes(res, {
+        success: true,
+        code: 200,
+        message: 'SSO 인증 및 로그인 처리 완료',
+        data: {
+          accessToken: 'mock-sso-access-token-' + Date.now(),
+          refreshToken: 'mock-sso-refresh-token-' + Date.now(),
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+          sproId: 'admin',
+          resultMessage: 'SSO 인증 및 로그인 처리 완료'
+        },
+        timestamp: new Date().toISOString()
       });
     }
 

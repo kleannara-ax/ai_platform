@@ -29,7 +29,12 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "U002", "이미 존재하는 사용자입니다."),
     USER_LOGIN_ID_DUPLICATED(HttpStatus.CONFLICT, "U003", "이미 사용 중인 로그인 ID입니다."),
-    USER_DISABLED(HttpStatus.FORBIDDEN, "U004", "비활성화된 사용자입니다.");
+    USER_DISABLED(HttpStatus.FORBIDDEN, "U004", "비활성화된 사용자입니다."),
+
+    // ── SSO ──
+    SSO_VALIDATION_FAILED(HttpStatus.UNAUTHORIZED, "S001", "SSO 인증에 실패했습니다."),
+    SSO_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "S002", "SSO 서버 연동 중 오류가 발생했습니다."),
+    SSO_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "S003", "SSO 인증된 사용자를 찾을 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
