@@ -278,6 +278,30 @@
     restoreThreshold();   // URL 파라미터 → localStorage → 115 우선순위
     autoFillOperator();
     loadPpmLimitFromServer(); // DB에서 PPM 기준값 로드
+    setDefaultDateFilters(); // 검사 이력 탭 날짜 필터 디폴트(금일)
+  }
+
+  /** 검사 이력 / 이력 테이블 탭의 날짜 필터를 금일로 초기화 */
+  function setDefaultDateFilters() {
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    var todayStr = yyyy + '-' + mm + '-' + dd;
+
+    // 검사 이력 탭
+    var hFrom = document.getElementById('h_dateFrom');
+    var hTo = document.getElementById('h_dateTo');
+    if (hFrom && !hFrom.value) hFrom.value = todayStr;
+    if (hTo && !hTo.value) hTo.value = todayStr;
+
+    // 이력 테이블 탭
+    var dtFrom = document.getElementById('dt_dateFrom');
+    var dtTo = document.getElementById('dt_dateTo');
+    if (dtFrom && !dtFrom.value) dtFrom.value = todayStr;
+    if (dtTo && !dtTo.value) dtTo.value = todayStr;
+    dtSearchParams.dateFrom = dtFrom ? dtFrom.value : '';
+    dtSearchParams.dateTo = dtTo ? dtTo.value : '';
   }
 
   /**
@@ -411,7 +435,7 @@
     var tabContent = document.getElementById('tab-' + tabName);
     if (tabBtn) tabBtn.classList.add('active');
     if (tabContent) tabContent.classList.add('active');
-    if (tabName === 'history') loadHistory();
+    if (tabName === 'history') searchHistory();
     if (tabName === 'detail-table') loadDetailTable();
   };
 
