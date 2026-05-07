@@ -234,6 +234,20 @@ public class PsInspectionService {
         return inspectionRepository.searchByMatnr(keyword, pageable).map(PsInspectionResponse::from);
     }
 
+    /** LOT + 날짜 범위 복합 검색 */
+    public Page<PsInspectionResponse> searchByLotnrAndDateRange(String keyword, String dateFrom, String dateTo, Pageable pageable) {
+        LocalDateTime from = hasText(dateFrom) ? LocalDate.parse(dateFrom).atStartOfDay() : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime to = hasText(dateTo) ? LocalDate.parse(dateTo).atTime(LocalTime.MAX) : LocalDateTime.of(2099, 12, 31, 23, 59, 59);
+        return inspectionRepository.searchByLotnrAndDateRange(keyword, from, to, pageable).map(PsInspectionResponse::from);
+    }
+
+    /** 자재코드 + 날짜 범위 복합 검색 */
+    public Page<PsInspectionResponse> searchByMatnrAndDateRange(String keyword, String dateFrom, String dateTo, Pageable pageable) {
+        LocalDateTime from = hasText(dateFrom) ? LocalDate.parse(dateFrom).atStartOfDay() : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime to = hasText(dateTo) ? LocalDate.parse(dateTo).atTime(LocalTime.MAX) : LocalDateTime.of(2099, 12, 31, 23, 59, 59);
+        return inspectionRepository.searchByMatnrAndDateRange(keyword, from, to, pageable).map(PsInspectionResponse::from);
+    }
+
     public Map<String, Object> checkExists(String matnr, String lotnr, String indBcd) {
         return inspectionRepository.findByMatnrAndLotnrAndIndBcd(matnr, lotnr, indBcd)
                 .map(entity -> Map.<String, Object>of(

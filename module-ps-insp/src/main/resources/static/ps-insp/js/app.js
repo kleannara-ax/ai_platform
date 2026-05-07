@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.1
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.2
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -31,6 +31,10 @@
 
   // 이력 테이블 검색 조건 (날짜 + 바코드)
   var dtSearchParams = { indBcd: '', dateFrom: '', dateTo: '' };
+
+  // 검사 이력 탭 검색 조건 (타입 + 키워드 + 날짜)
+  var hSearchParams = { type: 'indBcd', keyword: '', dateFrom: '', dateTo: '' };
+  var hSearchActive = false; // 검색 조건이 적용 중인지 여부
 
   // Image processing state
   var grayscaleData = null;     // Uint8ClampedArray (brightness 0~255)
@@ -1498,6 +1502,10 @@
   window.loadHistory = function (page) {
     if (page === undefined) page = 0;
     currentHistoryPage = page;
+
+    // 검색 조건이 적용 중이면 검색 API로 위임
+    if (hSearchActive) { _loadHistorySearch(page); return; }
+
     var container = document.getElementById('historyCardsBody');
     var pag = document.getElementById('pagination');
     if (!container) return;
@@ -1520,20 +1528,32 @@
       });
   };
 
-  window.searchHistory = function () {
-    var keyword = val('h_keyword');
-    var type = document.getElementById('h_searchType') ? document.getElementById('h_searchType').value : 'indBcd';
-    if (!keyword) { loadHistory(); return; }
+  /** 검색 조건 기반 이력 조회 (페이징 지원) */
+  function _loadHistorySearch(page) {
     var container = document.getElementById('historyCardsBody');
     var pag = document.getElementById('pagination');
     if (!container) return;
     container.innerHTML = '<div class="empty-msg">검색 중...</div>';
     if (pag) pag.innerHTML = '';
 
-    api('GET', '/ps-insp-api/inspections/search?type=' + enc(type) + '&keyword=' + enc(keyword) + '&page=0&size=50')
+    var queryParts = ['page=' + page, 'size=' + historyPageSize];
+    if (hSearchParams.keyword) {
+      queryParts.push('type=' + enc(hSearchParams.type));
+      queryParts.push('keyword=' + enc(hSearchParams.keyword));
+    }
+    if (hSearchParams.dateFrom) queryParts.push('dateFrom=' + enc(hSearchParams.dateFrom));
+    if (hSearchParams.dateTo) queryParts.push('dateTo=' + enc(hSearchParams.dateTo));
+
+    api('GET', '/ps-insp-api/inspections/search?' + queryParts.join('&'))
       .then(function (res) {
         if (res.success && res.data) {
-          renderHistoryCards(res.data.content || [], container);
+          var items = res.data.content || [];
+          var totalPages = res.data.totalPages || 0;
+          renderHistoryCards(items, container);
+          renderPagination(totalPages, page, pag, 'loadHistory');
+          if (items.length === 0) {
+            container.innerHTML = '<div class="empty-msg">검색 결과 없음</div>';
+          }
         } else {
           container.innerHTML = '<div class="empty-msg">검색 결과 없음</div>';
         }
@@ -1541,6 +1561,40 @@
       .catch(function (e) {
         container.innerHTML = '<div class="empty-msg">오류: ' + esc(e.message) + '</div>';
       });
+  }
+
+  window.searchHistory = function () {
+    var keyword = val('h_keyword');
+    var type = document.getElementById('h_searchType') ? document.getElementById('h_searchType').value : 'indBcd';
+    var dateFrom = val('h_dateFrom');
+    var dateTo = val('h_dateTo');
+
+    // 검색 조건이 하나도 없으면 전체 조회
+    if (!keyword && !dateFrom && !dateTo) {
+      hSearchActive = false;
+      loadHistory();
+      return;
+    }
+
+    // 검색 상태 저장 (페이지 이동 시 유지)
+    hSearchParams = { type: type, keyword: keyword, dateFrom: dateFrom, dateTo: dateTo };
+    hSearchActive = true;
+    currentHistoryPage = 0;
+    _loadHistorySearch(0);
+  };
+
+  window.resetHistorySearch = function () {
+    var kw = document.getElementById('h_keyword');
+    var df = document.getElementById('h_dateFrom');
+    var dt = document.getElementById('h_dateTo');
+    var st = document.getElementById('h_searchType');
+    if (kw) kw.value = '';
+    if (df) df.value = '';
+    if (dt) dt.value = '';
+    if (st) st.value = 'indBcd';
+    hSearchParams = { type: 'indBcd', keyword: '', dateFrom: '', dateTo: '' };
+    hSearchActive = false;
+    loadHistory();
   };
 
   function renderHistoryCards(items, container) {

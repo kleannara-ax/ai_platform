@@ -12,7 +12,7 @@
   <header class="header">
     <div class="header-left">
       <h1>PS 후면 지분 검사 도구</h1>
-      <span class="version">v8.6.1</span>
+      <span class="version">v8.6.2</span>
     </div>
     <div class="header-right">
       <button class="btn btn-sm btn-outline" onclick="openAdminSettings()" title="관리자 설정">&#9881; 설정</button>
@@ -182,15 +182,21 @@
     <div class="card">
       <div class="card-header">
         <h3>검사 이력 조회</h3>
-        <div class="toolbar-inline">
-          <select id="h_searchType">
-            <option value="indBcd">바코드</option>
-            <option value="lotnr">LOT</option>
-            <option value="matnr">자재코드</option>
-          </select>
-          <input type="text" id="h_keyword" placeholder="검색어 입력..." onkeydown="if(event.key==='Enter')searchHistory()">
-          <button class="btn btn-sm btn-primary" onclick="searchHistory()">검색</button>
-          <button class="btn btn-sm btn-outline" onclick="loadHistory()">전체</button>
+        <div class="toolbar-inline toolbar-wrap">
+          <div class="toolbar-row">
+            <select id="h_searchType">
+              <option value="indBcd">바코드</option>
+              <option value="lotnr">LOT</option>
+              <option value="matnr">자재코드</option>
+            </select>
+            <input type="text" id="h_keyword" placeholder="검색어 입력..." onkeydown="if(event.key==='Enter')searchHistory()">
+            <label class="toolbar-label">검사일</label>
+            <input type="date" id="h_dateFrom">
+            <label class="toolbar-label">~</label>
+            <input type="date" id="h_dateTo">
+            <button class="btn btn-sm btn-primary" onclick="searchHistory()">검색</button>
+            <button class="btn btn-sm btn-outline" onclick="resetHistorySearch()">초기화</button>
+          </div>
         </div>
       </div>
       <div class="card-body" id="historyCardsBody">

@@ -117,16 +117,45 @@ public class PsInspectionApiController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<PsInspectionResponse>>> searchInspections(
             @RequestParam(defaultValue = "indBcd") String type,
-            @RequestParam String keyword,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<PsInspectionResponse> result = switch (type.toLowerCase()) {
-            case "lotnr" -> inspectionService.searchByLotnr(keyword, pageable);
-            case "matnr" -> inspectionService.searchByMatnr(keyword, pageable);
-            default -> inspectionService.searchByIndBcd(keyword, pageable);
-        };
-        return ResponseEntity.ok(ApiResponse.success(result));
+
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        boolean hasDate = (dateFrom != null && !dateFrom.isBlank()) || (dateTo != null && !dateTo.isBlank());
+
+        // 키워드 + 날짜 복합 검색: 타입별로 분기
+        if (hasKeyword && hasDate) {
+            Page<PsInspectionResponse> result = switch (type.toLowerCase()) {
+                case "lotnr" -> inspectionService.searchByLotnrAndDateRange(keyword, dateFrom, dateTo, pageable);
+                case "matnr" -> inspectionService.searchByMatnrAndDateRange(keyword, dateFrom, dateTo, pageable);
+                default -> inspectionService.searchInspections(keyword, dateFrom, dateTo, pageable);
+            };
+            return ResponseEntity.ok(ApiResponse.success(result));
+        }
+
+        // 날짜만 있는 경우 (키워드 없음)
+        if (hasDate) {
+            return ResponseEntity.ok(ApiResponse.success(
+                    inspectionService.searchInspections(null, dateFrom, dateTo, pageable)));
+        }
+
+        // 키워드만 있는 경우 타입별 검색
+        if (hasKeyword) {
+            Page<PsInspectionResponse> result = switch (type.toLowerCase()) {
+                case "lotnr" -> inspectionService.searchByLotnr(keyword, pageable);
+                case "matnr" -> inspectionService.searchByMatnr(keyword, pageable);
+                default -> inspectionService.searchByIndBcd(keyword, pageable);
+            };
+            return ResponseEntity.ok(ApiResponse.success(result));
+        }
+
+        // 아무 조건도 없으면 전체 목록
+        return ResponseEntity.ok(ApiResponse.success(
+                inspectionService.listInspections(pageable)));
     }
 
     /**

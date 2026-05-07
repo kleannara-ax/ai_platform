@@ -47,6 +47,22 @@ public interface PsInspectionRepository extends JpaRepository<PsInspection, Long
             @Param("to") LocalDateTime to,
             Pageable pageable);
 
+    /** LOT + 기간 복합 검색 */
+    @Query("SELECT i FROM PsInspection i WHERE i.lotnr LIKE %:keyword% AND i.inspectedAt BETWEEN :from AND :to ORDER BY i.inspectedAt DESC")
+    Page<PsInspection> searchByLotnrAndDateRange(
+            @Param("keyword") String keyword,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            Pageable pageable);
+
+    /** 자재코드 + 기간 복합 검색 */
+    @Query("SELECT i FROM PsInspection i WHERE i.matnr LIKE %:keyword% AND i.inspectedAt BETWEEN :from AND :to ORDER BY i.inspectedAt DESC")
+    Page<PsInspection> searchByMatnrAndDateRange(
+            @Param("keyword") String keyword,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            Pageable pageable);
+
     /** 같은 바코드의 최대 seq 조회 */
     @Query("SELECT MAX(i.seq) FROM PsInspection i WHERE i.indBcd = :indBcd")
     Optional<Integer> findMaxSeqByIndBcd(@Param("indBcd") String indBcd);

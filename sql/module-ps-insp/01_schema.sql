@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS ps_inspection (
   COLLATE=utf8mb4_general_ci
   COMMENT='[module-ps-insp] PS 지분 검사 결과 (점보롤 지분 검사)';
 
--- ── 인덱스 ──
+-- ── 단일 컬럼 인덱스 ──
 CREATE INDEX IDX_PS_INSP_IND_BCD       ON ps_inspection (IND_BCD);
 CREATE INDEX IDX_PS_INSP_LOTNR         ON ps_inspection (LOTNR);
 CREATE INDEX IDX_PS_INSP_MATNR         ON ps_inspection (MATNR);
@@ -73,3 +73,10 @@ CREATE INDEX IDX_PS_INSP_MSRM_DATE     ON ps_inspection (MSRM_DATE DESC);
 CREATE INDEX IDX_PS_INSP_INSPECTED_AT  ON ps_inspection (INSPECTED_AT DESC);
 CREATE INDEX IDX_PS_INSP_OPERATOR_ID   ON ps_inspection (OPERATOR_ID);
 CREATE INDEX IDX_PS_INSP_STATUS        ON ps_inspection (STATUS);
+
+-- ── 복합 인덱스 (이력 조회 성능 튜닝) ──
+-- 날짜 범위 + 키워드 LIKE 복합 검색 최적화
+-- INSPECTED_AT 범위로 먼저 필터링 후 LIKE 스캔 → 풀테이블 스캔 방지
+CREATE INDEX IDX_PS_INSP_INSPAT_INDBCD ON ps_inspection (INSPECTED_AT DESC, IND_BCD);
+CREATE INDEX IDX_PS_INSP_INSPAT_LOTNR  ON ps_inspection (INSPECTED_AT DESC, LOTNR);
+CREATE INDEX IDX_PS_INSP_INSPAT_MATNR  ON ps_inspection (INSPECTED_AT DESC, MATNR);
