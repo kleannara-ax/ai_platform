@@ -133,7 +133,7 @@ public class MapController {
             if (floor.contains("2")) return "/images/bokji_2F.png";
             if (floor.contains("1")) return "/images/bokji_1F.png";
         }
-        if (containsAny(building, "\uAD00\uB9AC\uB3D9", "gwanri")) {
+        if ((containsAny(building, "\uAD00\uB9AC\uB3D9", "gwanri")) && !containsAny(building, "\uAE30\uC804\uAD00\uB9AC\uB3D9")) {
             if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/gwanri_2F.PNG";
             if (floor.contains("1")) return "/images/gwanri_1F.png";
@@ -163,6 +163,7 @@ public class MapController {
         }
         if (containsAny(building, "\uD654\uC7A5\uC9C0 3,6\uD638\uAE30", "\uD654\uC7A5\uC9C03,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A53,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A536", "tissue36", "tissue13")) {
             if (isBasement(floor)) return "";
+            if (floor.contains("3")) return "/images/tissue1,3_3F.png";
             if (floor.contains("2")) return "/images/tissue1,3_2F.PNG";
             if (floor.contains("1")) return "/images/tissue1,3_1F.PNG";
         }
@@ -173,7 +174,42 @@ public class MapController {
             if (floor.contains("1")) return "/images/tissue4,5_1F.PNG";
         }
         if (containsAny(building, "\uAE30\uC800\uADC0\uB3D9", "diaper")) {
-            return "/images/diaper_1F.png";
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/diaper_1F.png";
+            return "";
+        }
+        if (containsAny(building, "\uBC00\uB864\uCC3D\uACE0", "milrol")) {
+            if (floor.contains("3")) return "/images/milrol_3F.png";
+            if (floor.contains("2")) return "/images/milrol_2F.png";
+            return "/images/milrol_1F.png";
+        }
+        if (containsAny(building, "\uAE30\uAD00\uC2E4", "engine")) {
+            return "/images/engine_1F.png";
+        }
+        if (containsAny(building, "\uC804\uAE30\uD604\uC7A5", "elec")) {
+            if (floor.contains("2")) return "/images/elec_2F.png";
+            return "/images/elec_1F.png";
+        }
+        if (containsAny(building, "\uC8FC\uCC28\uD0C0\uC6CC", "tower")) {
+            if (floor.contains("\uC625\uC0C1") || floor.contains("rf") || floor.contains("rooftop")) return "/images/tower_RF.png";
+            if (floor.contains("3")) return "/images/tower_3F.png";
+            if (floor.contains("2")) return "/images/tower_2F.png";
+            return "/images/tower_1F.png";
+        }
+        if (containsAny(building, "\uBCF4\uC77C\uB7EC\uC870\uC815\uB3D9", "\uBCF4\uC77C\uB7EC \uC870\uC815\uB3D9", "boiler_ctrl", "boilerctrl")) {
+            if (floor.contains("2")) return "/images/boiler_ctrl_2F.png";
+            return "/images/boiler_ctrl_1F.png";
+        }
+        if (containsAny(building, "\uBCF5\uD569\uBCF4\uC77C\uB7EC", "comboboiler")) {
+            if (floor.contains("3")) return "/images/bokji_3F.png";
+            if (floor.contains("2")) return "/images/bokji_2F.png";
+            return "/images/bokji_1F.png";
+        }
+        if (containsAny(building, "\uC218\uCD9C\uCC3D\uACE0", "export")) {
+            return "/images/export_1F.png";
+        }
+        if (containsAny(building, "\uC911\uBB38\uCC3D\uACE0", "jungmun")) {
+            return "/images/jungmun_1F.png";
         }
         return "";
     }
