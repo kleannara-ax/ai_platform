@@ -2087,7 +2087,7 @@
   /** PPM 기준값 저장 (권한자 인증은 서버에서 토큰으로 자동 수행) */
   window.saveAdminPpmLimit = function () {
     if (!_adminModalState.isAdmin) {
-      toast('PPM 기준값 수정 권한이 없습니다.', 'error');
+      toast('후면 지분 값 수정 권한이 없습니다.', 'error');
       return;
     }
 

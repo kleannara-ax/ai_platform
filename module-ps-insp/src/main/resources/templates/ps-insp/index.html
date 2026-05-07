@@ -319,13 +319,13 @@
 
       <!-- 비권한자 안내 메시지 -->
       <div id="adminNoAuthMsg" class="admin-no-auth-msg" style="display:none;">
-        <p>&#128274; PPM 기준값 수정 권한이 없습니다.</p>
+        <p>&#128274; 후면 지분 값 수정 권한이 없습니다.</p>
         <small>아래에 등록된 권한자에게 추가를 요청하세요.</small>
       </div>
 
       <!-- PPM 기준값 설정 -->
       <div class="form-group">
-        <label>후면 지분 값(PPM) 기준값</label>
+        <label>후면 지분 기준 값(PPM)</label>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="number" id="adminPpmLimit" min="0" step="0.1" placeholder="예: 300" style="flex:1;">
           <button class="btn btn-primary btn-sm" id="btnSavePpm" onclick="saveAdminPpmLimit()">저장</button>
@@ -335,7 +335,7 @@
 
       <!-- 권한자 관리 -->
       <div class="form-group" style="margin-top:16px;">
-        <label>PPM 기준값 수정 권한자</label>
+        <label>후면 지분 값 수정 권한자</label>
         <div id="adminListContainer" class="admin-list-container">
           <div class="empty-msg">불러오는 중...</div>
         </div>
