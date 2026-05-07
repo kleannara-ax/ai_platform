@@ -941,7 +941,13 @@ async function loadBuildingFloorOptions() {
 
   const hb = document.getElementById('hydBuildingSel');
   const hf = document.getElementById('hydFloorSel');
-  if (hb) hb.innerHTML='<option value="">-- 건물 선택 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  if (hb) {
+    // 모달에는 도면이 등록된 건물만 표시
+    const modalBuildings = Object.keys(buildingFloorMap).length
+      ? buildings.filter(x => buildingFloorMap[String(x.buildingId)]?.length)
+      : buildings;
+    hb.innerHTML='<option value="">-- 건물 선택 --</option>'+modalBuildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  }
   if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+allFloorOptions.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
 }
 

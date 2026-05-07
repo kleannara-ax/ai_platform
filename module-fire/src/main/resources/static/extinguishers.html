@@ -932,8 +932,12 @@ async function loadBuildingOptions() {
   const ebSel = document.getElementById('extBuildingSel');
   const efSel = document.getElementById('extFloorSel');
   if (ebSel) {
+    // 모달에는 도면이 등록된 건물만 표시
+    const modalBuildings = Object.keys(extBuildingFloorMap).length
+      ? buildings.filter(x => extBuildingFloorMap[String(x.buildingId)]?.length)
+      : buildings;
     ebSel.innerHTML = '<option value="">-- 건물 선택 --</option>' +
-      buildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+      modalBuildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
   }
   if (efSel) {
     efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
