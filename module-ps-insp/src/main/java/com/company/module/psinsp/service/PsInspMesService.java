@@ -45,7 +45,7 @@ public class PsInspMesService {
 
     /** MES 서버 엔드포인트 URL (고정) */
     private static final String MES_ENDPOINT_URL =
-            "https://mesdev.kleannara.com:444/mobile/saveDustInspectionResult.data";
+            "https://mes.kleannara.com/mobile/saveDustInspectionResult.data";
 
     private final RestTemplate restTemplate;
     private final PsInspApiLogService apiLogService;
