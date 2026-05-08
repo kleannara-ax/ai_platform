@@ -10,4 +10,5 @@ public class QrPumpItem {
     private final String qrKey;
     private final String buildingName;
     private final String floorName;
+    private final String locationDescription;
 }

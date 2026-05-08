@@ -162,7 +162,8 @@ public class QrController {
                         e.getBuilding() != null ? e.getBuilding().getBuildingName() : "-",
                         e.getFloor() != null ? e.getFloor().getFloorName() : "-",
                         e.getExtinguisherType(),
-                        e.getManufactureDate() != null ? e.getManufactureDate().toString() : "-"))
+                        e.getManufactureDate() != null ? e.getManufactureDate().toString() : "-",
+                        e.getNote()))
                 .collect(Collectors.toList());
 
         List<QrHydItem> hydItems = hydList.stream()
@@ -184,7 +185,8 @@ public class QrController {
                         r.getReceiverId(),
                         r.getQrKey(),
                         r.getBuildingName(),
-                        r.getFloor() != null ? r.getFloor().getFloorName() : "-"))
+                        r.getFloor() != null ? r.getFloor().getFloorName() : "-",
+                        r.getLocationDescription()))
                 .collect(Collectors.toList());
 
         List<QrPumpItem> pumpItems = pumpList.stream()
@@ -193,7 +195,8 @@ public class QrController {
                         p.getPumpId(),
                         p.getQrKey(),
                         p.getBuildingName(),
-                        p.getFloor() != null ? p.getFloor().getFloorName() : "-"))
+                        p.getFloor() != null ? p.getFloor().getFloorName() : "-",
+                        p.getLocationDescription()))
                 .collect(Collectors.toList());
 
         Map<String, Object> result = new LinkedHashMap<>();

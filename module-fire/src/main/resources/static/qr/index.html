@@ -321,14 +321,15 @@
     }
   }
 
-  function registeredCardHtml(type, qrKey, buildingName, floorName) {
+  function registeredCardHtml(type, qrKey, buildingName, floorName, itemId, extraMeta) {
     var meta = '';
     if (buildingName) {
       meta = escHtml(buildingName);
       if (floorName) meta += ' / ' + escHtml(floorName);
     }
+    if (extraMeta) meta += (meta ? ' / ' : '') + escHtml(extraMeta);
     return '' +
-      '<div class="qr-card">' +
+      '<div class="qr-card" data-qr-type="' + escHtml(type) + '" data-qr-id="' + escHtml(String(itemId || '')) + '" style="cursor:pointer;">' +
       '  <div class="qr-card-row">' +
       '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl(type, qrKey) + '" loading="lazy" /></div>' +
       '    <div class="qr-meta">' + (meta || '-') + '</div>' +
@@ -389,7 +390,12 @@
         registeredWrap.className = gridClass;
         registeredWrap.innerHTML = items.map(function (item) {
           var qrKey = item.qrKey || item.noteKey || '';
-          return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName);
+          var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || '';
+          var extraMeta = '';
+          if (currentEquip === 'ext') extraMeta = item.note || '';
+          else if (currentEquip === 'hyd') extraMeta = item.locationDescription || '';
+          else extraMeta = item.locationDescription || '';
+          return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta);
         }).join('');
       }
     }

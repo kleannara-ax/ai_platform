@@ -16,4 +16,5 @@ public class QrExtItem {
     private final String floorName;
     private final String extinguisherType;
     private final String manufactureDate;
+    private final String note;
 }

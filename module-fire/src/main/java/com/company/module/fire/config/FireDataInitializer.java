@@ -44,9 +44,32 @@ public class FireDataInitializer implements ApplicationRunner {
 
         log.info("[FireDataInitializer] 필수 건물/층 마스터 데이터 확인 완료");
 
+        // ── 건물명 보정: 잘못된 이름 수정 ──
+        fixBuildingNames();
+
         // ── 데이터 보정: IS_ACTIVE=0 인 수신기/소방펌프 활성화 ──
         // QR 미등록 등록 시 isActive 누락 버그로 IS_ACTIVE=0 저장된 데이터 보정
         fixInactiveEquipment();
+    }
+
+    private void fixBuildingNames() {
+        // "저장 1,2호기" → "제지1,2호기", "저장 3호기" → "제지3호기"
+        String[][] corrections = {
+                {"저장 1,2호기", "제지1,2호기"},
+                {"저장1,2호기", "제지1,2호기"},
+                {"저장 3호기", "제지3호기"},
+                {"저장3호기", "제지3호기"},
+                {"저장12호기", "제지1,2호기"},
+                {"저장 12호기", "제지1,2호기"},
+        };
+        for (String[] pair : corrections) {
+            int affected = jdbc.update(
+                    "UPDATE building SET BUILDING_NAME = ? WHERE BUILDING_NAME = ?",
+                    pair[1], pair[0]);
+            if (affected > 0) {
+                log.info("[FireDataInitializer] 건물명 보정: '{}' → '{}'", pair[0], pair[1]);
+            }
+        }
     }
 
     private void fixInactiveEquipment() {

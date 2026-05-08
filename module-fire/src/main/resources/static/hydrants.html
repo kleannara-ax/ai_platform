@@ -501,6 +501,7 @@
             비정상 <span id="countFaulty">(0)</span>
           </button>
         </div>
+        <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;" title="엑셀 다운로드">📥 엑셀</button>
         <button type="button" class="btn status-add-btn" id="btnHydAdd"
           onclick="window.openHydrantUpsertModal?.({ id: 0, hydrantType: 'Indoor', operationType: 'Manual' })">+ 소화전 추가</button>
       </div>
@@ -512,7 +513,7 @@
     <div class="card-body">
       <div class="row g-2 align-items-center">
         <div class="col-md-4">
-          <input id="filterQ" class="form-control" placeholder="검색어(건물/층/구분/위치)" />
+          <input id="filterQ" class="form-control" placeholder="검색어(건물/층/구분/상세 위치)" />
         </div>
         <div class="col-md-3">
           <select id="filterBuildingId" class="form-select">
@@ -699,13 +700,17 @@
                 <option value="Outdoor">옥외</option>
               </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3" id="hydBuildingSelWrap">
               <label class="form-label">건물</label>
               <select class="form-select" id="hydBuildingSel">
                 <option value="">-- 건물 선택 --</option>
               </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3" id="hydBuildingInputWrap" style="display:none;">
+              <label class="form-label">건물 (직접 입력)</label>
+              <input type="text" class="form-control" id="hydBuildingInput" placeholder="건물명 입력" />
+            </div>
+            <div class="col-md-3" id="hydFloorSelWrap">
               <label class="form-label">층</label>
               <select class="form-select" id="hydFloorSel">
                 <option value="">-- 층 선택 --</option>
@@ -744,8 +749,8 @@
               <div class="form-text">선택 사항입니다.</div>
             </div>
             <div class="col-12">
-              <label class="form-label">위치정보 (선택)</label>
-              <input type="text" class="form-control" name="LocationDescription" id="hydLocation" placeholder="위치 상세 입력" />
+              <label class="form-label">상세 위치</label>
+              <input type="text" class="form-control" name="LocationDescription" id="hydLocation" placeholder="상세 위치 입력" />
               <div class="form-text">선택 입력 항목입니다.</div>
             </div>
           </div>
@@ -787,6 +792,8 @@
 <div id="fwToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
+<script>if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';document.head.appendChild(s);}</script>
 <script src="/js/csrf.js"></script>
 <script>
 // ===== JWT & 공용 API =====
@@ -1077,7 +1084,7 @@ function renderTable(items) {
             <th style="width:66px;">방식</th>
             <th style="width:92px;">건물</th>
             <th style="width:62px;">층</th>
-            <th style="width:130px;">위치</th>
+            <th style="width:130px;">상세 위치</th>
             <th style="width:92px;">최종 점검일</th>
             <th style="width:80px;">점검자</th>
             <th style="width:82px;">정상/비정상</th>
@@ -1163,7 +1170,7 @@ function renderStatusPanel(type) {
           <th style="width:66px;">방식</th>
           <th style="width:92px;">건물</th>
           <th style="width:62px;">층</th>
-          <th style="width:130px;">위치</th>
+          <th style="width:130px;">상세 위치</th>
           <th style="width:92px;">최종 점검일</th>
           <th style="width:80px;">점검자</th>
           <th style="width:82px;">정상/비정상</th>
@@ -1390,7 +1397,7 @@ async function openHydrantDetails(id) {
               <div class="fw-detail-item"><div class="fw-detail-item-label">건물</div><div class="fw-detail-item-value">${d.buildingName||'-'}</div></div>
               <div class="fw-detail-item"><div class="fw-detail-item-label">층</div><div class="fw-detail-item-value">${d.floorName||'-'}</div></div>
               <div class="fw-detail-item"><div class="fw-detail-item-label">좌표</div><div class="fw-detail-item-value">${coordStr}</div></div>
-              <div class="fw-detail-item"><div class="fw-detail-item-label">위치(상세)</div><div class="fw-detail-item-value">${d.locationDescription||'-'}</div></div>
+              <div class="fw-detail-item"><div class="fw-detail-item-label">상세 위치</div><div class="fw-detail-item-value">${d.locationDescription||'-'}</div></div>
             </div>
           </div>
           <div class="fw-edit-section">
@@ -1760,9 +1767,18 @@ window.openHydrantDetails = openHydrantDetails;
     selected=null; renderMarkers();
   }
 
+  const buildingInputEl = document.getElementById('hydBuildingInput');
+  const buildingSelWrap = document.getElementById('hydBuildingSelWrap');
+  const buildingInputWrap = document.getElementById('hydBuildingInputWrap');
+  const floorSelWrap = document.getElementById('hydFloorSelWrap');
+
   function syncTypeUI(){
     const t=typeEl?.value||'Indoor';
     const indoor=t==='Indoor';
+    // 옥내: 건물 드롭다운 표시, 옥외: 건물 직접입력 표시 + 층 숨김
+    if(buildingSelWrap) buildingSelWrap.style.display = indoor ? '' : 'none';
+    if(buildingInputWrap) buildingInputWrap.style.display = indoor ? 'none' : '';
+    if(floorSelWrap) floorSelWrap.style.display = indoor ? '' : 'none';
     if(buildingSel) buildingSel.disabled=!indoor;
     if(floorSel) floorSel.disabled=!indoor;
     if(!indoor){
@@ -1770,6 +1786,9 @@ window.openHydrantDetails = openHydrantDetails;
       setVal('hydBuildingId',99); setVal('hydFloorId',99);
       if(buildingSel) selectOptionSmart(buildingSel, 99, '옥외');
       if(floorSel) selectOptionSmart(floorSel, 99, '옥외');
+    } else {
+      // 옥내로 전환 시 건물 입력 초기화
+      if(buildingInputEl) buildingInputEl.value = '';
     }
   }
 
@@ -1943,13 +1962,33 @@ window.openHydrantDetails = openHydrantDetails;
     if(!id){
       const t=opts?.hydrantType||'Indoor';
       setVal('hydType',t); setVal('hydTypeHidden',t);
+      if(buildingInputEl) buildingInputEl.value = '';
+      syncTypeUI();
       if (buildingSel) {
         selectOptionSmart(buildingSel, opts?.buildingId, opts?.buildingName);
+        // 도면이 있는 건물·층 자동 감지: 옥내이고 건물이 선택되지 않았으면 첫 번째 도면등록 건물 자동 선택
+        if (t === 'Indoor' && !buildingSel.value && Object.keys(buildingFloorMap).length) {
+          const firstBId = Object.keys(buildingFloorMap).find(k => buildingFloorMap[k]?.length);
+          if (firstBId) {
+            const opt = Array.from(buildingSel.options).find(o => String(o.value) === firstBId);
+            if (opt) buildingSel.value = firstBId;
+          }
+        }
         updateModalFloorOptions(buildingSel.value);
       }
       if (floorSel) {
         selectOptionSmart(floorSel, opts?.floorId, opts?.floorName);
+        // 층이 선택되지 않았으면 해당 건물의 첫 번째 도면등록 층 자동 선택
+        if (t === 'Indoor' && !floorSel.value && buildingSel?.value) {
+          const bFloors = buildingFloorMap[String(buildingSel.value)];
+          if (bFloors?.length) {
+            const firstFloor = bFloors[0];
+            const fOpt = Array.from(floorSel.options).find(o => String(o.value) === String(firstFloor.floorId));
+            if (fOpt) floorSel.value = fOpt.value;
+          }
+        }
       }
+      document.getElementById('hydLocation').value = '';
       renderHistory([]);
       const qx=parseFloat(String(opts?.x??'')), qy=parseFloat(String(opts?.y??''));
       pendingSelected=(Number.isFinite(qx)&&Number.isFinite(qy))?{x:qx,y:qy}:null;
@@ -1967,8 +2006,23 @@ window.openHydrantDetails = openHydrantDetails;
       setVal('hydType',data.hydrantType||'Indoor');
       setVal('hydTypeHidden',data.hydrantType||'Indoor');
       if(typeEl) typeEl.value=data.hydrantType||'Indoor';
+      syncTypeUI();
       document.getElementById('hydOp').value=data.operationType||'Manual';
-      document.getElementById('hydLocation').value=data.locationDescription??'';
+      // 옥외일 때 locationDescription에서 건물명 추출하여 건물입력 필드에 설정
+      const locDesc = data.locationDescription ?? '';
+      if (data.hydrantType === 'Outdoor' && buildingInputEl) {
+        const slashIdx = locDesc.indexOf(' / ');
+        if (slashIdx > 0) {
+          buildingInputEl.value = locDesc.substring(0, slashIdx);
+          document.getElementById('hydLocation').value = locDesc.substring(slashIdx + 3);
+        } else {
+          buildingInputEl.value = locDesc;
+          document.getElementById('hydLocation').value = '';
+        }
+      } else {
+        if(buildingInputEl) buildingInputEl.value = '';
+        document.getElementById('hydLocation').value = locDesc;
+      }
       renderHistory(data.inspections || []);
       if(buildingSel) {
         selectOptionSmart(buildingSel, data.buildingId, data.buildingName);
@@ -2071,6 +2125,17 @@ window.openHydrantDetails = openHydrantDetails;
         setVal('hydBuildingId',99); setVal('hydFloorId',99);
       }
       const id=Number(document.getElementById('hydId')?.value||0);
+      // 옥외 건물 직접 입력값을 위치정보에 반영
+      let locDesc = (document.getElementById('hydLocation')?.value||'').trim();
+      if (typeVal === 'Outdoor') {
+        const outdoorBuilding = (buildingInputEl?.value || '').trim();
+        if (outdoorBuilding) {
+          // 위치정보에 건물명이 이미 포함되어 있지 않으면 앞에 추가
+          if (!locDesc.includes(outdoorBuilding)) {
+            locDesc = outdoorBuilding + (locDesc ? ' / ' + locDesc : '');
+          }
+        }
+      }
       const body={
         hydrantId: id||undefined,
         hydrantType: typeVal,
@@ -2079,7 +2144,7 @@ window.openHydrantDetails = openHydrantDetails;
         operationType: document.getElementById('hydOp')?.value||'Manual',
         x: Number.isFinite(x) ? x : null,
         y: Number.isFinite(y) ? y : null,
-        locationDescription: document.getElementById('hydLocation')?.value||''
+        locationDescription: locDesc
       };
       const r=await API.req('/fire-api/hydrants',{method:'POST',body});
       const t=await r?.text().catch(()=>'');
@@ -2280,6 +2345,39 @@ document.getElementById('btnReset')?.addEventListener('click',()=>{
 });
 document.getElementById('btnStatusInspect')?.addEventListener('click',()=>applyStatusFilter('inspect'));
 document.getElementById('btnStatusFaulty')?.addEventListener('click',()=>applyStatusFilter('faulty'));
+
+// ===== 엑셀 다운로드 =====
+document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
+  try {
+    if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해 주세요.'); return; }
+    if (!allItems || !allItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+    const rows = allItems.map((item, i) => ({
+      'No.': i + 1,
+      '소화전 ID': item.serialNumber || '-',
+      '구분': String(item.hydrantType || '').toLowerCase() === 'outdoor' ? '옥외' : '옥내',
+      '작동방식': String(item.operationType || '').toLowerCase() === 'auto' ? '자동' : '수동',
+      '건물': item.buildingName || '-',
+      '층': item.floorName || '-',
+      '위치': item.hydrantType === 'Outdoor'
+        ? (item.locationDescription || '-')
+        : (item.x != null && item.y != null ? `도면좌표 ${Number(item.x).toFixed(2)}%, ${Number(item.y).toFixed(2)}%` : '-'),
+      '최종 점검일': item.lastInspectionDate ? String(item.lastInspectionDate).slice(0, 10) : '-',
+      '점검자': item.lastInspectorName || '-',
+      '정상/비정상': item.lastInspectionDate == null ? '-' : (item.lastIsFaulty === true ? '비정상' : '정상'),
+      '고장 사유': item.lastIsFaulty === true ? (item.lastFaultReason || '-') : '-'
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = [5, 12, 8, 8, 12, 8, 20, 14, 10, 12, 20];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '소화전 목록');
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, `소화전_목록_${today}.xlsx`);
+  } catch(e) {
+    console.error('엑셀 다운로드 오류:', e);
+    alert('엑셀 다운로드 중 오류가 발생했습니다: ' + (e.message || e));
+  }
+});
 
 // 점검/저장 완료 후 갱신
 const reload = () => loadHydrants(

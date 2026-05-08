@@ -491,6 +491,7 @@
             교체필요 <span id="countUrgent">(0)</span>
           </button>
         </div>
+        <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;" title="엑셀 다운로드">📥 엑셀</button>
         <button type="button" class="btn status-add-btn" id="btnExtAdd">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
       </div>
     </div>
@@ -694,7 +695,7 @@
               <div class="border rounded p-2 bg-light">
                 <div id="extMapCanvas" class="position-relative" style="height:260px; overflow:hidden; background:#fff; border:1px solid #ddd; border-radius:8px;">
                   <img id="extPlanImg" alt="도면" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%;width:auto;height:auto;display:block;" />
-                  <div id="extMarkerLayer" style="position:absolute; inset:0; pointer-events:none; z-index:3;"></div>
+                  <div id="extMarkerLayer" style="position:absolute; inset:0; pointer-events:auto; z-index:3;"></div>
                 </div>
                 <div class="small text-muted mt-1">도면 클릭으로 위치를 선택하세요.</div>
                 <div class="small mt-1">선택 좌표: X <span id="extCoordX">-</span> / Y <span id="extCoordY">-</span></div>
@@ -767,6 +768,8 @@
 <div id="fwToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
+<script>if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';document.head.appendChild(s);}</script>
 <script src="/js/csrf.js"></script>
 <script>
  // ===== JWT & 공용 API =====
@@ -1609,6 +1612,7 @@ async function openDetails(id) {
   const histBody = document.getElementById('extInspectHistoryBody');
   let currentEditingExtId = 0;
   let selectedCoord = null;
+  let existingExtMarkers = []; // 현재 건물·층의 기존 소화기 좌표 목록
 
   function setVal(id, v){
     const el = document.getElementById(id);
@@ -1658,6 +1662,7 @@ async function openDetails(id) {
     if (coordXEl) coordXEl.textContent = '-';
     if (coordYEl) coordYEl.textContent = '-';
     selectedCoord = null;
+    document.getElementById('extNearbyDropdown')?.remove();
     renderSelectedMarker();
   }
   function computeFit(){
@@ -1683,9 +1688,51 @@ async function openDetails(id) {
   function renderSelectedMarker(){
     if (!markerLayer) return;
     markerLayer.innerHTML = '';
+    // 이미지가 로드되지 않았거나 모달이 보이지 않으면 대기
+    if (!planImg?.naturalWidth || !planImg?.naturalHeight) return;
     const f = computeFit();
     if (!f) return;
     layoutPlan(f);
+
+    // ── 기존 소화기 마커 표시 (반투명, 클릭 가능) ──
+    const currentId = currentEditingExtId || 0;
+    console.log('[EXT-MARKER] renderSelectedMarker: existingExtMarkers.length=', existingExtMarkers.length, 'currentId=', currentId);
+    existingExtMarkers.forEach(ext => {
+      if (ext.extinguisherId === currentId) return; // 현재 편집중인 건 제외
+      const ex = parseNum(ext.x), ey = parseNum(ext.y);
+      if (ex == null || ey == null) return;
+      const epos = toPx(ex, ey, f);
+      if (!epos) return;
+      const em = document.createElement('div');
+      em.className = 'ext-existing-marker';
+      em.style.cssText = [
+        'position:absolute',
+        `left:${epos.left}px`,
+        `top:${epos.top}px`,
+        'transform:translate(-50%,-50%)',
+        'width:28px',
+        'height:28px',
+        'cursor:pointer',
+        'opacity:0.55',
+        'border-radius:50%',
+        'z-index:5',
+        'pointer-events:auto',
+        'transition:opacity .15s'
+      ].join(';');
+      em.innerHTML = `<img src="${EXT_ICON_URL}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 2px rgba(0,0,0,.3));pointer-events:none;" onerror="this.style.display='none';" />`;
+      em.title = `소화기 #${ext.extinguisherId} (${ex.toFixed(1)}%, ${ey.toFixed(1)}%)`;
+      em.addEventListener('mouseenter', () => { em.style.opacity = '1'; });
+      em.addEventListener('mouseleave', () => { em.style.opacity = '0.55'; });
+      em.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCoord(ex, ey);
+        showNearbyExtDropdown(ex, ey);
+      });
+      markerLayer.appendChild(em);
+    });
+
+    // ── 현재 선택된 마커 (빨간 강조) ──
     const x = (selectedCoord && Number.isFinite(selectedCoord.x)) ? selectedCoord.x : parseNum(document.getElementById('extX')?.value);
     const y = (selectedCoord && Number.isFinite(selectedCoord.y)) ? selectedCoord.y : parseNum(document.getElementById('extY')?.value);
     if (x == null || y == null) return;
@@ -1701,10 +1748,36 @@ async function openDetails(id) {
       'height:34px',
       'pointer-events:none',
       'border-radius:50%',
-      'background:rgba(220,53,69,.18)'
+      'background:rgba(220,53,69,.18)',
+      'z-index:10'
     ].join(';');
-    marker.innerHTML = `<img src="${EXT_ICON_URL}" alt="extinguisher-marker" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 4px rgba(0,0,0,.35));" onerror="this.style.display='none';" />`;
+    marker.innerHTML = `<img src="${EXT_ICON_URL}" alt="extinguisher-marker" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 4px rgba(0,0,0,.35));pointer-events:none;" onerror="this.style.display='none';" />`;
     markerLayer.appendChild(marker);
+  }
+
+  /** 동일 위치 근처 소화기 목록을 드롭다운으로 표시 */
+  function showNearbyExtDropdown(x, y) {
+    const THRESHOLD = 1.5; // 1.5% 이내를 동일 위치로 판정
+    const nearby = existingExtMarkers.filter(ext => {
+      const ex = parseNum(ext.x), ey = parseNum(ext.y);
+      if (ex == null || ey == null) return false;
+      return Math.abs(ex - x) < THRESHOLD && Math.abs(ey - y) < THRESHOLD;
+    });
+    // 기존 드롭다운 제거
+    document.getElementById('extNearbyDropdown')?.remove();
+    if (!nearby.length) return;
+
+    const container = document.createElement('div');
+    container.id = 'extNearbyDropdown';
+    container.style.cssText = 'margin-top:8px;padding:8px 12px;background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;font-size:13px;';
+    container.innerHTML = `<div style="font-weight:600;margin-bottom:4px;">📍 동일 위치 소화기 (${nearby.length}개)</div>` +
+      nearby.map(ext => {
+        const serial = ext.serialNumber || `#${ext.extinguisherId}`;
+        return `<div style="padding:2px 0;color:#495057;">• ${serial}</div>`;
+      }).join('');
+    // 좌표 표시 영역 아래에 삽입
+    const coordArea = mapCanvas?.parentElement;
+    if (coordArea) coordArea.appendChild(container);
   }
   function selectOptionSmart(sel, id, name){
     if (!sel) return;
@@ -1778,10 +1851,12 @@ async function openDetails(id) {
     const hasNumericIds = /^\d+$/.test(String(b || '')) && /^\d+$/.test(String(f || ''));
     if (!b || !f || !planImg) {
       if (planImg) planImg.removeAttribute('src');
+      existingExtMarkers = [];
       clearCoord();
       return;
     }
     let mapUrl = '';
+    existingExtMarkers = [];
     try {
       if (hasNumericIds) {
         const params = new URLSearchParams({ buildingId: b, floorId: f });
@@ -1789,9 +1864,18 @@ async function openDetails(id) {
         if (r && r.ok) {
           const j = await r.json().catch(() => null);
           mapUrl = j?.data?.planImagePath || '';
+          // 기존 소화기 좌표 목록 저장 (API 응답 우선)
+          existingExtMarkers = Array.isArray(j?.data?.extinguishers) ? j.data.extinguishers : [];
         }
       }
     } catch {}
+    // API에서 마커를 못 가져왔으면 allItems에서 동일 건물·층 소화기를 추출
+    if (!existingExtMarkers.length && allItems && allItems.length) {
+      existingExtMarkers = allItems
+        .filter(it => String(it.buildingId) === String(b) && String(it.floorId) === String(f) && it.x != null && it.y != null)
+        .map(it => ({ extinguisherId: it.extinguisherId, serialNumber: it.serialNumber, x: it.x, y: it.y }));
+      console.log('[EXT-MARKER] fallback from allItems:', existingExtMarkers.length, 'markers for building=', b, 'floor=', f);
+    }
     if (!mapUrl) {
       const bName = buildingSel?.selectedOptions?.[0]?.textContent || '';
       const fName = floorSel?.selectedOptions?.[0]?.textContent || '';
@@ -1802,8 +1886,17 @@ async function openDetails(id) {
       renderSelectedMarker();
       return;
     }
-    planImg.onload = () => renderSelectedMarker();
-    planImg.src = `${mapUrl}?v=${Date.now()}`;
+    planImg.onload = () => {
+      // 이미지 로드 완료 후 마커 렌더링 (모달이 아직 안 보이면 shown.bs.modal에서 재호출)
+      renderSelectedMarker();
+    };
+    // 이미 같은 이미지가 로드되어 있으면 onload가 안 뜸 → 수동 렌더링
+    const newSrc = `${mapUrl}?v=${Date.now()}`;
+    if (planImg.src === newSrc && planImg.complete && planImg.naturalWidth) {
+      renderSelectedMarker();
+    } else {
+      planImg.src = newSrc;
+    }
   }
   function syncHiddenFromSelect(){
     setVal('extBuildingId', buildingSel?.value || '');
@@ -1891,10 +1984,27 @@ async function openDetails(id) {
       const ff = document.getElementById('filterFloorId')?.value || '';
       if (buildingSel) {
         selectOptionSmart(buildingSel, (opts?.buildingId ?? fb ?? ''), (opts?.buildingName ?? ''));
+        // 도면이 있는 건물·층 자동 감지: 건물이 선택되지 않았으면 첫 번째 도면등록 건물 자동 선택
+        if (!buildingSel.value && Object.keys(extBuildingFloorMap).length) {
+          const firstBId = Object.keys(extBuildingFloorMap).find(k => extBuildingFloorMap[k]?.length);
+          if (firstBId) {
+            const opt = Array.from(buildingSel.options).find(o => String(o.value) === firstBId);
+            if (opt) buildingSel.value = firstBId;
+          }
+        }
         updateExtModalFloorOptions(buildingSel.value);
       }
       if (floorSel) {
         selectOptionSmart(floorSel, (opts?.floorId ?? ff ?? ''), (opts?.floorName ?? ''));
+        // 층이 선택되지 않았으면 해당 건물의 첫 번째 도면등록 층 자동 선택
+        if (!floorSel.value && buildingSel?.value) {
+          const bFloors = extBuildingFloorMap[String(buildingSel.value)];
+          if (bFloors?.length) {
+            const firstFloor = bFloors[0];
+            const fOpt = Array.from(floorSel.options).find(o => String(o.value) === String(firstFloor.floorId));
+            if (fOpt) floorSel.value = fOpt.value;
+          }
+        }
       }
       syncHiddenFromSelect();
       setVal('extType','');
@@ -2088,6 +2198,8 @@ async function openDetails(id) {
   planImg?.addEventListener('load', renderSelectedMarker);
   window.addEventListener('resize', renderSelectedMarker);
   mapCanvas?.addEventListener('click', (e) => {
+    // 기존 소화기 마커를 클릭한 경우 무시 (마커 자체의 click 핸들러가 처리)
+    if (e.target.closest('.ext-existing-marker')) return;
     const f = computeFit();
     if (!f) return;
     const rect = mapCanvas.getBoundingClientRect();
@@ -2096,9 +2208,14 @@ async function openDetails(id) {
     if (px < f.ox || px > f.ox + f.w || py < f.oy || py > f.oy + f.h) return;
     const x = Math.max(0, Math.min(100, ((px - f.ox) / f.w) * 100));
     const y = Math.max(0, Math.min(100, ((py - f.oy) / f.h) * 100));
+    document.getElementById('extNearbyDropdown')?.remove();
     setCoord(x, y);
   });
   modalEl?.addEventListener('shown.bs.modal', renderSelectedMarker);
+  modalEl?.addEventListener('hidden.bs.modal', () => {
+    document.getElementById('extNearbyDropdown')?.remove();
+    existingExtMarkers = [];
+  });
 })();
 // ===== 이벤트 위임 (클릭) =====
 document.addEventListener('click', async (ev) => {
@@ -2188,6 +2305,39 @@ document.getElementById('btnStatusInspect')?.addEventListener('click', () => app
 document.getElementById('btnStatusPlanned')?.addEventListener('click', () => applyStatusFilter('planned'));
 document.getElementById('btnStatusUrgent')?.addEventListener('click', () => applyStatusFilter('urgent'));
 document.getElementById('btnExtAdd')?.addEventListener('click', () => window.openExtinguisherUpsertModal({ id: 0 }));
+
+// ===== 엑셀 다운로드 =====
+document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
+  try {
+    if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해 주세요.'); return; }
+    if (!allItems || !allItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+    const rows = allItems.map((item, i) => ({
+      'No.': i + 1,
+      '소화기 ID': item.serialNumber || '-',
+      '건물': item.buildingName || '-',
+      '층': item.floorName || '-',
+      '종류': item.extinguisherType || '-',
+      '제조일': item.manufactureDate ? String(item.manufactureDate).slice(0, 7) : '-',
+      '교체예정일': item.replacementDueDate ? String(item.replacementDueDate).slice(0, 10) : '-',
+      '최종 점검일': item.lastInspectionDate ? String(item.lastInspectionDate).slice(0, 10) : '-',
+      '점검자': item.lastInspectorName || '-',
+      '고장유무': item.lastInspectionDate == null ? '-' : (item.lastIsFaulty === true ? '비정상' : '정상'),
+      '고장 사유': item.lastIsFaulty === true ? (item.lastFaultReason || '-') : '-',
+      '수량': item.quantity || 1,
+      '비고': item.note || '-'
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = [5, 12, 12, 8, 16, 12, 14, 14, 10, 10, 20, 6, 16];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '소화기 목록');
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, `소화기_목록_${today}.xlsx`);
+  } catch(e) {
+    console.error('엑셀 다운로드 오류:', e);
+    alert('엑셀 다운로드 중 오류가 발생했습니다: ' + (e.message || e));
+  }
+});
 
 // 등록/점검 완료 후 목록 새로고침
 document.addEventListener('inspection:completed', () => loadExtinguishers(

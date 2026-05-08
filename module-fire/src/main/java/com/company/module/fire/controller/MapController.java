@@ -96,6 +96,7 @@ public class MapController {
         for (Extinguisher e : extinguisherRepository.findForMap(buildingId, floorId)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("extinguisherId", e.getExtinguisherId());
+            row.put("serialNumber", e.getSerialNumber());
             row.put("x", e.getX());
             row.put("y", e.getY());
             extinguishers.add(row);

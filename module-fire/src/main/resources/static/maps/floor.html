@@ -914,6 +914,12 @@
       btn.innerHTML = `<img src="${EX_ICON_URL}" alt="extinguisher">`;
       btn.onclick = (e) => {
         e.stopPropagation();
+        // 소화기 추가 모드일 때 마커 클릭 → 바로 추가 모달 열기 (미니 모달 대신)
+        if (state.addMode === 'ext') {
+          resetAddMode();
+          openAddModalAtPosition('ext', it.x, it.y);
+          return;
+        }
         resetMoveArm();
         state.selectedExtId = it.extinguisherId;
         state.selectedHydrantId = null;
