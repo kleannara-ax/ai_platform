@@ -264,6 +264,17 @@ public class PsInspectionService {
                 .orElse(Map.of("exists", false));
     }
 
+    // ──────────── MES 전송 상태 업데이트 ────────────
+
+    @Transactional
+    public void updateMesSendStatus(Long inspectionId, String mesSendStatus) {
+        PsInspection inspection = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new EntityNotFoundException("검사 결과를 찾을 수 없습니다. ID: " + inspectionId));
+        inspection.updateMesSendStatus(mesSendStatus);
+        inspectionRepository.save(inspection);
+        log.info("[PS-INSP] MES 전송 상태 업데이트 - id: {}, status: {}", inspectionId, mesSendStatus);
+    }
+
     // ──────────── 삭제 ────────────
 
     @Transactional

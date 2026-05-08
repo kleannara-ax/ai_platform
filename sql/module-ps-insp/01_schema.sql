@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS ps_inspection (
     OPERATOR_NM     VARCHAR(200)    NULL                     COMMENT '검사자 이름',
     DEVICE_ID       VARCHAR(200)    NULL                     COMMENT '장비 ID',
     STATUS          VARCHAR(100)    NULL                     COMMENT '검사 상태',
+    MES_SEND_STATUS VARCHAR(50)     NULL                     COMMENT 'MES 전송 상태 (전송 성공/전송 실패/미전송)',
     CREATED_AT      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     UPDATED_AT      DATETIME        NULL                     COMMENT '수정일시 (재검사 UPDATE 시 자동 갱신)',
 

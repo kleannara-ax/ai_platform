@@ -60,6 +60,7 @@ public class PsInspectionResponse {
     private String operatorNm;
     private String deviceId;
     private String status;
+    private String mesSendStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -124,6 +125,7 @@ public class PsInspectionResponse {
                 .operatorNm(entity.getOperatorNm())
                 .deviceId(entity.getDeviceId())
                 .status(entity.getStatus())
+                .mesSendStatus(entity.getMesSendStatus())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .isUpdate(isUpdate)

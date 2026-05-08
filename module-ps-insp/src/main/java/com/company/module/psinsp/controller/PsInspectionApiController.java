@@ -176,6 +176,20 @@ public class PsInspectionApiController {
     }
 
     /**
+     * MES 전송 상태 업데이트
+     */
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
+    @PatchMapping("/{id}/mes-status")
+    public ResponseEntity<ApiResponse<Map<String, String>>> updateMesSendStatus(
+            @PathVariable("id") Long id,
+            @RequestBody Map<String, String> body) {
+        String mesSendStatus = body.get("mesSendStatus");
+        inspectionService.updateMesSendStatus(id, mesSendStatus);
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("message", "MES 전송 상태 업데이트 완료", "id", String.valueOf(id), "mesSendStatus", mesSendStatus != null ? mesSendStatus : "")));
+    }
+
+    /**
      * 검사 결과 삭제
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")

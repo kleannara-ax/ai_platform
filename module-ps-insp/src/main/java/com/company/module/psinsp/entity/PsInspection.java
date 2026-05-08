@@ -162,6 +162,9 @@ public class PsInspection {
     @Column(name = "STATUS", length = 100)
     private String status;
 
+    @Column(name = "MES_SEND_STATUS", length = 50)
+    private String mesSendStatus;
+
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -270,6 +273,13 @@ public class PsInspection {
      */
     public void incrementSeq() {
         this.seq = (this.seq != null ? this.seq : 1) + 1;
+    }
+
+    /**
+     * MES 전송 상태 업데이트
+     */
+    public void updateMesSendStatus(String mesSendStatus) {
+        this.mesSendStatus = mesSendStatus;
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.3
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.4
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -379,25 +379,84 @@
     // ── IND_BCD 파라미터: 개별바코드로 자동 검색 ──
     // 예: ?tab=history-table&IND_BCD=26228J0039 → 이력 테이블에서 바코드 자동 검색
     //     ?tab=history&IND_BCD=26228J0039       → 검사 이력에서 바코드 자동 검색
+    // MES에서 호출 시 검사일 디폴트를 해당 바코드의 실제 검사일로 세팅
     var searchParam = params.get('IND_BCD') || params.get('search'); // IND_BCD 우선, search 하위호환
     if (searchParam) {
       var activeTabName = tabParam ? (({ 'history-table': 'detail-table', 'detail-table': 'detail-table', 'detail': 'detail-table', 'table': 'detail-table', 'history': 'history', 'inspection': 'inspection' })[tabParam] || tabParam) : null;
 
-      if (activeTabName === 'detail-table') {
-        // 이력 테이블 탭: 바코드 검색 필드에 자동 입력 후 검색
-        var dtKeyword = document.getElementById('dt_keyword');
-        if (dtKeyword) dtKeyword.value = searchParam;
-        dtSearchParams.indBcd = searchParam;
-        // 탭 전환 시 이미 loadDetailTable()이 호출되므로 별도 호출 불필요
-        // (dtSearchParams가 설정되었으므로 필터링된 결과를 반환)
-      } else if (activeTabName === 'history') {
-        // 검사 이력 탭: 검색어 입력 후 검색
-        var hKeyword = document.getElementById('h_keyword');
-        if (hKeyword) hKeyword.value = searchParam;
-        // searchHistory()는 switchTab('history') 이후 로드된 데이터와 별개로 실행
-        setTimeout(function () { searchHistory(); }, 200);
-      }
+      // 해당 바코드의 검사일을 API로 조회하여 날짜 필터 자동 세팅
+      _applySearchDateByBarcode(searchParam, activeTabName);
     }
+  }
+
+  /**
+   * URL search 파라미터 접근 시: 바코드로 검사 이력을 조회하여
+   * 해당 검사일 범위를 날짜 필터에 자동 세팅한 뒤 검색 실행
+   */
+  function _applySearchDateByBarcode(barcode, tabName) {
+    api('GET', '/ps-insp-api/inspections/search?type=indBcd&keyword=' + enc(barcode) + '&page=0&size=1')
+      .then(function (res) {
+        var dateStr = '';
+        if (res.success && res.data && res.data.content && res.data.content.length > 0) {
+          var item = res.data.content[0]; // 최신 검사 결과
+          if (item.inspectedAt) {
+            dateStr = String(item.inspectedAt).substring(0, 10); // 'YYYY-MM-DD'
+          }
+        }
+
+        if (tabName === 'detail-table') {
+          var dtKeyword = document.getElementById('dt_keyword');
+          if (dtKeyword) dtKeyword.value = barcode;
+          dtSearchParams.indBcd = barcode;
+          if (dateStr) {
+            var dfEl = document.getElementById('dt_dateFrom');
+            var dtEl = document.getElementById('dt_dateTo');
+            if (dfEl) dfEl.value = dateStr;
+            if (dtEl) dtEl.value = dateStr;
+            dtSearchParams.dateFrom = dateStr;
+            dtSearchParams.dateTo = dateStr;
+          } else {
+            // 검사일 못 찾으면 날짜 필터 비움 (전체 기간 검색)
+            var dfEl2 = document.getElementById('dt_dateFrom');
+            var dtEl2 = document.getElementById('dt_dateTo');
+            if (dfEl2) dfEl2.value = '';
+            if (dtEl2) dtEl2.value = '';
+            dtSearchParams.dateFrom = '';
+            dtSearchParams.dateTo = '';
+          }
+          loadDetailTable(0);
+        } else if (tabName === 'history') {
+          var hKeyword = document.getElementById('h_keyword');
+          if (hKeyword) hKeyword.value = barcode;
+          if (dateStr) {
+            var hFrom = document.getElementById('h_dateFrom');
+            var hTo = document.getElementById('h_dateTo');
+            if (hFrom) hFrom.value = dateStr;
+            if (hTo) hTo.value = dateStr;
+          } else {
+            var hFrom2 = document.getElementById('h_dateFrom');
+            var hTo2 = document.getElementById('h_dateTo');
+            if (hFrom2) hFrom2.value = '';
+            if (hTo2) hTo2.value = '';
+          }
+          setTimeout(function () { searchHistory(); }, 100);
+        }
+      })
+      .catch(function () {
+        // API 실패 시 기존 방식으로 폴백
+        if (tabName === 'detail-table') {
+          var dtKeyword = document.getElementById('dt_keyword');
+          if (dtKeyword) dtKeyword.value = barcode;
+          dtSearchParams.indBcd = barcode;
+          dtSearchParams.dateFrom = '';
+          dtSearchParams.dateTo = '';
+          loadDetailTable(0);
+        } else if (tabName === 'history') {
+          var hKeyword = document.getElementById('h_keyword');
+          if (hKeyword) hKeyword.value = barcode;
+          setTimeout(function () { searchHistory(); }, 100);
+        }
+      });
   }
 
   function autoFillOperator() {
@@ -1496,11 +1555,15 @@
   function sendToMes(data) {
     if (!data.indBcd || data.coverageRatio == null) return;
     var ppmValue = Math.round(data.coverageRatio * 1000000);
+    var inspId = data.inspectionId; // MES 전송 상태 저장용 ID
     api('POST', '/ps-insp-api/mes/send-result', { IND_BCD: data.indBcd, RST_VAL: ppmValue })
       .then(function (res) {
         // res.success = 우리 백엔드 API 응답 성공 여부
         // res.data.success = MES 서버 실제 전송 결과 (RS_CODE=S이면 true)
-        if (res.success && res.data && res.data.success) {
+        var mesSuccess = res.success && res.data && res.data.success;
+        var statusText = mesSuccess ? '전송 성공' : '전송 실패';
+
+        if (mesSuccess) {
           var rsMsg = res.data.rsMsg ? ' (' + res.data.rsMsg + ')' : '';
           toast('MES 전송 완료' + rsMsg, 'info');
         } else {
@@ -1514,9 +1577,37 @@
           }
           toast('MES 전송 실패: ' + detail, 'error');
         }
+
+        // ps_inspection 테이블에 MES 전송 상태 저장
+        if (inspId) {
+          _updateMesSendStatus(inspId, statusText);
+        }
       })
       .catch(function (e) {
         toast('MES 전송 오류: 서버 통신 실패', 'error');
+        // 통신 오류도 실패로 기록
+        if (inspId) {
+          _updateMesSendStatus(inspId, '전송 실패');
+        }
+      });
+  }
+
+  /**
+   * MES 전송 상태를 ps_inspection 테이블에 업데이트
+   * @param {number} inspId - 검사 ID
+   * @param {string} status - '전송 성공' 또는 '전송 실패'
+   */
+  function _updateMesSendStatus(inspId, status) {
+    api('PATCH', '/ps-insp-api/inspections/' + inspId + '/mes-status', { mesSendStatus: status })
+      .then(function (res) {
+        if (res.success) {
+          console.log('[MES] 전송 상태 저장 완료 - ID:', inspId, ', 상태:', status);
+        } else {
+          console.warn('[MES] 전송 상태 저장 실패 - ID:', inspId);
+        }
+      })
+      .catch(function (e) {
+        console.error('[MES] 전송 상태 저장 오류:', e.message);
       });
   }
 
@@ -1653,6 +1744,7 @@
         + '<div class="hci-row"><b>자동:</b> ' + (i.autoCount || 0) + ' | <b>수동:</b> ' + (i.manualCount || 0) + '</div>'
         + '<div class="hci-row"><b>최대임계값:</b> ' + (i.thresholdMax != null ? i.thresholdMax : '-') + '</div>'
         + '<div class="hci-row"><b>검사자:</b> ' + esc(i.operatorNm || '-') + '</div>'
+        + '<div class="hci-row"><b>MES 전송:</b> ' + _mesSendBadge(i.mesSendStatus) + '</div>'
         + '<div class="hci-row" style="font-size:12px;color:var(--text3);">' + dt + '</div>'
 
         + '</div>'
@@ -1681,7 +1773,7 @@
   // - 기간 미설정 시 전체 기간 조회
   // - 전체 48 컬럼 (요구사항 완전 일치)
   // ══════════════════════════════════════════════
-  var DETAIL_COLSPAN = 47; // thead colspan 합계 (삭제 컬럼 제거됨)
+  var DETAIL_COLSPAN = 48; // thead colspan 합계 (MES전송 컬럼 추가)
 
   window.loadDetailTable = function (page) {
     if (page === undefined) page = 0;
@@ -1799,8 +1891,9 @@
         + '<td>' + (i.prcSeqno != null ? i.prcSeqno : '-') + '</td>'
         + '<td><code>' + esc(i.inspItemGrpCd || '-') + '</code></td>'
         + '<td>' + esc(i.deviceId || '-') + '</td>'
-        // ── 상태 (2) ──
+        // ── 상태 (3) ──
         + '<td>' + stBadge + '</td>'
+        + '<td>' + _mesSendBadge(i.mesSendStatus) + '</td>'
         + '<td style="font-size:11px;white-space:nowrap;">' + crDt + '</td>'
         // ── 이미지 (6) ──
         + '<td>' + origLink + '</td>'
@@ -1818,6 +1911,13 @@
     if (v == null) return '-';
     var n = parseFloat(v);
     return isNaN(n) ? '-' : n.toFixed(4);
+  }
+
+  /** MES 전송 상태 배지 HTML 생성 */
+  function _mesSendBadge(status) {
+    if (status === '전송 성공') return '<span class="badge badge-active">전송 성공</span>';
+    if (status === '전송 실패') return '<span class="badge badge-inactive" style="background:var(--danger,#e74c3c);color:#fff;">전송 실패</span>';
+    return '<span class="badge" style="background:#888;color:#fff;font-size:10px;">미전송</span>';
   }
 
   // ══════════════════════════════════════════════
@@ -1845,7 +1945,7 @@
       '픽셀','픽셀',
       '검사 조건','검사 조건','검사 조건',
       '관리 정보','관리 정보','관리 정보','관리 정보','관리 정보','관리 정보',
-      '상태','상태',
+      '상태','상태','상태',
       '이미지','이미지','이미지','이미지','이미지','이미지'
     ];
 
@@ -1859,7 +1959,7 @@
       '객체px','전체px',
       '임계값','검사일시','측정일시',
       '검사자ID','검사자명','플랜트','처리순번','검사항목','장치ID',
-      '상태','등록일시',
+      '상태','MES전송','등록일시',
       '원본','원본 파일명','원본 저장경로','결과','결과 파일명','결과 저장경로'
     ];
 
@@ -1885,7 +1985,7 @@
         i.thresholdMax != null ? i.thresholdMax : '', inspDt, msrmDt,
         i.operatorId || '', i.operatorNm || '', i.werks || '',
         i.prcSeqno != null ? i.prcSeqno : '', i.inspItemGrpCd || '', i.deviceId || '',
-        i.status || '', crDt,
+        i.status || '', i.mesSendStatus || '미전송', crDt,
         i.originalImagePath || '', i.originalImageName || '', i.originalImageDir || '',
         i.resultImagePath || '', i.resultImageName || '', i.resultImageDir || ''
       ]);
@@ -1897,7 +1997,7 @@
     // 카테고리 행 머지 셀 설정
     var merges = [];
     var col = 0;
-    var mergeGroups = [7, 4, 5, 4, 4, 4, 2, 3, 6, 2, 6]; // 카테고리별 컬럼 수
+    var mergeGroups = [7, 4, 5, 4, 4, 4, 2, 3, 6, 3, 6]; // 카테고리별 컬럼 수 (상태: 2→3 MES전송 추가)
     mergeGroups.forEach(function (span) {
       if (span > 1) merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + span - 1 } });
       col += span;
