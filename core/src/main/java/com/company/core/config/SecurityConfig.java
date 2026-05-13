@@ -81,6 +81,11 @@ public class SecurityConfig {
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
                 .requestMatchers("/fire-api/qr/image").permitAll()
+                // 소방 모듈 파일(사진) 조회 - img 태그에서 JWT 헤더 전송 불가하므로 공개
+                .requestMatchers("/fire-api/extinguishers/files/**").permitAll()
+                .requestMatchers("/fire-api/hydrants/files/**").permitAll()
+                .requestMatchers("/fire-api/pumps/files/**").permitAll()
+                .requestMatchers("/fire-api/receivers/files/**").permitAll()
                 // PS-INSP 모듈: 헬스체크·페이지(iframe)·정적리소스만 공개
                 // API(/ps-insp-api/inspections/**, /ps-insp-api/mes/**)는 인증+메뉴접근권한 필요
                 .requestMatchers("/ps-insp-api/health").permitAll()
