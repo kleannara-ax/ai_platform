@@ -1043,14 +1043,17 @@ public class MobileInspectionController {
             String bn = bName == null ? "" : bName.toLowerCase();
             if (bn.contains("\uC625\uC678") || bn.contains("outdoor")) continue;
             for (Floor f : floors) {
-                String plan = resolvePlanImagePathStrict(bName, f.getFloorName());
-                if (plan == null || plan.isBlank()) continue;
+                String fName = f.getFloorName();
+                String fn = fName == null ? "" : fName.toLowerCase();
+                // 옥외 층 제외
+                if (fn.contains("\uC625\uC678") || fn.contains("outdoor")) continue;
+                String plan = resolvePlanImagePathStrict(bName, fName);
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("buildingId", b.getBuildingId());
                 m.put("buildingName", b.getBuildingName());
                 m.put("floorId", f.getFloorId());
                 m.put("floorName", f.getFloorName());
-                m.put("planImagePath", plan);
+                m.put("planImagePath", plan != null ? plan : "");
                 result.add(m);
             }
         }

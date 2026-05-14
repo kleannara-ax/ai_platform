@@ -949,25 +949,20 @@ async function loadBuildingFloorOptions() {
   const hb = document.getElementById('hydBuildingSel');
   const hf = document.getElementById('hydFloorSel');
   if (hb) {
-    // 모달에는 도면이 등록된 건물만 표시
-    const modalBuildings = Object.keys(buildingFloorMap).length
-      ? buildings.filter(x => buildingFloorMap[String(x.buildingId)]?.length)
-      : buildings;
-    hb.innerHTML='<option value="">-- 건물 선택 --</option>'+modalBuildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+    // 모달에 모든 DB 건물 표시 (도면 유무와 무관)
+    hb.innerHTML='<option value="">-- 건물 선택 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
   }
   if (hf) hf.innerHTML='<option value="">-- 층 선택 --</option>'+allFloorOptions.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
 }
 
-/** 모달 층 드롭다운 갱신 - 도면이 등록된 층만 표시 */
+/** 모달 층 드롭다운 갱신 - 모든 DB 층 표시 */
 function updateModalFloorOptions(buildingId) {
   const hf = document.getElementById('hydFloorSel');
   if (!hf) return;
   const prevVal = hf.value;
-  const bKey = String(buildingId || '');
-  // 도면 등록된 층이 있으면 해당 목록만, 없으면 DB 전체 층 표시
-  const floorList = (bKey && buildingFloorMap[bKey]?.length) ? buildingFloorMap[bKey] : allFloorOptions;
+  // 모든 DB 층 표시 (도면 유무와 무관)
   hf.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    allFloorOptions.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   // 이전 선택값 복원 시도
   if (prevVal && Array.from(hf.options).some(o => o.value === prevVal)) {
     hf.value = prevVal;

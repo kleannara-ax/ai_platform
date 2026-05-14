@@ -50,24 +50,25 @@ public class MapController {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Building b : buildings) {
             String bName = b.getBuildingName() == null ? "" : b.getBuildingName();
-            List<Map<String, Object>> matchedFloors = new ArrayList<>();
+            List<Map<String, Object>> allFloors = new ArrayList<>();
 
             for (Floor f : floors) {
                 String fName = f.getFloorName() == null ? "" : f.getFloorName();
+                // 옥외 층 제외
+                if (fName.contains("옥외")) continue;
                 String path = resolvePlanImagePath(bName, fName);
-                if (!path.isEmpty()) {
-                    Map<String, Object> fm = new LinkedHashMap<>();
-                    fm.put("floorId", f.getFloorId());
-                    fm.put("floorName", fName);
-                    matchedFloors.add(fm);
-                }
+                Map<String, Object> fm = new LinkedHashMap<>();
+                fm.put("floorId", f.getFloorId());
+                fm.put("floorName", fName);
+                fm.put("hasPlan", !path.isEmpty());
+                allFloors.add(fm);
             }
 
-            if (!matchedFloors.isEmpty()) {
+            if (!allFloors.isEmpty()) {
                 Map<String, Object> bm = new LinkedHashMap<>();
                 bm.put("buildingId", b.getBuildingId());
                 bm.put("buildingName", bName);
-                bm.put("floors", matchedFloors);
+                bm.put("floors", allFloors);
                 result.add(bm);
             }
         }

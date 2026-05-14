@@ -935,12 +935,9 @@ async function loadBuildingOptions() {
   const ebSel = document.getElementById('extBuildingSel');
   const efSel = document.getElementById('extFloorSel');
   if (ebSel) {
-    // 모달에는 도면이 등록된 건물만 표시
-    const modalBuildings = Object.keys(extBuildingFloorMap).length
-      ? buildings.filter(x => extBuildingFloorMap[String(x.buildingId)]?.length)
-      : buildings;
+    // 모달에 모든 DB 건물 표시 (도면 유무와 무관)
     ebSel.innerHTML = '<option value="">-- 건물 선택 --</option>' +
-      modalBuildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+      buildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
   }
   if (efSel) {
     efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
@@ -949,16 +946,14 @@ async function loadBuildingOptions() {
 
 }
 
-/** 모달 층 드롭다운 갱신 - 도면이 등록된 층만 표시 */
+/** 모달 층 드롭다운 갱신 - 모든 DB 층 표시 */
 function updateExtModalFloorOptions(buildingId) {
   const efSel = document.getElementById('extFloorSel');
   if (!efSel) return;
   const prevVal = efSel.value;
-  const bKey = String(buildingId || '');
-  // 도면 등록된 층이 있으면 해당 목록만, 없으면 DB 전체 층 표시
-  const floorList = (bKey && extBuildingFloorMap[bKey]?.length) ? extBuildingFloorMap[bKey] : optionFloors;
+  // 모든 DB 층 표시 (도면 유무와 무관)
   efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    optionFloors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   if (prevVal && Array.from(efSel.options).some(o => o.value === prevVal)) {
     efSel.value = prevVal;
   }
