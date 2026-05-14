@@ -53,14 +53,19 @@ public class FireDataInitializer implements ApplicationRunner {
     }
 
     private void fixBuildingNames() {
-        // "저장 1,2호기" → "제지1,2호기", "저장 3호기" → "제지3호기"
         String[][] corrections = {
+                // "저장" → "제지"
                 {"저장 1,2호기", "제지1,2호기"},
                 {"저장1,2호기", "제지1,2호기"},
                 {"저장 3호기", "제지3호기"},
                 {"저장3호기", "제지3호기"},
                 {"저장12호기", "제지1,2호기"},
                 {"저장 12호기", "제지1,2호기"},
+                // "현장저장" → "화장지"
+                {"현장저장 3,6호기", "화장지 3,6호기"},
+                {"현장저장3,6호기", "화장지 3,6호기"},
+                {"현장저장 4,5호기", "화장지 4,5호기"},
+                {"현장저장4,5호기", "화장지 4,5호기"},
         };
         for (String[] pair : corrections) {
             int affected = jdbc.update(
