@@ -1045,15 +1045,16 @@ public class MobileInspectionController {
             for (Floor f : floors) {
                 String fName = f.getFloorName();
                 String fn = fName == null ? "" : fName.toLowerCase();
-                // 옥외 층 제외
                 if (fn.contains("\uC625\uC678") || fn.contains("outdoor")) continue;
                 String plan = resolvePlanImagePathStrict(bName, fName);
+                // 도면이 있는 건물·층 조합만 반환
+                if (plan == null || plan.isBlank()) continue;
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("buildingId", b.getBuildingId());
                 m.put("buildingName", b.getBuildingName());
                 m.put("floorId", f.getFloorId());
                 m.put("floorName", f.getFloorName());
-                m.put("planImagePath", plan != null ? plan : "");
+                m.put("planImagePath", plan);
                 result.add(m);
             }
         }
@@ -1111,16 +1112,12 @@ public class MobileInspectionController {
             return null;
         }
         if (bn.contains("\uD654\uC7A5\uC9C036\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A536\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A536")
                 || bn.contains("tissue36")) {
             if (floorNo == 1) return "/images/tissue1,3_1F.PNG";
             if (floorNo == 2) return "/images/tissue1,3_2F.PNG";
             return null;
         }
         if (bn.contains("\uD654\uC7A5\uC9C045\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A545\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A545")
                 || bn.contains("tissue45")) {
             if (b1) return "/images/tissue4,5_B1.PNG";
             if (floorNo == 1) return "/images/tissue4,5_1F.PNG";
@@ -1197,15 +1194,11 @@ public class MobileInspectionController {
             return "/images/pad_1F.PNG";
         }
         if (bn.contains("\uD654\uC7A5\uC9C036\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A536\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A536")
                 || bn.contains("tissue36")) {
             if (f.contains("2")) return "/images/tissue1,3_2F.PNG";
             return "/images/tissue1,3_1F.PNG";
         }
         if (bn.contains("\uD654\uC7A5\uC9C045\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A545\uD638\uAE30")
-                || bn.contains("\uD604\uC7A5\uC800\uC7A545")
                 || bn.contains("tissue45")) {
             if (f.contains("\uC9C0\uD558") || f.contains("b1")) return "/images/tissue4,5_B1.PNG";
             if (f.contains("3")) return "/images/tissue4,5_3F.PNG";

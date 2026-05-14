@@ -50,27 +50,26 @@ public class MapController {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Building b : buildings) {
             String bName = b.getBuildingName() == null ? "" : b.getBuildingName();
-            List<Map<String, Object>> allFloors = new ArrayList<>();
+            List<Map<String, Object>> matchedFloors = new ArrayList<>();
 
             for (Floor f : floors) {
                 String fName = f.getFloorName() == null ? "" : f.getFloorName();
-                // 옥외 층 제외
                 if (fName.contains("옥외")) continue;
                 String path = resolvePlanImagePath(bName, fName);
-                Map<String, Object> fm = new LinkedHashMap<>();
-                fm.put("floorId", f.getFloorId());
-                fm.put("floorName", fName);
-                fm.put("hasPlan", !path.isEmpty());
-                allFloors.add(fm);
+                if (!path.isEmpty()) {
+                    Map<String, Object> fm = new LinkedHashMap<>();
+                    fm.put("floorId", f.getFloorId());
+                    fm.put("floorName", fName);
+                    matchedFloors.add(fm);
+                }
             }
 
-            if (!allFloors.isEmpty()) {
-                Map<String, Object> bm = new LinkedHashMap<>();
-                bm.put("buildingId", b.getBuildingId());
-                bm.put("buildingName", bName);
-                bm.put("floors", allFloors);
-                result.add(bm);
-            }
+            // 건물은 도면 유무와 관계없이 모두 반환, 도면이 있는 층만 floors에 포함
+            Map<String, Object> bm = new LinkedHashMap<>();
+            bm.put("buildingId", b.getBuildingId());
+            bm.put("buildingName", bName);
+            bm.put("floors", matchedFloors);
+            result.add(bm);
         }
         return ResponseEntity.ok(ApiResponse.success(result));
     }
@@ -163,13 +162,13 @@ public class MapController {
             if (floor.contains("2")) return "/images/pad_2F.PNG";
             if (floor.contains("1")) return "/images/pad_1F.PNG";
         }
-        if (containsAny(building, "\uD654\uC7A5\uC9C0 3,6\uD638\uAE30", "\uD654\uC7A5\uC9C03,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A53,6\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A536", "tissue36", "tissue13")) {
+        if (containsAny(building, "\uD654\uC7A5\uC9C0 3,6\uD638\uAE30", "\uD654\uC7A5\uC9C03,6\uD638\uAE30", "tissue36", "tissue13")) {
             if (isBasement(floor)) return "";
             if (floor.contains("3")) return "/images/tissue1,3_3F.png";
             if (floor.contains("2")) return "/images/tissue1,3_2F.PNG";
             if (floor.contains("1")) return "/images/tissue1,3_1F.PNG";
         }
-        if (containsAny(building, "\uD654\uC7A5\uC9C0 4,5\uD638\uAE30", "\uD654\uC7A5\uC9C04,5\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A54,5\uD638\uAE30", "\uD604\uC7A5\uC800\uC7A545", "tissue45")) {
+        if (containsAny(building, "\uD654\uC7A5\uC9C0 4,5\uD638\uAE30", "\uD654\uC7A5\uC9C04,5\uD638\uAE30", "tissue45")) {
             if (isBasement(floor)) return "/images/tissue4,5_B1.PNG";
             if (floor.contains("3")) return "/images/tissue4,5_3F.PNG";
             if (floor.contains("2")) return "/images/tissue4,5_2F.PNG";
