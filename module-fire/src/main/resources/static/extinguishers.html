@@ -946,14 +946,16 @@ async function loadBuildingOptions() {
 
 }
 
-/** 모달 층 드롭다운 갱신 - 모든 DB 층 표시 */
+/** 모달 층 드롭다운 갱신 - 도면이 존재하는 층만 표시 */
 function updateExtModalFloorOptions(buildingId) {
   const efSel = document.getElementById('extFloorSel');
   if (!efSel) return;
   const prevVal = efSel.value;
-  // 모든 DB 층 표시 (도면 유무와 무관)
+  // 도면이 등록된 층만 표시 (extBuildingFloorMap 기반), 없으면 전체 층 fallback
+  const planFloors = buildingId ? (extBuildingFloorMap[String(buildingId)] || []) : [];
+  const floorList = planFloors.length ? planFloors : optionFloors;
   efSel.innerHTML = '<option value="">-- 층 선택 --</option>' +
-    optionFloors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
+    floorList.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
   if (prevVal && Array.from(efSel.options).some(o => o.value === prevVal)) {
     efSel.value = prevVal;
   }
