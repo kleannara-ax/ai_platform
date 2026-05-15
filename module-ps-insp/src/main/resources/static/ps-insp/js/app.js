@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.6
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.7
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -940,7 +940,7 @@
           }
 
           var size = pixels.length;
-          if (size >= 1) { // 1픽셀 지분도 검출 (v8.6.6)
+          if (size >= 1) { // 1픽셀 지분도 검출 (v8.6.6+)
             components.push({
               id: 'auto-' + timestamp + '-' + components.length,
               size: size,
@@ -1137,7 +1137,7 @@
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('분포 균일도', (m.distributionUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('평균 / 표준편차', m.meanSize.toFixed(1) + ' / ' + m.stdSize.toFixed(1) + ' px', 'blue')
-      + qItem('제외 지분수', m.removedAutoCount, 'red');
+      + qItem('수 제외 지분수', m.removedAutoCount, 'red');
 
     // Bucket bar
     var bucketEl = document.getElementById('bucketBar');
