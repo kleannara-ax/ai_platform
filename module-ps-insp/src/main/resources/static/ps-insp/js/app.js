@@ -932,7 +932,7 @@
           }
 
           var size = pixels.length;
-          if (size >= 2) { // filter noise (1 pixel)
+          if (size >= 1) { // 1픽셀 지분도 검출 (v8.6.6)
             components.push({
               id: 'auto-' + timestamp + '-' + components.length,
               size: size,
