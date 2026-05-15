@@ -113,7 +113,7 @@ function _mockInspections() {
   var mesStatuses = ['SENT','SENT','SENT','SENT','PENDING','SENT','FAILED','SENT','PENDING','SENT'];
 
   var items = [];
-  for (var i = 1; i <= 20; i++) {
+  for (var i = 1; i <= 70; i++) {
     var mi = (i - 1) % matnrs.length;
     var oi = (i - 1) % operators.length;
     var totalCount = 5 + Math.floor(Math.random() * 80);

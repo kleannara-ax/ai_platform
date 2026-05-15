@@ -27,7 +27,7 @@
   var currentHistoryPage = 0;
   var historyPageSize = 10;
   var currentDetailPage = 0;
-  var detailPageSize = 20;
+  var detailPageSize = 50;
 
   // 이력 테이블 검색 조건 (날짜 + 바코드)
   var dtSearchParams = { indBcd: '', dateFrom: '', dateTo: '' };
