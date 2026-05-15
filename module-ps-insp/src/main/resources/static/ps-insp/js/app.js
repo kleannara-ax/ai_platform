@@ -1347,6 +1347,7 @@
   // ══════════════════════════════════════════════
   // Check Exists
   // ══════════════════════════════════════════════
+  var _existsCheckTimer = null;
   window.checkExists = function () {
     var matnr = val('f_matnr');
     var lotnr = val('f_lotnr');
@@ -1356,6 +1357,7 @@
       return;
     }
     var ec = document.getElementById('existsCheck');
+    if (_existsCheckTimer) { clearTimeout(_existsCheckTimer); _existsCheckTimer = null; }
     api('GET', '/ps-insp-api/inspections/check-exists?matnr=' + enc(matnr) + '&lotnr=' + enc(lotnr) + '&indBcd=' + enc(indBcd))
       .then(function (res) {
         if (res.success && res.data) {
@@ -1367,6 +1369,10 @@
             ec.className = 'exists-check ok';
           }
           ec.style.display = 'inline-block';
+          _existsCheckTimer = setTimeout(function () {
+            ec.style.display = 'none';
+            _existsCheckTimer = null;
+          }, 20000);
         }
       })
       .catch(function (e) { toast('중복 체크 실패: ' + e.message, 'error'); });
