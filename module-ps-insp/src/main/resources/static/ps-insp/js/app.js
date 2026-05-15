@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.5
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.6
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -25,7 +25,7 @@
   var token = '';
   var urlUserId = '';   // USERID 파라미터 (MES 등 외부 연동 시 로그인 생략용)
   var currentHistoryPage = 0;
-  var historyPageSize = 20;
+  var historyPageSize = 10;
   var currentDetailPage = 0;
   var detailPageSize = 20;
 
@@ -1643,7 +1643,7 @@
     var container = document.getElementById('historyCardsBody');
     var pag = document.getElementById('pagination');
     if (!container) return;
-    container.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+    container.innerHTML = '<div class="empty-msg"><span class="spinner"></span> 불러오는 중...</div>';
     if (pag) pag.innerHTML = '';
 
     api('GET', '/ps-insp-api/inspections?page=' + page + '&size=' + historyPageSize)
@@ -1667,7 +1667,7 @@
     var container = document.getElementById('historyCardsBody');
     var pag = document.getElementById('pagination');
     if (!container) return;
-    container.innerHTML = '<div class="empty-msg">검색 중...</div>';
+    container.innerHTML = '<div class="empty-msg"><span class="spinner"></span> 검색 중...</div>';
     if (pag) pag.innerHTML = '';
 
     var queryParts = ['page=' + page, 'size=' + historyPageSize];
@@ -1744,10 +1744,10 @@
         : '<span class="badge badge-inactive">' + esc(i.status || '-') + '</span>';
 
       var origImg = i.originalImagePath
-        ? '<img class="history-card-img" src="' + esc(i.originalImagePath) + '" alt="원본" onclick="openImageModal(\'' + esc(i.originalImagePath) + '\')" onerror="this.outerHTML=\'<div class=history-card-img-placeholder>이미지 없음</div>\'">'
+        ? '<img class="history-card-img" loading="lazy" src="' + esc(i.originalImagePath) + '" alt="원본" onclick="openImageModal(\'' + esc(i.originalImagePath) + '\')" onerror="this.outerHTML=\'<div class=history-card-img-placeholder>이미지 없음</div>\'">'
         : '<div class="history-card-img-placeholder">원본 없음</div>';
       var resImg = i.resultImagePath
-        ? '<img class="history-card-img" src="' + esc(i.resultImagePath) + '" alt="결과" onclick="openImageModal(\'' + esc(i.resultImagePath) + '\')" onerror="this.outerHTML=\'<div class=history-card-img-placeholder>이미지 없음</div>\'">'
+        ? '<img class="history-card-img" loading="lazy" src="' + esc(i.resultImagePath) + '" alt="결과" onclick="openImageModal(\'' + esc(i.resultImagePath) + '\')" onerror="this.outerHTML=\'<div class=history-card-img-placeholder>이미지 없음</div>\'">'
         : '<div class="history-card-img-placeholder">결과 없음</div>';
 
       return '<div class="history-card">'
