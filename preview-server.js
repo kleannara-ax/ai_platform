@@ -188,6 +188,41 @@ function _mockInspections() {
   return items;
 }
 
+// ── Helper: Filter Inspections by query params ──
+function _filterInspections(items, query) {
+  var dateFrom = query.dateFrom || '';
+  var dateTo = query.dateTo || '';
+  var indBcd = query.indBcd || '';
+  var keyword = query.keyword || '';
+  var type = query.type || '';
+
+  return items.filter(function (i) {
+    // 날짜 필터 (inspectedAt 기준, YYYY-MM-DD 비교)
+    if (dateFrom) {
+      var d = (i.inspectedAt || '').substring(0, 10);
+      if (d < dateFrom) return false;
+    }
+    if (dateTo) {
+      var d = (i.inspectedAt || '').substring(0, 10);
+      if (d > dateTo) return false;
+    }
+    // 바코드 부분일치 (이력 테이블)
+    if (indBcd && i.indBcd) {
+      if (i.indBcd.indexOf(indBcd) === -1) return false;
+    }
+    // 키워드 검색 (검사 이력 탭)
+    if (keyword && type) {
+      var target = '';
+      if (type === 'indBcd') target = i.indBcd || '';
+      else if (type === 'matnr') target = i.matnr || '';
+      else if (type === 'lotnr') target = (i.lotnr || i.lotNo || '');
+      else if (type === 'operatorNm') target = i.operatorNm || '';
+      if (target.indexOf(keyword) === -1) return false;
+    }
+    return true;
+  });
+}
+
 // ── Helper: JSON Response ──
 function jsonRes(res, data, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -544,7 +579,7 @@ const server = http.createServer((req, res) => {
 
       // ── Inspections: search ──
       if (pathname === '/ps-insp-api/inspections/search') {
-        var all = _mockInspections();
+        var all = _filterInspections(_mockInspections(), parsedUrl.query);
         var pg = parseInt(parsedUrl.query.page) || 0;
         var sz = parseInt(parsedUrl.query.size) || 10;
         var slice = all.slice(pg * sz, pg * sz + sz);
@@ -553,7 +588,7 @@ const server = http.createServer((req, res) => {
 
       // ── Inspections: list (paginated) ──
       if (pathname === '/ps-insp-api/inspections' && method === 'GET') {
-        var all = _mockInspections();
+        var all = _filterInspections(_mockInspections(), parsedUrl.query);
         var pg = parseInt(parsedUrl.query.page) || 0;
         var sz = parseInt(parsedUrl.query.size) || 10;
         var slice = all.slice(pg * sz, pg * sz + sz);
