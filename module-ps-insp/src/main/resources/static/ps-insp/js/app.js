@@ -330,7 +330,6 @@
       'IND_BCD':   'f_indBcd',
       'LOT_NO':    'f_lotnr',
       'MATNR':     'f_matnr',
-      'MATNR_NM':  'f_matnrNm',
       'WERKS':     'f_werks',           // hidden field에 저장
       'USERID':    'f_operatorId',
       'USERNM':    'f_operatorNm',
@@ -1290,7 +1289,7 @@
   // Form: Clear
   // ══════════════════════════════════════════════
   window.clearForm = function () {
-    ['f_matnr', 'f_matnrNm', 'f_lotnr', 'f_indBcd',
+    ['f_matnr', 'f_lotnr', 'f_indBcd',
       'f_operatorId', 'f_operatorNm'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.value = '';
@@ -1404,7 +1403,6 @@
     var metadata = {
       inspItemGrpCd: val('f_inspItemGrpCd') || 'COV_INS',
       matnr: matnr,
-      matnrNm: val('f_matnrNm'),
       werks: val('f_werks'),
       lotnr: lotnr,
       indBcd: indBcd,
@@ -1737,7 +1735,6 @@
         + '<div class="history-card-info">'
         + '<div class="hci-title">' + esc(i.indBcd || '-') + ' ' + stBadge + '</div>'
         + '<div class="hci-row"><b>자재코드:</b> ' + esc(i.matnr || '-') + '</div>'
-        + '<div class="hci-row"><b>자재명:</b> ' + esc(i.matnrNm || '-') + '</div>'
         + '<div class="hci-row"><b>LOT:</b> ' + esc(i.lotnr || '-') + ' (차수: ' + esc(i.indBcdSeq || '-') + ')</div>'
         + '<div class="hci-row"><b>총 지분수:</b> <strong>' + (i.totalCount || 0) + '</strong></div>'
         + '<div class="hci-row"><b>후면 지분 값(PPM):</b> <strong style="color:var(--orange);">' + covPPM + '</strong></div>'
@@ -1773,7 +1770,7 @@
   // - 기간 미설정 시 전체 기간 조회
   // - 전체 48 컬럼 (요구사항 완전 일치)
   // ══════════════════════════════════════════════
-  var DETAIL_COLSPAN = 48; // thead colspan 합계 (MES전송 컬럼 추가)
+  var DETAIL_COLSPAN = 47; // thead colspan 합계 (자재명 제거, MES전송 추가)
 
   window.loadDetailTable = function (page) {
     if (page === undefined) page = 0;
@@ -1843,11 +1840,10 @@
         ? '<a href="' + esc(i.resultImagePath) + '" target="_blank" style="color:var(--primary);">보기</a>' : '-';
 
       return '<tr>'
-        // ── 식별 정보 (7) ──
+        // ── 식별 정보 (6) ──
         + '<td>' + i.inspectionId + '</td>'
         + '<td>' + (i.seq != null ? i.seq : '-') + '</td>'
         + '<td><code>' + esc(i.matnr || '-') + '</code></td>'
-        + '<td>' + esc(i.matnrNm || '-') + '</td>'
         + '<td>' + esc(i.lotnr || '-') + '</td>'
         + '<td><code>' + esc(i.indBcd || '-') + '</code></td>'
         + '<td>' + esc(i.indBcdSeq || '-') + '</td>'
@@ -1936,7 +1932,7 @@
 
     // 카테고리 행
     var categoryRow = [
-      '식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보',
+      '식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보',
       '핵심 지표','핵심 지표','핵심 지표','핵심 지표',
       '카운트 상세','카운트 상세','카운트 상세','카운트 상세','카운트 상세',
       '균일도·통계','균일도·통계','균일도·통계','균일도·통계',
@@ -1950,7 +1946,7 @@
     ];
 
     var headerRow = [
-      'ID','차수','자재코드','자재명','LOT','바코드','바코드차수',
+      'ID','차수','자재코드','LOT','바코드','바코드차수',
       '후면 지분 값(PPM)','총 지분','밀도(개)','밀도(%)',
       '자동','수동','제외','수동+','수동-',
       '크기균일','분포균등','평균크기','표준편차',
@@ -1972,7 +1968,7 @@
       var crDt = i.createdAt ? String(i.createdAt).replace('T', ' ').substring(0, 19) : '';
 
       aoa.push([
-        i.inspectionId || '', i.seq || '', i.matnr || '', i.matnrNm || '',
+        i.inspectionId || '', i.seq || '', i.matnr || '',
         i.lotnr || '', i.indBcd || '', i.indBcdSeq || '',
         covPPM, i.totalCount || 0, i.densityCount || 0, fmtDecNum(i.densityRatio),
         i.autoCount || 0, i.manualCount || 0, i.removedAutoCount || 0,
@@ -1997,7 +1993,7 @@
     // 카테고리 행 머지 셀 설정
     var merges = [];
     var col = 0;
-    var mergeGroups = [7, 4, 5, 4, 4, 4, 2, 3, 6, 3, 6]; // 카테고리별 컬럼 수 (상태: 2→3 MES전송 추가)
+    var mergeGroups = [6, 4, 5, 4, 4, 4, 2, 3, 6, 3, 6]; // 카테고리별 컬럼 수 (식별정보: 7→6 자재명 제거)
     mergeGroups.forEach(function (span) {
       if (span > 1) merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + span - 1 } });
       col += span;

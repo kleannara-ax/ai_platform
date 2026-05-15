@@ -41,10 +41,7 @@
             <label>자재코드 (MATNR) <span class="required">*</span></label>
             <input type="text" id="f_matnr" placeholder="예: F2A11220-04600845A">
           </div>
-          <div class="form-group">
-            <label>자재명</label>
-            <input type="text" id="f_matnrNm" placeholder="예: Blanq-HBP 370GSM 1091*0788 Ream">
-          </div>
+
           <div class="form-group">
             <label>LOT 번호 <span class="required">*</span></label>
             <input type="text" id="f_lotnr" placeholder="예: LOT-2026-04-001">
@@ -232,7 +229,7 @@
           <thead>
             <!-- 상위 카테고리 헤더 -->
             <tr class="category-header">
-              <th colspan="7">식별 정보</th>
+              <th colspan="6">식별 정보</th>
               <th colspan="4">핵심 지표</th>
               <th colspan="5">카운트 상세</th>
               <th colspan="4">균일도 · 통계</th>
@@ -247,7 +244,7 @@
             <!-- 상세 컬럼 헤더 -->
             <tr>
               <!-- 식별 정보 (7) -->
-              <th>ID</th><th>차수</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th><th>바코드차수</th>
+              <th>ID</th><th>차수</th><th>자재코드</th><th>LOT</th><th>바코드</th><th>바코드차수</th>
               <!-- 핵심 지표 (4) -->
               <th>후면 지분 값(PPM)</th><th>총 지분</th><th>밀도(개)</th><th>밀도(%)</th>
               <!-- 카운트 상세 (5) -->
@@ -272,7 +269,7 @@
             </tr>
           </thead>
           <tbody id="detailTableBody">
-            <tr><td colspan="48" class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</td></tr>
+            <tr><td colspan="47" class="empty-msg">탭을 선택하면 자동으로 불러옵니다.</td></tr>
           </tbody>
         </table>
       </div>
