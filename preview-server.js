@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-const PORT = 8080;
+const PORT = 3000;
 
 // ── MIME Types ──
 const MIME = {
@@ -100,6 +100,15 @@ const mockPermissions = mockRoles.map(r => ({
            r.code === 'ROLE_FIRE_MANAGER' ? [1,6,61,62,63,64,65,66,67,68] :
            [1,6,61]
 }));
+
+// ── Helper: Mock PS-INSP Inspection Data ──
+function _mockInspections() {
+  return [
+    { inspectionId: 1, indBcd: 'IND-2024-001', lotNo: 'LOT-A001', matnr: 'MAT-001', ppmValue: 85.3, qualityResult: 'OK', threshold: 115, componentCount: 12, totalPixels: 2560000, defectPixels: 218, userId: 'admin', mesSendStatus: 'SENT', createdAt: '2024-12-01T09:30:00', inspectionImage: null },
+    { inspectionId: 2, indBcd: 'IND-2024-002', lotNo: 'LOT-A002', matnr: 'MAT-002', ppmValue: 523.7, qualityResult: 'NG', threshold: 115, componentCount: 45, totalPixels: 2560000, defectPixels: 1341, userId: 'admin', mesSendStatus: 'SENT', createdAt: '2024-12-01T10:15:00', inspectionImage: null },
+    { inspectionId: 3, indBcd: 'IND-2024-003', lotNo: 'LOT-B001', matnr: 'MAT-001', ppmValue: 42.1, qualityResult: 'OK', threshold: 120, componentCount: 5, totalPixels: 2560000, defectPixels: 108, userId: 'manager01', mesSendStatus: 'PENDING', createdAt: '2024-12-02T14:00:00', inspectionImage: null },
+  ];
+}
 
 // ── Helper: JSON Response ──
 function jsonRes(res, data, status = 200) {
@@ -410,19 +419,86 @@ const server = http.createServer((req, res) => {
       return apiOk(res, { content: [], totalElements: 7 });
     }
 
-    // PS-INSP API
+    // PS-INSP API — complete mock endpoints
     if (pathname.startsWith('/ps-insp-api/')) {
+
+      // ── PS-INSP Page (Thymeleaf template served as static HTML) ──
       if (pathname === '/ps-insp-api/page') {
-        // Serve ps-insp template
         const tplPath = path.join(TEMPLATE_DIR, 'ps-insp/index.html');
         if (fs.existsSync(tplPath)) {
           let html = fs.readFileSync(tplPath, 'utf8');
-          html = html.replace(/\s+th:[a-z]+="[^"]*"/g, '');
+          html = html.replace(/\s+th:[a-z-]+="[^"]*"/g, '');
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
       }
-      return apiOk(res, { message: 'PS-INSP Mock API' });
+
+      // ── Health ──
+      if (pathname === '/ps-insp-api/health') {
+        return apiOk(res, { status: 'UP', timestamp: new Date().toISOString() });
+      }
+
+      // ── Config: PPM Limit ──
+      if (pathname === '/ps-insp-api/config/ppm-limit' && method === 'GET') {
+        return apiOk(res, { ppmLimit: 500, updatedAt: new Date().toISOString() });
+      }
+      if (pathname === '/ps-insp-api/config/ppm-limit' && method === 'POST') {
+        return apiOk(res, { ppmLimit: (jsonBody && jsonBody.ppmLimit) || 500, updatedAt: new Date().toISOString() });
+      }
+
+      // ── Config: PPM Admins ──
+      if (pathname === '/ps-insp-api/config/ppm-admins' && method === 'GET') {
+        return apiOk(res, ['admin', 'manager01']);
+      }
+      if (pathname === '/ps-insp-api/config/ppm-admins' && method === 'POST') {
+        return apiOk(res, (jsonBody && jsonBody.admins) || []);
+      }
+
+      // ── Inspections: check-exists ──
+      if (pathname === '/ps-insp-api/inspections/check-exists') {
+        return apiOk(res, { exists: false });
+      }
+
+      // ── Inspections: by-barcode ──
+      if (pathname === '/ps-insp-api/inspections/by-barcode') {
+        return apiOk(res, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 });
+      }
+
+      // ── Inspections: search ──
+      if (pathname === '/ps-insp-api/inspections/search') {
+        return apiOk(res, { content: _mockInspections(), totalElements: 3, totalPages: 1, number: 0, size: 10 });
+      }
+
+      // ── Inspections: list (paginated) ──
+      if (pathname === '/ps-insp-api/inspections' && method === 'GET') {
+        return apiOk(res, { content: _mockInspections(), totalElements: 3, totalPages: 1, number: 0, size: 10 });
+      }
+
+      // ── Inspections: create (multipart or JSON) ──
+      if (pathname === '/ps-insp-api/inspections' && method === 'POST') {
+        return apiOk(res, {
+          inspectionId: 1000 + Math.floor(Math.random() * 9000),
+          indBcd: 'IND-MOCK-001',
+          lotNo: 'LOT-MOCK-001',
+          matnr: 'MAT-MOCK-001',
+          ppmValue: 123.45,
+          qualityResult: 'OK',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // ── Inspections: update MES status ──
+      if (pathname.match(/^\/ps-insp-api\/inspections\/\d+\/mes-status$/) && method === 'PATCH') {
+        return apiOk(res, { updated: true });
+      }
+
+      // ── MES: send-result ──
+      if (pathname === '/ps-insp-api/mes/send-result' && method === 'POST') {
+        return apiOk(res, { resultCode: '0', resultMessage: 'MES 전송 성공 (Mock)', timestamp: new Date().toISOString() });
+      }
+
+      // ── Catch-all for unknown ps-insp-api paths ──
+      return apiOk(res, { message: 'PS-INSP Mock API', path: pathname });
     }
 
     // ── Catch-all for unknown API paths ──

@@ -60,6 +60,14 @@
     return toKSTISOString(new Date());
   }
 
+  // ── 숫자 천 단위 쉼표 포맷 (표시 전용, 엑셀 제외) ──
+  function fmtComma(num) {
+    if (num == null || isNaN(num)) return '-';
+    var parts = String(num).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+  }
+
   var MAX_IMAGE_DIMENSION = 2200;
   var RESIZE_TARGET = 1600;
   var MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -1121,7 +1129,7 @@
     if (!summary) return;
     summary.innerHTML = ''
       + qItem('총 지분수', m.totalCount, 'blue')
-      + qItem('후면 지분 값(PPM)', ppm.toFixed(1), 'orange')
+      + qItem('후면 지분 값(PPM)', fmtComma(ppm.toFixed(1)), 'orange')
       + qItem('밀도 지분수', m.densityCount, 'green')
       + qItem('자동 / 수동', m.autoCount + ' / ' + m.manualCount, 'blue')
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
@@ -1396,9 +1404,9 @@
     if (!modal) return;
     msg.innerHTML = '후면 지분 값이 기준값을 <strong>초과</strong>했습니다.';
     detail.innerHTML = ''
-      + '<div class="ppm-alert-row"><span>측정값</span><strong style="color:var(--red);">' + ppmValue.toFixed(1) + ' PPM</strong></div>'
-      + '<div class="ppm-alert-row"><span>기준값</span><strong>' + ppmLimit.toFixed(1) + ' PPM</strong></div>'
-      + '<div class="ppm-alert-row"><span>초과량</span><strong style="color:var(--red);">+' + (ppmValue - ppmLimit).toFixed(1) + ' PPM</strong></div>';
+      + '<div class="ppm-alert-row"><span>측정값</span><strong style="color:var(--red);">' + fmtComma(ppmValue.toFixed(1)) + ' PPM</strong></div>'
+      + '<div class="ppm-alert-row"><span>기준값</span><strong>' + fmtComma(ppmLimit.toFixed(1)) + ' PPM</strong></div>'
+      + '<div class="ppm-alert-row"><span>초과량</span><strong style="color:var(--red);">+' + fmtComma((ppmValue - ppmLimit).toFixed(1)) + ' PPM</strong></div>';
     modal.style.display = 'flex';
   }
 
@@ -1546,7 +1554,7 @@
     var covPPM = '-';
     if (covRatio != null) {
       var ppmVal = covRatio < 1 ? covRatio * 1000000 : covRatio;
-      covPPM = ppmVal.toFixed(1) + ' PPM';
+      covPPM = fmtComma(ppmVal.toFixed(1)) + ' PPM';
     }
     var thMax = data.thresholdMax != null ? data.thresholdMax : getThresholdValue();
     var displayId = data.inspectionId != null ? data.inspectionId : '(저장 완료)';
@@ -1737,7 +1745,7 @@
       return;
     }
     container.innerHTML = items.map(function (i) {
-      var covPPM = i.coverageRatio != null ? (i.coverageRatio * 1000000).toFixed(1) + ' PPM' : '-';
+      var covPPM = i.coverageRatio != null ? fmtComma((i.coverageRatio * 1000000).toFixed(1)) + ' PPM' : '-';
       var dt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
       var stBadge = i.status === 'COMPLETED'
         ? '<span class="badge badge-active">완료</span>'
@@ -1848,7 +1856,7 @@
     window._detailData = items;
 
     tbody.innerHTML = items.map(function (i) {
-      var covPPM = i.coverageRatio != null ? (i.coverageRatio * 1000000).toFixed(1) : '-';
+      var covPPM = i.coverageRatio != null ? fmtComma((i.coverageRatio * 1000000).toFixed(1)) : '-';
       var inspDt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
       var msrmDt = i.msrmDate ? String(i.msrmDate).replace('T', ' ').substring(0, 19) : '-';
       var crDt = i.createdAt ? String(i.createdAt).replace('T', ' ').substring(0, 19) : '-';
