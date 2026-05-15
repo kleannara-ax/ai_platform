@@ -1130,8 +1130,8 @@
     var summary = document.getElementById('qualitySummary');
     if (!summary) return;
     summary.innerHTML = ''
-      + qItem('총 지분수', m.totalCount, 'blue')
-      + qItem('후면 지분 값(PPM)', fmtComma(ppm.toFixed(1)), 'orange')
+      + qItem('총 지분수', m.totalCount, 'blue', true)
+      + qItem('후면 지분 값(PPM)', fmtComma(ppm.toFixed(1)), 'orange', true)
       + qItem('밀도 지분수 (3~7px)', m.densityCount, 'green')
       + qItem('자동 / 수동', m.autoCount + ' / ' + m.manualCount, 'blue')
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
@@ -1160,8 +1160,9 @@
     }
   }
 
-  function qItem(label, value, color) {
-    return '<div class="quality-item"><div class="qlabel">' + label + '</div><div class="qvalue ' + color + '">' + value + '</div></div>';
+  function qItem(label, value, color, highlight) {
+    var cls = 'quality-item' + (highlight ? ' qi-highlight' : '');
+    return '<div class="' + cls + '"><div class="qlabel">' + label + '</div><div class="qvalue ' + color + '">' + value + '</div></div>';
   }
   function bItem(label, sub, count) {
     return '<div class="bucket-item"><div class="blabel">' + label + '<small class="bsub">' + sub + '</small></div><div class="bcount">' + count + '</div></div>';

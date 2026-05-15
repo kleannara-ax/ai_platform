@@ -300,6 +300,9 @@ input, select, textarea, button { font-family: inherit; font-size: 14px; }
   text-align: center; padding: 14px 10px; background: var(--surface2);
   border-radius: var(--radius); border: 1px solid var(--border);
 }
+.quality-item.qi-highlight {
+  background: #fffbe6; border-color: #f5e6a3;
+}
 .quality-item .qlabel { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; }
 .quality-item .qvalue { font-size: 20px; font-weight: 800; margin-top: 2px; }
 .quality-item .qvalue.blue { color: var(--primary); }
@@ -403,6 +406,9 @@ input, select, textarea, button { font-family: inherit; font-size: 14px; }
 .quality-item {
   text-align: center; padding: 14px 10px; background: var(--surface2);
   border-radius: var(--radius); border: 1px solid var(--border);
+}
+.quality-item.qi-highlight {
+  background: #fffbe6; border-color: #f5e6a3;
 }
 .quality-item .qlabel { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; }
 .quality-item .qvalue { font-size: 20px; font-weight: 800; margin-top: 2px; }
