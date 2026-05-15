@@ -21,6 +21,12 @@ spring:
   application:
     name: platform
 
+  # ── Multipart (파일 업로드 제한) ──
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+
   # ── DataSource (MariaDB 10.11.15) ──
   datasource:
     url: jdbc:mariadb://localhost:3306/platform_db?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul

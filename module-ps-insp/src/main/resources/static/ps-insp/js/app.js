@@ -62,7 +62,7 @@
 
   var MAX_IMAGE_DIMENSION = 2200;
   var RESIZE_TARGET = 1600;
-  var MAX_FILE_SIZE = 900 * 1024 * 1024; // 900MB
+  var MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
   var DEFAULT_THRESHOLD = 115;
   var THRESHOLD_STORAGE_KEY = 'jri_threshold';
   var THRESHOLD_DATE_KEY = 'jri_threshold_date'; // 임계값 저장 날짜 (YYYY-MM-DD)
@@ -565,7 +565,7 @@
 
   function handleImageUpload(file) {
     if (file.size > MAX_FILE_SIZE) {
-      toast('파일 크기가 900MB를 초과합니다.', 'error');
+      toast('파일 크기가 100MB를 초과합니다.', 'error');
       return;
     }
     if (!file.type.startsWith('image/')) {
