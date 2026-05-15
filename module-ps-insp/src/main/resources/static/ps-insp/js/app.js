@@ -1054,17 +1054,19 @@
       else if (cx < halfW && cy >= halfH) qBL++;
       else qBR++;
 
-      var eqR = Math.sqrt(s / Math.PI);
-      if (eqR <= 3) b3++;
-      else if (eqR <= 5) b5++;
-      else if (eqR <= 7) b7++;
-      else b7p++;
+      // 크기 버킷: 픽셀 면적(s) 기준, 지름 = sqrt(s)
+      var eqD = Math.sqrt(s);
+      if (eqD <= 3) b3++;        // ≤ 9 px²
+      else if (eqD <= 5) b5++;   // ≤ 25 px²
+      else if (eqD <= 7) b7++;   // ≤ 49 px²
+      else b7p++;                // > 49 px²
     });
 
     var coverageRatio = totalPixels > 0 ? objectPixelCount / totalPixels : 0;
     var coveragePPM = coverageRatio * 1000000;
-    var densityCount = totalCount;
-    var densityRatio = totalPixels > 0 ? totalCount / totalPixels : 0;
+    // 밀도 지분수: 지름 약 3px 이상 ~ 7px 이하 (b5 + b7 구간)
+    var densityCount = b5 + b7;
+    var densityRatio = totalPixels > 0 ? densityCount / totalPixels : 0;
 
     // Size uniformity (1 - CV)
     var meanSize = sizes.length > 0 ? sizes.reduce(function (a, b) { return a + b; }, 0) / sizes.length : 0;
