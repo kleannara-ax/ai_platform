@@ -193,9 +193,9 @@
             </select>
             <input type="text" id="h_keyword" placeholder="검색어 입력..." onkeydown="if(event.key==='Enter')searchHistory()">
             <label class="toolbar-label">검사일</label>
-            <input type="date" id="h_dateFrom">
+            <input type="date" id="h_dateFrom" onchange="searchHistory()">
             <label class="toolbar-label">~</label>
-            <input type="date" id="h_dateTo">
+            <input type="date" id="h_dateTo" onchange="searchHistory()">
             <button class="btn btn-sm btn-primary" onclick="searchHistory()">검색</button>
             <button class="btn btn-sm btn-outline" onclick="resetHistorySearch()">초기화</button>
           </div>
@@ -217,10 +217,10 @@
           <div class="toolbar-row">
             <label class="toolbar-label">바코드</label>
             <input type="text" id="dt_keyword" placeholder="부분일치 검색" onkeydown="if(event.key==='Enter')searchDetailTable()">
-            <label class="toolbar-label">시작일</label>
-            <input type="date" id="dt_dateFrom">
-            <label class="toolbar-label">종료일</label>
-            <input type="date" id="dt_dateTo">
+            <label class="toolbar-label">검사일</label>
+            <input type="date" id="dt_dateFrom" onchange="searchDetailTable()">
+            <label class="toolbar-label">~</label>
+            <input type="date" id="dt_dateTo" onchange="searchDetailTable()">
             <button class="btn btn-sm btn-primary" onclick="searchDetailTable()">검색</button>
             <button class="btn btn-sm btn-outline" onclick="resetDetailSearch()">초기화</button>
           </div>
