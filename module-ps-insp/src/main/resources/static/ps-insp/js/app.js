@@ -1132,7 +1132,7 @@
     summary.innerHTML = ''
       + qItem('총 지분수', m.totalCount, 'blue')
       + qItem('후면 지분 값(PPM)', fmtComma(ppm.toFixed(1)), 'orange')
-      + qItem('밀도 지분수', m.densityCount, 'green')
+      + qItem('밀도 지분수 (3~7px)', m.densityCount, 'green')
       + qItem('자동 / 수동', m.autoCount + ' / ' + m.manualCount, 'blue')
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('분포 균일도', (m.distributionUniformityScore * 100).toFixed(1) + '%', 'green')
@@ -1143,10 +1143,10 @@
     var bucketEl = document.getElementById('bucketBar');
     if (bucketEl) {
       bucketEl.innerHTML = ''
-        + bItem('~3px 이하', m.bucketUpTo3)
-        + bItem('~5px 이하', m.bucketUpTo5)
-        + bItem('~7px 이하', m.bucketUpTo7)
-        + bItem('7px 초과', m.bucketOver7);
+        + bItem('≤ 3px', '≤ 9 px²', m.bucketUpTo3)
+        + bItem('≤ 5px', '≤ 25 px²', m.bucketUpTo5)
+        + bItem('≤ 7px', '≤ 49 px²', m.bucketUpTo7)
+        + bItem('> 7px', '> 49 px²', m.bucketOver7);
     }
 
     // Quadrant
@@ -1163,8 +1163,8 @@
   function qItem(label, value, color) {
     return '<div class="quality-item"><div class="qlabel">' + label + '</div><div class="qvalue ' + color + '">' + value + '</div></div>';
   }
-  function bItem(label, count) {
-    return '<div class="bucket-item"><div class="blabel">' + label + '</div><div class="bcount">' + count + '</div></div>';
+  function bItem(label, sub, count) {
+    return '<div class="bucket-item"><div class="blabel">' + label + '<small class="bsub">' + sub + '</small></div><div class="bcount">' + count + '</div></div>';
   }
 
   function renderComponentList(combined) {
@@ -1980,7 +1980,7 @@
 
     var headerRow = [
       'ID','차수','자재코드','자재명','LOT','바코드','바코드차수',
-      '후면 지분 값(PPM)','총 지분','밀도(개)','밀도(%)',
+      '후면 지분 값(PPM)','총 지분','밀도(개,3~7px)','밀도(%)',
       '자동','수동','제외','수동+','수동-',
       '크기균일','분포균등','평균크기','표준편차',
       '≤3px','≤5px','≤7px','>7px',

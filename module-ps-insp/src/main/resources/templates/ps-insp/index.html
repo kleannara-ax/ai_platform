@@ -143,7 +143,7 @@
               <dt>후면 지분 값</dt>
               <dd>전체 이미지 픽셀 대비 지분 픽셀 비율(PPM)입니다.</dd>
               <dt>밀도</dt>
-              <dd>지름이 약 3px 이상 7px 이하로 추정되는 지분의 개수입니다.</dd>
+              <dd>지름이 약 3px 이상 7px 이하(면적 9~49 px²)로 추정되는 지분의 개수입니다.</dd>
               <dt>크기 균일도</dt>
               <dd>지분 픽셀 면적의 평균과 표준편차로 계산한 0~100점 지표입니다.</dd>
               <dt>분포 균등도</dt>
@@ -249,13 +249,13 @@
               <!-- 식별 정보 (7) -->
               <th>ID</th><th>차수</th><th>자재코드</th><th>자재명</th><th>LOT</th><th>바코드</th><th>바코드차수</th>
               <!-- 핵심 지표 (4) -->
-              <th>후면 지분 값(PPM)</th><th>총 지분</th><th>밀도(개)</th><th>밀도(%)</th>
+              <th>후면 지분 값(PPM)</th><th>총 지분</th><th>밀도(개,3~7px)</th><th>밀도(%)</th>
               <!-- 카운트 상세 (5) -->
               <th>자동</th><th>수동</th><th>제외</th><th>수동+</th><th>수동-</th>
               <!-- 균일도 · 통계 (4) -->
               <th>크기균일</th><th>분포균등</th><th>평균크기</th><th>표준편차</th>
               <!-- 크기 버킷 (4) -->
-              <th>≤3px</th><th>≤5px</th><th>≤7px</th><th>&gt;7px</th>
+              <th>≤3px<br><small>≤9px²</small></th><th>≤5px<br><small>≤25px²</small></th><th>≤7px<br><small>≤49px²</small></th><th>&gt;7px<br><small>&gt;49px²</small></th>
               <!-- 사분면 (4) -->
               <th>좌상</th><th>우상</th><th>좌하</th><th>우하</th>
               <!-- 픽셀 (2) -->
