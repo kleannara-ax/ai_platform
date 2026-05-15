@@ -1137,7 +1137,7 @@
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('분포 균일도', (m.distributionUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('평균 / 표준편차', m.meanSize.toFixed(1) + ' / ' + m.stdSize.toFixed(1) + ' px', 'blue')
-      + qItem('수 제외 지분수', m.removedAutoCount, 'red');
+      + qItem('수동 제외 지분 수', m.removedAutoCount, 'red');
 
     // Bucket bar
     var bucketEl = document.getElementById('bucketBar');
