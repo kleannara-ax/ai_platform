@@ -65,7 +65,6 @@
         <!-- hidden fields: URL 파라미터로만 수신 -->
         <input type="hidden" id="f_werks" value="">
         <input type="hidden" id="f_inspItemGrpCd" value="COV_INS">
-        <div class="exists-check" id="existsCheck" style="display:none;"></div>
       </div>
     </div>
 
@@ -169,6 +168,7 @@
     </div>
 
     <div class="action-bar" id="actionBar" style="display:none;">
+      <span class="exists-check" id="existsCheck" style="display:none;"></span>
       <button class="btn btn-outline" onclick="checkExists()">중복 체크</button>
       <button class="btn btn-primary btn-lg" onclick="saveInspection()" id="btnSave">검사 결과 저장</button>
     </div>

@@ -486,7 +486,7 @@ input, select, textarea, button { font-family: inherit; font-size: 14px; }
 
 /* ===== Exists Check ===== */
 .exists-check {
-  margin-top: 12px; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500;
+  padding: 6px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 500; margin-right: auto;
 }
 .exists-check.warn { background: var(--yellow-light); color: var(--yellow); border: 1px solid #fbbf24; }
 .exists-check.ok { background: var(--green-light); color: var(--green); border: 1px solid #86efac; }

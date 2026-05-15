@@ -1366,7 +1366,7 @@
             ec.innerHTML = '&#10004; 중복 없음. 새로운 검사 결과로 저장됩니다.';
             ec.className = 'exists-check ok';
           }
-          ec.style.display = 'block';
+          ec.style.display = 'inline-block';
         }
       })
       .catch(function (e) { toast('중복 체크 실패: ' + e.message, 'error'); });
