@@ -63,6 +63,10 @@ public interface PsInspectionRepository extends JpaRepository<PsInspection, Long
             @Param("to") LocalDateTime to,
             Pageable pageable);
 
+    /** 바코드 정확 매칭 (MES 조회용 - 인덱스 활용) */
+    @Query("SELECT i FROM PsInspection i WHERE i.indBcd = :indBcd ORDER BY i.inspectedAt DESC")
+    Page<PsInspection> findByIndBcdExact(@Param("indBcd") String indBcd, Pageable pageable);
+
     /** 같은 바코드의 최대 seq 조회 */
     @Query("SELECT MAX(i.seq) FROM PsInspection i WHERE i.indBcd = :indBcd")
     Optional<Integer> findMaxSeqByIndBcd(@Param("indBcd") String indBcd);

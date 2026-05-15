@@ -159,6 +159,22 @@ public class PsInspectionApiController {
     }
 
     /**
+     * 바코드 정확 매칭 조회 (MES 결과조회 전용)
+     * - LIKE 대신 = 사용으로 인덱스 활용 → 속도 최적화
+     * - 예: GET /ps-insp-api/inspections/by-barcode?indBcd=25830J0069
+     */
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")
+    @GetMapping("/by-barcode")
+    public ResponseEntity<ApiResponse<Page<PsInspectionResponse>>> findByBarcode(
+            @RequestParam String indBcd,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
+        return ResponseEntity.ok(ApiResponse.success(
+                inspectionService.findByIndBcdExact(indBcd, pageable)));
+    }
+
+    /**
      * 기존 레코드 존재 여부 확인 (Upsert 사전 체크)
      */
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'PS_INSP_MGMT')")

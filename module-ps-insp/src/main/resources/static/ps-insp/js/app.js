@@ -390,18 +390,18 @@
   }
 
   /**
-   * URL search 파라미터 접근 시: 바코드로 검사 이력을 조회하여
-   * 해당 검사일 범위를 날짜 필터에 자동 세팅한 뒤 검색 실행
+   * URL search 파라미터 접근 시: 바코드 정확 매칭 API 1회 호출로
+   * 데이터 조회 + 검사일 날짜 필터 자동 세팅을 동시에 처리
+   * (기존: 검사일 조회 API 1회 + 데이터 조회 API 1회 = 2회 → 1회로 통합)
    */
   function _applySearchDateByBarcode(barcode, tabName) {
-    api('GET', '/ps-insp-api/inspections/search?type=indBcd&keyword=' + enc(barcode) + '&page=0&size=1')
+    // 정확 매칭 API 사용 (LIKE %...% 대신 = 매칭, 인덱스 활용)
+    api('GET', '/ps-insp-api/inspections/by-barcode?indBcd=' + enc(barcode) + '&page=0&size=50')
       .then(function (res) {
+        var items = (res.success && res.data && res.data.content) ? res.data.content : [];
         var dateStr = '';
-        if (res.success && res.data && res.data.content && res.data.content.length > 0) {
-          var item = res.data.content[0]; // 최신 검사 결과
-          if (item.inspectedAt) {
-            dateStr = String(item.inspectedAt).substring(0, 10); // 'YYYY-MM-DD'
-          }
+        if (items.length > 0 && items[0].inspectedAt) {
+          dateStr = String(items[0].inspectedAt).substring(0, 10); // 최신 검사일
         }
 
         if (tabName === 'detail-table') {
@@ -416,7 +416,6 @@
             dtSearchParams.dateFrom = dateStr;
             dtSearchParams.dateTo = dateStr;
           } else {
-            // 검사일 못 찾으면 날짜 필터 비움 (전체 기간 검색)
             var dfEl2 = document.getElementById('dt_dateFrom');
             var dtEl2 = document.getElementById('dt_dateTo');
             if (dfEl2) dfEl2.value = '';
@@ -424,7 +423,20 @@
             dtSearchParams.dateFrom = '';
             dtSearchParams.dateTo = '';
           }
-          loadDetailTable(0);
+          // 이미 데이터를 가져왔으므로 바로 렌더링 (추가 API 호출 불필요)
+          var tbody = document.getElementById('detailTableBody');
+          var pag = document.getElementById('dtPagination');
+          if (tbody) {
+            // 날짜 필터에 맞는 항목만 필터링
+            var filtered = dateStr ? items.filter(function (i) {
+              return i.inspectedAt && String(i.inspectedAt).substring(0, 10) === dateStr;
+            }) : items;
+            renderDetailRows(filtered, tbody);
+            if (pag) {
+              var totalPages = res.data.totalPages || 0;
+              renderPagination(totalPages, 0, pag, 'loadDetailTable');
+            }
+          }
         } else if (tabName === 'history') {
           var hKeyword = document.getElementById('h_keyword');
           if (hKeyword) hKeyword.value = barcode;
@@ -439,11 +451,18 @@
             if (hFrom2) hFrom2.value = '';
             if (hTo2) hTo2.value = '';
           }
-          setTimeout(function () { searchHistory(); }, 100);
+          // 이미 데이터를 가져왔으므로 바로 렌더링
+          var container = document.getElementById('historyCardsBody');
+          if (container) {
+            var filtered2 = dateStr ? items.filter(function (i) {
+              return i.inspectedAt && String(i.inspectedAt).substring(0, 10) === dateStr;
+            }) : items;
+            renderHistoryCards(filtered2, container);
+          }
         }
       })
       .catch(function () {
-        // API 실패 시 기존 방식으로 폴백
+        // API 실패 시 기존 LIKE 검색으로 폴백
         if (tabName === 'detail-table') {
           var dtKeyword = document.getElementById('dt_keyword');
           if (dtKeyword) dtKeyword.value = barcode;

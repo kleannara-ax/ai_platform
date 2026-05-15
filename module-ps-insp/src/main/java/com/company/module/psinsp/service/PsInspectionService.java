@@ -226,6 +226,11 @@ public class PsInspectionService {
         return inspectionRepository.searchByIndBcd(keyword, pageable).map(PsInspectionResponse::from);
     }
 
+    /** 바코드 정확 매칭 조회 (MES 전용 - 인덱스 활용, LIKE 대신 = 사용) */
+    public Page<PsInspectionResponse> findByIndBcdExact(String indBcd, Pageable pageable) {
+        return inspectionRepository.findByIndBcdExact(indBcd, pageable).map(PsInspectionResponse::from);
+    }
+
     public Page<PsInspectionResponse> searchByLotnr(String keyword, Pageable pageable) {
         return inspectionRepository.searchByLotnr(keyword, pageable).map(PsInspectionResponse::from);
     }
