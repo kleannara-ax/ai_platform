@@ -101,13 +101,91 @@ const mockPermissions = mockRoles.map(r => ({
            [1,6,61]
 }));
 
-// ── Helper: Mock PS-INSP Inspection Data ──
+// ── Helper: Mock PS-INSP Inspection Data (20건) ──
 function _mockInspections() {
-  return [
-    { inspectionId: 1, indBcd: 'IND-2024-001', lotNo: 'LOT-A001', matnr: 'MAT-001', ppmValue: 85.3, qualityResult: 'OK', threshold: 115, componentCount: 12, totalPixels: 2560000, defectPixels: 218, userId: 'admin', mesSendStatus: 'SENT', createdAt: '2024-12-01T09:30:00', inspectionImage: null },
-    { inspectionId: 2, indBcd: 'IND-2024-002', lotNo: 'LOT-A002', matnr: 'MAT-002', ppmValue: 523.7, qualityResult: 'NG', threshold: 115, componentCount: 45, totalPixels: 2560000, defectPixels: 1341, userId: 'admin', mesSendStatus: 'SENT', createdAt: '2024-12-01T10:15:00', inspectionImage: null },
-    { inspectionId: 3, indBcd: 'IND-2024-003', lotNo: 'LOT-B001', matnr: 'MAT-001', ppmValue: 42.1, qualityResult: 'OK', threshold: 120, componentCount: 5, totalPixels: 2560000, defectPixels: 108, userId: 'manager01', mesSendStatus: 'PENDING', createdAt: '2024-12-02T14:00:00', inspectionImage: null },
+  var matnrs = ['MAT-001','MAT-002','MAT-003','MAT-004','MAT-005'];
+  var matnrNms = ['PE필름 A등급','PP필름 B등급','PET필름 C등급','PE필름 특수','PP필름 고급'];
+  var operators = [
+    {id:'admin', nm:'관리자'}, {id:'kim01', nm:'김검사'}, {id:'lee02', nm:'이품질'},
+    {id:'park03', nm:'박기술'}, {id:'choi04', nm:'최현장'}
   ];
+  var statuses = ['COMPLETED','COMPLETED','COMPLETED','COMPLETED','COMPLETED','COMPLETED','COMPLETED','COMPLETED','IN_PROGRESS','COMPLETED'];
+  var mesStatuses = ['SENT','SENT','SENT','SENT','PENDING','SENT','FAILED','SENT','PENDING','SENT'];
+
+  var items = [];
+  for (var i = 1; i <= 20; i++) {
+    var mi = (i - 1) % matnrs.length;
+    var oi = (i - 1) % operators.length;
+    var totalCount = 5 + Math.floor(Math.random() * 80);
+    var autoCount = Math.max(1, totalCount - Math.floor(Math.random() * 6));
+    var manualCount = totalCount - autoCount;
+    var removedAutoCount = Math.floor(Math.random() * 4);
+    var totalPixels = 2560000;
+    var objectPixelCount = Math.floor(Math.random() * 3000) + 50;
+    var coverageRatio = objectPixelCount / totalPixels;
+    var densityCount = Math.max(0, Math.floor(totalCount * 0.4 + Math.random() * totalCount * 0.3));
+    var threshold = 110 + Math.floor(Math.random() * 20);
+    var meanSize = 3 + Math.random() * 15;
+    var stdSize = 1 + Math.random() * 5;
+    var day = String(1 + Math.floor((i - 1) / 3)).padStart(2, '0');
+    var hour = String(8 + (i % 10)).padStart(2, '0');
+    var minute = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+    var inspectedAt = '2025-05-' + day + 'T' + hour + ':' + minute + ':00';
+    var msrmDate = inspectedAt;
+
+    items.push({
+      inspectionId: i,
+      seq: ((i - 1) % 3) + 1,
+      indBcd: 'IND-2025-' + String(i).padStart(3, '0'),
+      indBcdSeq: String(((i - 1) % 3) + 1),
+      lotNo: 'LOT-' + String.fromCharCode(65 + (i % 5)) + String(100 + i),
+      lotnr: 'LOT-' + String.fromCharCode(65 + (i % 5)) + String(100 + i),
+      matnr: matnrs[mi],
+      matnrNm: matnrNms[mi],
+      coverageRatio: coverageRatio,
+      totalCount: totalCount,
+      densityCount: densityCount,
+      densityRatio: totalPixels > 0 ? densityCount / totalPixels : 0,
+      autoCount: autoCount,
+      manualCount: manualCount,
+      removedAutoCount: removedAutoCount,
+      manualAddedCount: manualCount,
+      manualRemovedCount: removedAutoCount,
+      sizeUniformityScore: 0.6 + Math.random() * 0.35,
+      distributionUniformityScore: 0.5 + Math.random() * 0.45,
+      meanSize: meanSize,
+      stdSize: stdSize,
+      bucketUpTo3: Math.floor(totalCount * 0.15 + Math.random() * 5),
+      bucketUpTo5: Math.floor(totalCount * 0.30 + Math.random() * 5),
+      bucketUpTo7: Math.floor(totalCount * 0.25 + Math.random() * 5),
+      bucketOver7: Math.floor(totalCount * 0.10 + Math.random() * 3),
+      quadrantTopLeft: Math.floor(totalCount * 0.2 + Math.random() * 5),
+      quadrantTopRight: Math.floor(totalCount * 0.25 + Math.random() * 5),
+      quadrantBottomLeft: Math.floor(totalCount * 0.25 + Math.random() * 5),
+      quadrantBottomRight: Math.floor(totalCount * 0.2 + Math.random() * 5),
+      objectPixelCount: objectPixelCount,
+      totalPixels: totalPixels,
+      thresholdMax: threshold,
+      inspectedAt: inspectedAt,
+      msrmDate: msrmDate,
+      createdAt: inspectedAt,
+      operatorId: operators[oi].id,
+      operatorNm: operators[oi].nm,
+      werks: 'P100',
+      prcSeqno: i,
+      inspItemGrpCd: 'COV_INS',
+      deviceId: 'TAB-' + String(1 + (i % 3)).padStart(2, '0'),
+      status: statuses[(i - 1) % statuses.length],
+      mesSendStatus: mesStatuses[(i - 1) % mesStatuses.length],
+      originalImagePath: null,
+      originalImageName: null,
+      originalImageDir: null,
+      resultImagePath: null,
+      resultImageName: null,
+      resultImageDir: null
+    });
+  }
+  return items;
 }
 
 // ── Helper: JSON Response ──
@@ -466,12 +544,20 @@ const server = http.createServer((req, res) => {
 
       // ── Inspections: search ──
       if (pathname === '/ps-insp-api/inspections/search') {
-        return apiOk(res, { content: _mockInspections(), totalElements: 3, totalPages: 1, number: 0, size: 10 });
+        var all = _mockInspections();
+        var pg = parseInt(parsedUrl.query.page) || 0;
+        var sz = parseInt(parsedUrl.query.size) || 10;
+        var slice = all.slice(pg * sz, pg * sz + sz);
+        return apiOk(res, { content: slice, totalElements: all.length, totalPages: Math.ceil(all.length / sz), number: pg, size: sz });
       }
 
       // ── Inspections: list (paginated) ──
       if (pathname === '/ps-insp-api/inspections' && method === 'GET') {
-        return apiOk(res, { content: _mockInspections(), totalElements: 3, totalPages: 1, number: 0, size: 10 });
+        var all = _mockInspections();
+        var pg = parseInt(parsedUrl.query.page) || 0;
+        var sz = parseInt(parsedUrl.query.size) || 10;
+        var slice = all.slice(pg * sz, pg * sz + sz);
+        return apiOk(res, { content: slice, totalElements: all.length, totalPages: Math.ceil(all.length / sz), number: pg, size: sz });
       }
 
       // ── Inspections: create (multipart or JSON) ──
