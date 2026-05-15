@@ -1137,6 +1137,7 @@
       + qItem('크기 균일도', (m.sizeUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('분포 균일도', (m.distributionUniformityScore * 100).toFixed(1) + '%', 'green')
       + qItem('평균 크기 (px)', m.meanSize.toFixed(1), 'blue')
+      + qItem('표준편차 (px)', m.stdSize.toFixed(1), 'blue')
       + qItem('삭제 자동검출', m.removedAutoCount, 'red');
 
     // Bucket bar
