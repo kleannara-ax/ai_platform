@@ -361,11 +361,15 @@
       lastThreshold = v;
     }
 
-    // ── tab 파라미터: 지정된 탭으로 자동 전환 ──
-    // 예: ?tab=history-table → 이력 테이블 탭 활성화
-    //     ?tab=history       → 검사 이력 탭 활성화
-    //     ?tab=inspection    → 검사 실행 탭 활성화 (기본값)
+    // ── tab / IND_BCD 파라미터 처리 ──
     var tabParam = params.get('tab');
+    var searchParam = params.get('IND_BCD') || params.get('search'); // IND_BCD 우선, search 하위호환
+
+    // IND_BCD가 있으면 switchTab의 자동 로드를 스킵 (아래에서 직접 검색 실행)
+    if (searchParam) {
+      _skipTabAutoLoad = true;
+    }
+
     if (tabParam) {
       // 사용자 편의를 위한 탭 별칭 매핑
       var tabAliasMap = {
@@ -384,16 +388,7 @@
       }
     }
 
-    // ── IND_BCD 파라미터: 개별바코드로 자동 검색 ──
-    // 예: ?tab=history-table&IND_BCD=26228J0039 → 이력 테이블에서 바코드 자동 검색
-    //     ?tab=history&IND_BCD=26228J0039       → 검사 이력에서 바코드 자동 검색
-    // MES에서 호출 시 검사일 디폴트를 해당 바코드의 실제 검사일로 세팅
-    var searchParam = params.get('IND_BCD') || params.get('search'); // IND_BCD 우선, search 하위호환
     if (searchParam) {
-      // switchTab의 자동 loadDetailTable/searchHistory를 스킵 설정
-      // (아래 _applySearchDateByBarcode가 by-barcode 정확 매칭 API로 직접 렌더링)
-      _skipTabAutoLoad = true;
-
       var activeTabName = tabParam ? (({ 'history-table': 'detail-table', 'detail-table': 'detail-table', 'detail': 'detail-table', 'table': 'detail-table', 'history': 'history', 'inspection': 'inspection' })[tabParam] || tabParam) : null;
 
       // 해당 바코드의 검사일을 API로 조회하여 날짜 필터 자동 세팅
@@ -402,9 +397,8 @@
   }
 
   /**
-   * URL search 파라미터 접근 시: 바코드 정확 매칭 API 1회 호출로
-   * 데이터 조회 + 검사일 날짜 필터 자동 세팅을 동시에 처리
-   * (기존: 검사일 조회 API 1회 + 데이터 조회 API 1회 = 2회 → 1회로 통합)
+   * MES URL 파라미터 진입 시: 바코드 키워드 세팅 + 전체 기간 검색 실행
+   * (검색 버튼을 누른 것과 동일한 효과)
    */
   function _applySearchDateByBarcode(barcode, tabName) {
     console.log('[PS-INSP] MES 바코드 검색 실행:', barcode, '→ 탭:', tabName);
