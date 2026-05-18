@@ -437,20 +437,8 @@
             dtSearchParams.dateFrom = '';
             dtSearchParams.dateTo = '';
           }
-          // 이미 데이터를 가져왔으므로 바로 렌더링 (추가 API 호출 불필요)
-          var tbody = document.getElementById('detailTableBody');
-          var pag = document.getElementById('dtPagination');
-          if (tbody) {
-            // 날짜 필터에 맞는 항목만 필터링
-            var filtered = dateStr ? items.filter(function (i) {
-              return i.inspectedAt && String(i.inspectedAt).substring(0, 10) === dateStr;
-            }) : items;
-            renderDetailRows(filtered, tbody);
-            if (pag) {
-              var totalPages = res.data.totalPages || 0;
-              renderPagination(totalPages, 0, pag, 'loadDetailTable');
-            }
-          }
+          // 검색 조건 세팅 후 검색 실행 (검색 버튼을 누른 것과 동일)
+          loadDetailTable(0);
         } else if (tabName === 'history') {
           var hKeyword = document.getElementById('h_keyword');
           if (hKeyword) hKeyword.value = barcode;
@@ -465,14 +453,8 @@
             if (hFrom2) hFrom2.value = '';
             if (hTo2) hTo2.value = '';
           }
-          // 이미 데이터를 가져왔으므로 바로 렌더링
-          var container = document.getElementById('historyCardsBody');
-          if (container) {
-            var filtered2 = dateStr ? items.filter(function (i) {
-              return i.inspectedAt && String(i.inspectedAt).substring(0, 10) === dateStr;
-            }) : items;
-            renderHistoryCards(filtered2, container);
-          }
+          // 검색 조건 세팅 후 검색 실행 (검색 버튼을 누른 것과 동일)
+          searchHistory();
         }
       })
       .catch(function () {
