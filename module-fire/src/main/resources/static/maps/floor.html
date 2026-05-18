@@ -1073,6 +1073,26 @@
       }
     };
 
+    // building-floors API에서 도면이 있는 건물/층 조합 로드
+    try {
+      const bfr = await api('/fire-api/maps/building-floors');
+      if (bfr && bfr.ok) {
+        const bfj = await bfr.json().catch(() => null);
+        const bfData = Array.isArray(bfj?.data) ? bfj.data : [];
+        for (const b of bfData) {
+          const floors = Array.isArray(b.floors) ? b.floors : [];
+          for (const f of floors) {
+            upsertFloor({
+              buildingId: b.buildingId,
+              floorId: f.floorId,
+              buildingName: b.buildingName || '',
+              floorName: f.floorName || ''
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
     state.exts.forEach(upsertFloor);
     state.hyds.forEach(upsertFloor);
     state.hyds
@@ -1102,10 +1122,6 @@
     for (const f of resolved) {
       const key = `${String(f.buildingId)}|${String(f.floorId)}`;
       mergedMap.set(key, f);
-    }
-    for (const d of DEFAULT_FLOORS) {
-      const key = `${String(d.buildingId)}|${String(d.floorId)}`;
-      if (!mergedMap.has(key)) mergedMap.set(key, d);
     }
 
     const floorDedup = new Map();
