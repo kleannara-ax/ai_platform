@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.7
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.6.8
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -110,11 +110,11 @@
           _cachedPpmLimit = limit;
           // localStorage에도 동기화 (오프라인 폴백용)
           try { localStorage.setItem('jri_ppm_limit', String(limit)); } catch (e) { }
-          console.log('[PS-INSP] PPM 기준값 서버에서 로드:', limit);
+          console.log('[PS-INSP] 초기화 - PPM 기준값 로드 완료:', limit);
         }
       })
       .catch(function (e) {
-        console.warn('[PS-INSP] PPM 기준값 서버 로드 실패 (localStorage 폴백 사용):', e.message);
+        console.warn('[PS-INSP] 초기화 - PPM 기준값 로드 실패 (localStorage 폴백 사용):', e.message);
       });
   }
 
@@ -390,6 +390,10 @@
     // MES에서 호출 시 검사일 디폴트를 해당 바코드의 실제 검사일로 세팅
     var searchParam = params.get('IND_BCD') || params.get('search'); // IND_BCD 우선, search 하위호환
     if (searchParam) {
+      // switchTab의 자동 loadDetailTable/searchHistory를 스킵 설정
+      // (아래 _applySearchDateByBarcode가 by-barcode 정확 매칭 API로 직접 렌더링)
+      _skipTabAutoLoad = true;
+
       var activeTabName = tabParam ? (({ 'history-table': 'detail-table', 'detail-table': 'detail-table', 'detail': 'detail-table', 'table': 'detail-table', 'history': 'history', 'inspection': 'inspection' })[tabParam] || tabParam) : null;
 
       // 해당 바코드의 검사일을 API로 조회하여 날짜 필터 자동 세팅
@@ -403,10 +407,12 @@
    * (기존: 검사일 조회 API 1회 + 데이터 조회 API 1회 = 2회 → 1회로 통합)
    */
   function _applySearchDateByBarcode(barcode, tabName) {
+    console.log('[PS-INSP] 바코드 정확 매칭 조회 시작:', barcode, '→ 탭:', tabName);
     // 정확 매칭 API 사용 (LIKE %...% 대신 = 매칭, 인덱스 활용)
     api('GET', '/ps-insp-api/inspections/by-barcode?indBcd=' + enc(barcode) + '&page=0&size=50')
       .then(function (res) {
         var items = (res.success && res.data && res.data.content) ? res.data.content : [];
+        console.log('[PS-INSP] 바코드 정확 매칭 조회 완료:', barcode, '→', items.length, '건');
         var dateStr = '';
         if (items.length > 0 && items[0].inspectedAt) {
           dateStr = String(items[0].inspectedAt).substring(0, 10); // 최신 검사일
@@ -514,6 +520,10 @@
   // ══════════════════════════════════════════════
   // Tab Switching
   // ══════════════════════════════════════════════
+  // URL IND_BCD 파라미터 존재 시 switchTab의 자동 로드를 1회 스킵하는 플래그
+  // (_applySearchDateByBarcode가 정확 매칭 API로 직접 렌더링하므로 중복 전체 조회 방지)
+  var _skipTabAutoLoad = false;
+
   window.switchTab = function (tabName) {
     document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
@@ -521,6 +531,12 @@
     var tabContent = document.getElementById('tab-' + tabName);
     if (tabBtn) tabBtn.classList.add('active');
     if (tabContent) tabContent.classList.add('active');
+
+    // URL에 IND_BCD가 있으면 _applySearchDateByBarcode가 직접 로드하므로 스킵
+    if (_skipTabAutoLoad) {
+      _skipTabAutoLoad = false; // 1회 스킵 후 복원 (이후 수동 탭 전환은 정상 동작)
+      return;
+    }
     if (tabName === 'history') searchHistory();
     if (tabName === 'detail-table') loadDetailTable();
   };

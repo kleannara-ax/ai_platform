@@ -572,9 +572,14 @@ const server = http.createServer((req, res) => {
         return apiOk(res, { exists: false });
       }
 
-      // ── Inspections: by-barcode ──
+      // ── Inspections: by-barcode (정확 매칭) ──
       if (pathname === '/ps-insp-api/inspections/by-barcode') {
-        return apiOk(res, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 });
+        var bcd = parsedUrl.query.indBcd || '';
+        var matched = bcd ? _mockInspections().filter(function (i) { return i.indBcd === bcd; }) : [];
+        var pg = parseInt(parsedUrl.query.page) || 0;
+        var sz = parseInt(parsedUrl.query.size) || 50;
+        var slice = matched.slice(pg * sz, pg * sz + sz);
+        return apiOk(res, { content: slice, totalElements: matched.length, totalPages: Math.ceil(matched.length / sz), number: pg, size: sz });
       }
 
       // ── Inspections: search ──
