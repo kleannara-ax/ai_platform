@@ -223,7 +223,10 @@ public class MapController {
         }
         if (containsAny(building, "\uBCF5\uD569\uBCF4\uC77C\uB7EC", "comboboiler")) {
             if (isBasement(floor)) return "";
-            if (floor.contains("1")) return "/images/bokji_1F.png";
+            if (floor.contains("4")) return "/images/comboboiler_4F.png";
+            if (floor.contains("3")) return "/images/comboboiler_3F.png";
+            if (floor.contains("2")) return "/images/comboboiler_2F.png";
+            if (floor.contains("1")) return "/images/comboboiler_1F.png";
             return "";
         }
         if (containsAny(building, "\uC218\uCD9C\uCC3D\uACE0", "export")) {
