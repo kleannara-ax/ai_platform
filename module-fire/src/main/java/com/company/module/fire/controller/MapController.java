@@ -52,6 +52,16 @@ public class MapController {
             String bName = b.getBuildingName() == null ? "" : b.getBuildingName();
             List<Map<String, Object>> matchedFloors = new ArrayList<>();
 
+            // 옥외 건물은 별도 처리 (floor.html에서 drone_photo 직접 매핑)
+            if (bName.contains("옥외")) {
+                Map<String, Object> bm = new LinkedHashMap<>();
+                bm.put("buildingId", b.getBuildingId());
+                bm.put("buildingName", bName);
+                bm.put("floors", matchedFloors);
+                result.add(bm);
+                continue;
+            }
+
             for (Floor f : floors) {
                 String fName = f.getFloorName() == null ? "" : f.getFloorName();
                 if (fName.contains("옥외")) continue;
@@ -180,37 +190,51 @@ public class MapController {
             return "";
         }
         if (containsAny(building, "\uBC00\uB864\uCC3D\uACE0", "milrol")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("3")) return "/images/milrol_3F.png";
             if (floor.contains("2")) return "/images/milrol_2F.png";
-            return "/images/milrol_1F.png";
+            if (floor.contains("1")) return "/images/milrol_1F.png";
+            return "";
         }
         if (containsAny(building, "\uAE30\uAD00\uC2E4", "engine")) {
-            return "/images/engine_1F.png";
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/engine_1F.png";
+            return "";
         }
-        if (containsAny(building, "\uC804\uAE30\uD604\uC7A5", "elec")) {
+        if (containsAny(building, "\uC804\uAE30\uD604\uC7A5", "elec") && !containsAny(building, "\uC804\uAE30\uACF5\uBB34", "elecgm")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/elec_2F.png";
-            return "/images/elec_1F.png";
+            if (floor.contains("1")) return "/images/elec_1F.png";
+            return "";
         }
         if (containsAny(building, "\uC8FC\uCC28\uD0C0\uC6CC", "tower")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("\uC625\uC0C1") || floor.contains("rf") || floor.contains("rooftop")) return "/images/tower_RF.png";
             if (floor.contains("3")) return "/images/tower_3F.png";
             if (floor.contains("2")) return "/images/tower_2F.png";
-            return "/images/tower_1F.png";
+            if (floor.contains("1")) return "/images/tower_1F.png";
+            return "";
         }
         if (containsAny(building, "\uBCF4\uC77C\uB7EC\uC870\uC815\uB3D9", "\uBCF4\uC77C\uB7EC \uC870\uC815\uB3D9", "boiler_ctrl", "boilerctrl")) {
+            if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/boiler_ctrl_2F.png";
-            return "/images/boiler_ctrl_1F.png";
+            if (floor.contains("1")) return "/images/boiler_ctrl_1F.png";
+            return "";
         }
         if (containsAny(building, "\uBCF5\uD569\uBCF4\uC77C\uB7EC", "comboboiler")) {
-            if (floor.contains("3")) return "/images/bokji_3F.png";
-            if (floor.contains("2")) return "/images/bokji_2F.png";
-            return "/images/bokji_1F.png";
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/bokji_1F.png";
+            return "";
         }
         if (containsAny(building, "\uC218\uCD9C\uCC3D\uACE0", "export")) {
-            return "/images/export_1F.png";
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/export_1F.png";
+            return "";
         }
         if (containsAny(building, "\uC911\uBB38\uCC3D\uACE0", "jungmun")) {
-            return "/images/jungmun_1F.png";
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/jungmun_1F.png";
+            return "";
         }
         return "";
     }

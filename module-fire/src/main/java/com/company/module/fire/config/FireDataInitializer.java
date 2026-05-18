@@ -30,17 +30,34 @@ public class FireDataInitializer implements ApplicationRunner {
         log.info("[FireDataInitializer] 필수 건물/층 마스터 데이터 확인 시작");
 
         // ── 건물(building) ──
-        // id=99 '옥외' 건물은 옥외 소화전 등에서 반드시 필요
+        insertIgnoreBuilding(1,  "복지관");
+        insertIgnoreBuilding(2,  "관리동");
+        insertIgnoreBuilding(3,  "제지1,2호기");
+        insertIgnoreBuilding(4,  "제지3호기");
+        insertIgnoreBuilding(5,  "밀롤창고");
+        insertIgnoreBuilding(6,  "기관실");
+        insertIgnoreBuilding(7,  "화장지 3,6호기");
+        insertIgnoreBuilding(8,  "화장지 4,5호기");
+        insertIgnoreBuilding(9,  "전기현장");
+        insertIgnoreBuilding(10, "주차타워");
+        insertIgnoreBuilding(11, "보일러 조정동");
+        insertIgnoreBuilding(12, "복합보일러");
+        insertIgnoreBuilding(13, "전기공무");
+        insertIgnoreBuilding(14, "패드동");
+        insertIgnoreBuilding(15, "심면펄퍼");
+        insertIgnoreBuilding(16, "수출창고");
+        insertIgnoreBuilding(17, "중문창고");
+        insertIgnoreBuilding(18, "기저귀동");
         insertIgnoreBuilding(99, "옥외");
 
         // ── 층(floor) ──
-        // 지하1층 ~ 4층 + 옥외(id=99)
-        insertIgnoreFloor(1, "지하1층(B1)", 0);
-        insertIgnoreFloor(2, "1층",         1);
-        insertIgnoreFloor(3, "2층",         2);
-        insertIgnoreFloor(4, "3층",         3);
-        insertIgnoreFloor(5, "4층",         4);
-        insertIgnoreFloor(99, "옥외",       99);
+        insertIgnoreFloor(1,  "지하1층(B1)", 0);
+        insertIgnoreFloor(2,  "1층",         1);
+        insertIgnoreFloor(3,  "2층",         2);
+        insertIgnoreFloor(4,  "3층",         3);
+        insertIgnoreFloor(5,  "4층",         4);
+        insertIgnoreFloor(6,  "옥상",        5);
+        insertIgnoreFloor(99, "옥외",        99);
 
         log.info("[FireDataInitializer] 필수 건물/층 마스터 데이터 확인 완료");
 
