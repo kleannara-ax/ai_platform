@@ -1215,9 +1215,11 @@ function resolveDetailPlanImagePathHyd(buildingName, floorName){
   const b = String(buildingName || '').replace(/\s+/g,'').toLowerCase().replace(/[.,_\-]/g,'');
   const fRaw = String(floorName || '').replace(/\s+/g,'').toLowerCase();
   const f = (fRaw === 'b1' || fRaw.includes('지하') || fRaw.includes('b1')) ? 'b1'
-    : (fRaw.includes('1') ? '1f'
+    : (fRaw.includes('옥상') || fRaw.includes('rf') || fRaw.includes('rooftop')) ? 'rf'
+    : (fRaw.includes('4') ? '4f'
+    : (fRaw.includes('3') ? '3f'
     : (fRaw.includes('2') ? '2f'
-    : (fRaw.includes('3') ? '3f' : fRaw)));
+    : (fRaw.includes('1') ? '1f' : fRaw))));
   if (b.includes('복지관') || b.includes('bokji')) {
     if (f === 'b1') return '/images/bokji_B1.png';
     if (f === '1f') return '/images/bokji_1F.png';
@@ -1255,6 +1257,33 @@ function resolveDetailPlanImagePathHyd(buildingName, floorName){
     if (f === '3f') return '/images/tissue4,5_3F.PNG';
   }
   if ((b.includes('기저귀동') || b.includes('diaper')) && f === '1f') return '/images/diaper_1F.png';
+  if (b.includes('밀롤창고') || b.includes('milrol')) {
+    if (f === '1f') return '/images/milrol_1F.png';
+    if (f === '2f') return '/images/milrol_2F.png';
+    if (f === '3f') return '/images/milrol_3F.png';
+  }
+  if ((b.includes('기관실') || b.includes('engine')) && f === '1f') return '/images/engine_1F.png';
+  if ((b.includes('전기현장') || b.includes('elec')) && !b.includes('전기공무')) {
+    if (f === '1f') return '/images/elec_1F.png';
+    if (f === '2f') return '/images/elec_2F.png';
+  }
+  if (b.includes('주차타워') || b.includes('tower')) {
+    if (f === '1f') return '/images/tower_1F.png';
+    if (f === '2f') return '/images/tower_2F.png';
+    if (f === '3f') return '/images/tower_3F.png';
+  }
+  if (b.includes('보일러조정동') || b.includes('boilerctrl') || b.includes('boiler_ctrl')) {
+    if (f === '1f') return '/images/boiler_ctrl_1F.png';
+    if (f === '2f') return '/images/boiler_ctrl_2F.png';
+  }
+  if (b.includes('복합보일러') || b.includes('comboboiler')) {
+    if (f === '1f') return '/images/comboboiler_1F.png';
+    if (f === '2f') return '/images/comboboiler_2F.png';
+    if (f === '3f') return '/images/comboboiler_3F.png';
+    if (f === '4f') return '/images/comboboiler_4F.png';
+  }
+  if ((b.includes('수출창고') || b.includes('export')) && f === '1f') return '/images/export_1F.png';
+  if ((b.includes('중문창고') || b.includes('jungmun')) && f === '1f') return '/images/jungmun_1F.png';
   if (b.includes('옥외') || b.includes('outdoor')) return '/images/drone_photo.JPG';
   return '';
 }
@@ -1844,6 +1873,34 @@ window.openHydrantDetails = openHydrantDetails;
       if (f.includes('3')) return '/images/tissue4,5_3F.PNG';
     }
     if ((b.includes('기저귀동') || b.includes('diaper')) && f.includes('1')) return '/images/diaper_1F.png';
+    if (b.includes('밀롤창고') || b.includes('milrol')) {
+      if (f.includes('3')) return '/images/milrol_3F.png';
+      if (f.includes('2')) return '/images/milrol_2F.png';
+      if (f.includes('1')) return '/images/milrol_1F.png';
+    }
+    if ((b.includes('기관실') || b.includes('engine')) && f.includes('1')) return '/images/engine_1F.png';
+    if ((b.includes('전기현장') || b.includes('elec')) && !b.includes('전기공무')) {
+      if (f.includes('2')) return '/images/elec_2F.png';
+      if (f.includes('1')) return '/images/elec_1F.png';
+    }
+    if (b.includes('주차타워') || b.includes('tower')) {
+      if (f.includes('옥상') || f.includes('rf') || f.includes('rooftop')) return '/images/tower_RF.png';
+      if (f.includes('3')) return '/images/tower_3F.png';
+      if (f.includes('2')) return '/images/tower_2F.png';
+      if (f.includes('1')) return '/images/tower_1F.png';
+    }
+    if (b.includes('보일러조정동') || b.includes('boilerctrl') || b.includes('boiler_ctrl')) {
+      if (f.includes('2')) return '/images/boiler_ctrl_2F.png';
+      if (f.includes('1')) return '/images/boiler_ctrl_1F.png';
+    }
+    if (b.includes('복합보일러') || b.includes('comboboiler')) {
+      if (f.includes('4')) return '/images/comboboiler_4F.png';
+      if (f.includes('3')) return '/images/comboboiler_3F.png';
+      if (f.includes('2')) return '/images/comboboiler_2F.png';
+      if (f.includes('1')) return '/images/comboboiler_1F.png';
+    }
+    if ((b.includes('수출창고') || b.includes('export')) && f.includes('1')) return '/images/export_1F.png';
+    if ((b.includes('중문창고') || b.includes('jungmun')) && f.includes('1')) return '/images/jungmun_1F.png';
     if (b.includes('옥외') || b.includes('outdoor')) return '/images/drone_photo.JPG';
     return '';
   }

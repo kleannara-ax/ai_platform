@@ -84,6 +84,7 @@ public class SecurityConfig {
                 // 소방 모듈 건물/층 목록 - 드롭다운에서 사용, 토큰 만료 시에도 전체 목록 표시
                 .requestMatchers("/fire-api/qr/buildings", "/fire-api/qr/floors").permitAll()
                 .requestMatchers("/fire-api/maps/building-floors").permitAll()
+                .requestMatchers("/fire-api/maps/floor-data").permitAll()
                 // 소방 모듈 파일(사진) 조회 - img 태그에서 JWT 헤더 전송 불가하므로 공개
                 .requestMatchers("/fire-api/extinguishers/files/**").permitAll()
                 .requestMatchers("/fire-api/hydrants/files/**").permitAll()
