@@ -1827,7 +1827,7 @@
   // - 기간 미설정 시 전체 기간 조회
   // - 전체 48 컬럼 (요구사항 완전 일치)
   // ══════════════════════════════════════════════
-  var DETAIL_COLSPAN = 48; // thead colspan 합계 (MES전송 컬럼 추가)
+  var DETAIL_COLSPAN = 49; // thead colspan 합계 (No 컬럼 추가)
 
   window.loadDetailTable = function (page) {
     if (page === undefined) page = 0;
@@ -1882,7 +1882,8 @@
     }
     window._detailData = items;
 
-    tbody.innerHTML = items.map(function (i) {
+    tbody.innerHTML = items.map(function (i, idx) {
+      var rowNo = currentDetailPage * detailPageSize + idx + 1;
       var covPPM = i.coverageRatio != null ? fmtComma((i.coverageRatio * 1000000).toFixed(1)) : '-';
       var inspDt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '-';
       var msrmDt = i.msrmDate ? String(i.msrmDate).replace('T', ' ').substring(0, 19) : '-';
@@ -1897,7 +1898,8 @@
         ? '<a href="' + esc(i.resultImagePath) + '" target="_blank" style="color:var(--primary);">보기</a>' : '-';
 
       return '<tr>'
-        // ── 식별 정보 (7) ──
+        // ── No + 식별 정보 (1+7) ──
+        + '<td style="color:var(--text3);font-size:12px;">' + rowNo + '</td>'
         + '<td>' + i.inspectionId + '</td>'
         + '<td>' + (i.seq != null ? i.seq : '-') + '</td>'
         + '<td><code>' + esc(i.matnr || '-') + '</code></td>'
@@ -1990,7 +1992,7 @@
 
     // 카테고리 행
     var categoryRow = [
-      '식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보',
+      '','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보','식별 정보',
       '핵심 지표','핵심 지표','핵심 지표','핵심 지표',
       '카운트 상세','카운트 상세','카운트 상세','카운트 상세','카운트 상세',
       '균일도·통계','균일도·통계','균일도·통계','균일도·통계',
@@ -2004,7 +2006,7 @@
     ];
 
     var headerRow = [
-      'ID','차수','자재코드','자재명','LOT','바코드','바코드차수',
+      'No','ID','차수','자재코드','자재명','LOT','바코드','바코드차수',
       '후면 지분 값(PPM)','총 지분','밀도(개,3~7px)','밀도(%)',
       '자동','수동','제외','수동+','수동-',
       '크기균일','분포균등','평균크기','표준편차',
@@ -2019,14 +2021,15 @@
 
     var aoa = [categoryRow, headerRow];
 
-    items.forEach(function (i) {
+    items.forEach(function (i, index) {
       var covPPM = i.coverageRatio != null ? parseFloat((i.coverageRatio * 1000000).toFixed(1)) : '';
       var inspDt = i.inspectedAt ? String(i.inspectedAt).replace('T', ' ').substring(0, 19) : '';
       var msrmDt = i.msrmDate ? String(i.msrmDate).replace('T', ' ').substring(0, 19) : '';
       var crDt = i.createdAt ? String(i.createdAt).replace('T', ' ').substring(0, 19) : '';
 
+      var rowNo = index + 1;
       aoa.push([
-        i.inspectionId || '', i.seq || '', i.matnr || '', i.matnrNm || '',
+        rowNo, i.inspectionId || '', i.seq || '', i.matnr || '', i.matnrNm || '',
         i.lotnr || '', i.indBcd || '', i.indBcdSeq || '',
         covPPM, i.totalCount || 0, i.densityCount || 0, fmtDecNum(i.densityRatio),
         i.autoCount || 0, i.manualCount || 0, i.removedAutoCount || 0,
@@ -2051,7 +2054,7 @@
     // 카테고리 행 머지 셀 설정
     var merges = [];
     var col = 0;
-    var mergeGroups = [7, 4, 5, 4, 4, 4, 2, 3, 6, 3, 6]; // 카테고리별 컬럼 수 (상태: 2→3 MES전송 추가)
+    var mergeGroups = [1, 7, 4, 5, 4, 4, 4, 2, 3, 6, 3, 6]; // No(1) + 카테고리별 컬럼 수
     mergeGroups.forEach(function (span) {
       if (span > 1) merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + span - 1 } });
       col += span;
