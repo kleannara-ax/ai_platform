@@ -407,71 +407,32 @@
    * (기존: 검사일 조회 API 1회 + 데이터 조회 API 1회 = 2회 → 1회로 통합)
    */
   function _applySearchDateByBarcode(barcode, tabName) {
-    console.log('[PS-INSP] 바코드 정확 매칭 조회 시작:', barcode, '→ 탭:', tabName);
-    // 정확 매칭 API 사용 (LIKE %...% 대신 = 매칭, 인덱스 활용)
-    api('GET', '/ps-insp-api/inspections/by-barcode?indBcd=' + enc(barcode) + '&page=0&size=50')
-      .then(function (res) {
-        var items = (res.success && res.data && res.data.content) ? res.data.content : [];
-        console.log('[PS-INSP] 바코드 정확 매칭 조회 완료:', barcode, '→', items.length, '건');
-        var dateStr = '';
-        if (items.length > 0 && items[0].inspectedAt) {
-          dateStr = String(items[0].inspectedAt).substring(0, 10); // 최신 검사일
-        }
+    console.log('[PS-INSP] MES 바코드 검색 실행:', barcode, '→ 탭:', tabName);
 
-        if (tabName === 'detail-table') {
-          var dtKeyword = document.getElementById('dt_keyword');
-          if (dtKeyword) dtKeyword.value = barcode;
-          dtSearchParams.indBcd = barcode;
-          if (dateStr) {
-            var dfEl = document.getElementById('dt_dateFrom');
-            var dtEl = document.getElementById('dt_dateTo');
-            if (dfEl) dfEl.value = dateStr;
-            if (dtEl) dtEl.value = dateStr;
-            dtSearchParams.dateFrom = dateStr;
-            dtSearchParams.dateTo = dateStr;
-          } else {
-            var dfEl2 = document.getElementById('dt_dateFrom');
-            var dtEl2 = document.getElementById('dt_dateTo');
-            if (dfEl2) dfEl2.value = '';
-            if (dtEl2) dtEl2.value = '';
-            dtSearchParams.dateFrom = '';
-            dtSearchParams.dateTo = '';
-          }
-          // 검색 조건 세팅 후 검색 실행 (검색 버튼을 누른 것과 동일)
-          loadDetailTable(0);
-        } else if (tabName === 'history') {
-          var hKeyword = document.getElementById('h_keyword');
-          if (hKeyword) hKeyword.value = barcode;
-          if (dateStr) {
-            var hFrom = document.getElementById('h_dateFrom');
-            var hTo = document.getElementById('h_dateTo');
-            if (hFrom) hFrom.value = dateStr;
-            if (hTo) hTo.value = dateStr;
-          } else {
-            var hFrom2 = document.getElementById('h_dateFrom');
-            var hTo2 = document.getElementById('h_dateTo');
-            if (hFrom2) hFrom2.value = '';
-            if (hTo2) hTo2.value = '';
-          }
-          // 검색 조건 세팅 후 검색 실행 (검색 버튼을 누른 것과 동일)
-          searchHistory();
-        }
-      })
-      .catch(function () {
-        // API 실패 시 기존 LIKE 검색으로 폴백
-        if (tabName === 'detail-table') {
-          var dtKeyword = document.getElementById('dt_keyword');
-          if (dtKeyword) dtKeyword.value = barcode;
-          dtSearchParams.indBcd = barcode;
-          dtSearchParams.dateFrom = '';
-          dtSearchParams.dateTo = '';
-          loadDetailTable(0);
-        } else if (tabName === 'history') {
-          var hKeyword = document.getElementById('h_keyword');
-          if (hKeyword) hKeyword.value = barcode;
-          setTimeout(function () { searchHistory(); }, 100);
-        }
-      });
+    if (tabName === 'detail-table') {
+      var dtKeyword = document.getElementById('dt_keyword');
+      if (dtKeyword) dtKeyword.value = barcode;
+      dtSearchParams.indBcd = barcode;
+      // MES 진입 시 날짜 필터를 비워서 전체 기간 조회
+      var dfEl = document.getElementById('dt_dateFrom');
+      var dtEl = document.getElementById('dt_dateTo');
+      if (dfEl) dfEl.value = '';
+      if (dtEl) dtEl.value = '';
+      dtSearchParams.dateFrom = '';
+      dtSearchParams.dateTo = '';
+      // 검색 실행 (검색 버튼을 누른 것과 동일)
+      loadDetailTable(0);
+    } else if (tabName === 'history') {
+      var hKeyword = document.getElementById('h_keyword');
+      if (hKeyword) hKeyword.value = barcode;
+      // MES 진입 시 날짜 필터를 비워서 전체 기간 조회
+      var hFrom = document.getElementById('h_dateFrom');
+      var hTo = document.getElementById('h_dateTo');
+      if (hFrom) hFrom.value = '';
+      if (hTo) hTo.value = '';
+      // 검색 실행 (검색 버튼을 누른 것과 동일)
+      searchHistory();
+    }
   }
 
   function autoFillOperator() {
