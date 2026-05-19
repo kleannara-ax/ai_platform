@@ -1249,6 +1249,7 @@ function resolveDetailPlanImagePathHyd(buildingName, floorName){
   if (b.includes('화장지36호기') || b.includes('tissue13') || b.includes('tissue36')) {
     if (f === '1f') return '/images/tissue1,3_1F.PNG';
     if (f === '2f') return '/images/tissue1,3_2F.PNG';
+    if (f === '3f') return '/images/tissue1,3_3F.png';
   }
   if (b.includes('화장지45호기') || b.includes('tissue45')) {
     if (f === 'b1') return '/images/tissue4,5_B1.PNG';
@@ -1863,8 +1864,9 @@ window.openHydrantDetails = openHydrantDetails;
       if (f.includes('2')) return '/images/palpa_2F.PNG';
     }
     if (b.includes('화장지36호기') || b.includes('tissue13') || b.includes('tissue36')) {
-      if (f.includes('1')) return '/images/tissue1,3_1F.PNG';
+      if (f.includes('3')) return '/images/tissue1,3_3F.png';
       if (f.includes('2')) return '/images/tissue1,3_2F.PNG';
+      if (f.includes('1')) return '/images/tissue1,3_1F.PNG';
     }
     if (b.includes('화장지45호기') || b.includes('tissue45')) {
       if (f.includes('지하') || f.includes('b1')) return '/images/tissue4,5_B1.PNG';
