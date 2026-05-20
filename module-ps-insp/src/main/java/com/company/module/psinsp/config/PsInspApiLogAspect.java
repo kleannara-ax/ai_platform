@@ -249,6 +249,15 @@ public class PsInspApiLogAspect {
 
     private String extractClientIp(HttpServletRequest request) {
         if (request == null) return null;
+
+        // ── 디버깅: WAF 환경 IP 헤더 추적 (원인 파악 후 제거) ──
+        log.info("[IP-DEBUG] remoteAddr={}, X-Forwarded-For={}, X-Real-IP={}, Proxy-Client-IP={}",
+                request.getRemoteAddr(),
+                request.getHeader("X-Forwarded-For"),
+                request.getHeader("X-Real-IP"),
+                request.getHeader("Proxy-Client-IP"));
+        // ── 디버깅 끝 ──
+
         String ip = request.getHeader("X-Forwarded-For");
         if (ip != null && !ip.isBlank()) {
             return ip.split(",")[0].trim();
