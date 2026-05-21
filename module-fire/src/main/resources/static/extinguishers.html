@@ -39,6 +39,30 @@
       white-space: nowrap;
     }
 
+    /* ===== 다중 소화기 항목 카드 ===== */
+    .ext-multi-item {
+      background: #fff;
+      border: 1px solid rgba(148,163,184,.22);
+      border-radius: 12px;
+      padding: 12px 14px;
+      position: relative;
+      transition: box-shadow .15s;
+    }
+    .ext-multi-item:hover { box-shadow: 0 2px 8px rgba(15,23,42,.07); }
+    .ext-multi-item + .ext-multi-item { margin-top: 10px; }
+    .ext-multi-item .ext-item-badge {
+      position: absolute; top: -8px; left: 12px;
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color: #fff; font-size: 11px; font-weight: 700;
+      padding: 1px 10px; border-radius: 10px;
+    }
+    .ext-multi-item .ext-item-remove {
+      position: absolute; top: 6px; right: 8px;
+      background: none; border: none; color: #94a3b8;
+      font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 6px;
+    }
+    .ext-multi-item .ext-item-remove:hover { color: #ef4444; }
+
     /* ===== 토스트===== */
     #fwToast { position:fixed; top:16px; right:16px; z-index:2000; }
     .modal-backdrop.show { background: rgba(17,24,39,.35) !important; backdrop-filter: blur(4px); }
@@ -701,6 +725,8 @@
                 <div class="small mt-1">선택 좌표: X <span id="extCoordX">-</span> / Y <span id="extCoordY">-</span></div>
               </div>
             </div>
+            <!-- ===== 단일 소화기 필드 (수정 모드) ===== -->
+            <div id="extSingleItemWrap">
             <div class="col-md-3">
               <label class="form-label">제조일</label>
               <input type="month" class="form-control" name="InstallDate" id="extInstallDate" required />
@@ -728,7 +754,27 @@
               <div class="form-text">이미지 경로는 표시하지 않습니다.</div>
             </div>
             </div>
+            </div>
           </div>
+          <!-- ===== 다중 소화기 항목 (추가 모드) ===== -->
+          <div id="extMultiItemSection" style="display:none;">
+            <div class="fw-edit-section">
+              <div class="fw-edit-section-title">
+                <strong>소화기 목록</strong>
+                <span id="extMultiItemCount">1개</span>
+              </div>
+              <div id="extMultiItemList"></div>
+              <div class="text-end mt-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="extMultiAddBtn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;">
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+                  </svg> 항목 추가
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- ===== 점검 이력 (수정 모드만 표시) ===== -->
+          <div id="extInspectHistorySection">
           <div class="fw-edit-section">
             <div class="fw-edit-section-title">
               <strong>점검 이력</strong>
@@ -753,6 +799,7 @@
                 </table>
               </div>
             </div>
+          </div>
           </div>
         </form>
       </div>
@@ -1641,9 +1688,113 @@ async function openDetails(id) {
   const coordXEl = document.getElementById('extCoordX');
   const coordYEl = document.getElementById('extCoordY');
   const histBody = document.getElementById('extInspectHistoryBody');
+  const singleItemWrap = document.getElementById('extSingleItemWrap');
+  const multiItemSection = document.getElementById('extMultiItemSection');
+  const multiItemList = document.getElementById('extMultiItemList');
+  const multiAddBtn = document.getElementById('extMultiAddBtn');
+  const multiItemCount = document.getElementById('extMultiItemCount');
+  const inspectHistorySection = document.getElementById('extInspectHistorySection');
   let currentEditingExtId = 0;
   let selectedCoord = null;
   let existingExtMarkers = []; // 현재 건물·층의 기존 소화기 좌표 목록
+  let multiItemIdx = 0;
+  let isCreateMode = false;
+
+  // ===== 다중 소화기 항목 관리 =====
+  function createMultiItemCard(idx) {
+    const card = document.createElement('div');
+    card.className = 'ext-multi-item';
+    card.dataset.idx = idx;
+    card.innerHTML = `
+      <span class="ext-item-badge">#${idx}</span>
+      ${idx > 1 ? '<button type="button" class="ext-item-remove" title="삭제">&times;</button>' : ''}
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-3 col-6">
+          <label class="form-label mb-0" style="font-size:12px;">제조일</label>
+          <input type="month" class="form-control form-control-sm ext-mi-date" value="${new Date().toISOString().slice(0,7)}" required />
+        </div>
+        <div class="col-sm-2 col-6">
+          <label class="form-label mb-0" style="font-size:12px;">수량</label>
+          <input type="number" class="form-control form-control-sm ext-mi-qty" min="1" value="1" />
+        </div>
+        <div class="col-sm-4 col-6">
+          <label class="form-label mb-0" style="font-size:12px;">종류</label>
+          <select class="form-select form-select-sm ext-mi-type" required>
+            <option value="">-- 선택 --</option>
+            <option value="분말소화기 3kg">분말소화기 3kg</option>
+            <option value="분말소화기 20kg">분말소화기 20kg</option>
+            <option value="이산화탄소소화기">이산화탄소소화기</option>
+          </select>
+        </div>
+        <div class="col-sm-3 col-6">
+          <label class="form-label mb-0" style="font-size:12px;">비고</label>
+          <input type="text" class="form-control form-control-sm ext-mi-note" placeholder="비고" />
+        </div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-12">
+          <label class="form-label mb-0" style="font-size:12px;">사진</label>
+          <input type="file" class="form-control form-control-sm ext-mi-photo" accept="image/*" />
+        </div>
+      </div>`;
+    card.querySelector('.ext-item-remove')?.addEventListener('click', () => {
+      card.remove();
+      updateMultiItemNumbers();
+    });
+    return card;
+  }
+  function updateMultiItemNumbers() {
+    if (!multiItemList) return;
+    const items = multiItemList.querySelectorAll('.ext-multi-item');
+    items.forEach((el, i) => {
+      el.dataset.idx = i + 1;
+      const badge = el.querySelector('.ext-item-badge');
+      if (badge) badge.textContent = `#${i + 1}`;
+      // 첫 번째 항목은 삭제 불가
+      const rmBtn = el.querySelector('.ext-item-remove');
+      if (i === 0 && rmBtn) rmBtn.remove();
+      if (i > 0 && !rmBtn) {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'ext-item-remove'; btn.title = '삭제';
+        btn.textContent = '\u00d7';
+        btn.addEventListener('click', () => { el.remove(); updateMultiItemNumbers(); });
+        el.appendChild(btn);
+      }
+    });
+    if (multiItemCount) multiItemCount.textContent = `${items.length}개`;
+  }
+  function setCreateMode(on) {
+    isCreateMode = on;
+    if (singleItemWrap) singleItemWrap.style.display = on ? 'none' : '';
+    if (multiItemSection) multiItemSection.style.display = on ? '' : 'none';
+    if (inspectHistorySection) inspectHistorySection.style.display = on ? 'none' : '';
+    if (on) {
+      multiItemList.innerHTML = '';
+      multiItemIdx = 0;
+      addMultiItem();
+    }
+  }
+  function addMultiItem() {
+    multiItemIdx++;
+    const card = createMultiItemCard(multiItemIdx);
+    multiItemList.appendChild(card);
+    updateMultiItemNumbers();
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function getMultiItems() {
+    const items = [];
+    multiItemList?.querySelectorAll('.ext-multi-item').forEach(el => {
+      items.push({
+        date: el.querySelector('.ext-mi-date')?.value || '',
+        qty: parseInt(el.querySelector('.ext-mi-qty')?.value || '1'),
+        type: el.querySelector('.ext-mi-type')?.value || '',
+        note: el.querySelector('.ext-mi-note')?.value || '',
+        photo: el.querySelector('.ext-mi-photo')?.files?.[0] || null,
+      });
+    });
+    return items;
+  }
+  if (multiAddBtn) multiAddBtn.addEventListener('click', addMultiItem);
 
   function setVal(id, v){
     const el = document.getElementById(id);
@@ -2038,6 +2189,7 @@ async function openDetails(id) {
     setVal('extX', opts?.x ?? '');
     setVal('extY', opts?.y ?? '');
     renderHistory([]);
+    setCreateMode(!id); // 추가모드(id=0)이면 다중 항목 UI, 수정모드이면 단일 항목 UI
 
     if(!id){
       const fb = document.getElementById('filterBuildingId')?.value || '';
@@ -2122,20 +2274,67 @@ async function openDetails(id) {
   saveBtn.addEventListener('click', async function(){
     saveBtn.disabled = true;
     try {
-      const id = Number(document.getElementById('extId')?.value || 0);
       syncHiddenFromSelect();
+      const commonBuildingId = parseInt(document.getElementById('extBuildingId')?.value || '0');
+      const commonFloorId = parseInt(document.getElementById('extFloorId')?.value || '0');
+      const commonX = document.getElementById('extX')?.value ? parseFloat(document.getElementById('extX').value) : null;
+      const commonY = document.getElementById('extY')?.value ? parseFloat(document.getElementById('extY').value) : null;
+      if (!commonBuildingId || !commonFloorId) { alert('건물과 층을 선택해주세요.'); return; }
+
+      // ===== 다중 추가 모드 =====
+      if (isCreateMode) {
+        const items = getMultiItems();
+        if (!items.length) { alert('소화기 항목을 추가해주세요.'); return; }
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          if (!it.type) { alert(`항목 #${i+1}: 소화기 종류를 선택해주세요.`); return; }
+          if (!it.date) { alert(`항목 #${i+1}: 제조일을 입력해주세요.`); return; }
+        }
+        let successCount = 0;
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          const body = {
+            buildingId: commonBuildingId, floorId: commonFloorId,
+            extinguisherType: it.type,
+            manufactureDate: toMonthStartDate(it.date),
+            quantity: it.qty || 1,
+            note: it.note || '',
+            x: commonX, y: commonY,
+          };
+          const r = await API.req('/fire-api/extinguishers', { method:'POST', body });
+          if (!r || !r.ok) {
+            const t = await r?.text().catch(() => '');
+            alert(`항목 #${i+1} 저장 실패: ${t}`);
+            continue;
+          }
+          const saved = await r.json().catch(() => null);
+          const savedId = Number(saved?.data?.extinguisherId || 0);
+          if (it.photo && savedId) {
+            const fd = new FormData();
+            fd.append('file', it.photo);
+            await API.req('/fire-api/extinguishers/' + encodeURIComponent(savedId) + '/image', { method: 'POST', body: fd });
+          }
+          successCount++;
+        }
+        if (successCount > 0) {
+          bootstrap.Modal.getInstance(modalEl)?.hide();
+          document.dispatchEvent(new CustomEvent('extinguisher:upsertCompleted'));
+          if (successCount < items.length) alert(`${items.length}개 중 ${successCount}개 저장 성공`);
+        }
+        return;
+      }
+
+      // ===== 단일 수정 모드 =====
+      const id = Number(document.getElementById('extId')?.value || 0);
       const body = {
         extinguisherId: id || undefined,
-        buildingId: parseInt(document.getElementById('extBuildingId')?.value || '0'),
-        floorId: parseInt(document.getElementById('extFloorId')?.value || '0'),
+        buildingId: commonBuildingId, floorId: commonFloorId,
         extinguisherType: document.getElementById('extType')?.value || '',
         manufactureDate: toMonthStartDate(document.getElementById('extInstallDate')?.value || ''),
         quantity: parseInt(document.getElementById('extQty')?.value || '1'),
         note: document.getElementById('extNote')?.value || '',
-        x: document.getElementById('extX')?.value ? parseFloat(document.getElementById('extX').value) : null,
-        y: document.getElementById('extY')?.value ? parseFloat(document.getElementById('extY').value) : null,
+        x: commonX, y: commonY,
       };
-      if (!body.buildingId || !body.floorId) { alert('건물과 층을 선택해주세요.'); return; }
       if (!body.extinguisherType) { alert('소화기 종류를 입력해 주세요.'); return; }
       if (!body.manufactureDate) { alert('제조일을 입력해주세요.'); return; }
 
