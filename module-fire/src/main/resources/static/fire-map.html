@@ -1596,7 +1596,7 @@ function setOutdoorToolMode(mode){
     btnOutdoorMove?.classList.toggle('is-active', outdoorMoveMode);
     if (btnOutdoorMoveCancel) btnOutdoorMoveCancel.style.display = outdoorMoveMode ? '' : 'none';
     if (btnOutdoorMoveSave) btnOutdoorMoveSave.style.display = outdoorMoveMode ? '' : 'none';
-    document.body.classList.toggle('move-armed', outdoorMoveMode);
+    document.body.classList.toggle('move-armed', outdoorMoveMode || outdoorAddMode);
 }
 
 async function saveOutdoorMove(){
@@ -1748,26 +1748,15 @@ function renderOutdoorMarkers(){
     outdoorMarkers.innerHTML = '';
     outdoorByKey = new Map();
     if(!outdoorMode) return;
+    console.log('[RenderMarkers] mapStage:', mapStage?.offsetWidth+'x'+mapStage?.offsetHeight,
+        'outdoorMarkers containingBlock:', outdoorMarkers.offsetWidth+'x'+outdoorMarkers.offsetHeight,
+        'method: CSS %');
     const previewHydrants = (outdoorHydrants || []).map(h => {
         if (outdoorMoveMode && outdoorPendingCoord && Number(h.hydrantId) === Number(currentOutdoorId)) {
             return { ...h, x: outdoorPendingCoord.x, y: outdoorPendingCoord.y };
         }
         return h;
     });
-    const coverFrame = (() => {
-        const sw = scene?.clientWidth || 0;
-        const sh = scene?.clientHeight || 0;
-        const nat = getNaturalSize();
-        const iw = nat.w || 0;
-        const ih = nat.h || 0;
-        if (!sw || !sh || !iw || !ih) return null;
-        const scale = Math.max(sw / iw, sh / ih);
-        const w = iw * scale;
-        const h = ih * scale;
-        const ox = (sw - w) / 2;
-        const oy = (sh - h) / 2;
-        return { w, h, ox, oy };
-    })();
     const iconUrl = '/images/outdoorfirehydrant.PNG';
     previewHydrants.forEach(h => {
         if(h.x == null || h.y == null) return;
@@ -1783,15 +1772,8 @@ function renderOutdoorMarkers(){
         if(currentOutdoorId && list.some(x => x.hydrantId === currentOutdoorId)){
             btn.classList.add('is-selected');
         }
-        if (coverFrame){
-            const px = coverFrame.ox + (coverFrame.w * (Number(first.x) / 100));
-            const py = coverFrame.oy + (coverFrame.h * (Number(first.y) / 100));
-            btn.style.left = `${px}px`;
-            btn.style.top = `${py}px`;
-        } else {
-            btn.style.left = first.x + '%';
-            btn.style.top = first.y + '%';
-        }
+        btn.style.left = first.x + '%';
+        btn.style.top = first.y + '%';
         btn.dataset.key = key;
         btn.innerHTML = `<img class="icon" src="${iconUrl}" alt="">` + (list.length > 1 ? `<span class="badge">+${list.length}</span>` : '');
         btn.addEventListener('click', (e)=>{
@@ -1965,20 +1947,6 @@ function renderOutdoorEquipmentMarkers(){
     if(!outdoorEquipmentMarkers) return;
     outdoorEquipmentMarkers.innerHTML = '';
     if(!outdoorEquipmentMode) return;
-    const coverFrame = (() => {
-        const sw = scene?.clientWidth || 0;
-        const sh = scene?.clientHeight || 0;
-        const nat = getNaturalSize();
-        const iw = nat.w || 0;
-        const ih = nat.h || 0;
-        if (!sw || !sh || !iw || !ih) return null;
-        const scale = Math.max(sw / iw, sh / ih);
-        const w = iw * scale;
-        const h = ih * scale;
-        const ox = (sw - w) / 2;
-        const oy = (sh - h) / 2;
-        return { w, h, ox, oy };
-    })();
     const equipments = [
         ...(outdoorReceivers || []).map(item => ({ ...item, type: 'receiver', label: '수신기' })),
         ...(outdoorPumps || []).map(item => ({ ...item, type: 'pump', label: '펌프' }))
@@ -1988,15 +1956,8 @@ function renderOutdoorEquipmentMarkers(){
         btn.type = 'button';
         btn.className = `eqmarker ${item.type}`;
         const iconUrl = item.type === 'receiver' ? '/images/receiver.png' : '/images/pump.png';
-        if (coverFrame){
-            const px = coverFrame.ox + (coverFrame.w * (Number(item.x) / 100));
-            const py = coverFrame.oy + (coverFrame.h * (Number(item.y) / 100));
-            btn.style.left = `${px}px`;
-            btn.style.top = `${py}px`;
-        } else {
-            btn.style.left = item.x + '%';
-            btn.style.top = item.y + '%';
-        }
+        btn.style.left = item.x + '%';
+        btn.style.top = item.y + '%';
         btn.title = `${item.label} - ${item.buildingName || '-'}`;
         btn.innerHTML = `<img src="${iconUrl}" alt="${item.label}">`;
         btn.addEventListener('click', (e) => {
@@ -2691,6 +2652,12 @@ scene.addEventListener('click', async (e)=>{
     }
     if(outdoorAddMode){
         const p = getSvgPoint(e.clientX, e.clientY);
+        const _dr = getMapDisplayRect();
+        const _sr = scene.getBoundingClientRect();
+        console.log('[MainClick] x='+p.xPct.toFixed(4)+'% y='+p.yPct.toFixed(4)+'%',
+            'displayRect:', JSON.stringify(_dr),
+            'sceneBCR:', {l:_sr.left.toFixed(1),t:_sr.top.toFixed(1),w:_sr.width.toFixed(1),h:_sr.height.toFixed(1)},
+            'mapScale:'+mapScale, 'mapStageSize:', mapStage?.offsetWidth+'x'+mapStage?.offsetHeight);
         setOutdoorToolMode(null);
         openOutdoorEditModal({ id: 0, hydrantType: 'Outdoor', x: p.xPct, y: p.yPct });
         setOutdoorHint('선택한 위치가 입력된 추가 모달을 열었습니다.');
