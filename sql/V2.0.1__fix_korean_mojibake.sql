@@ -1,0 +1,69 @@
+-- ============================================================
+--  V2.0.1: 한글 이중 인코딩(mojibake) 데이터 복구
+--  원인: MariaDB CLI 연결 문자셋이 latin1인 상태에서 UTF-8 SQL을 적용하면
+--        UTF-8 한글이 'ë³µì§€ê´€' 형태로 utf8mb4 컬럼에 저장될 수 있음.
+--  처리: 현재 utf8mb4 컬럼에 저장된 latin1/cp1252 mojibake 문자를 원래 UTF-8 한글로 복원.
+--  안전성: 복구 대상 패턴('[À-ÿ]')이 남아있는 행만 업데이트하므로 반복 실행 가능.
+-- ============================================================
+
+SET NAMES utf8mb4;
+
+UPDATE `building`
+SET `BUILDING_NAME` = CONVERT(CAST(CONVERT(`BUILDING_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `BUILDING_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `floor`
+SET `FLOOR_NAME` = CONVERT(CAST(CONVERT(`FLOOR_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `FLOOR_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `core_user`
+SET `USER_NAME` = CONVERT(CAST(CONVERT(`USER_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `USER_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `core_menu`
+SET `MENU_NAME` = CONVERT(CAST(CONVERT(`MENU_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `MENU_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `core_menu`
+SET `DESCRIPTION` = CONVERT(CAST(CONVERT(`DESCRIPTION` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `DESCRIPTION` REGEXP '[À-ÿ]';
+
+UPDATE `core_permission`
+SET `PERM_NAME` = CONVERT(CAST(CONVERT(`PERM_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `PERM_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `core_permission`
+SET `DESCRIPTION` = CONVERT(CAST(CONVERT(`DESCRIPTION` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `DESCRIPTION` REGEXP '[À-ÿ]';
+
+UPDATE `code_group`
+SET `GROUP_NAME` = CONVERT(CAST(CONVERT(`GROUP_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `GROUP_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `code_group`
+SET `DESCRIPTION` = CONVERT(CAST(CONVERT(`DESCRIPTION` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `DESCRIPTION` REGEXP '[À-ÿ]';
+
+UPDATE `code_detail`
+SET `CODE_NAME` = CONVERT(CAST(CONVERT(`CODE_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `CODE_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `code_detail`
+SET `DESCRIPTION` = CONVERT(CAST(CONVERT(`DESCRIPTION` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `DESCRIPTION` REGEXP '[À-ÿ]';
+
+UPDATE `mod_user_department`
+SET `DEPT_NAME` = CONVERT(CAST(CONVERT(`DEPT_NAME` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `DEPT_NAME` REGEXP '[À-ÿ]';
+
+UPDATE `user_profile`
+SET `POSITION` = CONVERT(CAST(CONVERT(`POSITION` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `POSITION` REGEXP '[À-ÿ]';
+
+UPDATE `ps_inspection`
+SET `MATNR_NM` = CONVERT(CAST(CONVERT(`MATNR_NM` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `MATNR_NM` REGEXP '[À-ÿ]';
+
+UPDATE `ps_inspection`
+SET `OPERATOR_NM` = CONVERT(CAST(CONVERT(`OPERATOR_NM` USING latin1) AS BINARY) USING utf8mb4)
+WHERE `OPERATOR_NM` REGEXP '[À-ÿ]';
