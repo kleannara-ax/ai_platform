@@ -36,6 +36,8 @@
 
     .planWrap { position:relative; width:100%; height:calc(100% - 10px); min-height:420px; border:1px dashed #222; border-radius:12px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; }
     .planWrap.dragging { cursor:grabbing; }
+    .planWrap.add-mode { cursor:crosshair; }
+    .planWrap.add-mode .planImg { cursor:crosshair; }
     .planStage { position:relative; display:inline-block; padding:600px; }
     .planInner { position:relative; display:inline-block; transform-origin:0 0; }
     .planImg { display:block; max-width:none; width:auto; height:auto; user-select:none; -webkit-user-drag:none; }
@@ -654,6 +656,7 @@
   }
   function resetAddMode(){
     state.addMode = null;
+    planWrap.classList.remove('add-mode');
   }
   function buildAddOptions(kind, x, y){
     const current = state.current;
@@ -811,9 +814,11 @@
         return;
       }
       state.addMode = 'ext';
+      planWrap.classList.add('add-mode');
       return;
     }
     state.addMode = 'hyd';
+    planWrap.classList.add('add-mode');
   }
 
     function renderAccountMenu() {

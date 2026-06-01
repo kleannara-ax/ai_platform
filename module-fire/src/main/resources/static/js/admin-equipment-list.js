@@ -351,6 +351,26 @@
     return "/images/drone_photo.JPG";
   }
 
+  /* ── SVG↔Image coordinate conversion (drone_photo only) ── */
+  const SVG_VB_W = 1955, SVG_VB_H = 985;
+  function _isDronePhoto(imgEl) {
+    return imgEl && String(imgEl.src || '').includes('drone_photo');
+  }
+  function _svgToImg(sx, sy, iw, ih) {
+    if (!iw || !ih) return { x: sx, y: sy };
+    var ry = (ih * SVG_VB_W) / (iw * SVG_VB_H);
+    if (Math.abs(ry - 1) < 0.005) return { x: sx, y: sy };
+    var oy = (1 - ry) / 2 * 100;
+    return { x: sx, y: (sy - oy) / ry };
+  }
+  function _imgToSvg(ix, iy, iw, ih) {
+    if (!iw || !ih) return { x: ix, y: iy };
+    var ry = (ih * SVG_VB_W) / (iw * SVG_VB_H);
+    if (Math.abs(ry - 1) < 0.005) return { x: ix, y: iy };
+    var oy = (1 - ry) / 2 * 100;
+    return { x: ix, y: iy * ry + oy };
+  }
+
   function updatePlanImage(containerId, buildingName, floorName, onReady) {
     const container = document.getElementById(containerId);
     const img = container?.querySelector("img");
@@ -380,7 +400,7 @@
     if (img?.naturalWidth > 0 && img?.naturalHeight > 0) {
       return { width: img.naturalWidth, height: img.naturalHeight };
     }
-    return { width: 1955, height: 985 };
+    return { width: 3992, height: 2283 };
   }
 
   function getPlanDisplayRect(container) {
@@ -417,32 +437,36 @@
         .concat(state.peers.receivers.map(function (item) { return { item: item, kind: "receiver" }; }))
         .concat(state.peers.pumps.map(function (item) { return { item: item, kind: "pump" }; }));
 
+      var isDrone = _isDronePhoto(img);
+      var niw = img.naturalWidth || 0, nih = img.naturalHeight || 0;
       items.forEach(function (entry) {
-        const source = entry.item || {};
-        const itemId = String(entry.kind === "receiver" ? source.receiverId : source.pumpId);
-        const useSelected = currentItemId && itemId === currentItemId && state.selectedCoord;
-        const x = useSelected ? Number(state.selectedCoord.x) : Number(source.x);
-        const y = useSelected ? Number(state.selectedCoord.y) : Number(source.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        const marker = document.createElement("button");
+        var source = entry.item || {};
+        var itemId = String(entry.kind === "receiver" ? source.receiverId : source.pumpId);
+        var useSelected = currentItemId && itemId === currentItemId && state.selectedCoord;
+        var sx = useSelected ? Number(state.selectedCoord.x) : Number(source.x);
+        var sy = useSelected ? Number(state.selectedCoord.y) : Number(source.y);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+        var c = isDrone ? _svgToImg(sx, sy, niw, nih) : { x: sx, y: sy };
+        var marker = document.createElement("button");
         marker.type = "button";
         marker.className = "map-marker marker-" + entry.kind + (itemId === currentItemId ? " marker-current" : "");
         marker.dataset.kind = entry.kind;
         marker.dataset.id = itemId;
-        marker.style.left = (display.offsetX + (display.drawWidth * (x / 100))).toFixed(2) + "px";
-        marker.style.top = (display.offsetY + (display.drawHeight * (y / 100))).toFixed(2) + "px";
+        marker.style.left = (display.offsetX + (display.drawWidth * (c.x / 100))).toFixed(2) + "px";
+        marker.style.top = (display.offsetY + (display.drawHeight * (c.y / 100))).toFixed(2) + "px";
         marker.innerHTML = "<span></span>";
         layer.appendChild(marker);
       });
 
       if (state.selectedCoord) {
-        const iconPath = config.idField === "receiverId" ? "/images/receiver.png" : "/images/pump.png";
-        const marker = document.createElement("div");
+        var iconPath = config.idField === "receiverId" ? "/images/receiver.png" : "/images/pump.png";
+        var sc = isDrone ? _svgToImg(Number(state.selectedCoord.x), Number(state.selectedCoord.y), niw, nih) : { x: Number(state.selectedCoord.x), y: Number(state.selectedCoord.y) };
+        var marker = document.createElement("div");
         marker.className = "map-marker marker-selected marker-selected-highlight";
         marker.style.pointerEvents = "none";
         marker.style.zIndex = "4";
-        marker.style.left = (display.offsetX + (display.drawWidth * (Number(state.selectedCoord.x) / 100))).toFixed(2) + "px";
-        marker.style.top = (display.offsetY + (display.drawHeight * (Number(state.selectedCoord.y) / 100))).toFixed(2) + "px";
+        marker.style.left = (display.offsetX + (display.drawWidth * (sc.x / 100))).toFixed(2) + "px";
+        marker.style.top = (display.offsetY + (display.drawHeight * (sc.y / 100))).toFixed(2) + "px";
         marker.innerHTML =
           '<span class="marker-selected-ring"></span>' +
           '<img src="' + escapeHtml(iconPath) + '" alt="" class="marker-selected-icon" />';
@@ -483,10 +507,12 @@
       const oy = (ch - h) / 2;
       img.style.cssText = "position:absolute;left:" + ox + "px;top:" + oy + "px;width:" + w + "px;height:" + h + "px;transform:none;object-fit:contain;display:block;";
       if (!hasCoord) return;
-      const left = ox + w * (Math.max(0, Math.min(100, nx)) / 100);
-      const top = oy + h * (Math.max(0, Math.min(100, ny)) / 100);
-      const marker = document.createElement("div");
-      const markerSize = Math.max(24, Math.min(44, Math.min(w, h) * 0.05));
+      var isDrone = _isDronePhoto(img);
+      var c = isDrone ? _svgToImg(nx, ny, iw, ih) : { x: nx, y: ny };
+      var left = ox + w * (Math.max(0, Math.min(100, c.x)) / 100);
+      var top = oy + h * (Math.max(0, Math.min(100, c.y)) / 100);
+      var marker = document.createElement("div");
+      var markerSize = Math.max(18, Math.min(36, Math.min(w, h) * 0.04));
       marker.style.cssText = "position:absolute;left:" + left.toFixed(2) + "px;top:" + top.toFixed(2) + "px;width:" + markerSize.toFixed(1) + "px;height:" + markerSize.toFixed(1) + "px;transform:translate(-50%,-50%);pointer-events:none;z-index:4;filter:drop-shadow(0 0 10px rgba(220,38,38,.9)) drop-shadow(0 0 18px rgba(251,191,36,.75));";
       marker.innerHTML =
         "<span style=\"position:absolute;left:50%;top:50%;width:150%;height:150%;transform:translate(-50%,-50%);border:3px solid rgba(251,191,36,.95);border-radius:999px;box-shadow:0 0 0 2px rgba(15,23,42,.85),0 0 16px rgba(251,191,36,.9);\"></span>" +
@@ -499,17 +525,23 @@
     setTimeout(draw, 0);
   }
 
+  /* ── zoom modal state ── */
+  var eqZoomScale = 1, eqZoomPanX = 0, eqZoomPanY = 0;
+  var eqZoomDrag = false, eqZoomDragSX = 0, eqZoomDragSY = 0, eqZoomDragPX = 0, eqZoomDragPY = 0, eqZoomMoved = false;
+
   function ensureDetailZoomModal() {
     if (document.getElementById("detailImageZoomModal")) return;
-    const host = document.createElement("div");
+    var host = document.createElement("div");
     host.innerHTML = '' +
       '<div class="modal fade" id="detailImageZoomModal" tabindex="-1" aria-hidden="true">' +
       '  <div class="modal-dialog modal-dialog-centered" style="max-width: min(96vw, 1600px);">' +
       '    <div class="modal-content bg-dark">' +
-      '      <div class="modal-body p-3">' +
-      '        <div id="detailImageZoomStage" class="position-relative mx-auto" style="width:100%; height:min(88vh,1200px);">' +
-      '          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="position:absolute;top:8px;right:8px;z-index:4;"></button>' +
-      '          <img id="detailImageZoomTarget" src="" alt="zoom" style="width:100%;height:100%;object-fit:contain;display:block;" />' +
+      '      <div class="modal-header border-0">' +
+      '        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>' +
+      '      </div>' +
+      '      <div class="modal-body pt-0 pb-3">' +
+      '        <div id="detailImageZoomStage" class="position-relative mx-auto" style="width:100%; height:min(88vh,1200px); overflow:hidden; cursor:grab;">' +
+      '          <img id="detailImageZoomTarget" src="" alt="zoom" style="display:block;" />' +
       '          <div id="detailImageZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>' +
       '        </div>' +
       '      </div>' +
@@ -517,45 +549,76 @@
       '  </div>' +
       '</div>';
     document.body.appendChild(host.firstElementChild);
-    document.getElementById("detailImageZoomStage")?.addEventListener("click", function () {
-      bootstrap.Modal.getOrCreateInstance(document.getElementById("detailImageZoomModal")).hide();
+    var stageEl = document.getElementById("detailImageZoomStage");
+    /* wheel zoom */
+    stageEl?.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      var rect = stageEl.getBoundingClientRect();
+      var cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      var old = eqZoomScale;
+      eqZoomScale = Math.max(1, Math.min(10, eqZoomScale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      eqZoomPanX = cx - (cx - eqZoomPanX) * (eqZoomScale / old);
+      eqZoomPanY = cy - (cy - eqZoomPanY) * (eqZoomScale / old);
+      renderDetailZoomMarker();
+    }, { passive: false });
+    /* drag pan */
+    stageEl?.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      eqZoomDrag = true; eqZoomMoved = false;
+      eqZoomDragSX = e.clientX; eqZoomDragSY = e.clientY;
+      eqZoomDragPX = eqZoomPanX; eqZoomDragPY = eqZoomPanY;
+      stageEl.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
     });
-    document.getElementById("detailImageZoomTarget")?.addEventListener("click", function () {
-      bootstrap.Modal.getOrCreateInstance(document.getElementById("detailImageZoomModal")).hide();
+    window.addEventListener("mousemove", function (e) {
+      if (!eqZoomDrag) return;
+      var dx = e.clientX - eqZoomDragSX, dy = e.clientY - eqZoomDragSY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) eqZoomMoved = true;
+      eqZoomPanX = eqZoomDragPX + dx; eqZoomPanY = eqZoomDragPY + dy;
+      renderDetailZoomMarker();
     });
-    document.getElementById("detailImageZoomModal")?.addEventListener("click", function (e) {
-      if (e.target && e.target.id === "detailImageZoomModal") {
-        bootstrap.Modal.getOrCreateInstance(document.getElementById("detailImageZoomModal")).hide();
-      }
+    window.addEventListener("mouseup", function () {
+      if (!eqZoomDrag) return;
+      eqZoomDrag = false;
+      if (stageEl) stageEl.style.cursor = "grab";
+      document.body.style.userSelect = "";
     });
     document.getElementById("detailImageZoomModal")?.addEventListener("shown.bs.modal", renderDetailZoomMarker);
   }
 
   function renderDetailZoomMarker() {
-    const target = document.getElementById("detailImageZoomTarget");
-    const stage = document.getElementById("detailImageZoomStage");
-    const layer = document.getElementById("detailImageZoomMarkerLayer");
+    var target = document.getElementById("detailImageZoomTarget");
+    var stage = document.getElementById("detailImageZoomStage");
+    var layer = document.getElementById("detailImageZoomMarkerLayer");
     if (!target || !stage || !layer) return;
     layer.innerHTML = "";
-    const rawMarkerX = String(target.dataset.markerX || "").trim();
-    const rawMarkerY = String(target.dataset.markerY || "").trim();
-    if (!rawMarkerX || !rawMarkerY) return;
-    const markerX = parseFloat(rawMarkerX);
-    const markerY = parseFloat(rawMarkerY);
-    if (!Number.isFinite(markerX) || !Number.isFinite(markerY)) return;
-    const rect = stage.getBoundingClientRect();
-    const iw = target.naturalWidth || 0;
-    const ih = target.naturalHeight || 0;
-    if (!rect.width || !rect.height || !iw || !ih) return;
-    const scale = Math.min(rect.width / iw, rect.height / ih);
-    const drawWidth = iw * scale;
-    const drawHeight = ih * scale;
-    const offsetX = (rect.width - drawWidth) / 2;
-    const offsetY = (rect.height - drawHeight) / 2;
-    const left = offsetX + drawWidth * (markerX / 100);
-    const top = offsetY + drawHeight * (markerY / 100);
-    const marker = document.createElement("div");
-    marker.style.cssText = "position:absolute;left:" + left.toFixed(2) + "px;top:" + top.toFixed(2) + "px;width:44px;height:44px;transform:translate(-50%,-50%);pointer-events:none;z-index:4;filter:drop-shadow(0 0 10px rgba(220,38,38,.9)) drop-shadow(0 0 18px rgba(251,191,36,.75));";
+
+    var sw = stage.clientWidth || 0, sh = stage.clientHeight || 0;
+    var iw = target.naturalWidth || 0, ih = target.naturalHeight || 0;
+    if (!sw || !sh || !iw || !ih) return;
+
+    var baseScale = Math.min(sw / iw, sh / ih);
+    var sc = baseScale * eqZoomScale;
+    var w = iw * sc, h = ih * sc;
+    var ox = (sw - w) / 2 + eqZoomPanX;
+    var oy = (sh - h) / 2 + eqZoomPanY;
+    target.style.cssText = "position:absolute;left:" + ox + "px;top:" + oy + "px;width:" + w + "px;height:" + h + "px;display:block;";
+    layer.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:3;";
+
+    var rawMX = String(target.dataset.markerX || "").trim();
+    var rawMY = String(target.dataset.markerY || "").trim();
+    if (!rawMX || !rawMY) return;
+    var mx = parseFloat(rawMX), my = parseFloat(rawMY);
+    if (!Number.isFinite(mx) || !Number.isFinite(my)) return;
+
+    var isDrone = _isDronePhoto(target);
+    var c = isDrone ? _svgToImg(mx, my, iw, ih) : { x: mx, y: my };
+
+    var left = ox + w * (Math.max(0, Math.min(100, c.x)) / 100);
+    var top = oy + h * (Math.max(0, Math.min(100, c.y)) / 100);
+    var markerSize = Math.max(14, Math.min(36, Math.min(w, h) * 0.03));
+    var marker = document.createElement("div");
+    marker.style.cssText = "position:absolute;left:" + left.toFixed(2) + "px;top:" + top.toFixed(2) + "px;width:" + markerSize + "px;height:" + markerSize + "px;transform:translate(-50%,-50%);pointer-events:none;z-index:4;filter:drop-shadow(0 0 10px rgba(220,38,38,.9)) drop-shadow(0 0 18px rgba(251,191,36,.75));";
     marker.innerHTML =
       "<span style=\"position:absolute;left:50%;top:50%;width:150%;height:150%;transform:translate(-50%,-50%);border:3px solid rgba(251,191,36,.95);border-radius:999px;box-shadow:0 0 0 2px rgba(15,23,42,.85),0 0 16px rgba(251,191,36,.9);\"></span>" +
       "<img src=\"" + escapeHtml(target.dataset.markerIcon || "") + "\" alt=\"\" style=\"position:relative;width:100%;height:100%;object-fit:contain;display:block;background:transparent;z-index:1;\" />";
@@ -563,14 +626,15 @@
   }
 
   function openDetailImageZoom(sourceEl) {
-    const src = sourceEl?.getAttribute("data-zoom-src") || sourceEl?.getAttribute("src");
+    var src = sourceEl?.getAttribute("data-zoom-src") || sourceEl?.getAttribute("src");
     if (!src) return;
     ensureDetailZoomModal();
-    const target = document.getElementById("detailImageZoomTarget");
+    var target = document.getElementById("detailImageZoomTarget");
     if (!target) return;
     target.dataset.markerX = sourceEl?.dataset.markerX || "";
     target.dataset.markerY = sourceEl?.dataset.markerY || "";
     target.dataset.markerIcon = sourceEl?.dataset.markerIcon || "";
+    eqZoomScale = 1; eqZoomPanX = 0; eqZoomPanY = 0;
     target.onload = renderDetailZoomMarker;
     target.src = src;
     bootstrap.Modal.getOrCreateInstance(document.getElementById("detailImageZoomModal")).show();
@@ -637,7 +701,7 @@
       '      </div>' : '') +
       '      <div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면상 위치</strong></div>' +
              (planImagePath
-               ? '<div id="detailPlanWrap" class="fw-media-box position-relative" style="height:260px;overflow:hidden;">' +
+               ? '<div id="detailPlanWrap" class="fw-media-box position-relative" style="height:400px;overflow:hidden;">' +
                    '<img src="' + escapeHtml(planImagePath) + '" alt="plan" class="js-detail-zoomable" data-zoom-src="' + escapeHtml(planImagePath) + '" data-marker-x="' + escapeHtml(detail.x ?? "") + '" data-marker-y="' + escapeHtml(detail.y ?? "") + '" data-marker-icon="' + escapeHtml(markerIcon) + '" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%;width:auto;height:auto;display:block;" />' +
                    '<div id="detailMapMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>' +
                  '</div>'
@@ -1107,13 +1171,19 @@
     if (!planWrap || !markerLayer) return;
     planWrap.addEventListener("click", function (event) {
       if (event.target.closest(".map-marker")) return;
-      const display = getPlanDisplayRect(planWrap);
+      var display = getPlanDisplayRect(planWrap);
       if (!display) return;
-      const px = event.clientX - display.rect.left;
-      const py = event.clientY - display.rect.top;
-      const x = ((px - display.offsetX) / display.drawWidth) * 100;
-      const y = ((py - display.offsetY) / display.drawHeight) * 100;
-      state.selectedCoord = { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+      var px = event.clientX - display.rect.left;
+      var py = event.clientY - display.rect.top;
+      var imgX = ((px - display.offsetX) / display.drawWidth) * 100;
+      var imgY = ((py - display.offsetY) / display.drawHeight) * 100;
+      imgX = Math.max(0, Math.min(100, imgX));
+      imgY = Math.max(0, Math.min(100, imgY));
+      var planImg = planWrap.querySelector("img");
+      var isDrone = _isDronePhoto(planImg);
+      var niw = planImg?.naturalWidth || 0, nih = planImg?.naturalHeight || 0;
+      var sv = isDrone ? _imgToSvg(imgX, imgY, niw, nih) : { x: imgX, y: imgY };
+      state.selectedCoord = { x: sv.x, y: sv.y };
       setSelectedCoord(state.selectedCoord.x, state.selectedCoord.y);
       renderMapMarkers();
     });
@@ -1241,6 +1311,8 @@
     window.addEventListener("resize", function () {
       renderMapMarkers();
       rerenderDetailMap();
+      var zoomModal = document.getElementById("detailImageZoomModal");
+      if (zoomModal?.classList.contains("show")) renderDetailZoomMarker();
     });
     document.getElementById("detailModal")?.addEventListener("shown.bs.modal", rerenderDetailMap);
     document.getElementById("itemModal")?.addEventListener("hidden.bs.modal", function () {
