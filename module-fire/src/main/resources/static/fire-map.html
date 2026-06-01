@@ -222,9 +222,25 @@
         .outdoor-toggle label{
             font-weight:800;
         }
-        .outdoor-equipment-toggle{
+        .outdoor-ext-toggle{
             position:absolute;
             top:68px;
+            right:16px;
+            z-index:340;
+            background:rgba(255,255,255,.95);
+            border-radius:999px;
+            padding:8px 12px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+            box-shadow:0 8px 24px rgba(0,0,0,.15);
+        }
+        .outdoor-ext-toggle label{
+            font-weight:800;
+        }
+        .outdoor-equipment-toggle{
+            position:absolute;
+            top:120px;
             right:16px;
             z-index:340;
             background:rgba(255,255,255,.95);
@@ -240,7 +256,7 @@
         }
         .outdoor-equipment-panel{
             position:absolute;
-            top:122px;
+            top:174px;
             right:16px;
             z-index:340;
             width:clamp(220px, 24vw, 260px);
@@ -479,6 +495,19 @@
         body.move-armed .scene{
             cursor:crosshair;
         }
+        #outdoorExtMarkers{ position:absolute; inset:0; z-index:60; pointer-events:none; }
+        #outdoorExtMarkers .hmarker{ pointer-events:auto; }
+        #outdoorExtSelect{
+            right:16px;
+            bottom:120px;
+            z-index: 340;
+        }
+        #outdoorExtSelect.show{ display:block; }
+        #outdoorExtSelect .infoHead{
+            background:linear-gradient(135deg,#d97706 0%,#ea580c 100%) !important;
+        }
+        .oxe-label{ padding-top:4px; }
+        .oxe-select{ display:flex; align-items:center; }
         #outdoorEquipmentMarkers{ position:absolute; inset:0; z-index:61; pointer-events:none; }
         #outdoorEquipmentMarkers .eqmarker{ pointer-events:auto; }
         .eqmarker{
@@ -722,6 +751,7 @@
 
             <div id="zoneTooltip"></div>
             <div id="outdoorMarkers" aria-hidden="true"></div>
+            <div id="outdoorExtMarkers" aria-hidden="true"></div>
             <div id="outdoorEquipmentMarkers" aria-hidden="true"></div>
 
                         <svg id="zoneOverlay" class="zone-overlay"
@@ -847,6 +877,14 @@
         </label>
     </div>
 
+    <div class="outdoor-ext-toggle">
+        <label for="outdoorExtToggle">옥외 소화기</label>
+        <label class="toggle-switch">
+            <input type="checkbox" id="outdoorExtToggle" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
     <div class="outdoor-equipment-toggle">
         <label for="outdoorEquipmentToggle">수신기 / 소방펌프</label>
         <label class="toggle-switch">
@@ -900,6 +938,35 @@
                 <div class="col-4"><button class="btn btn-primary w-100" id="btnOutdoorSelectInspect" type="button">점검</button></div>
                 <div class="col-4" id="outdoorSelectEditCol" style="display:none;"><button class="btn btn-outline-primary w-100" id="btnOutdoorSelectEdit" type="button">수정</button></div>
                 <div class="col-12"><button class="btn btn-outline-secondary w-100" id="btnOutdoorSelectClose" type="button">닫기</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="outdoorExtSelect" class="infoCard" aria-hidden="true">
+        <div class="infoHead" style="background: linear-gradient(135deg, #d97706 0%, #ea580c 100%);">
+            <div class="t">옥외 소화기</div>
+            <button type="button" class="xbtn" id="outdoorExtSelectCloseBtn" aria-label="닫기">&times;</button>
+        </div>
+        <div class="infoBody">
+            <div class="kv">
+                <div class="k oxe-label">선택</div>
+                <div class="v oxe-select">
+                    <select id="outdoorExtSelectList" class="form-select form-select-sm"></select>
+                </div>
+                <div class="k">ID</div><div class="v" id="oxeId">-</div>
+                <div class="k">시리얼</div><div class="v" id="oxeSerial">-</div>
+                <div class="k">형식</div><div class="v" id="oxeType">-</div>
+                <div class="k">수량</div><div class="v" id="oxeQty">-</div>
+                <div class="k">좌표</div><div class="v" id="oxeCoord">-</div>
+                <div class="k">위치</div><div class="v" id="oxeLoc">-</div>
+            </div>
+        </div>
+        <div class="p-2 border-top bg-white">
+            <div class="row g-2">
+                <div class="col-4"><button class="btn btn-outline-dark w-100" id="btnOutdoorExtDetail" type="button">상세</button></div>
+                <div class="col-4"><button class="btn btn-primary w-100" id="btnOutdoorExtInspect" type="button">점검</button></div>
+                <div class="col-4" id="outdoorExtEditCol" style="display:none;"><button class="btn btn-outline-primary w-100" id="btnOutdoorExtEdit" type="button">수정</button></div>
+                <div class="col-12"><button class="btn btn-outline-secondary w-100" id="btnOutdoorExtClose" type="button">닫기</button></div>
             </div>
         </div>
     </div>
@@ -1016,6 +1083,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/js/hydrant-modal-host.js"></script>
+<script src="/js/extinguisher-modal-host.js"></script>
 <script src="/js/csrf.js"></script>
 <script>
 // ===== 전역 상태 =====
@@ -1031,6 +1099,10 @@ let outdoorByKey = new Map();
 let outdoorEquipmentMode = false;
 let outdoorReceivers = [];
 let outdoorPumps = [];
+let outdoorExtinguishers = [];
+let currentOutdoorExtId = null;
+let outdoorExtMode = false;
+let outdoorExtByKey = new Map();
 let currentOutdoorEquipment = null;
 let currentInspectHydrantId = null;
 let outdoorEquipmentAddType = '';
@@ -1104,6 +1176,7 @@ async function init() {
             });
             const editCol = document.getElementById('outdoorSelectEditCol');
             if (editCol) editCol.style.display = '';
+            if (outdoorExtEditCol) outdoorExtEditCol.style.display = '';
             if (outdoorEquipmentToggle?.parentElement?.parentElement) {
                 outdoorEquipmentToggle.parentElement.parentElement.style.display = 'flex';
             }
@@ -1117,6 +1190,7 @@ async function init() {
         }
         await loadOutdoorHydrants();
         await loadOutdoorEquipment();
+        await loadOutdoorExtinguishers();
     } catch(e) {
         console.error('init error', e);
     }
@@ -1158,6 +1232,22 @@ async function loadOutdoorEquipment() {
     }
 }
 
+// ===== 옥외 소화기 데이터 로드 =====
+async function loadOutdoorExtinguishers() {
+    try {
+        const res = await apiFetch('/fire-api/extinguishers?floorId=99&size=500&page=0');
+        if (!res) return;
+        const json = await res.json();
+        if ((res.ok || json.success) && json.data && json.data.content) {
+            outdoorExtinguishers = json.data.content
+                .filter(e => Number(e.floorId) === 99 && e.x != null && e.y != null);
+        }
+        renderOutdoorExtMarkers();
+    } catch(e) {
+        console.error('옥외 소화기 로드 실패', e);
+    }
+}
+
 // ===== DOM 참조 =====
 const screen = document.getElementById('screen');
 const menuBtn = document.getElementById('menuBtn');
@@ -1172,10 +1262,12 @@ const infoTitle = document.getElementById('infoTitle');
 const infoSub = document.getElementById('infoSub');
 const infoBody = document.getElementById('infoBody');
 const outdoorToggle = document.getElementById('outdoorToggle');
+const outdoorExtToggle = document.getElementById('outdoorExtToggle');
 const outdoorEquipmentToggle = document.getElementById('outdoorEquipmentToggle');
 const outdoorPanel = document.getElementById('outdoorPanel');
 const outdoorEquipmentPanel = document.getElementById('outdoorEquipmentPanel');
 const outdoorMarkers = document.getElementById('outdoorMarkers');
+const outdoorExtMarkers = document.getElementById('outdoorExtMarkers');
 const outdoorEquipmentMarkers = document.getElementById('outdoorEquipmentMarkers');
 const outdoorEquipmentSelect = document.getElementById('outdoorEquipmentSelect');
 const outdoorSelect = document.getElementById('outdoorSelect');
@@ -1185,6 +1277,20 @@ const btnOutdoorSelectDetail = document.getElementById('btnOutdoorSelectDetail')
 const btnOutdoorSelectEdit = document.getElementById('btnOutdoorSelectEdit');
 const btnOutdoorSelectClose = document.getElementById('btnOutdoorSelectClose');
 const btnOutdoorSelectClose2 = document.getElementById('outdoorSelectCloseBtn');
+const outdoorExtSelect = document.getElementById('outdoorExtSelect');
+const outdoorExtSelectList = document.getElementById('outdoorExtSelectList');
+const oxeId = document.getElementById('oxeId');
+const oxeSerial = document.getElementById('oxeSerial');
+const oxeType = document.getElementById('oxeType');
+const oxeQty = document.getElementById('oxeQty');
+const oxeCoord = document.getElementById('oxeCoord');
+const oxeLoc = document.getElementById('oxeLoc');
+const btnOutdoorExtDetail = document.getElementById('btnOutdoorExtDetail');
+const btnOutdoorExtInspect = document.getElementById('btnOutdoorExtInspect');
+const btnOutdoorExtEdit = document.getElementById('btnOutdoorExtEdit');
+const btnOutdoorExtClose = document.getElementById('btnOutdoorExtClose');
+const btnOutdoorExtCloseBtn = document.getElementById('outdoorExtSelectCloseBtn');
+const outdoorExtEditCol = document.getElementById('outdoorExtEditCol');
 
 function releaseFocus(container){
     const active = document.activeElement;
@@ -1439,7 +1545,7 @@ function bindZones() {
     zoneSvg.addEventListener('click', (e) => {
         const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
         if (!zone) return;
-        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        if (outdoorMode || outdoorEquipmentMode || outdoorExtMode || window.__pickEnabled) return;
         if (Date.now() < suppressZoneClickUntil) return;
         e.stopPropagation();
         const name = (zone.dataset.name || '').trim();
@@ -1643,6 +1749,124 @@ function renderOutdoorMarkers(){
             renderOutdoorMarkers();
         });
         outdoorMarkers.appendChild(btn);
+    });
+}
+
+// ===== 옥외 소화기 선택 카드 =====
+function hideOutdoorExtInfo(clearSelection = true){
+    if(outdoorExtSelect){
+        releaseFocus(outdoorExtSelect);
+        outdoorExtSelect.classList.remove('show');
+        outdoorExtSelect.setAttribute('aria-hidden', 'true');
+        outdoorExtSelect.setAttribute('inert', '');
+    }
+    if(clearSelection){
+        currentOutdoorExtId = null;
+        renderOutdoorExtMarkers();
+    }
+}
+function fillOutdoorExtSelectInfo(e){
+    if(!e) return;
+    if(oxeId) oxeId.textContent = `ID ${e.extinguisherId}`;
+    if(oxeSerial) oxeSerial.textContent = e.serialNumber || '-';
+    if(oxeType) oxeType.textContent = e.extinguisherType || '-';
+    if(oxeQty) oxeQty.textContent = (e.quantity != null) ? `${e.quantity}개` : '-';
+    if(oxeCoord) oxeCoord.textContent = (e.x != null && e.y != null) ? `${Number(e.x).toFixed(2)}%, ${Number(e.y).toFixed(2)}%` : '-';
+    if(oxeLoc) oxeLoc.textContent = e.note || '-';
+}
+function positionOutdoorExtSelect(markerEl){
+    if(!outdoorExtSelect || !markerEl || !scene) return;
+    const sceneRect = scene.getBoundingClientRect();
+    const mkRect = markerEl.getBoundingClientRect();
+    const cardW = outdoorExtSelect.offsetWidth || 300;
+    const cardH = outdoorExtSelect.offsetHeight || 250;
+    let left = mkRect.right - sceneRect.left + 12;
+    let top = mkRect.top - sceneRect.top - 12;
+    const maxLeft = sceneRect.width - cardW - 12;
+    const maxTop = sceneRect.height - cardH - 12;
+    if (left > maxLeft) left = Math.max(12, mkRect.left - sceneRect.left - cardW - 12);
+    if (top > maxTop) top = maxTop;
+    if (top < 12) top = 12;
+    outdoorExtSelect.style.left = `${left}px`;
+    outdoorExtSelect.style.top = `${top}px`;
+    outdoorExtSelect.style.right = 'auto';
+    outdoorExtSelect.style.bottom = 'auto';
+}
+
+// ===== 옥외 소화기 마커 렌더링 =====
+function renderOutdoorExtMarkers(){
+    if(!outdoorExtMarkers) return;
+    outdoorExtMarkers.innerHTML = '';
+    outdoorExtByKey = new Map();
+    if(!outdoorExtMode) return;
+    const coverFrame = (() => {
+        const sw = scene?.clientWidth || 0;
+        const sh = scene?.clientHeight || 0;
+        const nat = getNaturalSize();
+        const iw = nat.w || 0;
+        const ih = nat.h || 0;
+        if (!sw || !sh || !iw || !ih) return null;
+        const scale = Math.max(sw / iw, sh / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const ox = (sw - w) / 2;
+        const oy = (sh - h) / 2;
+        return { w, h, ox, oy };
+    })();
+    const iconUrl = '/images/Extinguisher.PNG';
+    (outdoorExtinguishers || []).forEach(e => {
+        if(e.x == null || e.y == null) return;
+        const key = `${Number(e.x).toFixed(2)},${Number(e.y).toFixed(2)}`;
+        if(!outdoorExtByKey.has(key)) outdoorExtByKey.set(key, []);
+        outdoorExtByKey.get(key).push(e);
+    });
+    outdoorExtByKey.forEach((list, key) => {
+        const first = list[0];
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hmarker';
+        if(currentOutdoorExtId && list.some(x => x.extinguisherId === currentOutdoorExtId)){
+            btn.classList.add('is-selected');
+        }
+        if (coverFrame){
+            const px = coverFrame.ox + (coverFrame.w * (Number(first.x) / 100));
+            const py = coverFrame.oy + (coverFrame.h * (Number(first.y) / 100));
+            btn.style.left = `${px}px`;
+            btn.style.top = `${py}px`;
+        } else {
+            btn.style.left = first.x + '%';
+            btn.style.top = first.y + '%';
+        }
+        btn.dataset.key = key;
+        btn.innerHTML = `<img class="icon" src="${iconUrl}" alt="">` + (list.length > 1 ? `<span class="badge">+${list.length}</span>` : '');
+        btn.addEventListener('click', (e)=>{
+            if (window.__mapDragLock || isPanning || panMoved) return;
+            e.stopPropagation();
+            const items = outdoorExtByKey.get(key) || [];
+            const selected = items.find(x => x.extinguisherId === currentOutdoorExtId);
+            const chosen = selected || items[0] || null;
+            currentOutdoorExtId = chosen?.extinguisherId ?? null;
+            if(outdoorExtSelectList){
+                outdoorExtSelectList.innerHTML = '';
+                items.forEach(x => {
+                    const opt = document.createElement('option');
+                    opt.value = String(x.extinguisherId);
+                    const label = x.serialNumber ? `${x.serialNumber} (ID ${x.extinguisherId})` : `ID ${x.extinguisherId}`;
+                    opt.textContent = label;
+                    outdoorExtSelectList.appendChild(opt);
+                });
+                outdoorExtSelectList.value = currentOutdoorExtId ? String(currentOutdoorExtId) : '';
+                fillOutdoorExtSelectInfo(chosen);
+            }
+            if(outdoorExtSelect){
+                outdoorExtSelect.removeAttribute('inert');
+                outdoorExtSelect.setAttribute('aria-hidden', 'false');
+                outdoorExtSelect.classList.add('show');
+                positionOutdoorExtSelect(btn);
+            }
+            renderOutdoorExtMarkers();
+        });
+        outdoorExtMarkers.appendChild(btn);
     });
 }
 
@@ -1980,6 +2204,10 @@ function setOutdoorMode(on){
     if (outdoorMode && outdoorEquipmentMode) {
         setOutdoorEquipmentMode(false);
     }
+    if (outdoorMode && outdoorExtMode) {
+        if (outdoorExtToggle) outdoorExtToggle.checked = false;
+        setOutdoorExtMode(false);
+    }
     setOutdoorToolMode(null);
     if (outdoorPanel) outdoorPanel.classList.toggle('show', outdoorMode);
     document.body.classList.toggle('outdoor-mode', outdoorMode);
@@ -1999,12 +2227,41 @@ function setOutdoorMode(on){
 }
 window.setOutdoorMode = setOutdoorMode;
 
+// ===== 옥외 소화기 모드 =====
+function setOutdoorExtMode(on){
+    outdoorExtMode = !!on;
+    if (outdoorExtMode) {
+        // 다른 토글과 배타 처리
+        if (outdoorMode) {
+            if (outdoorToggle) outdoorToggle.checked = false;
+            sessionStorage.setItem('outdoorMode', '0');
+            setOutdoorMode(false);
+        }
+        if (outdoorEquipmentMode) {
+            setOutdoorEquipmentMode(false);
+        }
+        screen.classList.remove('menu-open');
+        closePopup();
+    } else {
+        hideOutdoorExtInfo();
+        resetMapTransform(true);
+    }
+    if (outdoorExtToggle) outdoorExtToggle.checked = outdoorExtMode;
+    document.body.classList.toggle('outdoor-ext-mode', outdoorExtMode);
+    renderOutdoorExtMarkers();
+}
+window.setOutdoorExtMode = setOutdoorExtMode;
+
 function setOutdoorEquipmentMode(on){
     outdoorEquipmentMode = !!on;
     if (outdoorEquipmentMode && outdoorMode) {
         outdoorToggle.checked = false;
         sessionStorage.setItem('outdoorMode', '0');
         setOutdoorMode(false);
+    }
+    if (outdoorEquipmentMode && outdoorExtMode) {
+        if (outdoorExtToggle) outdoorExtToggle.checked = false;
+        setOutdoorExtMode(false);
     }
     document.body.classList.toggle('outdoor-equipment-mode', outdoorEquipmentMode);
     if (outdoorEquipmentToggle) {
@@ -2045,6 +2302,50 @@ if (outdoorToggle){
         setOutdoorMode(e.target.checked);
     });
 }
+if (outdoorExtToggle){
+    outdoorExtToggle.checked = false;
+    setOutdoorExtMode(false);
+    outdoorExtToggle.addEventListener('change', async (e)=> {
+        setOutdoorExtMode(e.target.checked);
+        if (e.target.checked && !outdoorExtinguishers.length) {
+            await loadOutdoorExtinguishers();
+        }
+    });
+}
+
+// ===== 옥외 소화기 select 카드 버튼 =====
+function openOutdoorExtModal(mode){
+    if (!currentOutdoorExtId || !window.FireWebExtinguisherModal) return;
+    window.FireWebExtinguisherModal.open({
+        mode,
+        id: currentOutdoorExtId,
+        onClose: (info) => {
+            if (info && /close$/.test(info.reason || '')) {
+                loadOutdoorExtinguishers().then(() => {
+                    const latest = (outdoorExtinguishers || []).find(x => x.extinguisherId === currentOutdoorExtId);
+                    if (latest) fillOutdoorExtSelectInfo(latest);
+                });
+            }
+        }
+    });
+}
+outdoorExtSelectList?.addEventListener('change', (e)=>{
+    const v = parseInt(e.target.value || '0', 10);
+    currentOutdoorExtId = v > 0 ? v : null;
+    if(currentOutdoorExtId){
+        const x = (outdoorExtinguishers || []).find(e2 => e2.extinguisherId === currentOutdoorExtId);
+        fillOutdoorExtSelectInfo(x);
+        renderOutdoorExtMarkers();
+    }
+});
+btnOutdoorExtInspect?.addEventListener('click', ()=> openOutdoorExtModal('inspect'));
+btnOutdoorExtDetail?.addEventListener('click', ()=> openOutdoorExtModal('details'));
+btnOutdoorExtEdit?.addEventListener('click', ()=> {
+    if(!canManage){ alert('수정 권한이 없습니다.'); return; }
+    openOutdoorExtModal('edit');
+});
+btnOutdoorExtClose?.addEventListener('click', ()=> hideOutdoorExtInfo(false));
+btnOutdoorExtCloseBtn?.addEventListener('click', ()=> hideOutdoorExtInfo(false));
 if (outdoorEquipmentToggle) {
     outdoorEquipmentToggle.checked = false;
     outdoorEquipmentToggle.addEventListener('change', async (e)=> {
@@ -2103,11 +2404,13 @@ mapImg?.addEventListener('load', () => {
     clampMap();
     requestMapTransform();
     renderOutdoorEquipmentMarkers();
+    renderOutdoorExtMarkers();
 });
 window.addEventListener('resize', () => {
     clampMap();
     requestMapTransform();
     renderOutdoorEquipmentMarkers();
+    renderOutdoorExtMarkers();
     if (zonePopup && zonePopup.style.display === 'block') {
         const pos = clampFloatingCardInScene(
             zonePopup,
@@ -2177,7 +2480,7 @@ btnOutdoorSelectClose2?.addEventListener('click', ()=> hideOutdoorInfo(false));
 
 // 추가/이동 모드 종료
 scene.addEventListener('wheel', (e) => {
-    if (!outdoorMode && !outdoorEquipmentMode) return;
+    if (!outdoorMode && !outdoorEquipmentMode && !outdoorExtMode) return;
     e.preventDefault();
     const rect = scene.getBoundingClientRect();
     const cx = e.clientX - rect.left;
@@ -2189,8 +2492,8 @@ scene.addEventListener('wheel', (e) => {
 // 마커 기준 좌표 추출
 scene.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest('.outdoor-panel, .outdoor-toggle, .outdoor-equipment-toggle, .outdoor-equipment-panel, #outdoorEquipmentMarkers, #outdoorEquipmentSelect, .info-panel, #pickPanel, #zonePopup')) return;
-    if (!outdoorMode && !canPanMap()) return;
+    if (e.target && e.target.closest && e.target.closest('.outdoor-panel, .outdoor-toggle, .outdoor-ext-toggle, .outdoor-equipment-toggle, .outdoor-equipment-panel, #outdoorMarkers, #outdoorExtMarkers, #outdoorExtSelect, #outdoorEquipmentMarkers, #outdoorEquipmentSelect, #outdoorSelect, .info-panel, #pickPanel, #zonePopup')) return;
+    if (!outdoorMode && !outdoorExtMode && !canPanMap()) return;
     isPanning = true;
     panMoved = false;
     window.__mapDragLock = true;
@@ -2693,12 +2996,14 @@ window.addEventListener('load', () => {
             bindZones();
             renderOutdoorMarkers();
             renderOutdoorEquipmentMarkers();
+            renderOutdoorExtMarkers();
         }, { once: true });
     } else {
         setOverlayViewBox();
         bindZones();
         renderOutdoorMarkers();
         renderOutdoorEquipmentMarkers();
+        renderOutdoorExtMarkers();
     }
     init();
 });
