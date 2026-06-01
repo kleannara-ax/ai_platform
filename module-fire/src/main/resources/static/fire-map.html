@@ -915,8 +915,9 @@
 
       <div class="outdoor-panel" id="outdoorExtPanel">
           <div class="panel-title">옥외 소화기</div>
-          <button type="button" id="btnOutdoorExtAdd" style="display:none;">추가</button>
-          <button type="button" id="btnOutdoorExtMove" style="display:none;">이동</button>
+          <div class="panel-sub">메인 도면에서 소화기를 바로 추가하거나 선택한 소화기 위치를 이동할 수 있습니다.</div>
+          <button type="button" id="btnOutdoorExtAdd" aria-label="메인 도면 소화기 추가" style="display:none;">소화기 추가</button>
+          <button type="button" id="btnOutdoorExtMove" aria-label="메인 도면 소화기 이동" style="display:none;">소화기 이동</button>
           <button type="button" id="btnOutdoorExtMoveCancel" style="display:none;">이동취소</button>
           <button type="button" id="btnOutdoorExtMoveSave" style="display:none;">좌표저장</button>
           <div class="hint" id="outdoorExtActionHint">마커를 선택하면 점검/수정/이동할 수 있습니다.</div>
@@ -2430,14 +2431,14 @@ btnOutdoorExtAdd?.addEventListener('click', ()=>{
     if(!canManage){ alert('추가 권한이 없습니다.'); return; }
     hideOutdoorExtInfo(false);
     setOutdoorExtToolMode('add');
-    setOutdoorExtHint('추가할 위치를 클릭하세요.');
+    setOutdoorExtHint('메인 도면에서 추가할 위치를 클릭하세요.');
 });
 btnOutdoorExtMove?.addEventListener('click', ()=>{
     if(!canManage){ alert('이동 권한이 없습니다.'); return; }
     if(!currentOutdoorExtId){ setOutdoorExtHint('먼저 이동할 소화기를 선택하세요.', 'error'); return; }
     hideOutdoorExtInfo(false);
     setOutdoorExtToolMode('move');
-    setOutdoorExtHint('새 위치를 클릭한 뒤 좌표저장을 누르세요.');
+    setOutdoorExtHint('메인 도면에서 새 위치를 클릭한 뒤 좌표저장을 누르세요.');
 });
 btnOutdoorExtMoveCancel?.addEventListener('click', ()=>{
     setOutdoorExtToolMode(null);

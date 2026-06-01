@@ -36,8 +36,9 @@
     .summary-sub { display:none; }
     .section-block + .section-block { margin-top:24px; }
     .section-head { display:none; }
-    /* 소화기: 4x4 grid */
-    .qr-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    /* 소화기 QR: 화면/출력 모두 가로 한 줄 4개 고정 */
+    .qr-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .qr-grid[data-equip-key="ext"] { grid-template-columns:repeat(4,minmax(0,1fr)); }
     /* 소화전/수신기/소방펌프: 2x3 grid */
     .qr-grid.large { grid-template-columns:repeat(2,1fr); gap:8px; }
     .qr-card {
@@ -90,8 +91,9 @@
       .qr-shell { display:block !important; padding:0 !important; }
       .content-card { box-shadow:none !important; border-radius:0 !important; padding:0 !important; }
       .section-block { margin:0 !important; }
-      /* 소화기 그리드: 가로 4열 고정 */
-      .qr-grid { grid-template-columns:repeat(4,1fr) !important; gap:6px !important; }
+      /* 소화기 QR 출력: 가로 한 줄 4개 고정 */
+      .qr-grid,
+      .qr-grid[data-equip-key="ext"] { grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:6px !important; }
       /* 소화전/수신기/소방펌프: 2열 고정, 3행이 한 페이지에 들어가도록 */
       .qr-grid.large { grid-template-columns:repeat(2,1fr) !important; gap:2px 6px !important; }
       .qr-grid.large .qr-card {
@@ -378,6 +380,7 @@
     const unregisteredSection = document.getElementById('unregisteredSection');
     const unregisteredWrap = document.getElementById('unregisteredWrap');
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
+    const gridEquipKey = conf.key || currentEquip;
 
     /* 미등록 QR이 있으면 미등록만 표시, 등록된 설비는 숨김 */
     if (Array.isArray(unregisteredList) && unregisteredList.length) {
@@ -386,6 +389,8 @@
       registeredWrap.innerHTML = '';
       unregisteredSection.style.display = '';
       unregisteredWrap.className = gridClass;
+      unregisteredWrap.dataset.equipKey = gridEquipKey;
+      registeredWrap.removeAttribute('data-equip-key');
       unregisteredWrap.innerHTML = unregisteredList.map(function (qrKey) {
         return unregisteredCardHtml(conf.key, qrKey);
       }).join('');
@@ -397,11 +402,14 @@
       registeredWrap.style.display = '';
       unregisteredSection.style.display = 'none';
       unregisteredWrap.innerHTML = '';
+      unregisteredWrap.removeAttribute('data-equip-key');
       if (!items.length) {
         registeredWrap.className = 'empty-state';
+        registeredWrap.removeAttribute('data-equip-key');
         registeredWrap.innerHTML = '조회된 ' + conf.label + ' QR이 없습니다.';
       } else {
         registeredWrap.className = gridClass;
+        registeredWrap.dataset.equipKey = gridEquipKey;
         registeredWrap.innerHTML = items.map(function (item) {
           var qrKey = item.qrKey || item.noteKey || '';
           var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || '';
