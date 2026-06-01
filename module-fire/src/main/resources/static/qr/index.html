@@ -64,11 +64,6 @@
       font-weight:400; color:#94a3b8;
     }
     .qr-grid.large .qr-meta .meta-blank { min-width:140px; }
-    /* QR 아래 넘버링 (몇 번 소화기) */
-    .qr-num {
-      margin-top:3px; font-size:11px; font-weight:700; color:#64748b; text-align:center;
-      width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    }
     .empty-state { padding:22px; border-radius:18px; background:#f8fafc; color:#64748b; text-align:center; }
     body.modal-open { overflow:hidden !important; padding-right:0 !important; }
     @media (max-width: 991px) {
@@ -112,10 +107,21 @@
       /* 6개마다 페이지 나눔 */
       .qr-grid.large .qr-card:nth-child(6n+1) { break-before:page; }
       .qr-grid.large .qr-card:nth-child(1) { break-before:auto; }
-      /* 소화기 카드 */
+      /* 소화기 카드: 가로 4열에 맞춰 크기 축소 */
+      .qr-grid:not(.large) .qr-card {
+        break-inside:avoid; page-break-inside:avoid;
+        min-height:0 !important; padding:3px !important;
+        border:1px solid #cbd5e1 !important; box-sizing:border-box;
+      }
+      /* 소화기 QR 이미지: A4 4열(194mm/4≈48mm)에 맞게 약 36mm */
+      .qr-grid:not(.large) .qr-img {
+        width:calc((100vw - 16mm) / 4 - 12px) !important;
+        height:calc((100vw - 16mm) / 4 - 12px) !important;
+        max-width:40mm !important; max-height:40mm !important;
+      }
       .qr-card { break-inside:avoid; border:1px solid #cbd5e1 !important; page-break-inside:avoid; }
+      .qr-grid:not(.large) .qr-meta { font-size:8px !important; margin-top:2px !important; line-height:1.1; }
       .qr-meta { display:block !important; }
-      .qr-num { display:block !important; font-size:9px !important; margin-top:2px !important; line-height:1.1; }
       .qr-meta .meta-blank { border-bottom:1px solid #94a3b8 !important; }
     }
   </style>
@@ -327,23 +333,18 @@
     }
   }
 
-  function registeredCardHtml(type, qrKey, buildingName, floorName, itemId, extraMeta, numberLabel) {
+  function registeredCardHtml(type, qrKey, buildingName, floorName, itemId, extraMeta) {
     var meta = '';
     if (buildingName) {
       meta = escHtml(buildingName);
       if (floorName) meta += ' / ' + escHtml(floorName);
     }
     if (extraMeta) meta += (meta ? ' / ' : '') + escHtml(extraMeta);
-    var numHtml = '';
-    if (numberLabel) {
-      numHtml = '    <div class="qr-num">' + escHtml(String(numberLabel)) + '</div>';
-    }
     return '' +
       '<div class="qr-card" data-qr-type="' + escHtml(type) + '" data-qr-id="' + escHtml(String(itemId || '')) + '" style="cursor:pointer;">' +
       '  <div class="qr-card-row">' +
       '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl(type, qrKey) + '" loading="lazy" /></div>' +
       '    <div class="qr-meta">' + (meta || '-') + '</div>' +
-      numHtml +
       '  </div>' +
       '</div>';
   }
@@ -385,7 +386,9 @@
       registeredWrap.innerHTML = '';
       unregisteredSection.style.display = '';
       unregisteredWrap.className = gridClass;
-      unregisteredWrap.innerHTML = unregisteredList.map(function (qrKey) { return unregisteredCardHtml(conf.key, qrKey); }).join('');
+      unregisteredWrap.innerHTML = unregisteredList.map(function (qrKey) {
+        return unregisteredCardHtml(conf.key, qrKey);
+      }).join('');
     } else {
       /* 미등록 QR 수량 0이면 등록된 설비 QR 표시 */
       const rawItems = Array.isArray(latestListData[conf.listKey]) ? latestListData[conf.listKey] : [];
@@ -406,12 +409,7 @@
           if (currentEquip === 'ext') extraMeta = item.note || '';
           else if (currentEquip === 'hyd') extraMeta = item.locationDescription || '';
           else extraMeta = item.locationDescription || '';
-          var numberLabel = '';
-          if (currentEquip === 'ext') {
-            var extNo = item.serialNumber || item.extinguisherId || '';
-            if (extNo) numberLabel = '소화기 ' + extNo;
-          }
-          return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta, numberLabel);
+          return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta);
         }).join('');
       }
     }
