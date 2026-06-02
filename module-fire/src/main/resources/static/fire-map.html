@@ -1657,7 +1657,7 @@ function setOutdoorExtToolMode(mode){
     btnOutdoorExtMove?.classList.toggle('is-active', outdoorExtMoveMode);
     if (btnOutdoorExtMoveCancel) btnOutdoorExtMoveCancel.style.display = outdoorExtMoveMode ? '' : 'none';
     if (btnOutdoorExtMoveSave) btnOutdoorExtMoveSave.style.display = outdoorExtMoveMode ? '' : 'none';
-    document.body.classList.toggle('move-armed', outdoorExtMoveMode);
+    document.body.classList.toggle('move-armed', outdoorExtMoveMode || outdoorExtAddMode);
 }
 
 async function saveOutdoorExtMove(){
@@ -1861,20 +1861,6 @@ function renderOutdoorExtMarkers(){
     outdoorExtMarkers.innerHTML = '';
     outdoorExtByKey = new Map();
     if(!outdoorExtMode) return;
-    const coverFrame = (() => {
-        const sw = scene?.clientWidth || 0;
-        const sh = scene?.clientHeight || 0;
-        const nat = getNaturalSize();
-        const iw = nat.w || 0;
-        const ih = nat.h || 0;
-        if (!sw || !sh || !iw || !ih) return null;
-        const scale = Math.max(sw / iw, sh / ih);
-        const w = iw * scale;
-        const h = ih * scale;
-        const ox = (sw - w) / 2;
-        const oy = (sh - h) / 2;
-        return { w, h, ox, oy };
-    })();
     const iconUrl = '/images/Extinguisher.PNG';
     const previewExts = (outdoorExtinguishers || []).map(e => {
         if (outdoorExtMoveMode && outdoorExtPendingCoord && Number(e.extinguisherId) === Number(currentOutdoorExtId)) {
@@ -1896,15 +1882,10 @@ function renderOutdoorExtMarkers(){
         if(currentOutdoorExtId && list.some(x => x.extinguisherId === currentOutdoorExtId)){
             btn.classList.add('is-selected');
         }
-        if (coverFrame){
-            const px = coverFrame.ox + (coverFrame.w * (Number(first.x) / 100));
-            const py = coverFrame.oy + (coverFrame.h * (Number(first.y) / 100));
-            btn.style.left = `${px}px`;
-            btn.style.top = `${py}px`;
-        } else {
-            btn.style.left = first.x + '%';
-            btn.style.top = first.y + '%';
-        }
+        // 메인 도면 좌표는 SVG viewBox(1955×985) 기준 % 값으로 저장/표시한다.
+        // #mapStage가 동일 기준으로 크기/이동/확대되므로 마커도 %로 배치해야 클릭 좌표와 일치한다.
+        btn.style.left = first.x + '%';
+        btn.style.top = first.y + '%';
         btn.dataset.key = key;
         btn.innerHTML = `<img class="icon" src="${iconUrl}" alt="">` + (list.length > 1 ? `<span class="badge">+${list.length}</span>` : '');
         btn.addEventListener('click', (e)=>{
