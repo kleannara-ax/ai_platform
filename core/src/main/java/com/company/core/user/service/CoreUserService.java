@@ -97,9 +97,23 @@ public class CoreUserService {
     }
 
     @Transactional
+    public void disableUserByLoginId(String loginId) {
+        CoreUser user = findUserByLoginId(loginId);
+        user.disable();
+        log.info("사용자 비활성화: loginId={}", loginId);
+    }
+
+    @Transactional
     public void enableUser(Long userId) {
         findUserById(userId).enable();
         log.info("사용자 활성화: userId={}", userId);
+    }
+
+    @Transactional
+    public void enableUserByLoginId(String loginId) {
+        CoreUser user = findUserByLoginId(loginId);
+        user.enable();
+        log.info("사용자 활성화: loginId={}", loginId);
     }
 
     @Transactional
@@ -113,5 +127,14 @@ public class CoreUserService {
     private CoreUser findUserById(Long userId) {
         return coreUserRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("CoreUser", userId));
+    }
+
+    private CoreUser findUserByLoginId(String loginId) {
+        String normalizedLoginId = loginId == null ? "" : loginId.trim();
+        if (normalizedLoginId.isBlank()) {
+            throw new EntityNotFoundException("CoreUser", loginId);
+        }
+        return coreUserRepository.findByLoginId(normalizedLoginId)
+                .orElseThrow(() -> new EntityNotFoundException("CoreUser", normalizedLoginId));
     }
 }

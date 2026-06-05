@@ -76,20 +76,20 @@ public class CoreUserController {
     /**
      * 사용자 비활성화
      */
-    @PatchMapping("/{userId}/disable")
+    @PatchMapping("/{loginId}/disable")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable Long userId) {
-        coreUserService.disableUser(userId);
+    public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable String loginId) {
+        coreUserService.disableUserByLoginId(loginId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     /**
      * 사용자 활성화
      */
-    @PatchMapping("/{userId}/enable")
+    @PatchMapping("/{loginId}/enable")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable Long userId) {
-        coreUserService.enableUser(userId);
+    public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable String loginId) {
+        coreUserService.enableUserByLoginId(loginId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
