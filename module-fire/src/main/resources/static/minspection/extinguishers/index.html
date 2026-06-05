@@ -98,8 +98,8 @@
       background: transparent; border: 0; padding: 0;
       pointer-events: none;
     }
-    .markerIcon img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; }
-    .markerIcon.existing { opacity: 0.8; filter: drop-shadow(0 0 4px rgba(0,0,0,.45)); }
+    .markerIcon img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; pointer-events: none; }
+    .markerIcon.existing { opacity: 0.8; filter: drop-shadow(0 0 4px rgba(0,0,0,.45)); pointer-events: auto; cursor: pointer; }
     .markerIcon.selected { width: 24px; height: 24px; filter: drop-shadow(0 0 7px rgba(37,99,235,.95)); }
     .coord { font-size: 12px; color: #555; margin-top: 4px; }
 
@@ -672,6 +672,21 @@
       const rect = mapCanvas.getBoundingClientRect();
       return rect.width && rect.height ? { ox: 0, oy: 0, w: rect.width, h: rect.height } : null;
     }
+    function parseCoord(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+    function updateSelectedPoint(x, y) {
+      const nx = parseCoord(x);
+      const ny = parseCoord(y);
+      if (nx == null || ny == null) return;
+      selectedPoint = { x: nx, y: ny };
+      document.getElementById('coordX').textContent = nx.toFixed(2);
+      document.getElementById('coordY').textContent = ny.toFixed(2);
+      document.getElementById('inputX').value = nx.toFixed(2);
+      document.getElementById('inputY').value = ny.toFixed(2);
+      renderMarkers();
+    }
     function placeMarker(el, x, y) {
       const f = computeFit(); if (!f) return;
       const planImg = document.getElementById('planImg');
@@ -687,11 +702,21 @@
       const markerLayer = document.getElementById('markerLayer'); if (!markerLayer) return;
       markerLayer.innerHTML = '';
       currentItems.forEach(it => {
-        if (it.x == null || it.y == null) return;
-        const m = document.createElement('div');
+        const ex = parseCoord(it.x), ey = parseCoord(it.y);
+        if (ex == null || ey == null) return;
+        const m = document.createElement('button');
+        m.type = 'button';
         m.className = 'markerIcon existing';
         m.innerHTML = `<img src="${EX_ICON_URL}" alt="">`;
-        placeMarker(m, it.x, it.y); markerLayer.appendChild(m);
+        m.title = `소화기 (${ex.toFixed(2)}%, ${ey.toFixed(2)}%)`;
+        m.setAttribute('aria-label', `기존 소화기 위치 선택 X ${ex.toFixed(2)} Y ${ey.toFixed(2)}`);
+        m.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          // 기존 마커 클릭 시 화면 클릭 좌표가 아니라 저장된 원본 좌표를 그대로 선택한다.
+          updateSelectedPoint(ex, ey);
+        });
+        placeMarker(m, ex, ey); markerLayer.appendChild(m);
       });
       if (selectedPoint) {
         const sel = document.createElement('div');
@@ -700,21 +725,17 @@
         placeMarker(sel, selectedPoint.x, selectedPoint.y); markerLayer.appendChild(sel);
       }
     }
+    window.__mobileExtRenderMarkers = renderMarkers;
 
-      mapCanvas.addEventListener('click', (e) => {
-        const rect = mapCanvas.getBoundingClientRect();
-        const px = e.clientX - rect.left, py = e.clientY - rect.top;
-        const f = computeFit(); if (!f) return;
-        const localX = (px - pan.x) / scale;
-        const localY = (py - pan.y) / scale;
-        const x = Math.max(0, Math.min(100, ((localX - f.ox) / f.w) * 100));
-        const y = Math.max(0, Math.min(100, ((localY - f.oy) / f.h) * 100));
-        selectedPoint = { x, y };
-        document.getElementById('coordX').textContent = x.toFixed(2);
-        document.getElementById('coordY').textContent = y.toFixed(2);
-      document.getElementById('inputX').value = x.toFixed(2);
-      document.getElementById('inputY').value = y.toFixed(2);
-      renderMarkers();
+    mapCanvas.addEventListener('click', (e) => {
+      const rect = mapCanvas.getBoundingClientRect();
+      const px = e.clientX - rect.left, py = e.clientY - rect.top;
+      const f = computeFit(); if (!f) return;
+      const localX = (px - pan.x) / scale;
+      const localY = (py - pan.y) / scale;
+      const x = Math.max(0, Math.min(100, ((localX - f.ox) / f.w) * 100));
+      const y = Math.max(0, Math.min(100, ((localY - f.oy) / f.h) * 100));
+      updateSelectedPoint(x, y);
     });
 
     mapCanvas.addEventListener('pointerdown', (e) => {
@@ -768,29 +789,8 @@
     const planImg = document.getElementById('planImg');
     if (planImg) {
       planImg.src = json.data.planImagePath;
-      planImg.onload = () => { /* renderMarkers called by resize */ };
-      setTimeout(() => {
-        const mapCanvas = document.getElementById('mapCanvas');
-        const markerLayer = document.getElementById('markerLayer');
-        if (mapCanvas && markerLayer) {
-          const rect = mapCanvas.getBoundingClientRect();
-          const f = { ox: 0, oy: 0, w: rect.width, h: rect.height };
-          markerLayer.innerHTML = '';
-          currentItems.forEach(it => {
-            if (it.x == null || it.y == null) return;
-            const iw = planImg.naturalWidth || f.w || 1;
-            const ratio = f.w / iw;
-            const size = Math.max(8, Math.round(35 * ratio * 10) / 10);
-            const m = document.createElement('div');
-            m.className = 'markerIcon existing';
-            m.style.width = size + 'px'; m.style.height = size + 'px';
-            m.style.left = (f.ox + f.w * (it.x / 100)) + 'px';
-            m.style.top = (f.oy + f.h * (it.y / 100)) + 'px';
-            m.innerHTML = `<img src="${EX_ICON_URL}" alt="">`;
-            markerLayer.appendChild(m);
-          });
-        }
-      }, 150);
+      planImg.onload = () => { window.__mobileExtRenderMarkers?.(); };
+      setTimeout(() => window.__mobileExtRenderMarkers?.(), 150);
     }
   }
 
