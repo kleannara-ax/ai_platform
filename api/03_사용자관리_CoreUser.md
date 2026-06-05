@@ -34,6 +34,7 @@
 | `internalExt` | String | - | - | 내선번호 |
 
 > **참고**: `role` 필드는 전송해도 서버에서 무시되며, 모든 신규 사용자는 `ROLE_USER`(사용자)로 생성됩니다.
+> **프로필 저장**: `deptCode`, `position`, `jobTitle`, `employeeNo`, `joinDate`, `officePhone`, `internalExt`는 사용자 생성 시 `user_profile` 테이블에 함께 저장됩니다. `deptName`은 요청/저장 컬럼이 아니라 `deptCode`를 `DEPT` 공통코드명으로 해석해 응답에 내려주는 파생 필드입니다.
 
 ### Request 예시
 
@@ -46,7 +47,11 @@
   "phone": "010-1234-5678",
   "deptCode": "DEV",
   "position": "대리",
-  "jobTitle": "개발자"
+  "jobTitle": "개발자",
+  "employeeNo": "EMP001",
+  "joinDate": "2026-06-05",
+  "officePhone": "02-1111-2222",
+  "internalExt": "1234"
 }
 ```
 

@@ -41,8 +41,7 @@ public class CoreUserProfileSyncService implements UserProfileSyncPort {
         List<Long> ids = userIds.stream().filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) return Map.of();
         Map<String, String> deptNameMap = getDeptNameMap();
-        return userProfileRepository.findAll().stream()
-                .filter(profile -> ids.contains(profile.getUserId()))
+        return userProfileRepository.findByUserIdIn(ids).stream()
                 .collect(Collectors.toMap(
                         UserProfile::getUserId,
                         profile -> toSnapshot(profile, deptNameMap),
