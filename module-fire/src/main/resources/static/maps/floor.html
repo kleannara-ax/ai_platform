@@ -66,7 +66,7 @@
     .extRow.sel .fw-semibold { color: #1d4ed8; }
     .extRow.sel .text-muted { color: #334155 !important; }
 
-    .infoCard { position:absolute; width:clamp(260px, 28vw, 320px); max-width:calc(100% - 24px); background:#fff; border:1px solid #e6e6e6; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; z-index:50; display:none; }
+    .infoCard { position:absolute; width:clamp(260px, 28vw, 320px); max-width:calc(100% - 24px); background:#fff; border:1px solid #e6e6e6; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; z-index:50; display:none; transform-origin:0 0; }
     .infoHead{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:linear-gradient(135deg,#5b5bd6 0%,#7b52c5 100%); color:#fff; }
     .infoHead.hyd{ background:linear-gradient(135deg,#5b5bd6 0%,#7b52c5 100%); }
     .infoHead .t{ font-weight:700; font-size:14px; }
@@ -563,7 +563,10 @@
       return '';
     }
   }
-  function applyTransform(){ planInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`; }
+  function applyTransform(){
+    planInner.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+    positionVisibleInfoCards();
+  }
   function getPointerDistance() {
     const pts = Array.from(activePointers.values());
     if (pts.length < 2) return 0;
@@ -696,6 +699,20 @@
     }
     openHydrantActionModal(options);
   }
+  function isInfoCardVisible(cardId){
+    const card = document.getElementById(cardId);
+    return !!card && card.style.display !== 'none' && card.getAttribute('aria-hidden') !== 'true';
+  }
+  function positionVisibleInfoCards(){
+    if (isInfoCardVisible('markerInfo') && state.selectedExtId) {
+      const marker = markersEl?.querySelector(`.marker[data-ext-id="${state.selectedExtId}"]`);
+      if (marker) positionInfoCard('markerInfo', marker);
+    }
+    if (isInfoCardVisible('hydrantInfo') && state.selectedHydrantId) {
+      const marker = hydrantMarkersEl?.querySelector(`.hmarker[data-hydrant-id="${state.selectedHydrantId}"]`);
+      if (marker) positionInfoCard('hydrantInfo', marker);
+    }
+  }
   function positionInfoCard(cardId, markerEl){
     const card = document.getElementById(cardId);
     const host = document.getElementById('planInner');
@@ -703,17 +720,26 @@
     card.style.display = 'block';
     card.removeAttribute('inert');
     card.setAttribute('aria-hidden', 'false');
+
+    // infoCard는 확대/축소 대상인 planInner 내부에 있으므로,
+    // 카드 자체에는 역스케일을 적용해 화면상 크기가 항상 동일하게 보이도록 한다.
+    const zoom = Math.max(0.01, Number(state.zoom) || 1);
+    card.style.transform = `scale(${1 / zoom})`;
+    card.style.transformOrigin = '0 0';
+
     const l = markerEl.style.left || (markerEl.offsetLeft + 'px');
     const t = markerEl.style.top || (markerEl.offsetTop + 'px');
-    card.style.left = `calc(${l} + 24px)`;
-    card.style.top = `calc(${t} - 8px)`;
+    const gapX = 24 / zoom;
+    const gapY = 8 / zoom;
+    card.style.left = `calc(${l} + ${gapX}px)`;
+    card.style.top = `calc(${t} - ${gapY}px)`;
 
     const cW = card.offsetWidth || 320;
     const cH = card.offsetHeight || 240;
     const hostRect = host.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
-    if (cardRect.right > hostRect.right) card.style.left = `calc(${l} - ${cW + 12}px)`;
-    if (cardRect.bottom > hostRect.bottom) card.style.top = `calc(${t} - ${cH + 12}px)`;
+    if (cardRect.right > hostRect.right) card.style.left = `calc(${l} - ${(cW + 12) / zoom}px)`;
+    if (cardRect.bottom > hostRect.bottom) card.style.top = `calc(${t} - ${(cH + 12) / zoom}px)`;
   }
 
   function setFaultCell(el, faulty){
