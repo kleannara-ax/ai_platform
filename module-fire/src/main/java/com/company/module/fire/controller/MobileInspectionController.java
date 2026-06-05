@@ -136,6 +136,7 @@ public class MobileInspectionController {
         String dateStr = getString(body, "manufactureDate");
         String inspectionDateStr = getString(body, "inspectionDate");
         String inspectorName = getString(body, "inspectorName");
+        String note = trimToNull(getString(body, "note"));
         BigDecimal x = getBigDecimal(body, "x");
         BigDecimal y = getBigDecimal(body, "y");
 
@@ -177,6 +178,7 @@ public class MobileInspectionController {
                 .manufactureDate(manufactureDate)
                 .replacementCycleYears(replacementYears)
                 .quantity(1)
+                .note(note)
                 .x(x)
                 .y(y)
                 .build();

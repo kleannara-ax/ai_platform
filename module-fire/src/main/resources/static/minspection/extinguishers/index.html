@@ -47,13 +47,15 @@
     .mi-err { color: #b91c1c; font-weight: 800; font-size: 14px; }
     .mi-form { display: grid; gap: 12px; }
     .mi-form label { font-weight: 700; font-size: 13px; display: block; margin-bottom: 4px; }
-    .mi-form input, .mi-form select {
+    .mi-form input, .mi-form select, .mi-form textarea {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
       border: 1px solid rgba(0,0,0,.12);
       font-size: 15px;
+      font-family: inherit;
     }
+    .mi-form textarea { min-height: 76px; resize: vertical; }
     .mi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .mi-actions { display: flex; gap: 8px; margin-top: 4px; }
     .btn-primary {
@@ -371,6 +373,10 @@
             <input type="date" id="regDate" value="${today()}" />
           </div>
           <div>
+            <label>비고</label>
+            <textarea id="regNote" maxlength="500" placeholder="위치 설명, 특이사항 등을 입력하세요."></textarea>
+          </div>
+          <div>
             <label>소화기 사진</label>
             <input type="file" id="regImage" accept="image/*" capture="environment" />
           </div>
@@ -452,6 +458,7 @@
     const type = document.getElementById('regType').value;
     const date = document.getElementById('regDate').value;
     const imageFile = document.getElementById('regImage')?.files?.[0] || null;
+    const note = document.getElementById('regNote')?.value?.trim() || '';
     const x = document.getElementById('inputX').value;
     const y = document.getElementById('inputY').value;
     const errEl = document.getElementById('regErr');
@@ -470,6 +477,7 @@
         floorId: parseInt(floorId, 10),
         extinguisherType: type,
         manufactureDate: date,
+        note: note || null,
         x: parseFloat(x),
         y: parseFloat(y)
       })

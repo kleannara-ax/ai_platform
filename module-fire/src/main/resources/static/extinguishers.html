@@ -200,11 +200,7 @@
         font-size: .72rem !important;
       }
     }
-    @media (max-width: 1599.98px) {
-      .fw-list-table .col-note {
-        display: none;
-      }
-    }
+    /* 비고 열은 소화기 목록 주요 정보이므로 화면 폭이 줄어도 유지한다. */
 
     /* ===== ✅ 관리 버튼(편집/점검) cshtml 톤 ===== */
     .btn-fw-edit{
@@ -1117,7 +1113,6 @@ function renderTable(items) {
         <td class="text-truncate" title="${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}">
           ${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}
         </td>
-        <td style="text-align:center;">${item.quantity||1}</td>
         <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
         <td class="text-center">
           <div class="ext-actions">
@@ -1144,8 +1139,7 @@ function renderTable(items) {
             <th style="width:74px;">점검자</th>
             <th style="width:68px;">고장유무</th>
             <th style="width:112px;">고장 사유</th>
-            <th style="width:48px;text-align:center;">수량</th>
-            <th class="col-note" style="width:110px;">비고</th>
+            <th class="col-note" style="width:140px;">비고</th>
             <th style="width:144px;text-align:center;">관리</th>
           </tr>
         </thead>
@@ -1222,7 +1216,6 @@ function renderStatusPanel(type) {
         ? (item.lastIsFaulty===true?'<span class="fw-status fw-bad">비정상</span>':'<span class="fw-status fw-ok">정상</span>')
         : '<span class="text-muted">-</span>'}</td>
       <td class="text-truncate" title="${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}">${item.lastIsFaulty===true?(item.lastFaultReason||'-'):'-'}</td>
-      <td style="text-align:center;">${item.quantity||1}</td>
       <td class="text-truncate col-note" title="${item.note||''}">${item.note||'-'}</td>
       <td class="text-center">
         <div class="ext-actions">
@@ -1246,8 +1239,7 @@ function renderStatusPanel(type) {
           <th style="width:74px;">점검자</th>
           <th style="width:68px;">고장유무</th>
           <th style="width:112px;">고장 사유</th>
-          <th style="width:48px;text-align:center;">수량</th>
-          <th class="col-note" style="width:110px;">비고</th>
+          <th class="col-note" style="width:140px;">비고</th>
           <th style="width:144px;text-align:center;">관리</th>
         </tr></thead>
         <tbody>${rows}</tbody>
