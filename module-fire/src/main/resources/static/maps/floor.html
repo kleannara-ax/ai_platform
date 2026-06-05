@@ -316,6 +316,13 @@
     floors: [], buildings: [], current: null, exts: [], hyds: [],
     needInspectMode: false
   };
+  const MIN_PLAN_ZOOM = 0.7; // 층별 도면은 원본 크기의 70% 미만으로 축소되지 않도록 제한
+  const MAX_PLAN_ZOOM = 3;
+  function clampPlanZoom(value){
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 1;
+    return Math.max(MIN_PLAN_ZOOM, Math.min(MAX_PLAN_ZOOM, n));
+  }
   const activePointers = new Map();
   let pinchStartDistance = 0;
   let pinchStartZoom = 1;
@@ -580,11 +587,11 @@
     const wrapH = planWrap.clientHeight || 0;
     if (!imgW || !imgH || !wrapW || !wrapH) return;
     const pad = 32;
-    const fitScale = Math.min(
-      Math.max((wrapW - pad) / imgW, 0.15),
-      Math.max((wrapH - pad) / imgH, 0.15),
+    const fitScale = clampPlanZoom(Math.min(
+      (wrapW - pad) / imgW,
+      (wrapH - pad) / imgH,
       1
-    );
+    ));
     state.zoom = fitScale;
     state.panX = 0;
     state.panY = 0;
@@ -1463,7 +1470,7 @@
     if (activePointers.size >= 2) {
       const nextDistance = getPointerDistance();
       if (!pinchStartDistance || !nextDistance) return;
-      const nextZoom = Math.max(0.15, Math.min(3, pinchStartZoom * (nextDistance / pinchStartDistance)));
+      const nextZoom = clampPlanZoom(pinchStartZoom * (nextDistance / pinchStartDistance));
       if (nextZoom !== state.zoom) {
         state.zoom = nextZoom;
         applyTransform();
@@ -1500,7 +1507,7 @@
   planWrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const oldZoom = state.zoom;
-    const newZoom = Math.max(0.15, Math.min(3, state.zoom + (e.deltaY > 0 ? -0.08 : 0.08)));
+    const newZoom = clampPlanZoom(state.zoom + (e.deltaY > 0 ? -0.08 : 0.08));
     if (newZoom === oldZoom) return;
     const cx = planWrap.clientWidth / 2;
     const cy = planWrap.clientHeight / 2;
