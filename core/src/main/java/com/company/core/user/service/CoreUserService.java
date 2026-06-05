@@ -7,6 +7,8 @@ import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserResponse;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.CoreUser;
+import com.company.core.user.profile.UserProfileSnapshot;
+import com.company.core.user.profile.UserProfileSyncPort;
 import com.company.core.user.repository.CoreUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * 사용자 관리 서비스 (Core)
@@ -27,6 +32,7 @@ public class CoreUserService {
 
     private final CoreUserRepository coreUserRepository;
     private final PasswordEncoder passwordEncoder;
+    private final Optional<UserProfileSyncPort> userProfileSyncPort;
 
     @Transactional
     public CoreUser createCoreUser(UserCreateRequest request) {
@@ -55,15 +61,27 @@ public class CoreUserService {
      */
     @Transactional
     public UserResponse createUser(UserCreateRequest request) {
-        return UserResponse.from(createCoreUser(request));
+        CoreUser saved = createCoreUser(request);
+        UserProfileSnapshot profile = userProfileSyncPort
+                .flatMap(port -> port.saveProfile(saved.getUserId(), request))
+                .orElse(null);
+        return UserResponse.from(saved, profile);
     }
 
     public UserResponse getUser(Long userId) {
-        return UserResponse.from(findUserById(userId));
+        CoreUser user = findUserById(userId);
+        UserProfileSnapshot profile = userProfileSyncPort
+                .flatMap(port -> port.findProfile(userId))
+                .orElse(null);
+        return UserResponse.from(user, profile);
     }
 
     public Page<UserResponse> getUsers(Pageable pageable) {
-        return coreUserRepository.findAll(pageable).map(UserResponse::from);
+        Page<CoreUser> users = coreUserRepository.findAll(pageable);
+        Map<Long, UserProfileSnapshot> profileMap = userProfileSyncPort
+                .map(port -> port.findProfiles(users.getContent().stream().map(CoreUser::getUserId).toList()))
+                .orElse(Map.of());
+        return users.map(user -> UserResponse.from(user, profileMap.get(user.getUserId())));
     }
 
     public Page<CoreUser> getUserEntities(Pageable pageable) {
@@ -78,8 +96,12 @@ public class CoreUserService {
     public UserResponse updateUser(Long userId, UserUpdateRequest request) {
         CoreUser user = findUserById(userId);
         user.updateProfile(request.getUserName(), request.getEmail(), request.getPhone());
+        UserProfileSnapshot profile = userProfileSyncPort
+                .flatMap(port -> port.saveProfile(userId, request))
+                .or(() -> userProfileSyncPort.flatMap(port -> port.findProfile(userId)))
+                .orElse(null);
         log.info("사용자 정보 수정 완료: userId={}", userId);
-        return UserResponse.from(user);
+        return UserResponse.from(user, profile);
     }
 
     @Transactional

@@ -1,6 +1,7 @@
 package com.company.core.user.dto;
 
 import com.company.core.user.entity.CoreUser;
+import com.company.core.user.profile.UserProfileSnapshot;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -36,7 +37,11 @@ public class UserResponse {
     private String internalExt;
 
     public static UserResponse from(CoreUser user) {
-        return UserResponse.builder()
+        return from(user, null);
+    }
+
+    public static UserResponse from(CoreUser user, UserProfileSnapshot profile) {
+        var builder = UserResponse.builder()
                 .userId(user.getUserId())
                 .loginId(user.getLoginId())
                 .userName(user.getUserName())
@@ -45,7 +50,19 @@ public class UserResponse {
                 .role(user.getRole())
                 .enabled(user.getEnabled())
                 .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+                .updatedAt(user.getUpdatedAt());
+
+        if (profile != null) {
+            builder.deptCode(profile.deptCode())
+                    .deptName(profile.deptName())
+                    .position(profile.position())
+                    .jobTitle(profile.jobTitle())
+                    .employeeNo(profile.employeeNo())
+                    .joinDate(profile.joinDate())
+                    .officePhone(profile.officePhone())
+                    .internalExt(profile.internalExt());
+        }
+
+        return builder.build();
     }
 }
