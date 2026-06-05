@@ -122,8 +122,23 @@
 
 | 항목 | 값 |
 |------|-----|
-| **URL** | `PATCH /api/integrated/users/{userId}/disable` |
+| **URL** | `PATCH /api/integrated/users/{loginId}/disable` |
 | **인증** | 필요 (`isAuthenticated()`) |
+
+### Path Parameter
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `loginId` | String | 비활성화할 사용자의 로그인 ID (`CORE_USER.LOGIN_ID`) |
+
+### 호출 예시
+
+```
+PATCH /api/integrated/users/jokim/disable
+Authorization: Bearer {accessToken}
+```
+
+> **변경 사항**: 활성화/비활성화 API는 `userId` 숫자 PK가 아니라 `loginId` 문자열을 기준으로 사용자를 조회합니다.
 
 ### Response — `ApiResponse<Void>` (200 OK)
 
@@ -133,8 +148,23 @@
 
 | 항목 | 값 |
 |------|-----|
-| **URL** | `PATCH /api/integrated/users/{userId}/enable` |
+| **URL** | `PATCH /api/integrated/users/{loginId}/enable` |
 | **인증** | 필요 (`isAuthenticated()`) |
+
+### Path Parameter
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `loginId` | String | 활성화할 사용자의 로그인 ID (`CORE_USER.LOGIN_ID`) |
+
+### 호출 예시
+
+```
+PATCH /api/integrated/users/jokim/enable
+Authorization: Bearer {accessToken}
+```
+
+> **변경 사항**: 활성화/비활성화 API는 `userId` 숫자 PK가 아니라 `loginId` 문자열을 기준으로 사용자를 조회합니다.
 
 ### Response — `ApiResponse<Void>` (200 OK)
 

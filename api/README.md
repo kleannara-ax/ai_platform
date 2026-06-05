@@ -1,7 +1,7 @@
 # API 문서 목록
 
 > **AI Platform** REST API 전문 문서
-> **최종 업데이트**: 2026-05-06
+> **최종 업데이트**: 2026-06-05
 > **Base URL**: `https://{서버주소}`
 > **인증 방식**: JWT Bearer Token
 
@@ -85,15 +85,15 @@
 | GET | `/api/core/users` | 사용자 목록 |
 | GET | `/api/core/users/{id}` | 사용자 조회 |
 | PUT | `/api/core/users/{id}` | 사용자 수정 |
-| PATCH | `/api/core/users/{id}/disable` | 사용자 비활성화 |
-| PATCH | `/api/core/users/{id}/enable` | 사용자 활성화 |
+| PATCH | `/api/core/users/{loginId}/disable` | 사용자 비활성화 (`loginId` 기준) |
+| PATCH | `/api/core/users/{loginId}/enable` | 사용자 활성화 (`loginId` 기준) |
 | PATCH | `/api/core/users/{id}/role` | 역할 변경 |
 | GET | `/api/integrated/users` | 통합 사용자 목록 |
 | GET | `/api/integrated/users/{id}` | 통합 사용자 조회 |
 | POST | `/api/integrated/users` | 통합 사용자 생성 |
 | PUT | `/api/integrated/users/{id}` | 통합 사용자 수정 |
-| PATCH | `/api/integrated/users/{id}/disable` | 통합 비활성화 |
-| PATCH | `/api/integrated/users/{id}/enable` | 통합 활성화 |
+| PATCH | `/api/integrated/users/{loginId}/disable` | 통합 비활성화 (`loginId` 기준) |
+| PATCH | `/api/integrated/users/{loginId}/enable` | 통합 활성화 (`loginId` 기준) |
 | PATCH | `/api/integrated/users/{id}/role` | 통합 역할 변경 |
 | GET | `/api/core/menus` | 메뉴 트리 (활성) |
 | GET | `/api/core/menus/tree` | 메뉴 트리 (전체) |
