@@ -316,7 +316,7 @@
     floors: [], buildings: [], current: null, exts: [], hyds: [],
     needInspectMode: false
   };
-  const MIN_PLAN_ZOOM = 0.7; // 층별 도면은 원본 크기의 70% 미만으로 축소되지 않도록 제한
+  const MIN_PLAN_ZOOM = 0.5; // 층별 도면은 원본 크기의 50% 미만으로 축소되지 않도록 제한
   const MAX_PLAN_ZOOM = 3;
   function clampPlanZoom(value){
     const n = Number(value);
