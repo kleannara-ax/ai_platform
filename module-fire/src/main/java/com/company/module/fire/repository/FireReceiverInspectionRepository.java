@@ -20,6 +20,8 @@ public interface FireReceiverInspectionRepository extends JpaRepository<FireRece
 
     List<FireReceiverInspection> findByReceiver_ReceiverIdOrderByInspectionDateDescInspectionIdDesc(Long receiverId, Pageable pageable);
 
+    List<FireReceiverInspection> findByReceiver_ReceiverIdAndImagePathIsNotNull(Long receiverId);
+
     List<FireReceiverInspection> findByReceiver_ReceiverIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
             Long receiverId, LocalDate fromDate, LocalDate toDate);
 

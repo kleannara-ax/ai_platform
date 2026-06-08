@@ -812,9 +812,23 @@ public class MobileInspectionController {
         FireReceiverInspection inspection = receiverInspectionRepository
                 .findTopByReceiver_ReceiverIdOrderByInspectionDateDescInspectionIdDesc(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        List<FireReceiverInspection> inspectionsWithImages = receiverInspectionRepository
+                .findByReceiver_ReceiverIdAndImagePathIsNotNull(id);
+        List<String> oldImagePaths = inspectionsWithImages.stream()
+                .map(FireReceiverInspection::getImagePath)
+                .filter(Objects::nonNull)
+                .toList();
 
         return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/receiver-inspections"),
-                "/fire-api/minspection/files/receivers/", inspection::updateImagePath, () -> {
+                "/fire-api/minspection/files/receivers/", oldImagePaths, inspection::updateImagePath, () -> {
+                    inspectionsWithImages.forEach(ins -> {
+                        if (!Objects.equals(ins.getInspectionId(), inspection.getInspectionId())) {
+                            ins.updateImagePath(null);
+                        }
+                    });
+                    if (!inspectionsWithImages.isEmpty()) {
+                        receiverInspectionRepository.saveAll(inspectionsWithImages);
+                    }
                     receiverInspectionRepository.save(inspection);
                 });
     }
@@ -1003,9 +1017,23 @@ public class MobileInspectionController {
         FirePumpInspection inspection = pumpInspectionRepository
                 .findTopByPump_PumpIdOrderByInspectionDateDescInspectionIdDesc(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        List<FirePumpInspection> inspectionsWithImages = pumpInspectionRepository
+                .findByPump_PumpIdAndImagePathIsNotNull(id);
+        List<String> oldImagePaths = inspectionsWithImages.stream()
+                .map(FirePumpInspection::getImagePath)
+                .filter(Objects::nonNull)
+                .toList();
 
         return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/pump-inspections"),
-                "/fire-api/minspection/files/pumps/", inspection::updateImagePath, () -> {
+                "/fire-api/minspection/files/pumps/", oldImagePaths, inspection::updateImagePath, () -> {
+                    inspectionsWithImages.forEach(ins -> {
+                        if (!Objects.equals(ins.getInspectionId(), inspection.getInspectionId())) {
+                            ins.updateImagePath(null);
+                        }
+                    });
+                    if (!inspectionsWithImages.isEmpty()) {
+                        pumpInspectionRepository.saveAll(inspectionsWithImages);
+                    }
                     pumpInspectionRepository.save(inspection);
                 });
     }
@@ -1302,6 +1330,7 @@ public class MobileInspectionController {
             MultipartFile file,
             Path dir,
             String publicPrefix,
+            Collection<String> oldImagePaths,
             java.util.function.Consumer<String> imageUpdater,
             Runnable saver) {
 
@@ -1324,6 +1353,8 @@ public class MobileInspectionController {
             Path target = dir.resolve(filename).normalize();
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
+            deleteReferencedImageFiles(dir, oldImagePaths);
+
             String publicPath = publicPrefix + filename;
             imageUpdater.accept(publicPath);
             saver.run();
@@ -1333,6 +1364,26 @@ public class MobileInspectionController {
             return ResponseEntity.ok(ApiResponse.success(result));
         } catch (IOException ex) {
             return ResponseEntity.internalServerError().body(ApiResponse.fail(MSG_ERROR));
+        }
+    }
+
+    private void deleteReferencedImageFiles(Path dir, Collection<String> imagePaths) throws IOException {
+        if (imagePaths == null || imagePaths.isEmpty()) {
+            return;
+        }
+        Path base = dir.toAbsolutePath().normalize();
+        for (String imagePath : imagePaths) {
+            if (imagePath == null || imagePath.isBlank()) {
+                continue;
+            }
+            String oldName = imagePath.substring(imagePath.lastIndexOf('/') + 1).replace("\\", "");
+            if (oldName.isBlank() || oldName.contains("..")) {
+                continue;
+            }
+            Path oldFile = base.resolve(oldName).normalize();
+            if (oldFile.startsWith(base)) {
+                Files.deleteIfExists(oldFile);
+            }
         }
     }
 

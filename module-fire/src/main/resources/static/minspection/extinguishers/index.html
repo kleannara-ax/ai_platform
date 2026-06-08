@@ -616,6 +616,18 @@
         body: JSON.stringify({ isFaulty: isBad, faultReason: faultReason || null })
       });
       if (res.ok) {
+        const inspectPhoto = document.getElementById('inspectPhotoInput')?.files?.[0];
+        if (inspectPhoto) {
+          const fd = new FormData();
+          fd.append('file', inspectPhoto);
+          const up = await apiFetch(API_BASE + '/' + encodeURIComponent(extId) + '/image', {
+            method: 'POST',
+            body: fd
+          });
+          if (!up.ok) {
+            alert('점검은 저장되었지만 사진 업로드는 실패했습니다. 네트워크 상태를 확인해주세요.');
+          }
+        }
         inspectOverlay.style.display = 'none';
         inspectModal.style.display = 'none';
         showInspectCompleted();

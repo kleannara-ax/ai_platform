@@ -20,6 +20,8 @@ public interface FirePumpInspectionRepository extends JpaRepository<FirePumpInsp
 
     List<FirePumpInspection> findByPump_PumpIdOrderByInspectionDateDescInspectionIdDesc(Long pumpId, Pageable pageable);
 
+    List<FirePumpInspection> findByPump_PumpIdAndImagePathIsNotNull(Long pumpId);
+
     List<FirePumpInspection> findByPump_PumpIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
             Long pumpId, LocalDate fromDate, LocalDate toDate);
 
