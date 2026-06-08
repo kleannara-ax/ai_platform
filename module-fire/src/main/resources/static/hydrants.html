@@ -181,6 +181,20 @@
       vertical-align: middle !important;
     }
     .table th{ vertical-align: middle !important; }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover {
+      filter: brightness(1.08);
+    }
+    .sort-indicator {
+      display: inline-block;
+      min-width: 1em;
+      margin-left: 4px;
+      font-size: .78em;
+      opacity: .9;
+    }
 
     @media (max-width: 1399.98px) {
       .hyd-list-table {
@@ -818,6 +832,7 @@ const API = (() => {
 
 let allItems = [];
 let currentStatusType = null;
+let currentSort = { key: 'serialNumber', direction: 'asc' };
 const canManage = API.canManage();
 // FIRE_ADMIN 아이디 기반 권한
 let canEdit = false;
@@ -1025,6 +1040,68 @@ function updateBucketCounts() {
 // ===== 메인 테이블 렌더링 (_HydListTable.cshtml 기반) =====
 function typeText(t) { return String(t||'').toLowerCase()==='outdoor'?'옥외':'옥내'; }
 function opText(t) { return String(t||'').toLowerCase()==='auto'?'자동':'수동'; }
+function locationText(x) {
+  return x?.hydrantType === 'Outdoor'
+    ? (x?.locationDescription || '')
+    : (x?.x != null && x?.y != null ? `도면좌표 ${Number(x.x).toFixed(2)}%, ${Number(x.y).toFixed(2)}%` : '');
+}
+
+function getHydSortId(item) {
+  return String(item?.serialNumber || item?.hydrantId || '');
+}
+
+function getHydSortValue(item, key) {
+  switch (key) {
+    case 'rowNo':
+    case 'serialNumber': return getHydSortId(item);
+    case 'hydrantType': return typeText(item?.hydrantType);
+    case 'operationType': return opText(item?.operationType);
+    case 'buildingName': return item?.buildingName || '';
+    case 'floorName': return item?.floorName || '';
+    case 'location': return locationText(item);
+    case 'lastInspectionDate': return item?.lastInspectionDate || '';
+    case 'lastInspectorName': return item?.lastInspectorName || '';
+    case 'lastIsFaulty': return item?.lastInspectionDate == null ? '' : (item?.lastIsFaulty === true ? '비정상' : '정상');
+    case 'lastFaultReason': return item?.lastIsFaulty === true ? (item?.lastFaultReason || '') : '';
+    default: return '';
+  }
+}
+
+function compareHydValues(a, b, key, direction) {
+  const av = getHydSortValue(a, key);
+  const bv = getHydSortValue(b, key);
+  const aBlank = av == null || String(av).trim() === '';
+  const bBlank = bv == null || String(bv).trim() === '';
+  if (aBlank && !bBlank) return 1;
+  if (!aBlank && bBlank) return -1;
+  let result = 0;
+  if (!aBlank || !bBlank) {
+    result = String(av).localeCompare(String(bv), 'ko', { numeric: true, sensitivity: 'base' });
+  }
+  if (result !== 0) return direction === 'desc' ? -result : result;
+  return getHydSortId(a).localeCompare(getHydSortId(b), 'ko', { numeric: true, sensitivity: 'base' });
+}
+
+function getSortedHydItems(items) {
+  return (items || []).slice().sort((a, b) => compareHydValues(a, b, currentSort.key, currentSort.direction));
+}
+
+function sortTh(label, key, style = '') {
+  const active = currentSort.key === key;
+  const indicator = active ? (currentSort.direction === 'asc' ? '▲' : '▼') : '↕';
+  const ariaSort = active ? (currentSort.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+  return `<th class="sortable-header js-sort-header" data-sort-key="${key}" aria-sort="${ariaSort}" title="클릭하여 오름차순/내림차순 정렬" style="${style}">${label}<span class="sort-indicator">${indicator}</span></th>`;
+}
+
+function applyListSort(key) {
+  if (!key) return;
+  if (currentSort.key === key) {
+    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort = { key, direction: 'asc' };
+  }
+  renderTable(getStatusFilteredItems(allItems));
+}
 
 function renderTable(items) {
   const wrap = document.getElementById('mainTableWrap');
@@ -1032,10 +1109,9 @@ function renderTable(items) {
     wrap.innerHTML='<div class="text-center text-muted py-4">조회 결과가 없습니다.</div>';
     return;
   }
-  let rows = items.map((x, index) => {
-    const loc = x.hydrantType==='Outdoor'
-      ? (x.locationDescription||'-')
-      : (x.x!=null&&x.y!=null ? `도면좌표 ${Number(x.x).toFixed(2)}%, ${Number(x.y).toFixed(2)}%` : '-');
+  const sortedItems = getSortedHydItems(items);
+  let rows = sortedItems.map((x, index) => {
+    const loc = locationText(x) || '-';
     let statusBadge = '';
     if (x.lastInspectionDate==null) statusBadge='<span class="text-muted">-</span>';
     else if (x.lastIsFaulty===true) statusBadge='<span class="fw-status fw-bad">비정상</span>';
@@ -1067,17 +1143,17 @@ function renderTable(items) {
       <table class="table table-hover mb-0 hyd-list-table">
         <thead class="table-dark">
           <tr>
-            <th style="width:48px;text-align:center;">No.</th>
-            <th style="width:84px;">소화전 ID</th>
-            <th style="width:66px;">구분</th>
-            <th style="width:66px;">방식</th>
-            <th style="width:92px;">건물</th>
-            <th style="width:62px;">층</th>
-            <th style="width:130px;">상세 위치</th>
-            <th style="width:92px;">최종 점검일</th>
-            <th style="width:80px;">점검자</th>
-            <th style="width:82px;">정상/비정상</th>
-            <th style="width:130px;">고장 사유</th>
+            ${sortTh('No.', 'rowNo', 'width:48px;text-align:center;')}
+            ${sortTh('소화전 ID', 'serialNumber', 'width:84px;')}
+            ${sortTh('구분', 'hydrantType', 'width:66px;')}
+            ${sortTh('방식', 'operationType', 'width:66px;')}
+            ${sortTh('건물', 'buildingName', 'width:92px;')}
+            ${sortTh('층', 'floorName', 'width:62px;')}
+            ${sortTh('상세 위치', 'location', 'width:130px;')}
+            ${sortTh('최종 점검일', 'lastInspectionDate', 'width:92px;')}
+            ${sortTh('점검자', 'lastInspectorName', 'width:80px;')}
+            ${sortTh('정상/비정상', 'lastIsFaulty', 'width:82px;')}
+            ${sortTh('고장 사유', 'lastFaultReason', 'width:130px;')}
             <th style="width:155px;text-align:center;">관리</th>
           </tr>
         </thead>
@@ -2361,6 +2437,13 @@ window.openHydrantDetails = openHydrantDetails;
 
 // ===== 이벤트 위임 =====
 document.addEventListener('click', async(ev)=>{
+  const sortHeader = ev.target.closest('.js-sort-header');
+  if (sortHeader) {
+    ev.preventDefault();
+    applyListSort(sortHeader.getAttribute('data-sort-key'));
+    return;
+  }
+
   const editBtn = ev.target.closest('.js-hydrant-edit');
   if(editBtn){
     ev.preventDefault();
