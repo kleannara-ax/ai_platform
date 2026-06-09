@@ -135,7 +135,9 @@ table tr:last-child td{border-bottom:none;}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s;}
 .modal-overlay.show{opacity:1;pointer-events:auto;}
-.modal{background:#fff;border-radius:16px;width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal{background:#fff;border-radius:16px;width:600px;max-width:calc(100vw - 32px);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal.modal-wide{width:min(1280px,96vw);max-height:94vh;}
+.modal.modal-wide .modal-body{padding:16px;}
 .modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .modal-header h3{font-size:17px;font-weight:700;}
 .modal-header .close{background:none;font-size:20px;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:4px;}
@@ -223,7 +225,7 @@ table tr:last-child td{border-bottom:none;}
 
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
+  <div class="modal" id="modalBox">
     <div class="modal-header"><h3 id="modalTitle">Modal</h3><button class="close" onclick="closeModal()">&times;</button></div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer" id="modalFooter"></div>
@@ -1799,8 +1801,9 @@ async function renderFireIndex() {
         return;
       }
       openModal(title || '설비 상세',
-        '<iframe title="설비 상세" src="'+esc(url)+'" style="display:block;width:100%;height:min(78vh,860px);border:0;background:transparent;border-radius:12px;"></iframe>',
-        '<button class="btn btn-sm btn-outline" onclick="closeModal()">닫기</button>'
+        '<iframe title="설비 상세" src="'+esc(url)+'" style="display:block;width:100%;height:min(84vh,960px);border:0;background:transparent;border-radius:12px;"></iframe>',
+        '<button class="btn btn-sm btn-outline" onclick="closeModal()">닫기</button>',
+        'modal-wide'
       );
     }
     function summarize(type, label, total, items, listPage) {
@@ -2100,8 +2103,8 @@ function roleBadge(role){
 }
 
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-function openModal(title,bodyHtml,footerHtml){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';document.getElementById('modalOverlay').classList.add('show');}
-function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+function openModal(title,bodyHtml,footerHtml,modalClass){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=bodyHtml;document.getElementById('modalFooter').innerHTML=footerHtml||'';const box=document.getElementById('modalBox');if(box)box.className='modal'+(modalClass?' '+modalClass:'');document.getElementById('modalOverlay').classList.add('show');}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show');const box=document.getElementById('modalBox');if(box)box.className='modal';}
 function toast(msg,type='info'){const c=document.getElementById('toasts');const t=document.createElement('div');t.className='toast toast-'+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3000);}
 
 // ══ PS 지분 검사 모듈 ══

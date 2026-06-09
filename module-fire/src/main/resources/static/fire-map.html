@@ -1995,6 +1995,13 @@ function selectOutdoorEquipmentById(type, id){
         setOutdoorEquipmentHint('요청한 수신기/소방펌프 데이터를 찾을 수 없습니다.', 'error');
         return false;
     }
+
+    // 바로가기 진입 시 추가/이동/드래그 상태가 남아 있으면 marker click handler가 차단될 수 있으므로 초기화한다.
+    setOutdoorEquipmentAction(null);
+    isPanning = false;
+    panMoved = false;
+    window.__mapDragLock = false;
+
     currentOutdoorEquipment = { ...item, type, label: type === 'receiver' ? '수신기' : '펌프' };
     renderOutdoorEquipmentMarkers();
     const marker = findOutdoorEquipmentMarker(type, id);
@@ -2002,15 +2009,27 @@ function selectOutdoorEquipmentById(type, id){
         setOutdoorEquipmentHint('요청한 수신기/소방펌프 마커를 찾을 수 없습니다.', 'error');
         return false;
     }
-    fillOutdoorEquipmentInfo(currentOutdoorEquipment);
-    if (outdoorEquipmentSelect) {
-        outdoorEquipmentSelect.removeAttribute('inert');
-        outdoorEquipmentSelect.setAttribute('aria-hidden', 'false');
-        outdoorEquipmentSelect.classList.add('show');
-        positionOutdoorEquipmentSelect(marker);
-    }
-    try { marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch (_) { marker.scrollIntoView(); }
-    try { marker.focus({ preventScroll: true }); } catch(_) { try { marker.focus(); } catch(__) {} }
+
+    try { marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch (_) { try { marker.scrollIntoView(); } catch(__) {} }
+
+    // 단순 표시가 아니라 실제 마커 클릭과 동일한 경로로 선택 카드/강조 상태를 연다.
+    marker.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+    setTimeout(() => {
+        const selectedMarker = findOutdoorEquipmentMarker(type, id) || marker;
+        if (selectedMarker) {
+            selectedMarker.classList.add('is-selected');
+            try { selectedMarker.focus({ preventScroll: true }); } catch(_) { try { selectedMarker.focus(); } catch(__) {} }
+        }
+        if (outdoorEquipmentSelect && !outdoorEquipmentSelect.classList.contains('show')) {
+            const latest = currentOutdoorEquipment || { ...item, type, label: type === 'receiver' ? '수신기' : '펌프' };
+            fillOutdoorEquipmentInfo(latest);
+            outdoorEquipmentSelect.removeAttribute('inert');
+            outdoorEquipmentSelect.setAttribute('aria-hidden', 'false');
+            outdoorEquipmentSelect.classList.add('show');
+            positionOutdoorEquipmentSelect(selectedMarker);
+        }
+    }, 60);
     return true;
 }
 
@@ -2020,9 +2039,19 @@ function focusOutdoorEquipmentFromQuery(){
     const focusId = (params.get('focusId') || '').trim();
     if (!focusId || (focusType !== 'receiver' && focusType !== 'pump')) return;
     setOutdoorEquipmentMode(true);
-    setTimeout(() => {
-        selectOutdoorEquipmentById(focusType, focusId);
-    }, 100);
+
+    let attempts = 0;
+    const tryFocus = async () => {
+        attempts += 1;
+        if (!outdoorReceivers.length && !outdoorPumps.length) {
+            await loadOutdoorEquipment();
+        }
+        const focused = selectOutdoorEquipmentById(focusType, focusId);
+        if (!focused && attempts < 20) {
+            setTimeout(() => { tryFocus(); }, 120);
+        }
+    };
+    setTimeout(() => { tryFocus(); }, 120);
 }
 
 function hideOutdoorEquipmentInfo(clearSelection = true){

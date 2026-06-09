@@ -1284,6 +1284,22 @@
     const focusId = (q.get('focusId') || '').trim();
     if (!focusType || !focusId) return;
     if (focusType !== 'ext' && focusType !== 'hyd') return;
+
+    const targetItem = focusType === 'ext'
+      ? state.exts.find(x => String(x.extinguisherId) === focusId)
+      : state.hyds.find(x => String(x.hydrantId) === focusId);
+    if (targetItem) {
+      const targetFloor = state.floors.find(v =>
+        (targetItem.buildingId != null && targetItem.floorId != null && String(v.buildingId) === String(targetItem.buildingId) && String(v.floorId) === String(targetItem.floorId)) ||
+        (normalize(v.buildingName) === normalize(targetItem.buildingName) && normalize(v.floorName) === normalize(targetItem.floorName))
+      );
+      if (targetFloor) {
+        state.current = targetFloor;
+        syncBuildingFloorSelectors(false);
+        syncCurrentFloor(false);
+      }
+    }
+
     state.needInspectMode = false;
     const btnNeedInspect = document.getElementById('btnNeedInspect');
     if (btnNeedInspect) {
@@ -1291,15 +1307,20 @@
       btnNeedInspect.style.background = '';
       btnNeedInspect.style.color = '';
     }
-    renderMarkers();
-    setTimeout(() => {
-      const candidates = focusType === 'ext'
-        ? Array.from(markersEl.querySelectorAll('.marker'))
-        : Array.from(hydrantMarkersEl.querySelectorAll('.hmarker'));
-      const btn = candidates.find(el => (focusType === 'ext' ? el.dataset.extId : el.dataset.hydrantId) === focusId);
-      if (!btn) return;
-      try { btn.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch(_) { btn.scrollIntoView(); }
-      btn.click();
+
+    let attempts = 0;
+    const tryFocus = () => {
+      attempts += 1;
+      renderMarkers();
+      const btn = focusType === 'ext'
+        ? markersEl.querySelector(`.marker[data-ext-id="${focusId}"]`)
+        : hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`);
+      if (!btn) {
+        if (attempts < 20) setTimeout(tryFocus, 120);
+        return;
+      }
+      try { btn.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch(_) { try { btn.scrollIntoView(); } catch(__) {} }
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       setTimeout(() => {
         const selected = focusType === 'ext'
           ? markersEl.querySelector(`.marker[data-ext-id="${focusId}"]`)
@@ -1308,8 +1329,9 @@
           selected.classList.add('sel');
           try { selected.focus({ preventScroll: true }); } catch(_) { try { selected.focus(); } catch(__) {} }
         }
-      }, 30);
-    }, 80);
+      }, 60);
+    };
+    setTimeout(tryFocus, 120);
   }
 
   buildingSelect?.addEventListener('change', () => {
