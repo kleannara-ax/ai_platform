@@ -286,6 +286,17 @@ public class FireReceiverService {
     }
 
     @Transactional
+    public FireReceiverResponse deleteInspection(Long receiverId, Long inspectionId) {
+        FireReceiverInspection inspection = fireReceiverInspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new EntityNotFoundException("FireReceiverInspection", inspectionId));
+        if (inspection.getReceiver() == null || !receiverId.equals(inspection.getReceiver().getReceiverId())) {
+            throw new BusinessException("Inspection does not belong to this receiver.");
+        }
+        fireReceiverInspectionRepository.delete(inspection);
+        return getReceiverDetail(receiverId);
+    }
+
+    @Transactional
     public void delete(Long receiverId) {
         FireReceiver receiver = fireReceiverRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("FireReceiver", receiverId));

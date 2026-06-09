@@ -99,6 +99,16 @@ public class FirePumpController {
         ));
     }
 
+    @DeleteMapping("/{id}/inspections/{inspectionId}")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_PUMP')")
+    public ResponseEntity<ApiResponse<FirePumpResponse>> deleteInspection(
+            @PathVariable Long id,
+            @PathVariable Long inspectionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                firePumpService.deleteInspection(id, inspectionId)
+        ));
+    }
+
     @GetMapping("/{id}/inspections/export")
     public ResponseEntity<byte[]> exportInspections(
             @PathVariable Long id,

@@ -284,6 +284,17 @@ public class FirePumpService {
     }
 
     @Transactional
+    public FirePumpResponse deleteInspection(Long pumpId, Long inspectionId) {
+        FirePumpInspection inspection = firePumpInspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new EntityNotFoundException("FirePumpInspection", inspectionId));
+        if (inspection.getPump() == null || !pumpId.equals(inspection.getPump().getPumpId())) {
+            throw new BusinessException("Inspection does not belong to this pump.");
+        }
+        firePumpInspectionRepository.delete(inspection);
+        return getPumpDetail(pumpId);
+    }
+
+    @Transactional
     public void delete(Long pumpId) {
         FirePump pump = firePumpRepository.findById(pumpId)
                 .orElseThrow(() -> new EntityNotFoundException("FirePump", pumpId));

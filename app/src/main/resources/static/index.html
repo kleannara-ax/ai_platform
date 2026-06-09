@@ -1806,12 +1806,15 @@ async function renderFireIndex() {
     function summarize(type, label, total, items, listPage) {
       var denom = items.length || total || 0;
       var abnormal = 0, inspect = 0, replace = 0, normal = 0;
-      var graphAbnormal = 0, graphInspect = 0, graphReplace = 0, graphNormal = 0;
+      var graphAbnormal = 0, graphInspect = 0, graphReplace = 0, graphNormal = 0, graphMaintenance = 0, graphFaulty = 0;
       var abnormalItems = [];
       items.forEach(function(it) {
         var a = isAbnormal(type, it);
         var i = isInspectionDue(it);
         var r = type === 'ext' ? isReplacementDue(it) : false;
+        var status = String(it.lastInspectionStatus || '').toUpperCase();
+        var m = (type === 'receiver' || type === 'pump') && status === 'MAINTENANCE';
+        var f = (type === 'receiver' || type === 'pump') && status === 'FAULTY';
         if (a) {
           abnormal++;
           abnormalItems.push({
@@ -1829,7 +1832,12 @@ async function renderFireIndex() {
         if (i) inspect++;
         if (r) replace++;
         if (!a && !i && !r) normal++;
-        if (a) graphAbnormal++;
+        if (type === 'receiver' || type === 'pump') {
+          if (f) graphFaulty++;
+          else if (m) graphMaintenance++;
+          else if (i) graphInspect++;
+          else graphNormal++;
+        } else if (a) graphAbnormal++;
         else if (r) graphReplace++;
         else if (i) graphInspect++;
         else graphNormal++;
@@ -1847,6 +1855,8 @@ async function renderFireIndex() {
         graphInspect: graphInspect,
         graphReplace: graphReplace,
         graphNormal: graphNormal,
+        graphMaintenance: graphMaintenance,
+        graphFaulty: graphFaulty,
         listPage: listPage,
         abnormalItems: abnormalItems,
         inspectRate: denom ? Math.round(inspect / denom * 100) : 0
@@ -1875,7 +1885,12 @@ async function renderFireIndex() {
     }
     function pieChartCard(summary) {
       var denom = Math.max(summary.denom || summary.total || 0, 0);
-      var slices = [
+      var slices = (summary.type === 'receiver' || summary.type === 'pump') ? [
+        { label:'정상', count:summary.graphNormal, color:'var(--green)' },
+        { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
+        { label:'요정비', count:summary.graphMaintenance, color:'#8b5cf6' },
+        { label:'불량', count:summary.graphFaulty, color:'var(--red)' }
+      ] : [
         { label:'정상', count:summary.graphNormal, color:'var(--green)' },
         { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
         { label:'교체필요', count:summary.graphReplace, color:'#8b5cf6' },
@@ -1928,12 +1943,14 @@ async function renderFireIndex() {
     var graphAbnormalTotal = summaries.reduce(function(n, s) { return n + s.graphAbnormal; }, 0);
     var graphInspectTotal = summaries.reduce(function(n, s) { return n + s.graphInspect; }, 0);
     var graphReplaceTotal = summaries.reduce(function(n, s) { return n + s.graphReplace; }, 0);
+    var graphMaintenanceTotal = summaries.reduce(function(n, s) { return n + s.graphMaintenance; }, 0);
+    var graphFaultyTotal = summaries.reduce(function(n, s) { return n + s.graphFaulty; }, 0);
     var graphNormalTotal = summaries.reduce(function(n, s) { return n + s.graphNormal; }, 0);
 
     var extSub = summaryByType.ext.replace > 0 ? '<span style="color:var(--red);font-weight:700;">교체필요 '+summaryByType.ext.replace+'</span>' : (summaryByType.ext.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.ext.inspect+'</span>' : '정상');
     var hydSub = summaryByType.hyd.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.hyd.inspect+'</span>' : '정상';
-    var recvSub = summaryByType.receiver.abnormal > 0 ? '<span style="color:var(--red);font-weight:700;">이상설비 '+summaryByType.receiver.abnormal+'</span>' : (summaryByType.receiver.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.receiver.inspect+'</span>' : '정상');
-    var pumpSub = summaryByType.pump.abnormal > 0 ? '<span style="color:var(--red);font-weight:700;">이상설비 '+summaryByType.pump.abnormal+'</span>' : (summaryByType.pump.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.pump.inspect+'</span>' : '정상');
+    var recvSub = summaryByType.receiver.graphFaulty > 0 ? '<span style="color:var(--red);font-weight:700;">불량 '+summaryByType.receiver.graphFaulty+'</span>' : (summaryByType.receiver.graphMaintenance > 0 ? '<span style="color:#8b5cf6;font-weight:700;">요정비 '+summaryByType.receiver.graphMaintenance+'</span>' : (summaryByType.receiver.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.receiver.inspect+'</span>' : '정상'));
+    var pumpSub = summaryByType.pump.graphFaulty > 0 ? '<span style="color:var(--red);font-weight:700;">불량 '+summaryByType.pump.graphFaulty+'</span>' : (summaryByType.pump.graphMaintenance > 0 ? '<span style="color:#8b5cf6;font-weight:700;">요정비 '+summaryByType.pump.graphMaintenance+'</span>' : (summaryByType.pump.inspect > 0 ? '<span style="color:var(--orange);font-weight:700;">점검필요 '+summaryByType.pump.inspect+'</span>' : '정상'));
 
     el.innerHTML = '<div class="stats-grid">'
       + '<div class="stat-card blue"><div class="label">소화기</div><div class="value">'+extV+'</div><div class="sub">'+extSub+'</div></div>'
@@ -1948,7 +1965,7 @@ async function renderFireIndex() {
       + '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">이상설비</div><div class="value" style="color:var(--red);">'+abnormalTotal+'</div><div class="sub">점검 결과 비정상 설비</div></div>'
       + '</div>'
       + '<div class="card"><div class="card-header"><h3>설비 현황</h3><span style="font-size:12px;color:var(--text3)">원형 그래프 중앙은 기본 정상설비 비율이며, 범례에 마우스를 올리면 해당 상태 비율을 표시합니다.</span></div><div class="card-body">'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8b5cf6;"></b> 교체필요 '+graphReplaceTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비 '+graphAbnormalTotal+'</span></div>'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8b5cf6;"></b> 교체필요/요정비 '+(graphReplaceTotal + graphMaintenanceTotal)+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비/불량 '+(graphAbnormalTotal + graphFaultyTotal)+'</span></div>'
       + '<div style="display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:18px;">' + summaries.map(pieChartCard).join('') + '</div></div></div>'
       + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상 수량, 점검 필요 설비는 최근 30일 기준 수량입니다.</span></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검 필요 설비</th><th></th></tr></thead><tbody>'

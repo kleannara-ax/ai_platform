@@ -99,6 +99,16 @@ public class FireReceiverController {
         ));
     }
 
+    @DeleteMapping("/{id}/inspections/{inspectionId}")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_RECEIVER')")
+    public ResponseEntity<ApiResponse<FireReceiverResponse>> deleteInspection(
+            @PathVariable Long id,
+            @PathVariable Long inspectionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                fireReceiverService.deleteInspection(id, inspectionId)
+        ));
+    }
+
     @GetMapping("/{id}/inspections/export")
     public ResponseEntity<byte[]> exportInspections(
             @PathVariable Long id,

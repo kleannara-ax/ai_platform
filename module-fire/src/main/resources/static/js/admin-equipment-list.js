@@ -905,7 +905,7 @@
         '<td><div class="d-flex gap-2"><input type="date" class="form-control form-control-sm js-hist-date" value="' + escapeHtml(row.inspectionDate || "") + '"><input type="time" class="form-control form-control-sm js-hist-time" value="' + escapeHtml(row.inspectionTime ? String(row.inspectionTime).slice(0, 5) : "") + '"></div></td>' +
         '<td><input type="text" class="form-control form-control-sm js-hist-inspector" value="' + escapeHtml(row.inspectorName || "") + '"></td>' +
         '<td><div class="mb-2">' + statusBadge(row.inspectionStatus) + '</div><textarea class="form-control form-control-sm js-hist-note" rows="3">' + escapeHtml(row.note || "") + '</textarea><div class="small mt-2">' + photoLink + '</div></td>' +
-        '<td>' + buildChecklistEditor(row) + '<div class="text-end mt-2"><button type="button" class="btn btn-sm btn-fw-edit js-history-save">저장</button></div></td>' +
+        '<td>' + buildChecklistEditor(row) + '<div class="text-end mt-2 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-fw-edit js-history-save">수정</button><button type="button" class="btn btn-sm btn-fw-delete js-history-delete">삭제</button></div></td>' +
         '</tr>';
     });
     rows.unshift(
@@ -1087,6 +1087,28 @@
     }
     const url = config.apiBase + "/inspections/export-all?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
     fetchCsvDownload(url, "inspections-all.csv");
+  }
+
+  async function deleteHistoryRow(button) {
+    const row = button.closest("tr[data-inspection-id]");
+    const currentItemId = document.getElementById("itemId")?.value || "";
+    const targetId = currentItemId || state.selectedDetailId;
+    const inspectionId = row?.getAttribute("data-inspection-id") || "";
+    if (!row || !targetId || !inspectionId) return;
+    if (!confirm("해당 점검 이력을 삭제하시겠습니까?")) return;
+    await window.FireWebCsrf?.ensureToken?.();
+    button.disabled = true;
+    try {
+      await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId), { method: "DELETE" });
+      await loadList();
+      if (state.detailModal && document.getElementById("detailModal")?.classList.contains("show")) {
+        await openDetail(targetId);
+      }
+      const detail = await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId), { method: "GET" });
+      renderEditableHistory(detail.inspections || []);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function saveHistoryRow(button) {
@@ -1299,12 +1321,17 @@
     });
     document.getElementById("itemHistoryBody")?.addEventListener("click", async function (event) {
       const saveBtn = event.target.closest(".js-history-save");
-      if (!saveBtn) return;
+      const deleteBtn = event.target.closest(".js-history-delete");
+      if (!saveBtn && !deleteBtn) return;
       if (!canEdit) return;
       try {
-        await saveHistoryRow(saveBtn);
+        if (deleteBtn) {
+          await deleteHistoryRow(deleteBtn);
+        } else {
+          await saveHistoryRow(saveBtn);
+        }
       } catch (error) {
-        alert(error.message || "점검 이력 저장에 실패했습니다.");
+        alert(error.message || (deleteBtn ? "점검 이력 삭제에 실패했습니다." : "점검 이력 저장에 실패했습니다."));
       }
     });
     bindMapEvents();
