@@ -1841,10 +1841,12 @@ async function renderFireIndex() {
     }
     function inspectionNeedCell(summary) {
       var rate = summary.denom ? Math.round(summary.inspect / summary.denom * 100) : 0;
-      var bg = rate >= 70 ? 'var(--red-light)' : (rate >= 40 ? 'var(--orange-light)' : (rate > 0 ? '#fef9c3' : '#dcfce7'));
-      var fg = rate >= 70 ? 'var(--red)' : (rate >= 40 ? 'var(--orange)' : (rate > 0 ? '#a16207' : 'var(--green)'));
-      return '<span class="badge" style="background:'+bg+';color:'+fg+';font-weight:800;">점검 필요 '+summary.inspect+'</span>'
-        + '<span style="font-size:11px;color:var(--text3);margin-left:6px;">/ '+summary.denom+'</span>';
+      var color = rate < 20 ? 'var(--green)' : (rate <= 50 ? '#eab308' : (rate <= 70 ? 'var(--orange)' : 'var(--red)'));
+      var light = rate < 20 ? '#dcfce7' : (rate <= 50 ? '#fef9c3' : (rate <= 70 ? 'var(--orange-light)' : 'var(--red-light)'));
+      return '<div style="display:flex;align-items:center;gap:10px;min-width:220px;">'
+        + '<div title="점검 필요 비율 '+rate+'%" style="background:var(--border);border-radius:999px;height:12px;width:132px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);">'
+        + '<div style="height:100%;width:'+rate+'%;background:'+color+';border-radius:999px;transition:width .25s ease;"></div></div>'
+        + '<span class="badge" style="background:'+light+';color:'+color+';font-weight:800;white-space:nowrap;">'+summary.inspect+'개</span></div>';
     }
     function pieChartCard(summary) {
       var denom = Math.max(summary.denom || summary.total || 0, 0);
@@ -1854,21 +1856,32 @@ async function renderFireIndex() {
         { label:'교체필요', count:summary.graphReplace, color:'#8b5cf6' },
         { label:'이상설비', count:summary.graphAbnormal, color:'var(--red)' }
       ];
-      var cursor = 0;
-      var gradient = denom > 0 ? slices.map(function(s) {
-        var start = cursor;
-        var end = cursor + (s.count / denom * 360);
-        cursor = end;
-        return s.color + ' ' + start.toFixed(2) + 'deg ' + end.toFixed(2) + 'deg';
-      }).join(',') : '#f1f5f9 0deg 360deg';
       var normalRate = denom ? Math.round(summary.graphNormal / denom * 100) : 0;
-      return '<div style="border:1px solid var(--border);border-radius:18px;padding:22px;background:#fff;display:flex;gap:24px;align-items:center;min-height:260px;">'
-        + '<div style="position:relative;width:190px;height:190px;flex:0 0 190px;border-radius:50%;background:conic-gradient('+gradient+');box-shadow:inset 0 0 0 1px rgba(15,23,42,.06),0 16px 28px rgba(15,23,42,.08);" title="'+esc(summary.label)+' 상태 분포">'
-        + '<div class="pie-center" data-default-label="정상설비" data-default-rate="'+normalRate+'%" style="position:absolute;inset:38px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(15,23,42,.06);">'
-        + '<b class="pie-rate" style="font-size:30px;color:var(--text);line-height:1;">'+normalRate+'%</b><span class="pie-label" style="font-size:12px;color:var(--text3);margin-top:6px;">정상설비</span></div></div>'
-        + '<div style="min-width:0;flex:1;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:16px;"><b style="font-size:18px;color:var(--text);">'+esc(summary.label)+'</b><span style="font-size:13px;color:var(--text3);">총 '+denom+'</span></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:13px;color:var(--text2);">'
-        + slices.map(function(s) { var pct = denom ? Math.round(s.count / denom * 100) : 0; return '<span data-label="'+esc(s.label)+'" data-rate="'+pct+'%" onmouseenter="var c=this.closest(\'div[style*=border]\').querySelector(\'.pie-center\'); if(c){c.querySelector(\'.pie-rate\').textContent=this.dataset.rate;c.querySelector(\'.pie-label\').textContent=this.dataset.label;}" onmouseleave="var c=this.closest(\'div[style*=border]\').querySelector(\'.pie-center\'); if(c){c.querySelector(\'.pie-rate\').textContent=c.dataset.defaultRate;c.querySelector(\'.pie-label\').textContent=c.dataset.defaultLabel;}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default;"><span><b style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+s.color+';margin-right:6px;"></b>'+s.label+'</span><b style="color:var(--text);">'+s.count+'</b></span>'; }).join('')
+      var offset = 0;
+      var segments = slices.map(function(s) {
+        var pct = denom ? (s.count / denom * 100) : 0;
+        var rounded = Math.round(pct);
+        var seg = '';
+        if (pct > 0) {
+          seg = '<circle class="pie-segment pie-hover-target" cx="60" cy="60" r="44" pathLength="100" fill="none" stroke="'+s.color+'" stroke-width="24" stroke-dasharray="'+pct.toFixed(3)+' '+(100-pct).toFixed(3)+'" stroke-dashoffset="-'+offset.toFixed(3)+'" transform="rotate(-90 60 60)" data-label="'+esc(s.label)+'" data-rate="'+rounded+'%" style="cursor:pointer;filter:drop-shadow(0 4px 3px rgba(15,23,42,.22));transition:stroke-width .16s ease, filter .16s ease;"></circle>';
+        }
+        offset += pct;
+        return seg;
+      }).join('') || '<circle cx="60" cy="60" r="44" pathLength="100" fill="none" stroke="#e2e8f0" stroke-width="24"></circle>';
+      return '<div class="fire-pie-card" style="border:1px solid var(--border);border-radius:18px;padding:24px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);display:flex;gap:28px;align-items:center;min-height:300px;box-shadow:0 14px 28px rgba(15,23,42,.06);">'
+        + '<div style="position:relative;width:230px;height:220px;flex:0 0 230px;perspective:800px;">'
+        + '<div style="position:absolute;left:32px;right:32px;bottom:14px;height:24px;border-radius:50%;background:rgba(15,23,42,.18);filter:blur(8px);"></div>'
+        + '<svg viewBox="0 0 120 120" width="220" height="220" aria-label="'+esc(summary.label)+' 설비 현황" style="position:absolute;left:5px;top:0;overflow:visible;transform:rotateX(14deg);transform-origin:center;">'
+        + '<defs><filter id="pieShadow'+esc(summary.type)+'" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="10" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.22"/></filter></defs>'
+        + '<circle cx="60" cy="66" r="44" fill="none" stroke="rgba(15,23,42,.18)" stroke-width="24"></circle>'
+        + '<g filter="url(#pieShadow'+esc(summary.type)+')">'+segments+'</g>'
+        + '<circle cx="60" cy="60" r="27" fill="#fff" stroke="rgba(15,23,42,.08)" stroke-width="1"></circle>'
+        + '</svg>'
+        + '<div class="pie-center" data-default-label="정상설비" data-default-rate="'+normalRate+'%" style="position:absolute;left:75px;top:75px;width:80px;height:80px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(15,23,42,.10), inset 0 0 0 1px rgba(15,23,42,.06);pointer-events:none;">'
+        + '<b class="pie-rate" style="font-size:28px;color:var(--text);line-height:1;">'+normalRate+'%</b><span class="pie-label" style="font-size:11px;color:var(--text3);margin-top:6px;">정상설비</span></div></div>'
+        + '<div style="min-width:0;flex:1;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:18px;"><b style="font-size:19px;color:var(--text);">'+esc(summary.label)+'</b><span style="font-size:13px;color:var(--text3);">총 '+denom+'</span></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px 16px;font-size:13px;color:var(--text2);">'
+        + slices.map(function(s) { var pct = denom ? Math.round(s.count / denom * 100) : 0; return '<span class="pie-legend-item pie-hover-target" data-label="'+esc(s.label)+'" data-rate="'+pct+'%" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;border-radius:10px;padding:7px 8px;background:#fff;box-shadow:inset 0 0 0 1px rgba(15,23,42,.06);"><span><b style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+s.color+';margin-right:6px;"></b>'+s.label+'</span><b style="color:var(--text);">'+s.count+'</b></span>'; }).join('')
         + '</div></div></div>';
     }
     function tableRow(summary) {
@@ -1925,6 +1938,43 @@ async function renderFireIndex() {
           return '<tr><td>'+esc(it.label)+'</td><td><b>'+esc(it.name)+'</b></td><td>'+esc(it.location)+'</td><td>'+fireBadge(it.status)+' <span style="font-size:12px;color:var(--text2);">'+esc(it.reason)+'</span></td><td>'+fireDate(it.date)+'</td><td style="text-align:right;">'+(it.url ? '<button type="button" class="btn-small fire-shortcut-btn" data-path="'+esc(it.url)+'" style="border:1px solid var(--primary);background:#fff;color:var(--primary);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">바로가기</button>' : '<span style="color:var(--text3);font-size:12px;">좌표 없음</span>')+'</td></tr>';
         }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">점검 결과 비정상으로 기록된 이상설비가 없습니다.</td></tr>')+'</tbody></table>'
       + '</div></div>';
+    el.querySelectorAll('.fire-pie-card').forEach(function(card) {
+      var center = card.querySelector('.pie-center');
+      if (!center) return;
+      var rateEl = center.querySelector('.pie-rate');
+      var labelEl = center.querySelector('.pie-label');
+      function setCenter(rate, label) {
+        if (rateEl) rateEl.textContent = rate || center.dataset.defaultRate || '-';
+        if (labelEl) labelEl.textContent = label || center.dataset.defaultLabel || '-';
+      }
+      function setSegmentActive(label, active) {
+        card.querySelectorAll('.pie-segment').forEach(function(seg) {
+          if ((seg.getAttribute('data-label') || '') !== label) return;
+          seg.setAttribute('stroke-width', active ? '28' : '24');
+          seg.style.filter = active ? 'drop-shadow(0 8px 6px rgba(15,23,42,.35))' : 'drop-shadow(0 4px 3px rgba(15,23,42,.22))';
+        });
+      }
+      card.querySelectorAll('.pie-hover-target').forEach(function(target) {
+        target.addEventListener('mouseenter', function() {
+          var label = target.getAttribute('data-label') || center.dataset.defaultLabel || '-';
+          setCenter(target.getAttribute('data-rate'), label);
+          setSegmentActive(label, true);
+          if (target.classList.contains('pie-legend-item')) {
+            target.style.background = '#f8fafc';
+            target.style.transform = 'translateY(-1px)';
+          }
+        });
+        target.addEventListener('mouseleave', function() {
+          var label = target.getAttribute('data-label') || '';
+          setCenter(center.dataset.defaultRate, center.dataset.defaultLabel);
+          setSegmentActive(label, false);
+          if (target.classList.contains('pie-legend-item')) {
+            target.style.background = '#fff';
+            target.style.transform = '';
+          }
+        });
+      });
+    });
     el.querySelectorAll('.fire-shortcut-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var path = btn.getAttribute('data-path');
