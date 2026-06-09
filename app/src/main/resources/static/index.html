@@ -1844,24 +1844,31 @@ async function renderFireIndex() {
         + '<div style="background:var(--border);border-radius:999px;height:10px;width:120px;overflow:hidden;"><div style="background:'+color+';height:100%;width:'+summary.inspectRate+'%;"></div></div>'
         + '<b style="font-size:12px;color:var(--text);">'+summary.inspectRate+'%</b><span style="font-size:11px;color:var(--text3)">('+summary.inspect+'/'+summary.denom+')</span></div>';
     }
-    function graphRow(summary) {
-      var denom = Math.max(summary.denom || summary.total || 0, 1);
-      var normalPct = Math.max(0, Math.round(summary.graphNormal / denom * 100));
-      var inspectPct = Math.max(0, Math.round(summary.graphInspect / denom * 100));
-      var replacePct = Math.max(0, Math.round(summary.graphReplace / denom * 100));
-      var abnormalPct = Math.max(0, Math.round(summary.graphAbnormal / denom * 100));
-      var empty = summary.denom === 0;
-      return '<div style="display:grid;grid-template-columns:90px 1fr 210px;gap:12px;align-items:center;margin:12px 0;">'
-        + '<b style="font-size:13px;">'+esc(summary.label)+'</b>'
-        + '<div style="display:flex;height:18px;background:var(--border);border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.03);">'
-        + (empty ? '<div style="width:100%;background:#f1f5f9;"></div>' : '')
-        + (!empty && normalPct ? '<div title="정상 '+summary.graphNormal+'" style="width:'+normalPct+'%;background:var(--green);"></div>' : '')
-        + (!empty && inspectPct ? '<div title="점검필요 '+summary.graphInspect+'" style="width:'+inspectPct+'%;background:var(--orange);"></div>' : '')
-        + (!empty && replacePct ? '<div title="교체필요 '+summary.graphReplace+'" style="width:'+replacePct+'%;background:#8b5cf6;"></div>' : '')
-        + (!empty && abnormalPct ? '<div title="이상설비 '+summary.graphAbnormal+'" style="width:'+abnormalPct+'%;background:var(--red);"></div>' : '')
-        + '</div>'
-        + '<div style="font-size:11px;color:var(--text2);display:flex;gap:8px;flex-wrap:wrap;"><span>정상 '+summary.graphNormal+'</span><span>점검 '+summary.graphInspect+'</span><span>교체 '+summary.graphReplace+'</span><span>이상 '+summary.graphAbnormal+'</span></div>'
-        + '</div>';
+    function pieChartCard(summary) {
+      var denom = Math.max(summary.denom || summary.total || 0, 0);
+      var slices = [
+        { label:'정상', count:summary.graphNormal, color:'var(--green)' },
+        { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
+        { label:'교체필요', count:summary.graphReplace, color:'#8b5cf6' },
+        { label:'이상설비', count:summary.graphAbnormal, color:'var(--red)' }
+      ];
+      var cursor = 0;
+      var gradient = denom > 0 ? slices.map(function(s) {
+        var start = cursor;
+        var end = cursor + (s.count / denom * 360);
+        cursor = end;
+        return s.color + ' ' + start.toFixed(2) + 'deg ' + end.toFixed(2) + 'deg';
+      }).join(',') : '#f1f5f9 0deg 360deg';
+      var issueCount = summary.graphInspect + summary.graphReplace + summary.graphAbnormal;
+      var issueRate = denom ? Math.round(issueCount / denom * 100) : 0;
+      return '<div style="border:1px solid var(--border);border-radius:16px;padding:16px;background:#fff;display:flex;gap:16px;align-items:center;min-height:170px;">'
+        + '<div style="position:relative;width:128px;height:128px;flex:0 0 128px;border-radius:50%;background:conic-gradient('+gradient+');box-shadow:inset 0 0 0 1px rgba(15,23,42,.06);" title="'+esc(summary.label)+' 상태 분포">'
+        + '<div style="position:absolute;inset:24px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(15,23,42,.06);">'
+        + '<b style="font-size:20px;color:var(--text);line-height:1;">'+issueRate+'%</b><span style="font-size:10px;color:var(--text3);margin-top:4px;">관리필요</span></div></div>'
+        + '<div style="min-width:0;flex:1;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;"><b style="font-size:15px;color:var(--text);">'+esc(summary.label)+'</b><span style="font-size:12px;color:var(--text3);">총 '+denom+'</span></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 10px;font-size:12px;color:var(--text2);">'
+        + slices.map(function(s) { return '<span style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span><b style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+s.color+';margin-right:5px;"></b>'+s.label+'</span><b style="color:var(--text);">'+s.count+'</b></span>'; }).join('')
+        + '</div></div></div>';
     }
     function tableRow(summary, color) {
       return '<tr><td><b>'+esc(summary.label)+'</b></td><td>'+summary.total+'</td><td>'+countBadge(summary.abnormal, '이상설비', 'red')+'</td><td>'+rateCell(summary, color)+'</td><td style="text-align:right;"><a href="#" onclick="navigate(\''+summary.listPage+'\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>';
@@ -1901,9 +1908,9 @@ async function renderFireIndex() {
       + '<div class="stat-card" style="border-left:3px solid #8b5cf6;"><div class="label">교체필요</div><div class="value" style="color:#8b5cf6;">'+replaceTotal+'</div><div class="sub">소화기 교체 예정/만료</div></div>'
       + '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">이상설비</div><div class="value" style="color:var(--red);">'+abnormalTotal+'</div><div class="sub">점검 결과 비정상 설비</div></div>'
       + '</div>'
-      + '<div class="card"><div class="card-header"><h3>설비 상태 그래프</h3><span style="font-size:12px;color:var(--text3)">정상/점검필요/교체필요/이상설비 분포</span></div><div class="card-body">'
+      + '<div class="card"><div class="card-header"><h3>설비 상태 원형 그래프</h3><span style="font-size:12px;color:var(--text3)">정상/점검필요/교체필요/이상설비 분포</span></div><div class="card-body">'
       + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8b5cf6;"></b> 교체필요 '+graphReplaceTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비 '+graphAbnormalTotal+'</span></div>'
-      + summaries.map(graphRow).join('') + '</div></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">' + summaries.map(pieChartCard).join('') + '</div></div></div>'
       + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상 수량, 점검필요 비율은 최근 30일 기준입니다.</span></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검필요 비율</th><th></th></tr></thead><tbody>'
       + tableRow(summaryByType.ext, 'var(--primary)')
