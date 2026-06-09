@@ -345,9 +345,15 @@
     addMode: null,
     selectedExtId: null, selectedHydrantId: null,
     selectedEquipmentType: null, selectedEquipmentId: null,
+    outdoorEquipmentView: 'ext',
     floors: [], buildings: [], current: null, exts: [], hyds: [], receivers: [], pumps: [],
     needInspectMode: false
   };
+  const OUTDOOR_EQUIPMENT_OPTIONS = [
+    { value: 'ext', label: '소화기' },
+    { value: 'hyd', label: '소화전' },
+    { value: 'equipment', label: '수신기/소방펌프' }
+  ];
   const MIN_PLAN_ZOOM = 0.5; // 일반 층별 도면은 원본 크기의 50% 미만으로 축소되지 않도록 제한
   const OUTDOOR_MIN_PLAN_ZOOM = 0.08; // 옥외 항공사진은 전체가 보이도록 더 많이 축소 허용
   const MAX_PLAN_ZOOM = 3;
@@ -485,18 +491,22 @@
     resetMoveArm();
     updateActionButtons();
     planImg.src = state.current.planImagePath || planImage(state.current.buildingName, state.current.floorName) || '';
-    planTitle.textContent = `${cleanBuildingName(state.current.buildingName)} ${cleanFloorName(state.current.floorName)}`;
+    updatePlanTitle();
     centerPlanInView();
     renderList();
     renderMarkers();
-    if (pushState) {
-      const next = `/maps/floor.html?buildingName=${encodeURIComponent(state.current.buildingName)}&floorName=${encodeURIComponent(state.current.floorName)}`;
-      history.replaceState(null, '', next);
-    }
+    if (pushState) replaceCurrentHistory();
   }
   function syncFloorSelectForBuilding(buildingKey){
     const b = state.buildings.find(x => x.key === buildingKey);
     if (!b || !floorSelect) return;
+    if (isOutdoorBuildingGroup(b)) {
+      floorSelect.innerHTML = OUTDOOR_EQUIPMENT_OPTIONS
+        .map(opt => `<option value="${opt.value}">${opt.label}</option>`)
+        .join('');
+      floorSelect.value = normalizeOutdoorEquipmentView(state.outdoorEquipmentView);
+      return;
+    }
     floorSelect.innerHTML = b.floors
       .map(f => `<option value="${String(f.floorId)}">${cleanFloorName(f.floorName)}</option>`)
       .join('');
@@ -515,7 +525,11 @@
     if (!currentBuilding) return;
     buildingSelect.value = currentBuilding.key;
     syncFloorSelectForBuilding(currentBuilding.key);
-    floorSelect.value = String(state.current.floorId);
+    if (isOutdoorBuildingGroup(currentBuilding)) {
+      floorSelect.value = normalizeOutdoorEquipmentView(state.outdoorEquipmentView);
+    } else {
+      floorSelect.value = String(state.current.floorId);
+    }
     if (setCurrentFloor) syncCurrentFloor(false);
   }
   function planImage(buildingName, floorName){
@@ -663,6 +677,68 @@
     const f = normalize(state.current.floorName);
     const p = String(state.current.planImagePath || '').toLowerCase();
     return b.includes('\uc625\uc678') || b.includes('outdoor') || f === '\uc625\uc678' || p.includes('drone_photo');
+  }
+  function isOutdoorFloorLike(item){
+    if (!item) return false;
+    if (item.isOutdoor) return true;
+    const b = normalize(item.buildingName);
+    const f = normalize(item.floorName);
+    const p = String(item.planImagePath || '').toLowerCase();
+    return b.includes('\uc625\uc678') || b.includes('outdoor') || f === '\uc625\uc678' || p.includes('drone_photo') || isOutdoorEquipmentItem(item);
+  }
+  function isOutdoorBuildingGroup(building){
+    if (!building) return false;
+    const b = normalize(building.buildingName);
+    return b.includes('\uc625\uc678') || b.includes('outdoor') || (Array.isArray(building.floors) && building.floors.some(isOutdoorFloorLike));
+  }
+  function getOutdoorFloor(){
+    return state.floors.find(v => v.isOutdoor)
+      || state.floors.find(v => normalize(v.buildingName).includes('\uc625\uc678') || normalize(v.buildingName).includes('outdoor'))
+      || state.floors.find(isOutdoorFloorLike)
+      || null;
+  }
+  function normalizeOutdoorEquipmentView(value){
+    const v = String(value || '').trim();
+    return OUTDOOR_EQUIPMENT_OPTIONS.some(opt => opt.value === v) ? v : 'ext';
+  }
+  function outdoorEquipmentViewForFocusType(focusType){
+    if (focusType === 'hyd') return 'hyd';
+    if (focusType === 'receiver' || focusType === 'pump') return 'equipment';
+    return 'ext';
+  }
+  function outdoorEquipmentViewLabel(value){
+    const v = normalizeOutdoorEquipmentView(value);
+    return OUTDOOR_EQUIPMENT_OPTIONS.find(opt => opt.value === v)?.label || '소화기';
+  }
+  function updatePlanTitle(){
+    if (!state.current) return;
+    planTitle.textContent = isOutdoorCurrent()
+      ? `${cleanBuildingName(state.current.buildingName)} ${outdoorEquipmentViewLabel(state.outdoorEquipmentView)}`
+      : `${cleanBuildingName(state.current.buildingName)} ${cleanFloorName(state.current.floorName)}`;
+  }
+  function replaceCurrentHistory(){
+    if (!state.current) return;
+    const next = new URL('/maps/floor.html', location.origin);
+    next.searchParams.set('buildingName', state.current.buildingName || '');
+    next.searchParams.set('floorName', state.current.floorName || '');
+    if (isOutdoorCurrent()) next.searchParams.set('outdoorView', normalizeOutdoorEquipmentView(state.outdoorEquipmentView));
+    history.replaceState(null, '', `${next.pathname}${next.search}`);
+  }
+  function syncOutdoorEquipmentView(pushState){
+    state.outdoorEquipmentView = normalizeOutdoorEquipmentView(state.outdoorEquipmentView);
+    if (floorSelect && isOutdoorCurrent()) floorSelect.value = state.outdoorEquipmentView;
+    state.selectedExtId = null;
+    state.selectedHydrantId = null;
+    state.selectedEquipmentType = null;
+    state.selectedEquipmentId = null;
+    hideInfo();
+    resetMoveArm();
+    resetAddMode();
+    updateActionButtons();
+    updatePlanTitle();
+    renderList();
+    renderMarkers();
+    if (pushState) replaceCurrentHistory();
   }
   function hasMapCoords(item){
     return item && item.x != null && item.y != null && Number.isFinite(Number(item.x)) && Number.isFinite(Number(item.y));
@@ -978,11 +1054,14 @@
 
   function renderList(){
     if (isOutdoorCurrent()) {
+      const view = normalizeOutdoorEquipmentView(state.outdoorEquipmentView);
       const extCount = state.exts.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
       const hydCount = state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x)).length;
       const receiverCount = state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
       const pumpCount = state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
-      listEl.innerHTML = `<div class="text-muted small">옥외 도면에서는 소화기 ${extCount}개, 소화전 ${hydCount}개, 수신기 ${receiverCount}개, 소방펌프 ${pumpCount}개가 마커로 표시됩니다.</div>`;
+      const selectedCount = view === 'ext' ? extCount : (view === 'hyd' ? hydCount : receiverCount + pumpCount);
+      const detail = view === 'equipment' ? `수신기 ${receiverCount}개, 소방펌프 ${pumpCount}개` : `${outdoorEquipmentViewLabel(view)} ${selectedCount}개`;
+      listEl.innerHTML = `<div class="text-muted small">옥외 도면은 층 선택 드롭다운에서 설비 구분을 선택합니다. 현재 <strong>${outdoorEquipmentViewLabel(view)}</strong>만 표시 중입니다. (${detail})</div>`;
       return;
     }
     listEl.innerHTML = '';
@@ -1033,13 +1112,14 @@
     equipmentMarkersEl.innerHTML = '';
 
     const outdoor = isOutdoorCurrent();
+    const outdoorView = normalizeOutdoorEquipmentView(state.outdoorEquipmentView);
     let exts = outdoor
-      ? state.exts.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x))
+      ? (outdoorView === 'ext' ? state.exts.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)) : [])
       : state.exts.filter(x => isCurrentFloor(x) && hasMapCoords(x));
     let hyds = outdoor
-      ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x))
+      ? (outdoorView === 'hyd' ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x)) : [])
       : state.hyds.filter(x => isCurrentFloor(x) && hasMapCoords(x));
-    let equipments = outdoor
+    let equipments = (outdoor && outdoorView === 'equipment')
       ? [
           ...state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'receiver' })),
           ...state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'pump' }))
@@ -1251,6 +1331,7 @@
     const qsNow = new URLSearchParams(location.search);
     const qBuilding = (qsNow.get('buildingName') || '').trim();
     const qFloor = (qsNow.get('floorName') || '').trim();
+    state.outdoorEquipmentView = normalizeOutdoorEquipmentView(qsNow.get('outdoorView') || state.outdoorEquipmentView);
 
     let ej = null;
     let hj = null;
@@ -1488,17 +1569,19 @@
         (targetItem.buildingId != null && targetItem.floorId != null && String(v.buildingId) === String(targetItem.buildingId) && String(v.floorId) === String(targetItem.floorId)) ||
         (normalize(v.buildingName) === normalize(targetItem.buildingName) && normalize(v.floorName) === normalize(targetItem.floorName))
       );
-      if (targetFloor) {
-        state.current = targetFloor;
-        syncBuildingFloorSelectors(false);
-        syncCurrentFloor(false);
-      } else if (isOutdoorEquipmentItem(targetItem)) {
-        const outdoorFloor = state.floors.find(v => isOutdoorEquipmentItem(v) || v.isOutdoor || normalize(v.buildingName).includes('\uc625\uc678'));
+      if (isOutdoorEquipmentItem(targetItem)) {
+        state.outdoorEquipmentView = outdoorEquipmentViewForFocusType(focusType);
+        const outdoorFloor = (targetFloor && isOutdoorFloorLike(targetFloor) ? targetFloor : null) || getOutdoorFloor() || targetFloor;
         if (outdoorFloor) {
           state.current = outdoorFloor;
           syncBuildingFloorSelectors(false);
           syncCurrentFloor(false);
+          if (floorSelect && isOutdoorCurrent()) floorSelect.value = state.outdoorEquipmentView;
         }
+      } else if (targetFloor) {
+        state.current = targetFloor;
+        syncBuildingFloorSelectors(false);
+        syncCurrentFloor(false);
       }
     }
 
@@ -1545,9 +1628,11 @@
     const b = state.buildings.find(x => x.key === key);
     if (!b) return;
     syncFloorSelectForBuilding(key);
-    const targetFloor = pickDefaultFloor(b.floors);
+    const targetFloor = isOutdoorBuildingGroup(b) ? (b.floors.find(isOutdoorFloorLike) || getOutdoorFloor() || b.floors[0]) : pickDefaultFloor(b.floors);
     if (!targetFloor) return;
-    if (floorSelect) floorSelect.value = String(targetFloor.floorId);
+    if (floorSelect) {
+      floorSelect.value = isOutdoorBuildingGroup(b) ? normalizeOutdoorEquipmentView(state.outdoorEquipmentView) : String(targetFloor.floorId);
+    }
     state.current = targetFloor;
     resetAddMode();
     syncCurrentFloor(true);
@@ -1556,6 +1641,11 @@
     const bKey = buildingSelect?.value || '';
     const b = state.buildings.find(x => x.key === bKey);
     if (!b) return;
+    if (isOutdoorBuildingGroup(b)) {
+      state.outdoorEquipmentView = normalizeOutdoorEquipmentView(floorSelect?.value);
+      syncOutdoorEquipmentView(true);
+      return;
+    }
     const floorId = floorSelect?.value;
     const target = b.floors.find(f => String(f.floorId) === String(floorId));
     if (!target) return;
