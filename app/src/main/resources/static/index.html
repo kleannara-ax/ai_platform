@@ -69,7 +69,7 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .nav-parent .chevron{width:14px;height:14px;flex-shrink:0;transition:transform .2s;color:#64748b;}
 .nav-parent.open .chevron{transform:rotate(90deg);color:#94a3b8;}
 .nav-group{max-height:0;overflow:hidden;transition:max-height .25s cubic-bezier(.4,0,.2,1);}
-.nav-group.open{max-height:500px;}
+.nav-group.open{max-height:1200px;}
 .nav-item.active{background:#334155;color:#fff;border-left-color:#3b82f6;}
 .nav-item svg{width:18px;height:18px;flex-shrink:0;}
 .sidebar-footer{padding:16px 24px;border-top:1px solid #334155;transition:padding .25s;}
@@ -372,7 +372,7 @@ async function enterApp() {
     // fireweb_user 저장 후 returnUrl로 이동
     if (token && currentUser) {
       var fireRole = (currentUser.role||'').replace('ROLE_','');
-      var fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
+      var fireCanManage = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
       localStorage.setItem('fireweb_user', JSON.stringify({
         loginId: currentUser.loginId,
         userName: currentUser.userName,
@@ -399,7 +399,7 @@ async function enterApp() {
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
   if (token && currentUser) {
     const fireRole = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
+    const fireCanManage = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
@@ -452,6 +452,10 @@ const menuIcons = {
   'FIRE_PUMP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M12 6V2"/><path d="M12 22v-4"/><path d="M6 12H2"/><path d="M22 12h-4"/><circle cx="12" cy="12" r="2"/></svg>',
   'FIRE_FLOOR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>',
   'FIRE_QR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="21" x2="21" y2="21"/></svg>',
+  'FIRE_EQUIPMENT_GROUP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16"/><path d="M9 21v-6h2v6"/><path d="M6 8h2M12 8h2M6 12h2M12 12h2"/><path d="M18 9h2v12"/></svg>',
+  'OTHER_EQUIPMENT_GROUP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v5H8z"/><path d="M9 18h.01M15 18h.01"/></svg>',
+  'OTHER_AIRCON': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="6" rx="2"/><path d="M7 14c0 2 2 2 2 4M12 14c0 2 2 2 2 4M17 14c0 2 2 2 2 4"/></svg>',
+  'OTHER_WATER_PURIFIER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8v5H8z"/><path d="M7 8h10l-1 13H8z"/><path d="M12 12c-1 1.2-2 2.4-2 3.6A2 2 0 0012 18a2 2 0 002-2.4c0-1.2-1-2.4-2-3.6z"/></svg>',
   'PS_INSP_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
 };
@@ -470,6 +474,10 @@ const menuCodeToPage = {
   'FIRE_PUMP': 'fire_pump',
   'FIRE_FLOOR': 'fire_floor',
   'FIRE_QR': 'fire_qr',
+  'FIRE_EQUIPMENT_GROUP': 'fire_equipment_group',
+  'OTHER_EQUIPMENT_GROUP': 'other_equipment_group',
+  'OTHER_AIRCON': 'other_aircon',
+  'OTHER_WATER_PURIFIER': 'other_water_purifier',
   'PS_INSP_MGMT': 'ps_insp',
 };
 
@@ -534,31 +542,29 @@ function renderSidebarMenus() {
     nav.innerHTML = '<div style="padding:20px 24px;color:#64748b;font-size:12px;">접근 가능한 메뉴가 없습니다.</div>';
     return;
   }
-  let html = '';
-  userMenus.forEach((menu, idx) => {
-    if (idx === 0) html += '<div class="nav-section">메뉴</div>';
+  const chevron = '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+  function renderMenuNode(menu, level, indexPath) {
     const page = menuCodeToPage[menu.menuCode] || menu.menuCode.toLowerCase();
     const icon = menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
     const hasChildren = menu.children && menu.children.length > 0;
-    const groupId = 'grp_' + menu.menuCode;
-    const isOpen = menuGroupState[groupId] === true;
+    const groupId = 'grp_' + menu.menuCode + '_' + indexPath.replace(/[^a-zA-Z0-9_]/g, '_');
+    const isOpen = menuGroupState[groupId] === true || ['FIRE_MGMT', 'FIRE_EQUIPMENT_GROUP', 'OTHER_EQUIPMENT_GROUP'].includes(menu.menuCode);
+    const childClass = level > 0 ? ' nav-child' : '';
+    const indent = level > 0 ? ` style="padding-left:${24 + level * 20}px"` : '';
     if (hasChildren) {
-      // 하위 메뉴가 있는 상위 메뉴 — 클릭 시 접기/펼치기
-      const chevron = '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
-      html += `<div class="nav-item nav-parent${isOpen?' open':''}" onclick="toggleMenuGroup('${esc(groupId)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}"><span style="display:flex;align-items:center;gap:10px;overflow:hidden;">${icon} ${esc(menu.menuName)}</span>${chevron}</div>`;
-      html += `<div class="nav-group${isOpen?' open':''}" id="${esc(groupId)}">`;
-      menu.children.forEach(child => {
-        const childPage = menuCodeToPage[child.menuCode] || child.menuCode.toLowerCase();
-        const childIcon = menuIcons[child.menuCode] || menuIcons['_DEFAULT'];
-        html += `<div class="nav-item nav-child" onclick="navigate('${esc(childPage)}',this)" data-menu-code="${esc(child.menuCode)}" data-tooltip="${esc(child.menuName)}">${childIcon} ${esc(child.menuName)}</div>`;
+      let nodeHtml = `<div class="nav-item nav-parent${childClass}${isOpen?' open':''}"${indent} onclick="toggleMenuGroup('${esc(groupId)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}"><span style="display:flex;align-items:center;gap:10px;overflow:hidden;">${icon} ${esc(menu.menuName)}</span>${chevron}</div>`;
+      nodeHtml += `<div class="nav-group${isOpen?' open':''}" id="${esc(groupId)}">`;
+      menu.children.forEach((child, childIdx) => {
+        nodeHtml += renderMenuNode(child, level + 1, indexPath + '_' + childIdx);
       });
-      html += '</div>';
-    } else {
-      // 하위 메뉴 없는 단독 메뉴
-      const active = (idx === 0) ? ' active' : '';
-      html += `<div class="nav-item${active}" onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
+      nodeHtml += '</div>';
+      return nodeHtml;
     }
-  });
+    const active = currentPage === page ? ' active' : '';
+    return `<div class="nav-item${childClass}${active}"${indent} onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
+  }
+  let html = '<div class="nav-section">메뉴</div>';
+  userMenus.forEach((menu, idx) => { html += renderMenuNode(menu, 0, String(idx)); });
   nav.innerHTML = html;
 }
 
@@ -611,14 +617,14 @@ function navigate(page, el) {
       }
     }
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'소방시설관리',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',ps_insp:'PS 지분 검사'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 소방시설관리',fire_dashboard:'모듈 > 소방시설관리 > 대시보드',fire_map:'모듈 > 소방시설관리 > 도면',fire_extinguisher:'모듈 > 소방시설관리 > 소화기',fire_hydrant:'모듈 > 소방시설관리 > 소화전',fire_receiver:'모듈 > 소방시설관리 > 수신기',fire_pump:'모듈 > 소방시설관리 > 소방펌프',fire_floor:'모듈 > 소방시설관리 > 층별 도면',fire_qr:'모듈 > 소방시설관리 > QR코드',ps_insp:'모듈 > PS 지분 검사'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_dashboard:'소방 대시보드',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',ps_insp:'PS 지분 검사'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_dashboard:'모듈 > 설비관리시스템 > 소방설비 > 대시보드',fire_map:'모듈 > 설비관리시스템 > 소방설비 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 소방설비 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',ps_insp:'모듈 > PS 지분 검사'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
   // iframe 모드 해제 (소방/PS-INSP 외 페이지 전환 시)
   var pc=document.getElementById('pageContent');
-  if((!page.startsWith('fire_') && page!=='ps_insp') || page==='fire' || page==='fire_dashboard') { pc.className='page'; }
+  if((!page.startsWith('fire_') && !page.startsWith('other_') && page!=='ps_insp') || page==='fire' || page==='fire_dashboard' || page==='fire_equipment_group' || page==='other_equipment_group') { pc.className='page'; }
   if(page==='dashboard')renderDashboard();
   else if(page==='users')renderUsers();
   else if(page==='menus')renderMenus();
@@ -626,6 +632,8 @@ function navigate(page, el) {
   else if(page==='codes')renderCodes();
   else if(page==='fire')renderFireIndex();
   else if(page==='fire_dashboard')renderFireIndex();
+  else if(page==='fire_equipment_group')renderEquipmentIndex('fire');
+  else if(page==='other_equipment_group')renderEquipmentIndex('other');
   else if(page==='fire_map')navigateToFirePage('/fire-map.html');
   else if(page==='fire_extinguisher')navigateToFirePage('/extinguishers.html');
   else if(page==='fire_hydrant')navigateToFirePage('/hydrants.html');
@@ -633,6 +641,8 @@ function navigate(page, el) {
   else if(page==='fire_pump')navigateToFirePage('/pumps.html');
   else if(page==='fire_floor')navigateToFirePage('/maps/floor.html');
   else if(page==='fire_qr')navigateToFirePage('/qr');
+  else if(page==='other_aircon')navigateToFirePage('/facility/air-conditioners');
+  else if(page==='other_water_purifier')navigateToFirePage('/facility/water-purifiers');
   else if(page==='ps_insp')navigateToPsInspPage('/ps-insp-api/page');
 }
 
@@ -1622,7 +1632,7 @@ function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
     const fireRole2 = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage2 = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_FIRE_MANAGER';
+    const fireCanManage2 = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
@@ -1642,6 +1652,36 @@ function navigateToFirePage(path) {
   iframe.src = path;
   el.innerHTML = '';
   el.appendChild(iframe);
+}
+
+function renderEquipmentIndex(kind) {
+  const el = document.getElementById('pageContent');
+  const isOther = kind === 'other';
+  const title = isOther ? '기타설비' : '소방설비';
+  const desc = isOther
+    ? '에어컨과 정수기를 소화기와 동일한 수준으로 관리합니다.'
+    : '기존 도면, 각 소방설비 목록, QR코드를 모두 확인할 수 있습니다.';
+  const cards = isOther ? [
+    { title:'에어컨', desc:'시스템 · 벽걸이 · 스탠드형 에어컨 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_aircon' },
+    { title:'정수기', desc:'정수기 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_water_purifier' }
+  ] : [
+    { title:'전체 도면', desc:'건물/층 도면과 설비 배치를 확인합니다.', page:'fire_map' },
+    { title:'층별 도면', desc:'선택한 건물과 층의 도면을 확인합니다.', page:'fire_floor' },
+    { title:'소화기', desc:'소화기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_extinguisher' },
+    { title:'소화전', desc:'소화전 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_hydrant' },
+    { title:'수신기', desc:'수신기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_receiver' },
+    { title:'소방펌프', desc:'소방펌프 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_pump' },
+    { title:'QR코드', desc:'소방설비 QR코드 발급/확인 화면입니다.', page:'fire_qr' }
+  ];
+  el.innerHTML = `
+    <section class="card">
+      <div class="card-header"><h3>${esc(title)}</h3><span style="font-size:12px;color:var(--text3)">${esc(desc)}</span></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+          ${cards.map(c => `<button class="card" style="text-align:left;padding:18px;border:1px solid var(--border);background:#fff;cursor:pointer;" onclick="navigate('${c.page}')"><h3 style="font-size:16px;margin-bottom:8px;color:var(--text)">${esc(c.title)}</h3><p style="font-size:12px;color:var(--text2);line-height:1.5">${esc(c.desc)}</p></button>`).join('')}
+        </div>
+      </div>
+    </section>`;
 }
 
 async function renderFireIndex() {

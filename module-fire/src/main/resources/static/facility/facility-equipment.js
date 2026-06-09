@@ -22,6 +22,7 @@
   const fmtDate = (v) => v ? String(v).slice(0, 10) : '-';
   const fmtMonth = (v) => v ? `${String(v).slice(0,4)}년 ${String(v).slice(5,7)}월` : '-';
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const isInIframe = () => { try { return window.self !== window.top; } catch { return true; } };
 
   const API = (() => {
     const getUser = () => { try { return JSON.parse(localStorage.getItem('fireweb_user') || localStorage.getItem('fw_user') || 'null'); } catch { return null; } };
@@ -66,7 +67,7 @@
 
   function renderShell() {
     document.body.innerHTML = `
-      <header>
+      <header ${isInIframe() ? 'style="display:none"' : ''}>
         <nav class="navbar navbar-expand-lg navbar-dark facility-navbar">
           <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="/fire-map.html">설비관리시스템</a>
@@ -74,22 +75,24 @@
             <div class="collapse navbar-collapse" id="topNav">
               <ul class="navbar-nav ms-3">
                 <li class="nav-item dropdown">
-                  <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">소방설비</a>
+                  <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">소방설비</a>
                   <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/fire/extinguishers">소화기</a></li>
-                    <li><a class="dropdown-item" href="/fire/hydrants">소화전</a></li>
-                    <li><a class="dropdown-item" href="/fire/receivers">수신기</a></li>
-                    <li><a class="dropdown-item" href="/fire/pumps">소방펌프</a></li>
+                    <li><a class="dropdown-item" href="/fire-map.html">전체 도면</a></li>
+                    <li><a class="dropdown-item" href="/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5">층별 도면</a></li>
+                    <li><a class="dropdown-item" href="/extinguishers.html">소화기</a></li>
+                    <li><a class="dropdown-item" href="/hydrants.html">소화전</a></li>
+                    <li><a class="dropdown-item" href="/receivers.html">수신기</a></li>
+                    <li><a class="dropdown-item" href="/pumps.html">소방펌프</a></li>
+                    <li><a class="dropdown-item" href="/qr">QR코드</a></li>
                   </ul>
                 </li>
                 <li class="nav-item dropdown">
-                  <a class="nav-link dropdown-toggle active fw-semibold" href="#" role="button" data-bs-toggle="dropdown">기타설비</a>
+                  <a class="nav-link dropdown-toggle active fw-semibold" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">기타설비</a>
                   <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="/facility/air-conditioners">에어컨</a></li>
                     <li><a class="dropdown-item" href="/facility/water-purifiers">정수기</a></li>
                   </ul>
                 </li>
-                <li class="nav-item"><a class="nav-link fw-semibold" href="/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5">도면</a></li>
               </ul>
               <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
             </div>

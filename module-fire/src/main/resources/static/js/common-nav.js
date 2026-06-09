@@ -65,17 +65,29 @@
     var menu = nav.querySelector(".navbar-nav.ms-3");
     if (!menu) return;
     // SPA 권한관리 기준: SPA에서 접근 허용된 사용자만 iframe에 도달하므로 모든 메뉴 표시
-    var defs = [
+    var fireDefs = [
+      { href: "/fire-map.html", text: "\uC804\uCCB4 \uB3C4\uBA74" },
+      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uCE35\uBCC4 \uB3C4\uBA74" },
       { href: "/extinguishers.html", text: "\uC18C\uD654\uAE30" },
       { href: "/hydrants.html", text: "\uC18C\uD654\uC804" },
       { href: "/receivers.html", text: "\uC218\uC2E0\uAE30" },
       { href: "/pumps.html", text: "\uC18C\uBC29\uD38C\uD504" },
-      { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uB3C4\uBA74" },
       { href: "/qr", text: "QR\uCF54\uB4DC" }
     ];
-    menu.innerHTML = defs.map(function (item) {
-      return '<li class="nav-item"><a class="nav-link fw-semibold" href="' + item.href + '">' + item.text + '</a></li>';
-    }).join("");
+    var otherDefs = [
+      { href: "/facility/air-conditioners", text: "\uC5D0\uC5B4\uCEE8" },
+      { href: "/facility/water-purifiers", text: "\uC815\uC218\uAE30" }
+    ];
+    function dropdown(label, items, active) {
+      return '<li class="nav-item dropdown">' +
+        '<a class="nav-link dropdown-toggle fw-semibold' + (active ? ' active' : '') + '" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">' + label + '</a>' +
+        '<ul class="dropdown-menu">' + items.map(function (item) {
+          return '<li><a class="dropdown-item" href="' + item.href + '">' + item.text + '</a></li>';
+        }).join("") + '</ul></li>';
+    }
+    var path = location.pathname;
+    var isOther = path.indexOf('/facility/') === 0;
+    menu.innerHTML = dropdown("\uC18C\uBC29\uC124\uBE44", fireDefs, !isOther) + dropdown("\uAE30\uD0C0\uC124\uBE44", otherDefs, isOther);
   }
 
   function syncVisibleLabels() {
