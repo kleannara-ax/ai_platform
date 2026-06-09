@@ -1839,10 +1839,12 @@ async function renderFireIndex() {
       if (count > 0) return '<span class="badge" style="background:'+(tone==='orange'?'var(--orange-light)':'var(--red-light)')+';color:'+(tone==='orange'?'var(--orange)':'var(--red)')+';">'+label+' '+count+'</span>';
       return '<span class="badge badge-active">0</span>';
     }
-    function rateCell(summary, color) {
-      return '<div style="display:flex;align-items:center;gap:8px;min-width:190px;">'
-        + '<div style="background:var(--border);border-radius:999px;height:10px;width:120px;overflow:hidden;"><div style="background:'+color+';height:100%;width:'+summary.inspectRate+'%;"></div></div>'
-        + '<b style="font-size:12px;color:var(--text);">'+summary.inspectRate+'%</b><span style="font-size:11px;color:var(--text3)">('+summary.inspect+'/'+summary.denom+')</span></div>';
+    function inspectionNeedCell(summary) {
+      var rate = summary.denom ? Math.round(summary.inspect / summary.denom * 100) : 0;
+      var bg = rate >= 70 ? 'var(--red-light)' : (rate >= 40 ? 'var(--orange-light)' : (rate > 0 ? '#fef9c3' : '#dcfce7'));
+      var fg = rate >= 70 ? 'var(--red)' : (rate >= 40 ? 'var(--orange)' : (rate > 0 ? '#a16207' : 'var(--green)'));
+      return '<span class="badge" style="background:'+bg+';color:'+fg+';font-weight:800;">점검 필요 '+summary.inspect+'</span>'
+        + '<span style="font-size:11px;color:var(--text3);margin-left:6px;">/ '+summary.denom+'</span>';
     }
     function pieChartCard(summary) {
       var denom = Math.max(summary.denom || summary.total || 0, 0);
@@ -1859,19 +1861,18 @@ async function renderFireIndex() {
         cursor = end;
         return s.color + ' ' + start.toFixed(2) + 'deg ' + end.toFixed(2) + 'deg';
       }).join(',') : '#f1f5f9 0deg 360deg';
-      var issueCount = summary.graphInspect + summary.graphReplace + summary.graphAbnormal;
-      var issueRate = denom ? Math.round(issueCount / denom * 100) : 0;
-      return '<div style="border:1px solid var(--border);border-radius:16px;padding:16px;background:#fff;display:flex;gap:16px;align-items:center;min-height:170px;">'
-        + '<div style="position:relative;width:128px;height:128px;flex:0 0 128px;border-radius:50%;background:conic-gradient('+gradient+');box-shadow:inset 0 0 0 1px rgba(15,23,42,.06);" title="'+esc(summary.label)+' 상태 분포">'
-        + '<div style="position:absolute;inset:24px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(15,23,42,.06);">'
-        + '<b style="font-size:20px;color:var(--text);line-height:1;">'+issueRate+'%</b><span style="font-size:10px;color:var(--text3);margin-top:4px;">관리필요</span></div></div>'
-        + '<div style="min-width:0;flex:1;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;"><b style="font-size:15px;color:var(--text);">'+esc(summary.label)+'</b><span style="font-size:12px;color:var(--text3);">총 '+denom+'</span></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 10px;font-size:12px;color:var(--text2);">'
-        + slices.map(function(s) { return '<span style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span><b style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+s.color+';margin-right:5px;"></b>'+s.label+'</span><b style="color:var(--text);">'+s.count+'</b></span>'; }).join('')
+      var normalRate = denom ? Math.round(summary.graphNormal / denom * 100) : 0;
+      return '<div style="border:1px solid var(--border);border-radius:18px;padding:22px;background:#fff;display:flex;gap:24px;align-items:center;min-height:260px;">'
+        + '<div style="position:relative;width:190px;height:190px;flex:0 0 190px;border-radius:50%;background:conic-gradient('+gradient+');box-shadow:inset 0 0 0 1px rgba(15,23,42,.06),0 16px 28px rgba(15,23,42,.08);" title="'+esc(summary.label)+' 상태 분포">'
+        + '<div class="pie-center" data-default-label="정상설비" data-default-rate="'+normalRate+'%" style="position:absolute;inset:38px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(15,23,42,.06);">'
+        + '<b class="pie-rate" style="font-size:30px;color:var(--text);line-height:1;">'+normalRate+'%</b><span class="pie-label" style="font-size:12px;color:var(--text3);margin-top:6px;">정상설비</span></div></div>'
+        + '<div style="min-width:0;flex:1;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:16px;"><b style="font-size:18px;color:var(--text);">'+esc(summary.label)+'</b><span style="font-size:13px;color:var(--text3);">총 '+denom+'</span></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:13px;color:var(--text2);">'
+        + slices.map(function(s) { var pct = denom ? Math.round(s.count / denom * 100) : 0; return '<span data-label="'+esc(s.label)+'" data-rate="'+pct+'%" onmouseenter="var c=this.closest(\'div[style*=border]\').querySelector(\'.pie-center\'); if(c){c.querySelector(\'.pie-rate\').textContent=this.dataset.rate;c.querySelector(\'.pie-label\').textContent=this.dataset.label;}" onmouseleave="var c=this.closest(\'div[style*=border]\').querySelector(\'.pie-center\'); if(c){c.querySelector(\'.pie-rate\').textContent=c.dataset.defaultRate;c.querySelector(\'.pie-label\').textContent=c.dataset.defaultLabel;}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default;"><span><b style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+s.color+';margin-right:6px;"></b>'+s.label+'</span><b style="color:var(--text);">'+s.count+'</b></span>'; }).join('')
         + '</div></div></div>';
     }
-    function tableRow(summary, color) {
-      return '<tr><td><b>'+esc(summary.label)+'</b></td><td>'+summary.total+'</td><td>'+countBadge(summary.abnormal, '이상설비', 'red')+'</td><td>'+rateCell(summary, color)+'</td><td style="text-align:right;"><a href="#" onclick="navigate(\''+summary.listPage+'\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>';
+    function tableRow(summary) {
+      return '<tr><td><b>'+esc(summary.label)+'</b></td><td>'+summary.total+'</td><td>'+countBadge(summary.abnormal, '이상설비', 'red')+'</td><td>'+inspectionNeedCell(summary)+'</td><td style="text-align:right;"><a href="#" onclick="navigate(\''+summary.listPage+'\');return false;" style="color:var(--primary);font-size:12px;font-weight:600;">목록 보기 &rarr;</a></td></tr>';
     }
 
     var summaries = [
@@ -1904,19 +1905,19 @@ async function renderFireIndex() {
       + '</div>'
       + '<div class="stats-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));">'
       + '<div class="stat-card" style="border-left:3px solid var(--primary);"><div class="label">전체 장비</div><div class="value" style="color:var(--primary);">'+totalEquip+'</div><div class="sub">소방시설 총 수량</div></div>'
-      + '<div class="stat-card" style="border-left:3px solid var(--orange);"><div class="label">점검필요</div><div class="value" style="color:var(--orange);">'+inspectTotal+'</div><div class="sub">최근 30일 내 점검 이력 없음</div></div>'
+      + '<div class="stat-card" style="border-left:3px solid var(--orange);"><div class="label">점검 필요 설비</div><div class="value" style="color:var(--orange);">'+inspectTotal+'</div><div class="sub">최근 30일 내 점검 이력 없음</div></div>'
       + '<div class="stat-card" style="border-left:3px solid #8b5cf6;"><div class="label">교체필요</div><div class="value" style="color:#8b5cf6;">'+replaceTotal+'</div><div class="sub">소화기 교체 예정/만료</div></div>'
       + '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">이상설비</div><div class="value" style="color:var(--red);">'+abnormalTotal+'</div><div class="sub">점검 결과 비정상 설비</div></div>'
       + '</div>'
-      + '<div class="card"><div class="card-header"><h3>설비 상태 원형 그래프</h3><span style="font-size:12px;color:var(--text3)">정상/점검필요/교체필요/이상설비 분포</span></div><div class="card-body">'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8b5cf6;"></b> 교체필요 '+graphReplaceTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비 '+graphAbnormalTotal+'</span></div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">' + summaries.map(pieChartCard).join('') + '</div></div></div>'
-      + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상 수량, 점검필요 비율은 최근 30일 기준입니다.</span></div><div class="card-body" style="padding:0;">'
-      + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검필요 비율</th><th></th></tr></thead><tbody>'
-      + tableRow(summaryByType.ext, 'var(--primary)')
-      + tableRow(summaryByType.hyd, 'var(--green)')
-      + tableRow(summaryByType.receiver, 'var(--orange)')
-      + tableRow(summaryByType.pump, 'var(--red)')
+      + '<div class="card"><div class="card-header"><h3>설비 현황</h3><span style="font-size:12px;color:var(--text3)">원형 그래프 중앙은 기본 정상설비 비율이며, 범례에 마우스를 올리면 해당 상태 비율을 표시합니다.</span></div><div class="card-body">'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8b5cf6;"></b> 교체필요 '+graphReplaceTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비 '+graphAbnormalTotal+'</span></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:18px;">' + summaries.map(pieChartCard).join('') + '</div></div></div>'
+      + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상 수량, 점검 필요 설비는 최근 30일 기준 수량입니다.</span></div><div class="card-body" style="padding:0;">'
+      + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검 필요 설비</th><th></th></tr></thead><tbody>'
+      + tableRow(summaryByType.ext)
+      + tableRow(summaryByType.hyd)
+      + tableRow(summaryByType.receiver)
+      + tableRow(summaryByType.pump)
       + '</tbody></table></div></div>'
       + '<div class="card"><div class="card-header"><h3>이상설비</h3><span style="font-size:12px;color:var(--text3)">점검 결과 비정상으로 기록된 설비입니다. 바로가기를 누르면 도면의 해당 마커가 선택됩니다.</span></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>이름/모델</th><th>위치</th><th>이상 내용</th><th>점검일</th><th style="text-align:right;">바로가기</th></tr></thead>'
