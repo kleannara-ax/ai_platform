@@ -1685,7 +1685,7 @@ function renderEquipmentIndex(kind) {
     ? '에어컨과 정수기를 소화기와 동일한 수준으로 관리합니다.'
     : '기존 도면, 각 소방설비 목록, QR코드를 모두 확인할 수 있습니다.';
   const cards = isOther ? [
-    { title:'대시보드', desc:'에어컨/정수기 전체 현황, 점검 필요, 교체 필요, 이상설비와 도면 바로가기를 확인합니다.', page:'other_dashboard' },
+    { title:'대시보드', desc:'에어컨/정수기 전체 현황과 점검요청/점검필요 설비, 도면 바로가기를 확인합니다.', page:'other_dashboard' },
     { title:'도면 (메인)', desc:'사업장 메인 도면에서 건물과 층을 선택해 기타설비 층별 도면으로 이동합니다. 옥외 설비는 표시하지 않습니다.', page:'other_map' },
     { title:'층별 도면', desc:'선택한 건물/층 도면에서 에어컨과 정수기 마커, 정보 카드, 상세/점검/수정 바로가기를 확인합니다.', page:'other_floor' },
     { title:'에어컨', desc:'시스템 · 벽걸이 · 스탠드형 에어컨 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_aircon' },
@@ -1715,7 +1715,6 @@ async function renderOtherEquipmentDashboard() {
   el.innerHTML = '<p style="color:var(--text3)">기타설비 현황을 불러오는 중...</p>';
   try {
     var today = new Date(); today.setHours(0,0,0,0);
-    var threshold30 = new Date(today.getTime() + 30*24*3600*1000);
     var oneMonthAgo = new Date(today.getTime() - 30*24*3600*1000);
     var results = await Promise.all([
       api('GET', '/facility-api/air-conditioners?page=0&size=2000'),
@@ -1735,12 +1734,8 @@ async function renderOtherEquipmentDashboard() {
       var dt = parseDate(it.lastInspectionDate);
       return !dt || dt < oneMonthAgo;
     }
-    function isReplacementDue(it) {
-      var due = parseDate(it.replacementDueDate);
-      return !!(due && due <= threshold30);
-    }
-    function isAbnormal(it) { return it.lastIsFaulty === true; }
     function typeLabel(type) { return type === 'aircon' ? '에어컨' : '정수기'; }
+    function inspectLabel(type) { return type === 'aircon' ? '점검요청' : '점검필요'; }
     function getId(it) { return it.equipmentId; }
     function locationText(it) { return [it.buildingName, it.floorName].filter(Boolean).join(' / ') || '-'; }
     function nameText(it) { return it.serialNumber || it.equipmentType || ('기타설비 #' + (it.equipmentId || '-')); }
@@ -1762,40 +1757,30 @@ async function renderOtherEquipmentDashboard() {
       return (type === 'aircon' ? '/facility/air-conditioners' : '/facility/water-purifiers') + '?' + p.toString();
     }
     function summarize(type, label, items, listPage) {
-      var abnormal = 0, inspect = 0, replace = 0, normal = 0;
-      var graphAbnormal = 0, graphInspect = 0, graphReplace = 0, graphNormal = 0;
-      var abnormalItems = [];
+      var inspect = 0, normal = 0;
+      var inspectItems = [];
       items.forEach(function(it) {
-        var a = isAbnormal(it);
         var i = isInspectionDue(it);
-        var r = isReplacementDue(it);
-        if (a) {
-          abnormal++;
-          abnormalItems.push({ type:type, label:label, id:getId(it), name:nameText(it), location:locationText(it), status:'비정상', reason:it.lastFaultReason || '점검 결과 비정상', date:it.lastInspectionDate || it.createdAt, url:shortcutUrl(type, it) });
+        if (i) {
+          inspect++;
+          inspectItems.push({ type:type, label:label, id:getId(it), name:nameText(it), location:locationText(it), status:inspectLabel(type), reason:'최근 30일 기준 점검 대상', date:it.lastInspectionDate || it.createdAt, url:shortcutUrl(type, it) });
+        } else {
+          normal++;
         }
-        if (i) inspect++;
-        if (r) replace++;
-        if (!a && !i && !r) normal++;
-        if (a) graphAbnormal++;
-        else if (r) graphReplace++;
-        else if (i) graphInspect++;
-        else graphNormal++;
       });
-      return { type:type, label:label, total:items.length, denom:items.length, abnormal:abnormal, inspect:inspect, replace:replace, normal:normal, graphAbnormal:graphAbnormal, graphInspect:graphInspect, graphReplace:graphReplace, graphNormal:graphNormal, abnormalItems:abnormalItems, listPage:listPage };
+      return { type:type, label:label, inspectLabel:inspectLabel(type), total:items.length, denom:items.length, inspect:inspect, normal:normal, inspectItems:inspectItems, listPage:listPage };
     }
     function badge(status) {
-      var bad = String(status || '').includes('비정상');
-      return '<span class="badge" style="background:'+(bad?'var(--red-light)':'var(--green-light)')+';color:'+(bad?'var(--red)':'var(--green)')+';">'+esc(status || '-')+'</span>';
+      var isAirRequest = String(status || '').includes('요청');
+      return '<span class="badge" style="background:'+(isAirRequest?'#dbeafe':'#ffedd5')+';color:'+(isAirRequest?'#2563eb':'var(--orange)')+';">'+esc(status || '-')+'</span>';
     }
     function donut(summary) {
       var slices = [
-        { label:'정상', count:summary.graphNormal, color:'var(--green)' },
-        { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
-        { label:'교체필요', count:summary.graphReplace, color:'var(--yellow-bright)' },
-        { label:'이상설비', count:summary.graphAbnormal, color:'var(--red)' }
+        { label:'정상', count:summary.normal, color:'var(--green)' },
+        { label:summary.inspectLabel, count:summary.inspect, color:summary.type === 'aircon' ? '#2563eb' : 'var(--orange)' }
       ];
       var denom = summary.denom || 0;
-      var normalRate = denom ? Math.round(summary.graphNormal / denom * 100) : 0;
+      var normalRate = denom ? Math.round(summary.normal / denom * 100) : 0;
       var offset = 0;
       var circles = slices.map(function(s) {
         var pct = denom ? (s.count / denom * 100) : 0;
@@ -1817,30 +1802,23 @@ async function renderOtherEquipmentDashboard() {
     ];
     var total = summaries.reduce((a,s)=>a+s.total,0);
     var inspectTotal = summaries.reduce((a,s)=>a+s.inspect,0);
-    var replaceTotal = summaries.reduce((a,s)=>a+s.replace,0);
-    var abnormalTotal = summaries.reduce((a,s)=>a+s.abnormal,0);
     var normalTotal = summaries.reduce((a,s)=>a+s.normal,0);
-    var graphNormalTotal = summaries.reduce((a,s)=>a+s.graphNormal,0);
-    var graphInspectTotal = summaries.reduce((a,s)=>a+s.graphInspect,0);
-    var graphReplaceTotal = summaries.reduce((a,s)=>a+s.graphReplace,0);
-    var graphAbnormalTotal = summaries.reduce((a,s)=>a+s.graphAbnormal,0);
-    var abnormalItems = summaries.flatMap(s => s.abnormalItems).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,20);
+    var inspectItems = summaries.flatMap(s => s.inspectItems).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).slice(0,20);
 
     el.innerHTML = ''
       + '<div class="stats-grid">'
       + '<div class="stat-card blue"><div class="label">전체 기타설비</div><div class="value">'+total+'</div><div class="sub">에어컨 '+airItems.length+' / 정수기 '+waterItems.length+'</div></div>'
-      + '<div class="stat-card green"><div class="label">정상설비</div><div class="value">'+normalTotal+'</div><div class="sub">점검/교체/이상 제외</div></div>'
-      + '<div class="stat-card orange"><div class="label">점검필요</div><div class="value">'+inspectTotal+'</div><div class="sub">최근 30일 기준</div></div>'
-      + '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">이상설비</div><div class="value" style="color:var(--red);">'+abnormalTotal+'</div><div class="sub">점검 결과 비정상 설비</div></div>'
+      + '<div class="stat-card green"><div class="label">정상설비</div><div class="value">'+normalTotal+'</div><div class="sub">점검요청/점검필요 제외</div></div>'
+      + '<div class="stat-card orange"><div class="label">점검요청/필요</div><div class="value">'+inspectTotal+'</div><div class="sub">에어컨은 점검요청, 정수기는 점검필요</div></div>'
       + '</div>'
-      + '<div class="card"><div class="card-header"><h3>기타설비 현황</h3><span style="font-size:12px;color:var(--text3)">소방 대시보드와 동일한 구성으로 에어컨/정수기 상태를 표시합니다.</span></div><div class="card-body">'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--yellow-bright);"></b> 교체필요 '+graphReplaceTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비 '+graphAbnormalTotal+'</span></div>'
+      + '<div class="card"><div class="card-header"><h3>기타설비 현황</h3><span style="font-size:12px;color:var(--text3)">기존 대시보드 구성은 유지하되 교체필요/이상설비 상태는 표시하지 않습니다.</span></div><div class="card-body">'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+normalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2563eb;"></b> 에어컨 점검요청 '+summaries[0].inspect+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 정수기 점검필요 '+summaries[1].inspect+'</span></div>'
       + '<div style="display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:18px;">'+summaries.map(donut).join('')+'</div></div></div>'
-      + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상 수량, 점검 필요 설비는 최근 30일 기준 수량입니다.</span></div><div class="card-body" style="padding:0;"><table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검 필요</th><th>교체 필요</th><th></th></tr></thead><tbody>'
-      + summaries.map(function(s){ return '<tr><td><strong>'+esc(s.label)+'</strong></td><td>'+s.total+'</td><td style="color:var(--red);font-weight:800;">'+s.abnormal+'</td><td style="color:var(--orange);font-weight:800;">'+s.inspect+'</td><td style="color:var(--yellow);font-weight:800;">'+s.replace+'</td><td><button class="btn btn-sm btn-outline" onclick="navigate(\''+s.listPage+'\')">목록</button></td></tr>'; }).join('')
+      + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">교체필요와 이상설비 컬럼은 기타설비 정책에 따라 제거했습니다.</span></div><div class="card-body" style="padding:0;"><table><thead><tr><th>유형</th><th>등록 수량</th><th>정상</th><th>점검 상태</th><th></th></tr></thead><tbody>'
+      + summaries.map(function(s){ return '<tr><td><strong>'+esc(s.label)+'</strong></td><td>'+s.total+'</td><td style="color:var(--green);font-weight:800;">'+s.normal+'</td><td style="color:'+(s.type==='aircon'?'#2563eb':'var(--orange)')+';font-weight:800;">'+esc(s.inspectLabel)+' '+s.inspect+'</td><td><button class="btn btn-sm btn-outline" onclick="navigate(\''+s.listPage+'\')">목록</button></td></tr>'; }).join('')
       + '</tbody></table></div></div>'
-      + '<div class="card"><div class="card-header"><h3>이상설비</h3><span style="font-size:12px;color:var(--text3)">바로가기를 누르면 기타설비 층별 도면의 해당 마커가 선택됩니다.</span></div><div class="card-body" style="padding:0;"><table><thead><tr><th>유형</th><th>설비</th><th>위치</th><th>상태</th><th>사유</th><th>최종 점검</th><th></th></tr></thead><tbody>'
-      + (abnormalItems.length ? abnormalItems.map(function(it){ return '<tr><td>'+esc(it.label)+'</td><td><button type="button" class="js-other-detail" data-type="'+esc(it.type)+'" data-id="'+esc(it.id)+'" data-title="'+esc(it.label+' 상세')+'" style="border:0;background:transparent;color:var(--primary);font-weight:800;padding:0;">'+esc(it.name)+'</button></td><td>'+esc(it.location)+'</td><td>'+badge(it.status)+'</td><td>'+esc(it.reason)+'</td><td>'+fmtDate(it.date)+'</td><td>'+(it.url?'<button type="button" class="btn btn-sm btn-primary js-other-shortcut" data-url="'+esc(it.url)+'">바로가기</button>':'')+'</td></tr>'; }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">점검 결과 비정상으로 기록된 이상설비가 없습니다.</td></tr>')
+      + '<div class="card"><div class="card-header"><h3>점검요청/점검필요 설비</h3><span style="font-size:12px;color:var(--text3)">바로가기를 누르면 기타설비 층별 도면의 해당 마커가 선택됩니다.</span></div><div class="card-body" style="padding:0;"><table><thead><tr><th>유형</th><th>설비</th><th>위치</th><th>상태</th><th>기준</th><th>최종 점검</th><th></th></tr></thead><tbody>'
+      + (inspectItems.length ? inspectItems.map(function(it){ return '<tr><td>'+esc(it.label)+'</td><td><button type="button" class="js-other-detail" data-type="'+esc(it.type)+'" data-id="'+esc(it.id)+'" data-title="'+esc(it.label+' 상세')+'" style="border:0;background:transparent;color:var(--primary);font-weight:800;padding:0;">'+esc(it.name)+'</button></td><td>'+esc(it.location)+'</td><td>'+badge(it.status)+'</td><td>'+esc(it.reason)+'</td><td>'+fmtDate(it.date)+'</td><td>'+(it.url?'<button type="button" class="btn btn-sm btn-primary js-other-shortcut" data-url="'+esc(it.url)+'">바로가기</button>':'')+'</td></tr>'; }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">점검요청/점검필요 설비가 없습니다.</td></tr>')
       + '</tbody></table></div></div>';
 
     el.querySelectorAll('.js-other-detail').forEach(function(btn) {

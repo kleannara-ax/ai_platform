@@ -48,6 +48,8 @@
   })();
 
   const canEdit = () => API.canManage();
+  const isAirconPage = () => CFG.menuCode === 'OTHER_AIRCON' || label === '에어컨';
+  const inspectStatusLabel = () => isAirconPage() ? '점검요청' : '점검필요';
 
   function bootstrapModal(id) {
     const el = $(id);
@@ -113,9 +115,7 @@
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <div class="btn-group" role="group">
-                <button type="button" class="btn btn-info text-white fw-bold" id="btnStatusInspect">점검필요 <span id="countInspect">(0)</span></button>
-                <button type="button" class="btn btn-warning text-white fw-bold" id="btnStatusPlanned">교체예정 <span id="countPlanned">(0)</span></button>
-                <button type="button" class="btn btn-danger text-white fw-bold" id="btnStatusUrgent">교체필요 <span id="countUrgent">(0)</span></button>
+                <button type="button" class="btn btn-info text-white fw-bold" id="btnStatusInspect">${esc(inspectStatusLabel())} <span id="countInspect">(0)</span></button>
               </div>
               ${canEdit() ? `<button type="button" class="btn btn-light fw-bold" id="btnAdd">+ ${esc(label)} 추가</button>` : ''}
             </div>
@@ -142,8 +142,8 @@
     return `
       <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="detailsModalBody"></div></div></div></div>
       <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1400px)"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img id="zoomImage" alt="확대 이미지" style="max-width:100%;max-height:84vh;object-fit:contain"></div></div></div></div>
-      <div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8"><label class="form-label fw-bold d-block">상태</label><div class="btn-group" role="group"><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><label class="btn btn-outline-success" for="inspectOk">정상</label><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><label class="btn btn-outline-danger" for="inspectBad">비정상</label></div></div><div class="col-12"><label class="form-label fw-bold">고장 사유</label><textarea class="form-control" id="inspectFaultReason" rows="3" placeholder="비정상인 경우 사유를 입력하세요."></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 대표 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
-      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong><span>소화기와 동일한 건물/층/좌표 기반 관리</span></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-md-4"><label class="form-label fw-bold">제조/설치월</label><input type="month" class="form-control" id="manufactureMonth" required></div><div class="col-md-4"><label class="form-label fw-bold">교체 주기(년)</label><input type="number" class="form-control" id="cycleYears" min="1" value="10"></div><div class="col-md-4"><label class="form-label fw-bold">수량</label><input type="number" class="form-control" id="quantity" min="1" value="1"></div><div class="col-md-6"><label class="form-label fw-bold">${esc(CFG.typeLabel || '설비 종류')}</label><select class="form-select" id="equipmentType" required></select></div><div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div><div class="col-12"><label class="form-label fw-bold">비고</label><textarea class="form-control" id="note" rows="2"></textarea></div><div class="col-12"><label class="form-label fw-bold">대표 사진</label><input type="file" class="form-control" id="photo" accept="image/*"><div class="form-text">저장 후 업로드되며, 기존 대표 이미지는 1장 정책에 따라 교체됩니다.</div></div></div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div><div class="small text-muted mt-2">선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></div></div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:18%">점검일</th><th style="width:18%">결과</th><th style="width:20%">점검자</th><th>고장 사유</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="5" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
+      <div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 대표 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
+      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong><span>소화기와 동일한 건물/층/좌표 기반 관리</span></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-md-4"><label class="form-label fw-bold">제조/설치월</label><input type="month" class="form-control" id="manufactureMonth" required></div><div class="col-md-4"><label class="form-label fw-bold">관리 주기(년)</label><input type="number" class="form-control" id="cycleYears" min="1" value="10"></div><div class="col-md-4"><label class="form-label fw-bold">수량</label><input type="number" class="form-control" id="quantity" min="1" value="1"></div><div class="col-md-6"><label class="form-label fw-bold">${esc(CFG.typeLabel || '설비 종류')}</label><select class="form-select" id="equipmentType" required></select></div><div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div><div class="col-12"><label class="form-label fw-bold">비고</label><textarea class="form-control" id="note" rows="2"></textarea></div><div class="col-12"><label class="form-label fw-bold">대표 사진</label><input type="file" class="form-control" id="photo" accept="image/*"><div class="form-text">저장 후 업로드되며, 기존 대표 이미지는 1장 정책에 따라 갱신됩니다.</div></div></div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div><div class="small text-muted mt-2">선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></div></div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
   }
 
   function renderNav() {
@@ -200,12 +200,8 @@
   function bucket(item) {
     const now = new Date(); now.setHours(0,0,0,0);
     const last = item.lastInspectionDate ? new Date(item.lastInspectionDate) : null;
-    const due = item.replacementDueDate ? new Date(item.replacementDueDate) : null;
-    const faulty = item.lastIsFaulty === true;
     const inspect = !last || new Date(last.getTime() + 30*24*3600*1000) <= now;
-    const urgent = faulty || (due && (due < now || due <= new Date(now.getTime() + 30*24*3600*1000)));
-    const planned = due && due >= now && due <= new Date(now.getTime() + 180*24*3600*1000) && !urgent;
-    return { inspect, urgent, planned };
+    return { inspect };
   }
 
   function filteredItems() {
@@ -216,8 +212,6 @@
   function updateCounts() {
     $('totalCount').textContent = String(state.items.length);
     $('countInspect').textContent = `(${state.items.filter(i => bucket(i).inspect).length})`;
-    $('countPlanned').textContent = `(${state.items.filter(i => bucket(i).planned).length})`;
-    $('countUrgent').textContent = `(${state.items.filter(i => bucket(i).urgent).length})`;
   }
 
   function sortValue(item, key) {
@@ -227,11 +221,8 @@
       case 'floorName': return item.floorName || '';
       case 'equipmentType': return item.equipmentType || '';
       case 'manufactureDate': return item.manufactureDate || '';
-      case 'replacementDueDate': return item.replacementDueDate || '';
       case 'lastInspectionDate': return item.lastInspectionDate || '';
       case 'lastInspectorName': return item.lastInspectorName || '';
-      case 'lastIsFaulty': return item.lastInspectionDate ? (item.lastIsFaulty ? '비정상' : '정상') : '';
-      case 'lastFaultReason': return item.lastIsFaulty ? (item.lastFaultReason || '') : '';
       case 'note': return item.note || '';
       default: return '';
     }
@@ -264,14 +255,13 @@
         <td class="text-truncate" title="${esc(it.buildingName || '')}">${esc(it.buildingName || '-')}</td>
         <td class="text-truncate" title="${esc(it.floorName || '')}">${esc(it.floorName || '-')}</td>
         <td><div class="d-flex align-items-center gap-2"><img class="facility-card-img" src="${esc(it.imagePath || defaultImage(it.equipmentType))}" alt="" onerror="this.src='${esc(defaultImage(it.equipmentType))}'"><span class="text-truncate">${esc(it.equipmentType || '-')}</span></div></td>
-        <td>${fmtMonth(it.manufactureDate)}</td><td>${fmtMonth(it.replacementDueDate)}</td><td>${fmtDate(it.lastInspectionDate)}</td>
+        <td>${fmtMonth(it.manufactureDate)}</td><td>${fmtDate(it.lastInspectionDate)}</td>
         <td class="text-truncate" title="${esc(it.lastInspectorName || '')}">${esc(it.lastInspectorName || '-')}</td>
-        <td>${it.lastInspectionDate ? (it.lastIsFaulty ? '<span class="fw-status fw-bad">비정상</span>' : '<span class="fw-status fw-ok">정상</span>') : '<span class="text-muted">-</span>'}</td>
-        <td class="text-truncate" title="${esc(it.lastIsFaulty ? (it.lastFaultReason || '-') : '-')}">${esc(it.lastIsFaulty ? (it.lastFaultReason || '-') : '-')}</td>
+        <td>${bucket(it).inspect ? `<span class="fw-status fw-warn">${esc(inspectStatusLabel())}</span>` : '<span class="fw-status fw-ok">정상</span>'}</td>
         <td class="text-truncate" title="${esc(it.note || '')}">${esc(it.note || '-')}</td>
         <td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button><button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검</button><button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td>
       </tr>`).join('');
-    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${th('종류/이미지', 'equipmentType', 'width:190px')}${th('제조일', 'manufactureDate', 'width:110px')}${th('교체예정일', 'replacementDueDate', 'width:110px')}${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}${th('고장유무', 'lastIsFaulty', 'width:90px')}${th('고장 사유', 'lastFaultReason', 'width:130px')}${th('비고', 'note', 'width:160px')}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${th('종류/이미지', 'equipmentType', 'width:190px')}${th('제조일', 'manufactureDate', 'width:110px')}${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}${th('상태', 'lastInspectionDate', 'width:100px')}${th('비고', 'note', 'width:160px')}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function defaultImage(type) { return CFG.defaultImages?.[type] || CFG.defaultImages?.default || markerIcon; }
@@ -286,8 +276,8 @@
   async function openDetails(id) {
     const d = await getDetail(id); if (!d) return;
     const plan = await fetchPlanImage(d.buildingId, d.floorId, d.buildingName, d.floorName);
-    const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td><td>${r.isFaulty ? '<span class="fw-status fw-bad">비정상</span>' : '<span class="fw-status fw-ok">정상</span>'}</td><td>${esc(r.faultReason || '-')}</td></tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
-    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${detailItem(CFG.typeLabel || '종류', d.equipmentType)}${detailItem('수량', `${d.quantity || 1} 개`)}${detailItem('제조일', fmtMonth(d.manufactureDate))}${detailItem('교체예정일', fmtDate(d.replacementDueDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${d.x} / Y ${d.y}` : '-')}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th><th>결과</th><th>고장 사유</th></tr></thead><tbody>${inspRows}</tbody></table></div>${d.note ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : ''}</div></div><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>대표 이미지</strong></div><div class="fw-media-box text-center"><img src="${esc(d.imagePath || defaultImage(d.equipmentType))}" alt="${esc(label)} 이미지" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.src='${esc(defaultImage(d.equipmentType))}'"></div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative" id="detailPlanWrap" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
+    const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
+    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${detailItem(CFG.typeLabel || '종류', d.equipmentType)}${detailItem('수량', `${d.quantity || 1} 개`)}${detailItem('제조일', fmtMonth(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${d.x} / Y ${d.y}` : '-')}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${d.note ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : ''}</div></div><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>대표 이미지</strong></div><div class="fw-media-box text-center"><img src="${esc(d.imagePath || defaultImage(d.equipmentType))}" alt="${esc(label)} 이미지" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.src='${esc(defaultImage(d.equipmentType))}'"></div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative" id="detailPlanWrap" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
     bootstrapModal('detailsModal')?.show();
     if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, defaultImage(d.equipmentType)), 80);
   }
@@ -298,29 +288,10 @@
     if (buildingId && floorId) {
       try { const r = await API.req(`/fire-api/maps/floor-data?${new URLSearchParams({ buildingId, floorId })}`); const j = r && r.ok ? await r.json().catch(() => null) : null; if (j?.data?.planImagePath) return j.data.planImagePath; } catch {}
     }
-    return resolvePlanByName(buildingName, floorName);
-  }
-
-  function norm(v) { return String(v || '').replace(/\s+/g, '').toLowerCase().replace(/[.,_\-]/g, ''); }
-  function floorNorm(v) { const s = norm(v); if (s.includes('지하') || s === 'b1') return 'b1'; if (s.includes('옥상') || s.includes('rf')) return 'rf'; for (const n of ['4','3','2','1']) if (s.includes(n)) return `${n}f`; return s; }
-  function resolvePlanByName(bn, fn) {
-    const b = norm(bn), f = floorNorm(fn);
-    const table = [
-      ['복지관','bokji',{b1:'/images/bokji_B1.png',1:'/images/bokji_1F.png',2:'/images/bokji_2F.png',3:'/images/bokji_3F.png'}],
-      ['관리동','gwanri',{1:'/images/gwanri_1F.png',2:'/images/gwanri_2F.PNG'}],
-      ['제지12호기','jeji12',{1:'/images/jeji1,2_1F.PNG',2:'/images/jeji1,2_2F.PNG'}],
-      ['제지3호기','jeji3',{1:'/images/jeji3_1F.PNG',2:'/images/jeji3_2F.PNG'}],
-      ['패드동','pad',{1:'/images/pad_1F.PNG',2:'/images/pad_2F.PNG'}],
-      ['심면펄퍼','palpa',{1:'/images/palpa_1F.PNG',2:'/images/palpa_2F.PNG'}],
-      ['화장지36호기','tissue36',{1:'/images/tissue1,3_1F.PNG',2:'/images/tissue1,3_2F.PNG',3:'/images/tissue1,3_3F.png'}],
-      ['화장지45호기','tissue45',{b1:'/images/tissue4,5_B1.PNG',1:'/images/tissue4,5_1F.PNG',2:'/images/tissue4,5_2F.PNG',3:'/images/tissue4,5_3F.PNG'}],
-      ['기저귀동','diaper',{1:'/images/diaper_1F.png'}],['밀롤창고','milrol',{1:'/images/milrol_1F.png',2:'/images/milrol_2F.png',3:'/images/milrol_3F.png'}],['기관실','engine',{1:'/images/engine_1F.png'}],['전기현장','elec',{1:'/images/elec_1F.png',2:'/images/elec_2F.png'}],['주차타워','tower',{rf:'/images/tower_RF.png',1:'/images/tower_1F.png',2:'/images/tower_2F.png',3:'/images/tower_3F.png'}],['보일러조정동','boilerctrl',{1:'/images/boiler_ctrl_1F.png',2:'/images/boiler_ctrl_2F.png'}],['복합보일러','comboboiler',{1:'/images/comboboiler_1F.png',2:'/images/comboboiler_2F.png',3:'/images/comboboiler_3F.png',4:'/images/comboboiler_4F.png'}],['수출창고','export',{1:'/images/export_1F.png'}],['중문창고','jungmun',{1:'/images/jungmun_1F.png'}]
-    ];
-    if (b.includes('옥외') || b.includes('outdoor')) return '/images/drone_photo.JPG';
-    const key = f === 'b1' || f === 'rf' ? f : f.replace('f','');
-    for (const [ko, en, floors] of table) if (b.includes(norm(ko)) || b.includes(en)) return floors[key] || '';
     return '';
   }
+
+  // 도면 이미지는 기존 층별 도면과 동일하게 /fire-api/maps/floor-data DB 응답만 사용한다.
 
   function drawSingleMarker(wrapId, imgId, layerId, x, y, icon) {
     const wrap = $(wrapId), img = $(imgId), layer = $(layerId); if (!wrap || !img || !layer) return;
@@ -384,8 +355,8 @@
   function renderHistory(rows) {
     const body = $('historyBody'); if (!body) return;
     const list = rows.slice(0, 12);
-    const blank = `<tr class="js-new-history"><td><input type="date" class="form-control form-control-sm js-h-date" value="${today()}"></td><td><select class="form-select form-select-sm js-h-faulty"><option value="false">정상</option><option value="true">비정상</option></select></td><td class="text-muted">신규</td><td><input class="form-control form-control-sm js-h-reason" placeholder="고장 사유"></td><td><button type="button" class="btn btn-sm btn-primary js-h-add">추가</button></td></tr>`;
-    body.innerHTML = list.map(r => `<tr data-id="${r.inspectionId}"><td><input type="date" class="form-control form-control-sm js-h-date" value="${fmtDate(r.inspectionDate)}"></td><td><select class="form-select form-select-sm js-h-faulty"><option value="false" ${!r.isFaulty?'selected':''}>정상</option><option value="true" ${r.isFaulty?'selected':''}>비정상</option></select></td><td class="fw-history-name">${esc(r.inspectorName || '-')}</td><td><input class="form-control form-control-sm js-h-reason" value="${esc(r.faultReason || '')}"></td><td><div class="fw-history-actions"><button type="button" class="btn btn-sm btn-outline-primary js-h-save">저장</button><button type="button" class="btn btn-sm btn-outline-danger js-h-del">삭제</button></div></td></tr>`).join('') + blank;
+    const blank = `<tr class="js-new-history"><td><input type="date" class="form-control form-control-sm js-h-date" value="${today()}"><input type="hidden" class="js-h-faulty" value="false"><input type="hidden" class="js-h-reason" value=""></td><td class="text-muted">신규</td><td><button type="button" class="btn btn-sm btn-primary js-h-add">추가</button></td></tr>`;
+    body.innerHTML = list.map(r => `<tr data-id="${r.inspectionId}"><td><input type="date" class="form-control form-control-sm js-h-date" value="${fmtDate(r.inspectionDate)}"><input type="hidden" class="js-h-faulty" value="false"><input type="hidden" class="js-h-reason" value=""></td><td class="fw-history-name">${esc(r.inspectorName || '-')}</td><td><div class="fw-history-actions"><button type="button" class="btn btn-sm btn-outline-primary js-h-save">저장</button><button type="button" class="btn btn-sm btn-outline-danger js-h-del">삭제</button></div></td></tr>`).join('') + blank;
   }
 
   async function saveEquipment() {
@@ -407,7 +378,7 @@
 
   async function inspectEquipment() {
     const isFaulty = $('inspectBad').checked; const faultReason = $('inspectFaultReason').value.trim();
-    if (isFaulty && !faultReason) return alert('비정상인 경우 고장 사유를 입력하세요.');
+    if (isFaulty && !faultReason) return alert('점검 사유를 입력하세요.');
     const res = await API.req(`${apiBase}/inspect`, { method: 'POST', body: { equipmentId: state.inspectId, inspectionDate: $('inspectDate').value || today(), faulty: isFaulty, faultReason } }); if (!res) return;
     const json = await res.json().catch(() => null); if (!res.ok || json?.success === false) return alert(json?.message || '점검 저장 실패');
     const file = $('inspectPhoto')?.files?.[0]; if (file) await uploadImage(state.inspectId, file);
@@ -416,7 +387,7 @@
 
   async function saveHistoryRow(tr, mode) {
     const inspectionDate = tr.querySelector('.js-h-date')?.value; const isFaulty = tr.querySelector('.js-h-faulty')?.value === 'true'; const faultReason = tr.querySelector('.js-h-reason')?.value || '';
-    if (!inspectionDate) return alert('점검일을 입력하세요.'); if (isFaulty && !faultReason.trim()) return alert('비정상인 경우 고장 사유를 입력하세요.');
+    if (!inspectionDate) return alert('점검일을 입력하세요.'); if (isFaulty && !faultReason.trim()) return alert('점검 사유를 입력하세요.');
     const url = mode === 'add' ? `${apiBase}/${state.editingId}/inspections` : `${apiBase}/${state.editingId}/inspections/${tr.dataset.id}`;
     const method = mode === 'add' ? 'POST' : 'PATCH';
     const res = await API.req(url, { method, body: { inspectionDate, isFaulty, faultReason } }); const json = res && await res.json().catch(() => null);
@@ -454,8 +425,6 @@
     $('btnSearch')?.addEventListener('click', () => { state.q = $('filterQ').value.trim(); state.buildingId = $('filterBuildingId').value; state.floorId = $('filterFloorId').value; loadList(); });
     $('btnReset')?.addEventListener('click', () => { state.q = state.buildingId = state.floorId = ''; $('filterQ').value = ''; $('filterBuildingId').value = ''; $('filterFloorId').value = ''; loadList(); });
     $('btnStatusInspect')?.addEventListener('click', () => { state.status = state.status === 'inspect' ? null : 'inspect'; renderTable(filteredItems()); });
-    $('btnStatusPlanned')?.addEventListener('click', () => { state.status = state.status === 'planned' ? null : 'planned'; renderTable(filteredItems()); });
-    $('btnStatusUrgent')?.addEventListener('click', () => { state.status = state.status === 'urgent' ? null : 'urgent'; renderTable(filteredItems()); });
     $('btnSave')?.addEventListener('click', saveEquipment);
     $('btnConfirmInspect')?.addEventListener('click', inspectEquipment);
     $('buildingSel')?.addEventListener('change', () => { updateModalFloorOptions(); loadPlanForModal(); });
