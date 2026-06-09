@@ -42,11 +42,13 @@
     .planInner { position:relative; display:inline-block; transform-origin:0 0; }
     .planImg { display:block; max-width:none; width:auto; height:auto; user-select:none; -webkit-user-drag:none; }
 
-    #markers,#hydrantMarkers { position:absolute; inset:0; pointer-events:none; }
-    #markers .marker,#hydrantMarkers .hmarker { pointer-events:auto; }
-    .marker,.hmarker { position:absolute; width:35px; height:35px; transform:translate(-50%,-50%); border:0; background:transparent; padding:0; border-radius:0; }
+    #markers,#hydrantMarkers,#equipmentMarkers { position:absolute; inset:0; pointer-events:none; }
+    #markers .marker,#hydrantMarkers .hmarker,#equipmentMarkers .eqmarker { pointer-events:auto; }
+    .marker,.hmarker,.eqmarker { position:absolute; width:35px; height:35px; transform:translate(-50%,-50%); border:0; background:transparent; padding:0; border-radius:0; }
     .hmarker.outdoor { width:18px; height:18px; }
-    .marker img,.hmarker img { width:100%; height:100%; object-fit:contain; display:block; }
+    .eqmarker { width:34px; height:34px; border-radius:999px; transition:transform .16s ease, filter .16s ease, box-shadow .16s ease; }
+    .eqmarker.is-selected { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 4px rgba(14,165,233,.35), 0 0 0 8px rgba(14,165,233,.18); filter:drop-shadow(0 0 8px rgba(14,165,233,.95)); z-index:5; }
+    .marker img,.hmarker img,.eqmarker img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
     .marker.sel img { filter:drop-shadow(0 0 6px rgba(0,123,255,.9)); }
     .hmarker.sel img { filter:drop-shadow(0 0 6px rgba(40,167,69,.9)); }
     .extRow {
@@ -179,6 +181,7 @@
             <img id="planImg" class="planImg" src="" alt="도면" />
             <div id="markers" aria-hidden="true"></div>
             <div id="hydrantMarkers" aria-hidden="true"></div>
+            <div id="equipmentMarkers" aria-hidden="true"></div>
 
             <div id="markerInfo" class="infoCard" aria-hidden="true">
               <div class="infoHead">
@@ -235,6 +238,31 @@
                 </div>
               </div>
             </div>
+
+            <div id="equipmentInfo" class="infoCard" aria-hidden="true">
+              <div class="infoHead hyd">
+                <div class="t" id="eiTitle">수신기/소방펌프</div>
+                <button type="button" class="xbtn" id="eiHeadCloseBtn" aria-label="닫기">×</button>
+              </div>
+              <div class="infoBody">
+                <div class="kv">
+                  <div class="k">구분</div><div class="v" id="eiType">-</div>
+                  <div class="k">시리얼</div><div class="v" id="eiSerial">-</div>
+                  <div class="k">위치</div><div class="v" id="eiLocation">-</div>
+                  <div class="k">좌표</div><div class="v" id="eiCoord">-</div>
+                  <div class="k">최종 점검</div><div class="v" id="eiLast">-</div>
+                  <div class="k">상태</div><div class="v" id="eiStatus">-</div>
+                </div>
+              </div>
+              <div class="p-2 border-top bg-white">
+                <div class="row g-2">
+                  <div class="col-4"><button class="btn btn-sm btn-outline-dark w-100" id="eiDetailBtn" type="button">상세</button></div>
+                  <div class="col-4"><button class="btn btn-sm btn-primary w-100" id="eiInspectBtn" type="button">점검</button></div>
+                  <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" id="eiEditBtn" type="button">수정</button></div>
+                  <div class="col-12"><button class="btn btn-sm btn-outline-secondary w-100" id="eiCloseBtn" type="button">닫기</button></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -261,6 +289,8 @@
   const EX_ICON_URL = '/images/Extinguisher.PNG';
   const HYDRANT_IN_ICON_URL = '/images/indoorfirehydrant.PNG';
   const HYDRANT_OUT_ICON_URL = '/images/outdoorfirehydrant.PNG';
+  const RECEIVER_ICON_URL = '/images/receiver.png';
+  const PUMP_ICON_URL = '/images/pump.png';
 
   const qs = new URLSearchParams(location.search);
 
@@ -273,6 +303,7 @@
   const listEl = document.getElementById('list');
   const markersEl = document.getElementById('markers');
   const hydrantMarkersEl = document.getElementById('hydrantMarkers');
+  const equipmentMarkersEl = document.getElementById('equipmentMarkers');
   const navAccountArea = document.getElementById('navAccountArea');
 
   if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
@@ -313,7 +344,8 @@
     moveArmed: false,
     addMode: null,
     selectedExtId: null, selectedHydrantId: null,
-    floors: [], buildings: [], current: null, exts: [], hyds: [],
+    selectedEquipmentType: null, selectedEquipmentId: null,
+    floors: [], buildings: [], current: null, exts: [], hyds: [], receivers: [], pumps: [],
     needInspectMode: false
   };
   const MIN_PLAN_ZOOM = 0.5; // 일반 층별 도면은 원본 크기의 50% 미만으로 축소되지 않도록 제한
@@ -447,6 +479,8 @@
     if (!state.current) return;
     state.selectedExtId = null;
     state.selectedHydrantId = null;
+    state.selectedEquipmentType = null;
+    state.selectedEquipmentId = null;
     hideInfo();
     resetMoveArm();
     updateActionButtons();
@@ -630,6 +664,26 @@
     const p = String(state.current.planImagePath || '').toLowerCase();
     return b.includes('\uc625\uc678') || b.includes('outdoor') || f === '\uc625\uc678' || p.includes('drone_photo');
   }
+  function hasMapCoords(item){
+    return item && item.x != null && item.y != null && Number.isFinite(Number(item.x)) && Number.isFinite(Number(item.y));
+  }
+  function isOutdoorEquipmentItem(item){
+    if (!item) return false;
+    const b = normalize(item.buildingName);
+    const f = normalize(item.floorName);
+    const buildingId = String(item.buildingId || '');
+    const floorId = String(item.floorId || '');
+    return buildingId === '99' || floorId === '99' || b.includes('\uc625\uc678') || b.includes('outdoor') || f.includes('\uc625\uc678') || f.includes('outdoor');
+  }
+  function getEquipmentId(item){
+    return item?.type === 'receiver' ? item.receiverId : item?.pumpId;
+  }
+  function equipmentLabel(type){
+    return type === 'receiver' ? '\uC218\uC2E0\uAE30' : '\uC18C\uBC29\uD38C\uD504';
+  }
+  function equipmentPage(type){
+    return type === 'receiver' ? '/receivers.html' : '/pumps.html';
+  }
   function updateActionButtons(){
     if (!canEdit) return;
     const addExtBtn = document.getElementById('addExtBtn');
@@ -659,7 +713,16 @@
     c.style.display = 'none';
     c.setAttribute('aria-hidden','true');
   }
-  function hideInfo(){ hideMarkerInfo(); hideHydrantInfo(); }
+  function hideEquipmentInfo(){
+    const c = document.getElementById('equipmentInfo');
+    if (!c) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && c.contains(active)) active.blur();
+    c.setAttribute('inert', '');
+    c.style.display = 'none';
+    c.setAttribute('aria-hidden','true');
+  }
+  function hideInfo(){ hideMarkerInfo(); hideHydrantInfo(); hideEquipmentInfo(); }
   function markerPos(x, y){ return { left: `${x}%`, top: `${y}%` }; }
   function resetMoveArm(){
     state.moveArmed = false;
@@ -720,6 +783,10 @@
     if (isInfoCardVisible('hydrantInfo') && state.selectedHydrantId) {
       const marker = hydrantMarkersEl?.querySelector(`.hmarker[data-hydrant-id="${state.selectedHydrantId}"]`);
       if (marker) positionInfoCard('hydrantInfo', marker);
+    }
+    if (isInfoCardVisible('equipmentInfo') && state.selectedEquipmentType && state.selectedEquipmentId) {
+      const marker = equipmentMarkersEl?.querySelector(`.eqmarker[data-equipment-type="${state.selectedEquipmentType}"][data-equipment-id="${state.selectedEquipmentId}"]`);
+      if (marker) positionInfoCard('equipmentInfo', marker);
     }
   }
   function positionInfoCard(cardId, markerEl){
@@ -816,6 +883,29 @@
       }
     });
   }
+  function openEquipmentActionModal(action, item){
+    const target = item || getSelectedEquipment();
+    if (!target?.type) return;
+    const id = getEquipmentId(target);
+    if (!id) return;
+    const params = new URLSearchParams();
+    if (action === 'inspect') {
+      params.set('embedInspect', '1');
+      params.set('inspect', String(id));
+    } else if (action === 'edit') {
+      params.set('embedEdit', '1');
+      params.set('edit', String(id));
+    } else {
+      params.set('embedDetails', '1');
+      params.set('details', String(id));
+    }
+    openActionModal(`${equipmentPage(target.type)}?${params.toString()}`);
+  }
+  function getSelectedEquipment(){
+    if (!state.selectedEquipmentType || !state.selectedEquipmentId) return null;
+    const source = state.selectedEquipmentType === 'receiver' ? state.receivers : state.pumps;
+    return (source || []).find(x => String(state.selectedEquipmentType === 'receiver' ? x.receiverId : x.pumpId) === String(state.selectedEquipmentId)) || null;
+  }
   function openSelectedEditModal(){
     if (!canEdit) {
       alert('권한이 필요합니다.');
@@ -829,7 +919,11 @@
       openExtinguisherActionModal({ mode: 'edit', id: state.selectedExtId });
       return;
     }
-    alert('먼저 수정할 소화기 또는 소화전을 선택하세요.');
+    if (state.selectedEquipmentType && state.selectedEquipmentId) {
+      openEquipmentActionModal('edit');
+      return;
+    }
+    alert('먼저 수정할 소화기, 소화전, 수신기 또는 소방펌프를 선택하세요.');
   }
   function openAddModal(kind){
     if (!canEdit) {
@@ -884,7 +978,11 @@
 
   function renderList(){
     if (isOutdoorCurrent()) {
-      listEl.innerHTML = '<div class="text-muted small">\uC625\uC678 \uB3C4\uBA74\uC5D0\uC11C\uB294 \uC18C\uD654\uAE30 \uBAA9\uB85D\uC774 \uD45C\uC2DC\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.</div>';
+      const extCount = state.exts.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
+      const hydCount = state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x)).length;
+      const receiverCount = state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
+      const pumpCount = state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).length;
+      listEl.innerHTML = `<div class="text-muted small">옥외 도면에서는 소화기 ${extCount}개, 소화전 ${hydCount}개, 수신기 ${receiverCount}개, 소방펌프 ${pumpCount}개가 마커로 표시됩니다.</div>`;
       return;
     }
     listEl.innerHTML = '';
@@ -907,6 +1005,8 @@
         resetMoveArm();
         state.selectedExtId = it.extinguisherId;
         state.selectedHydrantId = null;
+        state.selectedEquipmentType = null;
+        state.selectedEquipmentId = null;
         hideInfo();
         renderList();
         renderMarkers();
@@ -930,19 +1030,27 @@
   function renderMarkers(){
     markersEl.innerHTML = '';
     hydrantMarkersEl.innerHTML = '';
+    equipmentMarkersEl.innerHTML = '';
 
     const outdoor = isOutdoorCurrent();
     let exts = outdoor
-      ? []
-      : state.exts.filter(x => isCurrentFloor(x) && x.x != null && x.y != null);
+      ? state.exts.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x))
+      : state.exts.filter(x => isCurrentFloor(x) && hasMapCoords(x));
     let hyds = outdoor
-      ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && x.x != null && x.y != null)
-      : state.hyds.filter(x => isCurrentFloor(x) && x.x != null && x.y != null);
+      ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x))
+      : state.hyds.filter(x => isCurrentFloor(x) && hasMapCoords(x));
+    let equipments = outdoor
+      ? [
+          ...state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'receiver' })),
+          ...state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'pump' }))
+        ]
+      : [];
 
     // 점검 필요 설비 필터
     if (state.needInspectMode) {
       exts = exts.filter(needsInspection);
       hyds = hyds.filter(needsInspection);
+      equipments = equipments.filter(needsInspection);
     }
 
     for (const it of exts) {
@@ -963,7 +1071,10 @@
         resetMoveArm();
         state.selectedExtId = it.extinguisherId;
         state.selectedHydrantId = null;
+        state.selectedEquipmentType = null;
+        state.selectedEquipmentId = null;
         hideHydrantInfo();
+        hideEquipmentInfo();
         renderList();
         renderMarkers();
         const selectedBtn = markersEl.querySelector(`.marker[data-ext-id="${it.extinguisherId}"]`) || btn;
@@ -1045,7 +1156,10 @@
         resetMoveArm();
         state.selectedHydrantId = h.hydrantId;
         state.selectedExtId = null;
+        state.selectedEquipmentType = null;
+        state.selectedEquipmentId = null;
         hideMarkerInfo();
+        hideEquipmentInfo();
         renderList();
         renderMarkers();
         const selectedHydrantBtn = hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${h.hydrantId}"]`) || btn;
@@ -1075,6 +1189,59 @@
       };
       hydrantMarkersEl.appendChild(btn);
     }
+
+    for (const item of equipments) {
+      const equipmentId = getEquipmentId(item);
+      if (!equipmentId) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'eqmarker ' + item.type;
+      if (state.selectedEquipmentType === item.type && String(state.selectedEquipmentId) === String(equipmentId)) {
+        btn.classList.add('is-selected');
+      }
+      btn.dataset.equipmentType = item.type;
+      btn.dataset.equipmentId = String(equipmentId);
+      Object.assign(btn.style, markerPos(item.x, item.y));
+      const label = equipmentLabel(item.type);
+      btn.title = `${label} #${equipmentId}`;
+      btn.innerHTML = `<img src="${item.type === 'receiver' ? RECEIVER_ICON_URL : PUMP_ICON_URL}" alt="${label}">`;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        resetMoveArm();
+        state.selectedEquipmentType = item.type;
+        state.selectedEquipmentId = equipmentId;
+        state.selectedExtId = null;
+        state.selectedHydrantId = null;
+        hideMarkerInfo();
+        hideHydrantInfo();
+        renderList();
+        renderMarkers();
+        const selectedBtn = equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-type="${item.type}"][data-equipment-id="${equipmentId}"]`) || btn;
+        document.getElementById('eiTitle').textContent = `${label} #${equipmentId}`;
+        document.getElementById('eiType').textContent = label;
+        document.getElementById('eiSerial').textContent = item.serialNumber || '-';
+        document.getElementById('eiLocation').textContent = item.locationDescription || item.buildingName || '-';
+        document.getElementById('eiCoord').textContent = `${Number(item.x).toFixed(2)}%, ${Number(item.y).toFixed(2)}%`;
+        const lastDate = item.lastInspectionDate ? String(item.lastInspectionDate).slice(0,10) : '';
+        const lastTime = item.lastInspectionTime ? String(item.lastInspectionTime).slice(0,5) : '';
+        const inspector = item.lastInspectorName ? ` (${item.lastInspectorName})` : '';
+        document.getElementById('eiLast').textContent = lastDate ? `${lastDate}${lastTime ? ' ' + lastTime : ''}${inspector}` : '점검 이력 없음';
+        document.getElementById('eiStatus').textContent = item.lastInspectionStatus || '-';
+        document.getElementById('eiInspectBtn').onclick = () => {
+          if (!canEdit) return;
+          openEquipmentActionModal('inspect', item);
+        };
+        document.getElementById('eiDetailBtn').onclick = () => openEquipmentActionModal('details', item);
+        document.getElementById('eiEditBtn').onclick = () => {
+          if (!canEdit) return;
+          openEquipmentActionModal('edit', item);
+        };
+        document.getElementById('eiCloseBtn').onclick = hideEquipmentInfo;
+        document.getElementById('eiHeadCloseBtn').onclick = hideEquipmentInfo;
+        positionInfoCard('equipmentInfo', selectedBtn);
+      };
+      equipmentMarkersEl.appendChild(btn);
+    }
   }
 
   async function load(){
@@ -1087,13 +1254,23 @@
 
     let ej = null;
     let hj = null;
-    const er = await api('/fire-api/extinguishers?size=2000&page=0');
-    const hr = await api('/fire-api/hydrants?size=2000&page=0');
+    let rj = null;
+    let pj = null;
+    const [er, hr, rr, pr] = await Promise.all([
+      api('/fire-api/extinguishers?size=2000&page=0'),
+      api('/fire-api/hydrants?size=2000&page=0'),
+      api('/fire-api/receivers?size=2000&page=0'),
+      api('/fire-api/pumps?size=2000&page=0')
+    ]);
     if (er) ej = await er.json();
     if (hr) hj = await hr.json();
+    if (rr) rj = await rr.json();
+    if (pr) pj = await pr.json();
 
     state.exts = (ej?.data?.content || []).filter(x => x.active !== false);
     state.hyds = (hj?.data?.content || []).filter(x => x.active !== false);
+    state.receivers = (rj?.data?.content || []).filter(x => x.active !== false && x.isActive !== false);
+    state.pumps = (pj?.data?.content || []).filter(x => x.active !== false && x.isActive !== false);
 
     const floorMap = new Map();
     const upsertFloor = (x) => {
@@ -1137,6 +1314,16 @@
 
     state.exts.forEach(upsertFloor);
     state.hyds.forEach(upsertFloor);
+    if ([...state.exts, ...state.hyds, ...state.receivers, ...state.pumps].some(isOutdoorEquipmentItem)) {
+      floorMap.set('OUTDOOR|99', {
+        buildingId: 'OUTDOOR',
+        floorId: '99',
+        buildingName: '\uC625\uC678',
+        floorName: '\uC625\uC678',
+        isOutdoor: true,
+        planImagePath: '/images/drone_photo.JPG'
+      });
+    }
     state.hyds
       .filter(h => String(h.hydrantType || '').toLowerCase() === 'outdoor')
       .forEach(h => {
@@ -1255,9 +1442,11 @@
       // 마커 모달 버튼 숨김 (FIRE_ADMIN 아이디가 아닌 경우)
       document.getElementById('miEditBtn').style.display = 'none';
       document.getElementById('hiEditBtn').style.display = 'none';
+      document.getElementById('eiEditBtn').style.display = 'none';
       document.getElementById('miAddHereBtn').style.display = 'none';
       document.getElementById('miInspectBtn').style.display = 'none';
       document.getElementById('hiInspectBtn').style.display = 'none';
+      document.getElementById('eiInspectBtn').style.display = 'none';
       // QR코드 네비게이션 링크 숨김 (FIRE_ADMIN만 접근 가능)
       document.querySelectorAll('a[href*="/qr"]').forEach(el => {
         const li = el.closest('li.nav-item');
@@ -1285,11 +1474,15 @@
     const focusType = (q.get('focusType') || '').trim();
     const focusId = (q.get('focusId') || '').trim();
     if (!focusType || !focusId) return;
-    if (focusType !== 'ext' && focusType !== 'hyd') return;
+    if (focusType !== 'ext' && focusType !== 'hyd' && focusType !== 'receiver' && focusType !== 'pump') return;
 
     const targetItem = focusType === 'ext'
       ? state.exts.find(x => String(x.extinguisherId) === focusId)
-      : state.hyds.find(x => String(x.hydrantId) === focusId);
+      : focusType === 'hyd'
+        ? state.hyds.find(x => String(x.hydrantId) === focusId)
+        : focusType === 'receiver'
+          ? state.receivers.find(x => String(x.receiverId) === focusId)
+          : state.pumps.find(x => String(x.pumpId) === focusId);
     if (targetItem) {
       const targetFloor = state.floors.find(v =>
         (targetItem.buildingId != null && targetItem.floorId != null && String(v.buildingId) === String(targetItem.buildingId) && String(v.floorId) === String(targetItem.floorId)) ||
@@ -1299,6 +1492,13 @@
         state.current = targetFloor;
         syncBuildingFloorSelectors(false);
         syncCurrentFloor(false);
+      } else if (isOutdoorEquipmentItem(targetItem)) {
+        const outdoorFloor = state.floors.find(v => isOutdoorEquipmentItem(v) || v.isOutdoor || normalize(v.buildingName).includes('\uc625\uc678'));
+        if (outdoorFloor) {
+          state.current = outdoorFloor;
+          syncBuildingFloorSelectors(false);
+          syncCurrentFloor(false);
+        }
       }
     }
 
@@ -1316,7 +1516,9 @@
       renderMarkers();
       const btn = focusType === 'ext'
         ? markersEl.querySelector(`.marker[data-ext-id="${focusId}"]`)
-        : hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`);
+        : focusType === 'hyd'
+          ? hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`)
+          : equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-type="${focusType}"][data-equipment-id="${focusId}"]`);
       if (!btn) {
         if (attempts < 20) setTimeout(tryFocus, 120);
         return;
@@ -1326,9 +1528,11 @@
       setTimeout(() => {
         const selected = focusType === 'ext'
           ? markersEl.querySelector(`.marker[data-ext-id="${focusId}"]`)
-          : hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`);
+          : focusType === 'hyd'
+            ? hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`)
+            : equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-type="${focusType}"][data-equipment-id="${focusId}"]`);
         if (selected) {
-          selected.classList.add('sel');
+          selected.classList.add(focusType === 'receiver' || focusType === 'pump' ? 'is-selected' : 'sel');
           try { selected.focus({ preventScroll: true }); } catch(_) { try { selected.focus(); } catch(__) {} }
         }
       }, 60);
@@ -1444,12 +1648,16 @@
     const t = e.target;
     if (!t.closest('.marker') && !t.closest('#markerInfo')) hideMarkerInfo();
     if (!t.closest('.hmarker') && !t.closest('#hydrantInfo')) hideHydrantInfo();
+    if (!t.closest('.eqmarker') && !t.closest('#equipmentInfo')) hideEquipmentInfo();
   }, true);
   async function refreshAfterAction(){
     const wasExtInfoOpen = document.getElementById('markerInfo')?.style.display === 'block';
     const wasHydInfoOpen = document.getElementById('hydrantInfo')?.style.display === 'block';
+    const wasEquipmentInfoOpen = document.getElementById('equipmentInfo')?.style.display === 'block';
     const selectedExtId = state.selectedExtId;
     const selectedHydrantId = state.selectedHydrantId;
+    const selectedEquipmentType = state.selectedEquipmentType;
+    const selectedEquipmentId = state.selectedEquipmentId;
 
     await load();
 
@@ -1458,6 +1666,13 @@
     }
     if (selectedHydrantId && !state.hyds.some(x => x.hydrantId === selectedHydrantId)) {
       state.selectedHydrantId = null;
+    }
+    if (selectedEquipmentType && selectedEquipmentId) {
+      const source = selectedEquipmentType === 'receiver' ? state.receivers : state.pumps;
+      if (!source.some(x => String(selectedEquipmentType === 'receiver' ? x.receiverId : x.pumpId) === String(selectedEquipmentId))) {
+        state.selectedEquipmentType = null;
+        state.selectedEquipmentId = null;
+      }
     }
     renderList();
     renderMarkers();
@@ -1468,6 +1683,9 @@
     } else if (wasHydInfoOpen && state.selectedHydrantId) {
       const hydBtn = hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${state.selectedHydrantId}"]`);
       hydBtn?.click();
+    } else if (wasEquipmentInfoOpen && state.selectedEquipmentType && state.selectedEquipmentId) {
+      const eqBtn = equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-type="${state.selectedEquipmentType}"][data-equipment-id="${state.selectedEquipmentId}"]`);
+      eqBtn?.click();
     }
   }
 
@@ -1513,7 +1731,7 @@
   window.addEventListener('mouseup', () => { state.dragging = false; planWrap.classList.remove('dragging'); });
   planWrap.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
-    if (e.target?.closest('.marker, .hmarker, .infoCard')) return;
+    if (e.target?.closest('.marker, .hmarker, .eqmarker, .infoCard')) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (activePointers.size === 1) {
       state.dragging = true;
@@ -1626,6 +1844,10 @@
     set('hiInspectBtn', '\uC810\uAC80');
     set('hiEditBtn', '\uC218\uC815');
     set('hiCloseBtn', '\uB2EB\uAE30');
+    set('eiDetailBtn', '\uC0C1\uC138');
+    set('eiInspectBtn', '\uC810\uAC80');
+    set('eiEditBtn', '\uC218\uC815');
+    set('eiCloseBtn', '\uB2EB\uAE30');
 
     const planAlt = document.getElementById('planImg');
     if (planAlt) planAlt.alt = '\uB3C4\uBA74';
