@@ -12,6 +12,9 @@
 | `V8__add_fire_manager_role.sql` | ROLE_FIRE_MANAGER(소방시설관리) 역할 및 메뉴 권한 추가 |
 | `V9__rename_manager_role.sql` | ROLE_MANAGER 역할명 변경 (PS 지분 검사 매니저) |
 | `V10__add_fire_user_role.sql` | ROLE_FIRE_USER(소방시설사용자) 읽기 전용 역할 및 메뉴 권한 추가 |
+| `V11__add_fire_admin_code_group.sql` | 소방 관리자 권한 공통코드 추가 |
+| `V12__remove_fire_user_role.sql` | ROLE_FIRE_USER 제거 및 관련 메뉴 권한 정리 |
+| `V15__facility_management_system.sql` | 설비관리시스템 개편, 소방/기타설비 메뉴 분리, 에어컨/정수기 테이블 및 역할 권한 추가 |
 
 ## 실행 순서
 
@@ -22,6 +25,9 @@
 4. V8__add_fire_manager_role.sql   -- 소방시설관리 매니저 역할 추가
 5. V9__rename_manager_role.sql     -- ROLE_MANAGER 이름 변경
 6. V10__add_fire_user_role.sql     -- 소방시설사용자 역할 추가
+7. V11__add_fire_admin_code_group.sql -- 소방 관리자 권한 공통코드 추가
+8. V12__remove_fire_user_role.sql  -- 소방시설사용자 역할 제거
+9. V15__facility_management_system.sql -- 설비관리시스템/기타설비 확장
 ```
 
 ## 사전 조건
@@ -41,10 +47,14 @@ mysql -u platform_user -p platform_db < sql/module-fire/01_schema.sql
 # 3. 초기 데이터 입력
 mysql -u platform_user -p platform_db < sql/module-fire/02_seed_data.sql
 
-# 4. 역할 추가 (소방시설관리 매니저 + 소방시설사용자)
-mysql -u platform_user -p platform_db < sql/module-fire/V8__add_fire_manager_role.sql
-mysql -u platform_user -p platform_db < sql/module-fire/V9__rename_manager_role.sql
-mysql -u platform_user -p platform_db < sql/module-fire/V10__add_fire_user_role.sql
+# 4. 역할/권한 및 설비관리시스템 migration 적용
+# 한글 메뉴명 깨짐 방지를 위해 utf8mb4를 명시합니다.
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V8__add_fire_manager_role.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V9__rename_manager_role.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V10__add_fire_user_role.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V11__add_fire_admin_code_group.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V12__remove_fire_user_role.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V15__facility_management_system.sql
 ```
 
 ## 테이블 구조
@@ -63,11 +73,14 @@ mysql -u platform_user -p platform_db < sql/module-fire/V10__add_fire_user_role.
 | `fire_receiver_inspection` | 수신기 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
 | `fire_pump` | 소방펌프 | - |
 | `fire_pump_inspection` | 소방펌프 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
+| `facility_equipment` | 기타설비(에어컨/정수기) 마스터 | - |
+| `facility_equipment_inspection` | 기타설비 점검 이력 | IS_FAULTY + FAULT_REASON |
 
 ### 점검 방식 차이점
 
 - **소화기/소화전**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(불량 사유)
 - **수신기/소방펌프**: `INSPECTION_STATUS`(NORMAL/ABNORMAL) + 개별 항목별 상태 컬럼 + `NOTE`(비고)
+- **기타설비(에어컨/정수기)**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(고장 사유), 최근 12건 이력 유지
 
 ## 뷰
 

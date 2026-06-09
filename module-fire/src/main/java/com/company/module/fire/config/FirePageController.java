@@ -82,6 +82,20 @@ public class FirePageController {
         return serveHtml("static/qr/index.html");
     }
 
+    /** /facility/air-conditioners → facility/air-conditioners.html */
+    @GetMapping({"/facility/air-conditioners", "/facility/air-conditioners.html"})
+    @ResponseBody
+    public ResponseEntity<String> airConditioners() throws IOException {
+        return serveHtml("static/facility/air-conditioners.html");
+    }
+
+    /** /facility/water-purifiers → facility/water-purifiers.html */
+    @GetMapping({"/facility/water-purifiers", "/facility/water-purifiers.html"})
+    @ResponseBody
+    public ResponseEntity<String> waterPurifiers() throws IOException {
+        return serveHtml("static/facility/water-purifiers.html");
+    }
+
     // ── 모바일 점검 페이지 ──
 
     @GetMapping("/minspection/extinguishers/{serial}")

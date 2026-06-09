@@ -312,3 +312,53 @@ SELECT
     (SELECT pi.NOTE FROM fire_pump_inspection pi WHERE pi.PUMP_ID = p.PUMP_ID ORDER BY pi.INSPECTION_DATE DESC, pi.INSPECTION_ID DESC LIMIT 1) AS LAST_INSPECTION_NOTE
 FROM fire_pump p
 JOIN floor f ON p.FLOOR_ID = f.FLOOR_ID;
+
+-- -----------------------------------------------------------------------
+-- 기타설비(에어컨/정수기)
+-- -----------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS facility_equipment (
+    EQUIPMENT_ID             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '기타설비 ID (PK)',
+    CATEGORY                 VARCHAR(30)  NOT NULL                COMMENT '설비 분류 (AIRCON/WATER_PURIFIER)',
+    SERIAL_NUMBER            VARCHAR(50)  NOT NULL                COMMENT '일련번호 (AC-000001/WP-000001)',
+    BUILDING_ID              BIGINT       NOT NULL                COMMENT '건물 FK',
+    FLOOR_ID                 BIGINT       NOT NULL                COMMENT '층 FK',
+    EQUIPMENT_TYPE           VARCHAR(100) NOT NULL                COMMENT '설비 종류',
+    MANUFACTURE_DATE         DATE         NOT NULL                COMMENT '제조/설치 기준일',
+    REPLACEMENT_CYCLE_YEARS  INT          NOT NULL DEFAULT 10     COMMENT '교체 주기 (년)',
+    REPLACEMENT_DUE_DATE     DATE                                 COMMENT '교체 예정일',
+    QUANTITY                 INT          NOT NULL DEFAULT 1      COMMENT '수량',
+    X                        DECIMAL(9,4)                         COMMENT '도면 X 좌표',
+    Y                        DECIMAL(9,4)                         COMMENT '도면 Y 좌표',
+    IMAGE_PATH               VARCHAR(600)                         COMMENT '대표 이미지 경로',
+    NOTE                     VARCHAR(500)                         COMMENT '비고',
+    QR_KEY                   VARCHAR(100) NOT NULL                COMMENT 'QR 조회용 고정 키 (UUID)',
+    CREATED_AT               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '등록일시',
+
+    PRIMARY KEY (EQUIPMENT_ID),
+    CONSTRAINT UK_FACILITY_EQUIPMENT_SERIAL UNIQUE (SERIAL_NUMBER),
+    CONSTRAINT UK_FACILITY_EQUIPMENT_QR_KEY UNIQUE (QR_KEY),
+    CONSTRAINT FK_FACILITY_EQUIPMENT_BUILDING FOREIGN KEY (BUILDING_ID) REFERENCES building(BUILDING_ID) ON DELETE RESTRICT,
+    CONSTRAINT FK_FACILITY_EQUIPMENT_FLOOR    FOREIGN KEY (FLOOR_ID)    REFERENCES floor(FLOOR_ID)       ON DELETE RESTRICT,
+    CONSTRAINT CK_FACILITY_EQUIPMENT_CATEGORY CHECK (CATEGORY IN ('AIRCON', 'WATER_PURIFIER'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='기타설비(에어컨/정수기)';
+
+CREATE INDEX IF NOT EXISTS IDX_FACILITY_EQUIPMENT_CATEGORY ON facility_equipment(CATEGORY);
+CREATE INDEX IF NOT EXISTS IDX_FACILITY_EQUIPMENT_BUILDING ON facility_equipment(BUILDING_ID);
+CREATE INDEX IF NOT EXISTS IDX_FACILITY_EQUIPMENT_FLOOR    ON facility_equipment(FLOOR_ID);
+
+CREATE TABLE IF NOT EXISTS facility_equipment_inspection (
+    INSPECTION_ID        BIGINT       NOT NULL AUTO_INCREMENT COMMENT '점검 ID (PK)',
+    EQUIPMENT_ID         BIGINT       NOT NULL                COMMENT '기타설비 FK',
+    INSPECTION_DATE      DATE         NOT NULL                COMMENT '점검일',
+    IS_FAULTY            TINYINT(1)   NOT NULL DEFAULT 0      COMMENT '비정상 여부 (0=정상, 1=비정상)',
+    FAULT_REASON         VARCHAR(500)                         COMMENT '불량 사유',
+    INSPECTED_BY_USER_ID BIGINT                               COMMENT '점검자 ID',
+    INSPECTED_BY_NAME    VARCHAR(200)                         COMMENT '점검자 표시명',
+    CREATED_AT           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '등록일시',
+
+    PRIMARY KEY (INSPECTION_ID),
+    CONSTRAINT UK_FACILITY_INSPECTION_DATE UNIQUE (EQUIPMENT_ID, INSPECTION_DATE),
+    CONSTRAINT FK_FACILITY_INSPECTION_EQUIPMENT FOREIGN KEY (EQUIPMENT_ID) REFERENCES facility_equipment(EQUIPMENT_ID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='기타설비 점검 이력';

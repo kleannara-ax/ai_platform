@@ -39,7 +39,7 @@
 | 08 | [부서 관리 (Department)](./08_부서관리_Department.md) | `/api/module-common/departments` | 부서 CRUD, 하위 부서 조회 |
 | 09 | [사용자 프로필 (UserProfile)](./09_사용자프로필_UserProfile.md) | `/api/module-common/profiles` | 프로필 CRUD, 부서별 프로필 조회 |
 
-### Module-Fire (소방 모듈) (`/fire-api/*`)
+### Module-Fire / Facility (설비관리시스템) (`/fire-api/*`, `/facility-api/*`)
 
 | 번호 | 문서 | URL Prefix | 설명 |
 |------|------|------------|------|
@@ -49,6 +49,7 @@
 | 13 | [수신기 (Receiver)](./13_소방_수신기_Receiver.md) | `/fire-api/receivers` | 수신기 CRUD, 점검, CSV 내보내기 |
 | 14 | [대시보드 / 지도 / QR](./14_소방_대시보드_지도_QR.md) | `/fire-api/dashboard`, `/fire-api/maps`, `/fire-api/qr` | 통계, 도면, QR 이미지 생성 |
 | 15 | [모바일 점검](./15_소방_모바일점검.md) | `/fire-api/minspection` | QR 스캔 기반 모바일 현장 점검 |
+| 18 | [설비관리 기타설비](./18_설비관리_기타설비.md) | `/facility-api/air-conditioners`, `/facility-api/water-purifiers` | 에어컨/정수기 CRUD, 점검, 이미지, 도면 좌표 |
 
 ### Module-PS-Insp (PS 지분 검사 모듈) (`/ps-insp-api/*`)
 
@@ -76,6 +77,8 @@
 | GET | `/api/health` | 앱 헬스체크 |
 | GET | `/ps-insp-api/health` | PS 모듈 헬스체크 |
 | GET | `/fire-api/qr/image` | QR 이미지 생성 |
+| GET | `/facility/air-conditioners` | 에어컨 관리 화면 |
+| GET | `/facility/water-purifiers` | 정수기 관리 화면 |
 
 ### 인증 필요
 | Method | URL | 설명 |
@@ -133,3 +136,15 @@
 | GET | `/api/module-common/profiles/user/{userId}` | 프로필 조회 |
 | GET | `/api/module-common/profiles/department/{deptCode}` | 부서별 프로필 |
 | PUT | `/api/module-common/profiles/user/{userId}` | 프로필 수정 |
+| GET | `/facility-api/air-conditioners` | 에어컨 목록 |
+| GET | `/facility-api/air-conditioners/{id}` | 에어컨 상세 |
+| POST | `/facility-api/air-conditioners` | 에어컨 등록/수정 |
+| DELETE | `/facility-api/air-conditioners/{id}` | 에어컨 삭제 |
+| POST | `/facility-api/air-conditioners/{id}/image` | 에어컨 대표 이미지 업로드 |
+| POST | `/facility-api/air-conditioners/inspect` | 에어컨 점검 완료 |
+| GET | `/facility-api/water-purifiers` | 정수기 목록 |
+| GET | `/facility-api/water-purifiers/{id}` | 정수기 상세 |
+| POST | `/facility-api/water-purifiers` | 정수기 등록/수정 |
+| DELETE | `/facility-api/water-purifiers/{id}` | 정수기 삭제 |
+| POST | `/facility-api/water-purifiers/{id}/image` | 정수기 대표 이미지 업로드 |
+| POST | `/facility-api/water-purifiers/inspect` | 정수기 점검 완료 |
