@@ -80,7 +80,7 @@
 - 기타설비 메인 도면(`/facility-map.html`)은 신규 독립 축약 구현이 아니라 `/fire-map.html` 원본을 그대로 복사한 뒤 기타설비 메뉴/층별 링크만 변경하고 옥외소화전·옥외 소화기·수신기/소방펌프 UI 및 초기 로딩을 제외하도록 정리 완료
 - `V15__facility_management_system.sql`로 메뉴/역할/테이블 migration 추가
 - 빌드 검증 완료
-- 에어컨 식별 No. 및 실내기-실외기 pair 필드/화면/도면 표시 구현 중: `V16__facility_aircon_pair_fields.sql` 적용 필요
+- 에어컨 식별 No. 및 실내기-실외기 pair 필드/화면/도면 표시 구현 완료: `V16__facility_aircon_pair_fields.sql` DB 적용 및 신규 컬럼 확인 완료
 - 수신기/소방펌프 대시보드 그래프 4상태 반영 완료(요정비/교체필요 그래프 색상은 밝은 노란색 계열 적용)
 - 수신기/소방펌프 점검 이력 삭제 API 및 수정 모달 삭제 버튼 구현 완료
 - 이상설비 바로가기 마커 자동 선택 안정화 및 대시보드 상세 모달 확대 완료
@@ -93,6 +93,6 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 메뉴 노출 및 API 권한 검증
-- 운영/로컬 DB에 `sql/module-fire/V16__facility_aircon_pair_fields.sql` 적용 후 에어컨 신규 필드 저장 검증
+- 에어컨 신규 필드가 반영된 운영/로컬 DB에서 실데이터 저장·수정·조회 검증
 - 에어컨/정수기 실데이터 등록 후 기타설비 대시보드/메인 도면/층별 도면 포커스 흐름과 공통 DB 도면 좌표 매칭 검증
-- 운영 DB 적용 시 `mysql --default-character-set=utf8mb4` 사용 권장
+- 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장
