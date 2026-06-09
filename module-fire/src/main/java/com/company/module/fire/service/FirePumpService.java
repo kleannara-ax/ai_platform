@@ -25,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -142,19 +144,22 @@ public class FirePumpService {
         Floor floor = floorRepository.findById(DEFAULT_OUTDOOR_FLOOR_ID)
                 .orElseThrow(() -> new BusinessException("옥외 층 정보가 없습니다."));
 
+        BigDecimal x = normalizeCoord(request.getX());
+        BigDecimal y = normalizeCoord(request.getY());
+
         FirePump pump;
         if (request.getPumpId() != null && request.getPumpId() > 0) {
             pump = firePumpRepository.findById(request.getPumpId())
                     .orElseThrow(() -> new EntityNotFoundException("FirePump", request.getPumpId()));
-            pump.update(request.getBuildingName().trim(), floor, request.getX(), request.getY(),
+            pump.update(request.getBuildingName().trim(), floor, x, y,
                     request.getLocationDescription(), request.getNote());
         } else {
             pump = FirePump.builder()
                     .serialNumber(generateNextSerialNumber())
                     .buildingName(request.getBuildingName().trim())
                     .floor(floor)
-                    .x(request.getX())
-                    .y(request.getY())
+                    .x(x)
+                    .y(y)
                     .locationDescription(request.getLocationDescription())
                     .note(request.getNote())
                     .isActive(true)
@@ -299,6 +304,10 @@ public class FirePumpService {
         FirePump pump = firePumpRepository.findById(pumpId)
                 .orElseThrow(() -> new EntityNotFoundException("FirePump", pumpId));
         firePumpRepository.delete(pump);
+    }
+
+    private BigDecimal normalizeCoord(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String generateNextSerialNumber() {

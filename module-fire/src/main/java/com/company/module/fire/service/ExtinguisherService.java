@@ -16,6 +16,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -91,6 +93,9 @@ public class ExtinguisherService {
         Floor floor = floorRepository.findById(req.getFloorId())
                 .orElseThrow(() -> new BusinessException("층 정보를 찾을 수 없습니다."));
 
+        BigDecimal x = normalizeCoord(req.getX());
+        BigDecimal y = normalizeCoord(req.getY());
+
         Extinguisher entity;
 
         if (req.getExtinguisherId() != null && req.getExtinguisherId() > 0) {
@@ -101,7 +106,7 @@ public class ExtinguisherService {
             entity.update(building, floor, null,
                     req.getExtinguisherType(), req.getManufactureDate(),
                     req.getReplacementCycleYears(), req.getQuantity(),
-                    req.getX(), req.getY(), req.getNote());
+                    x, y, req.getNote());
         } else {
             // 신규 등록 - 일련번호 생성
             String serialNumber = generateNextSerialNumber();
@@ -113,8 +118,8 @@ public class ExtinguisherService {
                     .manufactureDate(req.getManufactureDate())
                     .replacementCycleYears(req.getReplacementCycleYears())
                     .quantity(req.getQuantity())
-                    .x(req.getX())
-                    .y(req.getY())
+                    .x(x)
+                    .y(y)
                     .note(req.getNote())
                     .build();
             extinguisherRepository.save(entity);
@@ -248,6 +253,10 @@ public class ExtinguisherService {
         Extinguisher e = extinguisherRepository.findById(extinguisherId)
                 .orElseThrow(() -> new EntityNotFoundException("Extinguisher", extinguisherId));
         e.updateImagePath(imagePath);
+    }
+
+    private BigDecimal normalizeCoord(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     /** 다음 일련번호 생성 (EXT-000001 형식) */

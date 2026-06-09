@@ -22,6 +22,7 @@
   const fmtDate = (v) => v ? String(v).slice(0, 10) : '-';
   const fmtMonth = (v) => v ? `${String(v).slice(0,4)}년 ${String(v).slice(5,7)}월` : '-';
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const coord2 = (v) => { if (v === '' || v == null) return null; const n = Number(v); return Number.isFinite(n) ? Number(n.toFixed(2)) : null; };
   const isInIframe = () => { try { return window.self !== window.top; } catch { return true; } };
 
   const API = (() => {
@@ -329,7 +330,7 @@
     $('upsertForm')?.reset(); $('manufactureMonth').value = new Date().toISOString().slice(0,7); $('cycleYears').value = '10'; $('quantity').value = '1';
   }
   function fillTypeOptions() { $('equipmentType').innerHTML = '<option value="">-- 종류 선택 --</option>' + (CFG.typeOptions || ['기타']).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join(''); }
-  function setCoord(x, y) { $('coordX').value = x ?? ''; $('coordY').value = y ?? ''; $('coordXText').textContent = x !== '' && x != null ? Number(x).toFixed(2) : '-'; $('coordYText').textContent = y !== '' && y != null ? Number(y).toFixed(2) : '-'; state.selectedCoord = num(x) != null && num(y) != null ? { x: num(x), y: num(y) } : null; renderPlanMarkers(); }
+  function setCoord(x, y) { const rx = coord2(x); const ry = coord2(y); $('coordX').value = rx ?? ''; $('coordY').value = ry ?? ''; $('coordXText').textContent = rx != null ? rx.toFixed(2) : '-'; $('coordYText').textContent = ry != null ? ry.toFixed(2) : '-'; state.selectedCoord = rx != null && ry != null ? { x: rx, y: ry } : null; renderPlanMarkers(); }
 
   async function loadPlanForModal() {
     const b = $('buildingSel')?.value, f = $('floorSel')?.value;
@@ -360,7 +361,7 @@
   }
 
   async function saveEquipment() {
-    const payload = { equipmentId: state.editingId || null, buildingId: Number($('buildingSel').value), floorId: Number($('floorSel').value), equipmentType: $('equipmentType').value, manufactureDate: monthStart($('manufactureMonth').value), replacementCycleYears: Number($('cycleYears').value || 10), quantity: Number($('quantity').value || 1), x: $('coordX').value ? Number($('coordX').value) : null, y: $('coordY').value ? Number($('coordY').value) : null, note: $('note').value || '' };
+    const payload = { equipmentId: state.editingId || null, buildingId: Number($('buildingSel').value), floorId: Number($('floorSel').value), equipmentType: $('equipmentType').value, manufactureDate: monthStart($('manufactureMonth').value), replacementCycleYears: Number($('cycleYears').value || 10), quantity: Number($('quantity').value || 1), x: coord2($('coordX').value), y: coord2($('coordY').value), note: $('note').value || '' };
     if (!payload.buildingId || !payload.floorId || !payload.equipmentType || !payload.manufactureDate) return alert('필수 항목을 입력하세요.');
     const res = await API.req(apiBase, { method: 'POST', body: payload }); if (!res) return;
     const json = await res.json().catch(() => null);

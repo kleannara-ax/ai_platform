@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -117,8 +118,8 @@ public class FireHydrantService {
             if (req.getX() == null || req.getY() == null) {
                 throw new BusinessException("Coordinates are required for outdoor hydrants.");
             }
-            x = req.getX().setScale(2, java.math.RoundingMode.HALF_UP);
-            y = req.getY().setScale(2, java.math.RoundingMode.HALF_UP);
+            x = normalizeCoord(req.getX());
+            y = normalizeCoord(req.getY());
         } else {
             if (req.getBuildingId() == null || req.getFloorId() == null) {
                 throw new BusinessException("Building and floor are required.");
@@ -127,8 +128,8 @@ public class FireHydrantService {
                     .orElseThrow(() -> new BusinessException("Building not found."));
             floor = floorRepository.findById(req.getFloorId())
                     .orElseThrow(() -> new BusinessException("Floor not found."));
-            x = req.getX();
-            y = req.getY();
+            x = normalizeCoord(req.getX());
+            y = normalizeCoord(req.getY());
         }
 
         entity.update(operationType, building, floor, x, y, req.getLocationDescription());
@@ -238,6 +239,10 @@ public class FireHydrantService {
         FireHydrant h = hydrantRepository.findById(hydrantId)
                 .orElseThrow(() -> new EntityNotFoundException("FireHydrant", hydrantId));
         h.updateImagePath(imagePath);
+    }
+
+    private BigDecimal normalizeCoord(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String generateNextSerialNumber() {

@@ -15,6 +15,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -76,11 +78,14 @@ public class FacilityEquipmentService {
         Floor floor = floorRepository.findById(req.getFloorId())
                 .orElseThrow(() -> new BusinessException("층 정보를 찾을 수 없습니다."));
 
+        BigDecimal x = normalizeCoord(req.getX());
+        BigDecimal y = normalizeCoord(req.getY());
+
         FacilityEquipment entity;
         if (req.getEquipmentId() != null && req.getEquipmentId() > 0) {
             entity = findOwned(normalizedCategory, req.getEquipmentId());
             entity.update(building, floor, req.getEquipmentType(), req.getManufactureDate(),
-                    req.getReplacementCycleYears(), req.getQuantity(), req.getX(), req.getY(), req.getNote());
+                    req.getReplacementCycleYears(), req.getQuantity(), x, y, req.getNote());
         } else {
             String serialNumber = generateNextSerialNumber(normalizedCategory);
             entity = FacilityEquipment.builder()
@@ -92,8 +97,8 @@ public class FacilityEquipmentService {
                     .manufactureDate(req.getManufactureDate())
                     .replacementCycleYears(req.getReplacementCycleYears())
                     .quantity(req.getQuantity())
-                    .x(req.getX())
-                    .y(req.getY())
+                    .x(x)
+                    .y(y)
                     .note(req.getNote())
                     .build();
             equipmentRepository.save(entity);
@@ -222,6 +227,10 @@ public class FacilityEquipmentService {
         if (CATEGORY_AIRCON.equals(category) && !AIRCON_TYPES.contains(equipmentType.trim())) {
             throw new BusinessException("에어컨 종류는 시스템, 벽걸이, 스탠드형 중 하나여야 합니다.");
         }
+    }
+
+    private BigDecimal normalizeCoord(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String generateNextSerialNumber(String category) {

@@ -25,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -144,19 +146,22 @@ public class FireReceiverService {
         Floor floor = floorRepository.findById(DEFAULT_OUTDOOR_FLOOR_ID)
                 .orElseThrow(() -> new BusinessException("옥외 층 정보가 없습니다."));
 
+        BigDecimal x = normalizeCoord(request.getX());
+        BigDecimal y = normalizeCoord(request.getY());
+
         FireReceiver receiver;
         if (request.getReceiverId() != null && request.getReceiverId() > 0) {
             receiver = fireReceiverRepository.findById(request.getReceiverId())
                     .orElseThrow(() -> new EntityNotFoundException("FireReceiver", request.getReceiverId()));
-            receiver.update(request.getBuildingName().trim(), floor, request.getX(), request.getY(),
+            receiver.update(request.getBuildingName().trim(), floor, x, y,
                     request.getLocationDescription(), request.getNote());
         } else {
             receiver = FireReceiver.builder()
                     .serialNumber(generateNextSerialNumber())
                     .buildingName(request.getBuildingName().trim())
                     .floor(floor)
-                    .x(request.getX())
-                    .y(request.getY())
+                    .x(x)
+                    .y(y)
                     .locationDescription(request.getLocationDescription())
                     .note(request.getNote())
                     .isActive(true)
@@ -301,6 +306,10 @@ public class FireReceiverService {
         FireReceiver receiver = fireReceiverRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("FireReceiver", receiverId));
         fireReceiverRepository.delete(receiver);
+    }
+
+    private BigDecimal normalizeCoord(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String generateNextSerialNumber() {
