@@ -34,21 +34,21 @@
     .toolbar { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
     .toolbar .btn { width:100%; white-space:nowrap; text-align:center; padding:10px 12px; }
 
-    .planWrap { position:relative; width:100%; height:calc(100% - 10px); min-height:420px; border:1px dashed #222; border-radius:12px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; }
+    .planWrap { position:relative; width:100%; height:calc(100% - 10px); min-height:420px; border:1px dashed #222; border-radius:12px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
     .planWrap.dragging { cursor:grabbing; }
     .planWrap.add-mode { cursor:crosshair; }
     .planWrap.add-mode .planImg { cursor:crosshair; }
-    .planStage { position:relative; display:inline-block; padding:600px; }
-    .planInner { position:relative; display:inline-block; transform-origin:0 0; }
-    .planImg { display:block; max-width:none; width:auto; height:auto; user-select:none; -webkit-user-drag:none; }
+    .planStage { position:relative; display:inline-block; padding:600px; user-select:none; -webkit-user-select:none; }
+    .planInner { position:relative; display:inline-block; transform-origin:0 0; user-select:none; -webkit-user-select:none; }
+    .planImg { display:block; max-width:none; width:auto; height:auto; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 
-    #markers,#hydrantMarkers,#equipmentMarkers { position:absolute; inset:0; pointer-events:none; }
+    #markers,#hydrantMarkers,#equipmentMarkers { position:absolute; inset:0; pointer-events:none; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; }
     #markers .marker,#hydrantMarkers .hmarker,#equipmentMarkers .eqmarker { pointer-events:auto; }
-    .marker,.hmarker,.eqmarker { position:absolute; width:35px; height:35px; transform:translate(-50%,-50%); border:0; background:transparent; padding:0; border-radius:0; }
+    .marker,.hmarker,.eqmarker { position:absolute; width:35px; height:35px; transform:translate(-50%,-50%); border:0; background:transparent; padding:0; border-radius:0; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; }
     .hmarker.outdoor { width:18px; height:18px; }
     .eqmarker { width:34px; height:34px; border-radius:999px; transition:transform .16s ease, filter .16s ease, box-shadow .16s ease; }
     .eqmarker.is-selected { transform:translate(-50%,-50%) scale(1.18); box-shadow:0 0 0 4px rgba(14,165,233,.35), 0 0 0 8px rgba(14,165,233,.18); filter:drop-shadow(0 0 8px rgba(14,165,233,.95)); z-index:5; }
-    .marker img,.hmarker img,.eqmarker img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+    .marker img,.hmarker img,.eqmarker img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; user-drag:none; }
     .marker.sel img { filter:drop-shadow(0 0 6px rgba(0,123,255,.9)); }
     .hmarker.sel img { filter:drop-shadow(0 0 6px rgba(40,167,69,.9)); }
     .extRow {
@@ -178,7 +178,7 @@
       <div class="planWrap" id="planWrap">
         <div class="planStage" id="planStage">
           <div class="planInner" id="planInner">
-            <img id="planImg" class="planImg" src="" alt="도면" />
+            <img id="planImg" class="planImg" src="" alt="도면" draggable="false" />
             <div id="markers" aria-hidden="true"></div>
             <div id="hydrantMarkers" aria-hidden="true"></div>
             <div id="equipmentMarkers" aria-hidden="true"></div>
@@ -337,6 +337,8 @@
       }
     } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
   }
+
+  planImg.draggable = false;
 
   const state = {
     zoom: 1, panX: 0, panY: 0, dragging: false,
@@ -1159,7 +1161,7 @@
       btn.className = 'marker' + (state.selectedExtId === it.extinguisherId ? ' sel' : '');
       btn.dataset.extId = String(it.extinguisherId || '');
       Object.assign(btn.style, markerPos(it.x, it.y));
-      btn.innerHTML = `<img src="${EX_ICON_URL}" alt="extinguisher">`;
+      btn.innerHTML = `<img draggable="false" src="${EX_ICON_URL}" alt="extinguisher">`;
       btn.onclick = (e) => {
         e.stopPropagation();
         // 소화기 추가 모드일 때 마커 클릭 → 바로 추가 모달 열기 (미니 모달 대신)
@@ -1250,7 +1252,7 @@
       const hydIcon = String(h.hydrantType || '').toLowerCase() === 'outdoor'
         ? HYDRANT_OUT_ICON_URL
         : HYDRANT_IN_ICON_URL;
-      btn.innerHTML = `<img src="${hydIcon}" alt="hydrant">`;
+      btn.innerHTML = `<img draggable="false" src="${hydIcon}" alt="hydrant">`;
       btn.onclick = (e) => {
         e.stopPropagation();
         resetMoveArm();
@@ -1304,7 +1306,7 @@
       Object.assign(btn.style, markerPos(item.x, item.y));
       const label = equipmentLabel(item.type);
       btn.title = `${label} #${equipmentId}`;
-      btn.innerHTML = `<img src="${item.type === 'receiver' ? RECEIVER_ICON_URL : PUMP_ICON_URL}" alt="${label}">`;
+      btn.innerHTML = `<img draggable="false" src="${item.type === 'receiver' ? RECEIVER_ICON_URL : PUMP_ICON_URL}" alt="${label}">`;
       btn.onclick = (e) => {
         e.stopPropagation();
         resetMoveArm();
@@ -1827,10 +1829,14 @@
 
   document.getElementById('btnZoomReset').onclick = () => { fitPlanToView(); centerPlanInView(); };
   planImg.addEventListener('load', () => { fitPlanToView(); centerPlanInView(); });
+  planWrap.addEventListener('dragstart', (e) => {
+    if (!e.target?.closest('.infoCard')) e.preventDefault();
+  });
 
   planWrap.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     if (e.target?.closest('.marker, .hmarker, .eqmarker, .infoCard')) return;
+    e.preventDefault();
     state.dragging = true;
     state.dragMoved = false;
     state.dragStartX = e.clientX;
