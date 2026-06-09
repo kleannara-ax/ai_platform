@@ -1214,7 +1214,12 @@
         return String(a.buildingName || '').localeCompare(String(b.buildingName || ''), 'ko');
       });
 
-    state.current = state.floors.find(v => normalize(v.buildingName) === normalize(qBuilding) && normalize(v.floorName) === normalize(qFloor)) || null;
+    const qBuildingId = (qsNow.get('buildingId') || '').trim();
+    const qFloorId = (qsNow.get('floorId') || '').trim();
+    state.current = state.floors.find(v =>
+      (qBuildingId && qFloorId && String(v.buildingId) === qBuildingId && String(v.floorId) === qFloorId) ||
+      (normalize(v.buildingName) === normalize(qBuilding) && normalize(v.floorName) === normalize(qFloor))
+    ) || null;
 
     if (!state.current) {
       const preferredBuilding = state.buildings.find(b => normalize(b.buildingName) === normalize(qBuilding));
@@ -1268,6 +1273,32 @@
 
     renderList();
     renderMarkers();
+    focusRequestedMarkerFromQuery();
+  }
+
+  function focusRequestedMarkerFromQuery(){
+    const q = new URLSearchParams(location.search);
+    const focusType = (q.get('focusType') || '').trim();
+    const focusId = (q.get('focusId') || '').trim();
+    if (!focusType || !focusId) return;
+    if (focusType !== 'ext' && focusType !== 'hyd') return;
+    state.needInspectMode = false;
+    const btnNeedInspect = document.getElementById('btnNeedInspect');
+    if (btnNeedInspect) {
+      btnNeedInspect.classList.remove('active');
+      btnNeedInspect.style.background = '';
+      btnNeedInspect.style.color = '';
+    }
+    renderMarkers();
+    setTimeout(() => {
+      const candidates = focusType === 'ext'
+        ? Array.from(markersEl.querySelectorAll('.marker'))
+        : Array.from(hydrantMarkersEl.querySelectorAll('.hmarker'));
+      const btn = candidates.find(el => (focusType === 'ext' ? el.dataset.extId : el.dataset.hydrantId) === focusId);
+      if (!btn) return;
+      try { btn.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch(_) { btn.scrollIntoView(); }
+      btn.click();
+    }, 80);
   }
 
   buildingSelect?.addEventListener('change', () => {
