@@ -13,6 +13,7 @@ import java.time.LocalDate;
 @Setter
 public class FacilityEquipmentSaveRequest {
     private Long equipmentId;
+    private String serialNumber;
 
     @NotNull(message = "건물을 선택하세요.")
     @Min(value = 1, message = "건물을 선택하세요.")
@@ -24,6 +25,13 @@ public class FacilityEquipmentSaveRequest {
 
     @NotBlank(message = "설비 종류를 입력하세요.")
     private String equipmentType;
+
+    private String manufacturer;
+    private Integer installationYear;
+    private String locationDescription;
+    private int outdoorUnitCount = 1;
+    private BigDecimal outdoorX;
+    private BigDecimal outdoorY;
 
     @NotNull(message = "제조일을 입력하세요.")
     private LocalDate manufactureDate;

@@ -21,6 +21,12 @@ public class FacilityEquipmentResponse {
     private final Long floorId;
     private final String floorName;
     private final String equipmentType;
+    private final String manufacturer;
+    private final Integer installationYear;
+    private final String locationDescription;
+    private final int outdoorUnitCount;
+    private final BigDecimal outdoorX;
+    private final BigDecimal outdoorY;
     private final LocalDate manufactureDate;
     private final int replacementCycleYears;
     private final LocalDate replacementDueDate;
@@ -48,6 +54,12 @@ public class FacilityEquipmentResponse {
                 .floorId(e.getFloor() != null ? e.getFloor().getFloorId() : null)
                 .floorName(e.getFloor() != null ? e.getFloor().getFloorName() : null)
                 .equipmentType(e.getEquipmentType())
+                .manufacturer(e.getManufacturer())
+                .installationYear(e.getInstallationYear())
+                .locationDescription(e.getLocationDescription())
+                .outdoorUnitCount(e.getOutdoorUnitCount())
+                .outdoorX(e.getOutdoorX())
+                .outdoorY(e.getOutdoorY())
                 .manufactureDate(e.getManufactureDate())
                 .replacementCycleYears(e.getReplacementCycleYears())
                 .replacementDueDate(e.getReplacementDueDate())

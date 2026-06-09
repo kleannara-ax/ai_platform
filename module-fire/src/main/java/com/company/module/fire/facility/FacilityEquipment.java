@@ -45,6 +45,24 @@ public class FacilityEquipment {
     @Column(name = "EQUIPMENT_TYPE", nullable = false, length = 100)
     private String equipmentType;
 
+    @Column(name = "MANUFACTURER", length = 100)
+    private String manufacturer;
+
+    @Column(name = "INSTALLATION_YEAR")
+    private Integer installationYear;
+
+    @Column(name = "LOCATION_DESCRIPTION", length = 200)
+    private String locationDescription;
+
+    @Column(name = "OUTDOOR_UNIT_COUNT", nullable = false)
+    private int outdoorUnitCount = 1;
+
+    @Column(name = "OUTDOOR_X", precision = 9, scale = 4)
+    private BigDecimal outdoorX;
+
+    @Column(name = "OUTDOOR_Y", precision = 9, scale = 4)
+    private BigDecimal outdoorY;
+
     @Column(name = "MANUFACTURE_DATE", nullable = false)
     private LocalDate manufactureDate;
 
@@ -83,6 +101,7 @@ public class FacilityEquipment {
         if (quantity < 1) {
             quantity = 1;
         }
+        outdoorUnitCount = normalizeOutdoorUnitCount(outdoorUnitCount);
         calculateReplacementDueDate();
         createdAt = LocalDateTime.now();
     }
@@ -94,13 +113,21 @@ public class FacilityEquipment {
 
     @Builder
     public FacilityEquipment(String category, String serialNumber, Building building, Floor floor,
-                             String equipmentType, LocalDate manufactureDate, int replacementCycleYears,
+                             String equipmentType, String manufacturer, Integer installationYear,
+                             String locationDescription, int outdoorUnitCount, BigDecimal outdoorX, BigDecimal outdoorY,
+                             LocalDate manufactureDate, int replacementCycleYears,
                              int quantity, BigDecimal x, BigDecimal y, String imagePath, String note) {
         this.category = category;
         this.serialNumber = serialNumber;
         this.building = building;
         this.floor = floor;
         this.equipmentType = equipmentType;
+        this.manufacturer = manufacturer;
+        this.installationYear = installationYear;
+        this.locationDescription = locationDescription;
+        this.outdoorUnitCount = normalizeOutdoorUnitCount(outdoorUnitCount);
+        this.outdoorX = outdoorX;
+        this.outdoorY = outdoorY;
         this.manufactureDate = manufactureDate;
         this.replacementCycleYears = replacementCycleYears <= 0 ? 10 : replacementCycleYears;
         this.quantity = quantity <= 0 ? 1 : quantity;
@@ -112,11 +139,21 @@ public class FacilityEquipment {
         calculateReplacementDueDate();
     }
 
-    public void update(Building building, Floor floor, String equipmentType, LocalDate manufactureDate,
-                       int replacementCycleYears, int quantity, BigDecimal x, BigDecimal y, String note) {
+    public void update(String serialNumber, Building building, Floor floor, String equipmentType,
+                       String manufacturer, Integer installationYear, String locationDescription,
+                       int outdoorUnitCount, BigDecimal outdoorX, BigDecimal outdoorY,
+                       LocalDate manufactureDate, int replacementCycleYears, int quantity,
+                       BigDecimal x, BigDecimal y, String note) {
+        this.serialNumber = serialNumber;
         this.building = building;
         this.floor = floor;
         this.equipmentType = equipmentType;
+        this.manufacturer = manufacturer;
+        this.installationYear = installationYear;
+        this.locationDescription = locationDescription;
+        this.outdoorUnitCount = normalizeOutdoorUnitCount(outdoorUnitCount);
+        this.outdoorX = outdoorX;
+        this.outdoorY = outdoorY;
         this.manufactureDate = manufactureDate;
         this.replacementCycleYears = replacementCycleYears <= 0 ? 10 : replacementCycleYears;
         this.quantity = quantity <= 0 ? 1 : quantity;
@@ -128,6 +165,11 @@ public class FacilityEquipment {
 
     public void updateImagePath(String imagePath) {
         this.imagePath = imagePath;
+    }
+
+    private int normalizeOutdoorUnitCount(int value) {
+        if (value < 1) return 1;
+        return Math.min(value, 2);
     }
 
     private void calculateReplacementDueDate() {

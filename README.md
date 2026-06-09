@@ -14,6 +14,7 @@
   - 대시보드 이상설비 상세 모달: 넓은 전용 모달로 상세 화면 표시
   - 수신기/소방펌프 현황 그래프: 정상, 점검필요, 요정비, 불량 4상태 구분 표시(요정비/교체필요는 밝은 노란색 계열로 통일)
   - 기타설비 관리: 에어컨, 정수기 목록/상세/등록/수정/삭제/점검/이미지 업로드
+  - 에어컨 관리 확장: 건물 번호 기반 식별 No.(예: `1-1`, `2-1`, `130-1`), 제조사, 설치연도, 상세 위치, 실외기 개수(최대 2대), 실외기 좌표를 관리하고 실내기-실외기 한 쌍을 도면에서 연결
   - 기타설비 대시보드/도면: 메인 도면은 `/fire-map.html` 원본 화면을 그대로 복사한 파생본으로 사용하되 옥외소화전/옥외 소화기/수신기·소방펌프만 제외하고, 층별 도면은 공통 DB 도면 흐름을 사용하며 에어컨은 `점검요청`, 정수기는 `점검필요` 상태만 표시
   - 설비별 건물/층/도면 좌표와 비고 관리
   - 대표 이미지 1장 유지 및 최근 점검 이력 12건 관리
@@ -30,7 +31,7 @@
 - **기타설비 화면**:
   - `/index.html?page=other_dashboard` → 기타설비 대시보드(에어컨/정수기 현황, 에어컨 `점검요청`, 정수기 `점검필요`, 층별 도면 바로가기)
   - `/facility-map.html` → 기타설비 도면(메인): 기존 `/fire-map.html` 화면/배경/zone overlay/tooltip/popup/이동·확대 디테일을 그대로 사용하고, 옥외소화전·옥외 소화기·수신기/소방펌프 UI와 초기 데이터 로딩만 제외. 건물/층 선택 시 `/facility/floor.html`로 이동
-  - `/facility/floor.html` → 기타설비 층별 도면(기존 `/maps/floor.html`의 도면 레이어/드래그/확대/정보 카드 패턴 기준, DB `/fire-api/maps/floor-data` 공통 사용, `buildingName`, `floorName`, `buildingId`, `floorId`, `focusType=aircon|water`, `focusId` 지원)
+  - `/facility/floor.html` → 기타설비 층별 도면(기존 `/maps/floor.html`의 도면 레이어/드래그/확대/정보 카드 패턴 기준, DB `/fire-api/maps/floor-data` 공통 사용, `buildingName`, `floorName`, `buildingId`, `floorId`, `focusType=aircon|water`, `focusId` 지원, 에어컨 선택 시 실외기 마커와 검정 연결선 표시)
   - `/facility/air-conditioners`
   - `/facility/water-purifiers`
 - **기타설비 API**:
@@ -41,7 +42,7 @@
 - **Database**: MariaDB (`platform_db`)
 - **DDL mode**: `spring.jpa.hibernate.ddl-auto=none`; schema changes are managed by SQL scripts.
 - **New Tables**:
-  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터
+  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터. 에어컨은 `MANUFACTURER`, `INSTALLATION_YEAR`, `LOCATION_DESCRIPTION`, `OUTDOOR_UNIT_COUNT`, `OUTDOOR_X`, `OUTDOOR_Y`로 실외기 pair 정보를 저장
   - `facility_equipment_inspection`: 기타설비 점검 이력
 - **File Storage**:
   - 기타설비 업로드: `/data/upload/module_fire/facility/{air-conditioners|water-purifiers}`
@@ -65,7 +66,7 @@
 8. 목록에서 설비 행을 클릭하면 상세 정보와 점검 이력을 볼 수 있습니다.
 9. 권한이 있는 사용자는 추가/수정/삭제/점검 및 이미지 업로드를 수행할 수 있습니다.
 10. 수신기/소방펌프 수정 모달의 점검 이력 영역에서 기존 내역은 `수정` 또는 `삭제`할 수 있고, 신규 행은 `추가`할 수 있습니다.
-11. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다.
+11. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨은 클릭 대상을 `실내기` 또는 `실외기`로 전환해 각각 좌표를 지정하고, 층별 도면에서는 에어컨을 클릭했을 때만 실외기 마커와 검정 연결선이 표시됩니다.
 
 ## Deployment / Runtime
 - **Runtime**: Spring Boot 3.2.5 + Java 21
@@ -79,6 +80,7 @@
 - 기타설비 메인 도면(`/facility-map.html`)은 신규 독립 축약 구현이 아니라 `/fire-map.html` 원본을 그대로 복사한 뒤 기타설비 메뉴/층별 링크만 변경하고 옥외소화전·옥외 소화기·수신기/소방펌프 UI 및 초기 로딩을 제외하도록 정리 완료
 - `V15__facility_management_system.sql`로 메뉴/역할/테이블 migration 추가
 - 빌드 검증 완료
+- 에어컨 식별 No. 및 실내기-실외기 pair 필드/화면/도면 표시 구현 중: `V16__facility_aircon_pair_fields.sql` 적용 필요
 - 수신기/소방펌프 대시보드 그래프 4상태 반영 완료(요정비/교체필요 그래프 색상은 밝은 노란색 계열 적용)
 - 수신기/소방펌프 점검 이력 삭제 API 및 수정 모달 삭제 버튼 구현 완료
 - 이상설비 바로가기 마커 자동 선택 안정화 및 대시보드 상세 모달 확대 완료
@@ -91,5 +93,6 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 메뉴 노출 및 API 권한 검증
+- 운영/로컬 DB에 `sql/module-fire/V16__facility_aircon_pair_fields.sql` 적용 후 에어컨 신규 필드 저장 검증
 - 에어컨/정수기 실데이터 등록 후 기타설비 대시보드/메인 도면/층별 도면 포커스 흐름과 공통 DB 도면 좌표 매칭 검증
 - 운영 DB 적용 시 `mysql --default-character-set=utf8mb4` 사용 권장

@@ -27,6 +27,8 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
             "     LOWER(f.floorName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.equipmentType) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "     LOWER(COALESCE(e.manufacturer, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "     LOWER(COALESCE(e.locationDescription, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.note) LIKE LOWER(CONCAT('%', :keyword, '%')))",
             countQuery =
             "SELECT COUNT(e) FROM FacilityEquipment e " +
@@ -40,6 +42,8 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
             "     LOWER(f.floorName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.equipmentType) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "     LOWER(COALESCE(e.manufacturer, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "     LOWER(COALESCE(e.locationDescription, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "     LOWER(e.note) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<FacilityEquipment> search(
             @Param("category") String category,
