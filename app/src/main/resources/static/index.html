@@ -13,7 +13,7 @@
   --primary:#3b82f6; --primary-light:#dbeafe; --primary-hover:#2563eb; --primary-dark:#1e40af;
   --green:#16a34a; --green-light:#dcfce7;
   --red:#dc2626; --red-light:#fee2e2;
-  --yellow:#ca8a04; --yellow-light:#fef9c3;
+  --yellow:#ca8a04; --yellow-bright:#facc15; --yellow-light:#fef9c3;
   --orange:#ea580c; --orange-light:#ffedd5;
   --radius:8px; --shadow:0 1px 3px rgba(0,0,0,0.08);
 }
@@ -1886,12 +1886,12 @@ async function renderFireIndex() {
       var slices = (summary.type === 'receiver' || summary.type === 'pump') ? [
         { label:'정상', count:summary.graphNormal, color:'var(--green)' },
         { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
-        { label:'요정비', count:summary.graphMaintenance, color:'var(--yellow)' },
+        { label:'요정비', count:summary.graphMaintenance, color:'var(--yellow-bright)' },
         { label:'불량', count:summary.graphFaulty, color:'var(--red)' }
       ] : [
         { label:'정상', count:summary.graphNormal, color:'var(--green)' },
         { label:'점검필요', count:summary.graphInspect, color:'var(--orange)' },
-        { label:'교체필요', count:summary.graphReplace, color:'var(--yellow)' },
+        { label:'교체필요', count:summary.graphReplace, color:'var(--yellow-bright)' },
         { label:'이상설비', count:summary.graphAbnormal, color:'var(--red)' }
       ];
       var normalRate = denom ? Math.round(summary.graphNormal / denom * 100) : 0;
@@ -1963,7 +1963,7 @@ async function renderFireIndex() {
       + '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">이상설비</div><div class="value" style="color:var(--red);">'+abnormalTotal+'</div><div class="sub">점검 결과 비정상/요정비 설비</div></div>'
       + '</div>'
       + '<div class="card"><div class="card-header"><h3>설비 현황</h3><span style="font-size:12px;color:var(--text3)">원형 그래프 중앙은 기본 정상설비 비율이며, 범례에 마우스를 올리면 해당 상태 비율을 표시합니다.</span></div><div class="card-body">'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--yellow);"></b> 교체필요/요정비 '+(graphReplaceTotal + graphMaintenanceTotal)+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비/불량 '+(graphAbnormalTotal + graphFaultyTotal)+'</span></div>'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text2);"><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);"></b> 정상 '+graphNormalTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--orange);"></b> 점검필요 '+graphInspectTotal+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--yellow-bright);"></b> 교체필요/요정비 '+(graphReplaceTotal + graphMaintenanceTotal)+'</span><span><b style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);"></b> 이상설비/불량 '+(graphAbnormalTotal + graphFaultyTotal)+'</span></div>'
       + '<div style="display:grid;grid-template-columns:repeat(2,minmax(360px,1fr));gap:18px;">' + summaries.map(pieChartCard).join('') + '</div></div></div>'
       + '<div class="card"><div class="card-header"><h3>장비 유형별 현황</h3><span style="font-size:12px;color:var(--text3)">이상설비는 점검 결과 비정상/요정비 수량, 점검 필요 설비는 최근 30일 기준 수량입니다.</span></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>등록 수량</th><th>이상설비</th><th>점검 필요 설비</th><th></th></tr></thead><tbody>'
