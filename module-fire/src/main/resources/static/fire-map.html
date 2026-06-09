@@ -2114,6 +2114,37 @@ function positionOutdoorEquipmentSelect(markerEl){
     outdoorEquipmentSelect.style.bottom = 'auto';
 }
 
+function findOutdoorHydrantMarkerById(id){
+    if (!id || !outdoorMarkers) return null;
+    return Array.from(outdoorMarkers.querySelectorAll('.hmarker')).find(btn => {
+        const list = outdoorByKey?.get(btn.dataset.key) || [];
+        return list.some(h => String(h.hydrantId) === String(id));
+    }) || null;
+}
+function findOutdoorExtMarkerById(id){
+    if (!id || !outdoorExtMarkers) return null;
+    return Array.from(outdoorExtMarkers.querySelectorAll('.hmarker')).find(btn => {
+        const list = outdoorExtByKey?.get(btn.dataset.key) || [];
+        return list.some(x => String(x.extinguisherId) === String(id));
+    }) || null;
+}
+function positionVisibleOutdoorInfoCards(){
+    if (outdoorSelect?.classList.contains('show') && currentOutdoorId) {
+        const marker = findOutdoorHydrantMarkerById(currentOutdoorId);
+        if (marker) positionOutdoorSelect(marker);
+    }
+    if (outdoorExtSelect?.classList.contains('show') && currentOutdoorExtId) {
+        const marker = findOutdoorExtMarkerById(currentOutdoorExtId);
+        if (marker) positionOutdoorExtSelect(marker);
+    }
+    if (outdoorEquipmentSelect?.classList.contains('show') && currentOutdoorEquipment) {
+        const type = currentOutdoorEquipment.type;
+        const id = type === 'receiver' ? currentOutdoorEquipment.receiverId : currentOutdoorEquipment.pumpId;
+        const marker = findOutdoorEquipmentMarker(type, id);
+        if (marker) positionOutdoorEquipmentSelect(marker);
+    }
+}
+
 function openOutdoorEquipmentModal(action, options = {}){
     const type = options.type || currentOutdoorEquipment?.type;
     if (!type || !outdoorEditHostEl || !outdoorEditFrame) return;
@@ -2263,6 +2294,7 @@ function applyMapTransform(){
     mapStage.style.height = `${baseH}px`;
     mapStage.style.transform = `translate(${baseLeft + mapTx}px, ${baseTop + mapTy}px) scale(${mapScale})`;
     scene?.classList.toggle('is-draggable', canPanMap() && !isPanning);
+    positionVisibleOutdoorInfoCards();
 }
 function requestMapTransform() {
     if (mapTransformFrame) return;

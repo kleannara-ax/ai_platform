@@ -1134,12 +1134,17 @@
     let hyds = outdoor
       ? (outdoorView === 'hyd' ? state.hyds.filter(x => String(x.hydrantType || '').toLowerCase() === 'outdoor' && hasMapCoords(x)) : [])
       : state.hyds.filter(x => isCurrentFloor(x) && hasMapCoords(x));
-    let equipments = (outdoor && outdoorView === 'equipment')
-      ? [
-          ...state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'receiver' })),
-          ...state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'pump' }))
-        ]
-      : [];
+    let equipments = outdoor
+      ? (outdoorView === 'equipment'
+          ? [
+              ...state.receivers.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'receiver' })),
+              ...state.pumps.filter(x => isOutdoorEquipmentItem(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'pump' }))
+            ]
+          : [])
+      : [
+          ...state.receivers.filter(x => isCurrentFloor(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'receiver' })),
+          ...state.pumps.filter(x => isCurrentFloor(x) && hasMapCoords(x)).map(x => ({ ...x, type: 'pump' }))
+        ];
 
     // 점검 필요 설비 필터
     if (state.needInspectMode) {

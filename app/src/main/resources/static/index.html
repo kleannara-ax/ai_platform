@@ -1766,12 +1766,6 @@ async function renderFireIndex() {
     function shortcutUrl(type, it) {
       var id = getId(type, it);
       if (!id) return '';
-      if (type === 'receiver' || type === 'pump') {
-        var mp = new URLSearchParams();
-        mp.set('focusType', type);
-        mp.set('focusId', String(id));
-        return '/fire-map.html?' + mp.toString();
-      }
       var fp = new URLSearchParams();
       if (it.buildingName) fp.set('buildingName', it.buildingName);
       if (it.floorName) fp.set('floorName', it.floorName);
