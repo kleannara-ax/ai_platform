@@ -89,6 +89,10 @@
                 <li class="nav-item dropdown">
                   <a class="nav-link dropdown-toggle active fw-semibold" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">기타설비</a>
                   <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/index.html?page=other_dashboard">대시보드</a></li>
+                    <li><a class="dropdown-item" href="/facility-map.html">도면 (메인)</a></li>
+                    <li><a class="dropdown-item" href="/facility/floor.html">층별 도면</a></li>
+                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="/facility/air-conditioners">에어컨</a></li>
                     <li><a class="dropdown-item" href="/facility/water-purifiers">정수기</a></li>
                   </ul>
@@ -462,9 +466,33 @@
     $('planCanvas')?.addEventListener('click', (e) => { const img = $('planImg'); if (!img || !img.naturalWidth) return; const rect = img.getBoundingClientRect(); if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return; const x = ((e.clientX - rect.left) / rect.width) * 100; const y = ((e.clientY - rect.top) / rect.height) * 100; setCoord(x, y); });
   }
 
+  async function handleInitialAction() {
+    const params = new URLSearchParams(location.search || '');
+    const detailsId = params.get('details');
+    const editId = params.get('edit');
+    const inspectId = params.get('inspect');
+    if (detailsId) {
+      await openDetails(detailsId);
+      return;
+    }
+    if (editId) {
+      await openUpsert(editId);
+      return;
+    }
+    if (inspectId) {
+      state.inspectId = Number(inspectId);
+      $('inspectDate').value = today();
+      $('inspectOk').checked = true;
+      $('inspectFaultReason').value = '';
+      $('inspectPhoto').value = '';
+      bootstrapModal('inspectModal')?.show();
+    }
+  }
+
   async function init() {
     renderShell(); bindEvents(); fillTypeOptions();
     await loadOptions(); await loadList();
+    await handleInitialAction();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

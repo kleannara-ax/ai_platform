@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <link rel="stylesheet" href="/css/spa-theme.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기타설비 층별 도면</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{background:#f5f7fa;margin:0;font-family:'Pretendard Variable',Pretendard,system-ui,sans-serif;}
+    .facility-navbar{position:relative;z-index:1030;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}.facility-navbar .nav-link,.facility-navbar .navbar-brand{color:#fff!important;}.facility-navbar .dropdown-menu{z-index:1040;}
+    .btn{border-radius:10px;font-weight:800}.btn-primary{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border:none}.btn-success{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);border:none;color:#fff}.btn-info{background:linear-gradient(135deg,#17a2b8 0%,#3dc1d3 100%);border:none;color:#fff}.page-wrap{padding:clamp(8px,1vw,12px)}
+    .wrap{display:flex!important;flex-direction:row!important;align-items:stretch;height:calc(100vh - 100px);gap:12px;box-sizing:border-box;min-height:0}.left{flex:0 0 clamp(280px,28vw,390px);width:clamp(280px,28vw,390px);min-width:260px;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:12px;overflow:auto}.right{flex:1 1 auto;min-width:0;background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:12px;overflow:hidden;position:relative}.titlebar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}.title{font-size:18px;font-weight:900;margin:0}.sub{color:#666;font-size:13px;margin-bottom:12px}.toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.titleSelect{width:min(220px,100%);max-width:60vw}
+    .planWrap{position:relative;width:100%;height:calc(100% - 10px);min-height:420px;border:1px dashed #222;border-radius:12px;overflow:auto;background:#0b1424;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.planWrap.dragging{cursor:grabbing}.planStage{position:relative;display:inline-block;padding:600px;user-select:none;-webkit-user-select:none}.planInner{position:relative;display:inline-block;transform-origin:0 0;user-select:none;-webkit-user-select:none}.planImg{display:block;max-width:none;width:auto;height:auto;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;user-drag:none;pointer-events:auto}#facilityMarkers{position:absolute;inset:0;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}.fmarker{position:absolute;width:34px;height:34px;transform:translate(-50%,-50%);border:0;background:transparent;padding:0;border-radius:999px;pointer-events:auto;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;user-select:none;-webkit-user-drag:none}.fmarker img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none}.fmarker.is-selected{transform:translate(-50%,-50%) scale(1.2);box-shadow:0 0 0 4px rgba(102,126,234,.35),0 0 0 8px rgba(102,126,234,.18);filter:drop-shadow(0 0 8px rgba(102,126,234,.95));z-index:5}
+    .infoCard{position:absolute;width:clamp(240px,25vw,300px);max-width:calc(100% - 24px);background:#fff;border:1px solid #e6e6e6;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.16);overflow:hidden;z-index:50;display:none;transform-origin:0 0}.infoHead{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;background:linear-gradient(135deg,#5b5bd6 0%,#7b52c5 100%);color:#fff}.infoHead .t{font-weight:900;font-size:14px}.infoHead .xbtn{border:0;background:transparent;color:#fff;font-size:18px;line-height:18px;padding:0 4px;cursor:pointer}.infoBody{max-height:220px;overflow:auto;padding:10px;background:#fff}.kv{display:grid;grid-template-columns:82px 1fr;gap:5px 8px;font-size:13px}.k{color:#666}.v{color:#111;font-weight:700}.hint{position:absolute;right:18px;bottom:18px;background:rgba(0,0,0,.55);color:#fff;padding:8px 10px;border-radius:10px;font-size:12px;z-index:5}.equipRow{border:1px solid rgba(148,163,184,.22);border-radius:14px;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}.equipRow:hover{transform:translateY(-1px);box-shadow:0 10px 18px rgba(15,23,42,.08)}.equipRow.sel{border-color:rgba(37,99,235,.55);background:linear-gradient(135deg,rgba(219,234,254,.95) 0%,rgba(239,246,255,.98) 100%);box-shadow:0 12px 22px rgba(37,99,235,.16)}.status-pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:900}.status-ok{background:#dcfce7;color:#16a34a}.status-bad{background:#fee2e2;color:#dc2626}.status-inspect{background:#ffedd5;color:#ea580c}.status-replace{background:#fef9c3;color:#ca8a04}
+    .action-embed-modal .modal-content{background:transparent;border:0;box-shadow:none;border-radius:14px;overflow:hidden}.action-embed-modal .modal-body{padding:0;background:transparent}.action-embed-modal .modal-dialog{max-width:min(1440px,calc(100vw - 24px));width:calc(100vw - 24px);margin:clamp(.35rem,1.5vw,1rem) auto}#facilityActionFrame{width:100%;height:min(90vh,1100px);border:0;background:transparent;display:block}.modal-backdrop.show{background:rgba(17,24,39,.35)!important;backdrop-filter:blur(4px)}
+    @media(max-width:1180px){.wrap{flex-direction:column!important;height:auto;min-height:calc(100vh - 100px)}.left{width:100%;flex:0 0 auto;min-width:0;max-height:42vh}.right{min-height:70vh}.toolbar{grid-template-columns:1fr}.planWrap{min-height:60vh;height:60vh}.hint{right:12px;bottom:12px;max-width:min(260px,calc(100% - 24px))}}
+    @media(max-width:768px){.page-wrap{padding:8px}.left,.right{padding:10px;border-radius:10px}.planWrap{min-height:52vh;height:52vh}.infoCard{width:min(280px,calc(100% - 16px));max-width:calc(100% - 16px)}.kv{grid-template-columns:78px 1fr;font-size:12px}.action-embed-modal .modal-dialog{width:calc(100vw - 12px);max-width:calc(100vw - 12px)}#facilityActionFrame{height:92vh}}
+  </style>
+</head>
+<body>
+<header id="pageHeader">
+  <nav class="navbar navbar-expand-lg navbar-dark facility-navbar">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="/facility-map.html"><img src="/images/KFMS.PNG" alt="" style="height:32px;object-fit:contain" onerror="this.style.display='none'">기타설비 도면</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3">
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/index.html?page=other_dashboard">대시보드</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility-map.html">도면 (메인)</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold active" href="/facility/floor.html">층별 도면</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/air-conditioners">에어컨</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/water-purifiers">정수기</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+<main class="page-wrap">
+  <div class="wrap">
+    <aside class="left">
+      <div class="titlebar"><h3 class="title">기타설비 층별 도면</h3></div>
+      <div class="sub">에어컨/정수기를 선택하면 도면 마커와 정보 카드가 표시됩니다. 옥외 설비는 제외합니다.</div>
+      <div class="toolbar">
+        <button id="btnNeedInspect" class="btn btn-warning" title="최종 점검일로부터 한달이 지난 설비만 표시">점검 필요 설비</button>
+        <button id="btnFaulty" class="btn btn-danger" title="비정상 설비만 표시">이상설비</button>
+      </div>
+      <div class="mb-2">
+        <label class="form-label mb-1">현재 도면</label>
+        <div class="d-flex gap-2"><select id="buildingSelect" class="form-select titleSelect"></select><select id="floorSelect" class="form-select titleSelect"></select></div>
+        <div class="form-text"><small>도면이 등록된 건물/층만 표시됩니다.</small></div>
+      </div>
+      <hr />
+      <div class="d-flex align-items-center justify-content-between mb-2"><div class="fw-semibold">기타설비 목록</div><small class="text-muted" id="listCount">0건</small></div>
+      <div id="list"></div>
+    </aside>
+    <section class="right">
+      <div class="titlebar"><h3 class="title" id="planTitle">도면</h3><div class="d-flex gap-2"><button id="btnZoomReset" type="button" class="btn btn-outline-secondary btn-sm">확대 초기화</button></div></div>
+      <div class="sub">휠로 확대/축소, 드래그로 이동할 수 있습니다.</div>
+      <div class="planWrap" id="planWrap">
+        <div class="planStage" id="planStage"><div class="planInner" id="planInner"><img id="planImg" class="planImg" src="" alt="도면" draggable="false"><div id="facilityMarkers"></div><div id="facilityInfo" class="infoCard" aria-hidden="true"><div class="infoHead"><div class="t" id="fiTitle">기타설비</div><button type="button" class="xbtn" id="fiCloseHead" aria-label="닫기">×</button></div><div class="infoBody"><div class="kv"><div class="k">구분</div><div class="v" id="fiCategory">-</div><div class="k">시리얼</div><div class="v" id="fiSerial">-</div><div class="k">종류</div><div class="v" id="fiType">-</div><div class="k">위치</div><div class="v" id="fiLocation">-</div><div class="k">좌표</div><div class="v" id="fiCoord">-</div><div class="k">최종 점검</div><div class="v" id="fiLast">-</div><div class="k">상태</div><div class="v" id="fiStatus">-</div><div class="k">비고</div><div class="v" id="fiNote">-</div></div></div><div class="p-2 border-top bg-white"><div class="row g-2"><div class="col-4"><button class="btn btn-sm btn-outline-dark w-100" id="fiDetailBtn" type="button">상세</button></div><div class="col-4"><button class="btn btn-sm btn-primary w-100" id="fiInspectBtn" type="button">점검</button></div><div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" id="fiEditBtn" type="button">수정</button></div><div class="col-12"><button class="btn btn-sm btn-outline-secondary w-100" id="fiCloseBtn" type="button">닫기</button></div></div></div></div></div></div>
+      </div>
+      <div class="hint">드래그 이동 / 휠 확대 / 마커 클릭</div>
+    </section>
+  </div>
+</main>
+<div class="modal fade action-embed-modal" id="facilityActionModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content"><div class="modal-body"><iframe id="facilityActionFrame" title="기타설비 상세"></iframe></div></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/csrf.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  const esc = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  const norm = v => String(v || '').replace(/\s+/g,'').replace(/[.,_\-]/g,'').toLowerCase();
+  const num = v => { const n=Number(v); return Number.isFinite(n) ? n : null; };
+  const fmtDate = v => v ? String(v).slice(0,10) : '-';
+  const parseDate = d => { if(!d) return null; const x=new Date(d); return Number.isNaN(x.getTime()) ? null : x; };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const ICONS = { AIRCON:'/images/facility/aircon_system.png', WATER_PURIFIER:'/images/facility/water_purifier.png' };
+  const state = { buildings:[], items:[], currentItems:[], selected:null, filter:null, plan:'', panX:0, panY:0, zoom:1, minZoom:.15, dragging:false, moved:false, sx:0, sy:0, spx:0, spy:0 };
+  const isInIframe = () => { try { return self !== top; } catch { return true; } };
+  if (isInIframe()) $('pageHeader')?.setAttribute('style','display:none');
+  async function req(url){ const res=await fetch(url,{headers:window.FireWebCsrf?.headers({},'GET')||{}}); if(res.status===401){window.FireWebCsrf?.goLogin?.(); return null;} return res; }
+  async function loadPage(url){ const r=await req(url); const j=r&&r.ok?await r.json().catch(()=>null):null; return j?.data?.content||[]; }
+  function categoryLabel(c){ return c === 'AIRCON' ? '에어컨' : '정수기'; }
+  function detailPath(it, mode){ const base = it.category === 'AIRCON' ? '/facility/air-conditioners' : '/facility/water-purifiers'; const p = new URLSearchParams(); if(mode) p.set(mode, it.equipmentId); return base + (mode ? '?' + p.toString() : ''); }
+  function bucket(it){ const last=parseDate(it.lastInspectionDate); const due=parseDate(it.replacementDueDate); const faulty=it.lastIsFaulty===true; const inspect=!last || last < new Date(today.getTime()-30*24*3600*1000); const replace=!!(due && due <= new Date(today.getTime()+30*24*3600*1000)); return {faulty, inspect, replace}; }
+  function statusHtml(it){ const b=bucket(it); if(b.faulty) return '<span class="status-pill status-bad">비정상</span>'; if(b.replace) return '<span class="status-pill status-replace">교체필요</span>'; if(b.inspect) return '<span class="status-pill status-inspect">점검필요</span>'; return '<span class="status-pill status-ok">정상</span>'; }
+  async function loadData(){
+    const [bf, air, water] = await Promise.all([
+      req('/fire-api/maps/building-floors').then(r=>r&&r.ok?r.json().catch(()=>null):null).catch(()=>null),
+      loadPage('/facility-api/air-conditioners?page=0&size=2000'),
+      loadPage('/facility-api/water-purifiers?page=0&size=2000')
+    ]);
+    state.buildings=Array.isArray(bf?.data)?bf.data:[];
+    state.items=[...air.map(x=>({...x,category:'AIRCON'})),...water.map(x=>({...x,category:'WATER_PURIFIER'}))];
+    fillBuildingSelect(); selectInitial(); await loadFloor();
+  }
+  function fillBuildingSelect(){ $('buildingSelect').innerHTML=state.buildings.filter(b=>!norm(b.buildingName).includes('옥외')).map(b=>`<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join(''); }
+  function floorsOf(buildingId){ return state.buildings.find(b=>String(b.buildingId)===String(buildingId))?.floors || []; }
+  function fillFloorSelect(){ const floors=floorsOf($('buildingSelect').value).filter(f=>!norm(f.floorName).includes('옥외')); $('floorSelect').innerHTML=floors.map(f=>`<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join(''); }
+  function selectInitial(){
+    const bq=qs.get('buildingId'), fq=qs.get('floorId'), bn=qs.get('buildingName'), fn=qs.get('floorName');
+    if(bq && [...$('buildingSelect').options].some(o=>String(o.value)===String(bq))) $('buildingSelect').value=bq;
+    else if(bn){ const opt=[...$('buildingSelect').options].find(o=>norm(o.textContent)===norm(bn)||norm(o.textContent).includes(norm(bn))||norm(bn).includes(norm(o.textContent))); if(opt) $('buildingSelect').value=opt.value; }
+    fillFloorSelect();
+    if(fq && [...$('floorSelect').options].some(o=>String(o.value)===String(fq))) $('floorSelect').value=fq;
+    else if(fn){ const opt=[...$('floorSelect').options].find(o=>norm(o.textContent)===norm(fn)||norm(o.textContent).includes(norm(fn))||norm(fn).includes(norm(o.textContent))); if(opt) $('floorSelect').value=opt.value; }
+  }
+  async function fetchPlan(){ const b=$('buildingSelect').value, f=$('floorSelect').value; if(!b||!f) return ''; const r=await req('/fire-api/maps/floor-data?'+new URLSearchParams({buildingId:b,floorId:f})); const j=r&&r.ok?await r.json().catch(()=>null):null; return j?.data?.planImagePath || resolvePlanByName($('buildingSelect').selectedOptions[0]?.textContent, $('floorSelect').selectedOptions[0]?.textContent); }
+  function floorKey(v){ const s=norm(v); if(s.includes('지하')||s==='b1')return'b1'; if(s.includes('옥상')||s.includes('rf'))return'rf'; for(const n of ['4','3','2','1']) if(s.includes(n)) return n; return s; }
+  function resolvePlanByName(bn, fn){ const b=norm(bn), f=floorKey(fn); const table=[['복지관','bokji',{b1:'/images/bokji_B1.png',1:'/images/bokji_1F.png',2:'/images/bokji_2F.png',3:'/images/bokji_3F.png'}],['관리동','gwanri',{1:'/images/gwanri_1F.png',2:'/images/gwanri_2F.PNG'}],['제지12호기','jeji12',{1:'/images/jeji1,2_1F.PNG',2:'/images/jeji1,2_2F.PNG'}],['제지3호기','jeji3',{1:'/images/jeji3_1F.PNG',2:'/images/jeji3_2F.PNG'}],['패드동','pad',{1:'/images/pad_1F.PNG',2:'/images/pad_2F.PNG'}],['심면펄퍼','palpa',{1:'/images/palpa_1F.PNG',2:'/images/palpa_2F.PNG'}],['화장지36호기','tissue36',{1:'/images/tissue1,3_1F.PNG',2:'/images/tissue1,3_2F.PNG',3:'/images/tissue1,3_3F.png'}],['화장지45호기','tissue45',{b1:'/images/tissue4,5_B1.PNG',1:'/images/tissue4,5_1F.PNG',2:'/images/tissue4,5_2F.PNG',3:'/images/tissue4,5_3F.PNG'}],['기저귀동','diaper',{1:'/images/diaper_1F.png'}],['밀롤창고','milrol',{1:'/images/milrol_1F.png',2:'/images/milrol_2F.png',3:'/images/milrol_3F.png'}],['기관실','engine',{1:'/images/engine_1F.png'}],['전기현장','elec',{1:'/images/elec_1F.png',2:'/images/elec_2F.png'}],['주차타워','tower',{rf:'/images/tower_RF.png',1:'/images/tower_1F.png',2:'/images/tower_2F.png',3:'/images/tower_3F.png'}],['보일러조정동','boilerctrl',{1:'/images/boiler_ctrl_1F.png',2:'/images/boiler_ctrl_2F.png'}],['복합보일러','comboboiler',{1:'/images/comboboiler_1F.png',2:'/images/comboboiler_2F.png',3:'/images/comboboiler_3F.png',4:'/images/comboboiler_4F.png'}],['수출창고','export',{1:'/images/export_1F.png'}],['중문창고','jungmun',{1:'/images/jungmun_1F.png'}]]; for(const [ko,en,floors] of table) if(b.includes(norm(ko))||b.includes(en)) return floors[f]||''; return ''; }
+  async function loadFloor(){
+    state.selected=null; hideInfo(); state.plan=await fetchPlan(); const img=$('planImg'); if(state.plan){ img.src=state.plan; img.style.display='block'; } else { img.removeAttribute('src'); img.style.display='none'; }
+    $('planTitle').textContent=($('buildingSelect').selectedOptions[0]?.textContent||'')+' '+($('floorSelect').selectedOptions[0]?.textContent||'');
+    state.currentItems=state.items.filter(it=>String(it.buildingId)===String($('buildingSelect').value)&&String(it.floorId)===String($('floorSelect').value)&&it.x!=null&&it.y!=null);
+    renderList(); if(img.complete) fitPlan(); img.onload=fitPlan; setTimeout(()=>{fitPlan(); focusFromQuery();},120);
+  }
+  function filteredItems(){ if(state.filter==='inspect') return state.currentItems.filter(it=>bucket(it).inspect); if(state.filter==='faulty') return state.currentItems.filter(it=>bucket(it).faulty); return state.currentItems; }
+  function renderList(){ const list=filteredItems(); $('listCount').textContent=list.length+'건'; $('list').innerHTML=list.length?list.map(it=>`<button class="equipRow w-100 bg-white p-2 mb-2 text-start ${state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?'sel':''}" data-id="${esc(it.equipmentId)}"><div class="d-flex align-items-center gap-2"><img src="${esc(it.imagePath||ICONS[it.category])}" alt="" style="width:34px;height:34px;object-fit:contain" onerror="this.src='${esc(ICONS[it.category])}'"><div class="flex-grow-1"><div class="fw-bold">${esc(it.serialNumber||'-')} <small class="text-muted">${esc(categoryLabel(it.category))}</small></div><div class="small text-muted">${esc(it.equipmentType||'-')} · X ${Number(it.x).toFixed(1)} / Y ${Number(it.y).toFixed(1)}</div></div>${statusHtml(it)}</div></button>`).join(''):'<div class="text-center text-muted py-4">현재 층에 표시할 기타설비가 없습니다.</div>'; renderMarkers(); }
+  function fitPlan(){ const img=$('planImg'), wrap=$('planWrap'); if(!img.naturalWidth||!wrap.clientWidth) return; state.minZoom=Math.min(wrap.clientWidth/img.naturalWidth, wrap.clientHeight/img.naturalHeight); state.zoom=state.minZoom; state.panX=0; state.panY=0; applyTransform(); renderMarkers(); }
+  function applyTransform(){ $('planInner').style.transform=`translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`; positionInfo(); }
+  function clampZoom(v){ return Math.max(state.minZoom, Math.min(4, v)); }
+  function renderMarkers(){ const layer=$('facilityMarkers'), img=$('planImg'); layer.innerHTML=''; if(!img.naturalWidth) return; filteredItems().forEach(it=>{ const x=num(it.x), y=num(it.y); if(x==null||y==null)return; const btn=document.createElement('button'); btn.type='button'; btn.className='fmarker'+(state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?' is-selected':''); btn.dataset.id=it.equipmentId; btn.style.left=x+'%'; btn.style.top=y+'%'; btn.title=(it.serialNumber||'')+' '+categoryLabel(it.category); btn.innerHTML=`<img draggable="false" src="${esc(it.imagePath||ICONS[it.category])}" alt="${esc(categoryLabel(it.category))}" onerror="this.src='${esc(ICONS[it.category])}'">`; btn.addEventListener('click', e=>{ e.stopPropagation(); selectItem(it.equipmentId); }); layer.appendChild(btn); }); }
+  function selectItem(id){ const it=state.currentItems.find(x=>String(x.equipmentId)===String(id)); if(!it)return; state.selected=it; renderList(); showInfo(it); }
+  function statusText(it){ const b=bucket(it); if(b.faulty) return '비정상'; if(b.replace) return '교체필요'; if(b.inspect) return '점검필요'; return '정상'; }
+  function showInfo(it){ $('fiTitle').textContent=categoryLabel(it.category); $('fiCategory').textContent=categoryLabel(it.category); $('fiSerial').textContent=it.serialNumber||'-'; $('fiType').textContent=it.equipmentType||'-'; $('fiLocation').textContent=[it.buildingName,it.floorName].filter(Boolean).join(' / ')||'-'; $('fiCoord').textContent=`X ${Number(it.x).toFixed(2)} / Y ${Number(it.y).toFixed(2)}`; $('fiLast').textContent=fmtDate(it.lastInspectionDate); $('fiStatus').textContent=statusText(it); $('fiNote').textContent=it.note||'-'; $('facilityInfo').style.display='block'; $('facilityInfo').setAttribute('aria-hidden','false'); positionInfo(); }
+  function positionInfo(){ const card=$('facilityInfo'); if(!state.selected||card.style.display==='none')return; const x=num(state.selected.x), y=num(state.selected.y); if(x==null||y==null)return; card.style.left=`calc(${x}% + 18px)`; card.style.top=`calc(${y}% - 12px)`; }
+  function hideInfo(){ $('facilityInfo').style.display='none'; $('facilityInfo').setAttribute('aria-hidden','true'); document.querySelectorAll('.fmarker.is-selected').forEach(x=>x.classList.remove('is-selected')); }
+  function openAction(mode){ if(!state.selected)return; const frame=$('facilityActionFrame'); frame.src=detailPath(state.selected, mode); bootstrap.Modal.getOrCreateInstance($('facilityActionModal')).show(); }
+  function focusFromQuery(){ const t=qs.get('focusType'), id=qs.get('focusId'); if(!id)return; const it=state.currentItems.find(x=>String(x.equipmentId)===String(id)&&(!t||(t==='aircon'&&x.category==='AIRCON')||(t==='water'&&x.category==='WATER_PURIFIER'))); if(it) selectItem(it.equipmentId); }
+  function bind(){
+    $('buildingSelect').addEventListener('change',()=>{fillFloorSelect();loadFloor();}); $('floorSelect').addEventListener('change',loadFloor); $('btnZoomReset').addEventListener('click',fitPlan); $('btnNeedInspect').addEventListener('click',()=>{state.filter=state.filter==='inspect'?null:'inspect';renderList();}); $('btnFaulty').addEventListener('click',()=>{state.filter=state.filter==='faulty'?null:'faulty';renderList();});
+    $('fiCloseBtn').addEventListener('click',()=>{state.selected=null;hideInfo();renderList();}); $('fiCloseHead').addEventListener('click',()=>{state.selected=null;hideInfo();renderList();}); $('fiDetailBtn').addEventListener('click',()=>openAction('details')); $('fiInspectBtn').addEventListener('click',()=>openAction('inspect')); $('fiEditBtn').addEventListener('click',()=>openAction('edit'));
+    document.addEventListener('click', e=>{ const row=e.target.closest('.equipRow'); if(row) selectItem(row.dataset.id); });
+    $('planWrap').addEventListener('dragstart', e=>{ if(!e.target?.closest('.infoCard')) e.preventDefault(); });
+    $('planWrap').addEventListener('mousedown', e=>{ if(e.button!==0)return; if(e.target?.closest('.fmarker,.infoCard'))return; e.preventDefault(); state.dragging=true; state.moved=false; state.sx=e.clientX; state.sy=e.clientY; state.spx=state.panX; state.spy=state.panY; $('planWrap').classList.add('dragging'); });
+    window.addEventListener('mousemove', e=>{ if(!state.dragging)return; const dx=e.clientX-state.sx, dy=e.clientY-state.sy; if(Math.abs(dx)>2||Math.abs(dy)>2)state.moved=true; state.panX=state.spx+dx; state.panY=state.spy+dy; applyTransform(); });
+    window.addEventListener('mouseup',()=>{ if(state.dragging){ state.dragging=false; $('planWrap').classList.remove('dragging'); }});
+    $('planWrap').addEventListener('click', e=>{ if(state.moved){ state.moved=false; return; } if(e.target.closest('.fmarker,.infoCard'))return; state.selected=null; hideInfo(); renderList(); });
+    $('planWrap').addEventListener('wheel', e=>{ e.preventDefault(); const old=state.zoom; const next=clampZoom(old*(e.deltaY<0?1.12:.88)); if(next===old)return; const rect=$('planWrap').getBoundingClientRect(); const mx=e.clientX-rect.left, my=e.clientY-rect.top; state.panX=mx-(mx-state.panX)*(next/old); state.panY=my-(my-state.panY)*(next/old); state.zoom=next; applyTransform(); },{passive:false});
+    window.addEventListener('resize',()=>setTimeout(fitPlan,80));
+  }
+  bind(); loadData();
+})();
+</script>
+</body>
+</html>

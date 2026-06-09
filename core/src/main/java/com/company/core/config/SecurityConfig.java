@@ -81,7 +81,7 @@ public class SecurityConfig {
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 // 기타설비 페이지는 SPA iframe 및 직접 URL 접근이 가능해야 하므로 공개
                 // API 본문(/facility-api/**)은 아래 파일 조회 예외를 제외하고 인증 유지
-                .requestMatchers("/facility/**").permitAll()
+                .requestMatchers("/facility-map.html", "/facility/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
                 .requestMatchers("/fire-api/qr/image").permitAll()
                 // 소방 모듈 건물/층 목록 - 드롭다운에서 사용, 토큰 만료 시에도 전체 목록 표시

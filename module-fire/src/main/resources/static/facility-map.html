@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <link rel="stylesheet" href="/css/spa-theme.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기타설비 도면</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:'Pretendard Variable',Pretendard,system-ui,sans-serif;}
+    .screen{position:fixed;inset:0;background:#0f172a;}
+    .scene{position:absolute;inset:0;z-index:1;transition:transform 300ms cubic-bezier(.4,0,.2,1);}
+    .scene img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.78);z-index:1;user-select:none;-webkit-user-drag:none;}
+    #mapStage{position:absolute;inset:0;z-index:1;transform-origin:0 0;}
+    :root{--menu-w:clamp(240px,26vw,300px);--logo-h:clamp(88px,10vw,120px);--hamburger:clamp(48px,5vw,60px);}
+    .top-left{position:absolute;top:0;left:0;z-index:700;display:flex;flex-direction:column;align-items:flex-start;}
+    .logo{width:var(--menu-w);height:var(--logo-h);background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .logo img{width:100%;height:100%;object-fit:contain;display:block;}
+    .hamburger{width:var(--hamburger);height:var(--hamburger);border:0;background:rgba(255,255,255,.95);cursor:pointer;border-radius:0 0 12px 0;position:relative;z-index:710;}
+    .hamburger .lines{width:28px;height:20px;position:relative;margin:0 auto;}.hamburger .lines span{position:absolute;left:0;right:0;height:3px;background:#667eea;border-radius:3px;transition:.3s}.hamburger .lines span:nth-child(1){top:0}.hamburger .lines span:nth-child(2){top:8px}.hamburger .lines span:nth-child(3){top:16px}
+    .screen.menu-open .hamburger .lines span:nth-child(1){top:8px;transform:rotate(45deg)}.screen.menu-open .hamburger .lines span:nth-child(2){opacity:0}.screen.menu-open .hamburger .lines span:nth-child(3){top:8px;transform:rotate(-45deg)}
+    .side-menu{position:absolute;top:0;left:0;width:var(--menu-w);height:100%;background:rgba(255,255,255,.96);z-index:250;transform:translateX(-100%);transition:transform 300ms cubic-bezier(.4,0,.2,1);padding:20px;padding-top:calc(var(--logo-h) + var(--hamburger) + 20px);box-sizing:border-box;overflow:auto;}
+    .screen.menu-open .side-menu{transform:translateX(0)}.screen.menu-open .scene{transform:translateX(var(--menu-w));}.overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;z-index:200;transition:opacity 300ms}.screen.menu-open .overlay{opacity:1;pointer-events:auto}
+    .menu-title{font-size:1.25rem;font-weight:900;margin-bottom:12px}.menu-btn{display:block;padding:14px 16px;border-radius:12px;margin-top:10px;background:#667eea;color:#fff;text-decoration:none;font-weight:800}.menu-btn:hover{background:#5a6fe0;color:#fff}.menu-card{border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:12px;margin-top:14px;background:#f8fafc}.menu-card .num{font-size:24px;font-weight:900;color:#4f46e5}.menu-card .lbl{font-size:12px;color:#64748b;font-weight:800}
+    .zone-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:40;pointer-events:auto}.zone-overlay .zone{fill:rgba(255,255,255,.08);stroke:rgba(255,255,255,0);stroke-width:4;cursor:pointer;transition:fill 120ms,stroke 120ms}.zone-overlay .zone:hover{fill:rgba(255,255,255,.18);stroke:rgba(255,255,255,.82)}.zone-overlay .zone.selected{fill:rgba(102,126,234,.22);stroke:rgba(102,126,234,.98)}
+    #zoneTooltip{position:absolute;z-index:500;display:none;padding:8px 12px;border-radius:10px;background:rgba(0,0,0,.78);color:#fff;font-weight:900;font-size:.95rem;pointer-events:none;transform:translateY(-6px);opacity:0;transition:opacity 120ms,transform 120ms}#zoneTooltip.show{opacity:1;transform:translateY(-10px)}
+    .zone-popup{position:absolute;z-index:520;min-width:min(260px,calc(100vw - 32px));max-width:min(390px,calc(100vw - 32px));max-height:min(460px,calc(100vh - 24px));overflow:auto;background:rgba(255,255,255,.97);border-radius:16px;padding:14px;box-shadow:0 14px 34px rgba(0,0,0,.28);border:1px solid rgba(0,0,0,.06)}.zone-popup .zp-title{font-weight:900;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}.zone-popup .zp-close{border:0;background:transparent;font-size:20px;cursor:pointer;opacity:.7}.zone-popup .zp-floors{display:flex;flex-wrap:wrap;gap:8px}.zone-popup .zp-floor{border:0;padding:8px 10px;border-radius:999px;background:#667eea;color:#fff;font-weight:900;cursor:pointer}.zone-popup .zp-meta{font-size:12px;color:#64748b;margin-bottom:10px;font-weight:700}
+    .status-panel{position:absolute;right:16px;top:16px;z-index:340;display:grid;gap:10px;min-width:min(320px,calc(100vw - 32px));}.status-card{background:rgba(255,255,255,.95);border-radius:16px;padding:14px;box-shadow:0 10px 26px rgba(15,23,42,.18);border:1px solid rgba(148,163,184,.25)}.status-title{font-weight:900;color:#0f172a}.status-sub{font-size:12px;color:#64748b;font-weight:700}.building-list{max-height:44vh;overflow:auto;margin-top:8px;display:grid;gap:8px}.building-btn{width:100%;border:1px solid rgba(148,163,184,.24);background:#fff;border-radius:12px;padding:10px;text-align:left;cursor:pointer}.building-btn:hover{border-color:#667eea;box-shadow:0 8px 18px rgba(102,126,234,.14)}.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:900;background:#eef2ff;color:#4f46e5;margin-right:4px}.pill.bad{background:#fee2e2;color:#dc2626}.pill.inspect{background:#ffedd5;color:#ea580c}
+    .ui-hide-toggle{position:absolute;left:16px;bottom:16px;z-index:760;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.94);border:1px solid rgba(148,163,184,.28);box-shadow:0 10px 24px rgba(15,23,42,.18);cursor:pointer;user-select:none}.ui-hide-toggle input{display:none}.ui-hide-toggle .track{position:relative;width:36px;height:20px;border-radius:999px;background:#cbd5e1}.ui-hide-toggle .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .18s}.ui-hide-toggle .label{font-size:11px;font-weight:900;color:#334155}body.ui-hidden .track{background:#2563eb}body.ui-hidden .track::after{transform:translateX(16px)}body.ui-hidden .top-left,body.ui-hidden .status-panel,body.ui-hidden #zonePopup{display:none!important}
+    @media(max-width:768px){.status-panel{top:72px}.zone-popup{max-height:55vh}.building-list{max-height:30vh}}
+  </style>
+</head>
+<body>
+<div class="screen" id="screen">
+  <div class="side-menu">
+    <div class="menu-title">기타설비</div>
+    <a class="menu-btn" href="/index.html?page=other_dashboard">기타설비 대시보드</a>
+    <a class="menu-btn" href="/facility-map.html">도면 (메인)</a>
+    <a class="menu-btn" href="/facility/floor.html">층별 도면</a>
+    <a class="menu-btn" href="/facility/air-conditioners">에어컨</a>
+    <a class="menu-btn" href="/facility/water-purifiers">정수기</a>
+    <div class="menu-card"><div class="lbl">전체 기타설비</div><div class="num" id="menuTotal">0</div></div>
+    <div class="menu-card"><div class="lbl">이상설비</div><div class="num text-danger" id="menuFaulty">0</div></div>
+  </div>
+  <div class="overlay" id="overlay"></div>
+  <div class="scene" id="scene">
+    <div id="mapStage">
+      <img class="bg" src="/images/drone_photo.JPG" alt="사업장 전경" draggable="false">
+      <svg id="zoneOverlay" class="zone-overlay" viewBox="0 0 1600 900" preserveAspectRatio="none">
+        <polygon class="zone" data-name="관리동" data-floors="1층,2층" points="1268,464 1340,446 1364,493 1292,516"/>
+        <polygon class="zone" data-name="복지관" data-floors="지하1층,1층,2층,3층" points="1307,555 1390,542 1424,617 1332,639"/>
+        <polygon class="zone" data-name="중문창고" data-floors="1층" points="1060,620 1148,590 1192,668 1100,704"/>
+        <polygon class="zone" data-name="화장지4,5호기" data-floors="지하1층,1층,2층,3층" points="780,360 1000,330 1110,560 870,610"/>
+        <polygon class="zone" data-name="복합보일러" data-floors="1층,2층,3층,4층" points="1065,300 1160,276 1216,404 1116,432"/>
+        <polygon class="zone" data-name="화장지 3,6호기" data-floors="1층,2층,3층" points="604,366 764,345 850,594 684,622"/>
+        <polygon class="zone" data-name="전기공무" data-floors="1층" points="1116,236 1184,220 1210,274 1140,292"/>
+        <polygon class="zone" data-name="제지1,2호기" data-floors="1층,2층" points="332,382 590,350 665,620 400,646"/>
+        <polygon class="zone" data-name="제지3호기" data-floors="1층,2층" points="178,402 322,386 392,650 240,664"/>
+        <polygon class="zone" data-name="패드동" data-floors="1층,2층" points="136,254 250,240 318,376 184,394"/>
+        <polygon class="zone" data-name="기저귀동" data-floors="1층" points="70,276 132,268 176,394 108,404"/>
+        <polygon class="zone" data-name="심면펄퍼" data-floors="1층,2층" points="288,234 404,214 452,348 328,370"/>
+        <polygon class="zone" data-name="수출창고" data-floors="1층" points="430,210 560,190 602,332 464,350"/>
+        <polygon class="zone" data-name="밀롤창고" data-floors="1층,2층,3층" points="610,184 740,166 780,318 644,338"/>
+        <polygon class="zone" data-name="기관실" data-floors="1층" points="790,158 890,146 926,284 820,300"/>
+        <polygon class="zone" data-name="전기현장" data-floors="1층,2층" points="930,146 1030,134 1060,272 954,288"/>
+        <polygon class="zone" data-name="주차타워" data-floors="1층,2층,3층,옥상" points="1268,240 1364,220 1390,360 1290,386"/>
+        <polygon class="zone" data-name="보일러 조정동" data-floors="1층,2층" points="1218,302 1280,288 1310,400 1246,418"/>
+      </svg>
+      <div id="zoneTooltip"></div>
+      <div id="zonePopup" class="zone-popup" style="display:none"></div>
+    </div>
+  </div>
+  <div class="top-left">
+    <div class="logo"><img src="/images/KFMS.PNG" alt="설비관리시스템" onerror="this.src='/images/Kleannara.PNG'"></div>
+    <button class="hamburger" id="hamburger" type="button" aria-label="메뉴"><span class="lines"><span></span><span></span><span></span></span></button>
+  </div>
+  <section class="status-panel" id="statusPanel">
+    <div class="status-card">
+      <div class="status-title">기타설비 도면 (메인)</div>
+      <div class="status-sub">건물을 선택하면 층별 도면으로 이동합니다. 옥외 설비는 표시하지 않습니다.</div>
+      <div class="d-flex gap-2 mt-3 flex-wrap"><span class="pill">에어컨 <b id="airCount">0</b></span><span class="pill">정수기 <b id="waterCount">0</b></span><span class="pill bad">이상 <b id="faultyCount">0</b></span><span class="pill inspect">점검필요 <b id="inspectCount">0</b></span></div>
+    </div>
+    <div class="status-card">
+      <div class="status-title">건물별 현황</div>
+      <div class="building-list" id="buildingList"><div class="status-sub">불러오는 중...</div></div>
+    </div>
+  </section>
+  <label class="ui-hide-toggle" title="화면 UI 숨김"><input type="checkbox" id="hideUi"><span class="track"></span><span class="label">UI 숨김</span></label>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/csrf.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  const norm = v => String(v || '').replace(/\s+/g,'').replace(/[.,_\-]/g,'').toLowerCase();
+  const parseDate = d => { if(!d) return null; const x = new Date(d); return Number.isNaN(x.getTime()) ? null : x; };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const req = async url => { const res = await fetch(url, { headers: window.FireWebCsrf?.headers({}, 'GET') || {} }); if(res.status === 401){ window.FireWebCsrf?.goLogin?.(); return null; } return res; };
+  const state = { buildings: [], floors: [], items: [] };
+  function bucket(it){ const last=parseDate(it.lastInspectionDate); const due=parseDate(it.replacementDueDate); const faulty=it.lastIsFaulty===true; const inspect=!last || last < new Date(today.getTime()-30*24*3600*1000); const replace=!!(due && due <= new Date(today.getTime()+30*24*3600*1000)); return {faulty, inspect, replace}; }
+  function categoryLabel(c){ return c === 'AIRCON' ? '에어컨' : '정수기'; }
+  async function loadList(url){ const r=await req(url); const j=r && r.ok ? await r.json().catch(()=>null) : null; return j?.data?.content || []; }
+  async function loadData(){
+    const [bf, air, water] = await Promise.all([
+      req('/fire-api/maps/building-floors').then(r => r && r.ok ? r.json().catch(()=>null) : null).catch(()=>null),
+      loadList('/facility-api/air-conditioners?page=0&size=2000'),
+      loadList('/facility-api/water-purifiers?page=0&size=2000')
+    ]);
+    state.buildings = Array.isArray(bf?.data) ? bf.data : [];
+    state.items = [...air.map(x => ({...x, category:'AIRCON'})), ...water.map(x => ({...x, category:'WATER_PURIFIER'}))];
+    renderStats(); renderBuildingList();
+  }
+  function findBuilding(name){ const n=norm(name); return state.buildings.find(b => norm(b.buildingName) === n || norm(b.buildingName).includes(n) || n.includes(norm(b.buildingName))); }
+  function floorsFor(zone){ const b=findBuilding(zone.dataset.name); if(b?.floors?.length) return b.floors; return String(zone.dataset.floors||'').split(',').filter(Boolean).map((floorName,idx)=>({floorName, floorId:'', sortOrder:idx})); }
+  function floorUrl(buildingName, floor){ const b=findBuilding(buildingName); const p=new URLSearchParams(); p.set('buildingName', buildingName); p.set('floorName', floor.floorName); if(b?.buildingId) p.set('buildingId', b.buildingId); if(floor.floorId) p.set('floorId', floor.floorId); return '/facility/floor.html?' + p.toString(); }
+  function renderStats(){
+    const air=state.items.filter(x=>x.category==='AIRCON').length, water=state.items.filter(x=>x.category==='WATER_PURIFIER').length;
+    const faulty=state.items.filter(x=>bucket(x).faulty).length, inspect=state.items.filter(x=>bucket(x).inspect).length;
+    $('airCount').textContent=air; $('waterCount').textContent=water; $('faultyCount').textContent=faulty; $('inspectCount').textContent=inspect; $('menuTotal').textContent=air+water; $('menuFaulty').textContent=faulty;
+  }
+  function renderBuildingList(){
+    const counts = new Map();
+    state.items.forEach(it => { const k=it.buildingName || '미지정'; const cur=counts.get(k)||{total:0,faulty:0,inspect:0}; cur.total++; const b=bucket(it); if(b.faulty) cur.faulty++; if(b.inspect) cur.inspect++; counts.set(k,cur); });
+    const rows = [...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0],'ko')).map(([name,c]) => `<button type="button" class="building-btn" data-building="${esc(name)}"><div class="fw-bold">${esc(name)}</div><div class="mt-1"><span class="pill">전체 ${c.total}</span><span class="pill bad">이상 ${c.faulty}</span><span class="pill inspect">점검필요 ${c.inspect}</span></div></button>`).join('');
+    $('buildingList').innerHTML = rows || '<div class="status-sub">등록된 기타설비가 없습니다.</div>';
+  }
+  function showPopup(zone, evt){
+    document.querySelectorAll('.zone.selected').forEach(z=>z.classList.remove('selected')); zone.classList.add('selected');
+    const name=zone.dataset.name; const list=floorsFor(zone);
+    $('zonePopup').innerHTML = `<div class="zp-title"><span>${esc(name)}</span><button type="button" class="zp-close">×</button></div><div class="zp-meta">층을 선택하면 기타설비 층별 도면으로 이동합니다.</div><div class="zp-floors">${list.map(f=>`<button type="button" class="zp-floor" data-url="${esc(floorUrl(name,f))}">${esc(f.floorName)}</button>`).join('')}</div>`;
+    $('zonePopup').style.display='block';
+    const x=Math.min(evt.clientX+12, innerWidth-$('zonePopup').offsetWidth-12), y=Math.min(evt.clientY+12, innerHeight-$('zonePopup').offsetHeight-12);
+    $('zonePopup').style.left=Math.max(12,x)+'px'; $('zonePopup').style.top=Math.max(12,y)+'px';
+  }
+  function bind(){
+    $('hamburger').addEventListener('click',()=> $('screen').classList.toggle('menu-open'));
+    $('overlay').addEventListener('click',()=> $('screen').classList.remove('menu-open'));
+    $('hideUi').addEventListener('change', e=> document.body.classList.toggle('ui-hidden', e.target.checked));
+    document.querySelectorAll('.zone').forEach(zone => {
+      zone.addEventListener('mouseenter', e => { $('zoneTooltip').textContent=zone.dataset.name; $('zoneTooltip').style.display='block'; requestAnimationFrame(()=>$('zoneTooltip').classList.add('show')); });
+      zone.addEventListener('mousemove', e => { $('zoneTooltip').style.left=(e.clientX+12)+'px'; $('zoneTooltip').style.top=(e.clientY-4)+'px'; });
+      zone.addEventListener('mouseleave', () => { $('zoneTooltip').classList.remove('show'); $('zoneTooltip').style.display='none'; });
+      zone.addEventListener('click', e => showPopup(zone,e));
+    });
+    document.addEventListener('click', e => {
+      const floor=e.target.closest('.zp-floor'); if(floor) location.href=floor.dataset.url;
+      if(e.target.closest('.zp-close')) { $('zonePopup').style.display='none'; document.querySelectorAll('.zone.selected').forEach(z=>z.classList.remove('selected')); }
+      const b=e.target.closest('.building-btn'); if(b){ const zone=[...document.querySelectorAll('.zone')].find(z=>norm(z.dataset.name)===norm(b.dataset.building)||norm(z.dataset.name).includes(norm(b.dataset.building))||norm(b.dataset.building).includes(norm(z.dataset.name))); if(zone){ zone.dispatchEvent(new MouseEvent('click',{clientX:innerWidth/2,clientY:innerHeight/2,bubbles:true})); } else { location.href='/facility/floor.html?buildingName='+encodeURIComponent(b.dataset.building); } }
+    });
+  }
+  bind(); loadData();
+})();
+</script>
+</body>
+</html>
