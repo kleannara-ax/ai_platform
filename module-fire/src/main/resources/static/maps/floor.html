@@ -964,6 +964,7 @@
         hideHydrantInfo();
         renderList();
         renderMarkers();
+        const selectedBtn = markersEl.querySelector(`.marker[data-ext-id="${it.extinguisherId}"]`) || btn;
         const sameAtPos = exts
           .filter(x => Number(x.x).toFixed(2) === Number(it.x).toFixed(2) && Number(x.y).toFixed(2) === Number(it.y).toFixed(2))
           .sort((a,b) => (a.extinguisherId || 0) - (b.extinguisherId || 0));
@@ -1021,7 +1022,7 @@
           document.getElementById('miHeadCloseBtn').onclick = hideMarkerInfo;
         };
         redraw();
-        positionInfoCard('markerInfo', btn);
+        positionInfoCard('markerInfo', selectedBtn);
       };
       markersEl.appendChild(btn);
     }
@@ -1045,6 +1046,7 @@
         hideMarkerInfo();
         renderList();
         renderMarkers();
+        const selectedHydrantBtn = hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${h.hydrantId}"]`) || btn;
         document.getElementById('hiTitle').textContent = `\uC18C\uD654\uC804 #${h.hydrantId}`;
         document.getElementById('hiSerial').textContent = h.serialNumber || '-';
         document.getElementById('hiType').textContent = (h.hydrantType === 'Outdoor' ? '\uC625\uC678' : '\uC625\uB0B4');
@@ -1067,7 +1069,7 @@
         };
         document.getElementById('hiCloseBtn').onclick = hideHydrantInfo;
         document.getElementById('hiHeadCloseBtn').onclick = hideHydrantInfo;
-        positionInfoCard('hydrantInfo', btn);
+        positionInfoCard('hydrantInfo', selectedHydrantBtn);
       };
       hydrantMarkersEl.appendChild(btn);
     }
@@ -1298,6 +1300,15 @@
       if (!btn) return;
       try { btn.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch(_) { btn.scrollIntoView(); }
       btn.click();
+      setTimeout(() => {
+        const selected = focusType === 'ext'
+          ? markersEl.querySelector(`.marker[data-ext-id="${focusId}"]`)
+          : hydrantMarkersEl.querySelector(`.hmarker[data-hydrant-id="${focusId}"]`);
+        if (selected) {
+          selected.classList.add('sel');
+          try { selected.focus({ preventScroll: true }); } catch(_) { try { selected.focus(); } catch(__) {} }
+        }
+      }, 30);
     }, 80);
   }
 

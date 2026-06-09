@@ -1778,6 +1778,31 @@ async function renderFireIndex() {
       fp.set('focusId', String(id));
       return '/maps/floor.html?' + fp.toString();
     }
+    function fireAttr(s) {
+      return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function fireDetailUrl(type, id) {
+      if (!type || !id) return '';
+      var p = new URLSearchParams();
+      p.set('embedDetails', '1');
+      p.set('details', String(id));
+      if (type === 'ext') return '/extinguishers.html?' + p.toString();
+      if (type === 'hyd') return '/hydrants.html?' + p.toString();
+      if (type === 'receiver') return '/receivers.html?' + p.toString();
+      if (type === 'pump') return '/pumps.html?' + p.toString();
+      return '';
+    }
+    function openFireDetailModal(type, id, title) {
+      var url = fireDetailUrl(type, id);
+      if (!url) {
+        toast('상세 정보를 열 수 없습니다.', 'error');
+        return;
+      }
+      openModal(title || '설비 상세',
+        '<iframe title="설비 상세" src="'+esc(url)+'" style="display:block;width:100%;height:min(78vh,860px);border:0;background:transparent;border-radius:12px;"></iframe>',
+        '<button class="btn btn-sm btn-outline" onclick="closeModal()">닫기</button>'
+      );
+    }
     function summarize(type, label, total, items, listPage) {
       var denom = items.length || total || 0;
       var abnormal = 0, inspect = 0, replace = 0, normal = 0;
@@ -1935,7 +1960,9 @@ async function renderFireIndex() {
       + '<div class="card"><div class="card-header"><h3>이상설비</h3><span style="font-size:12px;color:var(--text3)">점검 결과 비정상으로 기록된 설비입니다. 바로가기를 누르면 도면의 해당 마커가 선택됩니다.</span></div><div class="card-body" style="padding:0;">'
       + '<table><thead><tr><th>유형</th><th>이름/모델</th><th>위치</th><th>이상 내용</th><th>점검일</th><th style="text-align:right;">바로가기</th></tr></thead>'
       + '<tbody>'+(abnormalItems.length ? abnormalItems.map(function(it) {
-          return '<tr><td>'+esc(it.label)+'</td><td><b>'+esc(it.name)+'</b></td><td>'+esc(it.location)+'</td><td>'+fireBadge(it.status)+' <span style="font-size:12px;color:var(--text2);">'+esc(it.reason)+'</span></td><td>'+fireDate(it.date)+'</td><td style="text-align:right;">'+(it.url ? '<button type="button" class="btn-small fire-shortcut-btn" data-path="'+esc(it.url)+'" style="border:1px solid var(--primary);background:#fff;color:var(--primary);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">바로가기</button>' : '<span style="color:var(--text3);font-size:12px;">좌표 없음</span>')+'</td></tr>';
+          var rowTitle = it.label + ' 상세 - ' + it.name;
+          return '<tr class="fire-abnormal-row" tabindex="0" title="상세 보기" data-type="'+fireAttr(it.type)+'" data-id="'+fireAttr(it.id)+'" data-title="'+fireAttr(rowTitle)+'" style="cursor:pointer;">'
+            + '<td>'+esc(it.label)+'</td><td><b>'+esc(it.name)+'</b><br><span style="font-size:11px;color:var(--text3);">목록 클릭 시 상세 보기</span></td><td>'+esc(it.location)+'</td><td>'+fireBadge(it.status)+' <span style="font-size:12px;color:var(--text2);">'+esc(it.reason)+'</span></td><td>'+fireDate(it.date)+'</td><td style="text-align:right;">'+(it.url ? '<button type="button" class="btn-small fire-shortcut-btn" data-path="'+fireAttr(it.url)+'" style="border:1px solid var(--primary);background:#fff;color:var(--primary);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">바로가기</button>' : '<span style="color:var(--text3);font-size:12px;">좌표 없음</span>')+'</td></tr>';
         }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">점검 결과 비정상으로 기록된 이상설비가 없습니다.</td></tr>')+'</tbody></table>'
       + '</div></div>';
     el.querySelectorAll('.fire-pie-card').forEach(function(card) {
@@ -1975,8 +2002,22 @@ async function renderFireIndex() {
         });
       });
     });
+    el.querySelectorAll('.fire-abnormal-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        openFireDetailModal(row.getAttribute('data-type'), row.getAttribute('data-id'), row.getAttribute('data-title'));
+      });
+      row.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          row.click();
+        }
+      });
+      row.addEventListener('mouseenter', function() { row.style.background = 'var(--surface2)'; });
+      row.addEventListener('mouseleave', function() { row.style.background = ''; });
+    });
     el.querySelectorAll('.fire-shortcut-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function(event) {
+        event.stopPropagation();
         var path = btn.getAttribute('data-path');
         if (path) navigateToFirePage(path);
       });

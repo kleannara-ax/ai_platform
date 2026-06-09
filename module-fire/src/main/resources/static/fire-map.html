@@ -519,6 +519,18 @@
             padding:0;
             background:transparent;
             box-shadow:0 8px 20px rgba(0,0,0,.22);
+            border-radius:999px;
+            transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
+        }
+        .eqmarker.is-selected{
+            transform:translate(-50%,-50%) scale(1.2);
+            box-shadow:0 0 0 4px rgba(14,165,233,.35), 0 0 0 8px rgba(14,165,233,.18), 0 14px 28px rgba(0,0,0,.28);
+            filter:drop-shadow(0 0 8px rgba(14,165,233,.95));
+            z-index:5;
+        }
+        .eqmarker:focus-visible{
+            outline:3px solid rgba(14,165,233,.75);
+            outline-offset:4px;
         }
         .eqmarker img{
             width:100%;
@@ -1939,6 +1951,11 @@ function renderOutdoorEquipmentMarkers(){
         btn.type = 'button';
         btn.className = `eqmarker ${item.type}`;
         const equipmentId = item.type === 'receiver' ? item.receiverId : item.pumpId;
+        const selectedType = currentOutdoorEquipment?.type || '';
+        const selectedId = selectedType === 'receiver' ? currentOutdoorEquipment?.receiverId : currentOutdoorEquipment?.pumpId;
+        if (selectedType === item.type && String(selectedId || '') === String(equipmentId || '')) {
+            btn.classList.add('is-selected');
+        }
         btn.dataset.equipmentType = item.type;
         btn.dataset.equipmentId = String(equipmentId || '');
         const iconUrl = item.type === 'receiver' ? '/images/receiver.png' : '/images/pump.png';
@@ -1952,15 +1969,49 @@ function renderOutdoorEquipmentMarkers(){
             e.stopPropagation();
             currentOutdoorEquipment = item;
             fillOutdoorEquipmentInfo(item);
+            renderOutdoorEquipmentMarkers();
+            const selectedMarker = findOutdoorEquipmentMarker(item.type, equipmentId) || btn;
             if (outdoorEquipmentSelect) {
                 outdoorEquipmentSelect.removeAttribute('inert');
                 outdoorEquipmentSelect.setAttribute('aria-hidden', 'false');
                 outdoorEquipmentSelect.classList.add('show');
-                positionOutdoorEquipmentSelect(btn);
+                positionOutdoorEquipmentSelect(selectedMarker);
             }
+            try { selectedMarker.focus({ preventScroll: true }); } catch(_) { try { selectedMarker.focus(); } catch(__) {} }
         });
         outdoorEquipmentMarkers.appendChild(btn);
     });
+}
+
+function findOutdoorEquipmentMarker(type, id){
+    return Array.from(outdoorEquipmentMarkers?.querySelectorAll('.eqmarker') || [])
+        .find(btn => btn.dataset.equipmentType === String(type) && btn.dataset.equipmentId === String(id));
+}
+
+function selectOutdoorEquipmentById(type, id){
+    const source = type === 'receiver' ? outdoorReceivers : outdoorPumps;
+    const item = (source || []).find(x => String(type === 'receiver' ? x.receiverId : x.pumpId) === String(id));
+    if (!item) {
+        setOutdoorEquipmentHint('요청한 수신기/소방펌프 데이터를 찾을 수 없습니다.', 'error');
+        return false;
+    }
+    currentOutdoorEquipment = { ...item, type, label: type === 'receiver' ? '수신기' : '펌프' };
+    renderOutdoorEquipmentMarkers();
+    const marker = findOutdoorEquipmentMarker(type, id);
+    if (!marker) {
+        setOutdoorEquipmentHint('요청한 수신기/소방펌프 마커를 찾을 수 없습니다.', 'error');
+        return false;
+    }
+    fillOutdoorEquipmentInfo(currentOutdoorEquipment);
+    if (outdoorEquipmentSelect) {
+        outdoorEquipmentSelect.removeAttribute('inert');
+        outdoorEquipmentSelect.setAttribute('aria-hidden', 'false');
+        outdoorEquipmentSelect.classList.add('show');
+        positionOutdoorEquipmentSelect(marker);
+    }
+    try { marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch (_) { marker.scrollIntoView(); }
+    try { marker.focus({ preventScroll: true }); } catch(_) { try { marker.focus(); } catch(__) {} }
+    return true;
 }
 
 function focusOutdoorEquipmentFromQuery(){
@@ -1970,14 +2021,7 @@ function focusOutdoorEquipmentFromQuery(){
     if (!focusId || (focusType !== 'receiver' && focusType !== 'pump')) return;
     setOutdoorEquipmentMode(true);
     setTimeout(() => {
-        const marker = Array.from(outdoorEquipmentMarkers?.querySelectorAll('.eqmarker') || [])
-            .find(btn => btn.dataset.equipmentType === focusType && btn.dataset.equipmentId === focusId);
-        if (!marker) {
-            setOutdoorEquipmentHint('요청한 수신기/소방펌프 마커를 찾을 수 없습니다.', 'error');
-            return;
-        }
-        try { marker.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch (_) { marker.scrollIntoView(); }
-        marker.click();
+        selectOutdoorEquipmentById(focusType, focusId);
     }, 100);
 }
 
@@ -1988,7 +2032,10 @@ function hideOutdoorEquipmentInfo(clearSelection = true){
         outdoorEquipmentSelect.setAttribute('aria-hidden', 'true');
         outdoorEquipmentSelect.setAttribute('inert', '');
     }
-    if (clearSelection) currentOutdoorEquipment = null;
+    if (clearSelection) {
+        currentOutdoorEquipment = null;
+        renderOutdoorEquipmentMarkers();
+    }
 }
 
 function setOutdoorEquipmentHint(message, tone){
