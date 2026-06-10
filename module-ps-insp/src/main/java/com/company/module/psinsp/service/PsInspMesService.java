@@ -43,9 +43,9 @@ public class PsInspMesService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    /** MES 서버 엔드포인트 URL (테스트 — 운영 전환 시 https://mes.kleannara.com으로 변경) */
+    /** MES 서버 엔드포인트 URL (운영) */
     private static final String MES_ENDPOINT_URL =
-            "http://10.2.14.190:81/mobile/saveDustInspectionResult.data";
+            "https://mes.kleannara.com/mobile/saveDustInspectionResult.data";
 
     private final RestTemplate restTemplate;
     private final PsInspApiLogService apiLogService;
