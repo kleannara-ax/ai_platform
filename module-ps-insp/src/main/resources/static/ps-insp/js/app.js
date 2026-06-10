@@ -1,5 +1,5 @@
 /**
- * PS 후면 지분 검사 도구 - Application JavaScript v8.6.9
+ * PS 후면 지분 검사 도구 - Application JavaScript v8.7.0
  * Canvas-based threshold inspection pipeline
  *
  * 1단계: 이미지 업로드 & 전처리 (리사이즈, 크기검증)
@@ -645,7 +645,7 @@
     var numInput = document.getElementById('thresholdNumInput');
     if (!slider) return;
 
-    // 방어 3층: slider input 이벤트
+    // 방어 3층: slider input 이벤트 (드래그 중 → UI만 갱신, 분석 X)
     slider.addEventListener('input', function (e) {
       if (thresholdLocked) {
         e.preventDefault();
@@ -655,12 +655,10 @@
         toast('임계값이 잠금 상태입니다. 잠금 해제 후 조정하세요.', 'error');
         return;
       }
-      var sv = syncThresholdUI(this.value);
-      saveThresholdToStorage(sv);
-      if (grayscaleData) applyThreshold();
+      syncThresholdUI(this.value);
     });
 
-    // 방어 3층: slider change 이벤트
+    // 방어 3층: slider change 이벤트 (손 뗀 후 → 분석 실행)
     slider.addEventListener('change', function (e) {
       if (thresholdLocked) {
         e.preventDefault();
@@ -669,6 +667,9 @@
         updateThresholdLockUI();
         return;
       }
+      var sv = syncThresholdUI(this.value);
+      saveThresholdToStorage(sv);
+      if (grayscaleData) applyThreshold();
     });
 
     // 숫자 직접 입력
