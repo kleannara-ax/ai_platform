@@ -29,6 +29,7 @@ public class FirePumpResponse {
     private final BigDecimal y;
     private final String locationDescription;
     private final String note;
+    private final String imagePath;
     private final boolean isActive;
     private final LocalDateTime createdAt;
 
@@ -55,6 +56,7 @@ public class FirePumpResponse {
                 .y(pump.getY())
                 .locationDescription(pump.getLocationDescription())
                 .note(pump.getNote())
+                .imagePath(pump.getImagePath())
                 .isActive(pump.isActive())
                 .createdAt(pump.getCreatedAt())
                 .build();

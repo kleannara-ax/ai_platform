@@ -29,6 +29,7 @@ public class FireReceiverResponse {
     private final BigDecimal y;
     private final String locationDescription;
     private final String note;
+    private final String imagePath;
     private final boolean isActive;
     private final LocalDateTime createdAt;
 
@@ -55,6 +56,7 @@ public class FireReceiverResponse {
                 .y(receiver.getY())
                 .locationDescription(receiver.getLocationDescription())
                 .note(receiver.getNote())
+                .imagePath(receiver.getImagePath())
                 .isActive(receiver.isActive())
                 .createdAt(receiver.getCreatedAt())
                 .build();

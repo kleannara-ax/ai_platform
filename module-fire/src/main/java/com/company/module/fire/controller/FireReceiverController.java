@@ -28,6 +28,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -38,6 +39,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 public class FireReceiverController {
 
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
+    private static final Path RECEIVER_IMAGE_DIR = Paths.get("/data/upload/module_fire/receivers");
+    private static final Path RECEIVER_INSPECTION_IMAGE_DIR = Paths.get("/data/upload/module_fire/receiver-inspections");
 
     private final FireReceiverService fireReceiverService;
     private final com.company.module.fire.service.InspectorNameResolver inspectorNameResolver;
@@ -135,6 +138,41 @@ public class FireReceiverController {
                 .body(body);
     }
 
+    @PostMapping("/{id}/image")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_RECEIVER')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image file is empty."));
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Only image files are allowed."));
+        }
+
+        try {
+            Files.createDirectories(RECEIVER_IMAGE_DIR);
+
+            String filename = buildSafeImageFilename(file);
+            Path target = RECEIVER_IMAGE_DIR.resolve(filename).normalize();
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            String publicPath = "/fire-api/receivers/files/" + filename;
+            fireReceiverService.updateImagePath(id, publicPath);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("imagePath", publicPath);
+            return ResponseEntity.ok(ApiResponse.success(result));
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body(ApiResponse.fail("Image save failed."));
+        }
+    }
+
     @PostMapping("/{id}/inspections/{inspectionId}/image")
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_RECEIVER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadInspectionImage(
@@ -154,23 +192,10 @@ public class FireReceiverController {
         }
 
         try {
-            Path dir = Paths.get("/data/upload/module_fire/receiver-inspections");
-            Files.createDirectories(dir);
+            Files.createDirectories(RECEIVER_INSPECTION_IMAGE_DIR);
 
-            String original = file.getOriginalFilename();
-            String ext = "png";
-            if (original != null) {
-                int idx = original.lastIndexOf('.');
-                if (idx > -1 && idx < original.length() - 1) {
-                    String parsed = original.substring(idx + 1).replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
-                    if (!parsed.isBlank()) {
-                        ext = parsed;
-                    }
-                }
-            }
-
-            String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
-            Path target = dir.resolve(filename).normalize();
+            String filename = buildSafeImageFilename(file);
+            Path target = RECEIVER_INSPECTION_IMAGE_DIR.resolve(filename).normalize();
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
             String publicPath = "/fire-api/receivers/files/" + filename;
@@ -191,20 +216,38 @@ public class FireReceiverController {
             if (clean.contains("..") || clean.contains("/")) {
                 return ResponseEntity.badRequest().build();
             }
-            Path base = Paths.get("/data/upload/module_fire/receiver-inspections").toAbsolutePath().normalize();
-            Path file = base.resolve(clean).normalize();
-            if (!file.startsWith(base) || !Files.exists(file)) {
-                return ResponseEntity.notFound().build();
+            for (Path candidateBase : List.of(RECEIVER_IMAGE_DIR, RECEIVER_INSPECTION_IMAGE_DIR)) {
+                Path base = candidateBase.toAbsolutePath().normalize();
+                Path file = base.resolve(clean).normalize();
+                if (!file.startsWith(base) || !Files.exists(file)) {
+                    continue;
+                }
+                Resource resource = new UrlResource(file.toUri());
+                MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                        .contentType(mediaType)
+                        .body(resource);
             }
-            Resource resource = new UrlResource(file.toUri());
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                    .contentType(mediaType)
-                    .body(resource);
+            return ResponseEntity.notFound().build();
         } catch (Exception ex) {
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    private String buildSafeImageFilename(MultipartFile file) {
+        String original = file.getOriginalFilename();
+        String ext = "png";
+        if (original != null) {
+            int idx = original.lastIndexOf('.');
+            if (idx > -1 && idx < original.length() - 1) {
+                String parsed = original.substring(idx + 1).replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+                if (!parsed.isBlank()) {
+                    ext = parsed;
+                }
+            }
+        }
+        return UUID.randomUUID().toString().replace("-", "") + "." + ext;
     }
 
     @DeleteMapping("/{id}")

@@ -194,6 +194,14 @@ public class FireReceiverService {
             throw new BusinessException("수신기 점검 이력이 올바르지 않습니다.");
         }
         inspection.updateImagePath(imagePath);
+        inspection.getReceiver().updateImagePath(imagePath);
+    }
+
+    @Transactional
+    public void updateImagePath(Long receiverId, String imagePath) {
+        FireReceiver receiver = fireReceiverRepository.findById(receiverId)
+                .orElseThrow(() -> new EntityNotFoundException("FireReceiver", receiverId));
+        receiver.updateImagePath(imagePath);
     }
 
     @Transactional

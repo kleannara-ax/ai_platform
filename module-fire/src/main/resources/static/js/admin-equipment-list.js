@@ -167,6 +167,14 @@
     return '<span class="fw-status ' + statusClass(status) + '">' + statusLabel(status) + "</span>";
   }
 
+  function renderItemPhotoCurrent(path) {
+    const current = document.getElementById("itemPhotoCurrent");
+    if (!current) return;
+    current.innerHTML = path
+      ? '<div class="small mb-2">현재 사진: <a href="' + escapeHtml(path) + '" target="_blank" rel="noopener">사진 보기</a></div><img src="' + escapeHtml(path) + '" alt="현재 사진" class="img-thumbnail" style="max-height:140px;object-fit:contain;">'
+      : '<div class="small text-muted">등록된 사진이 없습니다. 사진은 최신 1장만 유지됩니다.</div>';
+  }
+
   async function apiFetch(path, options) {
     const opts = window.FireWebCsrf?.applyOptions(options || {}) || (options || {});
     const response = await fetch(path, opts);
@@ -750,6 +758,10 @@
     document.getElementById("buildingName").value = item?.buildingName || queryBuildingName || "";
     document.getElementById("locationDescription").value = item?.locationDescription || "";
     document.getElementById("note").value = item?.note || "";
+    const sameCurrentDetail = state.currentDetail && item?.[config.idField] && String(state.currentDetail[config.idField]) === String(item[config.idField]);
+    renderItemPhotoCurrent((sameCurrentDetail ? state.currentDetail?.imagePath : item?.imagePath) || "");
+    const itemPhoto = document.getElementById("itemPhoto");
+    if (itemPhoto) itemPhoto.value = "";
     document.getElementById("modalTitle").textContent = item ? config.singular + " 수정" : config.singular + " 등록";
     state.selectedCoord = coordOverride || (item?.x != null && item?.y != null ? { x: Number(item.x), y: Number(item.y) } : null);
     setSelectedCoord(state.selectedCoord?.x, state.selectedCoord?.y);
@@ -760,6 +772,7 @@
       if (historySection) historySection.style.display = canEdit ? "" : "none";
       apiFetch(config.apiBase + "/" + encodeURIComponent(item[config.idField]), { method: "GET" })
         .then(function (detail) {
+          renderItemPhotoCurrent(detail.imagePath || "");
           renderEditableHistory(detail.inspections || []);
         })
         .catch(function () {
@@ -768,6 +781,7 @@
           }
         });
     } else {
+      renderItemPhotoCurrent("");
       if (historySection) historySection.style.display = "none";
       if (historyBody) {
         historyBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">점검 이력이 없습니다.</td></tr>';
@@ -789,11 +803,19 @@
     if (!body.x || !body.y) throw new Error("옥외 도면에서 위치를 선택해 주세요.");
     const itemId = document.getElementById("itemId").value;
     if (itemId) body[config.idField] = Number(itemId);
-    await apiFetch(config.apiBase, {
+    const saved = await apiFetch(config.apiBase, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
+    const file = document.getElementById("itemPhoto")?.files?.[0];
+    if (file) {
+      try {
+        await uploadEquipmentImage(saved?.[config.idField] || itemId, file);
+      } catch (error) {
+        alert(config.singular + " 정보는 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
+      }
+    }
     state.itemModal.hide();
     await loadPeers();
     await loadList();
@@ -904,7 +926,7 @@
         '<tr data-inspection-id="' + escapeHtml(row.inspectionId) + '">' +
         '<td><div class="d-flex gap-2"><input type="date" class="form-control form-control-sm js-hist-date" value="' + escapeHtml(row.inspectionDate || "") + '"><input type="time" class="form-control form-control-sm js-hist-time" value="' + escapeHtml(row.inspectionTime ? String(row.inspectionTime).slice(0, 5) : "") + '"></div></td>' +
         '<td><input type="text" class="form-control form-control-sm js-hist-inspector" value="' + escapeHtml(row.inspectorName || "") + '"></td>' +
-        '<td><div class="mb-2">' + statusBadge(row.inspectionStatus) + '</div><textarea class="form-control form-control-sm js-hist-note" rows="3">' + escapeHtml(row.note || "") + '</textarea><div class="small mt-2">현재 사진: ' + photoLink + '</div><label class="form-label small mt-2 mb-1">사진 변경</label><input type="file" class="form-control form-control-sm js-hist-photo" accept="image/*"></td>' +
+        '<td><div class="mb-2">' + statusBadge(row.inspectionStatus) + '</div><textarea class="form-control form-control-sm js-hist-note" rows="3">' + escapeHtml(row.note || "") + '</textarea><div class="small mt-2">' + photoLink + '</div></td>' +
         '<td>' + buildChecklistEditor(row) + '<div class="text-end mt-2 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-fw-edit js-history-save">수정</button><button type="button" class="btn btn-sm btn-fw-delete js-history-delete">삭제</button></div></td>' +
         '</tr>';
     });
@@ -912,7 +934,7 @@
       '<tr data-inspection-id="">' +
       '<td><div class="d-flex gap-2"><input type="date" class="form-control form-control-sm js-hist-date" value=""><input type="time" class="form-control form-control-sm js-hist-time" value=""></div></td>' +
       '<td><input type="text" class="form-control form-control-sm js-hist-inspector" value=""></td>' +
-      '<td><div class="mb-2"><span class="fw-status fw-wait">신규</span></div><textarea class="form-control form-control-sm js-hist-note" rows="3"></textarea><label class="form-label small mt-2 mb-1">점검사진</label><input type="file" class="form-control form-control-sm js-hist-photo" accept="image/*"><div class="small mt-2 text-muted">새 점검 이력 추가</div></td>' +
+      '<td><div class="mb-2"><span class="fw-status fw-wait">신규</span></div><textarea class="form-control form-control-sm js-hist-note" rows="3"></textarea><div class="small mt-2 text-muted">새 점검 이력 추가</div></td>' +
       '<td>' + buildChecklistEditor({ checklistItems: [] }) + '<div class="text-end mt-2"><button type="button" class="btn btn-sm btn-primary js-history-save">추가</button></div></td>' +
       '</tr>'
     );
@@ -956,20 +978,39 @@
     return candidates[0]?.inspectionId || "";
   }
 
+  function validateImageFile(file) {
+    if (!file) return;
+    if (file.type && !String(file.type).toLowerCase().startsWith("image/")) {
+      throw new Error("사진은 이미지 파일만 업로드할 수 있습니다.");
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("사진은 10MB 이하만 업로드할 수 있습니다.");
+    }
+  }
+
   async function uploadInspectionImage(targetId, inspectionId, file) {
     if (!file) return;
     if (!inspectionId) {
       throw new Error("사진을 연결할 점검 이력을 찾지 못했습니다.");
     }
-    if (file.type && !String(file.type).toLowerCase().startsWith("image/")) {
-      throw new Error("점검사진은 이미지 파일만 업로드할 수 있습니다.");
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error("점검사진은 10MB 이하만 업로드할 수 있습니다.");
-    }
+    validateImageFile(file);
     const formData = new FormData();
     formData.append("file", file);
     await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId) + "/image", {
+      method: "POST",
+      body: formData
+    });
+  }
+
+  async function uploadEquipmentImage(targetId, file) {
+    if (!file) return;
+    if (!targetId) {
+      throw new Error("사진을 연결할 설비를 찾지 못했습니다.");
+    }
+    validateImageFile(file);
+    const formData = new FormData();
+    formData.append("file", file);
+    await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/image", {
       method: "POST",
       body: formData
     });
@@ -1202,8 +1243,7 @@
     button.disabled = true;
     try {
       const isNew = !inspectionId;
-      const previousMaxInspectionId = getMaxInspectionId(state.currentDetail?.inspections || []);
-      const savedDetail = await apiFetch(
+      await apiFetch(
         isNew
           ? config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections"
           : config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId),
@@ -1218,20 +1258,6 @@
           note: note || null
         })
       });
-      const file = row.querySelector(".js-hist-photo")?.files?.[0];
-      if (file) {
-        const savedInspectionId = resolveSavedInspectionId(savedDetail, {
-          preferredId: isNew ? "" : inspectionId,
-          afterId: previousMaxInspectionId,
-          inspectionDate: inspectionDate,
-          inspectionTime: inspectionTime
-        });
-        try {
-          await uploadInspectionImage(targetId, savedInspectionId, file);
-        } catch (error) {
-          alert("점검 이력은 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
-        }
-      }
       await loadList();
       const pendingAction = getPendingAction();
       if (pendingAction?.id) {

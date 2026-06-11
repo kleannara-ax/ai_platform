@@ -46,6 +46,9 @@ public class FireReceiver {
     @Column(name = "NOTE", length = 500)
     private String note;
 
+    @Column(name = "IMAGE_PATH", length = 600)
+    private String imagePath;
+
     @Column(name = "QR_KEY", nullable = false, unique = true, length = 100)
     private String qrKey;
 
@@ -94,5 +97,9 @@ public class FireReceiver {
         this.y = y;
         this.locationDescription = locationDescription;
         this.note = note;
+    }
+
+    public void updateImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 }

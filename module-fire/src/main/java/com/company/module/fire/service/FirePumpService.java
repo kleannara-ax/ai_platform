@@ -194,6 +194,14 @@ public class FirePumpService {
             throw new BusinessException("소방펌프 점검 이력이 올바르지 않습니다.");
         }
         inspection.updateImagePath(imagePath);
+        inspection.getPump().updateImagePath(imagePath);
+    }
+
+    @Transactional
+    public void updateImagePath(Long pumpId, String imagePath) {
+        FirePump pump = firePumpRepository.findById(pumpId)
+                .orElseThrow(() -> new EntityNotFoundException("FirePump", pumpId));
+        pump.updateImagePath(imagePath);
     }
 
     @Transactional
