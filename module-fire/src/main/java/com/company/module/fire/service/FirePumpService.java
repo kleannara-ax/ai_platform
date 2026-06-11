@@ -27,14 +27,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -99,9 +102,12 @@ public class FirePumpService {
                 .findByPump_PumpIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
                         pumpId, fromDate, toDate);
 
-        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
-                .map(inspection -> toWorkbookRow(pump, inspection))
-                .toList();
+        List<InspectionWorkbookExporter.RowData> rows = new ArrayList<>();
+        boolean latestForPump = true;
+        for (FirePumpInspection inspection : inspections) {
+            rows.add(toWorkbookRow(pump, inspection, latestForPump));
+            latestForPump = false;
+        }
         return InspectionWorkbookExporter.export("소방펌프 점검보고서", PUMP_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
@@ -111,9 +117,14 @@ public class FirePumpService {
         List<FirePumpInspection> inspections = firePumpInspectionRepository
                 .findByInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(fromDate, toDate);
 
-        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
-                .map(inspection -> toWorkbookRow(inspection.getPump(), inspection))
-                .toList();
+        Set<Long> pumpIdsAlreadyExported = new HashSet<>();
+        List<InspectionWorkbookExporter.RowData> rows = new ArrayList<>();
+        for (FirePumpInspection inspection : inspections) {
+            FirePump pump = inspection.getPump();
+            Long pumpId = pump == null ? null : pump.getPumpId();
+            boolean latestForPump = pumpId != null && pumpIdsAlreadyExported.add(pumpId);
+            rows.add(toWorkbookRow(pump, inspection, latestForPump));
+        }
         return InspectionWorkbookExporter.export("소방펌프 점검보고서", PUMP_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
@@ -431,15 +442,21 @@ public class FirePumpService {
         }
     }
 
-    private InspectionWorkbookExporter.RowData toWorkbookRow(FirePump pump, FirePumpInspection inspection) {
+    private InspectionWorkbookExporter.RowData toWorkbookRow(FirePump pump,
+                                                               FirePumpInspection inspection,
+                                                               boolean latestForPump) {
         String sectionTitle = pump != null ? pump.getBuildingName() : "소방펌프";
+        String imagePath = trimToNull(inspection.getImagePath());
+        if (imagePath == null && latestForPump && pump != null) {
+            imagePath = trimToNull(pump.getImagePath());
+        }
         return new InspectionWorkbookExporter.RowData(
                 sectionTitle,
                 inspection.getInspectionDate(),
                 inspection.getInspectionTime(),
                 inspection.getInspectedByName(),
                 toItemResultMap(parseChecklist(inspection)),
-                inspection.getImagePath(),
+                imagePath,
                 inspection.getNote()
         );
     }
@@ -459,6 +476,17 @@ public class FirePumpService {
     }
 
     private java.util.Optional<InspectionWorkbookExporter.ImageFile> resolveInspectionImage(String imagePath) {
-        return InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/pump-inspections"));
+        return InspectionWorkbookExporter.loadImage(imagePath, uploadDir("pump-inspections"))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, uploadDir("pumps")))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/pump-inspections")))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/pumps")));
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
     }
 }

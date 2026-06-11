@@ -27,14 +27,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -99,9 +102,12 @@ public class FireReceiverService {
                 .findByReceiver_ReceiverIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
                         receiverId, fromDate, toDate);
 
-        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
-                .map(inspection -> toWorkbookRow(receiver, inspection))
-                .toList();
+        List<InspectionWorkbookExporter.RowData> rows = new ArrayList<>();
+        boolean latestForReceiver = true;
+        for (FireReceiverInspection inspection : inspections) {
+            rows.add(toWorkbookRow(receiver, inspection, latestForReceiver));
+            latestForReceiver = false;
+        }
         return InspectionWorkbookExporter.export("수신기 점검보고서", RECEIVER_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
@@ -111,9 +117,14 @@ public class FireReceiverService {
         List<FireReceiverInspection> inspections = fireReceiverInspectionRepository
                 .findByInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(fromDate, toDate);
 
-        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
-                .map(inspection -> toWorkbookRow(inspection.getReceiver(), inspection))
-                .toList();
+        Set<Long> receiverIdsAlreadyExported = new HashSet<>();
+        List<InspectionWorkbookExporter.RowData> rows = new ArrayList<>();
+        for (FireReceiverInspection inspection : inspections) {
+            FireReceiver receiver = inspection.getReceiver();
+            Long receiverId = receiver == null ? null : receiver.getReceiverId();
+            boolean latestForReceiver = receiverId != null && receiverIdsAlreadyExported.add(receiverId);
+            rows.add(toWorkbookRow(receiver, inspection, latestForReceiver));
+        }
         return InspectionWorkbookExporter.export("수신기 점검보고서", RECEIVER_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
@@ -431,15 +442,21 @@ public class FireReceiverService {
         }
     }
 
-    private InspectionWorkbookExporter.RowData toWorkbookRow(FireReceiver receiver, FireReceiverInspection inspection) {
+    private InspectionWorkbookExporter.RowData toWorkbookRow(FireReceiver receiver,
+                                                               FireReceiverInspection inspection,
+                                                               boolean latestForReceiver) {
         String sectionTitle = receiver != null ? receiver.getBuildingName() : "수신기";
+        String imagePath = trimToNull(inspection.getImagePath());
+        if (imagePath == null && latestForReceiver && receiver != null) {
+            imagePath = trimToNull(receiver.getImagePath());
+        }
         return new InspectionWorkbookExporter.RowData(
                 sectionTitle,
                 inspection.getInspectionDate(),
                 inspection.getInspectionTime(),
                 inspection.getInspectedByName(),
                 toItemResultMap(parseChecklist(inspection)),
-                inspection.getImagePath(),
+                imagePath,
                 inspection.getNote()
         );
     }
@@ -459,6 +476,17 @@ public class FireReceiverService {
     }
 
     private java.util.Optional<InspectionWorkbookExporter.ImageFile> resolveInspectionImage(String imagePath) {
-        return InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/receiver-inspections"));
+        return InspectionWorkbookExporter.loadImage(imagePath, uploadDir("receiver-inspections"))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, uploadDir("receivers")))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/receiver-inspections")))
+                .or(() -> InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/receivers")));
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
     }
 }
