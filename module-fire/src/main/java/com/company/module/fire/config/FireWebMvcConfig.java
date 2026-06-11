@@ -17,6 +17,8 @@ public class FireWebMvcConfig implements WebMvcConfigurer {
         // 소방 모듈 관련 HTML 페이지 캐시 방지
         registry.addResourceHandler(
                         "/fire-map.html",
+                        "/fire-dashboard.html",
+                        "/facility-dashboard.html",
                         "/dashboard.html",
                         "/extinguishers.html",
                         "/hydrants.html",
