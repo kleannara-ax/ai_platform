@@ -324,6 +324,39 @@ async function api(method, path, body) {
   return await res.json();
 }
 
+async function fetchAllIntegratedUsers() {
+  const pageSize = 500;
+  const first = await api('GET', `/api/integrated/users?page=0&size=${pageSize}`);
+  if (!first.success) return first;
+
+  const firstData = first.data || {};
+  const firstContent = Array.isArray(firstData.content) ? firstData.content : (Array.isArray(firstData) ? firstData : []);
+  const totalPages = Number(firstData.totalPages || 1);
+  const merged = firstContent.slice();
+
+  for (let page = 1; page < totalPages; page++) {
+    const next = await api('GET', `/api/integrated/users?page=${page}&size=${pageSize}`);
+    if (!next.success) return next;
+    const nextData = next.data || {};
+    const nextContent = Array.isArray(nextData.content) ? nextData.content : (Array.isArray(nextData) ? nextData : []);
+    merged.push(...nextContent);
+  }
+
+  return {
+    success: true,
+    data: {
+      ...firstData,
+      content: merged,
+      page: 0,
+      size: merged.length,
+      totalElements: firstData.totalElements ?? merged.length,
+      totalPages: 1,
+      first: true,
+      last: true
+    }
+  };
+}
+
 // ══ Sidebar Toggle ══
 function toggleSidebar() {
   const sb = document.getElementById('sidebar');
@@ -676,7 +709,7 @@ async function renderDashboard() {
   try {
     // 사용자 목록 + 메뉴 트리 동시 로드
     const [usersRes, menuTreeRes] = await Promise.all([
-      api('GET','/api/integrated/users?page=0&size=100'),
+      fetchAllIntegratedUsers(),
       api('GET','/api/core/menus/tree')
     ]);
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
@@ -775,7 +808,7 @@ async function renderUsers(){
   document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateUser()">+ 사용자 추가</button>':'';
   try {
     const [usersRes,deptsRes]=await Promise.all([
-      api('GET','/api/integrated/users?page=0&size=100'),
+      fetchAllIntegratedUsers(),
       api('GET','/api/codes/lookup/DEPT')
     ]);
     allUsers=usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
