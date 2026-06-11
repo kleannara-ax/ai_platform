@@ -57,11 +57,12 @@
   - API file path: `/facility-api/{kind}/files/{filename}`
 
 ## Role / Menu Access
-- `ROLE_FACILITY_MANAGER`: 소방설비 + 기타설비 전체 접근
-- `ROLE_FIRE_MANAGER`: 소방설비만 접근
-- `ROLE_EQUIPMENT_MANAGER`: 기타설비만 접근
+- `ROLE_FACILITY_MANAGER`: 시설관리 — 소방설비 + 기타설비 전체 접근
+- `ROLE_FIRE_MANAGER`: 소방시설관리 — 기존 소방설비 전용 역할 유지
+- `ROLE_EQUIPMENT_MANAGER`: 기타시설관리 — 기타설비만 접근
 - `ROLE_ADMIN`: 전체 접근
 - 설비관리시스템 메뉴는 `FIRE_MGMT`를 상위 메뉴로 유지하되 이름을 “설비관리시스템”으로 변경했습니다.
+- 운영 DB에서 역할 공통코드가 중복되어 접근 권한 화면에 `소방시설관리`가 2개 표시되는 경우 `V20__fix_facility_role_duplicates.sql`로 ROLE 그룹/코드 중복을 정리하고 위 3개 설비 역할명을 보정합니다.
 
 ## User Guide
 1. 로그인 후 설비관리시스템 메뉴로 이동합니다.
@@ -89,6 +90,7 @@
 - 기타설비 도메인/API/화면 기본 구현 완료
 - 기타설비 메인 도면(`/facility-map.html`)은 신규 독립 축약 구현이 아니라 `/fire-map.html` 원본을 그대로 복사한 뒤 기타설비 메뉴/층별 링크만 변경하고 옥외소화전·옥외 소화기·수신기/소방펌프 UI 및 초기 로딩을 제외하도록 정리 완료
 - `V15__facility_management_system.sql`로 메뉴/역할/테이블 migration 추가
+- `V20__fix_facility_role_duplicates.sql`로 운영 DB의 ROLE 공통코드 중복 표시 보정 추가: 기존 `ROLE_FIRE_MANAGER`/소방시설관리는 유지하고 `ROLE_FACILITY_MANAGER`/시설관리, `ROLE_EQUIPMENT_MANAGER`/기타시설관리를 명확히 정리
 - 빌드 검증 완료
 - 에어컨 식별 No. 및 제조사/위치/실외기 대수 관리 구현 완료: 실외기 좌표/연결선, 설치연도, 수량 입력은 `V17__simplify_facility_aircon_fields.sql` 기준으로 제거
 - 정수기 종류 입력 제거 및 단순 등록/수정 구현 완료: `V19__simplify_facility_water_purifier_fields.sql` 기준으로 기존 정수기 종류를 `정수기`로 통일하고, 화면 입력은 설치일/건물/층/X/Y 좌표만 표시
@@ -109,6 +111,6 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 메뉴 노출 및 API 권한 검증
-- `V17__simplify_facility_aircon_fields.sql` 및 `V19__simplify_facility_water_purifier_fields.sql` 운영/로컬 DB 적용 후 에어컨/정수기 저장·수정·조회 검증
+- `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql` 운영/로컬 DB 적용 후 에어컨/정수기 저장·수정·조회 및 접근 권한 역할 목록 검증
 - 에어컨/정수기 실데이터 등록 후 기타설비 대시보드/메인 도면/층별 도면 포커스 흐름과 공통 DB 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장

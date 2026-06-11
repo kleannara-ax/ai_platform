@@ -19,6 +19,7 @@
 | `V17__simplify_facility_aircon_fields.sql` | 에어컨 입력 단순화: 설치연도, 실외기 좌표, 수량 컬럼 제거 |
 | `V18__add_fire_equipment_image_paths.sql` | 수신기/소방펌프 대표사진 경로 컬럼 추가 |
 | `V19__simplify_facility_water_purifier_fields.sql` | 정수기 입력 단순화: 종류를 '정수기'로 통일하고 설치일/건물/층/X/Y 중심 정책 정리 |
+| `V20__fix_facility_role_duplicates.sql` | 운영 DB 역할 공통코드 중복 보정: 기존 소방시설관리 유지, 시설관리/기타시설관리 역할명 정리 |
 
 ## 실행 순서
 
@@ -36,6 +37,7 @@
 11. V17__simplify_facility_aircon_fields.sql -- 에어컨 입력 단순화 컬럼 정리
 12. V18__add_fire_equipment_image_paths.sql -- 수신기/소방펌프 대표사진 컬럼 추가
 13. V19__simplify_facility_water_purifier_fields.sql -- 정수기 입력 단순화 및 기타설비 컬럼 주석 정리
+14. V20__fix_facility_role_duplicates.sql -- ROLE 공통코드 중복 보정 및 시설관리/소방시설관리/기타시설관리 역할명 정리
 ```
 
 ## 사전 조건
@@ -67,6 +69,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V17__simplify_facility_aircon_fields.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V18__add_fire_equipment_image_paths.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V19__simplify_facility_water_purifier_fields.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V20__fix_facility_role_duplicates.sql
 ```
 
 ## 테이블 구조
