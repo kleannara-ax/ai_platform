@@ -15,6 +15,10 @@
 | `V11__add_fire_admin_code_group.sql` | 소방 관리자 권한 공통코드 추가 |
 | `V12__remove_fire_user_role.sql` | ROLE_FIRE_USER 제거 및 관련 메뉴 권한 정리 |
 | `V15__facility_management_system.sql` | 설비관리시스템 개편, 소방/기타설비 메뉴 분리, 에어컨/정수기 테이블 및 역할 권한 추가 |
+| `V16__facility_aircon_pair_fields.sql` | 에어컨 제조사/위치/실외기 대수 등 추가 컬럼 반영 |
+| `V17__simplify_facility_aircon_fields.sql` | 에어컨 입력 단순화: 설치연도, 실외기 좌표, 수량 컬럼 제거 |
+| `V18__add_fire_equipment_image_paths.sql` | 수신기/소방펌프 대표사진 경로 컬럼 추가 |
+| `V19__simplify_facility_water_purifier_fields.sql` | 정수기 입력 단순화: 종류를 '정수기'로 통일하고 설치일/건물/층/X/Y 중심 정책 정리 |
 
 ## 실행 순서
 
@@ -28,6 +32,10 @@
 7. V11__add_fire_admin_code_group.sql -- 소방 관리자 권한 공통코드 추가
 8. V12__remove_fire_user_role.sql  -- 소방시설사용자 역할 제거
 9. V15__facility_management_system.sql -- 설비관리시스템/기타설비 확장
+10. V16__facility_aircon_pair_fields.sql -- 에어컨 관련 컬럼 추가
+11. V17__simplify_facility_aircon_fields.sql -- 에어컨 입력 단순화 컬럼 정리
+12. V18__add_fire_equipment_image_paths.sql -- 수신기/소방펌프 대표사진 컬럼 추가
+13. V19__simplify_facility_water_purifier_fields.sql -- 정수기 입력 단순화 및 기타설비 컬럼 주석 정리
 ```
 
 ## 사전 조건
@@ -57,6 +65,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V15__facility_management_system.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V16__facility_aircon_pair_fields.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V17__simplify_facility_aircon_fields.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V18__add_fire_equipment_image_paths.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V19__simplify_facility_water_purifier_fields.sql
 ```
 
 ## 테이블 구조
@@ -75,7 +85,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 | `fire_receiver_inspection` | 수신기 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
 | `fire_pump` | 소방펌프 | - |
 | `fire_pump_inspection` | 소방펌프 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
-| `facility_equipment` | 기타설비(에어컨/정수기) 마스터 | - |
+| `facility_equipment` | 기타설비(에어컨/정수기) 마스터. 에어컨은 종류/제조사/상세 위치/실외기 대수/제조·설치일을 사용하고, 정수기는 종류를 '정수기'로 고정하며 설치일/건물/층/X/Y 좌표만 사용자 입력으로 사용 | - |
 | `facility_equipment_inspection` | 기타설비 점검 이력 | IS_FAULTY + FAULT_REASON |
 
 ### 점검 방식 차이점

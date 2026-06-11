@@ -2,7 +2,7 @@
 -- module-fire: 소방 설비 관리 모듈 DDL (MariaDB)
 -- 실행 순서: ../01_ddl_core.sql → 01_schema.sql → 02_seed_data.sql
 -- 사전 조건: platform_db 데이터베이스가 이미 존재해야 함
--- 최종 업데이트: 2026-04-09
+-- 최종 업데이트: 2026-06-11
 -- =============================================================================
 
 -- -----------------------------------------------------------------------
@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS fire_receiver (
     X                    DECIMAL(5,2)                         COMMENT '도면 X 좌표 (%)',
     Y                    DECIMAL(5,2)                         COMMENT '도면 Y 좌표 (%)',
     LOCATION_DESCRIPTION VARCHAR(200)                         COMMENT '위치 설명',
+    IMAGE_PATH           VARCHAR(600)                         COMMENT '대표 이미지 경로',
     NOTE                 VARCHAR(500)                         COMMENT '비고',
     QR_KEY               VARCHAR(100) NOT NULL                COMMENT 'QR 고정 키 (UUID)',
     IS_ACTIVE            TINYINT(1)   NOT NULL DEFAULT 1      COMMENT '활성 여부',
@@ -212,6 +213,7 @@ CREATE TABLE IF NOT EXISTS fire_pump (
     X                    DECIMAL(5,2)                         COMMENT '도면 X 좌표 (%)',
     Y                    DECIMAL(5,2)                         COMMENT '도면 Y 좌표 (%)',
     LOCATION_DESCRIPTION VARCHAR(200)                         COMMENT '위치 설명',
+    IMAGE_PATH           VARCHAR(600)                         COMMENT '대표 이미지 경로',
     NOTE                 VARCHAR(500)                         COMMENT '비고',
     QR_KEY               VARCHAR(100) NOT NULL                COMMENT 'QR 고정 키 (UUID)',
     IS_ACTIVE            TINYINT(1)   NOT NULL DEFAULT 1      COMMENT '활성 여부',
@@ -322,11 +324,13 @@ CREATE TABLE IF NOT EXISTS facility_equipment (
     SERIAL_NUMBER            VARCHAR(50)  NOT NULL                COMMENT '일련번호 (AC-000001/WP-000001)',
     BUILDING_ID              BIGINT       NOT NULL                COMMENT '건물 FK',
     FLOOR_ID                 BIGINT       NOT NULL                COMMENT '층 FK',
-    EQUIPMENT_TYPE           VARCHAR(100) NOT NULL                COMMENT '설비 종류',
-    MANUFACTURE_DATE         DATE         NOT NULL                COMMENT '제조/설치 기준일',
+    EQUIPMENT_TYPE           VARCHAR(100) NOT NULL                COMMENT '설비 종류(에어컨 종류, 정수기는 정수기 고정)',
+    MANUFACTURER             VARCHAR(100)                         COMMENT '제조사(에어컨 전용)',
+    LOCATION_DESCRIPTION     VARCHAR(200)                         COMMENT '상세 위치(에어컨 전용)',
+    OUTDOOR_UNIT_COUNT       INT          NOT NULL DEFAULT 1      COMMENT '실외기 대수(에어컨 전용, 1~2)',
+    MANUFACTURE_DATE         DATE         NOT NULL                COMMENT '제조/설치일(에어컨: 제조/설치월 1일, 정수기: 설치일)',
     REPLACEMENT_CYCLE_YEARS  INT          NOT NULL DEFAULT 10     COMMENT '교체 주기 (년)',
     REPLACEMENT_DUE_DATE     DATE                                 COMMENT '교체 예정일',
-    QUANTITY                 INT          NOT NULL DEFAULT 1      COMMENT '수량',
     X                        DECIMAL(9,4)                         COMMENT '도면 X 좌표',
     Y                        DECIMAL(9,4)                         COMMENT '도면 Y 좌표',
     IMAGE_PATH               VARCHAR(600)                         COMMENT '대표 이미지 경로',

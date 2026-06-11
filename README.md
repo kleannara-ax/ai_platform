@@ -15,6 +15,7 @@
   - 수신기/소방펌프 현황 그래프: 정상, 점검필요, 요정비, 불량 4상태 구분 표시(요정비/교체필요는 밝은 노란색 계열로 통일)
   - 기타설비 관리: 에어컨, 정수기 목록/상세/등록/수정/삭제/점검/이미지 업로드
   - 에어컨 관리 단순화: 건물 번호 기반 식별 No.(예: `1-1`, `2-1`, `130-1`), 제조사, 상세 위치, 실외기 대수(최대 2대), 제조/설치월만 관리하며 실외기 좌표/연결선, 설치연도, 수량 입력은 제거
+  - 정수기 관리 단순화: 정수기 종류는 `정수기` 단일 값으로 고정하고, 등록/수정 화면은 설치일, 건물, 층, X/Y 좌표만 사용자 입력으로 표시
   - 기타설비 대시보드/도면: 메인 도면은 `/fire-map.html` 원본 화면을 그대로 복사한 파생본으로 사용하되 옥외소화전/옥외 소화기/수신기·소방펌프만 제외하고, 층별 도면은 공통 DB 도면 흐름을 사용하며 에어컨은 `점검요청`, 정수기는 `점검필요` 상태만 표시
   - 설비별 건물/층/도면 좌표와 비고 관리
   - 대표 이미지 1장 유지 및 최근 점검 이력 12건 관리
@@ -44,7 +45,7 @@
 - **Database**: MariaDB (`platform_db`)
 - **DDL mode**: `spring.jpa.hibernate.ddl-auto=none`; schema changes are managed by SQL scripts.
 - **New Tables**:
-  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터. 에어컨은 `MANUFACTURER`, `LOCATION_DESCRIPTION`, `OUTDOOR_UNIT_COUNT`, `MANUFACTURE_DATE` 중심으로 관리하며 `INSTALLATION_YEAR`, `OUTDOOR_X`, `OUTDOOR_Y`, `QUANTITY`는 `V17__simplify_facility_aircon_fields.sql`에서 제거
+  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터. 에어컨은 `EQUIPMENT_TYPE`, `MANUFACTURER`, `LOCATION_DESCRIPTION`, `OUTDOOR_UNIT_COUNT`, `MANUFACTURE_DATE` 중심으로 관리하며 `INSTALLATION_YEAR`, `OUTDOOR_X`, `OUTDOOR_Y`, `QUANTITY`는 `V17__simplify_facility_aircon_fields.sql`에서 제거. 정수기는 `V19__simplify_facility_water_purifier_fields.sql` 기준으로 `EQUIPMENT_TYPE='정수기'` 고정, `MANUFACTURE_DATE`를 설치일로 사용하고 사용자 입력은 건물/층/X/Y 좌표와 설치일만 받음
   - `facility_equipment_inspection`: 기타설비 점검 이력
 - **File Storage**:
   - 기타설비 업로드: `/data/upload/module_fire/facility/{air-conditioners|water-purifiers}`
@@ -69,7 +70,7 @@
 6. 기타설비는 기타설비 메뉴의 대시보드, 도면(메인), 층별 도면, 에어컨, 정수기 화면에서 관리합니다. 기타설비 메인 도면은 기존 `/fire-map.html`을 그대로 가져온 화면에서 옥외소화전/옥외 소화기/수신기·소방펌프만 제외한 구성이고, 구역/층 선택은 `/facility/floor.html`로 연동됩니다.
 7. 기타설비 대시보드의 바로가기를 누르면 `/facility/floor.html`에서 해당 에어컨/정수기 마커가 자동 선택·강조되고 정보 카드가 표시됩니다. 에어컨은 `점검요청`, 정수기는 `점검필요`로 표시합니다.
 8. 목록에서 설비 행을 클릭하면 상세 정보와 점검 이력을 볼 수 있습니다.
-9. 권한이 있는 사용자는 추가/수정/삭제/점검 및 이미지 업로드를 수행할 수 있습니다.
+9. 권한이 있는 사용자는 추가/수정/삭제/점검 및 이미지 업로드를 수행할 수 있습니다. 정수기는 등록/수정 시 설치일, 건물, 층, X/Y 좌표만 입력하면 되며 종류는 자동으로 `정수기`로 저장됩니다.
 10. 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에서 사진 파일을 선택하면 해당 설비의 대표사진이 최신 1장으로 교체됩니다.
 11. 수신기/소방펌프 수정 모달의 점검 이력 영역에서는 기존 내역 `수정`/`삭제`와 신규 행 `추가`만 수행하며, 점검 이력 편집 테이블에는 사진 업로드 입력을 두지 않습니다. 점검사진은 별도 `점검` 모달에서 저장 시 업로드됩니다.
 12. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다. 최신 점검 행에 점검사진이 없으면 해당 설비의 최신 대표사진을 대신 표시합니다.
@@ -88,6 +89,7 @@
 - `V15__facility_management_system.sql`로 메뉴/역할/테이블 migration 추가
 - 빌드 검증 완료
 - 에어컨 식별 No. 및 제조사/위치/실외기 대수 관리 구현 완료: 실외기 좌표/연결선, 설치연도, 수량 입력은 `V17__simplify_facility_aircon_fields.sql` 기준으로 제거
+- 정수기 종류 입력 제거 및 단순 등록/수정 구현 완료: `V19__simplify_facility_water_purifier_fields.sql` 기준으로 기존 정수기 종류를 `정수기`로 통일하고, 화면 입력은 설치일/건물/층/X/Y 좌표만 표시
 - 수신기/소방펌프 대시보드 그래프 4상태 반영 완료(요정비/교체필요 그래프 색상은 밝은 노란색 계열 적용)
 - 수신기/소방펌프 점검 이력 삭제 API 및 수정 모달 삭제 버튼 구현 완료
 - 이상설비 바로가기 마커 자동 선택 안정화 및 대시보드 상세 모달 확대 완료
@@ -104,6 +106,6 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 메뉴 노출 및 API 권한 검증
-- `V17__simplify_facility_aircon_fields.sql` 운영/로컬 DB 적용 후 에어컨 저장·수정·조회 검증
+- `V17__simplify_facility_aircon_fields.sql` 및 `V19__simplify_facility_water_purifier_fields.sql` 운영/로컬 DB 적용 후 에어컨/정수기 저장·수정·조회 검증
 - 에어컨/정수기 실데이터 등록 후 기타설비 대시보드/메인 도면/층별 도면 포커스 흐름과 공통 DB 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장

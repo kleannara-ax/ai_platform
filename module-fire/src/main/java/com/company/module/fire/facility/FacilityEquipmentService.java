@@ -33,6 +33,7 @@ public class FacilityEquipmentService {
     public static final String CATEGORY_WATER_PURIFIER = "WATER_PURIFIER";
 
     private static final Set<String> AIRCON_TYPES = Set.of("시스템", "벽걸이", "스탠드형");
+    private static final String WATER_PURIFIER_TYPE = "정수기";
     private static final Map<String, String> AIRCON_BUILDING_PREFIXES = Map.ofEntries(
             Map.entry("관리동", "1"),
             Map.entry("복지관", "2"),
@@ -98,7 +99,14 @@ public class FacilityEquipmentService {
     @Transactional
     public FacilityEquipmentResponse saveEquipment(String category, FacilityEquipmentSaveRequest req) {
         String normalizedCategory = normalizeCategory(category);
-        validateType(normalizedCategory, req.getEquipmentType());
+        String equipmentType = normalizeEquipmentType(normalizedCategory, req.getEquipmentType());
+        validateType(normalizedCategory, equipmentType);
+        boolean waterPurifier = CATEGORY_WATER_PURIFIER.equals(normalizedCategory);
+        String manufacturer = waterPurifier ? null : trimToNull(req.getManufacturer());
+        String locationDescription = waterPurifier ? null : trimToNull(req.getLocationDescription());
+        int outdoorUnitCount = waterPurifier ? 1 : normalizeOutdoorUnitCount(req.getOutdoorUnitCount());
+        int replacementCycleYears = waterPurifier ? 10 : req.getReplacementCycleYears();
+        String note = waterPurifier ? null : req.getNote();
 
         Building building = buildingRepository.findById(req.getBuildingId())
                 .orElseThrow(() -> new BusinessException("건물 정보를 찾을 수 없습니다."));
@@ -112,9 +120,9 @@ public class FacilityEquipmentService {
         if (req.getEquipmentId() != null && req.getEquipmentId() > 0) {
             entity = findOwned(normalizedCategory, req.getEquipmentId());
             String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), entity);
-            entity.update(serialNumber, building, floor, req.getEquipmentType(), trimToNull(req.getManufacturer()),
-                    trimToNull(req.getLocationDescription()), normalizeOutdoorUnitCount(req.getOutdoorUnitCount()),
-                    req.getManufactureDate(), req.getReplacementCycleYears(), x, y, req.getNote());
+            entity.update(serialNumber, building, floor, equipmentType, manufacturer,
+                    locationDescription, outdoorUnitCount,
+                    req.getManufactureDate(), replacementCycleYears, x, y, note);
         } else {
             String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), null);
             entity = FacilityEquipment.builder()
@@ -122,15 +130,15 @@ public class FacilityEquipmentService {
                     .serialNumber(serialNumber)
                     .building(building)
                     .floor(floor)
-                    .equipmentType(req.getEquipmentType())
-                    .manufacturer(trimToNull(req.getManufacturer()))
-                    .locationDescription(trimToNull(req.getLocationDescription()))
-                    .outdoorUnitCount(normalizeOutdoorUnitCount(req.getOutdoorUnitCount()))
+                    .equipmentType(equipmentType)
+                    .manufacturer(manufacturer)
+                    .locationDescription(locationDescription)
+                    .outdoorUnitCount(outdoorUnitCount)
                     .manufactureDate(req.getManufactureDate())
-                    .replacementCycleYears(req.getReplacementCycleYears())
+                    .replacementCycleYears(replacementCycleYears)
                     .x(x)
                     .y(y)
-                    .note(req.getNote())
+                    .note(note)
                     .build();
             equipmentRepository.save(entity);
         }
@@ -251,12 +259,21 @@ public class FacilityEquipmentService {
         throw new BusinessException("지원하지 않는 기타설비 유형입니다.");
     }
 
-    private void validateType(String category, String equipmentType) {
-        if (equipmentType == null || equipmentType.isBlank()) {
-            throw new BusinessException("설비 종류를 입력하세요.");
+    private String normalizeEquipmentType(String category, String equipmentType) {
+        if (CATEGORY_WATER_PURIFIER.equals(category)) {
+            return WATER_PURIFIER_TYPE;
         }
-        if (CATEGORY_AIRCON.equals(category) && !AIRCON_TYPES.contains(equipmentType.trim())) {
-            throw new BusinessException("에어컨 종류는 시스템, 벽걸이, 스탠드형 중 하나여야 합니다.");
+        return trimToNull(equipmentType);
+    }
+
+    private void validateType(String category, String equipmentType) {
+        if (CATEGORY_AIRCON.equals(category)) {
+            if (equipmentType == null || equipmentType.isBlank()) {
+                throw new BusinessException("에어컨 종류를 입력하세요.");
+            }
+            if (!AIRCON_TYPES.contains(equipmentType.trim())) {
+                throw new BusinessException("에어컨 종류는 시스템, 벽걸이, 스탠드형 중 하나여야 합니다.");
+            }
         }
     }
 
