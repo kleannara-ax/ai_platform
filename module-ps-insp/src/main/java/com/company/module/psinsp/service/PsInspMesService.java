@@ -43,7 +43,7 @@ public class PsInspMesService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    /** MES 서버 엔드포인트 URL (고정) */
+    /** MES 서버 엔드포인트 URL (운영) */
     private static final String MES_ENDPOINT_URL =
             "https://mes.kleannara.com/mobile/saveDustInspectionResult.data";
 

@@ -80,11 +80,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // DB 조회 없이 USERID 값으로 가상 인증 객체 생성 (ROLE_USER 부여)
+        // DB 조회 없이 USERID 값으로 가상 인증 객체 생성 (ROLE_USER + PS_INSP 바이패스 권한 부여)
         String trimmedUserId = userId.trim();
         User principal = new User(trimmedUserId, "", List.of(
                 new SimpleGrantedAuthority("ROLE_USER"),
-                new SimpleGrantedAuthority("ROLE_ADMIN")
+                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                new SimpleGrantedAuthority("ROLE_PS_INSP_BYPASS")
         ));
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
