@@ -107,17 +107,14 @@ public class FacilityEquipmentService {
 
         BigDecimal x = normalizeCoord(req.getX());
         BigDecimal y = normalizeCoord(req.getY());
-        BigDecimal outdoorX = normalizeCoord(req.getOutdoorX());
-        BigDecimal outdoorY = normalizeCoord(req.getOutdoorY());
 
         FacilityEquipment entity;
         if (req.getEquipmentId() != null && req.getEquipmentId() > 0) {
             entity = findOwned(normalizedCategory, req.getEquipmentId());
             String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), entity);
             entity.update(serialNumber, building, floor, req.getEquipmentType(), trimToNull(req.getManufacturer()),
-                    normalizeInstallationYear(req.getInstallationYear()), trimToNull(req.getLocationDescription()),
-                    normalizeOutdoorUnitCount(req.getOutdoorUnitCount()), outdoorX, outdoorY, req.getManufactureDate(),
-                    req.getReplacementCycleYears(), req.getQuantity(), x, y, req.getNote());
+                    trimToNull(req.getLocationDescription()), normalizeOutdoorUnitCount(req.getOutdoorUnitCount()),
+                    req.getManufactureDate(), req.getReplacementCycleYears(), x, y, req.getNote());
         } else {
             String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), null);
             entity = FacilityEquipment.builder()
@@ -127,14 +124,10 @@ public class FacilityEquipmentService {
                     .floor(floor)
                     .equipmentType(req.getEquipmentType())
                     .manufacturer(trimToNull(req.getManufacturer()))
-                    .installationYear(normalizeInstallationYear(req.getInstallationYear()))
                     .locationDescription(trimToNull(req.getLocationDescription()))
                     .outdoorUnitCount(normalizeOutdoorUnitCount(req.getOutdoorUnitCount()))
-                    .outdoorX(outdoorX)
-                    .outdoorY(outdoorY)
                     .manufactureDate(req.getManufactureDate())
                     .replacementCycleYears(req.getReplacementCycleYears())
-                    .quantity(req.getQuantity())
                     .x(x)
                     .y(y)
                     .note(req.getNote())
@@ -269,14 +262,6 @@ public class FacilityEquipmentService {
 
     private BigDecimal normalizeCoord(BigDecimal value) {
         return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private Integer normalizeInstallationYear(Integer year) {
-        if (year == null) return null;
-        if (year < 1980 || year > 2100) {
-            throw new BusinessException("설치연도는 1980~2100 사이로 입력하세요.");
-        }
-        return year;
     }
 
     private int normalizeOutdoorUnitCount(int value) {

@@ -27,20 +27,14 @@ public class FacilityEquipmentSaveRequest {
     private String equipmentType;
 
     private String manufacturer;
-    private Integer installationYear;
     private String locationDescription;
     private int outdoorUnitCount = 1;
-    private BigDecimal outdoorX;
-    private BigDecimal outdoorY;
 
     @NotNull(message = "제조일을 입력하세요.")
     private LocalDate manufactureDate;
 
     @Min(value = 1, message = "교체 주기는 1년 이상이어야 합니다.")
     private int replacementCycleYears = 10;
-
-    @Min(value = 1, message = "수량은 1 이상이어야 합니다.")
-    private int quantity = 1;
 
     private BigDecimal x;
     private BigDecimal y;

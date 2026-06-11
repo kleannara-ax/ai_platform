@@ -55,6 +55,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V11__add_fire_admin_code_group.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V12__remove_fire_user_role.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V15__facility_management_system.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V16__facility_aircon_pair_fields.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V17__simplify_facility_aircon_fields.sql
 ```
 
 ## 테이블 구조
