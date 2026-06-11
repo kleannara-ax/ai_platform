@@ -32,3 +32,4 @@ node_modules/
 test_*.js
 package*.json
 app.log
+uploads/

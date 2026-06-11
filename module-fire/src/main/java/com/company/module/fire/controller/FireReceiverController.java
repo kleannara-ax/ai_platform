@@ -39,8 +39,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 public class FireReceiverController {
 
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
-    private static final Path RECEIVER_IMAGE_DIR = Paths.get("/data/upload/module_fire/receivers");
-    private static final Path RECEIVER_INSPECTION_IMAGE_DIR = Paths.get("/data/upload/module_fire/receiver-inspections");
+    private static final Path RECEIVER_IMAGE_DIR = uploadDir("receivers");
+    private static final Path RECEIVER_INSPECTION_IMAGE_DIR = uploadDir("receiver-inspections");
 
     private final FireReceiverService fireReceiverService;
     private final com.company.module.fire.service.InspectorNameResolver inspectorNameResolver;
@@ -248,6 +248,14 @@ public class FireReceiverController {
             }
         }
         return UUID.randomUUID().toString().replace("-", "") + "." + ext;
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
     }
 
     @DeleteMapping("/{id}")

@@ -39,8 +39,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 public class FirePumpController {
 
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
-    private static final Path PUMP_IMAGE_DIR = Paths.get("/data/upload/module_fire/pumps");
-    private static final Path PUMP_INSPECTION_IMAGE_DIR = Paths.get("/data/upload/module_fire/pump-inspections");
+    private static final Path PUMP_IMAGE_DIR = uploadDir("pumps");
+    private static final Path PUMP_INSPECTION_IMAGE_DIR = uploadDir("pump-inspections");
 
     private final FirePumpService firePumpService;
     private final com.company.module.fire.service.InspectorNameResolver inspectorNameResolver;
@@ -248,6 +248,14 @@ public class FirePumpController {
             }
         }
         return UUID.randomUUID().toString().replace("-", "") + "." + ext;
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
     }
 
     @DeleteMapping("/{id}")

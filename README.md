@@ -48,9 +48,9 @@
   - `facility_equipment_inspection`: 기타설비 점검 이력
 - **File Storage**:
   - 기타설비 업로드: `/data/upload/module_fire/facility/{air-conditioners|water-purifiers}`
-  - 수신기 대표사진 업로드: `/data/upload/module_fire/receivers`, API file path: `/fire-api/receivers/files/{filename}`
-  - 소방펌프 대표사진 업로드: `/data/upload/module_fire/pumps`, API file path: `/fire-api/pumps/files/{filename}`
-  - 수신기/소방펌프 점검사진 업로드: `/data/upload/module_fire/{receiver-inspections|pump-inspections}`
+  - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
+  - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
+  - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
   - API file path: `/facility-api/{kind}/files/{filename}`
 
 ## Role / Menu Access
