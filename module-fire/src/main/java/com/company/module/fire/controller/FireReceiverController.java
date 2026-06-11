@@ -114,11 +114,11 @@ public class FireReceiverController {
             @PathVariable Long id,
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        byte[] body = fireReceiverService.exportInspectionCsv(id, from, to);
-        String filename = "receiver-inspections-" + id + "-" + from + "-" + to + ".csv";
+        byte[] body = fireReceiverService.exportInspectionWorkbook(id, from, to);
+        String filename = "receiver-inspections-" + id + "-" + from + "-" + to + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
-                .contentType(new MediaType("text", "csv"))
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
     }
 
@@ -127,11 +127,11 @@ public class FireReceiverController {
     public ResponseEntity<byte[]> exportAllInspections(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        byte[] body = fireReceiverService.exportAllInspectionCsv(from, to);
-        String filename = "receiver-inspections-all-" + from + "-" + to + ".csv";
+        byte[] body = fireReceiverService.exportAllInspectionWorkbook(from, to);
+        String filename = "receiver-inspections-all-" + from + "-" + to + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
-                .contentType(new MediaType("text", "csv"))
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
     }
 

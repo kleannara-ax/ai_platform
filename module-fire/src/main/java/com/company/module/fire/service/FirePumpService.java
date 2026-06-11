@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -44,6 +44,14 @@ public class FirePumpService {
 
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 99L;
     private static final int MAX_INSPECTION_HISTORY = 12;
+    private static final List<InspectionWorkbookExporter.ItemColumn> PUMP_EXPORT_COLUMNS = List.of(
+            new InspectionWorkbookExporter.ItemColumn("pump_operation", "소방펌프(주, 보조, 예비) 작동여부 [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("panel", "소방판넬 [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("water_supply", "소화용수 [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("fuel", "펌프(엔진)연료 [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("drain_pump", "배수펌프 [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("piping", "소방배관 [점검결과]")
+    );
 
     private final FirePumpRepository firePumpRepository;
     private final FirePumpInspectionRepository firePumpInspectionRepository;
@@ -82,13 +90,8 @@ public class FirePumpService {
     }
 
 
-    public byte[] exportInspectionCsv(Long pumpId, LocalDate fromDate, LocalDate toDate) {
-        if (fromDate == null || toDate == null) {
-            throw new BusinessException("조회 시작일과 종료일을 입력해 주세요.");
-        }
-        if (fromDate.isAfter(toDate)) {
-            throw new BusinessException("조회 시작일은 종료일보다 늦을 수 없습니다.");
-        }
+    public byte[] exportInspectionWorkbook(Long pumpId, LocalDate fromDate, LocalDate toDate) {
+        validateExportRange(fromDate, toDate);
 
         FirePump pump = firePumpRepository.findById(pumpId)
                 .orElseThrow(() -> new EntityNotFoundException("FirePump", pumpId));
@@ -96,47 +99,22 @@ public class FirePumpService {
                 .findByPump_PumpIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
                         pumpId, fromDate, toDate);
 
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF');
-        csv.append("설비구분,건물,점검일,점검자,점검결과,점검항목결과,비고\n");
-
-        for (FirePumpInspection inspection : inspections) {
-            csv.append(csvValue("소방펌프")).append(',')
-                    .append(csvValue(pump.getBuildingName())).append(',')
-                    .append(csvValue(inspection.getInspectionDate())).append(',')
-                    .append(csvValue(inspection.getInspectedByName())).append(',')
-                    .append(csvValue(statusLabel(inspection.getInspectionStatus()))).append(',')
-                    .append(csvValue(buildChecklistSummary(parseChecklist(inspection)))).append(',')
-                    .append(csvValue(inspection.getNote()))
-                    .append('\n');
-        }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
+                .map(inspection -> toWorkbookRow(pump, inspection))
+                .toList();
+        return InspectionWorkbookExporter.export("소방펌프 점검보고서", PUMP_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
 
-    public byte[] exportAllInspectionCsv(LocalDate fromDate, LocalDate toDate) {
+    public byte[] exportAllInspectionWorkbook(LocalDate fromDate, LocalDate toDate) {
         validateExportRange(fromDate, toDate);
         List<FirePumpInspection> inspections = firePumpInspectionRepository
                 .findByInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(fromDate, toDate);
 
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF');
-        csv.append("설비구분,건물,점검일,점검자,점검결과,점검항목결과,비고\n");
-
-        for (FirePumpInspection inspection : inspections) {
-            FirePump pump = inspection.getPump();
-            csv.append(csvValue("소방펌프")).append(',')
-                    .append(csvValue(pump != null ? pump.getBuildingName() : "")).append(',')
-                    .append(csvValue(inspection.getInspectionDate())).append(',')
-                    .append(csvValue(inspection.getInspectedByName())).append(',')
-                    .append(csvValue(statusLabel(inspection.getInspectionStatus()))).append(',')
-                    .append(csvValue(buildChecklistSummary(parseChecklist(inspection)))).append(',')
-                    .append(csvValue(inspection.getNote()))
-                    .append('\n');
-        }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
+                .map(inspection -> toWorkbookRow(inspection.getPump(), inspection))
+                .toList();
+        return InspectionWorkbookExporter.export("소방펌프 점검보고서", PUMP_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
     @Transactional
@@ -445,29 +423,34 @@ public class FirePumpService {
         }
     }
 
-    private String statusLabel(String status) {
-        return switch (String.valueOf(status == null ? "" : status).toUpperCase(Locale.ROOT)) {
-            case "NORMAL" -> "정상";
-            case "MAINTENANCE" -> "요정비";
-            case "FAULTY" -> "불량";
-            default -> "";
-        };
+    private InspectionWorkbookExporter.RowData toWorkbookRow(FirePump pump, FirePumpInspection inspection) {
+        String sectionTitle = pump != null ? pump.getBuildingName() : "소방펌프";
+        return new InspectionWorkbookExporter.RowData(
+                sectionTitle,
+                inspection.getInspectionDate(),
+                inspection.getInspectionTime(),
+                inspection.getInspectedByName(),
+                toItemResultMap(parseChecklist(inspection)),
+                inspection.getImagePath(),
+                inspection.getNote()
+        );
     }
 
-    private String buildChecklistSummary(List<FirePumpResponse.InspectionChecklistItem> items) {
-        if (items == null || items.isEmpty()) {
-            return "";
+    private Map<String, String> toItemResultMap(List<FirePumpResponse.InspectionChecklistItem> items) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (items == null) {
+            return result;
         }
-        return items.stream()
-                .map(item -> (item.getItemLabel() == null ? "" : item.getItemLabel()) + ": " + statusLabel(item.getResult()))
-                .toList()
-                .toString()
-                .replace("[", "")
-                .replace("]", "");
+        for (FirePumpResponse.InspectionChecklistItem item : items) {
+            String key = trimToNull(item.getItemKey());
+            if (key != null) {
+                result.put(key, item.getResult());
+            }
+        }
+        return result;
     }
 
-    private String csvValue(Object value) {
-        String text = value == null ? "" : String.valueOf(value);
-        return "\"" + text.replace("\"", "\"\"") + "\"";
+    private java.util.Optional<InspectionWorkbookExporter.ImageFile> resolveInspectionImage(String imagePath) {
+        return InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/pump-inspections"));
     }
 }

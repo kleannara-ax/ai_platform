@@ -114,11 +114,11 @@ public class FirePumpController {
             @PathVariable Long id,
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        byte[] body = firePumpService.exportInspectionCsv(id, from, to);
-        String filename = "pump-inspections-" + id + "-" + from + "-" + to + ".csv";
+        byte[] body = firePumpService.exportInspectionWorkbook(id, from, to);
+        String filename = "pump-inspections-" + id + "-" + from + "-" + to + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
-                .contentType(new MediaType("text", "csv"))
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
     }
 
@@ -127,11 +127,11 @@ public class FirePumpController {
     public ResponseEntity<byte[]> exportAllInspections(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        byte[] body = firePumpService.exportAllInspectionCsv(from, to);
-        String filename = "pump-inspections-all-" + from + "-" + to + ".csv";
+        byte[] body = firePumpService.exportAllInspectionWorkbook(from, to);
+        String filename = "pump-inspections-all-" + from + "-" + to + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
-                .contentType(new MediaType("text", "csv"))
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
     }
 

@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -44,6 +44,14 @@ public class FireReceiverService {
 
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 99L;
     private static final int MAX_INSPECTION_HISTORY = 12;
+    private static final List<InspectionWorkbookExporter.ItemColumn> RECEIVER_EXPORT_COLUMNS = List.of(
+            new InspectionWorkbookExporter.ItemColumn("power", "전원(전원 공급 및 전원표시등 \n정상여부 확인) [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("switch", "스위치[스위치 정위치(자동) \n여부] [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("transfer_device", "절환장치(상용전원 OFF시 자동 예비전원 절환 여부) [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("zone_map", "경계구역일람도(경계구역 일람도 적정여부) [점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("continuity_test", "도통시험(회로 단선여부) \n[점검결과]"),
+            new InspectionWorkbookExporter.ItemColumn("operation_test", "동작시험(주, 지구경종 및 시각경보기 작동상태) [점검결과]")
+    );
 
     private final FireReceiverRepository fireReceiverRepository;
     private final FireReceiverInspectionRepository fireReceiverInspectionRepository;
@@ -82,13 +90,8 @@ public class FireReceiverService {
     }
 
 
-    public byte[] exportInspectionCsv(Long receiverId, LocalDate fromDate, LocalDate toDate) {
-        if (fromDate == null || toDate == null) {
-            throw new BusinessException("조회 시작일과 종료일을 입력해 주세요.");
-        }
-        if (fromDate.isAfter(toDate)) {
-            throw new BusinessException("조회 시작일은 종료일보다 늦을 수 없습니다.");
-        }
+    public byte[] exportInspectionWorkbook(Long receiverId, LocalDate fromDate, LocalDate toDate) {
+        validateExportRange(fromDate, toDate);
 
         FireReceiver receiver = fireReceiverRepository.findById(receiverId)
                 .orElseThrow(() -> new EntityNotFoundException("FireReceiver", receiverId));
@@ -96,49 +99,22 @@ public class FireReceiverService {
                 .findByReceiver_ReceiverIdAndInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(
                         receiverId, fromDate, toDate);
 
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF');
-        csv.append("설비구분,건물,점검일,점검자,점검결과,점검항목결과,비고\n");
-
-        for (FireReceiverInspection inspection : inspections) {
-            csv.append(csvValue("수신기")).append(',')
-                    .append(csvValue(receiver.getBuildingName())).append(',')
-                    .append(csvValue(inspection.getInspectionDate())).append(',')
-                    .append(csvValue(inspection.getInspectionTime())).append(',')
-                    .append(csvValue(inspection.getInspectedByName())).append(',')
-                    .append(csvValue(statusLabel(inspection.getInspectionStatus()))).append(',')
-                    .append(csvValue(buildChecklistSummary(parseChecklist(inspection)))).append(',')
-                    .append(csvValue(inspection.getNote()))
-                    .append('\n');
-        }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
+                .map(inspection -> toWorkbookRow(receiver, inspection))
+                .toList();
+        return InspectionWorkbookExporter.export("수신기 점검보고서", RECEIVER_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
 
-    public byte[] exportAllInspectionCsv(LocalDate fromDate, LocalDate toDate) {
+    public byte[] exportAllInspectionWorkbook(LocalDate fromDate, LocalDate toDate) {
         validateExportRange(fromDate, toDate);
         List<FireReceiverInspection> inspections = fireReceiverInspectionRepository
                 .findByInspectionDateBetweenOrderByInspectionDateDescInspectionIdDesc(fromDate, toDate);
 
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF');
-        csv.append("설비구분,건물,점검일,점검자,점검결과,점검항목결과,비고\n");
-
-        for (FireReceiverInspection inspection : inspections) {
-            FireReceiver receiver = inspection.getReceiver();
-            csv.append(csvValue("수신기")).append(',')
-                    .append(csvValue(receiver != null ? receiver.getBuildingName() : "")).append(',')
-                    .append(csvValue(inspection.getInspectionDate())).append(',')
-                    .append(csvValue(inspection.getInspectionTime())).append(',')
-                    .append(csvValue(inspection.getInspectedByName())).append(',')
-                    .append(csvValue(statusLabel(inspection.getInspectionStatus()))).append(',')
-                    .append(csvValue(buildChecklistSummary(parseChecklist(inspection)))).append(',')
-                    .append(csvValue(inspection.getNote()))
-                    .append('\n');
-        }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
+                .map(inspection -> toWorkbookRow(inspection.getReceiver(), inspection))
+                .toList();
+        return InspectionWorkbookExporter.export("수신기 점검보고서", RECEIVER_EXPORT_COLUMNS, rows, this::resolveInspectionImage);
     }
 
     @Transactional
@@ -447,29 +423,34 @@ public class FireReceiverService {
         }
     }
 
-    private String statusLabel(String status) {
-        return switch (String.valueOf(status == null ? "" : status).toUpperCase(Locale.ROOT)) {
-            case "NORMAL" -> "정상";
-            case "MAINTENANCE" -> "요정비";
-            case "FAULTY" -> "불량";
-            default -> "";
-        };
+    private InspectionWorkbookExporter.RowData toWorkbookRow(FireReceiver receiver, FireReceiverInspection inspection) {
+        String sectionTitle = receiver != null ? receiver.getBuildingName() : "수신기";
+        return new InspectionWorkbookExporter.RowData(
+                sectionTitle,
+                inspection.getInspectionDate(),
+                inspection.getInspectionTime(),
+                inspection.getInspectedByName(),
+                toItemResultMap(parseChecklist(inspection)),
+                inspection.getImagePath(),
+                inspection.getNote()
+        );
     }
 
-    private String buildChecklistSummary(List<FireReceiverResponse.InspectionChecklistItem> items) {
-        if (items == null || items.isEmpty()) {
-            return "";
+    private Map<String, String> toItemResultMap(List<FireReceiverResponse.InspectionChecklistItem> items) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (items == null) {
+            return result;
         }
-        return items.stream()
-                .map(item -> (item.getItemLabel() == null ? "" : item.getItemLabel()) + ": " + statusLabel(item.getResult()))
-                .toList()
-                .toString()
-                .replace("[", "")
-                .replace("]", "");
+        for (FireReceiverResponse.InspectionChecklistItem item : items) {
+            String key = trimToNull(item.getItemKey());
+            if (key != null) {
+                result.put(key, item.getResult());
+            }
+        }
+        return result;
     }
 
-    private String csvValue(Object value) {
-        String text = value == null ? "" : String.valueOf(value);
-        return "\"" + text.replace("\"", "\"\"") + "\"";
+    private java.util.Optional<InspectionWorkbookExporter.ImageFile> resolveInspectionImage(String imagePath) {
+        return InspectionWorkbookExporter.loadImage(imagePath, Paths.get("/data/upload/module_fire/receiver-inspections"));
     }
 }

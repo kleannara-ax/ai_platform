@@ -657,7 +657,7 @@
       '<div class="d-flex justify-content-end gap-2 mb-3">' +
       '  <input type="date" class="form-control form-control-sm" id="exportFromDate" style="max-width:160px;" />' +
       '  <input type="date" class="form-control form-control-sm" id="exportToDate" style="max-width:160px;" />' +
-      '  <button type="button" class="btn btn-outline-success" id="detailExportBtn">CSV 다운로드</button>' +
+      '  <button type="button" class="btn btn-outline-success" id="detailExportBtn">엑셀 다운로드</button>' +
       '  <button type="button" class="btn btn-primary" id="detailInspectBtn"' + (canEdit ? "" : ' style="display:none;"') + '>점검</button>' +
       '  <button type="button" class="btn btn-outline-primary" id="detailEditBtn"' + (canEdit ? "" : ' style="display:none;"') + '>수정</button>' +
       '</div>' +
@@ -723,7 +723,7 @@
       renderDetailMap(detail);
     });
     renderHistory(detail.inspections || []);
-    document.getElementById("detailExportBtn")?.addEventListener("click", downloadInspectionCsv);
+    document.getElementById("detailExportBtn")?.addEventListener("click", downloadInspectionExcel);
     document.getElementById("detailInspectBtn")?.addEventListener("click", function () {
       if (!canEdit || !state.selectedDetailId) return;
       openInspectModal(state.selectedDetailId);
@@ -1024,7 +1024,7 @@
     }
   }
 
-  async function fetchCsvDownload(url, fallbackFilename) {
+  async function fetchExcelDownload(url, fallbackFilename) {
     try {
       const opts = window.FireWebCsrf?.applyOptions({ method: "GET" }) || { method: "GET" };
       const res = await fetch(url, opts);
@@ -1035,7 +1035,7 @@
       }
       if (!res.ok) {
         const t = await res.text().catch(() => "");
-        alert("CSV 다운로드 실패: " + (t || "HTTP " + res.status));
+        alert("엑셀 다운로드 실패: " + (t || "HTTP " + res.status));
         return;
       }
       const disposition = res.headers.get("Content-Disposition") || "";
@@ -1049,11 +1049,11 @@
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
     } catch (e) {
-      alert("CSV 다운로드 실패: " + (e.message || e));
+      alert("엑셀 다운로드 실패: " + (e.message || e));
     }
   }
 
-  function downloadInspectionCsv() {
+  function downloadInspectionExcel() {
     if (!state.selectedDetailId) {
       alert("상세 데이터를 먼저 선택해 주세요.");
       return;
@@ -1070,10 +1070,10 @@
     }
     const url = config.apiBase + "/" + encodeURIComponent(state.selectedDetailId) + "/inspections/export?from=" +
       encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
-    fetchCsvDownload(url, "inspections-" + state.selectedDetailId + ".csv");
+    fetchExcelDownload(url, "inspections-" + state.selectedDetailId + ".xlsx");
   }
 
-  function exportAllCsv() {
+  function exportAllExcel() {
     if (!canEdit) return;
     const from = document.getElementById("filterDateFrom")?.value || "";
     const to = document.getElementById("filterDateTo")?.value || "";
@@ -1086,7 +1086,7 @@
       return;
     }
     const url = config.apiBase + "/inspections/export-all?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
-    fetchCsvDownload(url, "inspections-all.csv");
+    fetchExcelDownload(url, "inspections-all.xlsx");
   }
 
   async function deleteHistoryRow(button) {
@@ -1240,7 +1240,7 @@
       state.activeStatusFilter = null;
       await loadList();
     });
-    document.getElementById("btnExportAll")?.addEventListener("click", exportAllCsv);
+    document.getElementById("btnExportAll")?.addEventListener("click", exportAllExcel);
     document.getElementById("btnStatusWaiting")?.addEventListener("click", function () {
       state.activeStatusFilter = state.activeStatusFilter === "waiting" ? null : "waiting";
       renderSummary();
@@ -1279,7 +1279,7 @@
         openItemModal(current);
       }
     });
-    document.getElementById("detailExportBtn")?.addEventListener("click", downloadInspectionCsv);
+    document.getElementById("detailExportBtn")?.addEventListener("click", downloadInspectionExcel);
     document.getElementById("inspectSaveBtn")?.addEventListener("click", async function () {
       try {
         await saveInspection();
