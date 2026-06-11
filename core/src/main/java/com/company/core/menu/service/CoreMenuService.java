@@ -66,6 +66,8 @@ public class CoreMenuService {
         List<String> roles = authorities.stream()
                 .map(org.springframework.security.core.GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
+        // PS-INSP USERID 파라미터 인증 바이패스 (MES 등 외부 시스템 연동)
+        if (roles.contains("ROLE_PS_INSP_BYPASS")) return true;
         return hasMenuAccessMultiRole(roles, menuCode);
     }
 
