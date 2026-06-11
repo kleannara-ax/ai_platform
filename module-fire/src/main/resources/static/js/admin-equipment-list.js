@@ -904,7 +904,7 @@
         '<tr data-inspection-id="' + escapeHtml(row.inspectionId) + '">' +
         '<td><div class="d-flex gap-2"><input type="date" class="form-control form-control-sm js-hist-date" value="' + escapeHtml(row.inspectionDate || "") + '"><input type="time" class="form-control form-control-sm js-hist-time" value="' + escapeHtml(row.inspectionTime ? String(row.inspectionTime).slice(0, 5) : "") + '"></div></td>' +
         '<td><input type="text" class="form-control form-control-sm js-hist-inspector" value="' + escapeHtml(row.inspectorName || "") + '"></td>' +
-        '<td><div class="mb-2">' + statusBadge(row.inspectionStatus) + '</div><textarea class="form-control form-control-sm js-hist-note" rows="3">' + escapeHtml(row.note || "") + '</textarea><div class="small mt-2">' + photoLink + '</div></td>' +
+        '<td><div class="mb-2">' + statusBadge(row.inspectionStatus) + '</div><textarea class="form-control form-control-sm js-hist-note" rows="3">' + escapeHtml(row.note || "") + '</textarea><div class="small mt-2">현재 사진: ' + photoLink + '</div><label class="form-label small mt-2 mb-1">사진 변경</label><input type="file" class="form-control form-control-sm js-hist-photo" accept="image/*"></td>' +
         '<td>' + buildChecklistEditor(row) + '<div class="text-end mt-2 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-fw-edit js-history-save">수정</button><button type="button" class="btn btn-sm btn-fw-delete js-history-delete">삭제</button></div></td>' +
         '</tr>';
     });
@@ -912,11 +912,67 @@
       '<tr data-inspection-id="">' +
       '<td><div class="d-flex gap-2"><input type="date" class="form-control form-control-sm js-hist-date" value=""><input type="time" class="form-control form-control-sm js-hist-time" value=""></div></td>' +
       '<td><input type="text" class="form-control form-control-sm js-hist-inspector" value=""></td>' +
-      '<td><div class="mb-2"><span class="fw-status fw-wait">신규</span></div><textarea class="form-control form-control-sm js-hist-note" rows="3"></textarea><div class="small mt-2 text-muted">새 점검 이력 추가</div></td>' +
+      '<td><div class="mb-2"><span class="fw-status fw-wait">신규</span></div><textarea class="form-control form-control-sm js-hist-note" rows="3"></textarea><label class="form-label small mt-2 mb-1">점검사진</label><input type="file" class="form-control form-control-sm js-hist-photo" accept="image/*"><div class="small mt-2 text-muted">새 점검 이력 추가</div></td>' +
       '<td>' + buildChecklistEditor({ checklistItems: [] }) + '<div class="text-end mt-2"><button type="button" class="btn btn-sm btn-primary js-history-save">추가</button></div></td>' +
       '</tr>'
     );
     tbody.innerHTML = rows.join("");
+  }
+
+  function normalizeInspectionTime(value) {
+    return value ? String(value).slice(0, 5) : "";
+  }
+
+  function getMaxInspectionId(inspections) {
+    return (Array.isArray(inspections) ? inspections : []).reduce(function (max, row) {
+      const id = Number(row?.inspectionId);
+      return Number.isFinite(id) ? Math.max(max, id) : max;
+    }, 0);
+  }
+
+  function resolveSavedInspectionId(detail, options) {
+    const inspections = Array.isArray(detail?.inspections) ? detail.inspections : [];
+    const opts = options || {};
+    if (opts.preferredId) return opts.preferredId;
+    if (!inspections.length) return "";
+
+    let candidates = inspections.slice();
+    if (opts.afterId) {
+      const after = Number(opts.afterId);
+      const filtered = candidates.filter(function (row) { return Number(row?.inspectionId) > after; });
+      if (filtered.length) candidates = filtered;
+    }
+    if (opts.inspectionDate) {
+      const filtered = candidates.filter(function (row) { return String(row?.inspectionDate || "") === String(opts.inspectionDate); });
+      if (filtered.length) candidates = filtered;
+    }
+    if (opts.inspectionTime) {
+      const expectedTime = normalizeInspectionTime(opts.inspectionTime);
+      const filtered = candidates.filter(function (row) { return normalizeInspectionTime(row?.inspectionTime) === expectedTime; });
+      if (filtered.length) candidates = filtered;
+    }
+
+    candidates.sort(function (a, b) { return Number(b?.inspectionId || 0) - Number(a?.inspectionId || 0); });
+    return candidates[0]?.inspectionId || "";
+  }
+
+  async function uploadInspectionImage(targetId, inspectionId, file) {
+    if (!file) return;
+    if (!inspectionId) {
+      throw new Error("사진을 연결할 점검 이력을 찾지 못했습니다.");
+    }
+    if (file.type && !String(file.type).toLowerCase().startsWith("image/")) {
+      throw new Error("점검사진은 이미지 파일만 업로드할 수 있습니다.");
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("점검사진은 10MB 이하만 업로드할 수 있습니다.");
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId) + "/image", {
+      method: "POST",
+      body: formData
+    });
   }
 
   function renderChecklistForm() {
@@ -966,24 +1022,29 @@
     if (items.some(item => !item.result)) {
       throw new Error("모든 점검 항목 결과를 선택해 주세요.");
     }
+    const inspectionTime = document.getElementById("inspectTime").value || null;
+    const previousMaxInspectionId = getMaxInspectionId(state.currentDetail?.inspections || []);
     const detail = await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/inspect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: items,
-        inspectionTime: document.getElementById("inspectTime").value || null,
+        inspectionTime: inspectionTime,
         note: document.getElementById("inspectNote").value.trim() || null
       })
     });
     const file = document.getElementById("inspectPhoto").files?.[0];
-    const inspectionId = detail?.inspections?.[0]?.inspectionId;
-    if (file && inspectionId) {
-      const formData = new FormData();
-      formData.append("file", file);
-      await apiFetch(config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId) + "/image", {
-        method: "POST",
-        body: formData
+    if (file) {
+      const inspectionId = resolveSavedInspectionId(detail, {
+        afterId: previousMaxInspectionId,
+        inspectionDate: new Date().toISOString().slice(0, 10),
+        inspectionTime: inspectionTime
       });
+      try {
+        await uploadInspectionImage(targetId, inspectionId, file);
+      } catch (error) {
+        alert("점검은 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
+      }
     }
     state.inspectModal.hide();
     await loadPeers();
@@ -1141,7 +1202,8 @@
     button.disabled = true;
     try {
       const isNew = !inspectionId;
-      await apiFetch(
+      const previousMaxInspectionId = getMaxInspectionId(state.currentDetail?.inspections || []);
+      const savedDetail = await apiFetch(
         isNew
           ? config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections"
           : config.apiBase + "/" + encodeURIComponent(targetId) + "/inspections/" + encodeURIComponent(inspectionId),
@@ -1156,6 +1218,20 @@
           note: note || null
         })
       });
+      const file = row.querySelector(".js-hist-photo")?.files?.[0];
+      if (file) {
+        const savedInspectionId = resolveSavedInspectionId(savedDetail, {
+          preferredId: isNew ? "" : inspectionId,
+          afterId: previousMaxInspectionId,
+          inspectionDate: inspectionDate,
+          inspectionTime: inspectionTime
+        });
+        try {
+          await uploadInspectionImage(targetId, savedInspectionId, file);
+        } catch (error) {
+          alert("점검 이력은 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
+        }
+      }
       await loadList();
       const pendingAction = getPendingAction();
       if (pendingAction?.id) {
