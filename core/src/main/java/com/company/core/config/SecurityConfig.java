@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -41,7 +42,35 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
+    /**
+     * 소방/기타설비 독립 대시보드 정적 파일 전용 체인.
+     *
+     * <p>메인 보안 체인의 authorizeHttpRequests().permitAll()은 JWT 필터 자체는 계속 실행한다.
+     * 운영 환경에서 만료/잘못된 Authorization 헤더 또는 정적 리소스 매칭 차이로
+     * 독립 대시보드 HTML이 401을 반환하는 경우가 있어, 해당 정적 파일은 JWT 필터를
+     * 등록하지 않은 선순위 체인에서 처리한다. 실제 데이터 API는 아래 메인 체인을 탄다.
+     */
     @Bean
+    @Order(0)
+    public SecurityFilterChain staticDashboardSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(
+                    "/fire-dashboard.html",
+                    "/facility-dashboard.html",
+                    "/css/equipment-dashboard.css",
+                    "/js/equipment-dashboard.js"
+            )
+            .csrf(AbstractHttpConfigurer::disable)
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+            )
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             // CSRF 비활성화 (Stateless REST API)

@@ -11,8 +11,13 @@
     return "";
   }
 
-  /** localStorage에서 JWT 토큰을 읽는다 (AI Platform SPA 연동) */
+  /** sessionStorage/localStorage에서 JWT 토큰을 읽는다 (AI Platform SPA 연동) */
   function getJwtToken() {
+    // SPA의 refreshToken()은 sessionStorage auth를 먼저 갱신하므로 최신 토큰을 우선 사용한다.
+    try {
+      var s = JSON.parse(sessionStorage.getItem("auth") || "null");
+      if (s && s.token) return s.token;
+    } catch (_) {}
     try {
       var u = JSON.parse(localStorage.getItem("fireweb_user") || "null");
       if (u && u.token) return u.token;

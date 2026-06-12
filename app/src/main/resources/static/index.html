@@ -292,6 +292,14 @@ async function refreshToken() {
       token = data.data.accessToken;
       refreshTk = data.data.refreshToken;
       saveSession();
+      try {
+        const raw = localStorage.getItem('fireweb_user');
+        if (raw) {
+          const u = JSON.parse(raw);
+          u.token = token;
+          localStorage.setItem('fireweb_user', JSON.stringify(u));
+        }
+      } catch(e) { /* 소방 모듈 연동 토큰 갱신 실패 무시 */ }
       return true;
     }
   } catch(e) { /* 갱신 실패 */ }
