@@ -76,17 +76,23 @@
     const normal = slices.find((slice) => slice.key === 'normal') || slices[0];
     const normalRate = denom ? Math.round((normal.count || 0) / denom * 100) : 0;
     let offset = 0;
-    const circles = slices.map((slice) => {
-      const pct = denom ? (slice.count || 0) / denom * 100 : 0;
-      const circle = '<circle r="15.9" cx="18" cy="18" fill="transparent" stroke="' + slice.color + '" stroke-width="7" stroke-dasharray="' + pct.toFixed(3) + ' ' + (100 - pct).toFixed(3) + '" stroke-dashoffset="-' + offset.toFixed(3) + '"></circle>';
+    const segments = slices.map((slice) => {
+      const count = Math.max(Number(slice.count || 0), 0);
+      const pct = denom ? count / denom * 100 : 0;
+      const rounded = denom ? Math.round(pct) : 0;
+      let segment = '';
+      if (pct > 0) {
+        segment = '<circle class="pie-segment pie-hover-target" cx="60" cy="60" r="44" pathLength="100" fill="none" stroke="' + slice.color + '" stroke-width="24" stroke-dasharray="' + pct.toFixed(3) + ' ' + Math.max(0, 100 - pct).toFixed(3) + '" stroke-dashoffset="-' + offset.toFixed(3) + '" transform="rotate(-90 60 60)" data-label="' + attr(slice.label) + '" data-rate="' + rounded + '%" tabindex="0"><title>' + esc(slice.label + ': ' + count + '개 (' + rounded + '%)') + '</title></circle>';
+      }
       offset += pct;
-      return circle;
-    }).join('');
+      return segment;
+    }).join('') || '<circle cx="60" cy="60" r="44" pathLength="100" fill="none" stroke="#e2e8f0" stroke-width="24"></circle>';
     const legend = slices.map((slice) => {
-      const pct = denom ? Math.round((slice.count || 0) / denom * 100) : 0;
-      return '<span class="legend-item"><span><b class="legend-dot" style="background:' + slice.color + '"></b>' + esc(slice.label) + '</span><b>' + (slice.count || 0) + ' <small>(' + pct + '%)</small></b></span>';
+      const count = Math.max(Number(slice.count || 0), 0);
+      const pct = denom ? Math.round(count / denom * 100) : 0;
+      return '<span class="pie-legend-item pie-hover-target" data-label="' + attr(slice.label) + '" data-rate="' + pct + '%"><span><b class="legend-dot" style="background:' + slice.color + '"></b>' + esc(slice.label) + '</span><b>' + count + '</b></span>';
     }).join('');
-    return '<article class="chart-card"><h3>' + esc(summary.label) + '</h3><div class="donut-wrap"><div class="donut-center"><svg class="donut" viewBox="0 0 36 36"><circle r="15.9" cx="18" cy="18" fill="transparent" stroke="#e5e7eb" stroke-width="7"></circle>' + circles + '</svg><div class="donut-center-label"><span class="donut-rate">' + normalRate + '%</span><span class="donut-caption">정상</span></div></div><div class="legend">' + legend + '</div></div></article>';
+    return '<article class="fire-pie-card"><div class="pie-visual"><div class="pie-shadow"></div><svg class="pie-svg" viewBox="0 0 120 120" aria-label="' + attr(summary.label) + ' 설비 현황"><defs><filter id="pieShadow-' + attr(summary.type || summary.label) + '" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="10" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.22"/></filter></defs><circle class="pie-depth" cx="60" cy="66" r="44" fill="none" stroke="rgba(15,23,42,.18)" stroke-width="24"></circle><g filter="url(#pieShadow-' + attr(summary.type || summary.label) + ')">' + segments + '</g><circle cx="60" cy="60" r="27" fill="#fff" stroke="rgba(15,23,42,.08)" stroke-width="1"></circle></svg><div class="pie-center" data-default-label="정상" data-default-rate="' + normalRate + '%"><b class="pie-rate">' + normalRate + '%</b><span class="pie-label">정상</span></div></div><div class="pie-info"><div class="pie-title-row"><b>' + esc(summary.label) + '</b><span>총 ' + denom + '개</span></div><div class="legend pie-legend">' + legend + '</div></div></article>';
   }
 
   function cardPanel(title, sub, bodyHtml, noPadding) {
@@ -99,9 +105,10 @@
     return '<div class="table-scroll"><table class="data-table">' + head + '<tbody>' + body + '</tbody></table></div>';
   }
 
-  function detailUrl(type, id) {
+  function detailUrl(type, id, embed) {
     if (!type || !id) return '';
     const params = new URLSearchParams();
+    if (embed) params.set('embedDetails', '1');
     params.set('details', String(id));
     if (type === 'ext') return '/extinguishers.html?' + params.toString();
     if (type === 'hyd') return '/hydrants.html?' + params.toString();
@@ -112,10 +119,114 @@
     return '';
   }
 
+  function ensureDetailModal() {
+    let modal = document.getElementById('dashboardDetailModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'dashboardDetailModal';
+    modal.className = 'dashboard-modal-overlay';
+    modal.innerHTML = '<section class="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="dashboardDetailTitle"><header class="dashboard-modal-head"><h2 id="dashboardDetailTitle">설비 상세</h2><button type="button" class="dashboard-modal-close" aria-label="닫기">×</button></header><div class="dashboard-modal-body"><iframe title="설비 상세" src="about:blank"></iframe></div></section>';
+    document.body.appendChild(modal);
+    modal.querySelector('.dashboard-modal-close').addEventListener('click', closeDetailModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeDetailModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('show')) closeDetailModal();
+    });
+    return modal;
+  }
+
+  function openDetailModal(url, title) {
+    if (!url) return;
+    const modal = ensureDetailModal();
+    const titleEl = modal.querySelector('#dashboardDetailTitle');
+    const iframe = modal.querySelector('iframe');
+    if (titleEl) titleEl.textContent = title || '설비 상세';
+    if (iframe) iframe.src = url;
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeDetailModal() {
+    const modal = document.getElementById('dashboardDetailModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+    const iframe = modal.querySelector('iframe');
+    if (iframe) iframe.src = 'about:blank';
+  }
+
+  function bindChartTooltips() {
+    root.querySelectorAll('.fire-pie-card').forEach((card) => {
+      const center = card.querySelector('.pie-center');
+      if (!center) return;
+      const rateEl = center.querySelector('.pie-rate');
+      const labelEl = center.querySelector('.pie-label');
+      function setCenter(rate, label) {
+        if (rateEl) rateEl.textContent = rate || center.dataset.defaultRate || '-';
+        if (labelEl) labelEl.textContent = label || center.dataset.defaultLabel || '-';
+      }
+      function setSegmentActive(label, active) {
+        card.querySelectorAll('.pie-segment').forEach((segment) => {
+          if ((segment.getAttribute('data-label') || '') !== label) return;
+          segment.setAttribute('stroke-width', active ? '28' : '24');
+          segment.style.filter = active ? 'drop-shadow(0 8px 6px rgba(15,23,42,.35))' : 'drop-shadow(0 4px 3px rgba(15,23,42,.22))';
+        });
+      }
+      card.querySelectorAll('.pie-hover-target').forEach((target) => {
+        target.addEventListener('mouseenter', () => {
+          const label = target.getAttribute('data-label') || center.dataset.defaultLabel || '-';
+          setCenter(target.getAttribute('data-rate'), label);
+          setSegmentActive(label, true);
+          if (target.classList.contains('pie-legend-item')) target.classList.add('active');
+        });
+        target.addEventListener('mouseleave', () => {
+          const label = target.getAttribute('data-label') || '';
+          setCenter(center.dataset.defaultRate, center.dataset.defaultLabel);
+          setSegmentActive(label, false);
+          if (target.classList.contains('pie-legend-item')) target.classList.remove('active');
+        });
+        target.addEventListener('focus', () => {
+          const label = target.getAttribute('data-label') || center.dataset.defaultLabel || '-';
+          setCenter(target.getAttribute('data-rate'), label);
+          setSegmentActive(label, true);
+        });
+        target.addEventListener('blur', () => {
+          const label = target.getAttribute('data-label') || '';
+          setCenter(center.dataset.defaultRate, center.dataset.defaultLabel);
+          setSegmentActive(label, false);
+        });
+      });
+    });
+  }
+
   function bindRouteButtons() {
     root.querySelectorAll('[data-go]').forEach((button) => {
-      button.addEventListener('click', () => go(button.dataset.go));
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        go(button.dataset.go);
+      });
     });
+    root.querySelectorAll('[data-modal-url]').forEach((row) => {
+      row.addEventListener('click', () => openDetailModal(row.dataset.modalUrl, row.dataset.modalTitle));
+      row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openDetailModal(row.dataset.modalUrl, row.dataset.modalTitle);
+        }
+      });
+    });
+    root.querySelectorAll('[data-row-go]').forEach((row) => {
+      row.addEventListener('click', () => go(row.dataset.rowGo));
+      row.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          go(row.dataset.rowGo);
+        }
+      });
+    });
+    bindChartTooltips();
   }
 
   async function renderFireDashboard() {
@@ -261,8 +372,10 @@
         return '<tr><td><strong>' + esc(summary.label) + '</strong></td><td>' + summary.total + '</td><td>' + badge(summary.abnormal, summary.abnormal > 0 ? 'red' : 'green') + '</td><td>' + badge(summary.inspect + '개', summary.inspect > 0 ? 'orange' : 'green') + '</td><td><button class="table-action" data-go="' + attr(summary.listUrl) + '">목록</button></td></tr>';
       });
       const abnormalRows = abnormalItems.map((item) => {
-        const detail = detailUrl(item.type, item.id);
-        return '<tr><td>' + esc(item.label) + '</td><td><strong>' + esc(item.name) + '</strong></td><td>' + esc(item.location) + '</td><td>' + statusBadge(item.status) + ' <span style="color:var(--dash-muted)">' + esc(item.reason) + '</span></td><td>' + fmtDate(item.date) + '</td><td>' + (detail ? '<button class="table-action" data-go="' + attr(detail) + '">상세</button> ' : '') + (item.shortcut ? '<button class="table-action" data-go="' + attr(item.shortcut) + '">도면</button>' : '') + '</td></tr>';
+        const detail = detailUrl(item.type, item.id, true);
+        const rowTitle = item.label + ' 상세 - ' + item.name;
+        const rowAttrs = detail ? ' class="clickable-row" data-modal-url="' + attr(detail) + '" data-modal-title="' + attr(rowTitle) + '" tabindex="0" title="상세정보 보기"' : '';
+        return '<tr' + rowAttrs + '><td>' + esc(item.label) + '</td><td><strong>' + esc(item.name) + '</strong></td><td>' + esc(item.location) + '</td><td>' + statusBadge(item.status) + ' <span style="color:var(--dash-muted)">' + esc(item.reason) + '</span></td><td>' + fmtDate(item.date) + '</td><td>' + (item.shortcut ? '<button class="table-action" data-go="' + attr(item.shortcut) + '">바로가기</button>' : '') + '</td></tr>';
       });
 
       root.innerHTML = ''
@@ -272,9 +385,9 @@
         + statCard('교체필요', replaceTotal, '소화기 교체 예정/만료', 'yellow')
         + statCard('이상설비', abnormalTotal, '점검 결과 비정상/요정비', 'red')
         + '</div>'
-        + cardPanel('설비 현황', '정상 ' + normalGraphTotal + ' / 점검필요 ' + inspectGraphTotal + ' / 교체·요정비 ' + yellowGraphTotal + ' / 이상·불량 ' + redGraphTotal, '<div class="chart-grid">' + chartHtml + '</div>')
+        + cardPanel('설비 현황', '정상 ' + normalGraphTotal + ' / 점검필요 ' + inspectGraphTotal + ' / 교체·요정비 ' + yellowGraphTotal + ' / 이상·불량 ' + redGraphTotal, '<div class="chart-grid fire-chart-grid">' + chartHtml + '</div>')
         + cardPanel('장비 유형별 현황', '점검 필요 설비는 최근 30일 기준입니다.', table(['유형', '등록 수량', '이상설비', '점검 필요 설비', ''], rows, '등록된 설비가 없습니다.'), true)
-        + cardPanel('이상설비', '점검 결과 비정상 또는 요정비로 기록된 설비입니다.', table(['유형', '이름/모델', '위치', '이상 내용', '점검일', ''], abnormalRows, '점검 결과 비정상 또는 요정비로 기록된 이상설비가 없습니다.'), true);
+        + cardPanel('이상설비', '목록 행을 클릭하면 상세정보로 이동합니다. 바로가기는 도면 위치로 연결됩니다.', table(['유형', '이름/모델', '위치', '이상 내용', '점검일', ''], abnormalRows, '점검 결과 비정상 또는 요정비로 기록된 이상설비가 없습니다.'), true);
       bindRouteButtons();
     } catch (error) {
       root.innerHTML = '<div class="error-box">소방설비 대시보드를 불러오지 못했습니다. ' + esc(error.message || '') + '</div>';
