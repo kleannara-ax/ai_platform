@@ -859,6 +859,7 @@ const API = (() => {
 
  // ===== 상태 =====
 let allItems = [];
+let allItemTotalCount = 0;
 let currentStatusType = null;
 let currentSort = { key: 'serialNumber', direction: 'asc' };
 let currentExtinguisherId = null;
@@ -1021,21 +1022,43 @@ function updateExtModalFloorOptions(buildingId) {
 
 // ===== 소화기목록 로드 =====
 async function loadExtinguishers(q='', buildingId='', floorId='') {
-  const params = new URLSearchParams({ size: 200, page: 0 });
-  if (q) params.set('q', q);
-  if (buildingId) params.set('buildingId', buildingId);
-  if (floorId) params.set('floorId', floorId);
-  const res = await API.req(`/fire-api/extinguishers?${params}`);
+  const pageSize = 500;
+  const makeParams = (pageNo) => {
+    const params = new URLSearchParams({ size: String(pageSize), page: String(pageNo) });
+    if (q) params.set('q', q);
+    if (buildingId) params.set('buildingId', buildingId);
+    if (floorId) params.set('floorId', floorId);
+    return params;
+  };
+
+  const res = await API.req(`/fire-api/extinguishers?${makeParams(0)}`);
   if (!res) return;
   const json = await res.json();
   if ((res.ok || json.success) && json.data) {
-    allItems = (json.data.content || []).slice().sort((a, b) => {
+    const firstPage = json.data;
+    const totalElements = Number(firstPage.totalElements);
+    const totalPages = Number(firstPage.totalPages);
+    const loadedItems = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+
+    if (Number.isFinite(totalPages) && totalPages > 1) {
+      for (let pageNo = 1; pageNo < totalPages; pageNo++) {
+        const pageRes = await API.req(`/fire-api/extinguishers?${makeParams(pageNo)}`);
+        if (!pageRes) break;
+        const pageJson = await pageRes.json().catch(() => null);
+        if (!(pageRes.ok || pageJson?.success) || !pageJson?.data) break;
+        loadedItems.push(...(Array.isArray(pageJson.data.content) ? pageJson.data.content : []));
+      }
+    }
+
+    allItems = loadedItems.sort((a, b) => {
       const left = String(a?.serialNumber || '');
       const right = String(b?.serialNumber || '');
       return left.localeCompare(right, 'ko');
     });
+    allItemTotalCount = Number.isFinite(totalElements) ? totalElements : allItems.length;
   } else {
     allItems = [];
+    allItemTotalCount = 0;
   }
   await loadBuildingOptions();
   const filterBuilding = document.getElementById('filterBuildingId');
@@ -1077,7 +1100,7 @@ function calcBuckets(items) {
 
 function updateBucketCounts() {
   const { inspectCount, plannedCount, urgentCount } = calcBuckets(allItems);
-  document.getElementById('totalCount').textContent = allItems.length;
+  document.getElementById('totalCount').textContent = allItemTotalCount;
   document.getElementById('countInspect').textContent = `(${inspectCount})`;
   document.getElementById('countPlanned').textContent = `(${plannedCount})`;
   document.getElementById('countUrgent').textContent = `(${urgentCount})`;
