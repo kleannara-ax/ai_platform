@@ -860,6 +860,10 @@ const API = (() => {
  // ===== 상태 =====
 let allItems = [];
 let allItemTotalCount = 0;
+const listPageSize = 200;
+let currentListPage = 0;
+let listTotalElements = 0;
+let listTotalPages = 1;
 let currentStatusType = null;
 let currentSort = { key: 'serialNumber', direction: 'asc' };
 let currentExtinguisherId = null;
@@ -1021,64 +1025,42 @@ function updateExtModalFloorOptions(buildingId) {
 }
 
 // ===== 소화기목록 로드 =====
-async function loadExtinguishers(q='', buildingId='', floorId='') {
-  const pageSize = 500;
-  const makeParams = (pageNo) => {
-    const params = new URLSearchParams({ size: String(pageSize), page: String(pageNo) });
-    if (q) params.set('q', q);
-    if (buildingId) params.set('buildingId', buildingId);
-    if (floorId) params.set('floorId', floorId);
-    return params;
-  };
+async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = currentListPage) {
+  const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
+  const params = new URLSearchParams({ size: String(listPageSize), page: String(requestedPage) });
+  if (q) params.set('q', q);
+  if (buildingId) params.set('buildingId', buildingId);
+  if (floorId) params.set('floorId', floorId);
 
-  async function fetchQrExtinguisherCount(fallbackCount) {
-    // QR 코드 화면과 같은 API/필터 기준으로 총 소화기 수를 맞춘다.
-    // 검색어(q)는 QR 화면에 없는 조건이므로 검색 중에는 목록 API의 totalElements를 유지한다.
-    if (q) return fallbackCount;
-    try {
-      const qrParams = new URLSearchParams();
-      if (buildingId) qrParams.set('buildingId', buildingId);
-      if (floorId) qrParams.set('floorId', floorId);
-      const qrRes = await API.req(`/fire-api/qr/list${qrParams.toString() ? '?' + qrParams.toString() : ''}`);
-      if (!qrRes) return fallbackCount;
-      const qrJson = await qrRes.json().catch(() => null);
-      const qrItems = qrJson?.data?.extinguishers;
-      return Array.isArray(qrItems) ? qrItems.length : fallbackCount;
-    } catch (err) {
-      console.warn('QR 기준 소화기 수 조회 실패', err);
-      return fallbackCount;
-    }
-  }
-
-  const res = await API.req(`/fire-api/extinguishers?${makeParams(0)}`);
+  const res = await API.req(`/fire-api/extinguishers?${params}`);
   if (!res) return;
-  const json = await res.json();
-  if ((res.ok || json.success) && json.data) {
-    const firstPage = json.data;
-    const totalElements = Number(firstPage.totalElements);
-    const totalPages = Number(firstPage.totalPages);
-    const loadedItems = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+  const json = await res.json().catch(() => null);
+  if ((res.ok || json?.success) && json?.data) {
+    const pageData = json.data;
+    const totalElements = Number(pageData.totalElements);
+    const totalPages = Number(pageData.totalPages);
+    const pageContent = Array.isArray(pageData.content) ? pageData.content.slice() : [];
 
-    if (Number.isFinite(totalPages) && totalPages > 1) {
-      for (let pageNo = 1; pageNo < totalPages; pageNo++) {
-        const pageRes = await API.req(`/fire-api/extinguishers?${makeParams(pageNo)}`);
-        if (!pageRes) break;
-        const pageJson = await pageRes.json().catch(() => null);
-        if (!(pageRes.ok || pageJson?.success) || !pageJson?.data) break;
-        loadedItems.push(...(Array.isArray(pageJson.data.content) ? pageJson.data.content : []));
+    listTotalElements = Number.isFinite(totalElements) ? totalElements : pageContent.length;
+    listTotalPages = Math.max(1, Number.isFinite(totalPages) ? totalPages : Math.ceil(listTotalElements / listPageSize));
+
+    // 삭제 등으로 현재 페이지가 비어 있고 앞 페이지가 존재하면 마지막 유효 페이지로 보정한다.
+    if (!pageContent.length && listTotalElements > 0 && requestedPage > 0) {
+      const correctedPage = Math.max(0, listTotalPages - 1);
+      if (correctedPage !== requestedPage) {
+        return loadExtinguishers(q, buildingId, floorId, correctedPage);
       }
     }
 
-    allItems = loadedItems.sort((a, b) => {
-      const left = String(a?.serialNumber || '');
-      const right = String(b?.serialNumber || '');
-      return left.localeCompare(right, 'ko');
-    });
-    const listApiTotalCount = Number.isFinite(totalElements) ? totalElements : allItems.length;
-    allItemTotalCount = await fetchQrExtinguisherCount(listApiTotalCount);
+    currentListPage = Math.min(requestedPage, listTotalPages - 1);
+    allItems = pageContent;
+    allItemTotalCount = listTotalElements;
   } else {
     allItems = [];
     allItemTotalCount = 0;
+    listTotalElements = 0;
+    listTotalPages = 1;
+    currentListPage = 0;
   }
   await loadBuildingOptions();
   const filterBuilding = document.getElementById('filterBuildingId');
@@ -1200,22 +1182,58 @@ function applyListSort(key) {
   renderTable(getStatusFilteredItems(allItems));
 }
 
+function renderListPagination(visibleCount) {
+  const total = Number.isFinite(listTotalElements) ? listTotalElements : allItemTotalCount;
+  const totalPages = Math.max(1, Number.isFinite(listTotalPages) ? listTotalPages : 1);
+  const currentPage = Math.min(Math.max(0, currentListPage), totalPages - 1);
+  const startNo = total > 0 ? currentPage * listPageSize + 1 : 0;
+  const endNo = total > 0 ? Math.min(total, currentPage * listPageSize + allItems.length) : 0;
+  const statusNote = currentStatusType ? ` · 현재 페이지 필터 ${visibleCount}건` : '';
+  const pageButtons = [];
+  const addPageButton = (page) => {
+    pageButtons.push(`<button type="button" class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-secondary'} js-list-page" data-page="${page}" ${page === currentPage ? 'aria-current="page"' : ''}>${page + 1}</button>`);
+  };
+  if (totalPages <= 7) {
+    for (let i = 0; i < totalPages; i++) addPageButton(i);
+  } else {
+    addPageButton(0);
+    if (currentPage > 3) pageButtons.push('<span class="px-1 text-muted">…</span>');
+    const from = Math.max(1, currentPage - 2);
+    const to = Math.min(totalPages - 2, currentPage + 2);
+    for (let i = from; i <= to; i++) addPageButton(i);
+    if (currentPage < totalPages - 4) pageButtons.push('<span class="px-1 text-muted">…</span>');
+    addPageButton(totalPages - 1);
+  }
+  return `
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-3 border-top bg-white">
+      <div class="text-muted small">
+        ${total > 0 ? `${startNo.toLocaleString()}-${endNo.toLocaleString()} / 총 ${total.toLocaleString()}건` : '총 0건'} · ${listPageSize}건 단위 출력${statusNote}
+      </div>
+      <nav aria-label="소화기 목록 페이지 이동" class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary js-list-page" data-page="${currentPage - 1}" ${currentPage <= 0 ? 'disabled' : ''}>이전</button>
+        <div class="btn-group btn-group-sm" role="group" aria-label="페이지 번호">${pageButtons.join('')}</div>
+        <button type="button" class="btn btn-sm btn-outline-secondary js-list-page" data-page="${currentPage + 1}" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>다음</button>
+      </nav>
+    </div>`;
+}
+
 function renderTable(items) {
   const wrap = document.getElementById('mainTableWrap');
   if (!items.length) {
-    wrap.innerHTML = '<div class="text-center text-muted py-4">조회 결과가 없습니다.</div>';
+    wrap.innerHTML = '<div class="text-center text-muted py-4">조회 결과가 없습니다.</div>' + renderListPagination(0);
     return;
   }
   const sortedItems = getSortedExtItems(items);
   let rows = '';
   sortedItems.forEach((item, index) => {
+    const rowNo = currentListPage * listPageSize + index + 1;
     const lastInspDate = item.lastInspectionDate ? item.lastInspectionDate.slice(0,10) : '';
     const lastInspector = item.lastInspectorName || '';
     const installDate = formatYearMonth(item.manufactureDate);
     const replaceDue = formatYearMonth(item.replacementDueDate);
     rows += `
       <tr class="clickable-row js-detail-row" data-id="${item.extinguisherId}">
-        <td style="text-align:center;">${index + 1}</td>
+        <td style="text-align:center;">${rowNo}</td>
         <td style="text-align:center;">${item.serialNumber||'-'}</td>
         <td class="text-truncate" title="${item.buildingName||''}">${item.buildingName||'-'}</td>
         <td class="text-truncate" title="${item.floorName||''}">${item.floorName||'-'}</td>
@@ -1262,7 +1280,7 @@ function renderTable(items) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-    </div></div>`;
+    </div></div>${renderListPagination(sortedItems.length)}`;
 }
 
 // ===== 상태 목록(statusPanel) 렌더링 =====
@@ -2678,6 +2696,21 @@ async function openDetails(id) {
 })();
 // ===== 이벤트 위임 (클릭) =====
 document.addEventListener('click', async (ev) => {
+  const pageBtn = ev.target.closest('.js-list-page');
+  if (pageBtn) {
+    ev.preventDefault();
+    if (pageBtn.disabled) return;
+    const page = Number.parseInt(pageBtn.getAttribute('data-page') || '0', 10);
+    if (!Number.isFinite(page) || page < 0 || page >= listTotalPages || page === currentListPage) return;
+    await loadExtinguishers(
+      document.getElementById('filterQ')?.value || '',
+      document.getElementById('filterBuildingId')?.value || '',
+      document.getElementById('filterFloorId')?.value || '',
+      page
+    );
+    return;
+  }
+
   const sortHeader = ev.target.closest('.js-sort-header');
   if (sortHeader) {
     ev.preventDefault();
@@ -2721,7 +2754,8 @@ document.addEventListener('click', async (ev) => {
     await loadExtinguishers(
       document.getElementById('filterQ')?.value||'',
       document.getElementById('filterBuildingId')?.value||'',
-      document.getElementById('filterFloorId')?.value||'');
+      document.getElementById('filterFloorId')?.value||'',
+      currentListPage);
     return;
   }
 
@@ -2756,7 +2790,7 @@ document.getElementById('btnSearch')?.addEventListener('click', () => {
   const q = document.getElementById('filterQ')?.value || '';
   const b = document.getElementById('filterBuildingId')?.value || '';
   const f = document.getElementById('filterFloorId')?.value || '';
-  loadExtinguishers(q, b, f);
+  loadExtinguishers(q, b, f, 0);
 });
 document.getElementById('filterQ')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btnSearch')?.click();
@@ -2767,7 +2801,7 @@ document.getElementById('btnReset')?.addEventListener('click', () => {
   document.getElementById('filterFloorId').value = '';
   currentStatusType = null;
   syncStatusButtons();
-  loadExtinguishers();
+  loadExtinguishers('', '', '', 0);
 });
 document.getElementById('btnStatusInspect')?.addEventListener('click', () => applyStatusFilter('inspect'));
 document.getElementById('btnStatusPlanned')?.addEventListener('click', () => applyStatusFilter('planned'));
@@ -2811,11 +2845,13 @@ document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
 document.addEventListener('inspection:completed', () => loadExtinguishers(
   document.getElementById('filterQ')?.value||'',
   document.getElementById('filterBuildingId')?.value||'',
-  document.getElementById('filterFloorId')?.value||''));
+  document.getElementById('filterFloorId')?.value||'',
+  currentListPage));
 document.addEventListener('extinguisher:upsertCompleted', () => loadExtinguishers(
   document.getElementById('filterQ')?.value||'',
   document.getElementById('filterBuildingId')?.value||'',
-  document.getElementById('filterFloorId')?.value||''));
+  document.getElementById('filterFloorId')?.value||'',
+  currentListPage));
 
 function _norm(v) { return String(v || '').replace(/\s+/g,'').toLowerCase(); }
 function _normBuildingCompat(v) { return _norm(v).replace(/[.,_\-]/g,''); }
@@ -3060,7 +3096,8 @@ if (!EMBED_MODAL_MODE) {
     return loadExtinguishers(
       document.getElementById('filterQ')?.value || '',
       document.getElementById('filterBuildingId')?.value || '',
-      document.getElementById('filterFloorId')?.value || ''
+      document.getElementById('filterFloorId')?.value || '',
+      currentListPage
     );
   }
 
