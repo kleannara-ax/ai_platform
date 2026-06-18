@@ -1693,7 +1693,8 @@ function navigateToFirePage(path) {
   iframe.className = 'fire-iframe';
   iframe.id = 'fireIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
-  iframe.src = path;
+  const cacheBustedPath = path + (path.includes('?') ? '&' : '?') + 'v=20260617-qr-count';
+  iframe.src = cacheBustedPath;
   el.innerHTML = '';
   el.appendChild(iframe);
 }
