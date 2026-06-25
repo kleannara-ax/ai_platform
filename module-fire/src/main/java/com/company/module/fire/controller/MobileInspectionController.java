@@ -1110,6 +1110,18 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/gwanri_1F.png";
             return null;
         }
+        if (bn.contains("화장지원단창고") || bn.contains("원단창고") || bn.contains("tissuerawwarehouse")) {
+            if (floorNo == 1) return "/images/tissue_raw_warehouse_1F.jpg";
+            return null;
+        }
+        if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
+            if (floorNo == 1) return "/images/tissue_tent_warehouse_1F.jpg";
+            return null;
+        }
+        if (bn.contains("원료장") || bn.contains("rawmaterialyard")) {
+            if (floorNo == 1) return "/images/raw_material_yard_1F.jpg";
+            return null;
+        }
         if (bn.contains("\uC81C\uC9C012\uD638\uAE30")
                 || bn.contains("jeji12")
                 || bn.contains("\uC81C\uC9C012")
@@ -1243,6 +1255,15 @@ public class MobileInspectionController {
         }
         if (b.contains("\uC625\uC678") || b.contains("outdoor")) {
             return "/images/drone_photo.JPG";
+        }
+        if (bn.contains("화장지원단창고") || bn.contains("원단창고") || bn.contains("tissuerawwarehouse")) {
+            return "/images/tissue_raw_warehouse_1F.jpg";
+        }
+        if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
+            return "/images/tissue_tent_warehouse_1F.jpg";
+        }
+        if (bn.contains("원료장") || bn.contains("rawmaterialyard")) {
+            return "/images/raw_material_yard_1F.jpg";
         }
         if (bn.contains("\uC81C\uC9C012\uD638\uAE30")
                 || bn.contains("jeji12")

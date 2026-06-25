@@ -11,6 +11,7 @@
   - 이상설비 도면 바로가기: 소화기/소화전/수신기/소방펌프 모두 층별 도면(`/maps/floor.html`)에서 마커 자동 선택, 강조 및 정보 카드 표시
   - 층별 도면: 실내/옥외 수신기·소방펌프 마커 포커스 지원, 도면 드래그 시 내부 이미지/마커의 브라우저 기본 드래그 고스트를 방지하고 선택된 마커 정보 카드를 유지하며, 일반 배경 클릭 시에만 닫힘 처리, 옥외 항공사진은 확대 초기화 배율까지만 축소되도록 제한
   - 메인 도면: 이동/확대/축소 시 열린 옥외 설비 미니 모달이 선택 마커를 따라 위치 재계산
+  - 메인 도면 신규 구역: `화장지 원단창고`, `화장지 천막창고`, `원료장` polygon을 추가하고 각 구역의 1층 층별 도면 이미지를 연결
   - 대시보드 이상설비 상세 모달: 넓은 전용 모달로 상세 화면 표시
   - 수신기/소방펌프 현황 그래프: 정상, 점검필요, 요정비, 불량 4상태 구분 표시(요정비/교체필요는 밝은 노란색 계열로 통일)
   - 기타설비 관리: 에어컨, 정수기 목록/상세/등록/수정/삭제/점검/이미지 업로드
@@ -50,6 +51,7 @@
   - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
   - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
+  - 층별 도면 정적 이미지: `/images/tissue_raw_warehouse_1F.jpg`, `/images/tissue_tent_warehouse_1F.jpg`, `/images/raw_material_yard_1F.jpg`
   - API file path: `/facility-api/{kind}/files/{filename}`
 
 ## Role / Menu Access
@@ -80,7 +82,7 @@
 - **Build**: `./gradlew :app:bootJar`
 - **Process Manager**: PM2 (`platform`)
 - **Start script**: `/home/user/webapp/start-app.sh`
-- **Last Updated**: 2026-06-18
+- **Last Updated**: 2026-06-25
 
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
@@ -101,10 +103,11 @@
 - 수신기/소방펌프 점검 내역 XLSX 다운로드 시 최신 점검 행에 점검사진이 없으면 설비 대표사진을 표시하고, 현재 업로드 루트와 기존 `/data/upload/module_fire` 경로를 모두 조회하도록 개선 완료
 - 소화기 목록 화면은 한 번에 전체 데이터를 병합하지 않고 `/fire-api/extinguishers?page={page}&size=200`으로 현재 페이지의 최대 200건만 출력하며, 이전/다음 및 페이지 번호 이동 UI를 제공
 - SPA 내부 소방 모듈 iframe 로딩 시 버전 쿼리스트링을 갱신해 브라우저에 캐시된 이전 `extinguishers.html`이 계속 표시되는 문제를 방지
+- `화장지 원단창고`, `화장지 천막창고`, `원료장`을 메인 도면 polygon 구역과 1층 층별 도면 이미지로 추가하고, `V22__add_new_map_zone_buildings.sql` 및 `FireDataInitializer`로 building 마스터를 보장
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
-- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql` 순서 적용 후 메뉴관리/접근권한 화면 검증
+- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql` 순서 적용 후 메뉴관리/접근권한 및 신규 도면 구역 이동 검증
 - `설비관리시스템 > 도면 (메인)`, `설비관리시스템 > 층별 도면`, `소방설비`, `기타설비`의 사이드바 정렬과 권한별 표시 확인
 - 에어컨/정수기 실데이터 등록 후 공통 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장

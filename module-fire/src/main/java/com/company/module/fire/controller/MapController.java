@@ -152,6 +152,21 @@ public class MapController {
         if (containsAny(building, "\uC625\uC678", "outdoor")) {
             return "/images/drone_photo.JPG";
         }
+        if (containsAny(building, "화장지원단창고", "원단창고", "tissue_raw_warehouse")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/tissue_raw_warehouse_1F.jpg";
+            return "";
+        }
+        if (containsAny(building, "화장지천막창고", "천막창고", "tissue_tent_warehouse")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/tissue_tent_warehouse_1F.jpg";
+            return "";
+        }
+        if (containsAny(building, "원료장", "raw_material_yard")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/raw_material_yard_1F.jpg";
+            return "";
+        }
         if (containsAny(building, "\uC81C\uC9C01,2\uD638\uAE30", "\uC81C\uC9C012", "\uC800\uC7A51,2\uD638\uAE30", "\uC800\uC7A512", "jeji12", "jeji2")) {
             if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/jeji1,2_2F.PNG";
