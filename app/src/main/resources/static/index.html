@@ -662,8 +662,8 @@ function navigate(page, el) {
       }
     }
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',ps_insp:'PS 지분 검사'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',ps_insp:'모듈 > PS 지분 검사'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 목록',other_water_purifier:'정수기 목록',ps_insp:'PS 지분 검사'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨 목록',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기 목록',ps_insp:'모듈 > PS 지분 검사'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
@@ -1693,7 +1693,7 @@ function navigateToFirePage(path) {
   iframe.className = 'fire-iframe';
   iframe.id = 'fireIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
-  const cacheBustedPath = path + (path.includes('?') ? '&' : '?') + 'v=20260625-map-zones';
+  const cacheBustedPath = path + (path.includes('?') ? '&' : '?') + 'v=20260626-facility-qr';
   iframe.src = cacheBustedPath;
   el.innerHTML = '';
   el.appendChild(iframe);
@@ -1707,14 +1707,14 @@ function renderEquipmentIndex(kind) {
     ? '에어컨과 정수기를 소화기와 동일한 수준으로 관리합니다.'
     : '기존 도면, 각 소방설비 목록, QR코드를 모두 확인할 수 있습니다.';
   const cards = isOther ? [
-    { title:'에어컨', desc:'시스템 · 벽걸이 · 스탠드형 에어컨 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_aircon' },
-    { title:'정수기', desc:'정수기 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_water_purifier' }
+    { title:'에어컨 목록', desc:'시스템 · 벽걸이 · 스탠드형 에어컨 목록, 상세, 등록/수정, 점검, QR, 이미지, 도면 좌표 관리', page:'other_aircon' },
+    { title:'정수기 목록', desc:'정수기 목록, 상세, 등록/수정, 점검, QR, 이미지, 도면 좌표 관리', page:'other_water_purifier' }
   ] : [
     { title:'소화기', desc:'소화기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_extinguisher' },
     { title:'소화전', desc:'소화전 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_hydrant' },
     { title:'수신기', desc:'수신기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_receiver' },
     { title:'소방펌프', desc:'소방펌프 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_pump' },
-    { title:'QR코드', desc:'소방설비 QR코드 발급/확인 화면입니다.', page:'fire_qr' }
+    { title:'QR코드', desc:'소방설비 및 기타설비 QR코드 발급/확인 화면입니다.', page:'fire_qr' }
   ];
   el.innerHTML = `
     <section class="card">
