@@ -22,7 +22,7 @@
 
   const state = {
     items: [],
-    peers: { receivers: [], pumps: [] },
+    peers: { receivers: [], pumps: [], sprinklerPipes: [] },
     selectedCoord: null,
     selectedDetailId: null,
     itemModal: null,
@@ -194,12 +194,14 @@
   }
 
   async function loadPeers() {
-    const [receivers, pumps] = await Promise.all([
+    const [receivers, pumps, sprinklerPipes] = await Promise.all([
       apiFetch("/fire-api/receivers?size=500&page=0", { method: "GET" }),
-      apiFetch("/fire-api/pumps?size=500&page=0", { method: "GET" })
+      apiFetch("/fire-api/pumps?size=500&page=0", { method: "GET" }),
+      apiFetch("/fire-api/sprinkler-pipes?size=500&page=0", { method: "GET" })
     ]);
     state.peers.receivers = Array.isArray(receivers?.content) ? receivers.content : [];
     state.peers.pumps = Array.isArray(pumps?.content) ? pumps.content : [];
+    state.peers.sprinklerPipes = Array.isArray(sprinklerPipes?.content) ? sprinklerPipes.content : [];
   }
 
   async function loadList() {
@@ -428,6 +430,27 @@
     };
   }
 
+  function equipmentIdByKind(kind, source) {
+    if (kind === "receiver") return source.receiverId;
+    if (kind === "pump") return source.pumpId;
+    if (kind === "sprinklerPipe") return source.sprinklerPipeId;
+    return source[config.idField];
+  }
+
+  function iconPathByIdField(idField) {
+    if (idField === "receiverId") return "/images/receiver.png";
+    if (idField === "pumpId") return "/images/pump.png";
+    if (idField === "sprinklerPipeId") return "/images/sprinkler_pipe.png";
+    return "/images/pump.png";
+  }
+
+  function peerSourceByKind(kind) {
+    if (kind === "receiver") return state.peers.receivers;
+    if (kind === "pump") return state.peers.pumps;
+    if (kind === "sprinklerPipe") return state.peers.sprinklerPipes;
+    return [];
+  }
+
   function renderMapMarkers() {
     const planWrap = document.getElementById("planWrap");
     const img = planWrap?.querySelector("img");
@@ -443,13 +466,14 @@
       const currentItemId = String(document.getElementById("itemId")?.value || "");
       const items = []
         .concat(state.peers.receivers.map(function (item) { return { item: item, kind: "receiver" }; }))
-        .concat(state.peers.pumps.map(function (item) { return { item: item, kind: "pump" }; }));
+        .concat(state.peers.pumps.map(function (item) { return { item: item, kind: "pump" }; }))
+        .concat(state.peers.sprinklerPipes.map(function (item) { return { item: item, kind: "sprinklerPipe" }; }));
 
       var isDrone = _isDronePhoto(img);
       var niw = img.naturalWidth || 0, nih = img.naturalHeight || 0;
       items.forEach(function (entry) {
         var source = entry.item || {};
-        var itemId = String(entry.kind === "receiver" ? source.receiverId : source.pumpId);
+        var itemId = String(equipmentIdByKind(entry.kind, source));
         var useSelected = currentItemId && itemId === currentItemId && state.selectedCoord;
         var sx = useSelected ? Number(state.selectedCoord.x) : Number(source.x);
         var sy = useSelected ? Number(state.selectedCoord.y) : Number(source.y);
@@ -467,7 +491,7 @@
       });
 
       if (state.selectedCoord) {
-        var iconPath = config.idField === "receiverId" ? "/images/receiver.png" : "/images/pump.png";
+        var iconPath = iconPathByIdField(config.idField);
         var sc = isDrone ? _svgToImg(Number(state.selectedCoord.x), Number(state.selectedCoord.y), niw, nih) : { x: Number(state.selectedCoord.x), y: Number(state.selectedCoord.y) };
         var marker = document.createElement("div");
         marker.className = "map-marker marker-selected marker-selected-highlight";
@@ -652,8 +676,8 @@
   function renderDetailLayout(detail) {
     const detailModal = document.getElementById("detailModal");
     const detailBody = detailModal?.querySelector(".modal-body");
-    const qrType = config.idField === "receiverId" ? "rcv" : "pmp";
-    const markerIcon = config.idField === "receiverId" ? "/images/receiver.png" : "/images/pump.png";
+    const qrType = config.idField === "receiverId" ? "rcv" : (config.idField === "sprinklerPipeId" ? "spp" : "pmp");
+    const markerIcon = iconPathByIdField(config.idField);
     const qrUrl = detail.qrKey ? ("/fire-api/qr/image?type=" + encodeURIComponent(qrType) + "&id=" + encodeURIComponent(detail.qrKey)) : "";
     const planImagePath = resolvePlanImagePathByName(detail.buildingName, detail.floorName);
     const photoPath = detail.imagePath || (Array.isArray(detail.inspections) ? ((detail.inspections.find(function (row) { return row.imagePath; }) || {}).imagePath || "") : "");
@@ -1317,8 +1341,8 @@
       event.preventDefault();
       const kind = marker.dataset.kind;
       const id = marker.dataset.id;
-      const source = kind === "receiver" ? state.peers.receivers : state.peers.pumps;
-      const found = source.find(item => String(kind === "receiver" ? item.receiverId : item.pumpId) === String(id));
+      const source = peerSourceByKind(kind);
+      const found = source.find(item => String(equipmentIdByKind(kind, item)) === String(id));
       if (!found) return;
       state.selectedCoord = { x: Number(found.x), y: Number(found.y) };
       setSelectedCoord(state.selectedCoord.x, state.selectedCoord.y);

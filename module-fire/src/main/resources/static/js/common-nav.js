@@ -72,6 +72,7 @@
       { href: "/hydrants.html", text: "\uC18C\uD654\uC804" },
       { href: "/receivers.html", text: "\uC218\uC2E0\uAE30" },
       { href: "/pumps.html", text: "\uC18C\uBC29\uD38C\uD504" },
+      { href: "/sprinkler-pipes.html", text: "\uC2A4\uD504\uB9C1\uD074\uB7EC \uBC30\uAD00" },
       { href: "/qr", text: "QR\uCF54\uB4DC" }
     ];
     var otherDefs = [

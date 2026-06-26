@@ -42,12 +42,14 @@ public class MobileInspectionController {
     private final FireHydrantRepository fireHydrantRepository;
     private final FireReceiverRepository fireReceiverRepository;
     private final FirePumpRepository firePumpRepository;
+    private final FireSprinklerPipeRepository fireSprinklerPipeRepository;
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
     private final ExtinguisherInspectionRepository extInspectionRepository;
     private final FireHydrantInspectionRepository hydInspectionRepository;
     private final FireReceiverInspectionRepository receiverInspectionRepository;
     private final FirePumpInspectionRepository pumpInspectionRepository;
+    private final FireSprinklerPipeInspectionRepository sprinklerPipeInspectionRepository;
     private final InspectorNameResolver inspectorNameResolver;
     private final ObjectMapper objectMapper;
     private static final String MSG_ERROR = "\uC694\uCCAD \uCC98\uB9AC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.";
@@ -1044,6 +1046,213 @@ public class MobileInspectionController {
     }
 
 
+    @GetMapping("/sprinkler-pipes/by-key")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSprinklerPipeByKey(@RequestParam String key) {
+        String qrKey = key == null ? "" : key.trim();
+        Optional<FireSprinklerPipe> opt = fireSprinklerPipeRepository.findByQrKey(qrKey);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (opt.isEmpty()) {
+            result.put("exists", false);
+            result.put("qrKey", qrKey);
+            result.put("buildings", getBuildingList());
+            result.put("floors", getFloorList());
+            result.put("mapOptions", getMappableBuildingFloorList());
+        } else {
+            FireSprinklerPipe sprinklerPipe = opt.get();
+            result.put("exists", true);
+            result.put("sprinklerPipeId", sprinklerPipe.getSprinklerPipeId());
+            result.put("qrKey", sprinklerPipe.getQrKey());
+            result.put("serialNumber", sprinklerPipe.getSerialNumber());
+            result.put("buildingName", sprinklerPipe.getBuildingName());
+            result.put("floorName", sprinklerPipe.getFloor() != null ? sprinklerPipe.getFloor().getFloorName() : "-");
+            result.put("locationDescription", sprinklerPipe.getLocationDescription());
+            result.put("x", sprinklerPipe.getX());
+            result.put("y", sprinklerPipe.getY());
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/sprinkler-pipes/register")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerSprinklerPipe(
+            @RequestBody Map<String, Object> body) {
+
+        String qrKey = getString(body, "qrKey");
+        if (qrKey == null || qrKey.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_EMPTY_SERIAL));
+        }
+
+        Optional<FireSprinklerPipe> existing = fireSprinklerPipeRepository.findByQrKey(qrKey.trim());
+        if (existing.isPresent()) {
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("sprinklerPipeId", existing.get().getSprinklerPipeId());
+            res.put("alreadyExists", true);
+            return ResponseEntity.ok(ApiResponse.success(res));
+        }
+
+        Long buildingId = getLong(body, "buildingId");
+        Long floorId = getLong(body, "floorId");
+        String locationDescription = getString(body, "locationDescription");
+        BigDecimal x = getBigDecimal(body, "x");
+        BigDecimal y = getBigDecimal(body, "y");
+
+        if (buildingId == null || buildingId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (floorId == null || floorId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+
+        Building building = buildingRepository.findById(buildingId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        Floor floor = floorRepository.findById(floorId)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        String serialNumber = generateNextSprinklerPipeSerialNumber();
+
+        FireSprinklerPipe entity = FireSprinklerPipe.builder()
+                .serialNumber(serialNumber)
+                .buildingName(building.getBuildingName())
+                .floor(floor)
+                .x(x)
+                .y(y)
+                .locationDescription(locationDescription)
+                .isActive(true)
+                .build();
+        entity.assignQrKey(qrKey.trim());
+
+        fireSprinklerPipeRepository.save(entity);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("sprinklerPipeId", entity.getSprinklerPipeId());
+        res.put("qrKey", entity.getQrKey());
+        res.put("alreadyExists", false);
+        return ResponseEntity.ok(ApiResponse.success(res));
+    }
+
+    @GetMapping("/sprinkler-pipes/{id}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSprinklerPipeById(@PathVariable Long id) {
+        FireSprinklerPipe sprinklerPipe = fireSprinklerPipeRepository.findById(id)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sprinklerPipeId", sprinklerPipe.getSprinklerPipeId());
+        result.put("serialNumber", sprinklerPipe.getSerialNumber());
+        result.put("buildingName", sprinklerPipe.getBuildingName());
+        result.put("floorName", sprinklerPipe.getFloor() != null ? sprinklerPipe.getFloor().getFloorName() : "-");
+        result.put("locationDescription", sprinklerPipe.getLocationDescription());
+        result.put("x", sprinklerPipe.getX());
+        result.put("y", sprinklerPipe.getY());
+
+        sprinklerPipeInspectionRepository
+                .findTopBySprinklerPipe_SprinklerPipeIdOrderByInspectionDateDescInspectionIdDesc(sprinklerPipe.getSprinklerPipeId())
+                .ifPresent(ins -> {
+                    result.put("lastInspectionDate", ins.getInspectionDate());
+                    result.put("lastInspectionTime", ins.getInspectionTime());
+                    result.put("lastInspectionStatus", ins.getInspectionStatus());
+                    result.put("lastInspectorName", ins.getInspectedByName());
+                    result.put("lastNote", ins.getNote());
+                    result.put("lastImagePath", ins.getImagePath());
+                });
+
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/sprinkler-pipes/{id}/inspect")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> inspectSprinklerPipe(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+
+        FireSprinklerPipe sprinklerPipe = fireSprinklerPipeRepository.findById(id)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        if (sprinklerPipeInspectionRepository.existsBySprinklerPipe_SprinklerPipeIdAndInspectionDate(id, LocalDate.now())) {
+            throw new BusinessException("이미 오늘 점검이 등록된 스프링쿨러 배관입니다.");
+        }
+
+        List<Map<String, String>> items = extractChecklistItems(body.get("items"));
+        String inspectorName = trimToNull(getString(body, "inspectorName"));
+        if (inspectorName == null) {
+            inspectorName = resolveInspectorName();
+        }
+        String note = trimToNull(getString(body, "note"));
+        Map<String, String> statusMap = toStatusMap(items);
+        String inspectionStatus = hasFaulty(items) ? "FAULTY" : "NORMAL";
+
+        FireSprinklerPipeInspection inspection = FireSprinklerPipeInspection.builder()
+                .sprinklerPipe(sprinklerPipe)
+                .inspectionDate(LocalDate.now())
+                .inspectionTime(LocalTime.now().withSecond(0).withNano(0))
+                .inspectionStatus(inspectionStatus)
+                .checklistJson(writeChecklistJson(items))
+                .note(note)
+                .pipeDamageStatus(statusMap.get("pipe_damage"))
+                .pipeConnectionStatus(statusMap.get("pipe_connection"))
+                .pipeSupportStatus(statusMap.get("pipe_support"))
+                .drainValveStatus(statusMap.get("drain_valve"))
+                .drainPipeSealingStatus(statusMap.get("drain_pipe_sealing"))
+                .headReflectorStatus(statusMap.get("head_reflector"))
+                .productClearanceStatus(statusMap.get("product_clearance"))
+                .inspectedByName(inspectorName)
+                .build();
+
+        sprinklerPipeInspectionRepository.save(inspection);
+        sprinklerPipeInspectionRepository.trimInspectionsKeepLatest12(id);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @PostMapping("/sprinkler-pipes/{id}/image")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadSprinklerPipeImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image file is empty."));
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
+        }
+        String ct = file.getContentType();
+        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        }
+
+        fireSprinklerPipeRepository.findById(id)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+
+        FireSprinklerPipeInspection inspection = sprinklerPipeInspectionRepository
+                .findTopBySprinklerPipe_SprinklerPipeIdOrderByInspectionDateDescInspectionIdDesc(id)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        List<FireSprinklerPipeInspection> inspectionsWithImages = sprinklerPipeInspectionRepository
+                .findBySprinklerPipe_SprinklerPipeIdAndImagePathIsNotNull(id);
+        List<String> oldImagePaths = inspectionsWithImages.stream()
+                .map(FireSprinklerPipeInspection::getImagePath)
+                .filter(Objects::nonNull)
+                .toList();
+
+        return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/sprinkler-pipe-inspections"),
+                "/fire-api/minspection/files/sprinkler-pipes/", oldImagePaths, inspection::updateImagePath, () -> {
+                    inspectionsWithImages.forEach(ins -> {
+                        if (!Objects.equals(ins.getInspectionId(), inspection.getInspectionId())) {
+                            ins.updateImagePath(null);
+                        }
+                    });
+                    if (!inspectionsWithImages.isEmpty()) {
+                        sprinklerPipeInspectionRepository.saveAll(inspectionsWithImages);
+                    }
+                    sprinklerPipeInspectionRepository.save(inspection);
+                });
+    }
+
+    @GetMapping("/files/sprinkler-pipes/{filename:.+}")
+    public ResponseEntity<Resource> getSprinklerPipeImageFile(@PathVariable String filename) {
+        return serveInspectionImage("/data/upload/module_fire/sprinkler-pipe-inspections", filename);
+    }
+
+
     private List<Map<String, Object>> getBuildingList() {
         return buildingRepository.findByActiveTrueOrderByBuildingName().stream().map(b -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -1562,6 +1771,22 @@ public class MobileInspectionController {
                 .max()
                 .orElse(0);
         return String.format("PMP-%06d", max + 1);
+    }
+
+    private String generateNextSprinklerPipeSerialNumber() {
+        int max = fireSprinklerPipeRepository.findAll().stream()
+                .map(FireSprinklerPipe::getSerialNumber)
+                .filter(s -> s != null && s.startsWith("SPP-"))
+                .mapToInt(s -> {
+                    try {
+                        return Integer.parseInt(s.substring(4));
+                    } catch (NumberFormatException ignored) {
+                        return 0;
+                    }
+                })
+                .max()
+                .orElse(0);
+        return String.format("SPP-%06d", max + 1);
     }
 
     private String resolveInspectorName() {

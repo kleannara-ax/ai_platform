@@ -23,6 +23,7 @@ public class FireDashboardController {
     private final FireHydrantRepository fireHydrantRepository;
     private final FirePumpRepository firePumpRepository;
     private final FireReceiverRepository fireReceiverRepository;
+    private final FireSprinklerPipeRepository fireSprinklerPipeRepository;
     private final BuildingRepository buildingRepository;
 
     @GetMapping("/stats")
@@ -32,12 +33,14 @@ public class FireDashboardController {
         long hydCount = fireHydrantRepository.count();
         long pumpCount = firePumpRepository.count();
         long recvCount = fireReceiverRepository.count();
+        long sprinklerPipeCount = fireSprinklerPipeRepository.count();
 
         stats.put("extinguisherCount", extCount);
         stats.put("hydrantCount", hydCount);
         stats.put("pumpCount", pumpCount);
         stats.put("receiverCount", recvCount);
-        stats.put("totalEquipment", extCount + hydCount + pumpCount + recvCount);
+        stats.put("sprinklerPipeCount", sprinklerPipeCount);
+        stats.put("totalEquipment", extCount + hydCount + pumpCount + recvCount + sprinklerPipeCount);
         stats.put("buildingCount", buildingRepository.count());
 
         return ResponseEntity.ok(ApiResponse.success(stats));

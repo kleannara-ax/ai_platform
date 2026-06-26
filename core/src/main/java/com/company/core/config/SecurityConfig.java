@@ -106,13 +106,14 @@ public class SecurityConfig {
                 // 소방 모듈 정적 리소스 및 메뉴 URL (/fire/**)
                 .requestMatchers("/fire/**").permitAll()
                 .requestMatchers("/fire-map.html", "/fire-dashboard.html", "/facility-dashboard.html").permitAll()
-                .requestMatchers("/extinguishers.html", "/hydrants.html", "/receivers.html", "/pumps.html").permitAll()
+                .requestMatchers("/extinguishers.html", "/hydrants.html", "/receivers.html", "/pumps.html", "/sprinkler-pipes.html").permitAll()
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 // 기타설비 페이지는 SPA iframe 및 직접 URL 접근이 가능해야 하므로 공개
                 // API 본문(/facility-api/**)은 아래 파일 조회 예외를 제외하고 인증 유지
                 .requestMatchers("/facility-map.html", "/facility/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
                 .requestMatchers("/fire-api/qr/image").permitAll()
+                .requestMatchers("/fire-api/minspection/**").permitAll()
                 // 소방 모듈 건물/층 목록 - 드롭다운에서 사용, 토큰 만료 시에도 전체 목록 표시
                 .requestMatchers("/fire-api/qr/buildings", "/fire-api/qr/floors").permitAll()
                 .requestMatchers("/fire-api/maps/building-floors").permitAll()
@@ -122,6 +123,7 @@ public class SecurityConfig {
                 .requestMatchers("/fire-api/hydrants/files/**").permitAll()
                 .requestMatchers("/fire-api/pumps/files/**").permitAll()
                 .requestMatchers("/fire-api/receivers/files/**").permitAll()
+                .requestMatchers("/fire-api/sprinkler-pipes/files/**").permitAll()
                 .requestMatchers("/facility-api/air-conditioners/files/**", "/facility-api/water-purifiers/files/**").permitAll()
                 // PS-INSP 모듈: 헬스체크·페이지(iframe)·정적리소스만 공개
                 // API(/ps-insp-api/inspections/**, /ps-insp-api/mes/**)는 인증+메뉴접근권한 필요

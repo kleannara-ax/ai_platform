@@ -68,6 +68,13 @@ public class FirePageController {
         return serveHtml("static/pumps.html");
     }
 
+    /** /fire/sprinkler-pipes → sprinkler-pipes.html */
+    @GetMapping("/fire/sprinkler-pipes")
+    @ResponseBody
+    public ResponseEntity<String> fireSprinklerPipes() throws IOException {
+        return serveHtml("static/sprinkler-pipes.html");
+    }
+
     /** /fire/floor → maps/floor.html */
     @GetMapping("/fire/floor")
     @ResponseBody
@@ -120,6 +127,12 @@ public class FirePageController {
     @ResponseBody
     public ResponseEntity<String> pumpInspectionPage(@PathVariable String serial) throws IOException {
         return serveHtml("static/minspection/pumps/index.html");
+    }
+
+    @GetMapping("/minspection/sprinkler-pipes/{serial}")
+    @ResponseBody
+    public ResponseEntity<String> sprinklerPipeInspectionPage(@PathVariable String serial) throws IOException {
+        return serveHtml("static/minspection/sprinkler-pipes/index.html");
     }
 
     @GetMapping("/minspection/air-conditioners/{qrKey}")
