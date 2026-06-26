@@ -7,6 +7,7 @@
   - JWT 로그인 및 사용자/역할/메뉴 권한 관리
   - 소방설비 관리: 소화기, 소화전, 수신기, 소방펌프, QR, 모바일 점검
   - 기타설비 QR 관리: 에어컨/정수기를 소방설비 QR 화면에 통합해 등록 QR 조회, 인쇄, 미등록 QR 생성, 건물/층 필터를 동일 흐름으로 제공
+  - 기타설비 공통 아이콘: 에어컨/정수기 도면 마커와 모바일 QR placeholder 화면 아이콘을 제공 이미지 기반 아이콘으로 통일
   - 설비관리시스템 공통 도면 메뉴: `도면 (메인)`, `층별 도면`은 소방설비/기타설비 하위가 아니라 `설비관리시스템` 바로 아래에서 공통 관리
   - 이상설비 집계: 소화기/소화전 비정상 설비와 수신기/소방펌프 불량·요정비 설비를 이상설비에 포함
   - 이상설비 도면 바로가기: 소화기/소화전/수신기/소방펌프 모두 층별 도면(`/maps/floor.html`)에서 마커 자동 선택, 강조 및 정보 카드 표시
@@ -56,6 +57,7 @@
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
   - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
   - 층별 도면 정적 이미지: `/images/tissue_raw_warehouse_1F.jpg`, `/images/tissue_tent_warehouse_1F.jpg`, `/images/raw_material_yard_1F.jpg`
+  - 기타설비 아이콘: `/images/facility/aircon.png`, `/images/facility/water_purifier_icon.png`
   - API file path: `/facility-api/{kind}/files/{filename}`
 
 ## Role / Menu Access
@@ -80,7 +82,7 @@
 10. 수신기/소방펌프 수정 모달의 점검 이력 영역에서는 기존 내역 `수정`/`삭제`와 신규 행 `추가`만 수행하며, 점검 이력 편집 테이블에는 사진 업로드 입력을 두지 않습니다. 점검사진은 별도 `점검` 모달에서 저장 시 업로드됩니다.
 11. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다.
 12. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨도 실내기 위치만 지정하며, 실외기는 좌표 연결 없이 대수만 입력합니다.
-13. QR 메뉴에서 에어컨/정수기 탭을 선택하면 소방설비와 동일하게 등록 QR 조회, 건물/층 필터, 미등록 QR 생성, 인쇄를 수행할 수 있습니다. 기타설비 QR은 현재 모바일 placeholder로 연결되며 실제 모바일 점검/추가 화면은 추후 교체 예정입니다.
+13. QR 메뉴에서 에어컨/정수기 탭을 선택하면 소방설비와 동일하게 등록 QR 조회, 건물/층 필터, 미등록 QR 생성, 인쇄를 수행할 수 있습니다. 기타설비 QR은 현재 제공 아이콘이 표시되는 모바일 placeholder로 연결되며 실제 모바일 점검/추가 화면은 추후 교체 예정입니다.
 
 ## Deployment / Runtime
 - **Runtime**: Spring Boot 3.2.5 + Java 21
@@ -92,6 +94,7 @@
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
 - 에어컨/정수기 QR을 소방설비 QR 화면에 통합하고 모바일 점검 placeholder 라우트를 추가
+- 제공받은 에어컨/정수기 아이콘을 정적 리소스로 추가하고 도면 마커/위치선택/모바일 placeholder 기본 아이콘으로 통일
 - 에어컨/정수기 메뉴명과 화면명을 `에어컨 목록`, `정수기 목록`으로 정리하고 `V23__rename_facility_equipment_list_menus.sql` 추가
 - `V15__facility_management_system.sql`로 설비관리시스템 상위 메뉴와 소방설비/기타설비 그룹을 추가
 - `V20__fix_facility_role_duplicates.sql`로 운영 DB의 ROLE 공통코드 중복 표시 보정 추가: 기존 `ROLE_FIRE_MANAGER`/소방시설관리는 유지하고 `ROLE_FACILITY_MANAGER`/시설관리, `ROLE_EQUIPMENT_MANAGER`/기타시설관리를 명확히 정리

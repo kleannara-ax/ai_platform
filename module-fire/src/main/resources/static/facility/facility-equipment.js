@@ -4,7 +4,7 @@
   const CFG = window.FACILITY_PAGE_CONFIG || {};
   const label = CFG.itemLabel || '설비';
   const apiBase = CFG.apiBase || '/facility-api/air-conditioners';
-  const markerIcon = CFG.defaultImages?.default || '/images/facility/aircon_system.png';
+  const markerIcon = CFG.defaultImages?.default || '/images/facility/aircon.png';
   const state = {
     items: [], buildings: [], floors: [], buildingFloorMap: {},
     q: '', buildingId: '', floorId: '', status: null,

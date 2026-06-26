@@ -40,8 +40,8 @@
           <li class="nav-item"><a class="nav-link fw-semibold" href="/index.html?page=other_dashboard">대시보드</a></li>
           <li class="nav-item"><a class="nav-link fw-semibold" href="/facility-map.html">도면 (메인)</a></li>
           <li class="nav-item"><a class="nav-link fw-semibold active" href="/facility/floor.html">층별 도면</a></li>
-          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/air-conditioners">에어컨</a></li>
-          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/water-purifiers">정수기</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/air-conditioners">에어컨 목록</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/water-purifiers">정수기 목록</a></li>
         </ul>
         <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
       </div>
@@ -89,7 +89,7 @@
   const fmtDate = v => v ? String(v).slice(0,10) : '-';
   const parseDate = d => { if(!d) return null; const x=new Date(d); return Number.isNaN(x.getTime()) ? null : x; };
   const today = new Date(); today.setHours(0,0,0,0);
-  const ICONS = { AIRCON:'/images/facility/aircon_system.png', WATER_PURIFIER:'/images/facility/water_purifier.png' };
+  const ICONS = { AIRCON:'/images/facility/aircon.png', WATER_PURIFIER:'/images/facility/water_purifier_icon.png' };
   const planWrap = $('planWrap');
   const planInner = $('planInner');
   const planImg = $('planImg');
@@ -157,7 +157,7 @@
   function fitPlan(){ fitPlanToView(); centerPlanInView(); }
   function renderMarkers(){
     $('markers').innerHTML=''; $('hydrantMarkers').innerHTML=''; equipmentMarkersEl.innerHTML=''; if(!planImg.naturalWidth) return;
-    filteredItems().forEach(it=>{ const x=num(it.x), y=num(it.y); if(x==null||y==null)return; const btn=document.createElement('button'); btn.type='button'; btn.className='eqmarker'+(state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?' is-selected':''); btn.dataset.equipmentId=String(it.equipmentId||''); btn.dataset.equipmentType=it.category==='AIRCON'?'aircon':'water'; btn.style.left=x+'%'; btn.style.top=y+'%'; btn.title=(it.serialNumber||'')+' '+categoryLabel(it.category); btn.innerHTML=`<img draggable="false" src="${esc(it.imagePath||ICONS[it.category])}" alt="${esc(categoryLabel(it.category))}" onerror="this.src='${esc(ICONS[it.category])}'">`; btn.addEventListener('click', e=>{ e.stopPropagation(); selectItem(it.equipmentId); }); equipmentMarkersEl.appendChild(btn); });
+    filteredItems().forEach(it=>{ const x=num(it.x), y=num(it.y); if(x==null||y==null)return; const btn=document.createElement('button'); btn.type='button'; btn.className='eqmarker'+(state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?' is-selected':''); btn.dataset.equipmentId=String(it.equipmentId||''); btn.dataset.equipmentType=it.category==='AIRCON'?'aircon':'water'; btn.style.left=x+'%'; btn.style.top=y+'%'; btn.title=(it.serialNumber||'')+' '+categoryLabel(it.category); btn.innerHTML=`<img draggable="false" src="${esc(ICONS[it.category])}" alt="${esc(categoryLabel(it.category))}" onerror="this.src='${esc(ICONS[it.category])}'">`; btn.addEventListener('click', e=>{ e.stopPropagation(); selectItem(it.equipmentId); }); equipmentMarkersEl.appendChild(btn); });
     positionVisibleInfoCards();
   }
   function selectItem(id){ const it=state.currentItems.find(x=>String(x.equipmentId)===String(id)); if(!it)return; state.selected=it; renderList(); const marker=equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-id="${CSS.escape(String(it.equipmentId))}"]`); showInfo(it, marker); }
