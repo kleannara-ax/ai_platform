@@ -569,12 +569,40 @@ function filterMenusByIp(menus){
   });
 }
 
+function ensureSprinklerPipeMenu(menus){
+  const fireRoot = menus.find(m => m.menuCode === 'FIRE_MGMT');
+  if(!fireRoot || !Array.isArray(fireRoot.children)) return menus;
+  const fireGroup = fireRoot.children.find(m => m.menuCode === 'FIRE_EQUIPMENT_GROUP');
+  if(!fireGroup || !Array.isArray(fireGroup.children)) return menus;
+  if(fireGroup.children.some(m => m.menuCode === 'FIRE_SPRINKLER_PIPE')) return menus;
+  const qrIndex = fireGroup.children.findIndex(m => m.menuCode === 'FIRE_QR');
+  const fallbackMenu = {
+    menuId: -20260629,
+    menuName: '스프링쿨러 배관 목록',
+    menuCode: 'FIRE_SPRINKLER_PIPE',
+    parentId: fireGroup.menuId,
+    menuUrl: '/fire/sprinkler-pipes',
+    icon: 'sprinkler_pipe',
+    sortOrder: 5,
+    menuType: 'MENU',
+    isVisible: true,
+    isActive: true,
+    description: '스프링쿨러 배관 목록 및 점검 관리',
+    allowedIps: null,
+    children: []
+  };
+  if(qrIndex >= 0) fireGroup.children.splice(qrIndex, 0, fallbackMenu);
+  else fireGroup.children.push(fallbackMenu);
+  return menus;
+}
+
 async function loadUserMenus() {
   const nav = document.getElementById('sidebarMenu');
   try {
     const role = currentUser.role || 'ROLE_USER';
     const res = await api('GET', '/api/core/menus/role/' + encodeURIComponent(role));
     let menus = res.success ? (res.data || []) : [];
+    menus = ensureSprinklerPipeMenu(menus);
     userMenus = filterMenusByIp(menus);
     renderSidebarMenus();
   } catch(e) {

@@ -96,7 +96,7 @@
 - **Build**: `./gradlew :app:bootJar`
 - **Process Manager**: PM2 (`platform`)
 - **Start script**: `/home/user/webapp/start-app.sh`
-- **Last Updated**: 2026-06-26
+- **Last Updated**: 2026-06-29
 
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
@@ -104,6 +104,9 @@
 - 제공받은 에어컨/정수기 아이콘을 정적 리소스로 추가하고 도면 마커/위치선택/모바일 placeholder 기본 아이콘으로 통일
 - 에어컨/정수기 메뉴명과 화면명을 `에어컨 목록`, `정수기 목록`으로 정리하고 `V23__rename_facility_equipment_list_menus.sql` 추가
 - 신규 소방설비 `스프링쿨러 배관`의 도메인/API/PC 목록/QR/모바일 QR 등록·점검 화면을 추가하고 `V24__add_fire_sprinkler_pipe.sql`을 적용
+- `V25__repair_fire_menu_and_qr_regressions.sql`로 스프링쿨러 배관 좌측 메뉴/권한을 재보정하고, 기타설비 메뉴명을 `에어컨 목록`, `정수기 목록`으로 재보정
+- 수신기/소방펌프 공통 목록 화면에서 보조 마커 조회 API 하나가 실패해도 현재 목록 조회가 중단되지 않도록 fail-soft 처리
+- QR 등록 목록 API는 QR 화면에서 기존 등록 QR이 안정적으로 표시되도록 공개 조회를 허용하고, QR 화면의 API 오류 처리를 보강
 - `V15__facility_management_system.sql`로 설비관리시스템 상위 메뉴와 소방설비/기타설비 그룹을 추가
 - `V20__fix_facility_role_duplicates.sql`로 운영 DB의 ROLE 공통코드 중복 표시 보정 추가: 기존 `ROLE_FIRE_MANAGER`/소방시설관리는 유지하고 `ROLE_FACILITY_MANAGER`/시설관리, `ROLE_EQUIPMENT_MANAGER`/기타시설관리를 명확히 정리
 - `V21__normalize_facility_menu_structure.sql`로 `설비관리시스템` 하위 정렬을 `도면 (메인)` → `층별 도면` → `소방설비` → `기타설비` 순서로 보정하고, `FIRE_DASHBOARD`, `OTHER_DASHBOARD`, `OTHER_MAP`, `OTHER_FLOOR` 메뉴/권한을 제거
@@ -125,7 +128,7 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
-- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__rename_facility_equipment_list_menus.sql`, `V24__add_fire_sprinkler_pipe.sql` 순서 적용 후 메뉴관리/접근권한, 스프링쿨러 배관 QR/모바일 등록·점검 흐름 및 신규 도면 구역 이동 검증
+- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__rename_facility_equipment_list_menus.sql`, `V24__add_fire_sprinkler_pipe.sql`, `V25__repair_fire_menu_and_qr_regressions.sql` 순서 적용 후 메뉴관리/접근권한, 스프링쿨러 배관 QR/모바일 등록·점검 흐름 및 신규 도면 구역 이동 검증
 - `설비관리시스템 > 도면 (메인)`, `설비관리시스템 > 층별 도면`, `소방설비`, `기타설비`의 사이드바 정렬과 권한별 표시 확인
 - 에어컨/정수기 실데이터 등록 후 공통 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장

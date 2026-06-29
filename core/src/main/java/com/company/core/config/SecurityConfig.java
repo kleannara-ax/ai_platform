@@ -112,7 +112,7 @@ public class SecurityConfig {
                 // API 본문(/facility-api/**)은 아래 파일 조회 예외를 제외하고 인증 유지
                 .requestMatchers("/facility-map.html", "/facility/**").permitAll()
                 .requestMatchers("/login.html").permitAll()
-                .requestMatchers("/fire-api/qr/image").permitAll()
+                .requestMatchers("/fire-api/qr/image", "/fire-api/qr/list").permitAll()
                 .requestMatchers("/fire-api/minspection/**").permitAll()
                 // 소방 모듈 건물/층 목록 - 드롭다운에서 사용, 토큰 만료 시에도 전체 목록 표시
                 .requestMatchers("/fire-api/qr/buildings", "/fire-api/qr/floors").permitAll()

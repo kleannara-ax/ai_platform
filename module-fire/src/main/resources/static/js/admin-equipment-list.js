@@ -193,11 +193,20 @@
     return json.data;
   }
 
+  async function loadOptionalPeer(url, label) {
+    try {
+      return await apiFetch(url, { method: "GET" });
+    } catch (error) {
+      console.warn("[admin-equipment-list] peer load failed:", label, error);
+      return { content: [] };
+    }
+  }
+
   async function loadPeers() {
     const [receivers, pumps, sprinklerPipes] = await Promise.all([
-      apiFetch("/fire-api/receivers?size=500&page=0", { method: "GET" }),
-      apiFetch("/fire-api/pumps?size=500&page=0", { method: "GET" }),
-      apiFetch("/fire-api/sprinkler-pipes?size=500&page=0", { method: "GET" })
+      loadOptionalPeer("/fire-api/receivers?size=500&page=0", "receivers"),
+      loadOptionalPeer("/fire-api/pumps?size=500&page=0", "pumps"),
+      loadOptionalPeer("/fire-api/sprinkler-pipes?size=500&page=0", "sprinkler-pipes")
     ]);
     state.peers.receivers = Array.isArray(receivers?.content) ? receivers.content : [];
     state.peers.pumps = Array.isArray(pumps?.content) ? pumps.content : [];

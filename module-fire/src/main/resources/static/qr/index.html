@@ -259,8 +259,10 @@
       if (window.FireWebCsrf?.isMutation?.(opts.method)) {
         await window.FireWebCsrf.ensureToken();
       }
-      const headers = window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers);
-      const res = await fetch(url, { ...opts, headers });
+      const requestOptions = window.FireWebCsrf?.applyOptions
+        ? window.FireWebCsrf.applyOptions(opts)
+        : { ...opts, headers: (window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers)) };
+      const res = await fetch(url, requestOptions);
       if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');
@@ -271,7 +273,11 @@
         window.location.href = '/fire-map.html';
         return null;
       }
-      return res.json();
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message || ('요청 실패: HTTP ' + res.status));
+      }
+      return json;
     } catch (err) {
       console.error('[QR] apiFetch error:', url, err);
       return null;
