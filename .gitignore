@@ -33,3 +33,10 @@ test_*.js
 package*.json
 app.log
 uploads/
+
+# ── Local DB backups / dumps (never commit) ──
+db_backups/
+*.sql.gz
+*.dump
+*.bak
+*.backup
