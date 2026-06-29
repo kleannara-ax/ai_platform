@@ -68,13 +68,6 @@ public class FirePageController {
         return serveHtml("static/pumps.html");
     }
 
-    /** /fire/sprinkler-pipes → sprinkler-pipes.html */
-    @GetMapping("/fire/sprinkler-pipes")
-    @ResponseBody
-    public ResponseEntity<String> fireSprinklerPipes() throws IOException {
-        return serveHtml("static/sprinkler-pipes.html");
-    }
-
     /** /fire/floor → maps/floor.html */
     @GetMapping("/fire/floor")
     @ResponseBody
@@ -129,24 +122,6 @@ public class FirePageController {
         return serveHtml("static/minspection/pumps/index.html");
     }
 
-    @GetMapping("/minspection/sprinkler-pipes/{serial}")
-    @ResponseBody
-    public ResponseEntity<String> sprinklerPipeInspectionPage(@PathVariable String serial) throws IOException {
-        return serveHtml("static/minspection/sprinkler-pipes/index.html");
-    }
-
-    @GetMapping("/minspection/air-conditioners/{qrKey}")
-    @ResponseBody
-    public ResponseEntity<String> airConditionerMobilePlaceholder(@PathVariable String qrKey) {
-        return mobileFacilityPlaceholder("에어컨", qrKey, "/images/facility/aircon.png");
-    }
-
-    @GetMapping("/minspection/water-purifiers/{qrKey}")
-    @ResponseBody
-    public ResponseEntity<String> waterPurifierMobilePlaceholder(@PathVariable String qrKey) {
-        return mobileFacilityPlaceholder("정수기", qrKey, "/images/facility/water_purifier_icon.png");
-    }
-
     @GetMapping("/minspection/complete")
     @ResponseBody
     public ResponseEntity<String> completePage() throws IOException {
@@ -178,30 +153,6 @@ public class FirePageController {
     @ResponseBody
     public ResponseEntity<String> floorPage() throws IOException {
         return serveHtml("static/maps/floor.html");
-    }
-
-    private ResponseEntity<String> mobileFacilityPlaceholder(String label, String qrKey, String iconPath) {
-        String safeLabel = org.springframework.web.util.HtmlUtils.htmlEscape(label == null ? "기타설비" : label);
-        String safeQrKey = org.springframework.web.util.HtmlUtils.htmlEscape(qrKey == null ? "" : qrKey);
-        String safeIconPath = org.springframework.web.util.HtmlUtils.htmlEscape(iconPath == null ? "/images/facility/aircon.png" : iconPath);
-        String html = "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                + "<title>" + safeLabel + " 모바일 점검 준비중</title>"
-                + "<style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:24px;color:#0f172a}"
-                + ".card{max-width:520px;margin:8vh auto;background:#fff;border-radius:22px;padding:28px;box-shadow:0 20px 50px rgba(15,23,42,.12);text-align:center}"
-                + ".icon{width:120px;height:120px;object-fit:contain;margin:0 auto 18px;display:block}"
-                + "h1{font-size:24px;margin:0 0 12px}.muted{color:#64748b;line-height:1.6;text-align:left}.key{margin-top:18px;padding:12px;border-radius:12px;background:#f8fafc;word-break:break-all;font-family:monospace;text-align:left}</style></head>"
-                + "<body><main class=\"card\"><img class=\"icon\" src=\"" + safeIconPath + "\" alt=\"" + safeLabel + " 아이콘\">"
-                + "<h1>" + safeLabel + " 모바일 점검 화면 준비중</h1>"
-                + "<p class=\"muted\">QR 연결 주소는 생성되어 있으며, 실제 모바일 점검/추가 화면은 추후 상세 점검항목 확정 후 확장할 수 있도록 열어두었습니다.</p>"
-                + "<div class=\"key\">QR KEY: " + safeQrKey + "</div>"
-                + "</main></body></html>";
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore().mustRevalidate().cachePrivate().sMaxAge(0, TimeUnit.SECONDS))
-                .header("Pragma", "no-cache")
-                .header("Expires", "0")
-                .contentType(new MediaType("text", "html", StandardCharsets.UTF_8))
-                .body(html);
     }
 
     private ResponseEntity<String> serveHtml(String resourcePath) throws IOException {

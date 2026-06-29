@@ -103,10 +103,10 @@ public class FacilityEquipmentService {
         validateType(normalizedCategory, equipmentType);
         boolean waterPurifier = CATEGORY_WATER_PURIFIER.equals(normalizedCategory);
         String manufacturer = waterPurifier ? null : trimToNull(req.getManufacturer());
-        String locationDescription = trimToNull(req.getLocationDescription());
+        String locationDescription = waterPurifier ? null : trimToNull(req.getLocationDescription());
         int outdoorUnitCount = waterPurifier ? 1 : normalizeOutdoorUnitCount(req.getOutdoorUnitCount());
         int replacementCycleYears = waterPurifier ? 10 : req.getReplacementCycleYears();
-        String note = trimToNull(req.getNote());
+        String note = waterPurifier ? null : req.getNote();
 
         Building building = buildingRepository.findById(req.getBuildingId())
                 .orElseThrow(() -> new BusinessException("건물 정보를 찾을 수 없습니다."));

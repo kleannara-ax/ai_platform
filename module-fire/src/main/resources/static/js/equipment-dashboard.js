@@ -114,7 +114,6 @@
     if (type === 'hyd') return '/hydrants.html?' + params.toString();
     if (type === 'receiver') return '/receivers.html?' + params.toString();
     if (type === 'pump') return '/pumps.html?' + params.toString();
-    if (type === 'sprinklerPipe') return '/sprinkler-pipes.html?' + params.toString();
     if (type === 'aircon') return '/facility/air-conditioners?' + params.toString();
     if (type === 'water') return '/facility/water-purifiers?' + params.toString();
     return '';
@@ -238,27 +237,24 @@
         if (statsRes.success) stats = statsRes.data;
       } catch (_) {}
 
-      const [extRes, hydRes, pumpRes, recvRes, sprinklerPipeRes] = await Promise.all([
+      const [extRes, hydRes, pumpRes, recvRes] = await Promise.all([
         api('GET', '/fire-api/extinguishers?page=0&size=2000&sort=updatedAt,desc'),
         api('GET', '/fire-api/hydrants?page=0&size=2000&sort=updatedAt,desc'),
         api('GET', '/fire-api/pumps?page=0&size=2000&sort=updatedAt,desc'),
-        api('GET', '/fire-api/receivers?page=0&size=2000&sort=updatedAt,desc'),
-        api('GET', '/fire-api/sprinkler-pipes?page=0&size=2000&sort=updatedAt,desc')
+        api('GET', '/fire-api/receivers?page=0&size=2000&sort=updatedAt,desc')
       ]);
 
       const extItems = content(extRes);
       const hydItems = content(hydRes);
       const pumpItems = content(pumpRes);
       const recvItems = content(recvRes);
-      const sprinklerPipeItems = content(sprinklerPipeRes);
       const counts = {
         ext: stats && stats.extinguisherCount !== undefined ? stats.extinguisherCount : totalElements(extRes, extItems),
         hyd: stats && stats.hydrantCount !== undefined ? stats.hydrantCount : totalElements(hydRes, hydItems),
         pump: stats && stats.pumpCount !== undefined ? stats.pumpCount : totalElements(pumpRes, pumpItems),
-        receiver: stats && stats.receiverCount !== undefined ? stats.receiverCount : totalElements(recvRes, recvItems),
-        sprinklerPipe: stats && stats.sprinklerPipeCount !== undefined ? stats.sprinklerPipeCount : totalElements(sprinklerPipeRes, sprinklerPipeItems)
+        receiver: stats && stats.receiverCount !== undefined ? stats.receiverCount : totalElements(recvRes, recvItems)
       };
-      const total = stats && stats.totalEquipment !== undefined ? stats.totalEquipment : counts.ext + counts.hyd + counts.pump + counts.receiver + counts.sprinklerPipe;
+      const total = stats && stats.totalEquipment !== undefined ? stats.totalEquipment : counts.ext + counts.hyd + counts.pump + counts.receiver;
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const oneMonthAgo = new Date(today.getTime() - 30 * 24 * 3600 * 1000);
       const replaceThreshold = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
@@ -267,7 +263,6 @@
         if (type === 'ext') return item.extinguisherId;
         if (type === 'hyd') return item.hydrantId;
         if (type === 'receiver') return item.receiverId;
-        if (type === 'sprinklerPipe') return item.sprinklerPipeId;
         return item.pumpId;
       }
       function isInspectDue(item) {
@@ -287,7 +282,6 @@
         if (type === 'ext') return item.modelName || item.serialNumber || item.extinguisherType || '소화기 #' + (item.extinguisherId || '-');
         if (type === 'hyd') return item.modelName || item.serialNumber || item.hydrantType || '소화전 #' + (item.hydrantId || '-');
         if (type === 'receiver') return item.modelName || item.name || item.serialNumber || '수신기 #' + (item.receiverId || '-');
-        if (type === 'sprinklerPipe') return item.modelName || item.name || item.serialNumber || '스프링쿨러 배관 #' + (item.sprinklerPipeId || '-');
         return item.modelName || item.name || item.serialNumber || '소방펌프 #' + (item.pumpId || '-');
       }
       function locationText(item) {
@@ -314,8 +308,8 @@
           const i = isInspectDue(item);
           const r = type === 'ext' ? isReplaceDue(item) : false;
           const status = String(item.lastInspectionStatus || '').toUpperCase();
-          const m = (type === 'receiver' || type === 'pump' || type === 'sprinklerPipe') && status === 'MAINTENANCE';
-          const f = (type === 'receiver' || type === 'pump' || type === 'sprinklerPipe') && status === 'FAULTY';
+          const m = (type === 'receiver' || type === 'pump') && status === 'MAINTENANCE';
+          const f = (type === 'receiver' || type === 'pump') && status === 'FAULTY';
           if (a) {
             abnormal += 1;
             abnormalItems.push({
@@ -329,7 +323,7 @@
           if (i) inspect += 1;
           if (r) replace += 1;
           if (!a && !i && !r) normal += 1;
-          if (type === 'receiver' || type === 'pump' || type === 'sprinklerPipe') {
+          if (type === 'receiver' || type === 'pump') {
             if (f) graphFaulty += 1;
             else if (m) graphMaintenance += 1;
             else if (i) graphInspect += 1;
@@ -346,8 +340,7 @@
         summarize('ext', '소화기', counts.ext, extItems, '/extinguishers.html'),
         summarize('hyd', '소화전', counts.hyd, hydItems, '/hydrants.html'),
         summarize('receiver', '수신기', counts.receiver, recvItems, '/receivers.html'),
-        summarize('pump', '소방펌프', counts.pump, pumpItems, '/pumps.html'),
-        summarize('sprinklerPipe', '스프링쿨러 배관', counts.sprinklerPipe, sprinklerPipeItems, '/sprinkler-pipes.html')
+        summarize('pump', '소방펌프', counts.pump, pumpItems, '/pumps.html')
       ];
       const abnormalItems = summaries.flatMap((summary) => summary.abnormalItems).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
       const inspectTotal = summaries.reduce((sum, summary) => sum + summary.inspect, 0);
@@ -359,7 +352,7 @@
       const redGraphTotal = summaries.reduce((sum, summary) => sum + summary.graphAbnormal + summary.graphFaulty, 0);
 
       const chartHtml = summaries.map((summary) => {
-        const slices = summary.type === 'receiver' || summary.type === 'pump' || summary.type === 'sprinklerPipe'
+        const slices = summary.type === 'receiver' || summary.type === 'pump'
           ? [
             { key: 'normal', label: '정상', count: summary.graphNormal, color: 'var(--dash-green)' },
             { key: 'inspect', label: '점검필요', count: summary.graphInspect, color: 'var(--dash-orange)' },

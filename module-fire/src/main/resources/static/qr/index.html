@@ -148,9 +148,6 @@
           <li class="nav-item"><a class="nav-link fw-semibold" href="/hydrants.html">소화전</a></li>
           <li class="nav-item"><a class="nav-link fw-semibold" href="/receivers.html">수신기</a></li>
           <li class="nav-item"><a class="nav-link fw-semibold" href="/pumps.html">소방펌프</a></li>
-          <li class="nav-item"><a class="nav-link fw-semibold" href="/sprinkler-pipes.html">스프링쿨러 배관</a></li>
-          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/air-conditioners">에어컨 목록</a></li>
-          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/water-purifiers">정수기 목록</a></li>
           <li class="nav-item"><a class="nav-link fw-semibold active" href="/qr">QR코드</a></li>
         </ul>
         <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
@@ -223,7 +220,6 @@
 <script src="/js/hydrant-modal-host.js"></script>
 <script src="/js/receiver-modal-host.js"></script>
 <script src="/js/pump-modal-host.js"></script>
-<script src="/js/sprinkler-pipe-modal-host.js"></script>
 <script src="/js/csrf.js"></script>
 <script src="/js/common-nav.js"></script>
 <script>
@@ -233,10 +229,7 @@
     ext: { key: 'ext', label: '소화기', listKey: 'extinguishers', qrType: 'ext', large: false },
     hyd: { key: 'hyd', label: '소화전', listKey: 'hydrants', qrType: 'hyd', large: true },
     rcv: { key: 'rcv', label: '수신기', listKey: 'receivers', qrType: 'rcv', large: true },
-    pmp: { key: 'pmp', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true },
-    spp: { key: 'spp', label: '스프링쿨러 배관', listKey: 'sprinklerPipes', qrType: 'spp', large: true },
-    aircon: { key: 'aircon', label: '에어컨', listKey: 'airConditioners', qrType: 'aircon', large: false },
-    water: { key: 'water', label: '정수기', listKey: 'waterPurifiers', qrType: 'water', large: false }
+    pmp: { key: 'pmp', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true }
   };
 
   let currentUser = null;
@@ -259,10 +252,8 @@
       if (window.FireWebCsrf?.isMutation?.(opts.method)) {
         await window.FireWebCsrf.ensureToken();
       }
-      const requestOptions = window.FireWebCsrf?.applyOptions
-        ? window.FireWebCsrf.applyOptions(opts)
-        : { ...opts, headers: (window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers)) };
-      const res = await fetch(url, requestOptions);
+      const headers = window.FireWebCsrf?.headers(authHeaders(opts.headers), opts.method) || authHeaders(opts.headers);
+      const res = await fetch(url, { ...opts, headers });
       if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');
@@ -273,11 +264,7 @@
         window.location.href = '/fire-map.html';
         return null;
       }
-      const json = await res.json().catch(() => null);
-      if (!res.ok || json?.success === false) {
-        throw new Error(json?.message || ('요청 실패: HTTP ' + res.status));
-      }
-      return json;
+      return res.json();
     } catch (err) {
       console.error('[QR] apiFetch error:', url, err);
       return null;
@@ -319,7 +306,7 @@
   }
 
   function isTextSearchEquip() {
-    return currentEquip === 'rcv' || currentEquip === 'pmp' || currentEquip === 'spp';
+    return currentEquip === 'rcv' || currentEquip === 'pmp';
   }
 
   function getKeywordValue() {
@@ -425,11 +412,10 @@
         registeredWrap.dataset.equipKey = gridEquipKey;
         registeredWrap.innerHTML = items.map(function (item) {
           var qrKey = item.qrKey || item.noteKey || '';
-          var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || item.sprinklerPipeId || item.equipmentId || '';
+          var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || '';
           var extraMeta = '';
           if (currentEquip === 'ext') extraMeta = item.note || '';
           else if (currentEquip === 'hyd') extraMeta = item.locationDescription || '';
-          else if (currentEquip === 'aircon' || currentEquip === 'water') extraMeta = item.locationDescription || item.note || item.equipmentType || '';
           else extraMeta = item.locationDescription || '';
           return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta);
         }).join('');
@@ -513,10 +499,7 @@
           extCount: currentEquip === 'ext' ? String(unregisteredCount) : '0',
           hydCount: currentEquip === 'hyd' ? String(unregisteredCount) : '0',
           receiverCount: currentEquip === 'rcv' ? String(unregisteredCount) : '0',
-          pumpCount: currentEquip === 'pmp' ? String(unregisteredCount) : '0',
-          sprinklerPipeCount: currentEquip === 'spp' ? String(unregisteredCount) : '0',
-          airconCount: currentEquip === 'aircon' ? String(unregisteredCount) : '0',
-          waterPurifierCount: currentEquip === 'water' ? String(unregisteredCount) : '0'
+          pumpCount: currentEquip === 'pmp' ? String(unregisteredCount) : '0'
         });
         const unregisteredRes = await apiFetch(API_BASE + '/qr/unregistered-serials?' + countParams.toString());
         if (unregisteredRes?.data) {
@@ -524,9 +507,6 @@
           if (currentEquip === 'hyd') unregisteredList = unregisteredRes.data.unregisteredHydSerials || [];
           if (currentEquip === 'rcv') unregisteredList = unregisteredRes.data.unregisteredReceiverSerials || [];
           if (currentEquip === 'pmp') unregisteredList = unregisteredRes.data.unregisteredPumpSerials || [];
-          if (currentEquip === 'spp') unregisteredList = unregisteredRes.data.unregisteredSprinklerPipeSerials || [];
-          if (currentEquip === 'aircon') unregisteredList = unregisteredRes.data.unregisteredAirconSerials || [];
-          if (currentEquip === 'water') unregisteredList = unregisteredRes.data.unregisteredWaterPurifierSerials || [];
         }
       }
 
@@ -552,22 +532,7 @@
       window.FireWebReceiverModal?.open({ mode: 'details', id });
       return;
     }
-    if (type === 'pmp') {
-      window.FireWebPumpModal?.open({ mode: 'details', id });
-      return;
-    }
-    if (type === 'spp') {
-      window.FireWebSprinklerPipeModal?.open({ mode: 'details', id });
-      return;
-    }
-    if (type === 'aircon') {
-      window.location.href = '/facility/air-conditioners?details=' + encodeURIComponent(id);
-      return;
-    }
-    if (type === 'water') {
-      window.location.href = '/facility/water-purifiers?details=' + encodeURIComponent(id);
-      return;
-    }
+    window.FireWebPumpModal?.open({ mode: 'details', id });
   }
 
   function printCurrentQrSection() {
