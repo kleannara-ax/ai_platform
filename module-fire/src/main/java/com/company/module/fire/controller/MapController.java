@@ -167,6 +167,13 @@ public class MapController {
             if (floor.contains("1")) return "/images/raw_material_yard_1F.jpg";
             return "";
         }
+        if (containsAny(building, "유동상소각로", "fluidized_bed_incinerator", "fluidizedbedincinerator", "incinerator")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("3")) return "/images/fluidized_bed_incinerator_3F.png";
+            if (floor.contains("2")) return "/images/fluidized_bed_incinerator_2F.png";
+            if (floor.contains("1")) return "/images/fluidized_bed_incinerator_1F.png";
+            return "";
+        }
         if (containsAny(building, "\uC81C\uC9C01,2\uD638\uAE30", "\uC81C\uC9C012", "\uC800\uC7A51,2\uD638\uAE30", "\uC800\uC7A512", "jeji12", "jeji2")) {
             if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/jeji1,2_2F.PNG";

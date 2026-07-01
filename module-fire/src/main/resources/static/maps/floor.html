@@ -418,6 +418,9 @@
     { buildingId: 'D-JUNGMUN', floorId: 'D-1F', buildingName: '\uC911\uBB38\uCC3D\uACE0', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/jungmun_1F.png' },
     { buildingId: 'D-ELECGM', floorId: 'D-1F', buildingName: '\uC804\uAE30\uACF5\uBB34', floorName: '1\uCE35', isOutdoor: false, planImagePath: '' },
     { buildingId: 'D-DIAPER', floorId: 'D-1F', buildingName: '\uAE30\uC800\uADC0\uB3D9', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/diaper_1F.png' },
+    { buildingId: 'D-FLUIDIZED-INCINERATOR', floorId: 'D-1F', buildingName: '\uC720\uB3D9\uC0C1\uC18C\uAC01\uB85C', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/fluidized_bed_incinerator_1F.png' },
+    { buildingId: 'D-FLUIDIZED-INCINERATOR', floorId: 'D-2F', buildingName: '\uC720\uB3D9\uC0C1\uC18C\uAC01\uB85C', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/fluidized_bed_incinerator_2F.png' },
+    { buildingId: 'D-FLUIDIZED-INCINERATOR', floorId: 'D-3F', buildingName: '\uC720\uB3D9\uC0C1\uC18C\uAC01\uB85C', floorName: '3\uCE35', isOutdoor: false, planImagePath: '/images/fluidized_bed_incinerator_3F.png' },
     { buildingId: 'D-OUT', floorId: 'D-OUT', buildingName: '\uC625\uC678', floorName: '\uC625\uC678', isOutdoor: true, planImagePath: '/images/drone_photo.JPG' }
   ];
   function normalize(v){ return String(v || '').replace(/\s+/g, '').toLowerCase(); }
@@ -441,6 +444,7 @@
     if (n.includes('\uc911\ubb38\ucc3d\uace0') || n.includes('jungmun')) return '\uC911\uBB38\uCC3D\uACE0';
     if (n.includes('\uc804\uae30\uacf5\ubb34') || n.includes('elecgm')) return '\uC804\uAE30\uACF5\uBB34';
     if (n.includes('\uae30\uc800\uadc0\ub3d9') || n.includes('diaper')) return '\uAE30\uC800\uADC0\uB3D9';
+    if (n.includes('\uc720\ub3d9\uc0c1\uc18c\uac01\ub85c') || n.includes('fluidizedbedincinerator') || n.includes('incinerator')) return '\uC720\uB3D9\uC0C1\uC18C\uAC01\uB85C';
     if (n.includes('\uc625\uc678') || n.includes('outdoor')) return '\uC625\uC678';
     return String(name || '');
   }
@@ -473,6 +477,7 @@
     if (n.includes('\uc911\ubb38\ucc3d\uace0') || n.includes('jungmun')) return 16;
     if (n.includes('\uc804\uae30\uacf5\ubb34') || n.includes('elecgm')) return 11;
     if (n.includes('\uae30\uc800\uadc0\ub3d9') || n.includes('diaper')) return 17;
+    if (n.includes('\uc720\ub3d9\uc0c1\uc18c\uac01\ub85c') || n.includes('fluidizedbedincinerator') || n.includes('incinerator')) return 18;
     if (n.includes('\uc625\uc678') || n.includes('outdoor')) return 99;
     return 999;
   }
@@ -611,6 +616,11 @@
     if (bn.includes('\uc911\ubb38\ucc3d\uace0') || bn.includes('jungmun')) return '/images/jungmun_1F.png';
     if (bn.includes('\uc804\uae30\uacf5\ubb34') || bn.includes('elecgm')) return '';
     if (bn.includes('\uae30\uc800\uadc0\ub3d9') || bn.includes('diaper')) return '/images/diaper_1F.png';
+    if (bn.includes('\uc720\ub3d9\uc0c1\uc18c\uac01\ub85c') || bn.includes('fluidizedbedincinerator') || bn.includes('incinerator')) {
+      if (f.includes('3')) return '/images/fluidized_bed_incinerator_3F.png';
+      if (f.includes('2')) return '/images/fluidized_bed_incinerator_2F.png';
+      return '/images/fluidized_bed_incinerator_1F.png';
+    }
     return '';
   }
   async function api(url){

@@ -1122,6 +1122,12 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/raw_material_yard_1F.jpg";
             return null;
         }
+        if (bn.contains("유동상소각로") || bn.contains("fluidizedbedincinerator") || bn.contains("incinerator")) {
+            if (floorNo == 1) return "/images/fluidized_bed_incinerator_1F.png";
+            if (floorNo == 2) return "/images/fluidized_bed_incinerator_2F.png";
+            if (floorNo == 3) return "/images/fluidized_bed_incinerator_3F.png";
+            return null;
+        }
         if (bn.contains("\uC81C\uC9C012\uD638\uAE30")
                 || bn.contains("jeji12")
                 || bn.contains("\uC81C\uC9C012")
@@ -1264,6 +1270,11 @@ public class MobileInspectionController {
         }
         if (bn.contains("원료장") || bn.contains("rawmaterialyard")) {
             return "/images/raw_material_yard_1F.jpg";
+        }
+        if (bn.contains("유동상소각로") || bn.contains("fluidizedbedincinerator") || bn.contains("incinerator")) {
+            if (f.contains("3")) return "/images/fluidized_bed_incinerator_3F.png";
+            if (f.contains("2")) return "/images/fluidized_bed_incinerator_2F.png";
+            return "/images/fluidized_bed_incinerator_1F.png";
         }
         if (bn.contains("\uC81C\uC9C012\uD638\uAE30")
                 || bn.contains("jeji12")

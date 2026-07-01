@@ -1,0 +1,5 @@
+INSERT INTO building (BUILDING_NAME, IS_ACTIVE)
+SELECT '유동상소각로', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM building WHERE BUILDING_NAME = '유동상소각로'
+);
