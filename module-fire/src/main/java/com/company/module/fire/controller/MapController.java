@@ -167,6 +167,20 @@ public class MapController {
             if (floor.contains("1")) return "/images/raw_material_yard_1F.jpg";
             return "";
         }
+        if (containsAny(building, "신설소각로폐기물처리동", "new_incinerator_waste", "newincineratorwaste")) {
+            if (isBasement(floor)) return "/images/new_incinerator_waste_B1.png";
+            if (floor.contains("4")) return "/images/new_incinerator_waste_4F.png";
+            if (floor.contains("3")) return "/images/new_incinerator_waste_3F.png";
+            if (floor.contains("2")) return "/images/new_incinerator_waste_2F.png";
+            if (floor.contains("1")) return "/images/new_incinerator_waste_1F.png";
+            return "";
+        }
+        if (containsAny(building, "신설소각로증기터빈동", "new_incinerator_turbine", "newincineratorturbine")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("2")) return "/images/new_incinerator_turbine_2F.png";
+            if (floor.contains("1")) return "/images/new_incinerator_turbine_1F.png";
+            return "";
+        }
         if (containsAny(building, "유동상소각로", "fluidized_bed_incinerator", "fluidizedbedincinerator", "incinerator")) {
             if (isBasement(floor)) return "";
             if (floor.contains("3")) return "/images/fluidized_bed_incinerator_3F.png";

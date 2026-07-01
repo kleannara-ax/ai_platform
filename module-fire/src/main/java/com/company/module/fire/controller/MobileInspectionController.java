@@ -1122,6 +1122,19 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/raw_material_yard_1F.jpg";
             return null;
         }
+        if (bn.contains("신설소각로폐기물처리동") || bn.contains("newincineratorwaste")) {
+            if (b1) return "/images/new_incinerator_waste_B1.png";
+            if (floorNo == 1) return "/images/new_incinerator_waste_1F.png";
+            if (floorNo == 2) return "/images/new_incinerator_waste_2F.png";
+            if (floorNo == 3) return "/images/new_incinerator_waste_3F.png";
+            if (floorNo == 4) return "/images/new_incinerator_waste_4F.png";
+            return null;
+        }
+        if (bn.contains("신설소각로증기터빈동") || bn.contains("newincineratorturbine")) {
+            if (floorNo == 1) return "/images/new_incinerator_turbine_1F.png";
+            if (floorNo == 2) return "/images/new_incinerator_turbine_2F.png";
+            return null;
+        }
         if (bn.contains("유동상소각로") || bn.contains("fluidizedbedincinerator") || bn.contains("incinerator")) {
             if (floorNo == 1) return "/images/fluidized_bed_incinerator_1F.png";
             if (floorNo == 2) return "/images/fluidized_bed_incinerator_2F.png";
@@ -1270,6 +1283,17 @@ public class MobileInspectionController {
         }
         if (bn.contains("원료장") || bn.contains("rawmaterialyard")) {
             return "/images/raw_material_yard_1F.jpg";
+        }
+        if (bn.contains("신설소각로폐기물처리동") || bn.contains("newincineratorwaste")) {
+            if (basement) return "/images/new_incinerator_waste_B1.png";
+            if (f.contains("4")) return "/images/new_incinerator_waste_4F.png";
+            if (f.contains("3")) return "/images/new_incinerator_waste_3F.png";
+            if (f.contains("2")) return "/images/new_incinerator_waste_2F.png";
+            return "/images/new_incinerator_waste_1F.png";
+        }
+        if (bn.contains("신설소각로증기터빈동") || bn.contains("newincineratorturbine")) {
+            if (f.contains("2")) return "/images/new_incinerator_turbine_2F.png";
+            return "/images/new_incinerator_turbine_1F.png";
         }
         if (bn.contains("유동상소각로") || bn.contains("fluidizedbedincinerator") || bn.contains("incinerator")) {
             if (f.contains("3")) return "/images/fluidized_bed_incinerator_3F.png";
