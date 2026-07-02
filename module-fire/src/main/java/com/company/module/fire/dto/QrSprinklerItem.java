@@ -1,0 +1,18 @@
+package com.company.module.fire.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * QR 코드 페이지 스프링클러 항목 DTO
+ */
+@Getter
+@AllArgsConstructor
+public class QrSprinklerItem {
+    private final Long sprinklerId;
+    private final String serialNumber;
+    private final String qrKey;
+    private final String buildingName;
+    private final String floorName;
+    private final String note;
+}

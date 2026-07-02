@@ -46,6 +46,12 @@ public class FireSprinkler {
     @Column(name = "NOTE", length = 500)
     private String note;
 
+    @Column(name = "QR_KEY", unique = true, length = 64)
+    private String qrKey;
+
+    @Column(name = "IMAGE_PATH", length = 500)
+    private String imagePath;
+
     @Column(name = "IS_ACTIVE", nullable = false)
     private boolean active = true;
 
@@ -63,13 +69,15 @@ public class FireSprinkler {
 
     @Builder
     public FireSprinkler(String serialNumber, Building building, Floor floor,
-                         BigDecimal x, BigDecimal y, String note, boolean isActive) {
+                         BigDecimal x, BigDecimal y, String note, String qrKey, String imagePath, boolean isActive) {
         this.serialNumber = serialNumber;
         this.building = building;
         this.floor = floor;
         this.x = x;
         this.y = y;
         this.note = note;
+        this.qrKey = qrKey;
+        this.imagePath = imagePath;
         this.active = isActive;
     }
 
@@ -83,5 +91,13 @@ public class FireSprinkler {
         this.x = x;
         this.y = y;
         this.note = note;
+    }
+
+    public void assignQrKey(String qrKey) {
+        this.qrKey = qrKey;
+    }
+
+    public void updateImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 }

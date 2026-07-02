@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface FireSprinklerRepository extends JpaRepository<FireSprinkler, Long> {
 
@@ -45,4 +46,16 @@ public interface FireSprinklerRepository extends JpaRepository<FireSprinkler, Lo
 
     @Query("SELECT s.serialNumber FROM FireSprinkler s WHERE s.serialNumber LIKE 'SPK-%'")
     List<String> findAllSerialNumbers();
+
+    Optional<FireSprinkler> findByQrKey(String qrKey);
+
+    boolean existsByQrKey(String qrKey);
+
+    List<FireSprinkler> findByActiveTrue();
+
+    List<FireSprinkler> findByBuilding_BuildingIdAndActiveTrue(Long buildingId);
+
+    List<FireSprinkler> findByFloor_FloorIdAndActiveTrue(Long floorId);
+
+    List<FireSprinkler> findByBuilding_BuildingIdAndFloor_FloorIdAndActiveTrue(Long buildingId, Long floorId);
 }

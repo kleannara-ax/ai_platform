@@ -129,6 +129,12 @@ public class FirePageController {
         return serveHtml("static/minspection/pumps/index.html");
     }
 
+    @GetMapping("/minspection/sprinklers/{serial}")
+    @ResponseBody
+    public ResponseEntity<String> sprinklerInspectionPage(@PathVariable String serial) throws IOException {
+        return serveHtml("static/minspection/sprinklers/index.html");
+    }
+
     @GetMapping("/minspection/complete")
     @ResponseBody
     public ResponseEntity<String> completePage() throws IOException {

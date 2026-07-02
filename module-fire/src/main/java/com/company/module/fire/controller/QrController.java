@@ -5,17 +5,20 @@ import com.company.module.fire.dto.QrExtItem;
 import com.company.module.fire.dto.QrHydItem;
 import com.company.module.fire.dto.QrPumpItem;
 import com.company.module.fire.dto.QrReceiverItem;
+import com.company.module.fire.dto.QrSprinklerItem;
 import com.company.module.fire.entity.Building;
 import com.company.module.fire.entity.Extinguisher;
 import com.company.module.fire.entity.FireHydrant;
 import com.company.module.fire.entity.FirePump;
 import com.company.module.fire.entity.FireReceiver;
+import com.company.module.fire.entity.FireSprinkler;
 import com.company.module.fire.entity.Floor;
 import com.company.module.fire.repository.BuildingRepository;
 import com.company.module.fire.repository.ExtinguisherRepository;
 import com.company.module.fire.repository.FireHydrantRepository;
 import com.company.module.fire.repository.FirePumpRepository;
 import com.company.module.fire.repository.FireReceiverRepository;
+import com.company.module.fire.repository.FireSprinklerRepository;
 import com.company.module.fire.repository.FloorRepository;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -56,6 +59,7 @@ public class QrController {
     private final FireHydrantRepository fireHydrantRepository;
     private final FireReceiverRepository fireReceiverRepository;
     private final FirePumpRepository firePumpRepository;
+    private final FireSprinklerRepository fireSprinklerRepository;
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
 
@@ -81,6 +85,8 @@ public class QrController {
             url = baseUrl + "/minspection/receivers/" + id;
         } else if ("pump".equalsIgnoreCase(type) || "pmp".equalsIgnoreCase(type)) {
             url = baseUrl + "/minspection/pumps/" + id;
+        } else if ("sprinkler".equalsIgnoreCase(type) || "spk".equalsIgnoreCase(type)) {
+            url = baseUrl + "/minspection/sprinklers/" + id;
         } else {
             url = baseUrl + "/minspection/extinguishers/" + id;
         }
@@ -114,12 +120,14 @@ public class QrController {
         List<FireHydrant> hydList;
         List<FireReceiver> receiverList;
         List<FirePump> pumpList;
+        List<FireSprinkler> sprinklerList;
 
         if (bId == null && fId == null) {
             extList = extinguisherRepository.findAll();
             hydList = fireHydrantRepository.findAll();
             receiverList = fireReceiverRepository.findAll();
             pumpList = firePumpRepository.findAll();
+            sprinklerList = fireSprinklerRepository.findByActiveTrue();
         } else if (bId != null && fId != null) {
             extList = extinguisherRepository.findByBuilding_BuildingIdAndFloor_FloorId(bId, fId);
             hydList = fireHydrantRepository.findByBuilding_BuildingIdAndFloor_FloorId(bId, fId);
@@ -133,6 +141,7 @@ public class QrController {
                     .filter(item -> item.getFloor() != null
                             && fId.equals(item.getFloor().getFloorId()))
                     .collect(Collectors.toList());
+            sprinklerList = fireSprinklerRepository.findByBuilding_BuildingIdAndFloor_FloorIdAndActiveTrue(bId, fId);
         } else if (bId != null) {
             extList = extinguisherRepository.findByBuilding_BuildingId(bId);
             hydList = fireHydrantRepository.findByBuilding_BuildingId(bId);
@@ -142,6 +151,7 @@ public class QrController {
             pumpList = firePumpRepository.findAll().stream()
                     .filter(item -> buildingNameMatches(item.getBuildingName(), buildingNameFilter))
                     .collect(Collectors.toList());
+            sprinklerList = fireSprinklerRepository.findByBuilding_BuildingIdAndActiveTrue(bId);
         } else {
             extList = extinguisherRepository.findByFloor_FloorId(fId);
             hydList = fireHydrantRepository.findByFloor_FloorId(fId);
@@ -151,6 +161,7 @@ public class QrController {
             pumpList = firePumpRepository.findAll().stream()
                     .filter(item -> item.getFloor() != null && fId.equals(item.getFloor().getFloorId()))
                     .collect(Collectors.toList());
+            sprinklerList = fireSprinklerRepository.findByFloor_FloorIdAndActiveTrue(fId);
         }
 
         List<QrExtItem> extItems = extList.stream()
@@ -199,11 +210,23 @@ public class QrController {
                         p.getLocationDescription()))
                 .collect(Collectors.toList());
 
+        List<QrSprinklerItem> sprinklerItems = sprinklerList.stream()
+                .sorted(Comparator.comparingLong(FireSprinkler::getSprinklerId).reversed())
+                .map(s -> new QrSprinklerItem(
+                        s.getSprinklerId(),
+                        s.getSerialNumber(),
+                        s.getQrKey(),
+                        s.getBuilding() != null ? s.getBuilding().getBuildingName() : "-",
+                        s.getFloor() != null ? s.getFloor().getFloorName() : "-",
+                        s.getNote()))
+                .collect(Collectors.toList());
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("extinguishers", extItems);
         result.put("hydrants", hydItems);
         result.put("receivers", receiverItems);
         result.put("pumps", pumpItems);
+        result.put("sprinklers", sprinklerItems);
 
         return ResponseEntity.ok(ApiResponse.success(result));
     }
@@ -249,17 +272,20 @@ public class QrController {
             @RequestParam(defaultValue = "0") int extCount,
             @RequestParam(defaultValue = "0") int hydCount,
             @RequestParam(defaultValue = "0") int receiverCount,
-            @RequestParam(defaultValue = "0") int pumpCount) {
+            @RequestParam(defaultValue = "0") int pumpCount,
+            @RequestParam(defaultValue = "0") int sprinklerCount) {
 
         extCount = Math.max(0, Math.min(extCount, 500));
         hydCount = Math.max(0, Math.min(hydCount, 500));
         receiverCount = Math.max(0, Math.min(receiverCount, 500));
         pumpCount = Math.max(0, Math.min(pumpCount, 500));
+        sprinklerCount = Math.max(0, Math.min(sprinklerCount, 500));
 
         List<String> extSerials = Collections.emptyList();
         List<String> hydSerials = Collections.emptyList();
         List<String> receiverSerials = Collections.emptyList();
         List<String> pumpSerials = Collections.emptyList();
+        List<String> sprinklerSerials = Collections.emptyList();
 
         if (extCount > 0) {
             extSerials = generateQrKeys(extCount, true);
@@ -273,12 +299,16 @@ public class QrController {
         if (pumpCount > 0) {
             pumpSerials = generateQrKeysByType(pumpCount, "pump");
         }
+        if (sprinklerCount > 0) {
+            sprinklerSerials = generateQrKeysByType(sprinklerCount, "sprinkler");
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("unregisteredExtSerials", extSerials);
         result.put("unregisteredHydSerials", hydSerials);
         result.put("unregisteredReceiverSerials", receiverSerials);
         result.put("unregisteredPumpSerials", pumpSerials);
+        result.put("unregisteredSprinklerSerials", sprinklerSerials);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
@@ -305,6 +335,8 @@ public class QrController {
             boolean exists;
             if ("receiver".equalsIgnoreCase(type)) {
                 exists = fireReceiverRepository.findByQrKey(key).isPresent();
+            } else if ("sprinkler".equalsIgnoreCase(type) || "spk".equalsIgnoreCase(type)) {
+                exists = fireSprinklerRepository.existsByQrKey(key);
             } else {
                 exists = firePumpRepository.findByQrKey(key).isPresent();
             }

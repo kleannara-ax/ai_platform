@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>스프링클러 점검 - FireWeb</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { --primary:#dc2626; --muted:#6b7280; --border:rgba(0,0,0,.12); --radius:14px; --shadow:0 4px 16px rgba(0,0,0,.10); }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#f3f4f6; color:#111827; min-height:100vh; }
+    header { background:linear-gradient(135deg,#b91c1c 0%,#ea580c 100%); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:10; }
+    header .title { font-size:18px; font-weight:900; }
+    main { padding:12px; }
+    .wrap { display:grid; gap:12px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px; }
+    .title-lg { font-size:17px; font-weight:900; }
+    .sub { color:var(--muted); font-size:13px; margin-top:4px; }
+    .err { color:#b91c1c; font-weight:800; font-size:14px; }
+    label { display:block; font-weight:800; font-size:13px; margin-bottom:5px; }
+    select, input[type="text"], textarea { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--border); font-size:15px; background:#fff; }
+    textarea { min-height:88px; resize:vertical; }
+    button { border:none; border-radius:12px; padding:13px; font-size:16px; font-weight:800; cursor:pointer; }
+    .btn-primary { background:var(--primary); color:#fff; width:100%; }
+    .btn-secondary { background:#e5e7eb; color:#374151; }
+    .actions { display:flex; gap:8px; margin-top:16px; }
+    .actions button { flex:1; }
+    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; }
+    .modal { display:none; position:fixed; left:0; right:0; bottom:0; z-index:101; max-height:90vh; overflow-y:auto; background:#fff; border-radius:20px 20px 0 0; padding:20px 16px 32px; }
+    .modal-title { font-size:18px; font-weight:900; margin-bottom:12px; }
+    .inspect-info { background:#f9fafb; border-radius:12px; padding:12px; margin-bottom:14px; font-size:14px; }
+    .checklist-wrap { display:grid; gap:10px; }
+    .check-item { border:1px solid rgba(0,0,0,.08); border-radius:10px; padding:10px; background:#fff; }
+    .check-item .label { font-size:14px; font-weight:800; margin-bottom:8px; }
+    .radio-group { display:flex; gap:16px; flex-wrap:wrap; }
+    .radio-group label { display:flex; align-items:center; gap:6px; margin:0; font-size:14px; font-weight:700; }
+    .radio-group input { width:18px; height:18px; }
+    .fault-box { margin-top:10px; padding:10px 12px; border-radius:10px; background:#fef2f2; color:#b91c1c; font-size:13px; font-weight:800; display:none; }
+    #completeView { display:none; text-align:center; padding:40px 16px; }
+    #completeView .ctitle { font-size:22px; font-weight:900; margin-top:12px; }
+    #completeView .csub { color:var(--muted); font-size:14px; margin-top:6px; }
+    #completeView button { margin-top:24px; padding:13px 32px; background:var(--primary); color:#fff; }
+    .mapWrap { position:relative; border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff; }
+    .mapCanvas { position:relative; width:100%; height:240px; overflow:hidden; touch-action:none; }
+    .mapCanvas img { width:100%; height:100%; object-fit:fill; display:block; background:#f0f0f0; }
+    .markerLayer { position:absolute; inset:0; pointer-events:none; }
+    .markerIcon { position:absolute; width:24px; height:24px; transform:translate(-50%,-50%); background:#dc2626; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(220,38,38,.8); pointer-events:none; }
+    .coord { font-size:12px; color:#555; margin-top:4px; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <header><div class="title">스프링클러 점검</div></header>
+  <main>
+    <div id="mainView" class="wrap"><div class="card"><div class="sub">불러오는 중...</div></div></div>
+    <div id="completeView">
+      <div class="ctitle">점검이 완료되었습니다.</div>
+      <div class="csub">창을 닫아 다음 작업으로 이동하세요.</div>
+      <button onclick="closeCurrentWindow()">닫기</button>
+    </div>
+  </main>
+
+  <div id="inspectOverlay" class="overlay"></div>
+  <div id="inspectModal" class="modal">
+    <div class="modal-title">스프링클러 점검</div>
+    <div class="inspect-info" id="inspectInfo"></div>
+    <div class="checklist-wrap" id="checklistWrap"></div>
+    <div class="fault-box" id="faultReasonAuto"></div>
+    <div style="margin-top:12px;">
+      <label for="inspectNote">점검 메모</label>
+      <textarea id="inspectNote" placeholder="특이사항이 있으면 입력하세요."></textarea>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn-secondary" id="btnCancelInspect">취소</button>
+      <button type="button" class="btn-primary" id="btnConfirmInspect">점검 저장</button>
+    </div>
+  </div>
+
+  <script src="/js/csrf.js"></script>
+  <script>
+  (function () {
+    const API_BASE = '/fire-api/minspection/sprinklers';
+    const RETURN_URL = location.pathname + location.search;
+    const CHECK_ITEMS = [
+      { key:'pipe_damage', label:'배관 손상 여부' },
+      { key:'pipe_connection', label:'배관 연결 상태' },
+      { key:'pipe_support', label:'배관 지지 상태' },
+      { key:'drain_valve', label:'배수밸브 상태' },
+      { key:'drain_pipe_sealing', label:'배수관 봉수 상태' },
+      { key:'head_reflector', label:'헤드 반사판/장애물 상태' },
+      { key:'product_clearance', label:'살수 장애 적재물 이격 상태' }
+    ];
+
+    if (!localStorage.getItem('fireweb_user') && !localStorage.getItem('fw_user')) {
+      location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+      return;
+    }
+
+    const qrKey = decodeURIComponent((window.location.pathname.split('/').pop() || '').trim());
+    const mainView = document.getElementById('mainView');
+    const completeView = document.getElementById('completeView');
+    const inspectOverlay = document.getElementById('inspectOverlay');
+    const inspectModal = document.getElementById('inspectModal');
+    const checklistWrap = document.getElementById('checklistWrap');
+    let mapOptions = [];
+    let selectedPoint = null;
+
+    function authHeaders(extra) { return { ...(extra || {}) }; }
+    async function apiFetch(url, opt) {
+      opt = opt || {};
+      if (window.FireWebCsrf?.isMutation?.(opt.method)) await window.FireWebCsrf.ensureToken();
+      const headers = window.FireWebCsrf?.headers(authHeaders(opt.headers), opt.method) || authHeaders(opt.headers);
+      const res = await fetch(url, { ...opt, headers });
+      if (res.status === 401) {
+        localStorage.removeItem('fireweb_user');
+        localStorage.removeItem('fw_user');
+        location.href = '/index.html?returnUrl=' + encodeURIComponent(RETURN_URL);
+        throw new Error('unauthorized');
+      }
+      return res;
+    }
+    function escHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    window.closeCurrentWindow = function () {
+      try { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('close'); } catch (_) {}
+      try { window.open('', '_self'); } catch (_) {}
+      try { window.close(); } catch (_) {}
+      setTimeout(() => { try { window.location.replace('about:blank'); } catch (_) {} }, 150);
+    };
+
+    function renderExistsView(data) {
+      mainView.innerHTML = `
+        <div class="card">
+          <div class="title-lg">스프링클러 정보</div>
+          <div class="sub">관리번호: ${escHtml(data.serialNumber || '-')}</div>
+          <div class="sub">위치: ${escHtml(data.buildingName || '-')} ${escHtml(data.floorName || '')}</div>
+          ${data.note ? `<div class="sub">비고: ${escHtml(data.note)}</div>` : ''}
+        </div>`;
+      setTimeout(() => openInspectModal(data.sprinklerId), 200);
+    }
+
+    function renderChecklist() {
+      checklistWrap.innerHTML = CHECK_ITEMS.map((item, index) => `
+        <div class="check-item" data-key="${item.key}">
+          <div class="label">${index + 1}. ${escHtml(item.label)}</div>
+          <div class="radio-group">
+            <label><input type="radio" name="check_${item.key}" value="NORMAL"> 정상</label>
+            <label><input type="radio" name="check_${item.key}" value="FAULTY"> 불량</label>
+          </div>
+        </div>`).join('');
+      checklistWrap.querySelectorAll('input[type="radio"]').forEach(r => r.addEventListener('change', updateFaultSummary));
+    }
+    function collectChecklistResult() {
+      const items = [];
+      let hasUnchecked = false;
+      CHECK_ITEMS.forEach(item => {
+        const checked = document.querySelector(`input[name="check_${item.key}"]:checked`);
+        if (!checked) { hasUnchecked = true; return; }
+        items.push({ key:item.key, label:item.label, result:checked.value });
+      });
+      return { hasUnchecked, items };
+    }
+    function updateFaultSummary() {
+      const box = document.getElementById('faultReasonAuto');
+      const faults = collectChecklistResult().items.filter(i => i.result === 'FAULTY').map(i => i.label);
+      box.style.display = faults.length ? 'block' : 'none';
+      box.textContent = faults.length ? ('불량 항목: ' + faults.join(', ')) : '';
+    }
+    function openInspectModal(id) {
+      renderChecklist();
+      document.getElementById('inspectNote').value = '';
+      inspectOverlay.style.display = 'block';
+      inspectModal.style.display = 'block';
+      apiFetch(API_BASE + '/' + id).then(r => r.json()).then(json => {
+        const data = json?.data;
+        if (!data) return;
+        const last = data.lastInspectionDate
+          ? `<br><span style="color:#6b7280;font-size:12px;">최근 점검: ${escHtml(data.lastInspectionDate)} ${data.lastInspectionTime ? escHtml(data.lastInspectionTime) : ''} / ${escHtml(data.lastInspectorName || '-')}</span>`
+          : '<br><span style="color:#6b7280;font-size:12px;">최근 점검 이력이 없습니다.</span>';
+        document.getElementById('inspectInfo').innerHTML = `<strong>${escHtml(data.serialNumber || '-')}</strong><br>${escHtml(data.buildingName || '-')} ${escHtml(data.floorName || '')}${data.note ? '<br>비고: ' + escHtml(data.note) : ''}${last}`;
+      });
+      document.getElementById('btnConfirmInspect').onclick = () => confirmInspect(id);
+    }
+    async function confirmInspect(id) {
+      const result = collectChecklistResult();
+      if (result.hasUnchecked) { alert('모든 점검 항목에 정상 또는 불량을 선택해 주세요.'); return; }
+      const btn = document.getElementById('btnConfirmInspect');
+      btn.disabled = true;
+      try {
+        const res = await apiFetch(API_BASE + '/' + id + '/inspect', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({ items:result.items, note:document.getElementById('inspectNote').value.trim() || null })
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          alert(json?.message || '점검 저장 중 오류가 발생했습니다.');
+          return;
+        }
+        inspectOverlay.style.display = 'none';
+        inspectModal.style.display = 'none';
+        document.querySelector('header').style.display = 'none';
+        mainView.style.display = 'none';
+        completeView.style.display = 'block';
+      } finally { btn.disabled = false; }
+    }
+    document.getElementById('btnCancelInspect').addEventListener('click', () => {
+      inspectOverlay.style.display = 'none';
+      inspectModal.style.display = 'none';
+    });
+
+    function renderRegisterForm(data) {
+      mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
+      mainView.innerHTML = `
+        <div class="card">
+          <div class="title-lg">스프링클러 등록</div>
+          <div class="sub">QR Key: ${escHtml(data.qrKey || qrKey)}</div>
+        </div>
+        <div class="card">
+          <form id="regForm" style="display:grid;gap:12px;">
+            <div id="regErr" class="err"></div>
+            <div>
+              <label for="mapOptionSelect">건물/층 선택</label>
+              <select id="mapOptionSelect"><option value="">선택하세요</option>${mapOptions.map((m, i) => `<option value="${i}">${escHtml(m.buildingName)} / ${escHtml(m.floorName)}</option>`).join('')}</select>
+            </div>
+            <div class="mapWrap">
+              <div class="mapCanvas" id="mapCanvas">
+                <img id="planImg" alt="도면" src="" />
+                <div class="markerLayer" id="markerLayer"></div>
+              </div>
+            </div>
+            <div class="coord">좌표: X <span id="coordX">-</span> / Y <span id="coordY">-</span></div>
+            <input type="hidden" id="inputX" /><input type="hidden" id="inputY" />
+            <div><label for="regNote">비고</label><input type="text" id="regNote" placeholder="예: 동측 배관 라인" /></div>
+            <button type="submit" class="btn-primary">등록</button>
+          </form>
+        </div>`;
+      document.getElementById('mapOptionSelect').addEventListener('change', onMapOptionChange);
+      document.getElementById('mapCanvas').addEventListener('click', onMapClick);
+      document.getElementById('regForm').addEventListener('submit', submitRegister);
+    }
+    function onMapOptionChange() {
+      const idx = document.getElementById('mapOptionSelect').value;
+      const opt = idx === '' ? null : mapOptions[Number(idx)];
+      selectedPoint = null;
+      document.getElementById('inputX').value = '';
+      document.getElementById('inputY').value = '';
+      document.getElementById('coordX').textContent = '-';
+      document.getElementById('coordY').textContent = '-';
+      document.getElementById('markerLayer').innerHTML = '';
+      document.getElementById('planImg').src = opt?.planImagePath || '';
+    }
+    function onMapClick(e) {
+      const img = document.getElementById('planImg');
+      if (!img.getAttribute('src')) { alert('건물/층을 먼저 선택하세요.'); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+      const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+      selectedPoint = { x:Number(x.toFixed(4)), y:Number(y.toFixed(4)) };
+      document.getElementById('inputX').value = selectedPoint.x;
+      document.getElementById('inputY').value = selectedPoint.y;
+      document.getElementById('coordX').textContent = selectedPoint.x;
+      document.getElementById('coordY').textContent = selectedPoint.y;
+      document.getElementById('markerLayer').innerHTML = `<div class="markerIcon" style="left:${selectedPoint.x}%;top:${selectedPoint.y}%;"></div>`;
+    }
+    async function submitRegister(e) {
+      e.preventDefault();
+      const idx = document.getElementById('mapOptionSelect').value;
+      const opt = idx === '' ? null : mapOptions[Number(idx)];
+      if (!opt) { document.getElementById('regErr').textContent = '건물/층을 선택하세요.'; return; }
+      if (!selectedPoint) { document.getElementById('regErr').textContent = '도면에서 위치를 선택하세요.'; return; }
+      const res = await apiFetch(API_BASE + '/register', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({
+          qrKey:dataQrKey(),
+          buildingId:opt.buildingId,
+          floorId:opt.floorId,
+          x:selectedPoint.x,
+          y:selectedPoint.y,
+          note:document.getElementById('regNote').value.trim() || null
+        })
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) { document.getElementById('regErr').textContent = json?.message || '등록 중 오류가 발생했습니다.'; return; }
+      await loadData();
+    }
+    function dataQrKey() { return qrKey; }
+
+    async function loadData() {
+      if (!qrKey) { mainView.innerHTML = '<div class="card"><div class="err">QR 키가 비어 있습니다.</div></div>'; return; }
+      try {
+        const res = await apiFetch(API_BASE + '/by-key?key=' + encodeURIComponent(qrKey));
+        const json = await res.json();
+        const data = json?.data;
+        if (!data) { mainView.innerHTML = '<div class="card"><div class="err">데이터를 불러오지 못했습니다.</div></div>'; return; }
+        if (data.exists) renderExistsView(data); else renderRegisterForm(data);
+      } catch (err) {
+        if (err.message !== 'unauthorized') mainView.innerHTML = '<div class="card"><div class="err">데이터 로드 실패: ' + escHtml(err.message) + '</div></div>';
+      }
+    }
+    loadData();
+  })();
+  </script>
+</body>
+</html>

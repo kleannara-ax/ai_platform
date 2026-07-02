@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -115,6 +116,7 @@ public class FireSprinklerService {
             sprinkler = fireSprinklerRepository.findById(request.getSprinklerId())
                     .orElseThrow(() -> new EntityNotFoundException("FireSprinkler", request.getSprinklerId()));
             sprinkler.update(building, floor, x, y, trimToNull(request.getNote()));
+            ensureQrKey(sprinkler);
         } else {
             sprinkler = FireSprinkler.builder()
                     .serialNumber(generateNextSerialNumber())
@@ -123,6 +125,7 @@ public class FireSprinklerService {
                     .x(x)
                     .y(y)
                     .note(trimToNull(request.getNote()))
+                    .qrKey(generateUniqueQrKey())
                     .isActive(true)
                     .build();
             fireSprinklerRepository.save(sprinkler);
@@ -291,6 +294,20 @@ public class FireSprinklerService {
             }
         }
         return String.format("SPK-%06d", maxNum + 1);
+    }
+
+    private void ensureQrKey(FireSprinkler sprinkler) {
+        if (sprinkler.getQrKey() == null || sprinkler.getQrKey().isBlank()) {
+            sprinkler.assignQrKey(generateUniqueQrKey());
+        }
+    }
+
+    private String generateUniqueQrKey() {
+        String key;
+        do {
+            key = UUID.randomUUID().toString().replace("-", "");
+        } while (fireSprinklerRepository.existsByQrKey(key));
+        return key;
     }
 
     private String resolveInspectionStatus(List<EquipmentInspectionItemRequest> items) {
