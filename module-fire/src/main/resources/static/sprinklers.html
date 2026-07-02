@@ -226,11 +226,8 @@ function applyFilter() {
 }
 function renderStatusPanel() {
   const panel = document.getElementById('statusPanelBody');
-  if (!currentStatusType) { panel.innerHTML = ''; bootstrap.Collapse.getOrCreateInstance(document.getElementById('statusPanel'), { toggle:false }).hide(); return; }
-  const title = currentStatusType === 'inspect' ? '점검필요 스프링클러' : '고장 스프링클러';
-  const rows = filteredItems.map((it, idx) => `<tr class="clickable-row" data-id="${it.sprinklerId}"><td>${idx+1}</td><td>${val(it.serialNumber)}</td><td>${val(it.buildingName)}</td><td>${val(it.floorName)}</td><td>${fmtDate(it.lastInspectionDate)}</td><td>${val(it.lastFaultReason)}</td></tr>`).join('') || `<tr><td colspan="6" class="text-center text-muted py-4">대상 설비가 없습니다.</td></tr>`;
-  panel.innerHTML = `<div class="p-3 fw-bold">${title}</div><div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>번호</th><th>ID</th><th>건물</th><th>층</th><th>최종점검일</th><th>고장사유</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  bootstrap.Collapse.getOrCreateInstance(document.getElementById('statusPanel'), { toggle:false }).show();
+  panel.innerHTML = '';
+  bootstrap.Collapse.getOrCreateInstance(document.getElementById('statusPanel'), { toggle:false }).hide();
 }
 function renderTable() {
   const rows = filteredItems.map((it, idx) => `
@@ -318,7 +315,8 @@ async function saveSprinkler() {
   } catch(e) { showToast(e.message, 'danger'); }
 }
 async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
-function toggleStatus(type) { currentStatusType = currentStatusType === type ? null : type; document.getElementById('btnStatusInspect').classList.toggle('active', currentStatusType === 'inspect'); document.getElementById('btnStatusFault').classList.toggle('active', currentStatusType === 'fault'); applyFilter(); renderTable(); renderStatusPanel(); }
+function syncStatusButtons() { document.getElementById('btnStatusInspect').classList.toggle('active', currentStatusType === 'inspect'); document.getElementById('btnStatusFault').classList.toggle('active', currentStatusType === 'fault'); }
+function toggleStatus(type) { currentStatusType = currentStatusType === type ? null : type; syncStatusButtons(); applyFilter(); renderTable(); renderStatusPanel(); }
 function dateStr(d) { return d.toISOString().slice(0,10); }
 function initExcelDates() {
   const to = new Date();
@@ -347,7 +345,7 @@ document.addEventListener('click', e => {
   if (e.target.id === 'btnAddHistory') document.getElementById('historyBody').insertAdjacentHTML('afterbegin', renderHistoryRow({}));
 });
 document.getElementById('btnSearch').addEventListener('click', loadSprinklers);
-document.getElementById('btnReset').addEventListener('click', () => { document.getElementById('filterQ').value=''; document.getElementById('filterBuildingId').value=''; syncFloorSelect('', 'filterFloorId', true); currentStatusType=null; loadSprinklers(); });
+document.getElementById('btnReset').addEventListener('click', () => { document.getElementById('filterQ').value=''; document.getElementById('filterBuildingId').value=''; syncFloorSelect('', 'filterFloorId', true); currentStatusType=null; syncStatusButtons(); loadSprinklers(); });
 document.getElementById('filterBuildingId').addEventListener('change', e => syncFloorSelect(e.target.value, 'filterFloorId', true));
 document.getElementById('spkBuildingSel').addEventListener('change', e => syncFloorSelect(e.target.value, 'spkFloorSel', false));
 document.getElementById('filterQ').addEventListener('keydown', e => { if (e.key === 'Enter') loadSprinklers(); });
