@@ -41,6 +41,11 @@
     .detail-label{font-size:.78rem;color:#64748b;font-weight:800;margin-bottom:3px;}.detail-value{font-weight:700;}
     .history-table input,.history-table select,.history-table textarea{min-width:120px;}
     .history-table textarea{min-width:180px;}
+    .filter-toolbar{display:grid;grid-template-columns:minmax(220px,1.7fr) minmax(150px,1fr) minmax(150px,1fr) 86px 96px 142px 142px 150px;gap:8px;align-items:center;}
+    .filter-toolbar .btn{white-space:nowrap;}
+    .filter-toolbar .excel-date{min-width:142px;}
+    @media(max-width:1399.98px){.filter-toolbar{grid-template-columns:repeat(3,minmax(0,1fr));}.filter-toolbar .btn{width:100%;}.filter-toolbar .excel-download-btn{grid-column:auto;}}
+    @media(max-width:767.98px){.filter-toolbar{grid-template-columns:1fr;}.filter-toolbar .excel-date{min-width:0;}}
     @media(max-width:1199.98px){.table{font-size:.8rem}.table td,.table th{padding:9px 6px!important}.detail-grid{grid-template-columns:1fr}.check-item{grid-template-columns:1fr}.check-radio{justify-content:flex-start;}}
   </style>
 </head>
@@ -73,7 +78,6 @@
           <button type="button" class="btn btn-info text-white" id="btnStatusInspect">점검필요 <span id="countInspect">(0)</span></button>
           <button type="button" class="btn btn-danger text-white" id="btnStatusFault">고장 <span id="countFault">(0)</span></button>
         </div>
-        <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;">엑셀</button>
         <button type="button" class="btn status-add-btn" id="btnSpkAdd">+ 스프링클러 추가</button>
       </div>
     </div>
@@ -81,11 +85,15 @@
 
   <section class="card shadow-sm mb-4" aria-label="검색 필터">
     <div class="card-body">
-      <div class="row g-2 align-items-center">
-        <div class="col-lg-4"><input id="filterQ" class="form-control" placeholder="검색어(ID/건물/층/비고)" /></div>
-        <div class="col-lg-3"><select id="filterBuildingId" class="form-select"><option value="">-- 건물 전체 --</option></select></div>
-        <div class="col-lg-3"><select id="filterFloorId" class="form-select"><option value="">-- 층 전체 --</option></select></div>
-        <div class="col-lg-2 d-flex gap-2"><button class="btn btn-primary w-100" type="button" id="btnSearch">검색</button><button class="btn btn-outline-secondary w-100" type="button" id="btnReset">초기화</button></div>
+      <div class="filter-toolbar">
+        <input id="filterQ" class="form-control" placeholder="검색어(ID/건물/층/비고)" />
+        <select id="filterBuildingId" class="form-select"><option value="">-- 건물 전체 --</option></select>
+        <select id="filterFloorId" class="form-select"><option value="">-- 층 전체 --</option></select>
+        <button class="btn btn-primary" type="button" id="btnSearch">검색</button>
+        <button class="btn btn-outline-secondary" type="button" id="btnReset">초기화</button>
+        <input type="date" id="excelFromDate" class="form-control excel-date" aria-label="엑셀 다운로드 시작일" />
+        <input type="date" id="excelToDate" class="form-control excel-date" aria-label="엑셀 다운로드 종료일" />
+        <button class="btn btn-success excel-download-btn" type="button" id="btnExcelDownload">엑셀 다운로드</button>
       </div>
     </div>
   </section>
@@ -311,7 +319,21 @@ async function saveSprinkler() {
 }
 async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
 function toggleStatus(type) { currentStatusType = currentStatusType === type ? null : type; document.getElementById('btnStatusInspect').classList.toggle('active', currentStatusType === 'inspect'); document.getElementById('btnStatusFault').classList.toggle('active', currentStatusType === 'fault'); applyFilter(); renderTable(); renderStatusPanel(); }
-function exportAll() { const to = new Date(); const from = new Date(); from.setFullYear(from.getFullYear() - 1); const f = from.toISOString().slice(0,10); const t = to.toISOString().slice(0,10); location.href = `/fire-api/sprinklers/inspections/export-all?from=${f}&to=${t}`; }
+function dateStr(d) { return d.toISOString().slice(0,10); }
+function initExcelDates() {
+  const to = new Date();
+  const from = new Date();
+  from.setFullYear(from.getFullYear() - 1);
+  document.getElementById('excelFromDate').value = dateStr(from);
+  document.getElementById('excelToDate').value = dateStr(to);
+}
+function exportAll() {
+  const f = document.getElementById('excelFromDate').value;
+  const t = document.getElementById('excelToDate').value;
+  if (!f || !t) { showToast('엑셀 다운로드 기간을 선택해 주세요.', 'warning'); return; }
+  if (f > t) { showToast('시작일은 종료일보다 늦을 수 없습니다.', 'warning'); return; }
+  location.href = `/fire-api/sprinklers/inspections/export-all?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+}
 
 document.addEventListener('click', e => {
   const row = e.target.closest('tr.clickable-row[data-id]');
@@ -335,7 +357,7 @@ document.getElementById('btnExcelDownload').addEventListener('click', exportAll)
 document.getElementById('btnSpkAdd').addEventListener('click', () => openUpsert(null));
 document.getElementById('btnSaveSpk').addEventListener('click', saveSprinkler);
 document.getElementById('btnConfirmInspect').addEventListener('click', confirmInspect);
-(async function init(){ await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); })();
+(async function init(){ initExcelDates(); await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); })();
 </script>
 </body>
 </html>
