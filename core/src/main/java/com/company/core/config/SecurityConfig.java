@@ -106,7 +106,7 @@ public class SecurityConfig {
                 // 소방 모듈 정적 리소스 및 메뉴 URL (/fire/**)
                 .requestMatchers("/fire/**").permitAll()
                 .requestMatchers("/fire-map.html", "/fire-dashboard.html", "/facility-dashboard.html").permitAll()
-                .requestMatchers("/extinguishers.html", "/hydrants.html", "/receivers.html", "/pumps.html").permitAll()
+                .requestMatchers("/extinguishers.html", "/sprinklers.html", "/hydrants.html", "/receivers.html", "/pumps.html").permitAll()
                 .requestMatchers("/maps/**", "/qr/**", "/minspection/**").permitAll()
                 // 기타설비 페이지는 SPA iframe 및 직접 URL 접근이 가능해야 하므로 공개
                 // API 본문(/facility-api/**)은 아래 파일 조회 예외를 제외하고 인증 유지
