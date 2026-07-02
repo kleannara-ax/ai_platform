@@ -454,9 +454,9 @@ async function enterApp() {
   await loadUserMenus();
   // 메뉴 로드 후 fireweb_user에 접근 가능 메뉴 코드 목록 추가
   updateFirewebUserMenuCodes();
-  var requestedPage = new URLSearchParams(window.location.search || '').get('page');
+  var requestedPage = normalizePage(new URLSearchParams(window.location.search || '').get('page'));
   var validPages = Object.values(menuCodeToPage).concat(['dashboard']);
-  var fallbackPage = validPages.includes(currentPage) ? currentPage : 'dashboard';
+  var fallbackPage = validPages.includes(normalizePage(currentPage)) ? normalizePage(currentPage) : 'dashboard';
   navigate(requestedPage && validPages.includes(requestedPage) ? requestedPage : fallbackPage);
   saveSession();
 }
@@ -492,6 +492,8 @@ const menuIcons = {
   'FIRE_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c-2 4-6 6-6 10a6 6 0 0012 0c0-4-4-6-6-10z"/><path d="M12 22a3 3 0 01-3-3c0-2 3-4 3-4s3 2 3 4a3 3 0 01-3 3z"/></svg>',
   'FIRE_MAP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
   'FIRE_EXTINGUISHER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="6" width="8" height="16" rx="2"/><path d="M10 6V4h4v2"/><path d="M14 4l3-2"/><line x1="12" y1="10" x2="12" y2="14"/></svg>',
+  'FIRE_SPRINKLER': '<img src="/images/sprinkler.png" alt="" style="width:18px;height:18px;object-fit:contain;flex-shrink:0;border-radius:3px;background:#fff;" onerror="this.style.display=\'none\'">',
+  'FIRE_SPRINKLER_PIPE': '<img src="/images/sprinkler.png" alt="" style="width:18px;height:18px;object-fit:contain;flex-shrink:0;border-radius:3px;background:#fff;" onerror="this.style.display=\'none\'">',
   'FIRE_HYDRANT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="4" width="8" height="14" rx="2"/><line x1="4" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="20" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/><circle cx="12" cy="8" r="2"/></svg>',
   'FIRE_RECEIVER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="6" width="4" height="3" rx="0.5"/><rect x="6" y="11" width="4" height="3" rx="0.5"/><line x1="14" y1="7" x2="18" y2="7"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="14" y1="17" x2="18" y2="17"/></svg>',
   'FIRE_PUMP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M12 6V2"/><path d="M12 22v-4"/><path d="M6 12H2"/><path d="M22 12h-4"/><circle cx="12" cy="12" r="2"/></svg>',
@@ -513,6 +515,8 @@ const menuCodeToPage = {
   'FIRE_MGMT': 'fire',
   'FIRE_MAP': 'fire_map',
   'FIRE_EXTINGUISHER': 'fire_extinguisher',
+  'FIRE_SPRINKLER': 'fire_sprinkler',
+  'FIRE_SPRINKLER_PIPE': 'fire_sprinkler',
   'FIRE_HYDRANT': 'fire_hydrant',
   'FIRE_RECEIVER': 'fire_receiver',
   'FIRE_PUMP': 'fire_pump',
@@ -524,6 +528,27 @@ const menuCodeToPage = {
   'OTHER_WATER_PURIFIER': 'other_water_purifier',
   'PS_INSP_MGMT': 'ps_insp',
 };
+function normalizeMenuCode(code){
+  const c=String(code||'').toUpperCase();
+  return c==='FIRE_SPRINKLER_PIPE'?'FIRE_SPRINKLER':c;
+}
+function normalizePage(page){
+  const p=String(page||'');
+  return p==='fire_sprinkler_pipe'?'fire_sprinkler':p;
+}
+function pageForMenuCode(code){
+  const normalized=normalizeMenuCode(code);
+  return menuCodeToPage[normalized] || String(code||'').toLowerCase();
+}
+function displayMenuName(menu){
+  const code=normalizeMenuCode(menu?.menuCode);
+  const name=String(menu?.menuName||'');
+  if(code==='FIRE_SPRINKLER' || name.includes('스프링쿨러') || name.includes('스프링클러 배관')) return '스프링클러 목록';
+  return name;
+}
+function displayMenuCode(menu){
+  return normalizeMenuCode(menu?.menuCode) || String(menu?.menuCode||'');
+}
 
 // IP → 32비트 정수 변환
 function ipToInt(ip){
@@ -588,16 +613,18 @@ function renderSidebarMenus() {
   }
   const chevron = '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
   function renderMenuNode(menu, level, indexPath) {
-    const page = menuCodeToPage[menu.menuCode] || menu.menuCode.toLowerCase();
-    const icon = menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
+    const normalizedCode = normalizeMenuCode(menu.menuCode);
+    const page = pageForMenuCode(menu.menuCode);
+    const icon = menuIcons[normalizedCode] || menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
+    const displayName = displayMenuName(menu);
     const children = Array.isArray(menu.children) ? menu.children.slice() : [];
     const hasChildren = children.length > 0;
     const groupId = 'grp_' + menu.menuCode + '_' + indexPath.replace(/[^a-zA-Z0-9_]/g, '_');
-    const isOpen = menuGroupState[groupId] === true || ['FIRE_MGMT', 'FIRE_EQUIPMENT_GROUP', 'OTHER_EQUIPMENT_GROUP'].includes(menu.menuCode);
+    const isOpen = menuGroupState[groupId] === true || ['FIRE_MGMT', 'FIRE_EQUIPMENT_GROUP', 'OTHER_EQUIPMENT_GROUP'].includes(normalizedCode);
     const childClass = level > 0 ? ' nav-child' : '';
     const indent = level > 0 ? ` style="padding-left:${24 + level * 20}px"` : '';
     if (hasChildren) {
-      let nodeHtml = `<div class="nav-item nav-parent${childClass}${isOpen?' open':''}"${indent} onclick="toggleMenuGroup('${esc(groupId)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}"><span style="display:flex;align-items:center;gap:10px;overflow:hidden;">${icon} ${esc(menu.menuName)}</span>${chevron}</div>`;
+      let nodeHtml = `<div class="nav-item nav-parent${childClass}${isOpen?' open':''}"${indent} onclick="toggleMenuGroup('${esc(groupId)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(displayName)}"><span style="display:flex;align-items:center;gap:10px;overflow:hidden;">${icon} ${esc(displayName)}</span>${chevron}</div>`;
       nodeHtml += `<div class="nav-group${isOpen?' open':''}" id="${esc(groupId)}">`;
       children.forEach((child, childIdx) => {
         nodeHtml += renderMenuNode(child, level + 1, indexPath + '_' + childIdx);
@@ -606,7 +633,7 @@ function renderSidebarMenus() {
       return nodeHtml;
     }
     const active = currentPage === page ? ' active' : '';
-    return `<div class="nav-item${childClass}${active}"${indent} onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(menu.menuName)}">${icon} ${esc(menu.menuName)}</div>`;
+    return `<div class="nav-item${childClass}${active}"${indent} onclick="navigate('${esc(page)}',this)" data-menu-code="${esc(menu.menuCode)}" data-tooltip="${esc(displayName)}">${icon} ${esc(displayName)}</div>`;
   }
   let html = '<div class="nav-section">메뉴</div>';
   userMenus.forEach((menu, idx) => { html += renderMenuNode(menu, 0, String(idx)); });
@@ -628,6 +655,7 @@ function restoreMenuGroupState() {
 
 // ══ Navigation ══
 function navigate(page, el) {
+  page = normalizePage(page);
   currentPage = page;
   saveSession();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -647,7 +675,7 @@ function navigate(page, el) {
     const matched = document.querySelector(`.nav-item[data-menu-code]`) ? 
       Array.from(document.querySelectorAll('.nav-item')).find(n => {
         const code = n.dataset.menuCode || '';
-        const p = menuCodeToPage[code] || code.toLowerCase();
+        const p = pageForMenuCode(code);
         return p === page;
       }) : null;
     if (matched) {
@@ -662,8 +690,8 @@ function navigate(page, el) {
       }
     }
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',ps_insp:'PS 지분 검사'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',ps_insp:'모듈 > PS 지분 검사'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',ps_insp:'PS 지분 검사'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_sprinkler:'모듈 > 설비관리시스템 > 소방설비 > 스프링클러 목록',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',ps_insp:'모듈 > PS 지분 검사'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
@@ -680,6 +708,7 @@ function navigate(page, el) {
   else if(page==='other_equipment_group')renderEquipmentIndex('other');
   else if(page==='fire_map')navigateToFirePage('/fire-map.html');
   else if(page==='fire_extinguisher')navigateToFirePage('/extinguishers.html');
+  else if(page==='fire_sprinkler')navigateToFirePage('/sprinklers.html');
   else if(page==='fire_hydrant')navigateToFirePage('/hydrants.html');
   else if(page==='fire_receiver')navigateToFirePage('/receivers.html');
   else if(page==='fire_pump')navigateToFirePage('/pumps.html');
@@ -734,7 +763,10 @@ async function renderDashboard() {
         const indent = level * 24;
         const isTop = level === 0;
         const bg = isTop ? 'background:var(--surface2);font-weight:600;' : '';
-        const icon = menuIcons[n.menuCode] || menuIcons['_DEFAULT'];
+        const normalizedCode = normalizeMenuCode(n.menuCode);
+        const menuName = displayMenuName(n);
+        const menuCode = displayMenuCode(n);
+        const icon = menuIcons[normalizedCode] || menuIcons[n.menuCode] || menuIcons['_DEFAULT'];
         const typeBadge = n.menuType==='MENU'
           ? '<span class="badge" style="font-size:10px;padding:2px 8px;background:var(--primary-light);color:var(--primary-dark);">메뉴</span>'
           : '<span class="badge" style="font-size:10px;padding:2px 8px;background:var(--green-light);color:var(--green);">기능</span>';
@@ -743,9 +775,9 @@ async function renderDashboard() {
         html += `<tr style="${bg}">
           <td style="padding-left:${16+indent}px;white-space:nowrap;">
             <span style="display:inline-block;width:20px;vertical-align:middle;opacity:0.5;">${icon}</span>
-            <span style="margin-left:4px;">${esc(n.menuName)}</span>${childCount}${ipTag}
+            <span style="margin-left:4px;">${esc(menuName)}</span>${childCount}${ipTag}
           </td>
-          <td><code style="font-size:12px;">${esc(n.menuCode)}</code></td>
+          <td><code style="font-size:12px;">${esc(menuCode)}</code></td>
           <td>${typeBadge}</td>
           <td style="font-size:12px;">${esc(n.menuUrl||'-')}</td>
           <td>${n.isActive?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
@@ -1087,6 +1119,8 @@ function renderMenuTableRows(nodes,level,canManage){
     const hasKids=n.children&&n.children.length>0;
     const isExpanded=!!menuExpandState[n.menuId];
     const indent=level*24;
+    const menuName=displayMenuName(n);
+    const menuCode=displayMenuCode(n);
     const isTop=level===0;
     const bg=isTop?'background:var(--surface2);':'';
     const toggleIcon=hasKids?(isExpanded?'&#9660;':'&#9654;'):'<span style="color:var(--border);">&#8226;</span>';
@@ -1098,9 +1132,9 @@ function renderMenuTableRows(nodes,level,canManage){
     html+=`<tr style="${bg}">
       <td style="padding-left:${16+indent}px;white-space:nowrap;">
         <span ${toggleClick} style="display:inline-block;width:18px;text-align:center;font-size:11px;color:var(--text3);">${toggleIcon}</span>
-        <b style="margin-left:4px;">${esc(n.menuName)}</b>${ipTag}${childCount}${levelBadge}
+        <b style="margin-left:4px;">${esc(menuName)}</b>${ipTag}${childCount}${levelBadge}
       </td>
-      <td><code style="font-size:12px;">${esc(n.menuCode)}</code></td>
+      <td><code style="font-size:12px;">${esc(menuCode)}</code></td>
       <td style="font-size:12px;">${esc(n.menuUrl||'-')}</td>
       <td><span class="badge" style="font-size:10px;padding:2px 8px;${n.menuType==='MENU'?'background:var(--primary-light);color:var(--primary-dark);':'background:var(--green-light);color:var(--green);'}">${n.menuType}</span></td>
       <td>${n.sortOrder}</td>
@@ -1134,8 +1168,8 @@ function getParentOptions(excludeId,prefix,nodes){
   let opts='';
   (nodes||menuTree).forEach(n=>{
     if(n.menuId===excludeId)return;
-    const label=prefix?prefix+' > '+n.menuName:n.menuName;
-    opts+=`<option value="${n.menuId}">${esc(label)} (${esc(n.menuCode)})</option>`;
+    const label=prefix?prefix+' > '+displayMenuName(n):displayMenuName(n);
+    opts+=`<option value="${n.menuId}">${esc(label)} (${esc(displayMenuCode(n))})</option>`;
     if(n.children&&n.children.length>0){
       opts+=getParentOptions(excludeId,label,n.children);
     }
@@ -1145,9 +1179,9 @@ function getParentOptions(excludeId,prefix,nodes){
 
 function openCreateMenu(parentId){
   const parentMenu=parentId?allMenus.find(m=>m.menuId===parentId):null;
-  const title=parentMenu?`하위 메뉴 추가 - ${parentMenu.menuName}`:'최상위 메뉴 추가';
+  const title=parentMenu?`하위 메뉴 추가 - ${displayMenuName(parentMenu)}`:'최상위 메뉴 추가';
   const parentOpts=getParentOptions(null,'',menuTree);
-  const parentLabel=parentMenu?`${parentMenu.menuName} (${parentMenu.menuCode})`:'';
+  const parentLabel=parentMenu?`${displayMenuName(parentMenu)} (${displayMenuCode(parentMenu)})`:'';
 
   openModal(title,`
     <div class="form-row">
@@ -1206,12 +1240,13 @@ async function submitCreateMenu(){
 async function openEditMenu(id){
   const m=allMenus.find(x=>x.menuId===id);if(!m)return;
   const parentOpts=getParentOptions(id,'',menuTree);
-  const parentName=m.parentId?(allMenus.find(x=>x.menuId===m.parentId)||{}).menuName:'';
+  const parentMenuForEdit=m.parentId?(allMenus.find(x=>x.menuId===m.parentId)||{}):{};
+  const parentName=parentMenuForEdit.menuId?displayMenuName(parentMenuForEdit):'';
 
-  openModal('메뉴 수정 - '+m.menuName,`
+  openModal('메뉴 수정 - '+displayMenuName(m),`
     <div class="form-row">
-      <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" value="${esc(m.menuName)}"></div>
-      <div class="form-group"><label>메뉴 코드</label><input id="m_menuCode" value="${esc(m.menuCode)}" readonly style="background:var(--bg)"></div>
+      <div class="form-group"><label>메뉴명 *</label><input id="m_menuName" value="${esc(displayMenuName(m))}"></div>
+      <div class="form-group"><label>메뉴 코드</label><input id="m_menuCode" value="${esc(displayMenuCode(m))}" readonly style="background:var(--bg)"></div>
     </div>
     <div class="form-group"><label>상위 메뉴</label><select id="m_parentMenu"><option value="">없음 (최상위)</option>${parentOpts}</select>
       ${parentName?`<div style="font-size:11px;color:var(--text3);margin-top:4px;">현재 상위: <b>${esc(parentName)}</b></div>`:''}
@@ -1294,12 +1329,13 @@ async function renderPermissions(){
       nodes.forEach(n=>{
         const hasKids=n.children&&n.children.length>0;
         const isTop=!n.parentId;
+        const menuName=displayMenuName(n);
         const icon=n.menuType==='BUTTON'?'<span style="color:var(--text3);font-size:9px;">&#9679;</span>':(hasKids?'<span style="color:var(--text3);font-size:10px;">&#9660;</span>':'<span style="color:var(--text3);font-size:10px;">&#9654;</span>');
         const indent=level*24;
         const bg=isTop?'background:var(--surface2);font-weight:600;':'';
         const typeBadge=n.menuType==='MENU'?'<span class="badge" style="font-size:10px;padding:1px 6px;margin-left:6px;background:var(--primary-light);color:var(--primary-dark);">메뉴</span>':'<span class="badge" style="font-size:10px;padding:1px 6px;margin-left:6px;background:var(--green-light);color:var(--green);">기능</span>';
         html+=`<tr style="${bg}">`;
-        html+=`<td style="padding-left:${16+indent}px;white-space:nowrap;position:sticky;left:0;background:${isTop?'var(--surface2)':'var(--surface1)'};z-index:1;">${icon} ${esc(n.menuName)}${typeBadge}</td>`;
+        html+=`<td style="padding-left:${16+indent}px;white-space:nowrap;position:sticky;left:0;background:${isTop?'var(--surface2)':'var(--surface1)'};z-index:1;">${icon} ${esc(menuName)}${typeBadge}</td>`;
         roles.forEach(role=>{
           const checked=roleMaps[role]&&roleMaps[role].has(n.menuId)?'checked':'';
           const disabled=canManage?'':'disabled';
@@ -1711,6 +1747,7 @@ function renderEquipmentIndex(kind) {
     { title:'정수기', desc:'정수기 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_water_purifier' }
   ] : [
     { title:'소화기', desc:'소화기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_extinguisher' },
+    { title:'스프링클러 목록', desc:'스프링클러 목록, 상세, 등록/수정, 90일 주기 점검 이력을 확인합니다.', page:'fire_sprinkler' },
     { title:'소화전', desc:'소화전 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_hydrant' },
     { title:'수신기', desc:'수신기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_receiver' },
     { title:'소방펌프', desc:'소방펌프 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_pump' },

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <style>body{opacity:0!important;transition:none!important;}</style>
+  <link rel="stylesheet" href="/css/spa-theme.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>스프링클러 목록 - FireWeb</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7fb;color:#0f172a;}
+    body{opacity:1!important;}
+    .fireweb-navbar{position:relative;z-index:1030;border-bottom-left-radius:14px;border-bottom-right-radius:14px;overflow:visible;}
+    .fireweb-navbar .navbar-brand,.fireweb-navbar .nav-link,.fireweb-navbar .account-link{color:#fff!important;}
+    .fireweb-navbar .brand-logos{display:flex;align-items:center;gap:8px;}
+    .fireweb-navbar .brand-logos img{height:32px!important;width:auto!important;display:block;object-fit:contain!important;}
+    .summary-gradient-card{border:0!important;box-shadow:none!important;background:transparent!important;}
+    .summary-gradient-card .card-body{border-radius:14px;border:0!important;box-shadow:none!important;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
+    .status-add-btn{background:#fff!important;color:#4f46e5!important;border:0!important;font-weight:800;border-radius:8px;padding:6px 16px;}
+    .table thead.table-dark th{background-image:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;color:#fff!important;font-weight:700!important;padding:12px 12px!important;border-color:rgba(255,255,255,.14)!important;white-space:nowrap;}
+    .table td{padding:13px 12px!important;vertical-align:middle!important;border-bottom-color:rgba(15,23,42,.1)!important;}
+    .clickable-row{cursor:pointer;}.clickable-row:hover{background:rgba(99,102,241,.06)!important;}
+    .fw-status{display:inline-block;padding:.18rem .68rem;border-radius:999px;font-weight:800;font-size:.78rem;line-height:1.25;color:#fff;}
+    .fw-ok{background:#178a54;}.fw-bad{background:#d64545;}.fw-warn{background:#f59e0b;}.fw-muted{background:#64748b;}
+    .btn-fw-edit{background:#fff!important;border:1px solid rgba(99,102,241,.45)!important;color:#2563eb!important;font-weight:700;padding:.28rem .62rem;border-radius:8px;}
+    .btn-fw-inspect{background:#12c2e9!important;border:1px solid #12c2e9!important;color:#fff!important;font-weight:800;padding:.28rem .62rem;border-radius:8px;}
+    .btn-fw-delete{background:#fff!important;border:1px solid rgba(220,38,38,.35)!important;color:#dc2626!important;font-weight:700;padding:.28rem .62rem;border-radius:8px;}
+    #fwToast{position:fixed;top:16px;right:16px;z-index:3000;}
+    .modal-backdrop.show{background:rgba(17,24,39,.35)!important;backdrop-filter:blur(4px);}
+    #spkUpsertModal .modal-header,#spkDetailModal .modal-header,#spkInspectModal .modal-header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-bottom:0;}
+    #spkUpsertModal .btn-close,#spkDetailModal .btn-close,#spkInspectModal .btn-close{filter:invert(1) grayscale(100%) brightness(200%);}
+    .check-section{border:1px solid #e2e8f0;border-radius:12px;padding:14px;background:#fff;margin-bottom:12px;}
+    .check-section-title{font-weight:900;color:#4f46e5;margin-bottom:10px;}
+    .check-item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px dashed #e2e8f0;}
+    .check-item:first-of-type{border-top:0;}
+    .check-radio{display:inline-flex;gap:12px;white-space:nowrap;}
+    .check-radio label{font-weight:700;font-size:.9rem;display:inline-flex;gap:5px;align-items:center;}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;}
+    .detail-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;}
+    .detail-label{font-size:.78rem;color:#64748b;font-weight:800;margin-bottom:3px;}.detail-value{font-weight:700;}
+    .history-table input,.history-table select,.history-table textarea{min-width:120px;}
+    .history-table textarea{min-width:180px;}
+    @media(max-width:1199.98px){.table{font-size:.8rem}.table td,.table th{padding:9px 6px!important}.detail-grid{grid-template-columns:1fr}.check-item{grid-template-columns:1fr}.check-radio{justify-content:flex-start;}}
+  </style>
+</head>
+<body>
+<header>
+  <nav class="navbar navbar-expand-lg navbar-dark fireweb-navbar" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/fire-map.html">
+        <span class="brand-logos" aria-hidden="true"><img src="/images/Kleannara.PNG" alt="" onerror="this.style.display='none'" /><img src="/images/KFMS.PNG" alt="" onerror="this.style.display='none'" /></span>
+        <span class="visually-hidden">FireWeb</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3"><li class="nav-item"><a class="nav-link fw-semibold" href="/sprinklers.html">스프링클러 목록</a></li></ul>
+        <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="container-fluid py-4">
+  <section class="card shadow-sm mb-4 summary-gradient-card" aria-labelledby="pageTitle">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3 text-white">
+      <div class="d-flex align-items-center gap-3">
+        <img src="/images/sprinkler.png" alt="스프링클러" style="width:54px;height:54px;object-fit:contain;background:#fff;border-radius:14px;padding:5px;">
+        <div><h3 class="mb-1 fw-bold" id="pageTitle">스프링클러 목록</h3><div class="text-white-50 fw-semibold">총 <span id="totalCount">0</span> 건 · 점검주기 90일</div></div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="btn-group" role="group" aria-label="스프링클러 상태 필터">
+          <button type="button" class="btn btn-info text-white" id="btnStatusInspect">점검필요 <span id="countInspect">(0)</span></button>
+          <button type="button" class="btn btn-danger text-white" id="btnStatusFault">고장 <span id="countFault">(0)</span></button>
+        </div>
+        <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;">엑셀</button>
+        <button type="button" class="btn status-add-btn" id="btnSpkAdd">+ 스프링클러 추가</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card shadow-sm mb-4" aria-label="검색 필터">
+    <div class="card-body">
+      <div class="row g-2 align-items-center">
+        <div class="col-lg-4"><input id="filterQ" class="form-control" placeholder="검색어(ID/건물/층/비고)" /></div>
+        <div class="col-lg-3"><select id="filterBuildingId" class="form-select"><option value="">-- 건물 전체 --</option></select></div>
+        <div class="col-lg-3"><select id="filterFloorId" class="form-select"><option value="">-- 층 전체 --</option></select></div>
+        <div class="col-lg-2 d-flex gap-2"><button class="btn btn-primary w-100" type="button" id="btnSearch">검색</button><button class="btn btn-outline-secondary w-100" type="button" id="btnReset">초기화</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="collapse mb-4" id="statusPanel" aria-label="상태별 목록"><div class="card shadow-sm"><div class="card-body p-0" id="statusPanelBody" style="max-height:35vh;overflow:auto;"></div></div></section>
+  <section class="card shadow-sm"><div class="card-body p-0" id="mainTableWrap"><div class="text-center py-5 text-muted">데이터를 불러오는 중...</div></div></section>
+</main>
+
+<div class="modal fade" id="spkDetailModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="spkDetailBody"></div></div></div></div>
+<div class="modal fade" id="spkInspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="inspectChecklist"></div><label class="form-label fw-bold mt-2" for="inspectNote">비고</label><textarea class="form-control" id="inspectNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea><div class="small text-muted mt-2">점검 결과는 모든 항목을 양호/불량 중 하나로 선택해야 저장됩니다.</div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
+<div class="modal fade" id="spkUpsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="spkUpsertTitle">스프링클러 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="spkUpsertForm"><input type="hidden" id="spkId"><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold" for="spkBuildingSel">건물</label><select class="form-select" id="spkBuildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold" for="spkFloorSel">층</label><select class="form-select" id="spkFloorSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold" for="spkX">좌표 X(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkX" placeholder="예: 42.5"></div><div class="col-md-6"><label class="form-label fw-bold" for="spkY">좌표 Y(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkY" placeholder="예: 61.2"></div><div class="col-12"><label class="form-label fw-bold" for="spkNote">비고</label><textarea class="form-control" id="spkNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary" id="btnSaveSpk">저장</button></div></div></div></div>
+<div id="fwToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/csrf.js"></script>
+<script src="/js/common-nav.js"></script>
+<script>
+const API = (() => {
+  const getUser = () => { try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); } catch { return null; } };
+  const canManage = () => { const u = getUser(); return u && u.canManage !== false; };
+  async function req(url, opts = {}) {
+    const requestOpts = { ...opts };
+    const headers = { ...(requestOpts.headers || {}) };
+    if (window.FireWebCsrf?.isMutation?.(requestOpts.method)) await window.FireWebCsrf.ensureToken();
+    if (!(requestOpts.body instanceof FormData) && requestOpts.body && typeof requestOpts.body === 'object') {
+      headers['Content-Type'] = 'application/json';
+      requestOpts.body = JSON.stringify(requestOpts.body);
+    }
+    requestOpts.headers = window.FireWebCsrf?.headers(headers, requestOpts.method) || headers;
+    const res = await fetch(url, requestOpts);
+    if (res.status === 401) {
+      localStorage.removeItem('fireweb_user'); localStorage.removeItem('fw_user');
+      (window.FireWebCsrf?.goLogin || function(){ location.href='/index.html'; })();
+      return null;
+    }
+    return res;
+  }
+  return { req, getUser, canManage };
+})();
+
+const checklistGroups = [
+  { title:'스프링클러 배관', items:[
+    { key:'pipe_damage', label:'배관 파손여부 확인(휘거나 찌그러짐)' },
+    { key:'pipe_connection', label:'배관 연결부 상태 확인(플랜지, 나사부, 엘보 등)' },
+    { key:'pipe_support', label:'배관 지지대 상태 확인(고정 및 풀림 확인)' },
+    { key:'drain_valve', label:'드레인 벨브 누수 상태 확인(벨브 파손 및 잠금상태)' },
+    { key:'drain_pipe_sealing', label:'드레인 배관 실리콘 마감상태 확인' }
+  ]},
+  { title:'스프링클러 헤드 반사판', items:[{ key:'head_reflector', label:'헤드 반사판 탈락여부 확인' }] },
+  { title:'제품', items:[{ key:'product_clearance', label:'헤드로부터 제품 이격거리 60cm 이격거리 확보 여부' }] }
+];
+const flatChecklist = checklistGroups.flatMap(g => g.items);
+let allItems = [], filteredItems = [], optionBuildings = [], optionFloors = [], buildingFloorMap = {}, currentStatusType = null, currentInspectId = null, currentDetailId = null;
+let canEdit = API.canManage();
+const pageSize = 500;
+
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function val(v){ return v === null || v === undefined || v === '' ? '-' : esc(v); }
+function fmtDate(v){ return v ? String(v).slice(0,10) : '-'; }
+function fmtCoord(x,y){ return (x !== null && x !== undefined && y !== null && y !== undefined) ? `${Number(x).toFixed(2)}, ${Number(y).toFixed(2)}` : '-'; }
+function resultKo(v){ return String(v || '').toUpperCase() === 'FAULTY' ? '불량' : '양호'; }
+function showToast(msg, type='success') {
+  const box = document.createElement('div'); box.className = `alert alert-${type} shadow`; box.textContent = msg;
+  document.getElementById('fwToast').appendChild(box); setTimeout(()=>box.remove(), 2600);
+}
+async function jsonOrThrow(res) {
+  if (!res) throw new Error('요청이 취소되었습니다.');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) throw new Error(data.message || '처리 중 오류가 발생했습니다.');
+  return data.data;
+}
+async function loadFireAdminPermission() {
+  try {
+    const u = API.getUser(); if (!u || !u.loginId) return;
+    const res = await API.req('/api/codes/lookup/FIRE_PERM');
+    const data = await jsonOrThrow(res);
+    const fireAdmin = Array.isArray(data) ? data.find(d => d.code === 'FIRE_ADMIN') : null;
+    if (fireAdmin?.extraValue1) canEdit = fireAdmin.extraValue1.split(',').map(s => s.trim()).includes(u.loginId);
+  } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+}
+async function loadBuildingOptions() {
+  try {
+    const res = await API.req('/fire-api/maps/building-floors');
+    const data = await jsonOrThrow(res);
+    const rows = Array.isArray(data) ? data : [];
+    optionBuildings = rows.map(b => ({ buildingId:b.buildingId, buildingName:b.buildingName || b.name || String(b.buildingId) })).filter(b => b.buildingId != null);
+    const fMap = new Map(); buildingFloorMap = {};
+    rows.forEach(b => {
+      const floors = Array.isArray(b.floors) ? b.floors.map(f => ({ floorId:f.floorId, floorName:f.floorName || f.name || String(f.floorId) })).filter(f => f.floorId != null) : [];
+      buildingFloorMap[String(b.buildingId)] = floors;
+      floors.forEach(f => fMap.set(String(f.floorId), f));
+    });
+    optionFloors = Array.from(fMap.values());
+  } catch(e) { optionBuildings = []; optionFloors = []; buildingFloorMap = {}; }
+  fillSelects();
+}
+function fillSelects() {
+  const bOptions = '<option value="">-- 건물 전체 --</option>' + optionBuildings.map(b => `<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join('');
+  const fOptions = '<option value="">-- 층 전체 --</option>' + optionFloors.map(f => `<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('');
+  document.getElementById('filterBuildingId').innerHTML = bOptions;
+  document.getElementById('filterFloorId').innerHTML = fOptions;
+  document.getElementById('spkBuildingSel').innerHTML = '<option value="">건물 선택</option>' + optionBuildings.map(b => `<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join('');
+  document.getElementById('spkFloorSel').innerHTML = '<option value="">층 선택</option>' + optionFloors.map(f => `<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('');
+}
+function syncFloorSelect(buildingId, targetId, includeAll) {
+  const floors = buildingId && buildingFloorMap[String(buildingId)]?.length ? buildingFloorMap[String(buildingId)] : optionFloors;
+  document.getElementById(targetId).innerHTML = (includeAll ? '<option value="">-- 층 전체 --</option>' : '<option value="">층 선택</option>') + floors.map(f => `<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('');
+}
+async function loadSprinklers() {
+  const params = new URLSearchParams({ page:'0', size:String(pageSize) });
+  const q = document.getElementById('filterQ').value.trim();
+  const b = document.getElementById('filterBuildingId').value;
+  const f = document.getElementById('filterFloorId').value;
+  if (q) params.set('q', q); if (b) params.set('buildingId', b); if (f) params.set('floorId', f);
+  try {
+    const data = await jsonOrThrow(await API.req('/fire-api/sprinklers?' + params.toString()));
+    allItems = Array.isArray(data?.content) ? data.content : (Array.isArray(data) ? data : []);
+    document.getElementById('totalCount').textContent = data?.totalElements ?? allItems.length;
+    updateCounts(); applyFilter(); renderTable(); renderStatusPanel();
+  } catch(e) {
+    document.getElementById('mainTableWrap').innerHTML = `<div class="text-center py-5 text-danger">${esc(e.message)}</div>`;
+  }
+}
+function updateCounts() {
+  document.getElementById('countInspect').textContent = `(${allItems.filter(x => x.inspectionRequired === true).length})`;
+  document.getElementById('countFault').textContent = `(${allItems.filter(x => x.lastIsFaulty === true).length})`;
+}
+function applyFilter() {
+  filteredItems = allItems.filter(x => currentStatusType === 'inspect' ? x.inspectionRequired === true : currentStatusType === 'fault' ? x.lastIsFaulty === true : true);
+}
+function renderStatusPanel() {
+  const panel = document.getElementById('statusPanelBody');
+  if (!currentStatusType) { panel.innerHTML = ''; bootstrap.Collapse.getOrCreateInstance(document.getElementById('statusPanel'), { toggle:false }).hide(); return; }
+  const title = currentStatusType === 'inspect' ? '점검필요 스프링클러' : '고장 스프링클러';
+  const rows = filteredItems.map((it, idx) => `<tr class="clickable-row" data-id="${it.sprinklerId}"><td>${idx+1}</td><td>${val(it.serialNumber)}</td><td>${val(it.buildingName)}</td><td>${val(it.floorName)}</td><td>${fmtDate(it.lastInspectionDate)}</td><td>${val(it.lastFaultReason)}</td></tr>`).join('') || `<tr><td colspan="6" class="text-center text-muted py-4">대상 설비가 없습니다.</td></tr>`;
+  panel.innerHTML = `<div class="p-3 fw-bold">${title}</div><div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>번호</th><th>ID</th><th>건물</th><th>층</th><th>최종점검일</th><th>고장사유</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  bootstrap.Collapse.getOrCreateInstance(document.getElementById('statusPanel'), { toggle:false }).show();
+}
+function renderTable() {
+  const rows = filteredItems.map((it, idx) => `
+    <tr class="clickable-row" data-id="${it.sprinklerId}">
+      <td class="text-center">${idx + 1}</td><td class="fw-bold">${val(it.serialNumber)}</td><td>${val(it.buildingName)}</td><td>${val(it.floorName)}</td><td>${fmtCoord(it.x,it.y)}</td>
+      <td>${fmtDate(it.lastInspectionDate)} ${it.inspectionRequired ? '<span class="fw-status fw-warn ms-1">점검필요</span>' : ''}</td><td>${val(it.lastInspectorName)}</td>
+      <td>${it.lastInspectionDate ? (it.lastIsFaulty ? '<span class="fw-status fw-bad">고장</span>' : '<span class="fw-status fw-ok">정상</span>') : '<span class="fw-status fw-muted">미점검</span>'}</td>
+      <td class="text-truncate" style="max-width:240px;" title="${esc(it.lastFaultReason || '')}">${val(it.lastFaultReason)}</td><td class="text-truncate" style="max-width:220px;" title="${esc(it.note || '')}">${val(it.note)}</td>
+      <td><div class="d-inline-flex gap-1">${canEdit ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.sprinklerId}">수정</button><button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.sprinklerId}">점검</button><button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.sprinklerId}" data-serial="${esc(it.serialNumber)}">삭제</button>` : ''}</div></td>
+    </tr>`).join('') || `<tr><td colspan="11" class="text-center text-muted py-5">등록된 스프링클러가 없습니다.</td></tr>`;
+  document.getElementById('mainTableWrap').innerHTML = `<div class="table-responsive"><table class="table mb-0"><thead class="table-dark"><tr><th style="width:70px" class="text-center">번호</th><th style="width:125px">ID</th><th>건물</th><th>층</th><th style="width:115px">좌표</th><th style="width:145px">최종점검일</th><th style="width:110px">점검자</th><th style="width:95px">고장유무</th><th>고장사유</th><th>비고</th><th style="width:170px">관리</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function checklistHtml(prefix, values = {}) {
+  return checklistGroups.map(group => `<section class="check-section"><div class="check-section-title">${esc(group.title)}</div>${group.items.map(item => {
+    const v = String(values[item.key] || '').toUpperCase();
+    return `<div class="check-item"><div class="fw-semibold">${esc(item.label)}</div><div class="check-radio"><label><input type="radio" name="${prefix}_${item.key}" value="NORMAL" ${v === 'NORMAL' ? 'checked' : ''}> 양호</label><label><input type="radio" name="${prefix}_${item.key}" value="FAULTY" ${v === 'FAULTY' ? 'checked' : ''}> 불량</label></div></div>`;
+  }).join('')}</section>`).join('');
+}
+function collectChecklist(prefix) {
+  return flatChecklist.map(item => {
+    const checked = document.querySelector(`input[name="${prefix}_${item.key}"]:checked`);
+    if (!checked) throw new Error(`'${item.label}' 결과를 선택해 주세요.`);
+    return { itemKey:item.key, itemLabel:item.label, result:checked.value };
+  });
+}
+function checklistMap(row) {
+  const map = {}; (row?.checklistItems || []).forEach(it => { map[it.itemKey] = it.result; }); return map;
+}
+async function openDetail(id) {
+  try {
+    const d = await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id))); currentDetailId = id;
+    const historyRows = Array.isArray(d.inspections) && d.inspections.length ? d.inspections.map(r => renderHistoryRow(r)).join('') : renderHistoryRow({});
+    document.getElementById('spkDetailBody').innerHTML = `
+      <div class="detail-grid mb-4"><div class="detail-item"><div class="detail-label">ID</div><div class="detail-value">${val(d.serialNumber)}</div></div><div class="detail-item"><div class="detail-label">건물 / 층</div><div class="detail-value">${val(d.buildingName)} / ${val(d.floorName)}</div></div><div class="detail-item"><div class="detail-label">좌표</div><div class="detail-value">${fmtCoord(d.x,d.y)}</div></div><div class="detail-item"><div class="detail-label">최종점검</div><div class="detail-value">${fmtDate(d.lastInspectionDate)} ${d.lastInspectorName ? '/ ' + esc(d.lastInspectorName) : ''}</div></div><div class="detail-item"><div class="detail-label">고장유무</div><div class="detail-value">${d.lastInspectionDate ? (d.lastIsFaulty ? '<span class="fw-status fw-bad">고장</span>' : '<span class="fw-status fw-ok">정상</span>') : '-'}</div></div><div class="detail-item"><div class="detail-label">고장사유</div><div class="detail-value">${val(d.lastFaultReason)}</div></div><div class="detail-item" style="grid-column:1/-1"><div class="detail-label">비고</div><div class="detail-value">${val(d.note)}</div></div></div>
+      <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">점검 이력(최근 12건)</h6><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddHistory">이력 추가</button></div>
+      <div class="table-responsive"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th><th style="width:115px">관리</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('spkDetailModal')).show();
+  } catch(e) { showToast(e.message, 'danger'); }
+}
+function renderHistoryRow(row) {
+  const id = row.inspectionId || '';
+  const map = checklistMap(row);
+  return `<tr data-inspection-id="${esc(id)}"><td><input type="date" class="form-control form-control-sm js-hist-date" value="${esc(row.inspectionDate ? String(row.inspectionDate).slice(0,10) : '')}"></td><td><input type="time" class="form-control form-control-sm js-hist-time" value="${esc(row.inspectionTime ? String(row.inspectionTime).slice(0,5) : '')}"></td><td><input type="text" class="form-control form-control-sm js-hist-inspector" value="${esc(row.inspectorName || '')}" placeholder="점검자"></td><td><button type="button" class="btn btn-sm ${row.isFaulty ? 'btn-danger' : 'btn-success'} js-hist-check">${row.inspectionId ? (row.isFaulty ? '불량' : '양호') : '체크'}</button><div class="d-none js-hist-items">${esc(JSON.stringify(map))}</div></td><td class="small text-danger">${val(row.faultReason)}</td><td><textarea class="form-control form-control-sm js-hist-note" rows="1" placeholder="비고">${esc(row.note || '')}</textarea></td><td><button class="btn btn-sm btn-fw-edit js-hist-save">저장</button>${id ? '<button class="btn btn-sm btn-fw-delete js-hist-delete ms-1">삭제</button>' : ''}</td></tr>`;
+}
+function openChecklistEditor(tr) {
+  const raw = tr.querySelector('.js-hist-items')?.textContent || '{}'; let map = {}; try { map = JSON.parse(raw); } catch {}
+  const holder = document.createElement('div'); holder.innerHTML = checklistHtml('hist', map);
+  const modal = document.createElement('div'); modal.className = 'modal fade'; modal.innerHTML = `<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">점검 결과 선택</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">${holder.innerHTML}</div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary">적용</button></div></div></div>`;
+  document.body.appendChild(modal); const inst = bootstrap.Modal.getOrCreateInstance(modal); inst.show();
+  modal.querySelector('.btn-primary').onclick = () => { try { const items = collectChecklist('hist'); const next = {}; items.forEach(x => next[x.itemKey] = x.result); tr.querySelector('.js-hist-items').textContent = JSON.stringify(next); const bad = items.some(x => x.result === 'FAULTY'); const btn = tr.querySelector('.js-hist-check'); btn.textContent = bad ? '불량' : '양호'; btn.className = `btn btn-sm ${bad ? 'btn-danger' : 'btn-success'} js-hist-check`; inst.hide(); } catch(e) { alert(e.message); } };
+  modal.addEventListener('hidden.bs.modal', () => modal.remove());
+}
+async function saveHistory(tr) {
+  try {
+    const inspectionId = tr.dataset.inspectionId || '';
+    const raw = tr.querySelector('.js-hist-items')?.textContent || '{}'; let map = {}; try { map = JSON.parse(raw); } catch {}
+    const items = flatChecklist.map(item => ({ itemKey:item.key, itemLabel:item.label, result:map[item.key] || '' }));
+    if (items.some(x => !x.result)) throw new Error('점검 결과를 선택해 주세요.');
+    const body = { inspectionDate:tr.querySelector('.js-hist-date').value, inspectionTime:tr.querySelector('.js-hist-time').value || null, inspectorName:tr.querySelector('.js-hist-inspector').value.trim(), items, note:tr.querySelector('.js-hist-note').value.trim() };
+    if (!body.inspectionDate) throw new Error('점검일을 입력해 주세요.');
+    const url = inspectionId ? `/fire-api/sprinklers/${currentDetailId}/inspections/${inspectionId}` : `/fire-api/sprinklers/${currentDetailId}/inspections`;
+    await jsonOrThrow(await API.req(url, { method: inspectionId ? 'PATCH' : 'POST', body }));
+    showToast('점검 이력이 저장되었습니다.'); await loadSprinklers(); await openDetail(currentDetailId);
+  } catch(e) { showToast(e.message, 'danger'); }
+}
+async function deleteHistory(tr) {
+  const id = tr.dataset.inspectionId; if (!id || !confirm('점검 이력을 삭제할까요?')) return;
+  try { await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentDetailId}/inspections/${id}`, { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); await openDetail(currentDetailId); } catch(e) { showToast(e.message, 'danger'); }
+}
+function openInspect(id) { currentInspectId = id; document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect'); document.getElementById('inspectNote').value = ''; bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show(); }
+async function confirmInspect() {
+  try { const body = { items:collectChecklist('inspect'), note:document.getElementById('inspectNote').value.trim() }; await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentInspectId}/inspect`, { method:'POST', body })); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).hide(); showToast('점검이 완료되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); }
+}
+function openUpsert(item) {
+  document.getElementById('spkUpsertTitle').textContent = item ? '스프링클러 수정' : '스프링클러 추가';
+  document.getElementById('spkId').value = item?.sprinklerId || ''; document.getElementById('spkBuildingSel').value = item?.buildingId || ''; syncFloorSelect(document.getElementById('spkBuildingSel').value, 'spkFloorSel', false);
+  document.getElementById('spkFloorSel').value = item?.floorId || ''; document.getElementById('spkX').value = item?.x ?? ''; document.getElementById('spkY').value = item?.y ?? ''; document.getElementById('spkNote').value = item?.note || '';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).show();
+}
+async function saveSprinkler() {
+  try {
+    const body = { sprinklerId:document.getElementById('spkId').value || null, buildingId:Number(document.getElementById('spkBuildingSel').value), floorId:Number(document.getElementById('spkFloorSel').value), x:document.getElementById('spkX').value === '' ? null : Number(document.getElementById('spkX').value), y:document.getElementById('spkY').value === '' ? null : Number(document.getElementById('spkY').value), note:document.getElementById('spkNote').value.trim() };
+    if (!body.buildingId) throw new Error('건물을 선택해 주세요.'); if (!body.floorId) throw new Error('층을 선택해 주세요.');
+    await jsonOrThrow(await API.req('/fire-api/sprinklers', { method:'POST', body })); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).hide(); showToast('저장되었습니다.'); await loadSprinklers();
+  } catch(e) { showToast(e.message, 'danger'); }
+}
+async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
+function toggleStatus(type) { currentStatusType = currentStatusType === type ? null : type; document.getElementById('btnStatusInspect').classList.toggle('active', currentStatusType === 'inspect'); document.getElementById('btnStatusFault').classList.toggle('active', currentStatusType === 'fault'); applyFilter(); renderTable(); renderStatusPanel(); }
+function exportAll() { const to = new Date(); const from = new Date(); from.setFullYear(from.getFullYear() - 1); const f = from.toISOString().slice(0,10); const t = to.toISOString().slice(0,10); location.href = `/fire-api/sprinklers/inspections/export-all?from=${f}&to=${t}`; }
+
+document.addEventListener('click', e => {
+  const row = e.target.closest('tr.clickable-row[data-id]');
+  if (row && !e.target.closest('button,a,input,select,textarea')) openDetail(row.dataset.id);
+  const edit = e.target.closest('.js-edit'); if (edit) { e.preventDefault(); openUpsert(allItems.find(x => Number(x.sprinklerId) === Number(edit.dataset.id))); }
+  const insp = e.target.closest('.js-inspect'); if (insp) { e.preventDefault(); openInspect(insp.dataset.id); }
+  const del = e.target.closest('.js-delete'); if (del) { e.preventDefault(); deleteSprinkler(del.dataset.id, del.dataset.serial); }
+  const histCheck = e.target.closest('.js-hist-check'); if (histCheck) openChecklistEditor(histCheck.closest('tr'));
+  const histSave = e.target.closest('.js-hist-save'); if (histSave) saveHistory(histSave.closest('tr'));
+  const histDel = e.target.closest('.js-hist-delete'); if (histDel) deleteHistory(histDel.closest('tr'));
+  if (e.target.id === 'btnAddHistory') document.getElementById('historyBody').insertAdjacentHTML('afterbegin', renderHistoryRow({}));
+});
+document.getElementById('btnSearch').addEventListener('click', loadSprinklers);
+document.getElementById('btnReset').addEventListener('click', () => { document.getElementById('filterQ').value=''; document.getElementById('filterBuildingId').value=''; syncFloorSelect('', 'filterFloorId', true); currentStatusType=null; loadSprinklers(); });
+document.getElementById('filterBuildingId').addEventListener('change', e => syncFloorSelect(e.target.value, 'filterFloorId', true));
+document.getElementById('spkBuildingSel').addEventListener('change', e => syncFloorSelect(e.target.value, 'spkFloorSel', false));
+document.getElementById('filterQ').addEventListener('keydown', e => { if (e.key === 'Enter') loadSprinklers(); });
+document.getElementById('btnStatusInspect').addEventListener('click', () => toggleStatus('inspect'));
+document.getElementById('btnStatusFault').addEventListener('click', () => toggleStatus('fault'));
+document.getElementById('btnExcelDownload').addEventListener('click', exportAll);
+document.getElementById('btnSpkAdd').addEventListener('click', () => openUpsert(null));
+document.getElementById('btnSaveSpk').addEventListener('click', saveSprinkler);
+document.getElementById('btnConfirmInspect').addEventListener('click', confirmInspect);
+(async function init(){ await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); })();
+</script>
+</body>
+</html>

@@ -13,7 +13,9 @@
   }
 
   function stripListWord(text) {
-    return String(text || "").replace(/\s*목록\b/g, "").trim();
+    var value = String(text || "");
+    if (value.indexOf("스프링클러 목록") >= 0) return value.trim();
+    return value.replace(/\s*목록\b/g, "").trim();
   }
 
   function esc(v) {
@@ -69,6 +71,7 @@
       { href: "/fire-map.html", text: "\uC804\uCCB4 \uB3C4\uBA74" },
       { href: "/maps/floor.html?buildingName=%EB%B3%B5%EC%A7%80%EA%B4%80&floorName=1%EC%B8%B5", text: "\uCE35\uBCC4 \uB3C4\uBA74" },
       { href: "/extinguishers.html", text: "\uC18C\uD654\uAE30" },
+      { href: "/sprinklers.html", text: "\uC2A4\uD504\uB9C1\uD074\uB7EC \uBAA9\uB85D" },
       { href: "/hydrants.html", text: "\uC18C\uD654\uC804" },
       { href: "/receivers.html", text: "\uC218\uC2E0\uAE30" },
       { href: "/pumps.html", text: "\uC18C\uBC29\uD38C\uD504" },

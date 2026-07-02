@@ -1,0 +1,132 @@
+package com.company.module.fire.entity;
+
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+/**
+ * 스프링클러 점검 이력 엔티티
+ * 테이블명: fire_sprinkler_inspection
+ */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Entity
+@Table(name = "fire_sprinkler_inspection",
+       uniqueConstraints = {
+           @UniqueConstraint(name = "UK_FIRE_SPRINKLER_INSPECTION_DATE",
+                             columnNames = {"SPRINKLER_ID", "INSPECTION_DATE"})
+       })
+public class FireSprinklerInspection {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "INSPECTION_ID")
+    private Long inspectionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "SPRINKLER_ID", nullable = false)
+    private FireSprinkler sprinkler;
+
+    @Column(name = "INSPECTION_DATE", nullable = false)
+    private LocalDate inspectionDate;
+
+    @Column(name = "INSPECTION_TIME")
+    private LocalTime inspectionTime;
+
+    @Column(name = "INSPECTION_STATUS", nullable = false, length = 30)
+    private String inspectionStatus;
+
+    @Lob
+    @Column(name = "CHECKLIST_JSON", columnDefinition = "LONGTEXT")
+    private String checklistJson;
+
+    @Column(name = "NOTE", length = 1000)
+    private String note;
+
+    @Column(name = "PIPE_DAMAGE_STATUS", length = 30)
+    private String pipeDamageStatus;
+
+    @Column(name = "PIPE_CONNECTION_STATUS", length = 30)
+    private String pipeConnectionStatus;
+
+    @Column(name = "PIPE_SUPPORT_STATUS", length = 30)
+    private String pipeSupportStatus;
+
+    @Column(name = "DRAIN_VALVE_STATUS", length = 30)
+    private String drainValveStatus;
+
+    @Column(name = "DRAIN_PIPE_SEALING_STATUS", length = 30)
+    private String drainPipeSealingStatus;
+
+    @Column(name = "HEAD_REFLECTOR_STATUS", length = 30)
+    private String headReflectorStatus;
+
+    @Column(name = "PRODUCT_CLEARANCE_STATUS", length = 30)
+    private String productClearanceStatus;
+
+    @Column(name = "INSPECTED_BY_USER_ID")
+    private Long inspectedByUserId;
+
+    @Column(name = "INSPECTED_BY_NAME", length = 200)
+    private String inspectedByName;
+
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @Builder
+    public FireSprinklerInspection(FireSprinkler sprinkler, LocalDate inspectionDate, LocalTime inspectionTime,
+                                   String inspectionStatus, String checklistJson, String note,
+                                   String pipeDamageStatus, String pipeConnectionStatus, String pipeSupportStatus,
+                                   String drainValveStatus, String drainPipeSealingStatus,
+                                   String headReflectorStatus, String productClearanceStatus,
+                                   Long inspectedByUserId, String inspectedByName) {
+        this.sprinkler = sprinkler;
+        this.inspectionDate = inspectionDate;
+        this.inspectionTime = inspectionTime;
+        this.inspectionStatus = inspectionStatus;
+        this.checklistJson = checklistJson;
+        this.note = note;
+        this.pipeDamageStatus = pipeDamageStatus;
+        this.pipeConnectionStatus = pipeConnectionStatus;
+        this.pipeSupportStatus = pipeSupportStatus;
+        this.drainValveStatus = drainValveStatus;
+        this.drainPipeSealingStatus = drainPipeSealingStatus;
+        this.headReflectorStatus = headReflectorStatus;
+        this.productClearanceStatus = productClearanceStatus;
+        this.inspectedByUserId = inspectedByUserId;
+        this.inspectedByName = inspectedByName;
+    }
+
+    public void updateInspection(LocalDate inspectionDate, LocalTime inspectionTime, String inspectionStatus,
+                                 String checklistJson, String note, String inspectedByName,
+                                 String pipeDamageStatus, String pipeConnectionStatus, String pipeSupportStatus,
+                                 String drainValveStatus, String drainPipeSealingStatus,
+                                 String headReflectorStatus, String productClearanceStatus) {
+        this.inspectionDate = inspectionDate;
+        this.inspectionTime = inspectionTime;
+        this.inspectionStatus = inspectionStatus;
+        this.checklistJson = checklistJson;
+        this.note = note;
+        this.pipeDamageStatus = pipeDamageStatus;
+        this.pipeConnectionStatus = pipeConnectionStatus;
+        this.pipeSupportStatus = pipeSupportStatus;
+        this.drainValveStatus = drainValveStatus;
+        this.drainPipeSealingStatus = drainPipeSealingStatus;
+        this.headReflectorStatus = headReflectorStatus;
+        this.productClearanceStatus = productClearanceStatus;
+        if (inspectedByName != null && !inspectedByName.isBlank()) {
+            this.inspectedByName = inspectedByName.trim();
+        }
+    }
+}

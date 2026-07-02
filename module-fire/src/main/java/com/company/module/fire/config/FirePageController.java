@@ -68,6 +68,13 @@ public class FirePageController {
         return serveHtml("static/pumps.html");
     }
 
+    /** /fire/sprinklers → sprinklers.html */
+    @GetMapping({"/fire/sprinklers", "/fire/sprinkler-pipes", "/fire/sprinkler-pipes.html"})
+    @ResponseBody
+    public ResponseEntity<String> fireSprinklers() throws IOException {
+        return serveHtml("static/sprinklers.html");
+    }
+
     /** /fire/floor → maps/floor.html */
     @GetMapping("/fire/floor")
     @ResponseBody
