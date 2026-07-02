@@ -1114,6 +1114,10 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/tissue_raw_warehouse_1F.jpg";
             return null;
         }
+        if (bn.contains("패드동천막창고") || bn.contains("padtentwarehouse")) {
+            if (floorNo == 1) return "/images/pad_tent_warehouse_1F.jpg";
+            return null;
+        }
         if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
             if (floorNo == 1) return "/images/tissue_tent_warehouse_1F.jpg";
             return null;
@@ -1277,6 +1281,9 @@ public class MobileInspectionController {
         }
         if (bn.contains("화장지원단창고") || bn.contains("원단창고") || bn.contains("tissuerawwarehouse")) {
             return "/images/tissue_raw_warehouse_1F.jpg";
+        }
+        if (bn.contains("패드동천막창고") || bn.contains("padtentwarehouse")) {
+            return "/images/pad_tent_warehouse_1F.jpg";
         }
         if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
             return "/images/tissue_tent_warehouse_1F.jpg";

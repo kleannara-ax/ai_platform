@@ -428,6 +428,7 @@
     { buildingId: 'D-NEW-INCINERATOR-WASTE', floorId: 'D-4F', buildingName: '\uC2E0\uC124\uC18C\uAC01\uB85C \uD3D0\uAE30\uBB3C \uCC98\uB9AC\uB3D9', floorName: '4\uCE35', isOutdoor: false, planImagePath: '/images/new_incinerator_waste_4F.png' },
     { buildingId: 'D-NEW-INCINERATOR-TURBINE', floorId: 'D-1F', buildingName: '\uC2E0\uC124\uC18C\uAC01\uB85C \uC99D\uAE30\uD130\uBE48\uB3D9', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/new_incinerator_turbine_1F.png' },
     { buildingId: 'D-NEW-INCINERATOR-TURBINE', floorId: 'D-2F', buildingName: '\uC2E0\uC124\uC18C\uAC01\uB85C \uC99D\uAE30\uD130\uBE48\uB3D9', floorName: '2\uCE35', isOutdoor: false, planImagePath: '/images/new_incinerator_turbine_2F.png' },
+    { buildingId: 'D-PAD-TENT-WAREHOUSE', floorId: 'D-1F', buildingName: '\uD328\uB4DC\uB3D9 \uCC9C\uB9C9\uCC3D\uACE0', floorName: '1\uCE35', isOutdoor: false, planImagePath: '/images/pad_tent_warehouse_1F.jpg' },
     { buildingId: 'D-OUT', floorId: 'D-OUT', buildingName: '\uC625\uC678', floorName: '\uC625\uC678', isOutdoor: true, planImagePath: '/images/drone_photo.JPG' }
   ];
   function normalize(v){ return String(v || '').replace(/\s+/g, '').toLowerCase(); }
@@ -439,6 +440,7 @@
     if (n.includes('\ud654\uc7a5\uc9c036') || n.includes('tissue36')) return '\uD654\uC7A5\uC9C03,6\uD638\uAE30';
     if (n.includes('\uc81c\uc9c012') || n.includes('jeji12')) return '\uC81C\uC9C01,2\uD638\uAE30';
     if (n.includes('\uc81c\uc9c03') || n.includes('jeji3')) return '\uC81C\uC9C03\uD638\uAE30';
+    if (n.includes('\ud328\ub4dc\ub3d9\ucc9c\ub9c9\ucc3d\uace0') || n.includes('padtentwarehouse')) return '\uD328\uB4DC\uB3D9 \uCC9C\uB9C9\uCC3D\uACE0';
     if (n.includes('\ud328\ub4dc\ub3d9') || n.includes('pad')) return '\uD328\uB4DC\uB3D9';
     if (n.includes('\uc2ec\uba74\ud384\ud37c') || n.includes('palpa') || n.includes('pulper')) return '\uC2EC\uBA74\uD384\uD37C';
     if (n.includes('\ubc00\ub864\ucc3d\uace0') || n.includes('milrol')) return '\uBC00\uB864\uCC3D\uACE0';
@@ -474,6 +476,7 @@
     if (n.includes('\ud654\uc7a5\uc9c036') || n.includes('tissue36')) return 4;
     if (n.includes('\uc81c\uc9c012') || n.includes('jeji12')) return 5;
     if (n.includes('\uc81c\uc9c03') || n.includes('jeji3')) return 6;
+    if (n.includes('\ud328\ub4dc\ub3d9\ucc9c\ub9c9\ucc3d\uace0') || n.includes('padtentwarehouse')) return 7.5;
     if (n.includes('\ud328\ub4dc\ub3d9') || n.includes('pad')) return 7;
     if (n.includes('\uc2ec\uba74\ud384\ud37c') || n.includes('palpa') || n.includes('pulper')) return 8;
     if (n.includes('\ubc00\ub864\ucc3d\uace0') || n.includes('milrol')) return 9;
@@ -588,6 +591,7 @@
       if (f.includes('2')) return '/images/palpa_2F.PNG';
       return '/images/palpa_1F.PNG';
     }
+    if (bn.includes('\ud328\ub4dc\ub3d9\ucc9c\ub9c9\ucc3d\uace0') || bn.includes('padtentwarehouse')) return '/images/pad_tent_warehouse_1F.jpg';
     if (bn.includes('\ud328\ub4dc\ub3d9') || bn.includes('pad')) {
       if (f.includes('2')) return '/images/pad_2F.PNG';
       return '/images/pad_1F.PNG';

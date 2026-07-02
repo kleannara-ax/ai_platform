@@ -54,6 +54,7 @@ public class FireDataInitializer implements ApplicationRunner {
         insertIgnoreBuilding(22, "유동상소각로");
         insertIgnoreBuilding(23, "신설소각로 폐기물 처리동");
         insertIgnoreBuilding(24, "신설소각로 증기터빈동");
+        insertIgnoreBuilding(25, "패드동 천막창고");
         insertIgnoreBuilding(99, "옥외");
 
         // ── 층(floor) ──

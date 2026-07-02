@@ -157,6 +157,11 @@ public class MapController {
             if (floor.contains("1")) return "/images/tissue_raw_warehouse_1F.jpg";
             return "";
         }
+        if (containsAny(building, "패드동천막창고", "pad_tent_warehouse", "padtentwarehouse")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/pad_tent_warehouse_1F.jpg";
+            return "";
+        }
         if (containsAny(building, "화장지천막창고", "천막창고", "tissue_tent_warehouse")) {
             if (isBasement(floor)) return "";
             if (floor.contains("1")) return "/images/tissue_tent_warehouse_1F.jpg";
