@@ -445,25 +445,20 @@ public class MobileInspectionController {
         if (operationType == null || (!operationType.equals("Manual") && !operationType.equals("Auto")))
             return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
 
-        Long buildingId;
-        Long floorId;
-
-        if ("Outdoor".equals(hydrantType)) {
-            buildingId = 99L;
-            floorId = 99L;
-        } else {
-            buildingId = getLong(body, "buildingId");
-            floorId = getLong(body, "floorId");
-            if (buildingId == null || buildingId <= 0)
-                return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
-            if (floorId == null || floorId <= 0)
-                return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
-        }
+        Long buildingId = getLong(body, "buildingId");
+        Long floorId = getLong(body, "floorId");
+        if (buildingId == null || buildingId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (floorId == null || floorId <= 0)
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
 
         Building building = buildingRepository.findById(buildingId)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
         Floor floor = floorRepository.findById(floorId)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        if ("Outdoor".equals(hydrantType) && (!isOutdoorName(building.getBuildingName()) || !isOutdoorName(floor.getFloorName()))) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        }
 
         FireHydrant entity = FireHydrant.builder()
                 .serialNumber(generateNextHydrantSerialNumber())
@@ -1255,6 +1250,11 @@ public class MobileInspectionController {
         return result;
     }
 
+    private boolean isOutdoorName(String name) {
+        String n = name == null ? "" : name.replaceAll("\\s+", "").toLowerCase();
+        return n.contains("\uC625\uC678") || n.contains("outdoor");
+    }
+
     private String resolvePlanImagePathStrict(String buildingName, String floorName) {
         String b = buildingName == null ? "" : buildingName.trim().toLowerCase();
         String f = floorName == null ? "" : floorName.trim().toLowerCase();
@@ -1344,6 +1344,7 @@ public class MobileInspectionController {
                 || bn.contains("tissue36")) {
             if (floorNo == 1) return "/images/tissue1,3_1F.PNG";
             if (floorNo == 2) return "/images/tissue1,3_2F.PNG";
+            if (floorNo == 3) return "/images/tissue1,3_3F.png";
             return null;
         }
         if (bn.contains("\uD654\uC7A5\uC9C045\uD638\uAE30")

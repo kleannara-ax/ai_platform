@@ -322,24 +322,33 @@
   }
 
   // ======= 미등록 =======
-  function renderRegisterForm(data) {
-    const mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
-    const allBuildings = Array.isArray(data.buildings) ? data.buildings : [];
-    const allFloors = Array.isArray(data.floors) ? data.floors : [];
+  function normalizeName(v) {
+    return String(v || '').replace(/\s+/g,'').toLowerCase();
+  }
+
+  function resolveOutdoorMeta(data) {
+    const allBuildings = Array.isArray(data?.buildings) ? data.buildings : [];
+    const allFloors = Array.isArray(data?.floors) ? data.floors : [];
     const outdoorBuilding = allBuildings.find(b => {
-      const n = String(b.buildingName || '').replace(/\s+/g,'').toLowerCase();
+      const n = normalizeName(b.buildingName);
       return n.includes('옥외') || n.includes('outdoor');
     });
     const outdoorFloor = allFloors.find(f => {
-      const n = String(f.floorName || '').replace(/\s+/g,'').toLowerCase();
-      return n === '1층' || n === '1f' || n === '1';
+      const n = normalizeName(f.floorName);
+      return n.includes('옥외') || n.includes('outdoor');
     });
-    const outdoorMeta = {
-      buildingId: outdoorBuilding?.buildingId ?? 99,
-      buildingName: outdoorBuilding?.buildingName ?? '옥외',
-      floorId: outdoorFloor?.floorId ?? 1,
-      floorName: outdoorFloor?.floorName ?? '1층'
+    if (!outdoorBuilding || !outdoorFloor) return null;
+    return {
+      buildingId: outdoorBuilding.buildingId,
+      buildingName: outdoorBuilding.buildingName || '옥외',
+      floorId: outdoorFloor.floorId,
+      floorName: outdoorFloor.floorName || '옥외'
     };
+  }
+
+  function renderRegisterForm(data) {
+    const mapOptions = Array.isArray(data.mapOptions) ? data.mapOptions : [];
+    const outdoorMeta = resolveOutdoorMeta(data);
 
     mainView.innerHTML = `
       <div class="mi-card">
@@ -416,7 +425,14 @@
       const isOutdoor = hydTypeEl.value === 'Outdoor';
       const bSel = document.getElementById('regBuilding');
       const fSel = document.getElementById('regFloor');
+      const outdoorNote = document.getElementById('outdoorNote');
       if (isOutdoor) {
+        if (!outdoorMeta?.buildingId || !outdoorMeta?.floorId) {
+          if (bSel) { bSel.innerHTML = '<option value="">옥외 건물 없음</option>'; bSel.value = ''; bSel.disabled = true; }
+          if (fSel) { fSel.innerHTML = '<option value="">옥외 층 없음</option>'; fSel.value = ''; fSel.disabled = true; }
+          if (outdoorNote) { outdoorNote.style.display = 'block'; outdoorNote.textContent = '옥외 건물/층 마스터 정보를 찾을 수 없어 옥외 소화전을 등록할 수 없습니다.'; }
+          return;
+        }
         if (bSel) {
           bSel.innerHTML = `<option value="${outdoorMeta.buildingId}">${escHtml(outdoorMeta.buildingName)}</option>`;
           bSel.value = String(outdoorMeta.buildingId);
@@ -427,8 +443,10 @@
         }
         if (bSel) bSel.disabled = true;
         if (fSel) fSel.disabled = true;
+        if (outdoorNote) { outdoorNote.style.display = 'block'; outdoorNote.textContent = '옥외 소화전입니다. 아래 항공사진에서 설치 위치를 터치하세요.'; }
         loadMap();
       } else {
+        if (outdoorNote) { outdoorNote.style.display = 'none'; outdoorNote.textContent = ''; }
         if (bSel) bSel.disabled = false;
         if (fSel) fSel.disabled = false;
         bindHydMappableOptions(mapOptions, outdoorMeta);
@@ -448,12 +466,13 @@
 
     const buildingMap = new Map();
     (mapOptions || []).forEach(o => {
-      const bid = String(o.buildingId || '');
+      if (!o || o.buildingId == null || o.floorId == null || !o.planImagePath) return;
+      const bid = String(o.buildingId);
       if (!bid) return;
       if (!buildingMap.has(bid)) {
         buildingMap.set(bid, { buildingId: o.buildingId, buildingName: o.buildingName || '', floors: [] });
       }
-      buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '' });
+      buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '', planImagePath: o.planImagePath });
     });
 
     const buildings = Array.from(buildingMap.values());
@@ -496,6 +515,7 @@
     floorId = parseInt(document.getElementById('regFloor').value || '0', 10);
     const xVal = document.getElementById('inputX').value;
     const yVal = document.getElementById('inputY').value;
+    if (hydType === 'Outdoor' && (!buildingId || !floorId)) { errEl.textContent = '옥외 건물/층 마스터 정보를 찾을 수 없습니다.'; return; }
     if (!buildingId) { errEl.textContent = '건물을 선택하세요.'; return; }
     if (!floorId) { errEl.textContent = '층을 선택하세요.'; return; }
     if (!xVal || !yVal) { errEl.textContent = '도면에서 위치를 선택하세요.'; return; }

@@ -400,12 +400,13 @@
 
     const buildingMap = new Map();
     (mapOptions || []).forEach(o => {
-      const bid = String(o.buildingId || '');
+      if (!o || o.buildingId == null || o.floorId == null || !o.planImagePath) return;
+      const bid = String(o.buildingId);
       if (!bid) return;
       if (!buildingMap.has(bid)) {
         buildingMap.set(bid, { buildingId: o.buildingId, buildingName: o.buildingName || '', floors: [] });
       }
-      buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '' });
+      buildingMap.get(bid).floors.push({ floorId: o.floorId, floorName: o.floorName || '', planImagePath: o.planImagePath });
     });
 
     const buildings = Array.from(buildingMap.values());

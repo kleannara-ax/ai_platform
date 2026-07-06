@@ -661,7 +661,7 @@
               <div class="spk-qr-media-box"><img class="spk-qr-equipment-img" src="${escHtml(imagePath)}" alt="스프링클러 이미지" onerror="this.src='/images/sprinkler.png'"></div>
             </section>
             <section class="spk-qr-section" aria-label="스프링클러 도면 위치">
-              <div class="spk-qr-section-title"><strong>도면 위치</strong><span>${valHtml(d.buildingName)} / ${valHtml(d.floorName)}</span></div>
+              <div class="spk-qr-section-title"><strong>도면 위치</strong></div>
               ${planImagePath ? `<div class="spk-qr-map-canvas"><img src="${escHtml(planImagePath)}" alt="도면">${markerHtml}</div>` : '<div class="empty-state">등록된 도면을 찾을 수 없습니다.</div>'}
             </section>
             ${qrUrl ? `<section class="spk-qr-section" aria-label="스프링클러 QR"><div class="spk-qr-section-title"><strong>QR</strong><span>${escHtml(qrKey)}</span></div><div class="spk-qr-media-box"><img src="${qrUrl}" alt="스프링클러 QR" style="width:180px;height:180px;"></div></section>` : ''}

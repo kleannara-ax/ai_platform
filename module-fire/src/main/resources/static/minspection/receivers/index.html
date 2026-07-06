@@ -212,8 +212,6 @@
   (function () {
     const API_BASE = '/fire-api/minspection/receivers';
     const RETURN_URL = location.pathname + location.search;
-    const OUTDOOR_BUILDING_ID = 99;
-    const OUTDOOR_FLOOR_ID = 99;
     const OUTDOOR_PLAN_IMAGE = '/images/drone_photo.JPG';
     const CHECK_ITEMS = [
       { key: 'power', label: '전원 표시 상태' },
@@ -237,6 +235,7 @@
     const inspectModal = document.getElementById('inspectModal');
     const checklistWrap = document.getElementById('checklistWrap');
     let receiverData = null;
+    let outdoorMeta = null;
 
     function authHeaders(extra) {
       return { ...(extra || {}) };
@@ -274,6 +273,31 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    function normalizeName(v) {
+      return String(v || '').replace(/\s+/g, '').toLowerCase();
+    }
+
+    function resolveOutdoorMeta(data) {
+      const buildings = Array.isArray(data?.buildings) ? data.buildings : [];
+      const floors = Array.isArray(data?.floors) ? data.floors : [];
+      const building = buildings.find(b => {
+        const name = normalizeName(b.buildingName);
+        return name.includes('옥외') || name.includes('outdoor');
+      });
+      const floor = floors.find(f => {
+        const name = normalizeName(f.floorName);
+        return name.includes('옥외') || name.includes('outdoor');
+      });
+      if (!building || !floor) return null;
+      return {
+        buildingId: building.buildingId,
+        buildingName: building.buildingName || '옥외',
+        floorId: floor.floorId,
+        floorName: floor.floorName || '옥외',
+        planImagePath: OUTDOOR_PLAN_IMAGE
+      };
     }
 
     function renderChecklist() {
@@ -444,6 +468,8 @@
     let selectedPoint = null;
 
     function renderRegisterForm(data) {
+      outdoorMeta = resolveOutdoorMeta(data);
+      const canRegisterOutdoor = !!(outdoorMeta?.buildingId && outdoorMeta?.floorId);
       mainView.innerHTML = `
         <div class="card">
           <div class="title-lg">수신기 등록</div>
@@ -451,6 +477,7 @@
         </div>
         <div class="card">
           <div class="outdoor-note">수신기는 옥외 설비입니다. 아래 항공사진에서 설치 위치를 터치하세요.</div>
+          ${canRegisterOutdoor ? '' : '<div class="err" style="margin-top:10px;">옥외 건물/층 마스터 정보를 찾을 수 없어 등록할 수 없습니다.</div>'}
           <form id="regForm" style="display:grid;gap:12px;margin-top:12px;">
             <div id="regErr" class="err"></div>
             <div class="mapWrap">
@@ -469,7 +496,7 @@
               <input type="text" id="regLocation" placeholder="예: 제지1호기 옆 수신기" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);font-size:15px;" />
             </div>
             <div style="display:flex;gap:8px;margin-top:4px;">
-              <button type="submit" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;">등록</button>
+              <button type="submit" ${canRegisterOutdoor ? '' : 'disabled'} style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;">등록</button>
             </div>
           </form>
         </div>`;
@@ -585,6 +612,7 @@
       const errEl = document.getElementById('regErr');
       errEl.textContent = '';
 
+      if (!outdoorMeta?.buildingId || !outdoorMeta?.floorId) { errEl.textContent = '옥외 건물/층 마스터 정보를 찾을 수 없습니다.'; return; }
       if (!xVal || !yVal) { errEl.textContent = '항공사진에서 설치 위치를 터치하세요.'; return; }
 
       const x = parseFloat(xVal);
@@ -598,8 +626,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             qrKey,
-            buildingId: OUTDOOR_BUILDING_ID,
-            floorId: OUTDOOR_FLOOR_ID,
+            buildingId: outdoorMeta.buildingId,
+            floorId: outdoorMeta.floorId,
             locationDescription: locationDescription || null,
             x: x,
             y: y
