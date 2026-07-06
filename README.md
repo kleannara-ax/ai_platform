@@ -64,7 +64,7 @@
   - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
   - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
-  - 스프링클러 좌측 메뉴 전용 투명 아이콘: `/images/sprinkler-menu.png`
+  - 스프링클러 좌측 메뉴 전용 투명 마스크 아이콘: `/images/sprinkler-menu.png` (`currentColor`로 사이드바 SVG 아이콘과 동일 색상 적용)
   - 스프링클러 페이지 기본 이미지: `/images/sprinkler.png`
   - 스프링클러 도면상 마커 전용 아이콘: `/images/sprinkler-marker.png`
   - 층별 도면 정적 이미지: `/images/tissue_raw_warehouse_1F.jpg`, `/images/tissue_tent_warehouse_1F.jpg`, `/images/raw_material_yard_1F.jpg`, `/images/fluidized_bed_incinerator_1F.png`, `/images/fluidized_bed_incinerator_2F.png`, `/images/fluidized_bed_incinerator_3F.png`, `/images/new_incinerator_waste_B1.png`, `/images/new_incinerator_waste_1F.png`, `/images/new_incinerator_waste_2F.png`, `/images/new_incinerator_waste_3F.png`, `/images/new_incinerator_waste_4F.png`, `/images/new_incinerator_turbine_1F.png`, `/images/new_incinerator_turbine_2F.png`, `/images/pad_tent_warehouse_1F.jpg`
@@ -128,7 +128,7 @@
 - 스프링클러 추가/수정 모달에 기존 소방설비와 동일한 `도면 위치 선택` 영역을 추가하여 건물/층 도면을 표시하고, 도면 클릭 시 좌표 X/Y가 자동 반영되도록 개선 완료
 - `V28__add_fire_sprinkler_qr_mobile_fields.sql`로 `fire_sprinkler.QR_KEY`, `IMAGE_PATH`를 추가하고, QR 관리 페이지/QR 이미지/미등록 QR 생성/모바일 등록·점검 API와 `/minspection/sprinklers/{qrKey}` 모바일 페이지를 스프링클러에 연결
 - 스프링클러 상세 모달을 소화기 상세와 동일한 카드/그리드 구조로 개선하고, 상세 이미지·도면·QR 클릭 확대 및 마우스 휠 확대/축소·드래그 이동을 지원하도록 개선 완료. 상세 모달의 점검 이력은 읽기 전용으로 정리
-- 새 투명 스프링클러 이미지는 좌측 메뉴 전용 `/images/sprinkler-menu.png`로 분리하고, 좌측 메뉴 아이콘의 흰 배경 스타일을 제거. 스프링클러 목록 기본 이미지는 기존 `/images/sprinkler.png`를 유지하며, 도면상 마커는 신규 `/images/sprinkler-marker.png` 아이콘을 사용하도록 분리
+- 새 투명 스프링클러 이미지는 좌측 메뉴 전용 `/images/sprinkler-menu.png`로 분리하고, 좌측 메뉴 아이콘의 흰 배경 스타일을 제거. 이후 낮은 가시성과 외곽 잔상을 줄이기 위해 아이콘 alpha를 정리한 마스크로 보정하고 `currentColor` 기반 CSS mask를 적용해 다른 사이드바 아이콘과 동일 색상으로 표시. 스프링클러 목록 기본 이미지는 기존 `/images/sprinkler.png`를 유지하며, 도면상 마커는 신규 `/images/sprinkler-marker.png` 아이콘을 사용하도록 분리
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
