@@ -79,7 +79,11 @@ public class QrController {
                         ? ":" + request.getServerPort() : "");
 
         String url;
-        if ("hyd".equalsIgnoreCase(type)) {
+        if ("aircon".equalsIgnoreCase(type) || "ac".equalsIgnoreCase(type)) {
+            url = baseUrl + "/facility/air-conditioners?qrKey=" + id;
+        } else if ("water".equalsIgnoreCase(type) || "water_purifier".equalsIgnoreCase(type) || "wp".equalsIgnoreCase(type)) {
+            url = baseUrl + "/facility/water-purifiers?qrKey=" + id;
+        } else if ("hyd".equalsIgnoreCase(type)) {
             url = baseUrl + "/minspection/hydrants/" + id;
         } else if ("receiver".equalsIgnoreCase(type) || "rcv".equalsIgnoreCase(type)) {
             url = baseUrl + "/minspection/receivers/" + id;

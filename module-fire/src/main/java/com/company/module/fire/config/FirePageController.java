@@ -103,6 +103,13 @@ public class FirePageController {
         return serveHtml("static/facility/water-purifiers.html");
     }
 
+    /** /facility/qr → facility/qr.html */
+    @GetMapping({"/facility/qr", "/facility/qr/", "/facility/qr.html"})
+    @ResponseBody
+    public ResponseEntity<String> facilityQr() throws IOException {
+        return serveHtml("static/facility/qr.html");
+    }
+
     // ── 모바일 점검 페이지 ──
 
     @GetMapping("/minspection/extinguishers/{serial}")

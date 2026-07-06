@@ -57,6 +57,19 @@ public class FacilityEquipmentController {
                 FacilityEquipmentService.CATEGORY_WATER_PURIFIER, buildingId, floorId, q, page, size)));
     }
 
+    @GetMapping("/qr/list")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_QR')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getFacilityQrList(
+            @RequestParam(required = false) Long buildingId,
+            @RequestParam(required = false) Long floorId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("airConditioners", facilityEquipmentService.getEquipmentList(
+                FacilityEquipmentService.CATEGORY_AIRCON, buildingId, floorId, null, 0, 10000).getContent());
+        result.put("waterPurifiers", facilityEquipmentService.getEquipmentList(
+                FacilityEquipmentService.CATEGORY_WATER_PURIFIER, buildingId, floorId, null, 0, 10000).getContent());
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     @GetMapping("/air-conditioners/{id}")
     public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> getAirConditioner(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.getDetail(FacilityEquipmentService.CATEGORY_AIRCON, id)));

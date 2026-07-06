@@ -19,8 +19,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -34,31 +32,6 @@ public class FacilityEquipmentService {
 
     private static final Set<String> AIRCON_TYPES = Set.of("시스템", "벽걸이", "스탠드형");
     private static final String WATER_PURIFIER_TYPE = "정수기";
-    private static final Map<String, String> AIRCON_BUILDING_PREFIXES = Map.ofEntries(
-            Map.entry("관리동", "1"),
-            Map.entry("복지관", "2"),
-            Map.entry("화장지45호동", "3"),
-            Map.entry("경비실중문", "4"),
-            Map.entry("천막창고중문", "5"),
-            Map.entry("보일러동", "6"),
-            Map.entry("물류현장사무실container", "7"),
-            Map.entry("전기현장사무실동", "8"),
-            Map.entry("화장지13동", "9"),
-            Map.entry("생산지원팀동", "10"),
-            Map.entry("pulper동", "11"),
-            Map.entry("원료장", "12"),
-            Map.entry("제지2호동화장지2호동", "13"),
-            Map.entry("제지3호동", "14"),
-            Map.entry("수출창고동제지", "15"),
-            Map.entry("pad동", "16"),
-            Map.entry("환경에너지동", "17"),
-            Map.entry("폐수처리및소각동", "18"),
-            Map.entry("동진창고", "19"),
-            Map.entry("경비실정문", "20"),
-            Map.entry("유동상보일러동", "21"),
-            Map.entry("신규설치", "22"),
-            Map.entry("제지1호기", "130")
-    );
     private static final int MAX_INSPECTION_HISTORY = 12;
 
     private final FacilityEquipmentRepository equipmentRepository;
@@ -293,6 +266,9 @@ public class FacilityEquipmentService {
 
     private String resolveSerialNumber(String category, Building building, String requestedSerialNumber, FacilityEquipment current) {
         String requested = trimToNull(requestedSerialNumber);
+        if (CATEGORY_AIRCON.equals(category) && requested == null) {
+            throw new BusinessException("에어컨 식별 No.를 입력하세요.");
+        }
         String serialNumber = requested != null ? requested : (current != null ? current.getSerialNumber() : generateNextSerialNumber(category, building));
         equipmentRepository.findBySerialNumber(serialNumber).ifPresent(found -> {
             if (current == null || !found.getEquipmentId().equals(current.getEquipmentId())) {
@@ -303,7 +279,10 @@ public class FacilityEquipmentService {
     }
 
     private String generateNextSerialNumber(String category, Building building) {
-        String prefix = CATEGORY_AIRCON.equals(category) ? resolveAirconBuildingPrefix(building) + "-" : "WP-";
+        if (CATEGORY_AIRCON.equals(category)) {
+            throw new BusinessException("에어컨 식별 No.는 자동 생성할 수 없습니다. 직접 입력하세요.");
+        }
+        String prefix = "WP-";
         List<String> serials = equipmentRepository.findByCategory(category).stream()
                 .map(FacilityEquipment::getSerialNumber)
                 .filter(s -> s != null && s.startsWith(prefix))
@@ -315,21 +294,7 @@ public class FacilityEquipmentService {
                 if (num > maxNum) maxNum = num;
             } catch (NumberFormatException ignored) { }
         }
-        return CATEGORY_AIRCON.equals(category) ? prefix + (maxNum + 1) : String.format("%s%06d", prefix, maxNum + 1);
+        return String.format("%s%06d", prefix, maxNum + 1);
     }
 
-    private String resolveAirconBuildingPrefix(Building building) {
-        String normalized = normalizeName(building != null ? building.getBuildingName() : null);
-        String prefix = AIRCON_BUILDING_PREFIXES.get(normalized);
-        if (prefix != null) return prefix;
-        if (building != null && building.getBuildingId() != null && building.getBuildingId() > 0) {
-            return String.valueOf(building.getBuildingId());
-        }
-        return "AC";
-    }
-
-    private String normalizeName(String value) {
-        if (value == null) return "";
-        return value.toLowerCase(Locale.ROOT).replaceAll("[\\s\\r\\n\\t\\\"'()+,._\\-]+", "");
-    }
 }

@@ -4,7 +4,11 @@
   const CFG = window.FACILITY_PAGE_CONFIG || {};
   const label = CFG.itemLabel || '설비';
   const apiBase = CFG.apiBase || '/facility-api/air-conditioners';
-  const markerIcon = CFG.defaultImages?.default || '/images/facility/aircon_system.png';
+  const markerSvg = (bg, text) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48"><path d="M20 46C15.5 39.5 5 28.8 5 18.8 5 9.6 11.7 3 20 3s15 6.6 15 15.8c0 10-10.5 20.7-15 27.2Z" fill="${bg}" stroke="#fff" stroke-width="3"/><circle cx="20" cy="18" r="10" fill="rgba(255,255,255,.92)"/><text x="20" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="${bg}">${text}</text></svg>`)}`;
+  const builtinMarkerImages = {
+    aircon: markerSvg('#2563eb', 'AC'),
+    water: markerSvg('#0891b2', 'WP')
+  };
   const state = {
     items: [], buildings: [], floors: [], buildingFloorMap: {},
     q: '', buildingId: '', floorId: '', status: null,
@@ -107,6 +111,7 @@
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="/facility/air-conditioners">에어컨</a></li>
                     <li><a class="dropdown-item" href="/facility/water-purifiers">정수기</a></li>
+                    <li><a class="dropdown-item" href="/facility/qr">QR코드</a></li>
                   </ul>
                 </li>
               </ul>
@@ -150,7 +155,7 @@
 
   function renderAirconFields() {
     if (!isAirconPage()) return '';
-    return `<div class="col-md-4"><label class="form-label fw-bold">식별 No.</label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1 (미입력 시 자동생성)"><div class="form-text">건물 번호 기준으로 자동 생성됩니다.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div>`;
+    return `<div class="col-md-4"><label class="form-label fw-bold">에어컨 식별 No. <span class="text-danger">*</span></label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1" required><div class="form-text">자동 생성되지 않습니다. 현장 식별 No.를 직접 입력하세요.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div>`;
   }
 
   function renderTypeField() {
@@ -167,14 +172,14 @@
 
   function renderNoteAndPhotoFields() {
     if (isSimpleWaterPurifier()) return '';
-    return '<div class="col-12"><label class="form-label fw-bold">비고</label><textarea class="form-control" id="note" rows="2"></textarea></div><div class="col-12"><label class="form-label fw-bold">대표 사진</label><input type="file" class="form-control" id="photo" accept="image/*"><div class="form-text">저장 후 업로드되며, 기존 대표 이미지는 1장 정책에 따라 갱신됩니다.</div></div>';
+    return '<div class="col-12"><label class="form-label fw-bold">비고</label><textarea class="form-control" id="note" rows="2"></textarea></div><div class="col-12"><label class="form-label fw-bold">업로드 이미지</label><input type="file" class="form-control" id="photo" accept="image/*"><div class="form-text">저장 후 사용자가 업로드한 이미지로 저장되며, 기존 업로드 이미지는 1장 정책에 따라 갱신됩니다.</div></div>';
   }
 
   function renderModals() {
     return `
       <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="detailsModalBody"></div></div></div></div>
       <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1400px)"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img id="zoomImage" alt="확대 이미지" style="max-width:100%;max-height:84vh;object-fit:contain"></div></div></div></div>
-      <div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 대표 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
+      <div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 사용자가 업로드한 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
       <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span></div></div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
   }
 
@@ -282,7 +287,7 @@
     const wrap = $('mainTableWrap'); if (!wrap) return;
     if (!items.length) { wrap.innerHTML = '<div class="text-center text-muted py-5">조회 결과가 없습니다.</div>'; return; }
     const rows = sorted(items).map((it, idx) => {
-      const typeCell = isSimpleWaterPurifier() ? '' : `<td><div class="d-flex align-items-center gap-2"><img class="facility-card-img" src="${esc(it.imagePath || defaultImage(it.equipmentType))}" alt="" onerror="this.src='${esc(defaultImage(it.equipmentType))}'"><span class="text-truncate">${esc(it.equipmentType || '-')}</span></div>${isAirconPage() ? `<div class="small text-muted mt-1">${esc([it.manufacturer, it.locationDescription, it.outdoorUnitCount ? '실외기 ' + outdoorUnitCount(it.outdoorUnitCount) + '대' : ''].filter(Boolean).join(' · ') || '-')}</div>` : ''}</td>`;
+      const typeCell = isSimpleWaterPurifier() ? '' : `<td><div class="fw-semibold text-truncate" title="${esc(it.equipmentType || '')}">${esc(it.equipmentType || '-')}</div>${isAirconPage() ? `<div class="small text-muted mt-1">${esc([it.manufacturer, it.locationDescription, it.outdoorUnitCount ? '실외기 ' + outdoorUnitCount(it.outdoorUnitCount) + '대' : ''].filter(Boolean).join(' · ') || '-')}</div>` : ''}</td>`;
       const coordCell = isSimpleWaterPurifier() ? `<td>${it.x != null && it.y != null ? `X ${Number(it.x).toFixed(2)} / Y ${Number(it.y).toFixed(2)}` : '-'}</td>` : '';
       const noteCell = isSimpleWaterPurifier() ? '' : `<td class="text-truncate" title="${esc(it.note || '')}">${esc(it.note || '-')}</td>`;
       return `<tr class="clickable-row js-detail" data-id="${it.equipmentId}">
@@ -295,13 +300,16 @@
         ${noteCell}<td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button><button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검</button><button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td>
       </tr>`;
     }).join('');
-    const typeHead = isSimpleWaterPurifier() ? '' : th('종류/이미지', 'equipmentType', 'width:190px');
+    const typeHead = isSimpleWaterPurifier() ? '' : th('종류', 'equipmentType', 'width:170px');
     const coordHead = isSimpleWaterPurifier() ? th('좌표', 'rowNo', 'width:130px') : '';
     const noteHead = isSimpleWaterPurifier() ? '' : th('비고', 'note', 'width:160px');
     wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${typeHead}${th(installDateLabel(), 'manufactureDate', 'width:110px')}${coordHead}${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}${th('상태', 'lastInspectionDate', 'width:100px')}${noteHead}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
-  function defaultImage(type) { return CFG.defaultImages?.[type] || CFG.defaultImages?.default || markerIcon; }
+  function markerImage(type) {
+    const fallback = isWaterPurifierPage() ? builtinMarkerImages.water : builtinMarkerImages.aircon;
+    return CFG.markerImages?.[type] || CFG.markerImages?.default || fallback;
+  }
 
   function airconExtraDetail(d) {
     if (!isAirconPage()) return '';
@@ -323,10 +331,10 @@
     const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
     const typeDetail = isSimpleWaterPurifier() ? '' : detailItem(CFG.typeLabel || '종류', d.equipmentType);
     const noteBox = (!isSimpleWaterPurifier() && d.note) ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : '';
-    const imageSection = isSimpleWaterPurifier() ? '' : `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>대표 이미지</strong></div><div class="fw-media-box text-center"><img src="${esc(d.imagePath || defaultImage(d.equipmentType))}" alt="${esc(label)} 이미지" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.src='${esc(defaultImage(d.equipmentType))}'"></div></div>`;
+    const imageSection = d.imagePath ? `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>업로드 이미지</strong><span>사용자가 업로드한 이미지</span></div><div class="fw-media-box text-center"><img src="${esc(d.imagePath)}" alt="${esc(label)} 업로드 이미지" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.closest('.fw-edit-section')?.remove()"></div></div>` : '';
     $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div></div><div class="col-lg-6 d-flex flex-column gap-3">${imageSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative" id="detailPlanWrap" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
     bootstrapModal('detailsModal')?.show();
-    if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, defaultImage(d.equipmentType)), 80);
+    if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, markerImage(d.equipmentType)), 80);
   }
 
   function detailItem(k, v) { return `<div class="fw-detail-item"><div class="fw-detail-item-label">${esc(k)}</div><div class="fw-detail-item-value">${esc(v || '-')}</div></div>`; }
@@ -348,8 +356,9 @@
       img.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;display:block;object-fit:contain`;
       const nx = num(x), ny = num(y); if (nx == null || ny == null) return;
       const m = document.createElement('div');
-      m.style.cssText = `position:absolute;left:${ox+w*nx/100}px;top:${oy+h*ny/100}px;width:28px;height:28px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 6px rgba(0,0,0,.6));z-index:3`;
-      m.innerHTML = `<img src="${esc(icon)}" alt="" style="width:100%;height:100%;object-fit:contain">`;
+      m.className = 'facility-map-marker';
+      m.style.cssText = `position:absolute;left:${ox+w*nx/100}px;top:${oy+h*ny/100}px;width:28px;height:28px;transform:translate(-50%,-50%);z-index:3`;
+      m.innerHTML = `<img src="${esc(icon)}" alt="" class="facility-marker-img">`;
       layer.appendChild(m);
     };
     if (img.complete) draw(); img.onload = draw; setTimeout(draw, 0);
@@ -408,9 +417,9 @@
     const cw = canvas.clientWidth, ch = canvas.clientHeight, iw = img.naturalWidth, ih = img.naturalHeight;
     const scale = Math.min(cw/iw, ch/ih), w = iw*scale, h = ih*scale, ox = (cw-w)/2, oy = (ch-h)/2;
     img.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;display:block;object-fit:contain`;
-    const add = (x, y, icon, selected, title) => { const nx = num(x), ny = num(y); if (nx == null || ny == null) return; const m = document.createElement('div'); m.title = title || ''; m.style.cssText = `position:absolute;left:${ox+w*nx/100}px;top:${oy+h*ny/100}px;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px;transform:translate(-50%,-50%);opacity:${selected ? 1 : .5};cursor:${selected ? 'default':'pointer'};filter:drop-shadow(0 0 5px rgba(0,0,0,.45));z-index:${selected ? 4 : 2}`; m.innerHTML = `<img src="${esc(icon)}" alt="" style="width:100%;height:100%;object-fit:contain;pointer-events:none">`; if (!selected) m.addEventListener('click', e => { e.stopPropagation(); setCoord(nx, ny); }); layer.appendChild(m); };
-    state.existingMarkers.forEach(it => add(it.x, it.y, defaultImage(it.equipmentType), false, it.serialNumber));
-    if (state.selectedCoord) add(state.selectedCoord.x, state.selectedCoord.y, defaultImage($('equipmentType')?.value || fixedType()), true, '선택 위치');
+    const add = (x, y, icon, selected, title) => { const nx = num(x), ny = num(y); if (nx == null || ny == null) return; const m = document.createElement('div'); m.className = `facility-map-marker${selected ? ' selected' : ''}`; m.title = title || ''; m.style.cssText = `position:absolute;left:${ox+w*nx/100}px;top:${oy+h*ny/100}px;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px;transform:translate(-50%,-50%);opacity:${selected ? 1 : .7};cursor:${selected ? 'default':'pointer'};z-index:${selected ? 4 : 2}`; m.innerHTML = `<img src="${esc(icon)}" alt="" class="facility-marker-img">`; if (!selected) m.addEventListener('click', e => { e.stopPropagation(); setCoord(nx, ny); }); layer.appendChild(m); };
+    state.existingMarkers.forEach(it => add(it.x, it.y, markerImage(it.equipmentType), false, it.serialNumber));
+    if (state.selectedCoord) add(state.selectedCoord.x, state.selectedCoord.y, markerImage($('equipmentType')?.value || fixedType()), true, '선택 위치');
   }
 
   function renderHistory(rows) {
@@ -434,6 +443,7 @@
     };
     if (isAirconPage()) {
       payload.serialNumber = $('serialNumber')?.value?.trim() || null;
+      if (!payload.serialNumber) { $('serialNumber')?.focus(); return alert('에어컨 식별 No.를 입력하세요.'); }
       payload.manufacturer = $('manufacturer')?.value?.trim() || null;
       payload.locationDescription = $('locationDescription')?.value?.trim() || null;
       payload.outdoorUnitCount = outdoorUnitCount($('outdoorUnitCount')?.value);
@@ -520,11 +530,20 @@
   async function handleInitialAction() {
     const params = new URLSearchParams(location.search || '');
     const detailsId = params.get('details');
+    const qrKey = params.get('qrKey');
     const editId = params.get('edit');
     const inspectId = params.get('inspect');
     if (detailsId) {
       await openDetails(detailsId);
       return;
+    }
+    if (qrKey) {
+      const matched = state.items.find(it => String(it.qrKey || '') === String(qrKey));
+      if (matched?.equipmentId) {
+        await openDetails(matched.equipmentId);
+        return;
+      }
+      alert('해당 QR 설비를 찾을 수 없습니다.');
     }
     if (editId) {
       await openUpsert(editId);

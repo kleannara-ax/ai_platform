@@ -505,6 +505,7 @@ const menuIcons = {
   'OTHER_EQUIPMENT_GROUP': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v5H8z"/><path d="M9 18h.01M15 18h.01"/></svg>',
   'OTHER_AIRCON': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="6" rx="2"/><path d="M7 14c0 2 2 2 2 4M12 14c0 2 2 2 2 4M17 14c0 2 2 2 2 4"/></svg>',
   'OTHER_WATER_PURIFIER': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8v5H8z"/><path d="M7 8h10l-1 13H8z"/><path d="M12 12c-1 1.2-2 2.4-2 3.6A2 2 0 0012 18a2 2 0 002-2.4c0-1.2-1-2.4-2-3.6z"/></svg>',
+  'OTHER_QR': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><path d="M21 14v7h-7"/></svg>',
   'PS_INSP_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
 };
@@ -528,6 +529,7 @@ const menuCodeToPage = {
   'OTHER_EQUIPMENT_GROUP': 'other_equipment_group',
   'OTHER_AIRCON': 'other_aircon',
   'OTHER_WATER_PURIFIER': 'other_water_purifier',
+  'OTHER_QR': 'other_qr',
   'PS_INSP_MGMT': 'ps_insp',
 };
 function normalizeMenuCode(code){
@@ -692,8 +694,8 @@ function navigate(page, el) {
       }
     }
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',ps_insp:'PS 지분 검사'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_sprinkler:'모듈 > 설비관리시스템 > 소방설비 > 스프링클러 목록',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',ps_insp:'모듈 > PS 지분 검사'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',other_qr:'QR코드',ps_insp:'PS 지분 검사'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_sprinkler:'모듈 > 설비관리시스템 > 소방설비 > 스프링클러 목록',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > 소방설비 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',other_qr:'모듈 > 설비관리시스템 > 기타설비 > QR코드',ps_insp:'모듈 > PS 지분 검사'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
@@ -718,6 +720,7 @@ function navigate(page, el) {
   else if(page==='fire_qr')navigateToFirePage('/qr');
   else if(page==='other_aircon')navigateToFirePage('/facility/air-conditioners');
   else if(page==='other_water_purifier')navigateToFirePage('/facility/water-purifiers');
+  else if(page==='other_qr')navigateToFirePage('/facility/qr');
   else if(page==='ps_insp')navigateToPsInspPage('/ps-insp-api/page');
 }
 
@@ -1746,7 +1749,8 @@ function renderEquipmentIndex(kind) {
     : '기존 도면, 각 소방설비 목록, QR코드를 모두 확인할 수 있습니다.';
   const cards = isOther ? [
     { title:'에어컨', desc:'시스템 · 벽걸이 · 스탠드형 에어컨 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_aircon' },
-    { title:'정수기', desc:'정수기 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_water_purifier' }
+    { title:'정수기', desc:'정수기 목록, 상세, 등록/수정, 점검, 이미지, 도면 좌표 관리', page:'other_water_purifier' },
+    { title:'QR코드', desc:'기타설비 QR코드 발급/확인 및 인쇄 화면입니다.', page:'other_qr' }
   ] : [
     { title:'소화기', desc:'소화기 목록, 상세, 등록/수정, 점검 이력을 확인합니다.', page:'fire_extinguisher' },
     { title:'스프링클러 목록', desc:'스프링클러 목록, 상세, 등록/수정, 90일 주기 점검 이력을 확인합니다.', page:'fire_sprinkler' },

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기타설비 QR코드 - 설비관리시스템</title>
+  <link rel="stylesheet" href="/css/spa-theme.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{font-family:'Pretendard Variable',Pretendard,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f7fb;color:#0f172a}
+    .facility-navbar{position:relative;z-index:1030;overflow:visible;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-bottom-left-radius:14px;border-bottom-right-radius:14px}.facility-navbar .navbar-brand,.facility-navbar .nav-link,.facility-navbar .dropdown-toggle{color:#fff!important}.facility-navbar .dropdown-menu{z-index:1040}
+    .hero-card{border:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:18px;box-shadow:0 16px 34px rgba(15,23,42,.12)}
+    .filter-card,.qr-card{border:1px solid rgba(148,163,184,.22);border-radius:16px;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+    .qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.qr-card{background:#fff;padding:14px}.qr-image{width:150px;height:150px;object-fit:contain;border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:8px}.qr-title{font-weight:900;color:#0f172a}.qr-meta{font-size:.86rem;color:#64748b}.badge-air{background:#dbeafe;color:#2563eb}.badge-water{background:#dcfce7;color:#16a34a}.empty-box{border:1px dashed rgba(148,163,184,.5);border-radius:16px;background:#fff;color:#64748b;text-align:center;padding:42px 18px}
+    @media print{header,.filter-card,.hero-actions{display:none!important}body{background:#fff}.container-fluid{padding:0!important}.hero-card{box-shadow:none;color:#111;background:#fff}.qr-grid{grid-template-columns:repeat(3,1fr);gap:8px}.qr-card{break-inside:avoid;box-shadow:none}}
+  </style>
+</head>
+<body>
+<header id="pageHeader">
+  <nav class="navbar navbar-expand-lg navbar-dark facility-navbar">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="/index.html?page=other_equipment_group">기타설비</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="topNav">
+        <ul class="navbar-nav ms-3">
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/air-conditioners">에어컨</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/water-purifiers">정수기</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold active" href="/facility/qr">QR코드</a></li>
+          <li class="nav-item"><a class="nav-link fw-semibold" href="/facility/floor.html">층별 도면</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center" id="navAccountArea"></ul>
+      </div>
+    </div>
+  </nav>
+</header>
+<main class="container-fluid py-4">
+  <section class="card hero-card mb-4">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <h3 class="mb-1 fw-bold">기타설비 QR코드</h3>
+        <div class="text-white-50 fw-semibold">에어컨/정수기 QR코드를 조회하고 인쇄합니다. QR은 각 설비 상세 화면으로 연결됩니다.</div>
+      </div>
+      <div class="hero-actions d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-light fw-bold" id="btnPrint">인쇄</button>
+        <button type="button" class="btn btn-outline-light fw-bold" id="btnReload">새로고침</button>
+      </div>
+    </div>
+  </section>
+  <section class="card filter-card mb-4">
+    <div class="card-body">
+      <div class="row g-2 align-items-center">
+        <div class="col-lg-3"><select id="filterType" class="form-select"><option value="">-- 설비 전체 --</option><option value="AIRCON">에어컨</option><option value="WATER_PURIFIER">정수기</option></select></div>
+        <div class="col-lg-3"><select id="filterBuildingId" class="form-select"><option value="">-- 건물 전체 --</option></select></div>
+        <div class="col-lg-3"><select id="filterFloorId" class="form-select"><option value="">-- 층 전체 --</option></select></div>
+        <div class="col-lg-3 d-flex gap-2"><button type="button" class="btn btn-primary w-100" id="btnSearch">검색</button><button type="button" class="btn btn-outline-secondary w-100" id="btnReset">초기화</button></div>
+      </div>
+    </div>
+  </section>
+  <section id="resultWrap"><div class="empty-box">QR 목록을 불러오는 중...</div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/csrf.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  const state = { buildings: [], floors: [], items: [], type: '', buildingId: '', floorId: '' };
+  const isInIframe = () => { try { return window.self !== window.top; } catch { return true; } };
+  if (isInIframe()) $('pageHeader')?.setAttribute('style', 'display:none');
+  const apiHeaders = (extra = {}, method = 'GET') => window.FireWebCsrf?.headers(extra, method) || extra;
+  async function req(url) {
+    const res = await fetch(url, { headers: apiHeaders({}, 'GET') });
+    if (res.status === 401) { window.FireWebCsrf?.goLogin?.(); return null; }
+    return res;
+  }
+  function renderAccountMenu() {
+    const area = $('navAccountArea'); if (!area) return;
+    let userName = 'User';
+    try { const raw = localStorage.getItem('fireweb_user'); if (raw) { const u = JSON.parse(raw); userName = u.displayName || u.username || u.loginId || userName; } } catch {}
+    area.innerHTML = `<li class="nav-item dropdown"><a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">${esc(userName)}</a><ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="/index.html?page=other_equipment_group">기타설비</a></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item" id="btnLogout">로그아웃</button></li></ul></li>`;
+    $('btnLogout')?.addEventListener('click', () => window.FireWebNav?.logout?.() || window.FireWebCsrf?.goLogin?.() || (location.href='/index.html'));
+  }
+  async function loadOptions() {
+    const [br, fr] = await Promise.all([req('/fire-api/qr/buildings'), req('/fire-api/qr/floors')]);
+    const bj = br && br.ok ? await br.json().catch(() => null) : null;
+    const fj = fr && fr.ok ? await fr.json().catch(() => null) : null;
+    state.buildings = Array.isArray(bj?.data) ? bj.data : [];
+    state.floors = Array.isArray(fj?.data) ? fj.data : [];
+    $('filterBuildingId').innerHTML = '<option value="">-- 건물 전체 --</option>' + state.buildings.map(b => `<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join('');
+    $('filterFloorId').innerHTML = '<option value="">-- 층 전체 --</option>' + state.floors.map(f => `<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('');
+  }
+  function normalizeRows(data) {
+    const air = (data?.airConditioners || []).map(x => ({ ...x, qrType: 'aircon', qrLabel: '에어컨', qrClass: 'badge-air', category: 'AIRCON' }));
+    const water = (data?.waterPurifiers || []).map(x => ({ ...x, qrType: 'water', qrLabel: '정수기', qrClass: 'badge-water', category: 'WATER_PURIFIER' }));
+    return air.concat(water).filter(x => !state.type || x.category === state.type);
+  }
+  async function loadList() {
+    const params = new URLSearchParams();
+    if (state.buildingId) params.set('buildingId', state.buildingId);
+    if (state.floorId) params.set('floorId', state.floorId);
+    $('resultWrap').innerHTML = '<div class="empty-box">QR 목록을 불러오는 중...</div>';
+    const res = await req('/facility-api/qr/list' + (params.toString() ? '?' + params : ''));
+    const json = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok || json?.success === false) {
+      $('resultWrap').innerHTML = `<div class="empty-box text-danger">${esc(json?.message || 'QR 목록을 불러오지 못했습니다.')}</div>`;
+      return;
+    }
+    state.items = normalizeRows(json.data || {});
+    renderList();
+  }
+  function renderList() {
+    if (!state.items.length) { $('resultWrap').innerHTML = '<div class="empty-box">조회 결과가 없습니다.</div>'; return; }
+    $('resultWrap').innerHTML = `<div class="d-flex justify-content-between align-items-center mb-3"><strong>총 ${state.items.length}건</strong><span class="text-muted small">대표 이미지는 출력하지 않고 QR만 표시합니다.</span></div><div class="qr-grid">${state.items.map(renderCard).join('')}</div>`;
+  }
+  function renderCard(it) {
+    const qrKey = it.qrKey || it.equipmentId || it.serialNumber || '';
+    const qrSrc = `/fire-api/qr/image?type=${encodeURIComponent(it.qrType)}&id=${encodeURIComponent(qrKey)}`;
+    const detailUrl = it.qrType === 'aircon' ? `/facility/air-conditioners?qrKey=${encodeURIComponent(qrKey)}` : `/facility/water-purifiers?qrKey=${encodeURIComponent(qrKey)}`;
+    return `<article class="qr-card"><div class="d-flex justify-content-between align-items-start gap-2 mb-2"><div><div class="qr-title">${esc(it.serialNumber || '-')}</div><div class="qr-meta">${esc([it.buildingName, it.floorName].filter(Boolean).join(' / ') || '-')}</div></div><span class="badge ${it.qrClass}">${esc(it.qrLabel)}</span></div><div class="text-center my-2"><img class="qr-image" src="${esc(qrSrc)}" alt="${esc(it.serialNumber || '')} QR"></div><div class="qr-meta">종류: ${esc(it.equipmentType || '-')}</div>${it.manufacturer ? `<div class="qr-meta">제조사: ${esc(it.manufacturer)}</div>` : ''}<a class="btn btn-sm btn-outline-primary w-100 mt-3" href="${esc(detailUrl)}" target="_blank" rel="noopener">상세 열기</a></article>`;
+  }
+  function bind() {
+    $('btnPrint')?.addEventListener('click', () => window.print());
+    $('btnReload')?.addEventListener('click', loadList);
+    $('btnSearch')?.addEventListener('click', () => { state.type = $('filterType').value; state.buildingId = $('filterBuildingId').value; state.floorId = $('filterFloorId').value; loadList(); });
+    $('btnReset')?.addEventListener('click', () => { state.type = state.buildingId = state.floorId = ''; $('filterType').value = ''; $('filterBuildingId').value = ''; $('filterFloorId').value = ''; loadList(); });
+  }
+  async function init() { renderAccountMenu(); bind(); await loadOptions(); await loadList(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>
