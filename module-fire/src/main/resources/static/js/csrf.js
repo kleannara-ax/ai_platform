@@ -11,20 +11,99 @@
     return "";
   }
 
+  function normalizeJwtToken(value) {
+    var token = String(value || "").trim();
+    if (!token) return "";
+    if (token.toLowerCase().startsWith("bearer ")) {
+      token = token.substring(7).trim();
+    }
+    // 사용자명만 들어있는 fw_user 등을 Authorization 헤더로 보내지 않도록 JWT 형태만 허용한다.
+    return token.split(".").length === 3 ? token : "";
+  }
+
+  function readStorageObject(storage, key) {
+    try {
+      var raw = storage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function tokenFromObject(obj) {
+    if (!obj) return "";
+    if (typeof obj === "string") return normalizeJwtToken(obj);
+    return normalizeJwtToken(obj.token)
+        || normalizeJwtToken(obj.accessToken)
+        || normalizeJwtToken(obj.jwt)
+        || normalizeJwtToken(obj.jwtToken)
+        || normalizeJwtToken(obj.access_token)
+        || normalizeJwtToken(obj.data && obj.data.accessToken)
+        || normalizeJwtToken(obj.auth && obj.auth.token);
+  }
+
   /** sessionStorage/localStorage에서 JWT 토큰을 읽는다 (AI Platform SPA 연동) */
   function getJwtToken() {
     // SPA의 refreshToken()은 sessionStorage auth를 먼저 갱신하므로 최신 토큰을 우선 사용한다.
+    return tokenFromObject(readStorageObject(sessionStorage, "auth"))
+        || tokenFromObject(readStorageObject(localStorage, "fireweb_user"))
+        || tokenFromObject(readStorageObject(localStorage, "fw_user"))
+        || normalizeJwtToken(localStorage.getItem("fireweb_token"))
+        || normalizeJwtToken(localStorage.getItem("fw_token"))
+        || normalizeJwtToken(localStorage.getItem("accessToken"))
+        || normalizeJwtToken(localStorage.getItem("token"));
+  }
+
+  function refreshTokenFromObject(obj) {
+    if (!obj || typeof obj === "string") return "";
+    return String(obj.refreshTk || obj.refreshToken || obj.refresh_token || (obj.data && obj.data.refreshToken) || "").trim();
+  }
+
+  function getRefreshToken() {
+    return refreshTokenFromObject(readStorageObject(sessionStorage, "auth"))
+        || refreshTokenFromObject(readStorageObject(localStorage, "fireweb_user"))
+        || refreshTokenFromObject(readStorageObject(localStorage, "fw_user"))
+        || String(localStorage.getItem("fireweb_refresh_token") || localStorage.getItem("fw_refresh_token") || "").trim();
+  }
+
+  function updateStoredJwt(accessToken, refreshToken) {
     try {
-      var s = JSON.parse(sessionStorage.getItem("auth") || "null");
-      if (s && s.token) return s.token;
+      var auth = readStorageObject(sessionStorage, "auth") || {};
+      auth.token = accessToken;
+      if (refreshToken) auth.refreshTk = refreshToken;
+      sessionStorage.setItem("auth", JSON.stringify(auth));
     } catch (_) {}
+    ["fireweb_user", "fw_user"].forEach(function (key) {
+      try {
+        var obj = readStorageObject(localStorage, key);
+        if (!obj || typeof obj === "string") return;
+        obj.token = accessToken;
+        if (refreshToken) obj.refreshToken = refreshToken;
+        localStorage.setItem(key, JSON.stringify(obj));
+      } catch (_) {}
+    });
+    try { localStorage.setItem("fireweb_token", accessToken); } catch (_) {}
+  }
+
+  async function refreshJwtToken() {
+    var refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
     try {
-      var u = JSON.parse(localStorage.getItem("fireweb_user") || "null");
-      if (u && u.token) return u.token;
-    } catch (_) {}
-    return localStorage.getItem("fireweb_token")
-        || localStorage.getItem("fw_token")
-        || "";
+      var res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "X-Refresh-Token": refreshToken }
+      });
+      if (!res.ok) return false;
+      var json = await res.json().catch(function () { return null; });
+      var accessToken = normalizeJwtToken(json && json.data && json.data.accessToken);
+      if (!accessToken) return false;
+      updateStoredJwt(accessToken, (json.data && json.data.refreshToken) || refreshToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   function isMutation(method) {
@@ -88,6 +167,7 @@
     getToken: function () { return readCookie("XSRF-TOKEN"); },
     getJwtToken: getJwtToken,
     ensureToken: ensureToken,
+    refreshJwtToken: refreshJwtToken,
     headers: headers,
     applyOptions: applyOptions,
     isMutation: isMutation,

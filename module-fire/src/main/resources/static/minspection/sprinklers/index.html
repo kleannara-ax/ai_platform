@@ -124,9 +124,18 @@
     function authHeaders(extra) { return { ...(extra || {}) }; }
     async function apiFetch(url, opt) {
       opt = opt || {};
-      if (window.FireWebCsrf?.isMutation?.(opt.method)) await window.FireWebCsrf.ensureToken();
-      const headers = window.FireWebCsrf?.headers(authHeaders(opt.headers), opt.method) || authHeaders(opt.headers);
-      const res = await fetch(url, { ...opt, headers });
+      if (window.FireWebCsrf?.isMutation?.(opt.method)) {
+        await window.FireWebCsrf.ensureToken();
+      }
+      let headers = window.FireWebCsrf?.headers(authHeaders(opt.headers), opt.method) || authHeaders(opt.headers);
+      let res = await fetch(url, { ...opt, headers: headers });
+      if (res.status === 401 && window.FireWebCsrf?.refreshJwtToken) {
+        const refreshed = await window.FireWebCsrf.refreshJwtToken();
+        if (refreshed) {
+          headers = window.FireWebCsrf.headers(authHeaders(opt.headers), opt.method);
+          res = await fetch(url, { ...opt, headers: headers });
+        }
+      }
       if (res.status === 401) {
         localStorage.removeItem('fireweb_user');
         localStorage.removeItem('fw_user');

@@ -86,13 +86,12 @@ public class ExtinguisherController {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
         }
-        String ct = file.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
+        if (!isAllowedImageFile(file)) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Only image files are allowed."));
         }
 
         try {
-            Path dir = Paths.get("/data/upload/module_fire/extinguishers");
+            Path dir = uploadDir("extinguishers");
             Files.createDirectories(dir);
 
             ExtinguisherResponse detail = extinguisherService.getExtinguisherDetail(id);
@@ -142,17 +141,20 @@ public class ExtinguisherController {
             if (clean.contains("..") || clean.contains("/")) {
                 return ResponseEntity.badRequest().build();
             }
-            Path base = Paths.get("/data/upload/module_fire/extinguishers").toAbsolutePath().normalize();
-            Path file = base.resolve(clean).normalize();
-            if (!file.startsWith(base) || !Files.exists(file)) {
-                return ResponseEntity.notFound().build();
+            for (Path candidateBase : java.util.List.of(uploadDir("extinguishers"), Paths.get("/data/upload/module_fire/extinguishers"))) {
+                Path base = candidateBase.toAbsolutePath().normalize();
+                Path file = base.resolve(clean).normalize();
+                if (!file.startsWith(base) || !Files.exists(file)) {
+                    continue;
+                }
+                Resource resource = new UrlResource(file.toUri());
+                MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                        .contentType(mediaType)
+                        .body(resource);
             }
-            Resource resource = new UrlResource(file.toUri());
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                    .contentType(mediaType)
-                    .body(resource);
+            return ResponseEntity.notFound().build();
         } catch (Exception ex) {
             return ResponseEntity.internalServerError().build();
         }
@@ -220,5 +222,30 @@ public class ExtinguisherController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         extinguisherService.deleteExtinguisher(id);
         return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
+    }
+
+    private boolean isAllowedImageFile(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/")) {
+            return true;
+        }
+        String original = file.getOriginalFilename();
+        if (original == null) {
+            return false;
+        }
+        int idx = original.lastIndexOf('.');
+        if (idx < 0 || idx >= original.length() - 1) {
+            return false;
+        }
+        String ext = original.substring(idx + 1).replaceAll("[^a-zA-Z0-9]", "").toLowerCase(java.util.Locale.ROOT);
+        return java.util.Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif").contains(ext);
     }
 }

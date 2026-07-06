@@ -256,7 +256,7 @@ public class MobileInspectionController {
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         try {
-            Path dir = Paths.get("/data/upload/module_fire/extinguishers");
+            Path dir = uploadDir("extinguishers");
             Files.createDirectories(dir);
 
             String serial = e.getSerialNumber();
@@ -300,25 +300,10 @@ public class MobileInspectionController {
 
     @GetMapping("/files/extinguishers/{filename:.+}")
     public ResponseEntity<Resource> getExtinguisherImageFile(@PathVariable String filename) {
-        try {
-            String clean = filename == null ? "" : filename.replace("\\", "/");
-            if (clean.contains("..") || clean.contains("/")) {
-                return ResponseEntity.badRequest().build();
-            }
-            Path base = Paths.get("/data/upload/module_fire/extinguishers").toAbsolutePath().normalize();
-            Path file = base.resolve(clean).normalize();
-            if (!file.startsWith(base) || !Files.exists(file)) {
-                return ResponseEntity.notFound().build();
-            }
-            Resource resource = new UrlResource(file.toUri());
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                    .contentType(mediaType)
-                    .body(resource);
-        } catch (Exception ex) {
-            return ResponseEntity.internalServerError().build();
-        }
+        return serveInspectionImage(List.of(
+                uploadDir("extinguishers"),
+                Paths.get("/data/upload/module_fire/extinguishers")
+        ), filename);
     }
 
     @GetMapping("/extinguishers/mapdata")
@@ -531,7 +516,7 @@ public class MobileInspectionController {
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         try {
-            Path dir = Paths.get("/data/upload/module_fire/hydrants");
+            Path dir = uploadDir("hydrants");
             Files.createDirectories(dir);
 
             String serial = h.getSerialNumber();
@@ -574,25 +559,10 @@ public class MobileInspectionController {
 
     @GetMapping("/files/hydrants/{filename:.+}")
     public ResponseEntity<Resource> getHydrantImageFile(@PathVariable String filename) {
-        try {
-            String clean = filename == null ? "" : filename.replace("\\", "/");
-            if (clean.contains("..") || clean.contains("/")) {
-                return ResponseEntity.badRequest().build();
-            }
-            Path base = Paths.get("/data/upload/module_fire/hydrants").toAbsolutePath().normalize();
-            Path file = base.resolve(clean).normalize();
-            if (!file.startsWith(base) || !Files.exists(file)) {
-                return ResponseEntity.notFound().build();
-            }
-            Resource resource = new UrlResource(file.toUri());
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                    .contentType(mediaType)
-                    .body(resource);
-        } catch (Exception ex) {
-            return ResponseEntity.internalServerError().build();
-        }
+        return serveInspectionImage(List.of(
+                uploadDir("hydrants"),
+                Paths.get("/data/upload/module_fire/hydrants")
+        ), filename);
     }
     @GetMapping("/hydrants/mapdata")
     @Transactional(readOnly = true)

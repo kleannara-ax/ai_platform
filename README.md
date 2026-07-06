@@ -25,7 +25,7 @@
   - 소화기 목록은 `/fire-api/extinguishers`의 서버 페이지네이션을 사용해 200건 단위로 조회·출력하며, 전체 건수는 목록 API의 `totalElements` 기준으로 표시
   - 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에서 대표사진 업로드/변경 지원(최신 1장만 유지)
   - 수신기/소방펌프 점검 모달 및 모바일 QR 점검에서 정상/요정비/불량 3상태 점검과 점검사진 업로드 지원(저장된 점검 이력에 연결되며 대표사진도 최신 사진으로 갱신)
-  - 소화기/소화전/스프링클러 모바일 QR 점검 사진 업로드 지원. 소화기/소화전은 기존 모바일 업로드 UI를 유지하면서 모바일 브라우저의 누락/비표준 `Content-Type`과 `heic`/`heif` 확장자를 허용하도록 보완했고, 스프링클러는 모바일 점검 모달에 사진 선택/촬영 입력을 추가해 최신 대표사진으로 저장
+  - 소화기/소화전/스프링클러 모바일 QR 점검 사진 업로드 지원. 소화기/소화전은 기존 모바일 업로드 UI를 유지하면서 모바일 브라우저의 누락/비표준 `Content-Type`과 `heic`/`heif` 확장자를 허용하도록 보완했고, 업로드 저장 루트를 샌드박스에서도 쓰기 가능한 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 정책으로 통일했으며, 스프링클러는 모바일 점검 모달에 사진 선택/촬영 입력을 추가해 최신 대표사진으로 저장
   - 수신기/소방펌프 모바일 QR 점검 사진 업로드는 모바일 브라우저의 누락/비표준 `Content-Type`과 `heic`/`heif` 확장자를 보완하고, PC 업로드와 동일한 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 저장 루트 정책을 사용하며, 모바일 점검사진 조회 URL은 `<img>` 태그에서 JWT 헤더를 보낼 수 없는 제약을 고려해 파일 조회만 인증 예외로 처리
   - 수신기/소방펌프 점검 내역 엑셀 다운로드: 점검항목결과 통합 컬럼 없이 항목별 결과 컬럼과 실제 비고를 분리하고, 등록된 점검사진을 XLSX 내부 이미지로 첨부하며, 최신 점검 행은 점검사진이 없으면 설비 대표사진을 표시
 
@@ -71,7 +71,8 @@
   - 기타설비 업로드: `/data/upload/module_fire/facility/{air-conditioners|water-purifiers}`
   - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
-  - 소화기/소화전 모바일 QR 사진 업로드: `/data/upload/module_fire/{extinguishers|hydrants}`, API file path: `/fire-api/minspection/files/{extinguishers|hydrants}/{filename}`. 모바일 브라우저의 누락/비표준 이미지 `Content-Type`과 `heic`/`heif` 확장자를 허용
+  - 소화기/소화전 모바일 QR 사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{extinguishers|hydrants}`, API file path: `/fire-api/minspection/files/{extinguishers|hydrants}/{filename}`. 모바일 브라우저의 누락/비표준 이미지 `Content-Type`과 `heic`/`heif` 확장자를 허용하며, 기존 `/data/upload/module_fire/{extinguishers|hydrants}` 파일은 조회 fallback으로 유지
+  - PC 소화기/소화전 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{extinguishers|hydrants}`, API file path: `/fire-api/{extinguishers|hydrants}/files/{filename}`. 모바일 QR 업로드와 같은 쓰기 가능한 저장 루트를 사용하며, 기존 `/data/upload/module_fire/{extinguishers|hydrants}` 파일은 조회 fallback으로 유지
   - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`. 모바일 QR 업로드도 동일 루트를 사용하며, 기존 `/data/upload/module_fire/{receiver-inspections|pump-inspections}` 파일은 조회 fallback으로 유지
   - 스프링클러 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/sprinklers`, API file path: `/fire-api/sprinklers/files/{filename}`. 파일명은 `sprinkler-{id}.{ext}`로 저장해 같은 확장자는 덮어쓰고, 확장자 변경 시 기존 이미지 파일을 삭제해 설비별 1장만 유지. 모바일 QR 점검 사진도 같은 저장소와 조회 URL을 사용해 최신 대표사진으로 갱신
   - 스프링클러 좌측 메뉴 전용 투명 마스크 아이콘: `/images/sprinkler-menu.png` (`currentColor`로 사이드바 SVG 아이콘과 동일 색상 적용)
@@ -131,6 +132,7 @@
 - 수신기/소방펌프 모바일 QR 점검에 `요정비` 선택지를 추가하고, 모바일 점검 API가 `NORMAL`/`MAINTENANCE`/`FAULTY`를 정규화해 종합 상태와 항목별 상태에 저장하도록 개선 완료
 - 수신기/소방펌프 모바일 QR 점검사진 업로드가 모바일 브라우저의 누락/비표준 이미지 Content-Type과 HEIC/HEIF 파일을 처리하도록 보완하고, 저장 루트를 PC 업로드와 같은 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 정책으로 통일 완료
 - 소화기/소화전 모바일 QR 점검사진 업로드의 파일 검증도 모바일 브라우저의 누락/비표준 이미지 Content-Type과 HEIC/HEIF 파일을 처리하도록 보완하고, 업로드 실패 시 서버 오류 메시지를 사용자에게 표시하도록 개선 완료
+- 소화기/소화전 모바일 QR 및 PC 대표사진 업로드 저장 경로를 기존 `/data/upload/module_fire` 하드코딩에서 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 정책으로 통일해 샌드박스 권한 문제로 업로드 POST가 500 처리되던 문제를 해결. `/fire-api/minspection/.../image`, `/fire-api/extinguishers/{id}/image`, `/fire-api/hydrants/{id}/image`는 인증 필요를 유지하며, 실제 multipart 검증에서 무인증 401, 인증 포함 200, 반환 이미지 URL GET 200을 확인
 - 스프링클러 모바일 QR 점검 모달에 사진 선택/촬영 입력과 `/fire-api/minspection/sprinklers/{id}/image` 업로드 API를 추가해 점검 저장 후 최신 대표사진으로 갱신하도록 개선 완료
 - 수신기/소방펌프 점검 내역 XLSX 다운로드 시 최신 점검 행에 점검사진이 없으면 설비 대표사진을 표시하고, 현재 업로드 루트와 기존 `/data/upload/module_fire` 경로를 모두 조회하도록 개선 완료
 - 소화기 목록 화면은 한 번에 전체 데이터를 병합하지 않고 `/fire-api/extinguishers?page={page}&size=200`으로 현재 페이지의 최대 200건만 출력하며, 이전/다음 및 페이지 번호 이동 UI를 제공
