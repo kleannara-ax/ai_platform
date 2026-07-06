@@ -46,6 +46,23 @@
     .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;}
     .detail-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;}
     .detail-label{font-size:.78rem;color:#64748b;font-weight:800;margin-bottom:3px;}.detail-value{font-weight:700;}
+    #spkDetailModal .modal-body{background:#f8fafc;}
+    .fw-edit-section{background:rgba(255,255,255,.94);border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:18px;box-shadow:0 16px 32px rgba(15,23,42,.06);}
+    .fw-edit-section + .fw-edit-section{margin-top:16px;}
+    .fw-edit-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+    .fw-edit-section-title strong{font-size:1rem;font-weight:800;color:#1e293b;letter-spacing:-.02em;}
+    .fw-edit-section-title span{font-size:.82rem;font-weight:700;color:#64748b;}
+    .fw-detail-grid{display:grid;gap:10px;}
+    .fw-detail-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:#f8fbff;}
+    .fw-detail-item-label{width:110px;flex:0 0 110px;font-size:.82rem;font-weight:800;color:#64748b;}
+    .fw-detail-item-value{min-width:0;font-weight:700;color:#0f172a;word-break:break-word;}
+    .fw-media-box{border:1px solid rgba(148,163,184,.18);border-radius:16px;background:#fff;padding:14px;}
+    .fw-empty-box{border:1px dashed rgba(148,163,184,.45);border-radius:16px;background:rgba(248,250,252,.95);color:#64748b;text-align:center;padding:24px 18px;font-weight:700;}
+    .fw-history-wrap{border:1px solid rgba(148,163,184,.18);border-radius:16px;overflow:auto;background:#fff;max-height:420px;}
+    .fw-history-wrap .table{margin-bottom:0;}
+    .js-spk-zoomable{cursor:zoom-in;}
+    .spk-detail-image{width:100%;max-height:320px;object-fit:contain;display:block;border-radius:12px;background:#fff;}
+    .spk-zoom-help{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.72);color:#fff;border-radius:999px;padding:6px 12px;font-size:.78rem;font-weight:800;pointer-events:none;}
     .history-table input,.history-table select,.history-table textarea{min-width:120px;}
     .history-table textarea{min-width:180px;}
     .filter-toolbar{display:grid;grid-template-columns:minmax(220px,1.7fr) minmax(150px,1fr) minmax(150px,1fr) 86px 96px 142px 142px 150px;gap:8px;align-items:center;}
@@ -120,6 +137,7 @@
 </main>
 
 <div class="modal fade" id="spkDetailModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="spkDetailBody"></div></div></div></div>
+<div class="modal fade" id="spkDetailZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1600px);"><div class="modal-content bg-dark"><div class="modal-header border-0"><h5 class="modal-title text-white" id="spkDetailZoomTitle">확대 보기</h5><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body pt-0 pb-3"><div id="spkDetailZoomStage" class="position-relative mx-auto" style="width:100%;height:min(88vh,1200px);overflow:hidden;cursor:grab;"><img id="spkDetailZoomTarget" alt="확대 이미지" style="position:absolute;display:block;" draggable="false"><div id="spkDetailZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div><div class="spk-zoom-help">마우스 휠 확대/축소 · 드래그 이동</div></div></div></div></div></div>
 <div class="modal fade" id="spkInspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="inspectChecklist"></div><label class="form-label fw-bold mt-2" for="inspectNote">비고</label><textarea class="form-control" id="inspectNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea><div class="small text-muted mt-2">점검 결과는 모든 항목을 양호/불량 중 하나로 선택해야 저장됩니다.</div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
 <div class="modal fade" id="spkUpsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="spkUpsertTitle">스프링클러 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="spkUpsertForm"><input type="hidden" id="spkId"><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold" for="spkBuildingSel">건물</label><select class="form-select" id="spkBuildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold" for="spkFloorSel">층</label><select class="form-select" id="spkFloorSel" required></select></div><div class="col-12" id="spkMapSection"><label class="form-label fw-bold">도면 위치 선택</label><div class="border rounded p-2 bg-light"><div id="spkMapCanvas" class="spk-map-canvas"><img id="spkPlanImg" alt="도면"><div id="spkMarkerLayer"></div><div id="spkMapEmpty" class="spk-map-empty">건물과 층을 선택하면 도면이 표시됩니다.</div></div><div class="small text-muted mt-1">도면 클릭으로 위치를 선택하세요.</div><div class="small mt-1">선택 좌표: X <span id="spkCoordX">-</span> / Y <span id="spkCoordY">-</span></div></div></div><div class="col-md-6"><label class="form-label fw-bold" for="spkX">좌표 X(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkX" placeholder="예: 42.5"></div><div class="col-md-6"><label class="form-label fw-bold" for="spkY">좌표 Y(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkY" placeholder="예: 61.2"></div><div class="col-12"><label class="form-label fw-bold" for="spkNote">비고</label><textarea class="form-control" id="spkNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary" id="btnSaveSpk">저장</button></div></div></div></div>
 <div id="fwToast"></div>
@@ -277,11 +295,55 @@ async function openDetail(id) {
   try {
     const d = await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id))); currentDetailId = id;
     const historyRows = Array.isArray(d.inspections) && d.inspections.length ? d.inspections.map(r => renderHistoryRow(r)).join('') : renderHistoryRow({});
+    const detailImageUrl = d.imagePath ? esc(d.imagePath) : '/images/sprinkler.png';
+    const qrId = String(d.qrKey || '').trim();
+    const qrUrl = qrId ? `/fire-api/qr/image?type=sprinkler&id=${encodeURIComponent(qrId)}` : '';
     document.getElementById('spkDetailBody').innerHTML = `
-      <div class="detail-grid mb-4"><div class="detail-item"><div class="detail-label">ID</div><div class="detail-value">${val(d.serialNumber)}</div></div><div class="detail-item"><div class="detail-label">건물 / 층</div><div class="detail-value">${val(d.buildingName)} / ${val(d.floorName)}</div></div><div class="detail-item"><div class="detail-label">좌표</div><div class="detail-value">${fmtCoord(d.x,d.y)}</div></div><div class="detail-item"><div class="detail-label">최종점검</div><div class="detail-value">${fmtDate(d.lastInspectionDate)} ${d.lastInspectorName ? '/ ' + esc(d.lastInspectorName) : ''}</div></div><div class="detail-item"><div class="detail-label">고장유무</div><div class="detail-value">${d.lastInspectionDate ? (d.lastIsFaulty ? '<span class="fw-status fw-bad">고장</span>' : '<span class="fw-status fw-ok">정상</span>') : '-'}</div></div><div class="detail-item"><div class="detail-label">고장사유</div><div class="detail-value">${val(d.lastFaultReason)}</div></div><div class="detail-item" style="grid-column:1/-1"><div class="detail-label">비고</div><div class="detail-value">${val(d.note)}</div></div></div>
-      <section class="spk-detail-map-card mb-4" aria-label="스프링클러 도면상 위치"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><h6 class="fw-bold mb-0">도면상 위치</h6><div class="small text-muted">건물: ${val(d.buildingName)} · 층: ${val(d.floorName)} · 좌표: ${fmtCoord(d.x,d.y)}</div></div><div id="spkDetailMapCanvas" class="spk-detail-map-canvas"><img id="spkDetailPlanImg" alt="도면"><div id="spkDetailMarkerLayer"></div><div id="spkDetailMapEmpty" class="spk-map-empty">도면을 불러오는 중입니다...</div></div></section>
-      <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">점검 이력(최근 12건)</h6><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddHistory">이력 추가</button></div>
-      <div class="table-responsive"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th><th style="width:115px">관리</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>`;
+      <div class="container-fluid">
+        <div class="row g-4">
+          <div class="col-lg-6 d-flex flex-column gap-3">
+            <section class="fw-edit-section" aria-label="스프링클러 기본 정보">
+              <div class="fw-edit-section-title"><strong>기본 정보</strong><span>스프링클러</span></div>
+              <div class="fw-detail-grid">
+                <div class="fw-detail-item"><div class="fw-detail-item-label">ID</div><div class="fw-detail-item-value">${val(d.serialNumber)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">건물 / 층</div><div class="fw-detail-item-value">${val(d.buildingName)} / ${val(d.floorName)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">도면 좌표</div><div class="fw-detail-item-value">${fmtCoord(d.x,d.y)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">고장유무</div><div class="fw-detail-item-value">${d.lastInspectionDate ? (d.lastIsFaulty ? '<span class="fw-status fw-bad">고장</span>' : '<span class="fw-status fw-ok">정상</span>') : '<span class="fw-status fw-muted">미점검</span>'}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">비고</div><div class="fw-detail-item-value">${val(d.note)}</div></div>
+              </div>
+            </section>
+            <section class="fw-edit-section" aria-label="스프링클러 점검 정보">
+              <div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 상태</span></div>
+              <div class="fw-detail-grid">
+                <div class="fw-detail-item"><div class="fw-detail-item-label">최종점검</div><div class="fw-detail-item-value">${fmtDate(d.lastInspectionDate)} ${d.lastInspectorName ? '/ ' + esc(d.lastInspectorName) : ''}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">점검필요</div><div class="fw-detail-item-value">${d.inspectionRequired ? '<span class="fw-status fw-warn">점검필요</span>' : '<span class="fw-status fw-ok">정상</span>'}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">고장사유</div><div class="fw-detail-item-value">${val(d.lastFaultReason)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">점검비고</div><div class="fw-detail-item-value">${val(d.lastInspectionNote)}</div></div>
+              </div>
+            </section>
+            <section class="fw-edit-section" aria-label="스프링클러 점검 이력">
+              <div class="fw-edit-section-title"><strong>점검 이력</strong><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddHistory">이력 추가</button></div>
+              <div class="fw-history-wrap"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th><th style="width:115px">관리</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>
+            </section>
+          </div>
+          <div class="col-lg-6 d-flex flex-column gap-3">
+            <section class="fw-edit-section" aria-label="스프링클러 이미지">
+              <div class="fw-edit-section-title"><strong>이미지</strong><span>클릭하면 확대됩니다</span></div>
+              <div class="fw-media-box"><img id="spkDetailEquipmentImg" class="spk-detail-image js-spk-zoomable" src="${detailImageUrl}" alt="스프링클러 이미지" data-zoom-title="스프링클러 이미지" onerror="this.closest('.fw-media-box').innerHTML='<div class=&quot;fw-empty-box&quot;>이미지를 불러오지 못했습니다.</div>'"></div>
+            </section>
+            <section class="fw-edit-section" aria-label="스프링클러 도면상 위치">
+              <div class="fw-edit-section-title"><strong>도면</strong><span>클릭하면 확대됩니다</span></div>
+              <div class="fw-detail-grid mb-3">
+                <div class="fw-detail-item"><div class="fw-detail-item-label">건물</div><div class="fw-detail-item-value">${val(d.buildingName)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">층</div><div class="fw-detail-item-value">${val(d.floorName)}</div></div>
+                <div class="fw-detail-item"><div class="fw-detail-item-label">좌표</div><div class="fw-detail-item-value">${fmtCoord(d.x,d.y)}</div></div>
+              </div>
+              <div class="fw-media-box"><div id="spkDetailMapCanvas" class="spk-detail-map-canvas js-spk-zoomable" data-zoom-title="스프링클러 도면"><img id="spkDetailPlanImg" alt="도면" class="js-spk-zoomable"><div id="spkDetailMarkerLayer"></div><div id="spkDetailMapEmpty" class="spk-map-empty">도면을 불러오는 중입니다...</div></div></div>
+            </section>
+            ${qrUrl ? `<section class="fw-edit-section" aria-label="스프링클러 QR"><div class="fw-edit-section-title"><strong>QR</strong><span>${esc(qrId)}</span></div><div class="fw-media-box text-center"><img class="js-spk-zoomable" src="${qrUrl}" alt="스프링클러 QR" data-zoom-title="스프링클러 QR" style="width:180px;max-width:100%;height:auto;object-fit:contain;"></div></section>` : ''}
+          </div>
+        </div>
+      </div>`;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('spkDetailModal')).show();
     setTimeout(() => loadSpkDetailPlanImage(d), 180);
   } catch(e) { showToast(e.message, 'danger'); }
@@ -387,6 +449,10 @@ async function loadSpkDetailPlanImage(item) {
     mapUrl = data?.data?.planImagePath || '';
   } catch(e) { console.warn('스프링클러 상세 도면 조회 실패', e); }
   if (!mapUrl) { img.removeAttribute('src'); if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('등록된 건물/층의 도면이 없습니다.', true); return; }
+  img.dataset.markerX = x == null ? '' : String(x);
+  img.dataset.markerY = y == null ? '' : String(y);
+  img.dataset.markerIcon = '/images/sprinkler.png';
+  img.dataset.zoomTitle = '스프링클러 도면';
   img.onload = () => {
     setSpkDetailMapMessage('', false);
     renderSpkDetailMarker(item);
@@ -394,6 +460,75 @@ async function loadSpkDetailPlanImage(item) {
   };
   img.onerror = () => { if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('도면 이미지를 불러오지 못했습니다.', true); };
   img.src = mapUrl + (mapUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
+}
+let spkZoomScale = 1, spkZoomPanX = 0, spkZoomPanY = 0;
+let spkZoomDrag = false, spkZoomDragSX = 0, spkZoomDragSY = 0, spkZoomDragPX = 0, spkZoomDragPY = 0;
+function resetSpkZoom() { spkZoomScale = 1; spkZoomPanX = 0; spkZoomPanY = 0; }
+function clampSpkZoom(v) { return Math.max(1, Math.min(6, v)); }
+function renderSpkZoom() {
+  const stage = document.getElementById('spkDetailZoomStage');
+  const target = document.getElementById('spkDetailZoomTarget');
+  const layer = document.getElementById('spkDetailZoomMarkerLayer');
+  if (!stage || !target || !layer || !target.naturalWidth || !target.naturalHeight) return;
+  const sw = stage.clientWidth || 0, sh = stage.clientHeight || 0;
+  const iw = target.naturalWidth || 0, ih = target.naturalHeight || 0;
+  if (!sw || !sh || !iw || !ih) return;
+  const baseScale = Math.min(sw / iw, sh / ih);
+  const scale = baseScale * spkZoomScale;
+  const w = iw * scale, h = ih * scale;
+  const ox = (sw - w) / 2 + spkZoomPanX;
+  const oy = (sh - h) / 2 + spkZoomPanY;
+  target.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;display:block;user-select:none;`;
+  layer.innerHTML = '';
+  const mx = numOrNull(target.dataset.markerX);
+  const my = numOrNull(target.dataset.markerY);
+  if (mx == null || my == null) return;
+  const left = ox + w * (Math.max(0, Math.min(100, mx)) / 100);
+  const top = oy + h * (Math.max(0, Math.min(100, my)) / 100);
+  const markerSize = Math.max(18, Math.min(42, Math.min(w, h) * 0.045));
+  const marker = document.createElement('div');
+  marker.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${markerSize}px;height:${markerSize}px;border-radius:50%;background:rgba(37,99,235,.18);box-shadow:0 0 0 4px rgba(37,99,235,.35);transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 8px rgba(0,0,0,.7));`;
+  marker.innerHTML = `<img src="${target.dataset.markerIcon || '/images/sprinkler.png'}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+  layer.appendChild(marker);
+}
+function openSpkZoomFromImage(sourceEl) {
+  const src = sourceEl?.currentSrc || sourceEl?.src || '';
+  if (!src) return;
+  resetSpkZoom();
+  const target = document.getElementById('spkDetailZoomTarget');
+  const title = document.getElementById('spkDetailZoomTitle');
+  const layer = document.getElementById('spkDetailZoomMarkerLayer');
+  if (!target || !title || !layer) return;
+  title.textContent = sourceEl.dataset.zoomTitle || sourceEl.getAttribute('alt') || '확대 보기';
+  target.dataset.markerX = sourceEl.dataset.markerX || '';
+  target.dataset.markerY = sourceEl.dataset.markerY || '';
+  target.dataset.markerIcon = sourceEl.dataset.markerIcon || '';
+  layer.innerHTML = '';
+  target.onload = renderSpkZoom;
+  target.src = src;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('spkDetailZoomModal')).show();
+  setTimeout(renderSpkZoom, 80);
+}
+function openSpkDetailPlanZoom() {
+  const img = document.getElementById('spkDetailPlanImg');
+  if (!img || !img.getAttribute('src')) return;
+  openSpkZoomFromImage(img);
+}
+function handleSpkZoomWheel(e) {
+  e.preventDefault();
+  const stage = document.getElementById('spkDetailZoomStage');
+  if (!stage) return;
+  const before = spkZoomScale;
+  const next = clampSpkZoom(before * (e.deltaY < 0 ? 1.12 : 0.88));
+  if (next === before) return;
+  const rect = stage.getBoundingClientRect();
+  const mx = e.clientX - rect.left - stage.clientWidth / 2;
+  const my = e.clientY - rect.top - stage.clientHeight / 2;
+  const ratio = next / before;
+  spkZoomPanX = mx - (mx - spkZoomPanX) * ratio;
+  spkZoomPanY = my - (my - spkZoomPanY) * ratio;
+  spkZoomScale = next;
+  renderSpkZoom();
 }
 function setSpkMapMessage(message, visible = true) { const el = document.getElementById('spkMapEmpty'); if (!el) return; el.textContent = message; el.style.display = visible ? 'flex' : 'none'; }
 function syncSpkCoordDisplay() {
@@ -481,6 +616,13 @@ function exportAll() {
 }
 
 document.addEventListener('click', e => {
+  const zoomable = e.target.closest('.js-spk-zoomable');
+  if (zoomable && document.getElementById('spkDetailBody')?.contains(zoomable)) {
+    e.preventDefault();
+    if (zoomable.id === 'spkDetailMapCanvas') openSpkDetailPlanZoom();
+    else if (zoomable.tagName === 'IMG') openSpkZoomFromImage(zoomable);
+    return;
+  }
   const row = e.target.closest('tr.clickable-row[data-id]');
   if (row && !e.target.closest('button,a,input,select,textarea')) openDetail(row.dataset.id);
   const edit = e.target.closest('.js-edit'); if (edit) { e.preventDefault(); openUpsert(allItems.find(x => Number(x.sprinklerId) === Number(edit.dataset.id))); }
@@ -508,6 +650,34 @@ document.getElementById('btnExcelDownload').addEventListener('click', exportAll)
 document.getElementById('btnSpkAdd').addEventListener('click', () => openUpsert(null));
 document.getElementById('btnSaveSpk').addEventListener('click', saveSprinkler);
 document.getElementById('btnConfirmInspect').addEventListener('click', confirmInspect);
+const spkZoomStage = document.getElementById('spkDetailZoomStage');
+if (spkZoomStage) {
+  spkZoomStage.addEventListener('wheel', handleSpkZoomWheel, { passive:false });
+  spkZoomStage.addEventListener('pointerdown', e => {
+    spkZoomDrag = true;
+    spkZoomDragSX = e.clientX; spkZoomDragSY = e.clientY;
+    spkZoomDragPX = spkZoomPanX; spkZoomDragPY = spkZoomPanY;
+    spkZoomStage.setPointerCapture?.(e.pointerId);
+    spkZoomStage.style.cursor = 'grabbing';
+  });
+  spkZoomStage.addEventListener('pointermove', e => {
+    if (!spkZoomDrag) return;
+    spkZoomPanX = spkZoomDragPX + (e.clientX - spkZoomDragSX);
+    spkZoomPanY = spkZoomDragPY + (e.clientY - spkZoomDragSY);
+    renderSpkZoom();
+  });
+  const endDrag = e => {
+    spkZoomDrag = false;
+    spkZoomStage.releasePointerCapture?.(e.pointerId);
+    spkZoomStage.style.cursor = 'grab';
+  };
+  spkZoomStage.addEventListener('pointerup', endDrag);
+  spkZoomStage.addEventListener('pointercancel', endDrag);
+  spkZoomStage.addEventListener('pointerleave', () => { spkZoomDrag = false; spkZoomStage.style.cursor = 'grab'; });
+}
+document.getElementById('spkDetailZoomModal').addEventListener('shown.bs.modal', renderSpkZoom);
+document.getElementById('spkDetailZoomModal').addEventListener('hidden.bs.modal', () => { resetSpkZoom(); const t = document.getElementById('spkDetailZoomTarget'); if (t) t.removeAttribute('src'); });
+window.addEventListener('resize', renderSpkZoom);
 (async function init(){ initExcelDates(); await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); })();
 </script>
 </body>

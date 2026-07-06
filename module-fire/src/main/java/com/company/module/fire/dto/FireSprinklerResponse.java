@@ -28,6 +28,8 @@ public class FireSprinklerResponse {
     private final BigDecimal x;
     private final BigDecimal y;
     private final String note;
+    private final String qrKey;
+    private final String imagePath;
     private final boolean isActive;
     private final LocalDateTime createdAt;
 
@@ -54,6 +56,8 @@ public class FireSprinklerResponse {
                 .x(sprinkler.getX())
                 .y(sprinkler.getY())
                 .note(sprinkler.getNote())
+                .qrKey(sprinkler.getQrKey())
+                .imagePath(sprinkler.getImagePath())
                 .isActive(sprinkler.isActive())
                 .createdAt(sprinkler.getCreatedAt())
                 .build();

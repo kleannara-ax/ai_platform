@@ -6,7 +6,7 @@
 - **Main Features**:
   - JWT 로그인 및 사용자/역할/메뉴 권한 관리
   - 소방설비 관리: 소화기, 스프링클러, 소화전, 수신기, 소방펌프, QR, 모바일 점검
-  - 스프링클러 목록 및 QR/모바일 점검 관리: 이미지 아이콘 기반 메뉴, 목록/상세/등록/수정/삭제, 도면 클릭 기반 X/Y 좌표 선택, QR 발급, 모바일 QR 등록/점검, 90일 주기 점검필요 판정, 양호/불량 체크리스트, 고장 필터, 기간 선택 기반 점검 이력 XLSX 다운로드
+  - 스프링클러 목록 및 QR/모바일 점검 관리: 메뉴 전용 투명 아이콘, 목록/소화기 스타일 상세 모달/등록/수정/삭제, 도면 클릭 기반 X/Y 좌표 선택, 상세 이미지·도면 클릭 확대 및 마우스 휠 확대/축소, QR 발급, 모바일 QR 등록/점검, 90일 주기 점검필요 판정, 양호/불량 체크리스트, 고장 필터, 기간 선택 기반 점검 이력 XLSX 다운로드
   - 설비관리시스템 공통 도면 메뉴: `도면 (메인)`, `층별 도면`은 소방설비/기타설비 하위가 아니라 `설비관리시스템` 바로 아래에서 공통 관리
   - 이상설비 집계: 소화기/소화전 비정상 설비와 수신기/소방펌프 불량·요정비 설비를 이상설비에 포함
   - 이상설비 도면 바로가기: 소화기/소화전/수신기/소방펌프 모두 층별 도면(`/maps/floor.html`)에서 마커 자동 선택, 강조 및 정보 카드 표시
@@ -64,7 +64,8 @@
   - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
   - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
-  - 스프링클러 메뉴/페이지 아이콘: `/images/sprinkler.png`
+  - 스프링클러 좌측 메뉴 전용 투명 아이콘: `/images/sprinkler-menu.png`
+  - 스프링클러 페이지/도면 마커 아이콘: `/images/sprinkler.png`
   - 층별 도면 정적 이미지: `/images/tissue_raw_warehouse_1F.jpg`, `/images/tissue_tent_warehouse_1F.jpg`, `/images/raw_material_yard_1F.jpg`, `/images/fluidized_bed_incinerator_1F.png`, `/images/fluidized_bed_incinerator_2F.png`, `/images/fluidized_bed_incinerator_3F.png`, `/images/new_incinerator_waste_B1.png`, `/images/new_incinerator_waste_1F.png`, `/images/new_incinerator_waste_2F.png`, `/images/new_incinerator_waste_3F.png`, `/images/new_incinerator_waste_4F.png`, `/images/new_incinerator_turbine_1F.png`, `/images/new_incinerator_turbine_2F.png`, `/images/pad_tent_warehouse_1F.jpg`
   - API file path: `/facility-api/{kind}/files/{filename}`
 
@@ -80,7 +81,7 @@
 ## User Guide
 1. 로그인 후 `설비관리시스템` 메뉴로 이동합니다.
 2. `설비관리시스템` 바로 아래의 공통 메뉴 `도면 (메인)`과 `층별 도면`에서 소방설비/기타설비가 함께 사용하는 도면을 확인합니다.
-3. `소방설비` 그룹에서는 소화기, 스프링클러 목록, 소화전, 수신기, 소방펌프, QR 메뉴를 통해 설비 목록, 상세, 등록/수정, 점검 이력을 관리합니다. 스프링클러 목록 상단은 `점검필요`, `고장`, `스프링클러 추가` 버튼만 표시하며, 엑셀 다운로드는 검색/초기화 옆의 시작일·종료일 기간 선택과 초록색 `엑셀 다운로드` 버튼으로 제공합니다. 스프링클러 추가/수정 모달에서는 건물/층 선택 아래의 `도면 위치 선택`에서 도면을 클릭해 X/Y 좌표를 자동 입력할 수 있습니다. QR 메뉴에서는 스프링클러 QR을 조회/인쇄하고, 미등록 QR을 스캔하면 `/minspection/sprinklers/{qrKey}`에서 모바일 등록 후 바로 점검할 수 있습니다. 최종 점검일로부터 90일 이상 지나면 점검필요로 표시됩니다.
+3. `소방설비` 그룹에서는 소화기, 스프링클러 목록, 소화전, 수신기, 소방펌프, QR 메뉴를 통해 설비 목록, 상세, 등록/수정, 점검 이력을 관리합니다. 스프링클러 목록 상단은 `점검필요`, `고장`, `스프링클러 추가` 버튼만 표시하며, 엑셀 다운로드는 검색/초기화 옆의 시작일·종료일 기간 선택과 초록색 `엑셀 다운로드` 버튼으로 제공합니다. 스프링클러 상세 모달은 소화기 상세와 동일한 카드형 기본정보/점검정보/이미지/도면/QR/점검이력 구조로 표시되며, 이미지 또는 도면을 클릭하면 확대 모달에서 마우스 휠로 확대·축소하고 드래그로 이동할 수 있습니다. 스프링클러 추가/수정 모달에서는 건물/층 선택 아래의 `도면 위치 선택`에서 도면을 클릭해 X/Y 좌표를 자동 입력할 수 있습니다. QR 메뉴에서는 스프링클러 QR을 조회/인쇄하고, 미등록 QR을 스캔하면 `/minspection/sprinklers/{qrKey}`에서 모바일 등록 후 바로 점검할 수 있습니다. 최종 점검일로부터 90일 이상 지나면 점검필요로 표시됩니다.
 4. `기타설비` 그룹에서는 에어컨, 정수기 메뉴만 표시하며, 기타설비 하위의 대시보드/도면(메인)/층별 도면 가상 메뉴는 제거되었습니다.
 5. 대시보드 메뉴(`FIRE_DASHBOARD`, `OTHER_DASHBOARD`)는 메뉴관리·접근권한 대상에서 제거되었으며, 이전 세션에 삭제된 페이지가 남아 있으면 기본 대시보드로 자동 복귀합니다.
 6. 층별 도면에서 건물 `옥외`를 선택하면 두 번째 드롭다운이 `소화기`, `소화전`, `수신기/소방펌프` 설비 구분으로 바뀌며 선택된 구분의 마커만 표시됩니다. 실내/옥외 수신기·소방펌프 바로가기는 대상 층/설비 구분을 자동 선택한 뒤 대상 마커를 클릭·강조하고 정보 카드를 표시합니다.
@@ -96,7 +97,7 @@
 - **Build**: `./gradlew :app:bootJar`
 - **Process Manager**: PM2 (`platform`)
 - **Start script**: `/home/user/webapp/start-app.sh`
-- **Last Updated**: 2026-07-02
+- **Last Updated**: 2026-07-06
 
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
@@ -125,6 +126,8 @@
 - 스프링클러 목록 UI에서 상단 요약 버튼 그룹의 `엑셀` 버튼을 제거하고, 검색/초기화 옆에 시작일·종료일 기간 선택과 초록색 `엑셀 다운로드` 버튼을 배치하도록 개선 완료
 - 스프링클러 추가/수정 모달에 기존 소방설비와 동일한 `도면 위치 선택` 영역을 추가하여 건물/층 도면을 표시하고, 도면 클릭 시 좌표 X/Y가 자동 반영되도록 개선 완료
 - `V28__add_fire_sprinkler_qr_mobile_fields.sql`로 `fire_sprinkler.QR_KEY`, `IMAGE_PATH`를 추가하고, QR 관리 페이지/QR 이미지/미등록 QR 생성/모바일 등록·점검 API와 `/minspection/sprinklers/{qrKey}` 모바일 페이지를 스프링클러에 연결
+- 스프링클러 상세 모달을 소화기 상세와 동일한 카드/그리드 구조로 개선하고, 상세 이미지·도면·QR 클릭 확대 및 마우스 휠 확대/축소·드래그 이동을 지원하도록 개선 완료
+- 새 투명 스프링클러 이미지는 좌측 메뉴 전용 `/images/sprinkler-menu.png`로 분리하고, 스프링클러 목록/도면 마커는 기존 `/images/sprinkler.png` 아이콘을 사용하도록 복구
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
