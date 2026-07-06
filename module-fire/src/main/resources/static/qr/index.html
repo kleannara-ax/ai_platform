@@ -84,7 +84,11 @@
     .spk-qr-equipment-img { width:100%; max-height:300px; border-radius:12px; background:#fff; }
     .spk-qr-map-canvas { position:relative; width:100%; height:320px; overflow:hidden; border:1px solid rgba(148,163,184,.28); border-radius:14px; background:#f1f5f9; }
     .spk-qr-map-canvas img { width:100%; height:100%; object-fit:fill; display:block; }
-    .spk-qr-map-marker { position:absolute; width:28px; height:28px; transform:translate(-50%,-50%); border-radius:50%; background:rgba(102,126,234,.18); border:3px solid rgba(102,126,234,.85); box-shadow:0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(37,99,235,.35); }
+    .spk-qr-map-marker { position:absolute; width:28px; height:28px; transform:translate(-50%,-50%); border-radius:50%; background:rgba(102,126,234,.18); border:3px solid rgba(102,126,234,.85); box-shadow:0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(37,99,235,.35); pointer-events:none; }
+    .spk-qr-zoomable { cursor:zoom-in; }
+    #spkQrZoomStage { width:100%; height:min(88vh,1200px); overflow:hidden; cursor:grab; touch-action:none; background:#0b1120; }
+    #spkQrZoomTarget { position:absolute; display:block; user-select:none; -webkit-user-drag:none; }
+    .spk-qr-zoom-help { position:absolute; right:14px; bottom:12px; z-index:4; color:#e2e8f0; background:rgba(15,23,42,.72); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:6px 12px; font-size:.82rem; font-weight:800; pointer-events:none; }
     .spk-qr-status { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:.78rem; font-weight:900; }
     .spk-qr-ok { background:#dcfce7; color:#166534; }
     .spk-qr-bad { background:#fee2e2; color:#991b1b; }
@@ -251,6 +255,24 @@
   </div>
 </div>
 
+<div class="modal fade" id="spkQrZoomModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1600px);">
+    <div class="modal-content bg-dark">
+      <div class="modal-header border-0">
+        <h5 class="modal-title text-white" id="spkQrZoomTitle">확대 보기</h5>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body pt-0 pb-3">
+        <div id="spkQrZoomStage" class="position-relative mx-auto">
+          <img id="spkQrZoomTarget" alt="확대 이미지" draggable="false">
+          <div id="spkQrZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>
+          <div class="spk-qr-zoom-help">마우스 휠 확대/축소 · 드래그 이동</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/js/extinguisher-modal-host.js"></script>
 <script src="/js/hydrant-modal-host.js"></script>
@@ -274,6 +296,14 @@
   let latestListData = {};
   let buildingFloors = [];  /* [{buildingId, buildingName, floors:[{floorId,floorName},...]}] */
   let isFireAdmin = false; /* FIRE_ADMIN 아이디 기반 권한 */
+  let spkQrZoomScale = 1;
+  let spkQrZoomPanX = 0;
+  let spkQrZoomPanY = 0;
+  let spkQrZoomDrag = false;
+  let spkQrZoomDragSX = 0;
+  let spkQrZoomDragSY = 0;
+  let spkQrZoomDragPX = 0;
+  let spkQrZoomDragPY = 0;
 
   function escHtml(str) {
     if (str == null) return '';
@@ -604,6 +634,91 @@
     }
   }
 
+  function resetSpkQrZoom() {
+    spkQrZoomScale = 1;
+    spkQrZoomPanX = 0;
+    spkQrZoomPanY = 0;
+  }
+
+  function clampSpkQrZoom(v) {
+    return Math.max(1, Math.min(10, v));
+  }
+
+  function spkQrNumOrNull(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function renderSpkQrZoom() {
+    const stage = document.getElementById('spkQrZoomStage');
+    const target = document.getElementById('spkQrZoomTarget');
+    const layer = document.getElementById('spkQrZoomMarkerLayer');
+    if (!stage || !target || !layer || !target.naturalWidth || !target.naturalHeight) return;
+
+    const sw = stage.clientWidth || 0;
+    const sh = stage.clientHeight || 0;
+    const iw = target.naturalWidth || 0;
+    const ih = target.naturalHeight || 0;
+    if (!sw || !sh || !iw || !ih) return;
+
+    const baseScale = Math.min(sw / iw, sh / ih);
+    const scale = baseScale * spkQrZoomScale;
+    const w = iw * scale;
+    const h = ih * scale;
+    const ox = (sw - w) / 2 + spkQrZoomPanX;
+    const oy = (sh - h) / 2 + spkQrZoomPanY;
+
+    target.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;display:block;user-select:none;-webkit-user-drag:none;`;
+    layer.innerHTML = '';
+
+    const mx = spkQrNumOrNull(target.dataset.markerX);
+    const my = spkQrNumOrNull(target.dataset.markerY);
+    if (mx == null || my == null) return;
+
+    const left = ox + w * (Math.max(0, Math.min(100, mx)) / 100);
+    const top = oy + h * (Math.max(0, Math.min(100, my)) / 100);
+    const markerSize = Math.max(18, Math.min(42, Math.min(w, h) * 0.045));
+    const marker = document.createElement('div');
+    marker.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${markerSize}px;height:${markerSize}px;border-radius:50%;background:rgba(102,126,234,.18);box-shadow:0 0 0 4px rgba(102,126,234,.35);transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 8px rgba(0,0,0,.7));`;
+    marker.innerHTML = `<img src="${target.dataset.markerIcon || '/images/sprinkler-marker.png'}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+    layer.appendChild(marker);
+  }
+
+  function openSpkQrZoomFromImage(sourceEl) {
+    const src = sourceEl?.getAttribute('data-zoom-src') || sourceEl?.currentSrc || sourceEl?.src || '';
+    if (!src) return;
+    const target = document.getElementById('spkQrZoomTarget');
+    const title = document.getElementById('spkQrZoomTitle');
+    const layer = document.getElementById('spkQrZoomMarkerLayer');
+    if (!target || !title || !layer) return;
+
+    resetSpkQrZoom();
+    title.textContent = sourceEl.dataset.zoomTitle || sourceEl.getAttribute('alt') || '확대 보기';
+    target.dataset.markerX = sourceEl.dataset.markerX || '';
+    target.dataset.markerY = sourceEl.dataset.markerY || '';
+    target.dataset.markerIcon = sourceEl.dataset.markerIcon || '';
+    layer.innerHTML = '';
+    target.onload = renderSpkQrZoom;
+    target.src = src;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('spkQrZoomModal')).show();
+    setTimeout(renderSpkQrZoom, 80);
+  }
+
+  function handleSpkQrZoomWheel(event) {
+    event.preventDefault();
+    const stage = document.getElementById('spkQrZoomStage');
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const cx = event.clientX - rect.left;
+    const cy = event.clientY - rect.top;
+    const oldScale = spkQrZoomScale;
+    spkQrZoomScale = clampSpkQrZoom(spkQrZoomScale * (event.deltaY < 0 ? 1.15 : 1 / 1.15));
+    const ratio = spkQrZoomScale / oldScale;
+    spkQrZoomPanX = cx - (cx - spkQrZoomPanX) * ratio;
+    spkQrZoomPanY = cy - (cy - spkQrZoomPanY) * ratio;
+    renderSpkQrZoom();
+  }
+
   async function openSprinklerDetail(id) {
     const modalEl = document.getElementById('spkQrDetailModal');
     const body = document.getElementById('spkQrDetailBody');
@@ -658,13 +773,13 @@
           <div class="col-lg-6 d-flex flex-column gap-3">
             <section class="spk-qr-section" aria-label="스프링클러 이미지">
               <div class="spk-qr-section-title"><strong>이미지</strong><span>대표 이미지</span></div>
-              <div class="spk-qr-media-box"><img class="spk-qr-equipment-img" src="${escHtml(imagePath)}" alt="스프링클러 이미지" onerror="this.src='/images/sprinkler.png'"></div>
+              <div class="spk-qr-media-box"><img class="spk-qr-equipment-img spk-qr-zoomable" src="${escHtml(imagePath)}" alt="스프링클러 이미지" data-zoom-title="스프링클러 이미지" onerror="this.src='/images/sprinkler.png'"></div>
             </section>
             <section class="spk-qr-section" aria-label="스프링클러 도면 위치">
               <div class="spk-qr-section-title"><strong>도면 위치</strong></div>
-              ${planImagePath ? `<div class="spk-qr-map-canvas"><img src="${escHtml(planImagePath)}" alt="도면">${markerHtml}</div>` : '<div class="empty-state">등록된 도면을 찾을 수 없습니다.</div>'}
+              ${planImagePath ? `<div class="spk-qr-map-canvas"><img class="spk-qr-zoomable" src="${escHtml(planImagePath)}" alt="스프링클러 도면" data-zoom-title="스프링클러 도면" data-marker-x="${hasMarker ? escHtml(d.x) : ''}" data-marker-y="${hasMarker ? escHtml(d.y) : ''}" data-marker-icon="/images/sprinkler-marker.png">${markerHtml}</div>` : '<div class="empty-state">등록된 도면을 찾을 수 없습니다.</div>'}
             </section>
-            ${qrUrl ? `<section class="spk-qr-section" aria-label="스프링클러 QR"><div class="spk-qr-section-title"><strong>QR</strong><span>${escHtml(qrKey)}</span></div><div class="spk-qr-media-box"><img src="${qrUrl}" alt="스프링클러 QR" style="width:180px;height:180px;"></div></section>` : ''}
+            ${qrUrl ? `<section class="spk-qr-section" aria-label="스프링클러 QR"><div class="spk-qr-section-title"><strong>QR</strong><span>${escHtml(qrKey)}</span></div><div class="spk-qr-media-box"><img class="spk-qr-zoomable" src="${qrUrl}" alt="스프링클러 QR" data-zoom-title="스프링클러 QR" style="width:180px;height:180px;"></div></section>` : ''}
           </div>
         </div>
       </div>`;
@@ -715,10 +830,56 @@
       }
     });
     document.addEventListener('click', (event) => {
+      const zoomable = event.target.closest('.spk-qr-zoomable');
+      if (zoomable && document.getElementById('spkQrDetailBody')?.contains(zoomable)) {
+        event.preventDefault();
+        event.stopPropagation();
+        openSpkQrZoomFromImage(zoomable);
+        return;
+      }
+
       const card = event.target.closest('.qr-card[data-qr-type][data-qr-id]');
       if (!card) return;
       openQrDetails(card.dataset.qrType, card.dataset.qrId);
     });
+
+    const zoomStage = document.getElementById('spkQrZoomStage');
+    if (zoomStage) {
+      zoomStage.addEventListener('wheel', handleSpkQrZoomWheel, { passive:false });
+      zoomStage.addEventListener('pointerdown', (event) => {
+        if (event.button !== undefined && event.button !== 0) return;
+        spkQrZoomDrag = true;
+        spkQrZoomDragSX = event.clientX;
+        spkQrZoomDragSY = event.clientY;
+        spkQrZoomDragPX = spkQrZoomPanX;
+        spkQrZoomDragPY = spkQrZoomPanY;
+        zoomStage.setPointerCapture?.(event.pointerId);
+        zoomStage.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+      });
+      zoomStage.addEventListener('pointermove', (event) => {
+        if (!spkQrZoomDrag) return;
+        spkQrZoomPanX = spkQrZoomDragPX + (event.clientX - spkQrZoomDragSX);
+        spkQrZoomPanY = spkQrZoomDragPY + (event.clientY - spkQrZoomDragSY);
+        renderSpkQrZoom();
+      });
+      const endZoomDrag = (event) => {
+        if (!spkQrZoomDrag) return;
+        spkQrZoomDrag = false;
+        zoomStage.releasePointerCapture?.(event.pointerId);
+        zoomStage.style.cursor = 'grab';
+        document.body.style.userSelect = '';
+      };
+      zoomStage.addEventListener('pointerup', endZoomDrag);
+      zoomStage.addEventListener('pointercancel', endZoomDrag);
+      zoomStage.addEventListener('pointerleave', () => {
+        spkQrZoomDrag = false;
+        zoomStage.style.cursor = 'grab';
+        document.body.style.userSelect = '';
+      });
+    }
+
+    document.getElementById('spkQrZoomModal')?.addEventListener('shown.bs.modal', renderSpkQrZoom);
   }
 
   function renderNav() {
