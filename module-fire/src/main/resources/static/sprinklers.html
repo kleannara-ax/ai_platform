@@ -103,9 +103,9 @@
 <main class="container-fluid py-4">
   <section class="card shadow-sm mb-4 summary-gradient-card" aria-labelledby="pageTitle">
     <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3 text-white">
-      <div class="d-flex align-items-center gap-3">
-        <img src="/images/sprinkler.png" alt="스프링클러" style="width:54px;height:54px;object-fit:contain;background:#fff;border-radius:14px;padding:5px;">
-        <div><h3 class="mb-1 fw-bold" id="pageTitle">스프링클러 목록</h3><div class="text-white-50 fw-semibold">총 <span id="totalCount">0</span> 건 · 점검주기 90일</div></div>
+      <div>
+        <h3 class="mb-1 fw-bold" id="pageTitle">스프링클러 목록</h3>
+        <div class="text-white-50 fw-semibold">총 <span id="totalCount">0</span> 건 · 점검주기 90일</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <div class="btn-group status-chip-group" role="group" aria-label="스프링클러 상태 필터">
@@ -288,13 +288,10 @@ function collectChecklist(prefix) {
     return { itemKey:item.key, itemLabel:item.label, result:checked.value };
   });
 }
-function checklistMap(row) {
-  const map = {}; (row?.checklistItems || []).forEach(it => { map[it.itemKey] = it.result; }); return map;
-}
 async function openDetail(id) {
   try {
     const d = await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id))); currentDetailId = id;
-    const historyRows = Array.isArray(d.inspections) && d.inspections.length ? d.inspections.map(r => renderHistoryRow(r)).join('') : renderHistoryRow({});
+    const historyRows = Array.isArray(d.inspections) && d.inspections.length ? d.inspections.map(r => renderHistoryRow(r)).join('') : '<tr><td colspan="6" class="text-center text-muted py-4">등록된 점검 이력이 없습니다.</td></tr>';
     const detailImageUrl = d.imagePath ? esc(d.imagePath) : '/images/sprinkler.png';
     const qrId = String(d.qrKey || '').trim();
     const qrUrl = qrId ? `/fire-api/qr/image?type=sprinkler&id=${encodeURIComponent(qrId)}` : '';
@@ -322,8 +319,8 @@ async function openDetail(id) {
               </div>
             </section>
             <section class="fw-edit-section" aria-label="스프링클러 점검 이력">
-              <div class="fw-edit-section-title"><strong>점검 이력</strong><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddHistory">이력 추가</button></div>
-              <div class="fw-history-wrap"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th><th style="width:115px">관리</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>
+              <div class="fw-edit-section-title"><strong>점검 이력</strong><span>읽기 전용</span></div>
+              <div class="fw-history-wrap"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>
             </section>
           </div>
           <div class="col-lg-6 d-flex flex-column gap-3">
@@ -349,34 +346,8 @@ async function openDetail(id) {
   } catch(e) { showToast(e.message, 'danger'); }
 }
 function renderHistoryRow(row) {
-  const id = row.inspectionId || '';
-  const map = checklistMap(row);
-  return `<tr data-inspection-id="${esc(id)}"><td><input type="date" class="form-control form-control-sm js-hist-date" value="${esc(row.inspectionDate ? String(row.inspectionDate).slice(0,10) : '')}"></td><td><input type="time" class="form-control form-control-sm js-hist-time" value="${esc(row.inspectionTime ? String(row.inspectionTime).slice(0,5) : '')}"></td><td><input type="text" class="form-control form-control-sm js-hist-inspector" value="${esc(row.inspectorName || '')}" placeholder="점검자"></td><td><button type="button" class="btn btn-sm ${row.isFaulty ? 'btn-danger' : 'btn-success'} js-hist-check">${row.inspectionId ? (row.isFaulty ? '불량' : '양호') : '체크'}</button><div class="d-none js-hist-items">${esc(JSON.stringify(map))}</div></td><td class="small text-danger">${val(row.faultReason)}</td><td><textarea class="form-control form-control-sm js-hist-note" rows="1" placeholder="비고">${esc(row.note || '')}</textarea></td><td><button class="btn btn-sm btn-fw-edit js-hist-save">저장</button>${id ? '<button class="btn btn-sm btn-fw-delete js-hist-delete ms-1">삭제</button>' : ''}</td></tr>`;
-}
-function openChecklistEditor(tr) {
-  const raw = tr.querySelector('.js-hist-items')?.textContent || '{}'; let map = {}; try { map = JSON.parse(raw); } catch {}
-  const holder = document.createElement('div'); holder.innerHTML = checklistHtml('hist', map);
-  const modal = document.createElement('div'); modal.className = 'modal fade'; modal.innerHTML = `<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">점검 결과 선택</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">${holder.innerHTML}</div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary">적용</button></div></div></div>`;
-  document.body.appendChild(modal); const inst = bootstrap.Modal.getOrCreateInstance(modal); inst.show();
-  modal.querySelector('.btn-primary').onclick = () => { try { const items = collectChecklist('hist'); const next = {}; items.forEach(x => next[x.itemKey] = x.result); tr.querySelector('.js-hist-items').textContent = JSON.stringify(next); const bad = items.some(x => x.result === 'FAULTY'); const btn = tr.querySelector('.js-hist-check'); btn.textContent = bad ? '불량' : '양호'; btn.className = `btn btn-sm ${bad ? 'btn-danger' : 'btn-success'} js-hist-check`; inst.hide(); } catch(e) { alert(e.message); } };
-  modal.addEventListener('hidden.bs.modal', () => modal.remove());
-}
-async function saveHistory(tr) {
-  try {
-    const inspectionId = tr.dataset.inspectionId || '';
-    const raw = tr.querySelector('.js-hist-items')?.textContent || '{}'; let map = {}; try { map = JSON.parse(raw); } catch {}
-    const items = flatChecklist.map(item => ({ itemKey:item.key, itemLabel:item.label, result:map[item.key] || '' }));
-    if (items.some(x => !x.result)) throw new Error('점검 결과를 선택해 주세요.');
-    const body = { inspectionDate:tr.querySelector('.js-hist-date').value, inspectionTime:tr.querySelector('.js-hist-time').value || null, inspectorName:tr.querySelector('.js-hist-inspector').value.trim(), items, note:tr.querySelector('.js-hist-note').value.trim() };
-    if (!body.inspectionDate) throw new Error('점검일을 입력해 주세요.');
-    const url = inspectionId ? `/fire-api/sprinklers/${currentDetailId}/inspections/${inspectionId}` : `/fire-api/sprinklers/${currentDetailId}/inspections`;
-    await jsonOrThrow(await API.req(url, { method: inspectionId ? 'PATCH' : 'POST', body }));
-    showToast('점검 이력이 저장되었습니다.'); await loadSprinklers(); await openDetail(currentDetailId);
-  } catch(e) { showToast(e.message, 'danger'); }
-}
-async function deleteHistory(tr) {
-  const id = tr.dataset.inspectionId; if (!id || !confirm('점검 이력을 삭제할까요?')) return;
-  try { await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentDetailId}/inspections/${id}`, { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); await openDetail(currentDetailId); } catch(e) { showToast(e.message, 'danger'); }
+  const resultBadge = row?.inspectionId ? (row.isFaulty ? '<span class="fw-status fw-bad">불량</span>' : '<span class="fw-status fw-ok">양호</span>') : '<span class="fw-status fw-muted">-</span>';
+  return `<tr data-inspection-id="${esc(row.inspectionId || '')}"><td>${fmtDate(row.inspectionDate)}</td><td>${val(row.inspectionTime ? String(row.inspectionTime).slice(0,5) : '')}</td><td>${val(row.inspectorName)}</td><td>${resultBadge}</td><td class="small text-danger">${val(row.faultReason)}</td><td>${val(row.note)}</td></tr>`;
 }
 function openInspect(id) { currentInspectId = id; document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect'); document.getElementById('inspectNote').value = ''; bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show(); }
 async function confirmInspect() {
@@ -628,10 +599,6 @@ document.addEventListener('click', e => {
   const edit = e.target.closest('.js-edit'); if (edit) { e.preventDefault(); openUpsert(allItems.find(x => Number(x.sprinklerId) === Number(edit.dataset.id))); }
   const insp = e.target.closest('.js-inspect'); if (insp) { e.preventDefault(); openInspect(insp.dataset.id); }
   const del = e.target.closest('.js-delete'); if (del) { e.preventDefault(); deleteSprinkler(del.dataset.id, del.dataset.serial); }
-  const histCheck = e.target.closest('.js-hist-check'); if (histCheck) openChecklistEditor(histCheck.closest('tr'));
-  const histSave = e.target.closest('.js-hist-save'); if (histSave) saveHistory(histSave.closest('tr'));
-  const histDel = e.target.closest('.js-hist-delete'); if (histDel) deleteHistory(histDel.closest('tr'));
-  if (e.target.id === 'btnAddHistory') document.getElementById('historyBody').insertAdjacentHTML('afterbegin', renderHistoryRow({}));
 });
 document.getElementById('btnSearch').addEventListener('click', loadSprinklers);
 document.getElementById('btnReset').addEventListener('click', () => { document.getElementById('filterQ').value=''; document.getElementById('filterBuildingId').value=''; syncFloorSelect('', 'filterFloorId', true); currentStatusType=null; syncStatusButtons(); loadSprinklers(); });
