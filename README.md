@@ -24,7 +24,8 @@
   - 대표 이미지 1장 유지 및 최근 점검 이력 12건 관리
   - 소화기 목록은 `/fire-api/extinguishers`의 서버 페이지네이션을 사용해 200건 단위로 조회·출력하며, 전체 건수는 목록 API의 `totalElements` 기준으로 표시
   - 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에서 대표사진 업로드/변경 지원(최신 1장만 유지)
-  - 수신기/소방펌프 점검 모달에서 점검사진 업로드 지원(저장된 점검 이력에 연결되며 대표사진도 최신 사진으로 갱신)
+  - 수신기/소방펌프 점검 모달 및 모바일 QR 점검에서 정상/요정비/불량 3상태 점검과 점검사진 업로드 지원(저장된 점검 이력에 연결되며 대표사진도 최신 사진으로 갱신)
+  - 수신기/소방펌프 모바일 QR 점검 사진 업로드는 모바일 브라우저의 누락/비표준 `Content-Type`과 `heic`/`heif` 확장자를 보완하고, PC 업로드와 동일한 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 저장 루트 정책을 사용
   - 수신기/소방펌프 점검 내역 엑셀 다운로드: 점검항목결과 통합 컬럼 없이 항목별 결과 컬럼과 실제 비고를 분리하고, 등록된 점검사진을 XLSX 내부 이미지로 첨부하며, 최신 점검 행은 점검사진이 없으면 설비 대표사진을 표시
 
 ## URLs
@@ -69,7 +70,7 @@
   - 기타설비 업로드: `/data/upload/module_fire/facility/{air-conditioners|water-purifiers}`
   - 수신기 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/receivers`, API file path: `/fire-api/receivers/files/{filename}`
   - 소방펌프 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/pumps`, API file path: `/fire-api/pumps/files/{filename}`
-  - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`
+  - 수신기/소방펌프 점검사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/{receiver-inspections|pump-inspections}`. 모바일 QR 업로드도 동일 루트를 사용하며, 기존 `/data/upload/module_fire/{receiver-inspections|pump-inspections}` 파일은 조회 fallback으로 유지
   - 스프링클러 대표사진 업로드: `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}/sprinklers`, API file path: `/fire-api/sprinklers/files/{filename}`. 파일명은 `sprinkler-{id}.{ext}`로 저장해 같은 확장자는 덮어쓰고, 확장자 변경 시 기존 이미지 파일을 삭제해 설비별 1장만 유지
   - 스프링클러 좌측 메뉴 전용 투명 마스크 아이콘: `/images/sprinkler-menu.png` (`currentColor`로 사이드바 SVG 아이콘과 동일 색상 적용)
   - 스프링클러 페이지 기본 이미지: `/images/sprinkler.png`
@@ -98,8 +99,9 @@
 8. 권한이 있는 사용자는 추가/수정/삭제/점검 및 이미지 업로드를 수행할 수 있습니다. 에어컨 식별 No.는 자동 생성되지 않으므로 등록/수정 시 반드시 직접 입력해야 합니다. 정수기는 등록/수정 시 설치일, 건물, 층, X/Y 좌표만 입력하면 되며 종류는 자동으로 `정수기`로 저장됩니다.
 9. 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에서 사진 파일을 선택하면 해당 설비의 대표사진이 최신 1장으로 교체됩니다.
 10. 수신기/소방펌프 수정 모달의 점검 이력 영역에서는 기존 내역 `수정`/`삭제`와 신규 행 `추가`만 수행하며, 점검 이력 편집 테이블에는 사진 업로드 입력을 두지 않습니다. 점검사진은 별도 `점검` 모달에서 저장 시 업로드됩니다.
-11. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다.
-12. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨도 실내기 위치만 지정하며, 실외기는 좌표 연결 없이 대수만 입력합니다.
+11. 수신기/소방펌프 모바일 QR 점검(`/minspection/receivers/{qrKey}`, `/minspection/pumps/{qrKey}`)에서는 각 점검 항목별로 `정상`, `요정비`, `불량` 중 하나를 선택하며, 요정비/불량 항목은 자동 요약됩니다. 모바일에서 촬영/선택한 사진은 점검 저장 후 최신 점검 이력과 설비 대표사진에 연결됩니다.
+12. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다.
+13. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨도 실내기 위치만 지정하며, 실외기는 좌표 연결 없이 대수만 입력합니다.
 
 ## Deployment / Runtime
 - **Runtime**: Spring Boot 3.2.5 + Java 21
@@ -124,6 +126,8 @@
 - 수신기/소방펌프 점검 내역 다운로드를 CSV에서 사진 포함 XLSX로 변경하고, 점검항목결과 통합 컬럼을 제거한 뒤 각 점검 항목 결과와 실제 비고를 별도 컬럼으로 출력하도록 개선 완료
 - 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에 대표사진 업로드를 추가하고, 설비별 대표사진은 최신 1장만 유지하도록 개선 완료
 - 수신기/소방펌프 점검 모달 저장 시 선택 사진이 생성된 점검 이력에 안정적으로 연결되도록 업로드 대상 식별 로직 개선 완료
+- 수신기/소방펌프 모바일 QR 점검에 `요정비` 선택지를 추가하고, 모바일 점검 API가 `NORMAL`/`MAINTENANCE`/`FAULTY`를 정규화해 종합 상태와 항목별 상태에 저장하도록 개선 완료
+- 수신기/소방펌프 모바일 QR 점검사진 업로드가 모바일 브라우저의 누락/비표준 이미지 Content-Type과 HEIC/HEIF 파일을 처리하도록 보완하고, 저장 루트를 PC 업로드와 같은 `${MODULE_FIRE_UPLOAD_ROOT:-<app-working-dir>/uploads/module_fire}` 정책으로 통일 완료
 - 수신기/소방펌프 점검 내역 XLSX 다운로드 시 최신 점검 행에 점검사진이 없으면 설비 대표사진을 표시하고, 현재 업로드 루트와 기존 `/data/upload/module_fire` 경로를 모두 조회하도록 개선 완료
 - 소화기 목록 화면은 한 번에 전체 데이터를 병합하지 않고 `/fire-api/extinguishers?page={page}&size=200`으로 현재 페이지의 최대 200건만 출력하며, 이전/다음 및 페이지 번호 이동 UI를 제공
 - SPA 내부 소방 모듈 iframe 로딩 시 버전 쿼리스트링을 갱신해 브라우저에 캐시된 이전 `extinguishers.html`이 계속 표시되는 문제를 방지

@@ -763,7 +763,7 @@ public class MobileInspectionController {
         }
         String note = trimToNull(getString(body, "note"));
         Map<String, String> statusMap = toStatusMap(items);
-        String inspectionStatus = hasFaulty(items) ? "FAULTY" : "NORMAL";
+        String inspectionStatus = resolveInspectionStatus(items);
 
         FireReceiverInspection inspection = FireReceiverInspection.builder()
                 .receiver(receiver)
@@ -798,12 +798,11 @@ public class MobileInspectionController {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
         }
-        String ct = file.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (!isAllowedImageFile(file)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("이미지 파일만 업로드할 수 있습니다."));
         }
 
-        fireReceiverRepository.findById(id)
+        FireReceiver receiver = fireReceiverRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         FireReceiverInspection inspection = receiverInspectionRepository
@@ -816,23 +815,28 @@ public class MobileInspectionController {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/receiver-inspections"),
+        return uploadInspectionImage(file, uploadDir("receiver-inspections"),
                 "/fire-api/minspection/files/receivers/", oldImagePaths, inspection::updateImagePath, () -> {
                     inspectionsWithImages.forEach(ins -> {
                         if (!Objects.equals(ins.getInspectionId(), inspection.getInspectionId())) {
                             ins.updateImagePath(null);
                         }
                     });
+                    receiver.updateImagePath(inspection.getImagePath());
                     if (!inspectionsWithImages.isEmpty()) {
                         receiverInspectionRepository.saveAll(inspectionsWithImages);
                     }
                     receiverInspectionRepository.save(inspection);
+                    fireReceiverRepository.save(receiver);
                 });
     }
 
     @GetMapping("/files/receivers/{filename:.+}")
     public ResponseEntity<Resource> getReceiverImageFile(@PathVariable String filename) {
-        return serveInspectionImage("/data/upload/module_fire/receiver-inspections", filename);
+        return serveInspectionImage(List.of(
+                uploadDir("receiver-inspections"),
+                Paths.get("/data/upload/module_fire/receiver-inspections")
+        ), filename);
     }
 
     @GetMapping("/pumps/by-key")
@@ -968,7 +972,7 @@ public class MobileInspectionController {
         }
         String note = trimToNull(getString(body, "note"));
         Map<String, String> statusMap = toStatusMap(items);
-        String inspectionStatus = hasFaulty(items) ? "FAULTY" : "NORMAL";
+        String inspectionStatus = resolveInspectionStatus(items);
 
         FirePumpInspection inspection = FirePumpInspection.builder()
                 .pump(pump)
@@ -1003,12 +1007,11 @@ public class MobileInspectionController {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
         }
-        String ct = file.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (!isAllowedImageFile(file)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("이미지 파일만 업로드할 수 있습니다."));
         }
 
-        firePumpRepository.findById(id)
+        FirePump pump = firePumpRepository.findById(id)
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
 
         FirePumpInspection inspection = pumpInspectionRepository
@@ -1021,23 +1024,28 @@ public class MobileInspectionController {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return uploadInspectionImage(file, Paths.get("/data/upload/module_fire/pump-inspections"),
+        return uploadInspectionImage(file, uploadDir("pump-inspections"),
                 "/fire-api/minspection/files/pumps/", oldImagePaths, inspection::updateImagePath, () -> {
                     inspectionsWithImages.forEach(ins -> {
                         if (!Objects.equals(ins.getInspectionId(), inspection.getInspectionId())) {
                             ins.updateImagePath(null);
                         }
                     });
+                    pump.updateImagePath(inspection.getImagePath());
                     if (!inspectionsWithImages.isEmpty()) {
                         pumpInspectionRepository.saveAll(inspectionsWithImages);
                     }
                     pumpInspectionRepository.save(inspection);
+                    firePumpRepository.save(pump);
                 });
     }
 
     @GetMapping("/files/pumps/{filename:.+}")
     public ResponseEntity<Resource> getPumpImageFile(@PathVariable String filename) {
-        return serveInspectionImage("/data/upload/module_fire/pump-inspections", filename);
+        return serveInspectionImage(List.of(
+                uploadDir("pump-inspections"),
+                Paths.get("/data/upload/module_fire/pump-inspections")
+        ), filename);
     }
 
     @GetMapping("/sprinklers/by-key")
@@ -1178,7 +1186,7 @@ public class MobileInspectionController {
         }
         String note = trimToNull(getString(body, "note"));
         Map<String, String> statusMap = toStatusMap(items);
-        String inspectionStatus = hasFaulty(items) ? "FAULTY" : "NORMAL";
+        String inspectionStatus = resolveInspectionStatus(items);
 
         FireSprinklerInspection inspection = FireSprinklerInspection.builder()
                 .sprinkler(sprinkler)
@@ -1615,23 +1623,51 @@ public class MobileInspectionController {
         }
     }
 
-    private ResponseEntity<Resource> serveInspectionImage(String baseDir, String filename) {
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
+    }
+
+    private boolean isAllowedImageFile(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            return true;
+        }
+        String original = file.getOriginalFilename();
+        if (original == null) {
+            return false;
+        }
+        int idx = original.lastIndexOf('.');
+        if (idx < 0 || idx >= original.length() - 1) {
+            return false;
+        }
+        String ext = original.substring(idx + 1).replaceAll("[^a-zA-Z0-9]", "").toLowerCase(Locale.ROOT);
+        return Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif").contains(ext);
+    }
+
+    private ResponseEntity<Resource> serveInspectionImage(List<Path> baseDirs, String filename) {
         try {
             String clean = filename == null ? "" : filename.replace("\\", "/");
             if (clean.contains("..") || clean.contains("/")) {
                 return ResponseEntity.badRequest().build();
             }
-            Path base = Paths.get(baseDir).toAbsolutePath().normalize();
-            Path file = base.resolve(clean).normalize();
-            if (!file.startsWith(base) || !Files.exists(file)) {
-                return ResponseEntity.notFound().build();
+            for (Path candidateBase : baseDirs) {
+                Path base = candidateBase.toAbsolutePath().normalize();
+                Path file = base.resolve(clean).normalize();
+                if (!file.startsWith(base) || !Files.exists(file)) {
+                    continue;
+                }
+                Resource resource = new UrlResource(file.toUri());
+                MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                        .contentType(mediaType)
+                        .body(resource);
             }
-            Resource resource = new UrlResource(file.toUri());
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                    .contentType(mediaType)
-                    .body(resource);
+            return ResponseEntity.notFound().build();
         } catch (Exception ex) {
             return ResponseEntity.internalServerError().build();
         }
@@ -1649,21 +1685,52 @@ public class MobileInspectionController {
             }
             String key = trimToNull(String.valueOf(rawMap.get("key")));
             String label = trimToNull(String.valueOf(rawMap.get("label")));
-            String result = trimToNull(String.valueOf(rawMap.get("result")));
+            String result = normalizeChecklistResult(String.valueOf(rawMap.get("result")));
             if (key == null || result == null) {
                 continue;
             }
             Map<String, String> item = new LinkedHashMap<>();
             item.put("key", key);
             item.put("label", label);
-            item.put("result", result.toUpperCase(Locale.ROOT));
+            item.put("result", result);
             items.add(item);
         }
         return items;
     }
 
-    private boolean hasFaulty(List<Map<String, String>> items) {
-        return items.stream().anyMatch(item -> "FAULTY".equalsIgnoreCase(item.get("result")));
+    private String resolveInspectionStatus(List<Map<String, String>> items) {
+        boolean hasFaulty = false;
+        boolean hasMaintenance = false;
+        for (Map<String, String> item : items) {
+            String result = normalizeChecklistResult(item.get("result"));
+            if ("FAULTY".equals(result)) {
+                hasFaulty = true;
+            } else if ("MAINTENANCE".equals(result)) {
+                hasMaintenance = true;
+            } else if (!"NORMAL".equals(result)) {
+                throw new BusinessException("점검 결과는 정상, 요정비, 불량만 가능합니다.");
+            }
+        }
+        if (hasFaulty) {
+            return "FAULTY";
+        }
+        if (hasMaintenance) {
+            return "MAINTENANCE";
+        }
+        return "NORMAL";
+    }
+
+    private String normalizeChecklistResult(String result) {
+        String normalized = trimToNull(result);
+        if (normalized == null) {
+            return null;
+        }
+        return switch (normalized.toUpperCase(Locale.ROOT)) {
+            case "정상", "NORMAL" -> "NORMAL";
+            case "요정비", "MAINTENANCE", "NEED_MAINTENANCE", "NEEDS_REPAIR", "REPAIR_REQUIRED" -> "MAINTENANCE";
+            case "불량", "FAULTY" -> "FAULTY";
+            default -> normalized.toUpperCase(Locale.ROOT);
+        };
     }
 
     private Map<String, String> toStatusMap(List<Map<String, String>> items) {
@@ -1672,7 +1739,7 @@ public class MobileInspectionController {
             String key = trimToNull(item.get("key"));
             String status = trimToNull(item.get("result"));
             if (key != null && status != null) {
-                result.put(key, status.toUpperCase(Locale.ROOT));
+                result.put(key, normalizeChecklistResult(status));
             }
         }
         return result;

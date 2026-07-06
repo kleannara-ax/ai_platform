@@ -94,11 +94,12 @@
       margin-top: 10px;
       padding: 10px 12px;
       border-radius: 10px;
-      background: #fef2f2;
-      color: #b91c1c;
+      background: #fff7ed;
+      color: #9a3412;
       font-size: 13px;
       font-weight: 700;
       display: none;
+      white-space: pre-line;
     }
     .actions { display: flex; gap: 8px; margin-top: 16px; }
     .actions button {
@@ -306,6 +307,7 @@
           <div class="label">${index + 1}. ${escHtml(item.label)}</div>
           <div class="radio-group">
             <label><input type="radio" name="check_${item.key}" value="NORMAL"> 정상</label>
+            <label><input type="radio" name="check_${item.key}" value="MAINTENANCE"> 요정비</label>
             <label><input type="radio" name="check_${item.key}" value="FAULTY"> 불량</label>
           </div>
         </div>
@@ -337,14 +339,18 @@
     function updateFaultSummary() {
       const faultBox = document.getElementById('faultReasonAuto');
       const result = collectChecklistResult();
+      const maintenances = result.items.filter((item) => item.result === 'MAINTENANCE').map((item) => item.label);
       const faults = result.items.filter((item) => item.result === 'FAULTY').map((item) => item.label);
-      if (!faults.length) {
+      const lines = [];
+      if (maintenances.length) lines.push('요정비 항목: ' + maintenances.join(', '));
+      if (faults.length) lines.push('불량 항목: ' + faults.join(', '));
+      if (!lines.length) {
         faultBox.style.display = 'none';
         faultBox.textContent = '';
         return;
       }
       faultBox.style.display = 'block';
-      faultBox.textContent = '불량 항목: ' + faults.join(', ');
+      faultBox.textContent = lines.join('\n');
     }
 
     function renderExistsView(data) {
@@ -388,7 +394,7 @@
     async function confirmInspect(pumpId) {
       const result = collectChecklistResult();
       if (result.hasUnchecked) {
-        alert('모든 점검 항목에 정상 또는 불량을 선택해 주세요.');
+        alert('모든 점검 항목에 정상, 요정비 또는 불량을 선택해 주세요.');
         return;
       }
 
@@ -421,7 +427,8 @@
             body: fd
           });
           if (!uploadRes.ok) {
-            alert('점검은 저장되었지만 사진 업로드는 실패했습니다.');
+            const uploadJson = await uploadRes.json().catch(() => null);
+            alert(uploadJson?.message || '점검은 저장되었지만 사진 업로드는 실패했습니다.');
           }
         }
 
