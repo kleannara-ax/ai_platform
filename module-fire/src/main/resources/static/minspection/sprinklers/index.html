@@ -40,10 +40,11 @@
     #completeView .csub { color:var(--muted); font-size:14px; margin-top:6px; }
     #completeView button { margin-top:24px; padding:13px 32px; background:var(--primary); color:#fff; }
     .mapWrap { position:relative; border:1px solid rgba(0,0,0,.08); border-radius:12px; overflow:hidden; background:#fff; }
-    .mapCanvas { position:relative; width:100%; height:240px; overflow:hidden; touch-action:none; }
-    .mapCanvas img { width:100%; height:100%; object-fit:fill; display:block; background:#f0f0f0; }
-    .markerLayer { position:absolute; inset:0; pointer-events:none; }
+    .mapCanvas { position:relative; width:100%; height:240px; overflow:hidden; touch-action:none; cursor:crosshair; }
+    .mapCanvas img { width:100%; height:100%; object-fit:fill; display:block; background:#f0f0f0; transform-origin:0 0; user-select:none; -webkit-user-drag:none; }
+    .markerLayer { position:absolute; inset:0; pointer-events:none; transform-origin:0 0; }
     .markerIcon { position:absolute; width:24px; height:24px; transform:translate(-50%,-50%); background:var(--primary); border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(102,126,234,.8); pointer-events:none; }
+    .mapHint { position:absolute; left:8px; right:8px; bottom:8px; z-index:3; padding:6px 8px; border-radius:999px; background:rgba(17,24,39,.72); color:#fff; font-size:11px; font-weight:800; text-align:center; pointer-events:none; }
     .coord { font-size:12px; color:#555; margin-top:4px; }
     .hidden { display:none !important; }
   </style>
@@ -105,6 +106,13 @@
     let mapOptionsByBuilding = new Map();
     let selectedMapOption = null;
     let selectedPoint = null;
+    let mapZoomScale = 1;
+    let mapZoomPanX = 0;
+    let mapZoomPanY = 0;
+    let mapActivePointers = new Map();
+    let mapGestureStart = null;
+    let mapGestureMoved = false;
+    let suppressNextMapClick = false;
 
     function authHeaders(extra) { return { ...(extra || {}) }; }
     async function apiFetch(url, opt) {
@@ -231,6 +239,173 @@
         mapOptionsByBuilding.get(key).floors.push(opt);
       });
     }
+    function resetMapZoom() {
+      mapZoomScale = 1;
+      mapZoomPanX = 0;
+      mapZoomPanY = 0;
+      mapActivePointers.clear();
+      mapGestureStart = null;
+      mapGestureMoved = false;
+      suppressNextMapClick = false;
+      applyMapZoom();
+    }
+
+    function clampMapScale(v) { return Math.max(1, Math.min(6, v)); }
+
+    function clampMapPan() {
+      const canvas = document.getElementById('mapCanvas');
+      if (!canvas) return;
+      if (mapZoomScale <= 1) {
+        mapZoomPanX = 0;
+        mapZoomPanY = 0;
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const minX = rect.width * (1 - mapZoomScale);
+      const minY = rect.height * (1 - mapZoomScale);
+      mapZoomPanX = Math.min(0, Math.max(minX, mapZoomPanX));
+      mapZoomPanY = Math.min(0, Math.max(minY, mapZoomPanY));
+    }
+
+    function applyMapZoom() {
+      clampMapPan();
+      const transform = `translate(${mapZoomPanX}px, ${mapZoomPanY}px) scale(${mapZoomScale})`;
+      const img = document.getElementById('planImg');
+      const layer = document.getElementById('markerLayer');
+      if (img) img.style.transform = transform;
+      if (layer) layer.style.transform = transform;
+    }
+
+    function getMapPointerDistance(a, b) {
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }
+
+    function getMapPointerCenter(a, b) {
+      return { clientX:(a.clientX + b.clientX) / 2, clientY:(a.clientY + b.clientY) / 2 };
+    }
+
+    function zoomMapAt(clientX, clientY, nextScale) {
+      const canvas = document.getElementById('mapCanvas');
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = clientX - rect.left;
+      const cy = clientY - rect.top;
+      const oldScale = mapZoomScale;
+      mapZoomScale = clampMapScale(nextScale);
+      if (oldScale === mapZoomScale) return;
+      const ratio = mapZoomScale / oldScale;
+      mapZoomPanX = cx - (cx - mapZoomPanX) * ratio;
+      mapZoomPanY = cy - (cy - mapZoomPanY) * ratio;
+      applyMapZoom();
+    }
+
+    function getMapPointFromEvent(e) {
+      const canvas = document.getElementById('mapCanvas');
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const rawX = ((e.clientX - rect.left) - mapZoomPanX) / mapZoomScale;
+      const rawY = ((e.clientY - rect.top) - mapZoomPanY) / mapZoomScale;
+      return {
+        x: Math.max(0, Math.min(100, (rawX / rect.width) * 100)),
+        y: Math.max(0, Math.min(100, (rawY / rect.height) * 100))
+      };
+    }
+
+    function handleMapPointerDown(e) {
+      const img = document.getElementById('planImg');
+      if (!img?.getAttribute('src')) return;
+      const canvas = document.getElementById('mapCanvas');
+      canvas?.setPointerCapture?.(e.pointerId);
+      mapActivePointers.set(e.pointerId, { clientX:e.clientX, clientY:e.clientY });
+      mapGestureMoved = false;
+      if (mapActivePointers.size === 1) {
+        mapGestureStart = {
+          type:'pan',
+          startX:e.clientX,
+          startY:e.clientY,
+          panX:mapZoomPanX,
+          panY:mapZoomPanY,
+          scale:mapZoomScale
+        };
+      } else if (mapActivePointers.size === 2) {
+        const pts = Array.from(mapActivePointers.values());
+        mapGestureStart = {
+          type:'pinch',
+          distance:getMapPointerDistance(pts[0], pts[1]) || 1,
+          center:getMapPointerCenter(pts[0], pts[1]),
+          panX:mapZoomPanX,
+          panY:mapZoomPanY,
+          scale:mapZoomScale
+        };
+      }
+    }
+
+    function handleMapPointerMove(e) {
+      if (!mapActivePointers.has(e.pointerId)) return;
+      mapActivePointers.set(e.pointerId, { clientX:e.clientX, clientY:e.clientY });
+      if (!mapGestureStart) return;
+      if (mapActivePointers.size >= 2 && mapGestureStart.type === 'pinch') {
+        const pts = Array.from(mapActivePointers.values()).slice(0, 2);
+        const distance = getMapPointerDistance(pts[0], pts[1]) || 1;
+        const center = getMapPointerCenter(pts[0], pts[1]);
+        const startCenter = mapGestureStart.center;
+        const oldScale = mapGestureStart.scale;
+        const nextScale = clampMapScale(mapGestureStart.scale * (distance / mapGestureStart.distance));
+        const canvas = document.getElementById('mapCanvas');
+        const rect = canvas.getBoundingClientRect();
+        const startCx = startCenter.clientX - rect.left;
+        const startCy = startCenter.clientY - rect.top;
+        const nextCx = center.clientX - rect.left;
+        const nextCy = center.clientY - rect.top;
+        const ratio = nextScale / oldScale;
+        mapZoomScale = nextScale;
+        mapZoomPanX = nextCx - (startCx - mapGestureStart.panX) * ratio;
+        mapZoomPanY = nextCy - (startCy - mapGestureStart.panY) * ratio;
+        mapGestureMoved = true;
+        suppressNextMapClick = true;
+        applyMapZoom();
+        return;
+      }
+      if (mapActivePointers.size === 1 && mapGestureStart.type === 'pan') {
+        const dx = e.clientX - mapGestureStart.startX;
+        const dy = e.clientY - mapGestureStart.startY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) mapGestureMoved = true;
+        if (mapZoomScale > 1) {
+          mapZoomPanX = mapGestureStart.panX + dx;
+          mapZoomPanY = mapGestureStart.panY + dy;
+          suppressNextMapClick = true;
+          applyMapZoom();
+        }
+      }
+    }
+
+    function handleMapPointerEnd(e) {
+      const canvas = document.getElementById('mapCanvas');
+      canvas?.releasePointerCapture?.(e.pointerId);
+      mapActivePointers.delete(e.pointerId);
+      if (mapGestureMoved) suppressNextMapClick = true;
+      if (mapActivePointers.size === 1) {
+        const p = Array.from(mapActivePointers.values())[0];
+        mapGestureStart = {
+          type:'pan',
+          startX:p.clientX,
+          startY:p.clientY,
+          panX:mapZoomPanX,
+          panY:mapZoomPanY,
+          scale:mapZoomScale
+        };
+      } else {
+        mapGestureStart = null;
+      }
+    }
+
+    function handleMapWheel(e) {
+      const img = document.getElementById('planImg');
+      if (!img?.getAttribute('src')) return;
+      e.preventDefault();
+      zoomMapAt(e.clientX, e.clientY, mapZoomScale * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
+    }
+
     function resetMapSelection(clearPlan) {
       selectedPoint = null;
       document.getElementById('inputX').value = '';
@@ -238,6 +413,7 @@
       document.getElementById('coordX').textContent = '-';
       document.getElementById('coordY').textContent = '-';
       document.getElementById('markerLayer').innerHTML = '';
+      resetMapZoom();
       if (clearPlan) document.getElementById('planImg').removeAttribute('src');
     }
     function populateBuildingSelect() {
@@ -286,9 +462,10 @@
               <select id="floorSelect" disabled><option value="">층을 선택하세요</option></select>
             </div>
             <div class="mapWrap">
-              <div class="mapCanvas" id="mapCanvas">
-                <img id="planImg" alt="도면" src="" />
+              <div class="mapCanvas" id="mapCanvas" aria-label="도면 위치 선택 영역">
+                <img id="planImg" alt="도면" src="" draggable="false" />
                 <div class="markerLayer" id="markerLayer"></div>
+                <div class="mapHint">한 손가락 탭: 위치 선택 · 두 손가락: 확대/축소 · 확대 후 드래그 이동</div>
               </div>
             </div>
             <div class="coord">좌표: X <span id="coordX">-</span> / Y <span id="coordY">-</span></div>
@@ -300,16 +477,26 @@
       populateBuildingSelect();
       document.getElementById('buildingSelect').addEventListener('change', onBuildingChange);
       document.getElementById('floorSelect').addEventListener('change', onFloorChange);
-      document.getElementById('mapCanvas').addEventListener('click', onMapClick);
+      const mapCanvas = document.getElementById('mapCanvas');
+      mapCanvas.addEventListener('click', onMapClick);
+      mapCanvas.addEventListener('pointerdown', handleMapPointerDown);
+      mapCanvas.addEventListener('pointermove', handleMapPointerMove);
+      mapCanvas.addEventListener('pointerup', handleMapPointerEnd);
+      mapCanvas.addEventListener('pointercancel', handleMapPointerEnd);
+      mapCanvas.addEventListener('pointerleave', handleMapPointerEnd);
+      mapCanvas.addEventListener('wheel', handleMapWheel, { passive:false });
       document.getElementById('regForm').addEventListener('submit', submitRegister);
     }
     function onMapClick(e) {
+      if (suppressNextMapClick) {
+        suppressNextMapClick = false;
+        return;
+      }
       const img = document.getElementById('planImg');
       if (!img.getAttribute('src')) { alert('건물과 층을 먼저 선택하세요.'); return; }
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-      const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-      selectedPoint = { x:Number(x.toFixed(4)), y:Number(y.toFixed(4)) };
+      const point = getMapPointFromEvent(e);
+      if (!point) return;
+      selectedPoint = { x:Number(point.x.toFixed(4)), y:Number(point.y.toFixed(4)) };
       document.getElementById('inputX').value = selectedPoint.x;
       document.getElementById('inputY').value = selectedPoint.y;
       document.getElementById('coordX').textContent = selectedPoint.x;
