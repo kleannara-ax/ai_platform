@@ -35,6 +35,8 @@
     .radio-group label { display:flex; align-items:center; gap:6px; margin:0; font-size:14px; font-weight:700; }
     .radio-group input { width:18px; height:18px; }
     .fault-box { margin-top:10px; padding:10px 12px; border-radius:10px; background:#fef2f2; color:#b91c1c; font-size:13px; font-weight:800; display:none; }
+    .inspect-photo-wrap { margin-top:12px; }
+    .inspect-photo-wrap input[type="file"] { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--border); font-size:15px; background:#fff; }
     #completeView { display:none; text-align:center; padding:40px 16px; }
     #completeView .ctitle { font-size:22px; font-weight:900; margin-top:12px; }
     #completeView .csub { color:var(--muted); font-size:14px; margin-top:6px; }
@@ -69,6 +71,11 @@
     <div style="margin-top:12px;">
       <label for="inspectNote">점검 메모</label>
       <textarea id="inspectNote" placeholder="특이사항이 있으면 입력하세요."></textarea>
+    </div>
+    <div class="inspect-photo-wrap">
+      <label for="inspectPhotoInput">점검 사진</label>
+      <input type="file" id="inspectPhotoInput" accept="image/*" capture="environment" />
+      <div class="sub">사진은 선택 사항이며 업로드 시 스프링클러 최신 사진으로 저장됩니다.</div>
     </div>
     <div class="actions">
       <button type="button" class="btn-secondary" id="btnCancelInspect">취소</button>
@@ -180,6 +187,8 @@
     function openInspectModal(id) {
       renderChecklist();
       document.getElementById('inspectNote').value = '';
+      const photoInput = document.getElementById('inspectPhotoInput');
+      if (photoInput) photoInput.value = '';
       inspectOverlay.style.display = 'block';
       inspectModal.style.display = 'block';
       apiFetch(API_BASE + '/' + id).then(r => r.json()).then(json => {
@@ -207,6 +216,19 @@
           const json = await res.json().catch(() => null);
           alert(json?.message || '점검 저장 중 오류가 발생했습니다.');
           return;
+        }
+        const inspectPhoto = document.getElementById('inspectPhotoInput')?.files?.[0];
+        if (inspectPhoto) {
+          const fd = new FormData();
+          fd.append('file', inspectPhoto);
+          const uploadRes = await apiFetch(API_BASE + '/' + encodeURIComponent(id) + '/image', {
+            method:'POST',
+            body:fd
+          });
+          if (!uploadRes.ok) {
+            const uploadJson = await uploadRes.json().catch(() => null);
+            alert(uploadJson?.message || '점검은 저장되었지만 사진 업로드는 실패했습니다.');
+          }
         }
         inspectOverlay.style.display = 'none';
         inspectModal.style.display = 'none';

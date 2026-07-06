@@ -626,7 +626,8 @@
             body: fd
           });
           if (!up.ok) {
-            alert('점검은 저장되었지만 사진 업로드는 실패했습니다. 네트워크 상태를 확인해주세요.');
+            const uploadJson = await up.json().catch(() => null);
+            alert(uploadJson?.message || '점검은 저장되었지만 사진 업로드는 실패했습니다. 네트워크 상태를 확인해주세요.');
           }
         }
         inspectOverlay.style.display = 'none';

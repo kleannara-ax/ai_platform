@@ -674,7 +674,8 @@ function openInspectModal(hydId) {
           body: fd
         });
         if (!up.ok) {
-          alert('사진 업로드에 실패했습니다. 네트워크 상태를 확인해주세요.');
+          const uploadJson = await up.json().catch(() => null);
+          alert(uploadJson?.message || '사진 업로드에 실패했습니다. 네트워크 상태를 확인해주세요.');
         }
       }
       inspectOverlay.style.display = 'none';

@@ -248,9 +248,8 @@ public class MobileInspectionController {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
         }
-        String ct = file.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (!isAllowedImageFile(file)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("이미지 파일만 업로드할 수 있습니다."));
         }
 
         Extinguisher e = extinguisherRepository.findById(id)
@@ -524,9 +523,8 @@ public class MobileInspectionController {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
         }
-        String ct = file.getContentType();
-        if (ct == null || !ct.toLowerCase().startsWith("image/")) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail(MSG_ERROR));
+        if (!isAllowedImageFile(file)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("이미지 파일만 업로드할 수 있습니다."));
         }
 
         FireHydrant h = fireHydrantRepository.findById(id)
@@ -1208,6 +1206,34 @@ public class MobileInspectionController {
         sprinklerInspectionRepository.save(inspection);
         sprinklerInspectionRepository.trimInspectionsKeepLatest12(id);
         return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @PostMapping("/sprinklers/{id}/image")
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadSprinklerImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image file is empty."));
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
+        }
+        if (!isAllowedImageFile(file)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("이미지 파일만 업로드할 수 있습니다."));
+        }
+
+        FireSprinkler sprinkler = fireSprinklerRepository.findById(id)
+                .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException(MSG_NOT_FOUND));
+        List<String> oldImagePaths = sprinkler.getImagePath() == null || sprinkler.getImagePath().isBlank()
+                ? List.of()
+                : List.of(sprinkler.getImagePath());
+
+        return uploadInspectionImage(file, uploadDir("sprinklers"),
+                "/fire-api/sprinklers/files/", oldImagePaths, sprinkler::updateImagePath, () -> {
+                    fireSprinklerRepository.save(sprinkler);
+                });
     }
 
 
