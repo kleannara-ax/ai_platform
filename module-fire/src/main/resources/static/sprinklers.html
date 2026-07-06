@@ -427,7 +427,7 @@ function renderSpkDetailMarker(item) {
   marker.className = 'spk-selected-marker';
   marker.style.left = `${rect.left + rect.width * x / 100}px`;
   marker.style.top = `${rect.top + rect.height * y / 100}px`;
-  marker.innerHTML = '<img src="/images/sprinkler.png" alt="스프링클러 위치" onerror="this.style.display=\'none\'">';
+  marker.innerHTML = '<img src="/images/sprinkler-marker.png" alt="스프링클러 위치" onerror="this.style.display=\'none\'">';
   layer.appendChild(marker);
 }
 async function loadSpkDetailPlanImage(item) {
@@ -451,7 +451,7 @@ async function loadSpkDetailPlanImage(item) {
   if (!mapUrl) { img.removeAttribute('src'); if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('등록된 건물/층의 도면이 없습니다.', true); return; }
   img.dataset.markerX = x == null ? '' : String(x);
   img.dataset.markerY = y == null ? '' : String(y);
-  img.dataset.markerIcon = '/images/sprinkler.png';
+  img.dataset.markerIcon = '/images/sprinkler-marker.png';
   img.dataset.zoomTitle = '스프링클러 도면';
   img.onload = () => {
     setSpkDetailMapMessage('', false);
@@ -488,7 +488,7 @@ function renderSpkZoom() {
   const markerSize = Math.max(18, Math.min(42, Math.min(w, h) * 0.045));
   const marker = document.createElement('div');
   marker.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${markerSize}px;height:${markerSize}px;border-radius:50%;background:rgba(37,99,235,.18);box-shadow:0 0 0 4px rgba(37,99,235,.35);transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 0 8px rgba(0,0,0,.7));`;
-  marker.innerHTML = `<img src="${target.dataset.markerIcon || '/images/sprinkler.png'}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
+  marker.innerHTML = `<img src="${target.dataset.markerIcon || '/images/sprinkler-marker.png'}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">`;
   layer.appendChild(marker);
 }
 function openSpkZoomFromImage(sourceEl) {
@@ -566,7 +566,7 @@ function renderSpkMarker() {
   marker.className = 'spk-selected-marker';
   marker.style.left = `${rect.left + rect.width * x / 100}px`;
   marker.style.top = `${rect.top + rect.height * y / 100}px`;
-  marker.innerHTML = '<img src="/images/sprinkler.png" alt="선택 위치" onerror="this.style.display=\'none\'">';
+  marker.innerHTML = '<img src="/images/sprinkler-marker.png" alt="선택 위치" onerror="this.style.display=\'none\'">';
   layer.appendChild(marker);
 }
 async function loadSpkPlanImage(options = {}) {
