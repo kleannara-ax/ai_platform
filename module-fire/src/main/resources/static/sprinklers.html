@@ -139,7 +139,7 @@
 <div class="modal fade" id="spkDetailModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="spkDetailBody"></div></div></div></div>
 <div class="modal fade" id="spkDetailZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1600px);"><div class="modal-content bg-dark"><div class="modal-header border-0"><h5 class="modal-title text-white" id="spkDetailZoomTitle">확대 보기</h5><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body pt-0 pb-3"><div id="spkDetailZoomStage" class="position-relative mx-auto" style="width:100%;height:min(88vh,1200px);overflow:hidden;cursor:grab;"><img id="spkDetailZoomTarget" alt="확대 이미지" style="position:absolute;display:block;" draggable="false"><div id="spkDetailZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div><div class="spk-zoom-help">마우스 휠 확대/축소 · 드래그 이동</div></div></div></div></div></div>
 <div class="modal fade" id="spkInspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">스프링클러 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="inspectChecklist"></div><label class="form-label fw-bold mt-2" for="inspectNote">비고</label><textarea class="form-control" id="inspectNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea><div class="small text-muted mt-2">점검 결과는 모든 항목을 양호/불량 중 하나로 선택해야 저장됩니다.</div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
-<div class="modal fade" id="spkUpsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="spkUpsertTitle">스프링클러 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="spkUpsertForm"><input type="hidden" id="spkId"><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold" for="spkBuildingSel">건물</label><select class="form-select" id="spkBuildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold" for="spkFloorSel">층</label><select class="form-select" id="spkFloorSel" required></select></div><div class="col-12" id="spkMapSection"><label class="form-label fw-bold">도면 위치 선택</label><div class="border rounded p-2 bg-light"><div id="spkMapCanvas" class="spk-map-canvas"><img id="spkPlanImg" alt="도면"><div id="spkMarkerLayer"></div><div id="spkMapEmpty" class="spk-map-empty">건물과 층을 선택하면 도면이 표시됩니다.</div></div><div class="small text-muted mt-1">도면 클릭으로 위치를 선택하세요.</div><div class="small mt-1">선택 좌표: X <span id="spkCoordX">-</span> / Y <span id="spkCoordY">-</span></div></div></div><div class="col-md-6"><label class="form-label fw-bold" for="spkX">좌표 X(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkX" placeholder="예: 42.5"></div><div class="col-md-6"><label class="form-label fw-bold" for="spkY">좌표 Y(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkY" placeholder="예: 61.2"></div><div class="col-12"><label class="form-label fw-bold" for="spkNote">비고</label><textarea class="form-control" id="spkNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary" id="btnSaveSpk">저장</button></div></div></div></div>
+<div class="modal fade" id="spkUpsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="spkUpsertTitle">스프링클러 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="spkUpsertForm"><input type="hidden" id="spkId"><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold" for="spkBuildingSel">건물</label><select class="form-select" id="spkBuildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold" for="spkFloorSel">층</label><select class="form-select" id="spkFloorSel" required></select></div><div class="col-12" id="spkMapSection"><label class="form-label fw-bold">도면 위치 선택</label><div class="border rounded p-2 bg-light"><div id="spkMapCanvas" class="spk-map-canvas"><img id="spkPlanImg" alt="도면"><div id="spkMarkerLayer"></div><div id="spkMapEmpty" class="spk-map-empty">건물과 층을 선택하면 도면이 표시됩니다.</div></div><div class="small text-muted mt-1">도면 클릭으로 위치를 선택하세요.</div><div class="small mt-1">선택 좌표: X <span id="spkCoordX">-</span> / Y <span id="spkCoordY">-</span></div></div></div><div class="col-md-6"><label class="form-label fw-bold" for="spkX">좌표 X(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkX" placeholder="예: 42.5"></div><div class="col-md-6"><label class="form-label fw-bold" for="spkY">좌표 Y(%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="spkY" placeholder="예: 61.2"></div><div class="col-12"><label class="form-label fw-bold" for="spkImageFile">스프링클러 이미지</label><input type="file" class="form-control" id="spkImageFile" accept="image/*"><div class="small text-muted mt-1">이미지는 1개만 저장되며, 새 이미지를 선택하면 기존 이미지를 덮어씁니다.</div><div id="spkImagePreviewWrap" class="mt-2" style="display:none;"><img id="spkImagePreview" alt="스프링클러 이미지 미리보기" style="max-width:220px;max-height:160px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px;"></div></div><div class="col-12"><label class="form-label fw-bold" for="spkNote">비고</label><textarea class="form-control" id="spkNote" rows="3" placeholder="비고 사항을 입력하세요."></textarea></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary" id="btnSaveSpk">저장</button></div></div></div></div>
 <div id="fwToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -183,6 +183,7 @@ const checklistGroups = [
 const flatChecklist = checklistGroups.flatMap(g => g.items);
 let allItems = [], filteredItems = [], optionBuildings = [], optionFloors = [], buildingFloorMap = {}, currentStatusType = null, currentInspectId = null, currentDetailId = null;
 let canEdit = API.canManage();
+let spkSelectedImageObjectUrl = '';
 const pageSize = 500;
 
 function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -349,6 +350,54 @@ function renderHistoryRow(row) {
   const resultBadge = row?.inspectionId ? (row.isFaulty ? '<span class="fw-status fw-bad">불량</span>' : '<span class="fw-status fw-ok">양호</span>') : '<span class="fw-status fw-muted">-</span>';
   return `<tr data-inspection-id="${esc(row.inspectionId || '')}"><td>${fmtDate(row.inspectionDate)}</td><td>${val(row.inspectionTime ? String(row.inspectionTime).slice(0,5) : '')}</td><td>${val(row.inspectorName)}</td><td>${resultBadge}</td><td class="small text-danger">${val(row.faultReason)}</td><td>${val(row.note)}</td></tr>`;
 }
+function setSpkImagePreview(src) {
+  const wrap = document.getElementById('spkImagePreviewWrap');
+  const img = document.getElementById('spkImagePreview');
+  if (!wrap || !img) return;
+  if (!src) {
+    img.removeAttribute('src');
+    wrap.style.display = 'none';
+    return;
+  }
+  img.src = src;
+  wrap.style.display = 'block';
+}
+function resetSpkImageSelection(existingPath = '') {
+  const input = document.getElementById('spkImageFile');
+  if (input) input.value = '';
+  if (spkSelectedImageObjectUrl) {
+    URL.revokeObjectURL(spkSelectedImageObjectUrl);
+    spkSelectedImageObjectUrl = '';
+  }
+  setSpkImagePreview(existingPath ? existingPath + (existingPath.includes('?') ? '&' : '?') + 'v=' + Date.now() : '');
+}
+function handleSpkImageChange(e) {
+  const file = e.target.files && e.target.files[0];
+  if (spkSelectedImageObjectUrl) {
+    URL.revokeObjectURL(spkSelectedImageObjectUrl);
+    spkSelectedImageObjectUrl = '';
+  }
+  if (!file) {
+    setSpkImagePreview('');
+    return;
+  }
+  if (!file.type || !file.type.startsWith('image/')) {
+    showToast('이미지 파일만 선택할 수 있습니다.', 'warning');
+    e.target.value = '';
+    setSpkImagePreview('');
+    return;
+  }
+  spkSelectedImageObjectUrl = URL.createObjectURL(file);
+  setSpkImagePreview(spkSelectedImageObjectUrl);
+}
+async function uploadSprinklerImage(sprinklerId) {
+  const input = document.getElementById('spkImageFile');
+  const file = input?.files && input.files[0];
+  if (!file) return null;
+  const fd = new FormData();
+  fd.append('file', file);
+  return jsonOrThrow(await API.req(`/fire-api/sprinklers/${encodeURIComponent(sprinklerId)}/image`, { method:'POST', body:fd }));
+}
 function openInspect(id) { currentInspectId = id; document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect'); document.getElementById('inspectNote').value = ''; bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show(); }
 async function confirmInspect() {
   try { const body = { items:collectChecklist('inspect'), note:document.getElementById('inspectNote').value.trim() }; await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentInspectId}/inspect`, { method:'POST', body })); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).hide(); showToast('점검이 완료되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); }
@@ -364,6 +413,7 @@ function openUpsert(item) {
   document.getElementById('spkX').value = item?.x ?? '';
   document.getElementById('spkY').value = item?.y ?? '';
   document.getElementById('spkNote').value = item?.note || '';
+  resetSpkImageSelection(item?.imagePath || '');
   syncSpkCoordDisplay();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).show();
   setTimeout(() => loadSpkPlanImage({ keepCoord:true }), 150);
@@ -372,7 +422,11 @@ async function saveSprinkler() {
   try {
     const body = { sprinklerId:document.getElementById('spkId').value || null, buildingId:Number(document.getElementById('spkBuildingSel').value), floorId:Number(document.getElementById('spkFloorSel').value), x:document.getElementById('spkX').value === '' ? null : Number(document.getElementById('spkX').value), y:document.getElementById('spkY').value === '' ? null : Number(document.getElementById('spkY').value), note:document.getElementById('spkNote').value.trim() };
     if (!body.buildingId) throw new Error('건물을 선택해 주세요.'); if (!body.floorId) throw new Error('층을 선택해 주세요.');
-    await jsonOrThrow(await API.req('/fire-api/sprinklers', { method:'POST', body })); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).hide(); showToast('저장되었습니다.'); await loadSprinklers();
+    const saved = await jsonOrThrow(await API.req('/fire-api/sprinklers', { method:'POST', body }));
+    const uploaded = await uploadSprinklerImage(saved.sprinklerId);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).hide();
+    showToast(uploaded ? '저장 및 이미지 반영이 완료되었습니다.' : '저장되었습니다.');
+    await loadSprinklers();
   } catch(e) { showToast(e.message, 'danger'); }
 }
 async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
@@ -608,6 +662,8 @@ document.getElementById('spkFloorSel').addEventListener('change', () => loadSpkP
 document.getElementById('spkMapCanvas').addEventListener('click', handleSpkMapClick);
 document.getElementById('spkPlanImg').addEventListener('load', renderSpkMarker);
 document.getElementById('spkUpsertModal').addEventListener('shown.bs.modal', renderSpkMarker);
+document.getElementById('spkUpsertModal').addEventListener('hidden.bs.modal', () => resetSpkImageSelection(''));
+document.getElementById('spkImageFile').addEventListener('change', handleSpkImageChange);
 document.getElementById('spkX').addEventListener('input', syncSpkCoordDisplay);
 document.getElementById('spkY').addEventListener('input', syncSpkCoordDisplay);
 document.getElementById('filterQ').addEventListener('keydown', e => { if (e.key === 'Enter') loadSprinklers(); });

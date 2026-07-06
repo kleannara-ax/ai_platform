@@ -226,6 +226,13 @@ public class FireSprinklerService {
         fireSprinklerRepository.delete(sprinkler);
     }
 
+    @Transactional
+    public void updateImagePath(Long sprinklerId, String imagePath) {
+        FireSprinkler sprinkler = fireSprinklerRepository.findById(sprinklerId)
+                .orElseThrow(() -> new EntityNotFoundException("FireSprinkler", sprinklerId));
+        sprinkler.updateImagePath(imagePath);
+    }
+
     public byte[] exportInspectionWorkbook(Long sprinklerId, LocalDate fromDate, LocalDate toDate) {
         validateExportRange(fromDate, toDate);
         FireSprinkler sprinkler = fireSprinklerRepository.findById(sprinklerId)

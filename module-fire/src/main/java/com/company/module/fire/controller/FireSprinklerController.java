@@ -9,11 +9,14 @@ import com.company.module.fire.service.FireSprinklerService;
 import com.company.module.fire.service.InspectorNameResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,14 +28,26 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.Principal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/fire-api/sprinklers")
 @RequiredArgsConstructor
 public class FireSprinklerController {
+
+    private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
+    private static final Path SPRINKLER_IMAGE_DIR = uploadDir("sprinklers");
 
     private final FireSprinklerService fireSprinklerService;
     private final InspectorNameResolver inspectorNameResolver;
@@ -56,6 +71,70 @@ public class FireSprinklerController {
     @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_SPRINKLER')")
     public ResponseEntity<ApiResponse<FireSprinklerResponse>> save(@Valid @RequestBody FireSprinklerSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(fireSprinklerService.save(request)));
+    }
+
+    @PostMapping("/{id}/image")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_SPRINKLER')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image file is empty."));
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Image size must be <= 10MB."));
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Only image files are allowed."));
+        }
+
+        try {
+            Files.createDirectories(SPRINKLER_IMAGE_DIR);
+            FireSprinklerResponse detail = fireSprinklerService.getSprinklerDetail(id);
+            String ext = resolveExtension(file.getOriginalFilename(), contentType);
+            String filename = "sprinkler-" + id + "." + ext;
+            deleteOldImage(detail.getImagePath(), filename);
+            deleteOtherImageVariants(id, filename);
+
+            Path base = SPRINKLER_IMAGE_DIR.toAbsolutePath().normalize();
+            Path target = base.resolve(filename).normalize();
+            if (!target.startsWith(base)) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Invalid image filename."));
+            }
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            String publicPath = "/fire-api/sprinklers/files/" + filename;
+            fireSprinklerService.updateImagePath(id, publicPath);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("imagePath", publicPath);
+            return ResponseEntity.ok(ApiResponse.success(result));
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body(ApiResponse.fail("Image save failed."));
+        }
+    }
+
+    @GetMapping("/files/{filename:.+}")
+    public ResponseEntity<Resource> getImageFile(@PathVariable String filename) {
+        try {
+            String clean = filename == null ? "" : filename.replace("\\", "/");
+            if (clean.contains("..") || clean.contains("/")) {
+                return ResponseEntity.badRequest().build();
+            }
+            Path base = SPRINKLER_IMAGE_DIR.toAbsolutePath().normalize();
+            Path file = base.resolve(clean).normalize();
+            if (!file.startsWith(base) || !Files.exists(file)) {
+                return ResponseEntity.notFound().build();
+            }
+            Resource resource = new UrlResource(file.toUri());
+            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                    .contentType(mediaType)
+                    .body(resource);
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PostMapping("/{id}/inspect")
@@ -115,6 +194,65 @@ public class FireSprinklerController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(body);
+    }
+
+    private void deleteOldImage(String oldPath, String newFilename) throws IOException {
+        if (oldPath == null || oldPath.isBlank()) return;
+        String oldName = oldPath.substring(oldPath.lastIndexOf('/') + 1).replace("\\", "");
+        if (oldName.isBlank() || oldName.contains("..") || oldName.contains("/")) return;
+        if (oldName.equals(newFilename)) return;
+        Path base = SPRINKLER_IMAGE_DIR.toAbsolutePath().normalize();
+        Path target = base.resolve(oldName).normalize();
+        if (target.startsWith(base)) {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    private void deleteOtherImageVariants(Long sprinklerId, String keepFilename) throws IOException {
+        String prefix = "sprinkler-" + sprinklerId + ".";
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(SPRINKLER_IMAGE_DIR, prefix + "*")) {
+            Path base = SPRINKLER_IMAGE_DIR.toAbsolutePath().normalize();
+            for (Path candidate : stream) {
+                Path target = candidate.toAbsolutePath().normalize();
+                if (target.startsWith(base) && !candidate.getFileName().toString().equals(keepFilename)) {
+                    Files.deleteIfExists(target);
+                }
+            }
+        }
+    }
+
+    private String resolveExtension(String original, String contentType) {
+        String parsed = "";
+        if (original != null) {
+            int idx = original.lastIndexOf('.');
+            if (idx > -1 && idx < original.length() - 1) {
+                parsed = original.substring(idx + 1).replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+            }
+        }
+        if (isAllowedImageExtension(parsed)) {
+            return parsed.equals("jpeg") ? "jpg" : parsed;
+        }
+        String normalizedType = contentType == null ? "" : contentType.toLowerCase();
+        if (normalizedType.contains("jpeg")) return "jpg";
+        if (normalizedType.contains("png")) return "png";
+        if (normalizedType.contains("gif")) return "gif";
+        if (normalizedType.contains("webp")) return "webp";
+        if (normalizedType.contains("bmp")) return "bmp";
+        if (normalizedType.contains("svg")) return "svg";
+        return "png";
+    }
+
+    private boolean isAllowedImageExtension(String ext) {
+        return "png".equals(ext) || "jpg".equals(ext) || "jpeg".equals(ext)
+                || "gif".equals(ext) || "webp".equals(ext) || "bmp".equals(ext) || "svg".equals(ext);
+    }
+
+    private static Path uploadDir(String child) {
+        String root = System.getenv("MODULE_FIRE_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire").toString();
+        }
+        return Paths.get(root).resolve(child).normalize();
     }
 
     @GetMapping("/inspections/export-all")
