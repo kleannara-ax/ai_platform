@@ -17,7 +17,14 @@
     .fireweb-navbar .brand-logos img{height:32px!important;width:auto!important;display:block;object-fit:contain!important;}
     .summary-gradient-card{border:0!important;box-shadow:none!important;background:transparent!important;}
     .summary-gradient-card .card-body{border-radius:14px;border:0!important;box-shadow:none!important;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
-    .status-add-btn{background:#fff!important;color:#4f46e5!important;border:0!important;font-weight:800;border-radius:8px;padding:6px 16px;}
+    .status-chip-group{display:inline-flex;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.28);}
+    .status-chip-group .btn{border:0!important;border-radius:999px!important;color:#fff!important;font-weight:800!important;letter-spacing:-.1px;padding:.42rem .88rem!important;box-shadow:0 6px 16px rgba(15,23,42,.22);transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;}
+    .status-chip-group .btn:hover{transform:translateY(-1px);filter:brightness(1.05);box-shadow:0 10px 22px rgba(15,23,42,.28);}
+    .status-chip-group .btn:active{transform:translateY(0);filter:brightness(.98);box-shadow:0 4px 12px rgba(15,23,42,.22);}
+    .status-chip-group .btn.active{box-shadow:0 0 0 2px rgba(255,255,255,.58),0 10px 22px rgba(15,23,42,.28);}
+    #btnStatusInspect{background:linear-gradient(135deg,#06b6d4 0%,#2563eb 100%)!important;}
+    #btnStatusFault{background:linear-gradient(135deg,#f43f5e 0%,#be123c 100%)!important;}
+    .btn.status-add-btn{background:linear-gradient(135deg,#22c55e 0%,#15803d 100%)!important;color:#fff!important;border:0!important;font-weight:600;border-radius:8px;padding:6px 16px;}
     .table thead.table-dark th{background-image:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;color:#fff!important;font-weight:700!important;padding:12px 12px!important;border-color:rgba(255,255,255,.14)!important;white-space:nowrap;}
     .table td{padding:13px 12px!important;vertical-align:middle!important;border-bottom-color:rgba(15,23,42,.1)!important;}
     .clickable-row{cursor:pointer;}.clickable-row:hover{background:rgba(99,102,241,.06)!important;}
@@ -50,6 +57,10 @@
     .spk-selected-marker{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:rgba(37,99,235,.16);box-shadow:0 0 0 3px rgba(37,99,235,.28);pointer-events:none;z-index:10;}
     .spk-selected-marker img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));}
     .spk-map-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:700;background:#f8fafc;z-index:2;}
+    .spk-detail-map-card{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:14px;box-shadow:0 1px 0 rgba(15,23,42,.04);}
+    .spk-detail-map-canvas{position:relative;height:420px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:10px;}
+    #spkDetailPlanImg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%;width:auto;height:auto;display:block;}
+    #spkDetailMarkerLayer{position:absolute;inset:0;z-index:3;pointer-events:none;}
     @media(max-width:1399.98px){.filter-toolbar{grid-template-columns:repeat(3,minmax(0,1fr));}.filter-toolbar .btn{width:100%;}.filter-toolbar .excel-download-btn{grid-column:auto;}}
     @media(max-width:767.98px){.filter-toolbar{grid-template-columns:1fr;}.filter-toolbar .excel-date{min-width:0;}}
     @media(max-width:1199.98px){.table{font-size:.8rem}.table td,.table th{padding:9px 6px!important}.detail-grid{grid-template-columns:1fr}.check-item{grid-template-columns:1fr}.check-radio{justify-content:flex-start;}}
@@ -80,7 +91,7 @@
         <div><h3 class="mb-1 fw-bold" id="pageTitle">스프링클러 목록</h3><div class="text-white-50 fw-semibold">총 <span id="totalCount">0</span> 건 · 점검주기 90일</div></div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <div class="btn-group" role="group" aria-label="스프링클러 상태 필터">
+        <div class="btn-group status-chip-group" role="group" aria-label="스프링클러 상태 필터">
           <button type="button" class="btn btn-info text-white" id="btnStatusInspect">점검필요 <span id="countInspect">(0)</span></button>
           <button type="button" class="btn btn-danger text-white" id="btnStatusFault">고장 <span id="countFault">(0)</span></button>
         </div>
@@ -268,9 +279,11 @@ async function openDetail(id) {
     const historyRows = Array.isArray(d.inspections) && d.inspections.length ? d.inspections.map(r => renderHistoryRow(r)).join('') : renderHistoryRow({});
     document.getElementById('spkDetailBody').innerHTML = `
       <div class="detail-grid mb-4"><div class="detail-item"><div class="detail-label">ID</div><div class="detail-value">${val(d.serialNumber)}</div></div><div class="detail-item"><div class="detail-label">건물 / 층</div><div class="detail-value">${val(d.buildingName)} / ${val(d.floorName)}</div></div><div class="detail-item"><div class="detail-label">좌표</div><div class="detail-value">${fmtCoord(d.x,d.y)}</div></div><div class="detail-item"><div class="detail-label">최종점검</div><div class="detail-value">${fmtDate(d.lastInspectionDate)} ${d.lastInspectorName ? '/ ' + esc(d.lastInspectorName) : ''}</div></div><div class="detail-item"><div class="detail-label">고장유무</div><div class="detail-value">${d.lastInspectionDate ? (d.lastIsFaulty ? '<span class="fw-status fw-bad">고장</span>' : '<span class="fw-status fw-ok">정상</span>') : '-'}</div></div><div class="detail-item"><div class="detail-label">고장사유</div><div class="detail-value">${val(d.lastFaultReason)}</div></div><div class="detail-item" style="grid-column:1/-1"><div class="detail-label">비고</div><div class="detail-value">${val(d.note)}</div></div></div>
+      <section class="spk-detail-map-card mb-4" aria-label="스프링클러 도면상 위치"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><h6 class="fw-bold mb-0">도면상 위치</h6><div class="small text-muted">건물: ${val(d.buildingName)} · 층: ${val(d.floorName)} · 좌표: ${fmtCoord(d.x,d.y)}</div></div><div id="spkDetailMapCanvas" class="spk-detail-map-canvas"><img id="spkDetailPlanImg" alt="도면"><div id="spkDetailMarkerLayer"></div><div id="spkDetailMapEmpty" class="spk-map-empty">도면을 불러오는 중입니다...</div></div></section>
       <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">점검 이력(최근 12건)</h6><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddHistory">이력 추가</button></div>
       <div class="table-responsive"><table class="table table-sm history-table"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th><th style="width:115px">관리</th></tr></thead><tbody id="historyBody">${historyRows}</tbody></table></div>`;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('spkDetailModal')).show();
+    setTimeout(() => loadSpkDetailPlanImage(d), 180);
   } catch(e) { showToast(e.message, 'danger'); }
 }
 function renderHistoryRow(row) {
@@ -331,6 +344,57 @@ async function saveSprinkler() {
 }
 async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
 function numOrNull(v) { const n = parseFloat(String(v ?? '')); return Number.isFinite(n) ? n : null; }
+function setSpkDetailMapMessage(message, visible = true) { const el = document.getElementById('spkDetailMapEmpty'); if (!el) return; el.textContent = message; el.style.display = visible ? 'flex' : 'none'; }
+function getSpkDetailImageRect() {
+  const canvas = document.getElementById('spkDetailMapCanvas');
+  const img = document.getElementById('spkDetailPlanImg');
+  if (!canvas || !img || !img.naturalWidth || !img.naturalHeight) return null;
+  const cr = canvas.getBoundingClientRect();
+  const ir = img.getBoundingClientRect();
+  return { left:ir.left - cr.left, top:ir.top - cr.top, width:ir.width, height:ir.height };
+}
+function renderSpkDetailMarker(item) {
+  const layer = document.getElementById('spkDetailMarkerLayer');
+  if (!layer) return;
+  layer.innerHTML = '';
+  const x = numOrNull(item?.x);
+  const y = numOrNull(item?.y);
+  const rect = getSpkDetailImageRect();
+  if (x == null || y == null || !rect) return;
+  const marker = document.createElement('div');
+  marker.className = 'spk-selected-marker';
+  marker.style.left = `${rect.left + rect.width * x / 100}px`;
+  marker.style.top = `${rect.top + rect.height * y / 100}px`;
+  marker.innerHTML = '<img src="/images/sprinkler.png" alt="스프링클러 위치" onerror="this.style.display=\'none\'">';
+  layer.appendChild(marker);
+}
+async function loadSpkDetailPlanImage(item) {
+  const img = document.getElementById('spkDetailPlanImg');
+  const layer = document.getElementById('spkDetailMarkerLayer');
+  if (!img) return;
+  const b = item?.buildingId;
+  const f = item?.floorId;
+  const x = numOrNull(item?.x);
+  const y = numOrNull(item?.y);
+  if (!b || !f) { img.removeAttribute('src'); if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('등록된 건물/층 정보가 없습니다.', true); return; }
+  if (x == null || y == null) { if (layer) layer.innerHTML = ''; }
+  setSpkDetailMapMessage('도면을 불러오는 중입니다...', true);
+  let mapUrl = '';
+  try {
+    const params = new URLSearchParams({ buildingId:String(b), floorId:String(f) });
+    const res = await API.req('/fire-api/maps/floor-data?' + params.toString());
+    const data = res && res.ok ? await res.json().catch(() => null) : null;
+    mapUrl = data?.data?.planImagePath || '';
+  } catch(e) { console.warn('스프링클러 상세 도면 조회 실패', e); }
+  if (!mapUrl) { img.removeAttribute('src'); if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('등록된 건물/층의 도면이 없습니다.', true); return; }
+  img.onload = () => {
+    setSpkDetailMapMessage('', false);
+    renderSpkDetailMarker(item);
+    if (x == null || y == null) setSpkDetailMapMessage('도면은 등록되어 있으나 좌표가 없습니다.', true);
+  };
+  img.onerror = () => { if (layer) layer.innerHTML = ''; setSpkDetailMapMessage('도면 이미지를 불러오지 못했습니다.', true); };
+  img.src = mapUrl + (mapUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
+}
 function setSpkMapMessage(message, visible = true) { const el = document.getElementById('spkMapEmpty'); if (!el) return; el.textContent = message; el.style.display = visible ? 'flex' : 'none'; }
 function syncSpkCoordDisplay() {
   const x = numOrNull(document.getElementById('spkX').value);
