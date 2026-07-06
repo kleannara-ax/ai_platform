@@ -67,6 +67,29 @@
     .qr-grid.large .qr-meta .meta-blank { min-width:140px; }
     .empty-state { padding:22px; border-radius:18px; background:#f8fafc; color:#64748b; text-align:center; }
     body.modal-open { overflow:hidden !important; padding-right:0 !important; }
+    #spkQrDetailModal .modal-header { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-bottom:0; }
+    #spkQrDetailModal .btn-close { filter:invert(1) grayscale(100%) brightness(200%); }
+    #spkQrDetailModal .modal-body { background:#f8fafc; }
+    .spk-qr-section { background:#fff; border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; box-shadow:0 14px 28px rgba(15,23,42,.06); }
+    .spk-qr-section + .spk-qr-section { margin-top:14px; }
+    .spk-qr-section-title { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:12px; }
+    .spk-qr-section-title strong { font-weight:900; color:#1e293b; }
+    .spk-qr-section-title span { font-size:.82rem; font-weight:800; color:#64748b; }
+    .spk-qr-detail-grid { display:grid; gap:10px; }
+    .spk-qr-detail-item { display:flex; gap:12px; align-items:flex-start; padding:10px 12px; border-radius:14px; background:#f8fbff; }
+    .spk-qr-detail-label { width:96px; flex:0 0 96px; font-size:.82rem; font-weight:900; color:#64748b; }
+    .spk-qr-detail-value { min-width:0; font-weight:800; color:#0f172a; word-break:break-word; }
+    .spk-qr-media-box { border:1px solid rgba(148,163,184,.18); border-radius:16px; background:#fff; padding:12px; min-height:120px; display:flex; align-items:center; justify-content:center; }
+    .spk-qr-media-box img { max-width:100%; object-fit:contain; display:block; }
+    .spk-qr-equipment-img { width:100%; max-height:300px; border-radius:12px; background:#fff; }
+    .spk-qr-map-canvas { position:relative; width:100%; height:320px; overflow:hidden; border:1px solid rgba(148,163,184,.28); border-radius:14px; background:#f1f5f9; }
+    .spk-qr-map-canvas img { width:100%; height:100%; object-fit:fill; display:block; }
+    .spk-qr-map-marker { position:absolute; width:28px; height:28px; transform:translate(-50%,-50%); border-radius:50%; background:rgba(102,126,234,.18); border:3px solid rgba(102,126,234,.85); box-shadow:0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(37,99,235,.35); }
+    .spk-qr-status { display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; font-size:.78rem; font-weight:900; }
+    .spk-qr-ok { background:#dcfce7; color:#166534; }
+    .spk-qr-bad { background:#fee2e2; color:#991b1b; }
+    .spk-qr-warn { background:#fef3c7; color:#92400e; }
+    .spk-qr-muted { background:#e5e7eb; color:#475569; }
     @media (max-width: 991px) {
       .qr-shell { grid-template-columns:1fr; }
       .side-card { position:static; }
@@ -214,7 +237,19 @@
   </section>
 </main>
 
-
+<div class="modal fade" id="spkQrDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">스프링클러 상세</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body" id="spkQrDetailBody">
+        <div class="text-center text-muted py-5">데이터를 불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/js/extinguisher-modal-host.js"></script>
@@ -523,6 +558,118 @@
     }
   }
 
+  function valHtml(v) {
+    return v === null || v === undefined || v === '' ? '-' : escHtml(v);
+  }
+
+  function fmtDate(v) {
+    return v ? escHtml(String(v).slice(0, 10)) : '-';
+  }
+
+  function fmtTime(v) {
+    return v ? escHtml(String(v).slice(0, 5)) : '-';
+  }
+
+  function fmtCoord(x, y) {
+    if (x === null || x === undefined || y === null || y === undefined || x === '' || y === '') return '-';
+    return Number(x).toFixed(2) + ', ' + Number(y).toFixed(2);
+  }
+
+  function sprinklerStatusBadge(d) {
+    if (!d?.lastInspectionDate) return '<span class="spk-qr-status spk-qr-muted">미점검</span>';
+    return d.lastIsFaulty ? '<span class="spk-qr-status spk-qr-bad">불량</span>' : '<span class="spk-qr-status spk-qr-ok">정상</span>';
+  }
+
+  function sprinklerHistoryRow(row) {
+    const badge = row?.isFaulty ? '<span class="spk-qr-status spk-qr-bad">불량</span>' : '<span class="spk-qr-status spk-qr-ok">양호</span>';
+    return '<tr>' +
+      '<td>' + fmtDate(row?.inspectionDate) + '</td>' +
+      '<td>' + fmtTime(row?.inspectionTime) + '</td>' +
+      '<td>' + valHtml(row?.inspectorName) + '</td>' +
+      '<td>' + badge + '</td>' +
+      '<td class="text-danger small">' + valHtml(row?.faultReason) + '</td>' +
+      '<td>' + valHtml(row?.note) + '</td>' +
+      '</tr>';
+  }
+
+  async function resolveSprinklerPlanImage(d) {
+    if (!d?.buildingId || !d?.floorId) return '';
+    try {
+      const params = new URLSearchParams({ buildingId:String(d.buildingId), floorId:String(d.floorId) });
+      const res = await apiFetch(API_BASE + '/maps/floor-data?' + params.toString());
+      return res?.data?.planImagePath || '';
+    } catch (err) {
+      console.warn('[QR] sprinkler map load failed', err);
+      return '';
+    }
+  }
+
+  async function openSprinklerDetail(id) {
+    const modalEl = document.getElementById('spkQrDetailModal');
+    const body = document.getElementById('spkQrDetailBody');
+    if (!modalEl || !body) return;
+    body.innerHTML = '<div class="text-center text-muted py-5">스프링클러 상세 정보를 불러오는 중...</div>';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+    const res = await apiFetch(API_BASE + '/sprinklers/' + encodeURIComponent(id));
+    const d = res?.data;
+    if (!d) {
+      body.innerHTML = '<div class="empty-state">스프링클러 상세 정보를 불러오지 못했습니다.</div>';
+      return;
+    }
+
+    const planImagePath = await resolveSprinklerPlanImage(d);
+    const imagePath = d.imagePath || '/images/sprinkler.png';
+    const qrKey = String(d.qrKey || '').trim();
+    const qrUrl = qrKey ? (API_BASE + '/qr/image?type=spk&id=' + encodeURIComponent(qrKey)) : '';
+    const hasMarker = planImagePath && d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined;
+    const markerHtml = hasMarker ? '<div class="spk-qr-map-marker" style="left:' + Number(d.x) + '%;top:' + Number(d.y) + '%;"></div>' : '';
+    const historyRows = Array.isArray(d.inspections) && d.inspections.length
+      ? d.inspections.map(sprinklerHistoryRow).join('')
+      : '<tr><td colspan="6" class="text-center text-muted py-4">등록된 점검 이력이 없습니다.</td></tr>';
+
+    body.innerHTML = `
+      <div class="container-fluid">
+        <div class="row g-4">
+          <div class="col-lg-6 d-flex flex-column gap-3">
+            <section class="spk-qr-section" aria-label="스프링클러 기본 정보">
+              <div class="spk-qr-section-title"><strong>기본 정보</strong><span>${valHtml(d.serialNumber)}</span></div>
+              <div class="spk-qr-detail-grid">
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">관리번호</div><div class="spk-qr-detail-value">${valHtml(d.serialNumber)}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">건물 / 층</div><div class="spk-qr-detail-value">${valHtml(d.buildingName)} / ${valHtml(d.floorName)}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">도면 좌표</div><div class="spk-qr-detail-value">${fmtCoord(d.x, d.y)}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">상태</div><div class="spk-qr-detail-value">${sprinklerStatusBadge(d)} ${d.inspectionRequired ? '<span class="spk-qr-status spk-qr-warn ms-1">점검필요</span>' : ''}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">비고</div><div class="spk-qr-detail-value">${valHtml(d.note)}</div></div>
+              </div>
+            </section>
+            <section class="spk-qr-section" aria-label="스프링클러 점검 정보">
+              <div class="spk-qr-section-title"><strong>점검 정보</strong><span>최근 상태</span></div>
+              <div class="spk-qr-detail-grid">
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">최종점검</div><div class="spk-qr-detail-value">${fmtDate(d.lastInspectionDate)} ${d.lastInspectorName ? '/ ' + escHtml(d.lastInspectorName) : ''}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">고장사유</div><div class="spk-qr-detail-value">${valHtml(d.lastFaultReason)}</div></div>
+                <div class="spk-qr-detail-item"><div class="spk-qr-detail-label">점검비고</div><div class="spk-qr-detail-value">${valHtml(d.lastInspectionNote)}</div></div>
+              </div>
+            </section>
+            <section class="spk-qr-section" aria-label="스프링클러 점검 이력">
+              <div class="spk-qr-section-title"><strong>점검 이력</strong><span>읽기 전용</span></div>
+              <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-dark"><tr><th>점검일</th><th>시간</th><th>점검자</th><th>결과</th><th>고장사유</th><th>비고</th></tr></thead><tbody>${historyRows}</tbody></table></div>
+            </section>
+          </div>
+          <div class="col-lg-6 d-flex flex-column gap-3">
+            <section class="spk-qr-section" aria-label="스프링클러 이미지">
+              <div class="spk-qr-section-title"><strong>이미지</strong><span>대표 이미지</span></div>
+              <div class="spk-qr-media-box"><img class="spk-qr-equipment-img" src="${escHtml(imagePath)}" alt="스프링클러 이미지" onerror="this.src='/images/sprinkler.png'"></div>
+            </section>
+            <section class="spk-qr-section" aria-label="스프링클러 도면 위치">
+              <div class="spk-qr-section-title"><strong>도면 위치</strong><span>${valHtml(d.buildingName)} / ${valHtml(d.floorName)}</span></div>
+              ${planImagePath ? `<div class="spk-qr-map-canvas"><img src="${escHtml(planImagePath)}" alt="도면">${markerHtml}</div>` : '<div class="empty-state">등록된 도면을 찾을 수 없습니다.</div>'}
+            </section>
+            ${qrUrl ? `<section class="spk-qr-section" aria-label="스프링클러 QR"><div class="spk-qr-section-title"><strong>QR</strong><span>${escHtml(qrKey)}</span></div><div class="spk-qr-media-box"><img src="${qrUrl}" alt="스프링클러 QR" style="width:180px;height:180px;"></div></section>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
   function openQrDetails(type, id) {
     if (!type || !id) return;
     if (type === 'ext') {
@@ -538,7 +685,7 @@
       return;
     }
     if (type === 'spk') {
-      window.location.href = '/sprinklers.html';
+      openSprinklerDetail(id);
       return;
     }
     window.FireWebPumpModal?.open({ mode: 'details', id });
