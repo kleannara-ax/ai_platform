@@ -431,15 +431,16 @@
     return d < oneMonthAgo;
   }
   async function api(url, opts = {}){
-    const method = opts.method || 'GET';
-    const headers = authHeaders(opts.headers || {}, method);
-    const init = { ...opts, method, headers };
+    const { authRedirect = true, ...requestOpts } = opts;
+    const method = requestOpts.method || 'GET';
+    const headers = authHeaders(requestOpts.headers || {}, method);
+    const init = { ...requestOpts, method, headers };
     if (init.body && !(init.body instanceof FormData) && typeof init.body !== 'string') {
       init.body = JSON.stringify(init.body);
       init.headers['Content-Type'] = init.headers['Content-Type'] || 'application/json';
     }
     const r = await fetch(url, init);
-    if (r.status === 401) {
+    if (r.status === 401 && authRedirect) {
       (window.FireWebCsrf?.goLogin || function(){ location.href='/index.html'; })();
       return null;
     }
@@ -447,7 +448,7 @@
   }
   async function fetchPageList(url){
     try {
-      const r = await api(url.includes('?') ? url : `${url}?size=3000&page=0`);
+      const r = await api(url.includes('?') ? url : `${url}?size=3000&page=0`, { authRedirect:false });
       if (!r || !r.ok) return [];
       const j = await r.json().catch(() => null);
       const data = j?.data;
