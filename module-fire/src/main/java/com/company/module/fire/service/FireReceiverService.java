@@ -48,12 +48,12 @@ public class FireReceiverService {
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 99L;
     private static final int MAX_INSPECTION_HISTORY = 12;
     private static final List<InspectionWorkbookExporter.ItemColumn> RECEIVER_EXPORT_COLUMNS = List.of(
-            new InspectionWorkbookExporter.ItemColumn("power", "전원(전원 공급 및 전원표시등 \n정상여부 확인) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("switch", "스위치[스위치 정위치(자동) \n여부] [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("transfer_device", "절환장치(상용전원 OFF시 자동 예비전원 절환 여부) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("zone_map", "경계구역일람도(경계구역 일람도 적정여부) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("continuity_test", "도통시험(회로 단선여부) \n[점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("operation_test", "동작시험(주, 지구경종 및 시각경보기 작동상태) [점검결과]")
+            new InspectionWorkbookExporter.ItemColumn("power", "전원(전원 공급 및 전원표시등 정상여부 확인)"),
+            new InspectionWorkbookExporter.ItemColumn("switch", "스위치[스위치 정위치(자동) 여부]"),
+            new InspectionWorkbookExporter.ItemColumn("transfer_device", "절환장치(상용전원 OFF시 자동 예비전원 절환 여부)"),
+            new InspectionWorkbookExporter.ItemColumn("zone_map", "경계구역일람도(경계구역 일람도 적정여부)"),
+            new InspectionWorkbookExporter.ItemColumn("continuity_test", "도통시험(회로 단선여부)"),
+            new InspectionWorkbookExporter.ItemColumn("operation_test", "동작시험(주, 지구경종 및 시각경보기 작동상태)")
     );
 
     private final FireReceiverRepository fireReceiverRepository;

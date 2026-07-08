@@ -48,12 +48,12 @@ public class FirePumpService {
     private static final long DEFAULT_OUTDOOR_FLOOR_ID = 99L;
     private static final int MAX_INSPECTION_HISTORY = 12;
     private static final List<InspectionWorkbookExporter.ItemColumn> PUMP_EXPORT_COLUMNS = List.of(
-            new InspectionWorkbookExporter.ItemColumn("pump_operation", "소방펌프(주, 보조, 예비) 작동여부 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("panel", "소방판넬 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("water_supply", "소화용수 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("fuel", "펌프(엔진)연료 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("drain_pump", "배수펌프 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("piping", "소방배관 [점검결과]")
+            new InspectionWorkbookExporter.ItemColumn("pump_operation", "소방펌프(주, 보조, 예비) 작동여부"),
+            new InspectionWorkbookExporter.ItemColumn("panel", "소방판넬"),
+            new InspectionWorkbookExporter.ItemColumn("water_supply", "소화용수"),
+            new InspectionWorkbookExporter.ItemColumn("fuel", "펌프(엔진)연료"),
+            new InspectionWorkbookExporter.ItemColumn("drain_pump", "배수펌프"),
+            new InspectionWorkbookExporter.ItemColumn("piping", "소방배관")
     );
 
     private final FirePumpRepository firePumpRepository;
