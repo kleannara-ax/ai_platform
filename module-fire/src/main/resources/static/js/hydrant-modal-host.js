@@ -33,46 +33,56 @@
 
     modalEl = document.createElement('div');
     modalEl.id = HOST_ID;
-    modalEl.className = 'modal fade action-embed-modal';
+    modalEl.className = 'action-embed-host action-embed-modal';
     modalEl.tabIndex = -1;
     modalEl.setAttribute('aria-hidden', 'true');
-    modalEl.style.background = 'transparent';
-    modalEl.style.padding = '8px';
-    modalEl.style.overflow = 'hidden';
+    Object.assign(modalEl.style, {
+      position: 'fixed',
+      inset: '0',
+      zIndex: '1055',
+      display: 'none',
+      width: '100vw',
+      height: '100vh',
+      padding: '8px',
+      overflow: 'hidden',
+      background: 'rgba(17,24,39,.35)',
+      backdropFilter: 'blur(4px)',
+      boxSizing: 'border-box'
+    });
     modalEl.innerHTML = [
-      '<div class="modal-dialog modal-xl" style="margin:0 auto;max-width:min(1240px, calc(100vw - 16px));height:min(94vh, calc(100vh - 16px));overflow:hidden;">',
-      `  <div id="${SHELL_ID}" class="modal-content" style="position:relative;height:100%;background:transparent;border:0;box-shadow:none;border-radius:18px;overflow:hidden;">`,
-      `    <button type="button" id="${CLOSE_ID}" aria-label="닫기" style="position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border:0;border-radius:999px;background:transparent;color:#475569;font-size:20px;line-height:1;cursor:pointer;">×</button>`,
-      '    <div class="modal-body" style="padding:0;height:100%;background:transparent;overflow:hidden;">',
-      `      <iframe id="${FRAME_ID}" title="소화전 작업" style="width:100%;height:100%;border:0;background:transparent;display:block;"></iframe>`,
+      '<div class="modal-dialog modal-xl" style="margin:0;width:100%;max-width:none;height:100%;overflow:hidden;pointer-events:none;">',
+      `  <div id="${SHELL_ID}" class="modal-content" style="position:relative;width:100%;height:100%;background:transparent;border:0;box-shadow:none;border-radius:0;overflow:hidden;pointer-events:none;">`,
+      '    <div class="modal-body" style="padding:0;width:100%;height:100%;background:transparent;overflow:hidden;pointer-events:none;">',
+      `      <iframe id="${FRAME_ID}" title="소화전 작업" style="width:100%;height:100%;border:0;background:transparent;display:block;pointer-events:auto;"></iframe>`,
       '    </div>',
       '  </div>',
       '</div>'
     ].join('');
     document.body.appendChild(modalEl);
 
-    modalEl.addEventListener('hidden.bs.modal', () => {
+    function closeHost(reason = 'dismiss') {
       const frame = document.getElementById(FRAME_ID);
+      modalEl.style.display = 'none';
+      modalEl.setAttribute('aria-hidden', 'true');
       if (frame) frame.src = 'about:blank';
 
       if (!activeRequest) return;
       const request = activeRequest;
       activeRequest = null;
-      notifyClose(request, closingReason || 'dismiss');
+      notifyClose(request, reason);
       closingReason = null;
-    });
+    }
 
     window.addEventListener('message', (ev) => {
       const msg = String(ev.data || '');
       if (!CLOSE_RE.test(msg)) return;
 
       closingReason = msg;
-      bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      closeHost(msg);
     });
 
-    document.getElementById(CLOSE_ID)?.addEventListener('click', () => {
-      closingReason = 'dismiss';
-      bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    modalEl.addEventListener('click', (ev) => {
+      if (ev.target === modalEl) closeHost('dismiss');
     });
     return modalEl;
   }
@@ -124,7 +134,8 @@
       onClose: typeof options?.onClose === 'function' ? options.onClose : null
     };
 
-    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    modalEl.style.display = 'block';
+    modalEl.setAttribute('aria-hidden', 'false');
   }
 
   window.FireWebHydrantModal = { open };

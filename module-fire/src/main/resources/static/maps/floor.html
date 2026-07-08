@@ -90,7 +90,12 @@
     .action-embed-modal .modal-content { background:transparent; border:0; box-shadow:none; border-radius:14px; overflow:hidden; }
     .action-embed-modal .modal-body { padding: 0; background:transparent; }
     .action-embed-modal .modal-dialog { max-width: min(1440px, calc(100vw - 24px)); width: calc(100vw - 24px); margin: clamp(.35rem, 1.5vw, 1rem) auto; }
-    #floorActionFrame { width: 100%; height: min(90vh, 1100px); border: 0; background: transparent; display: block; }
+    #floorActionModal.floor-action-host { position:fixed; inset:0; z-index:1055; display:none; width:100vw; height:100vh; padding:8px; overflow:hidden; background:rgba(17,24,39,.35); backdrop-filter:blur(4px); box-sizing:border-box; }
+    #floorActionModal.floor-action-host.is-open { display:block; }
+    #floorActionModal.floor-action-host .modal-dialog { width:100%; max-width:none; height:100%; margin:0; pointer-events:none; }
+    #floorActionModal.floor-action-host .modal-content,
+    #floorActionModal.floor-action-host .modal-body { width:100%; height:100%; background:transparent; border:0; box-shadow:none; padding:0; overflow:hidden; pointer-events:none; }
+    #floorActionFrame { width: 100%; height: 100%; border: 0; background: transparent; display: block; pointer-events:auto; }
     .modal-backdrop.show { background: rgba(17,24,39,.35) !important; backdrop-filter: blur(4px); }
 
     @media (max-width: 1180px) {
@@ -124,7 +129,7 @@
       .infoCard { width:min(280px, calc(100% - 16px)); max-width:calc(100% - 16px); }
       .kv { grid-template-columns:78px 1fr; gap:5px 7px; font-size:12px; }
       .action-embed-modal .modal-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); margin: .35rem auto; }
-      #floorActionFrame { height: 92vh; }
+      #floorActionModal.floor-action-host { padding:6px; }
     }
   </style>
 </head>
@@ -286,8 +291,8 @@
   </div>
 </main>
 
-<div class="modal fade action-embed-modal" id="floorActionModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+<div class="floor-action-host action-embed-modal" id="floorActionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-body">
         <iframe id="floorActionFrame" title="작업"></iframe>
@@ -704,12 +709,26 @@
   }
 
   let actionModalRefreshRequested = false;
+  async function closeActionModal(refresh = false){
+    const frame = $('floorActionFrame'), modalEl = $('floorActionModal');
+    if (refresh) actionModalRefreshRequested = true;
+    if (modalEl) {
+      modalEl.classList.remove('is-open');
+      modalEl.setAttribute('aria-hidden', 'true');
+    }
+    if (frame) frame.src = 'about:blank';
+    if (actionModalRefreshRequested) {
+      actionModalRefreshRequested = false;
+      await refreshAfterAction();
+    }
+  }
   function openActionModal(url){
     const frame = $('floorActionFrame'), modalEl = $('floorActionModal');
     if (!frame || !modalEl || !url) return;
     actionModalRefreshRequested = false;
     frame.src = url;
-    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    modalEl.classList.add('is-open');
+    modalEl.setAttribute('aria-hidden', 'false');
   }
   function numericCurrentIds(){
     const current = state.current || {};
@@ -914,16 +933,10 @@
   window.addEventListener('message', async (ev) => {
     const msg = typeof ev.data === 'string' ? ev.data : String(ev.data?.type || '');
     if (!msg.startsWith('fireweb:')) return;
-    if (msg.includes('saved')) actionModalRefreshRequested = true;
-    if (msg.includes('close') || msg.includes('saved')) bootstrap.Modal.getOrCreateInstance($('floorActionModal')).hide();
+    if (msg.includes('close') || msg.includes('saved')) await closeActionModal(msg.includes('saved'));
   });
-  $('floorActionModal')?.addEventListener('hidden.bs.modal', async () => {
-    const frame = $('floorActionFrame');
-    if (frame) frame.src = 'about:blank';
-    if (actionModalRefreshRequested) {
-      actionModalRefreshRequested = false;
-      await refreshAfterAction();
-    }
+  $('floorActionModal')?.addEventListener('click', async (e) => {
+    if (e.target === $('floorActionModal')) await closeActionModal(false);
   });
   $('btnZoomReset')?.addEventListener('click', () => { fitPlanToView(); centerPlanInView(); });
   planImg.addEventListener('load', () => { fitPlanToView(); centerPlanInView(); });
