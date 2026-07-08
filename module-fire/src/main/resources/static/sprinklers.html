@@ -186,6 +186,23 @@ let allItems = [], filteredItems = [], optionBuildings = [], optionFloors = [], 
 let canEdit = API.canManage();
 let spkSelectedImageObjectUrl = '';
 const pageSize = 500;
+const initialQuery = new URLSearchParams(location.search || '');
+function isFloorEmbed() {
+  return initialQuery.get('returnTo') === 'floor' || ['embedAdd','embedEdit','embedInspect','embedDetails'].some(k => initialQuery.get(k) === '1');
+}
+function postFloorMessage(type) {
+  if (!isFloorEmbed()) return;
+  try { window.parent?.postMessage(type, '*'); } catch (_) {}
+}
+function applyEmbeddedShell() {
+  if (!isFloorEmbed()) return;
+  document.body.style.background = 'transparent';
+  document.querySelector('header')?.style.setProperty('display', 'none');
+  document.querySelector('main.container-fluid')?.style.setProperty('display', 'none');
+  const style = document.createElement('style');
+  style.textContent = 'body{background:transparent!important}.modal-backdrop{display:none!important}.modal{background:transparent!important}.modal-dialog{margin:.35rem auto!important}.modal-content{box-shadow:0 14px 36px rgba(15,23,42,.18)!important}';
+  document.head.appendChild(style);
+}
 
 function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function val(v){ return v === null || v === undefined || v === '' ? '-' : esc(v); }
@@ -401,18 +418,18 @@ async function uploadSprinklerImage(sprinklerId) {
 }
 function openInspect(id) { currentInspectId = id; document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect'); document.getElementById('inspectNote').value = ''; bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show(); }
 async function confirmInspect() {
-  try { const body = { items:collectChecklist('inspect'), note:document.getElementById('inspectNote').value.trim() }; await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentInspectId}/inspect`, { method:'POST', body })); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).hide(); showToast('점검이 완료되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); }
+  try { const body = { items:collectChecklist('inspect'), note:document.getElementById('inspectNote').value.trim() }; await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentInspectId}/inspect`, { method:'POST', body })); postFloorMessage('fireweb:floor-action-saved'); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).hide(); showToast('점검이 완료되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); }
 }
-function openUpsert(item) {
+function openUpsert(item, preset = {}) {
   document.getElementById('spkUpsertTitle').textContent = item ? '스프링클러 수정' : '스프링클러 추가';
-  const initialBuildingId = item?.buildingId || document.getElementById('filterBuildingId').value || '';
-  const initialFloorId = item?.floorId || document.getElementById('filterFloorId').value || '';
+  const initialBuildingId = item?.buildingId || preset.buildingId || document.getElementById('filterBuildingId').value || '';
+  const initialFloorId = item?.floorId || preset.floorId || document.getElementById('filterFloorId').value || '';
   document.getElementById('spkId').value = item?.sprinklerId || '';
   document.getElementById('spkBuildingSel').value = initialBuildingId;
   syncFloorSelect(document.getElementById('spkBuildingSel').value, 'spkFloorSel', false);
   document.getElementById('spkFloorSel').value = initialFloorId;
-  document.getElementById('spkX').value = item?.x ?? '';
-  document.getElementById('spkY').value = item?.y ?? '';
+  document.getElementById('spkX').value = item?.x ?? preset.x ?? '';
+  document.getElementById('spkY').value = item?.y ?? preset.y ?? '';
   document.getElementById('spkNote').value = item?.note || '';
   resetSpkImageSelection(item?.imagePath || '');
   syncSpkCoordDisplay();
@@ -425,12 +442,13 @@ async function saveSprinkler() {
     if (!body.buildingId) throw new Error('건물을 선택해 주세요.'); if (!body.floorId) throw new Error('층을 선택해 주세요.');
     const saved = await jsonOrThrow(await API.req('/fire-api/sprinklers', { method:'POST', body }));
     const uploaded = await uploadSprinklerImage(saved.sprinklerId);
+    postFloorMessage('fireweb:floor-action-saved');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('spkUpsertModal')).hide();
     showToast(uploaded ? '저장 및 이미지 반영이 완료되었습니다.' : '저장되었습니다.');
     await loadSprinklers();
   } catch(e) { showToast(e.message, 'danger'); }
 }
-async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
+async function deleteSprinkler(id, serial) { if (!confirm(`스프링클러를 삭제할까요?\n${serial || ''}`)) return; try { await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id), { method:'DELETE' })); postFloorMessage('fireweb:floor-action-saved'); showToast('삭제되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); } }
 function numOrNull(v) { const n = parseFloat(String(v ?? '')); return Number.isFinite(n) ? n : null; }
 function setSpkDetailMapMessage(message, visible = true) { const el = document.getElementById('spkDetailMapEmpty'); if (!el) return; el.textContent = message; el.style.display = visible ? 'flex' : 'none'; }
 function getSpkDetailImageRect() {
@@ -697,7 +715,37 @@ if (spkZoomStage) {
 document.getElementById('spkDetailZoomModal').addEventListener('shown.bs.modal', renderSpkZoom);
 document.getElementById('spkDetailZoomModal').addEventListener('hidden.bs.modal', () => { resetSpkZoom(); const t = document.getElementById('spkDetailZoomTarget'); if (t) t.removeAttribute('src'); });
 window.addEventListener('resize', renderSpkZoom);
-(async function init(){ initExcelDates(); await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); })();
+
+async function handleInitialAction() {
+  if (!isFloorEmbed()) return;
+  if (initialQuery.get('add') === '1' || initialQuery.get('embedAdd') === '1') {
+    if (!canEdit) return;
+    openUpsert(null, {
+      buildingId: initialQuery.get('buildingId') || '',
+      floorId: initialQuery.get('floorId') || '',
+      x: initialQuery.get('x') || '',
+      y: initialQuery.get('y') || ''
+    });
+    return;
+  }
+  const detailsId = initialQuery.get('details');
+  const editId = initialQuery.get('edit');
+  const inspectId = initialQuery.get('inspect');
+  if (detailsId) return openDetail(detailsId);
+  if (editId) {
+    const item = allItems.find(it => String(it.sprinklerId) === String(editId));
+    if (canEdit && item) return openUpsert(item);
+    if (item) return openDetail(editId);
+  }
+  if (inspectId) {
+    if (canEdit) return openInspect(inspectId);
+    return openDetail(inspectId);
+  }
+}
+['spkUpsertModal','spkInspectModal','spkDetailModal'].forEach(id => {
+  document.getElementById(id)?.addEventListener('hidden.bs.modal', () => postFloorMessage('fireweb:floor-action-close'));
+});
+(async function init(){ applyEmbeddedShell(); initExcelDates(); await loadFireAdminPermission(); await loadBuildingOptions(); await loadSprinklers(); await handleInitialAction(); })();
 </script>
 </body>
 </html>

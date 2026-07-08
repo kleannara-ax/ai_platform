@@ -51,7 +51,22 @@
     return { req, getUser, canManage };
   })();
 
+  const initialQuery = new URLSearchParams(location.search || '');
   const canEdit = () => API.canManage();
+  const isFloorEmbed = () => initialQuery.get('returnTo') === 'floor' || ['embedAdd','embedEdit','embedInspect','embedDetails'].some(k => initialQuery.get(k) === '1');
+  function postFloorMessage(type) {
+    if (!isFloorEmbed()) return;
+    try { window.parent?.postMessage(type, '*'); } catch (_) {}
+  }
+  function applyEmbeddedShell() {
+    if (!isFloorEmbed()) return;
+    document.body.style.background = 'transparent';
+    document.querySelector('header')?.style.setProperty('display', 'none');
+    document.querySelector('main.container-fluid')?.style.setProperty('display', 'none');
+    const style = document.createElement('style');
+    style.textContent = 'body{background:transparent!important}.modal-backdrop{display:none!important}.modal{background:transparent!important}.modal-dialog{margin:.35rem auto!important}.modal-content{box-shadow:0 14px 36px rgba(15,23,42,.18)!important}';
+    document.head.appendChild(style);
+  }
   const isAirconPage = () => CFG.menuCode === 'OTHER_AIRCON' || label === '에어컨';
   const isWaterPurifierPage = () => CFG.menuCode === 'OTHER_WATER_PURIFIER' || label === '정수기';
   const isSimpleWaterPurifier = () => Boolean(CFG.simpleFields) || isWaterPurifierPage();
@@ -364,7 +379,7 @@
     if (img.complete) draw(); img.onload = draw; setTimeout(draw, 0);
   }
 
-  async function openUpsert(id = 0) {
+  async function openUpsert(id = 0, preset = {}) {
     state.editingId = Number(id || 0); state.selectedCoord = null;
     $('upsertTitle').textContent = state.editingId ? `${label} 수정` : `${label} 등록`;
     $('equipmentId').value = state.editingId || '';
@@ -383,7 +398,10 @@
       }
       setCoord(d.x, d.y); renderHistory(d.inspections || []);
     } else {
-      renderHistory([]); setCoord('', '');
+      renderHistory([]);
+      if (preset.buildingId) { $('buildingSel').value = preset.buildingId; updateModalFloorOptions(); }
+      if (preset.floorId) $('floorSel').value = preset.floorId;
+      setCoord(preset.x ?? '', preset.y ?? '');
     }
     await loadPlanForModal();
     bootstrapModal('upsertModal')?.show();
@@ -459,6 +477,7 @@
     if (!res.ok || json?.success === false) return alert(json?.message || '저장 실패');
     const saved = json.data; const file = $('photo')?.files?.[0];
     if (file && saved?.equipmentId) await uploadImage(saved.equipmentId, file);
+    postFloorMessage('fireweb:floor-action-saved');
     bootstrapModal('upsertModal')?.hide(); showToast(`${label} 저장 완료`); await loadList();
   }
 
@@ -474,6 +493,7 @@
     const res = await API.req(`${apiBase}/inspect`, { method: 'POST', body: { equipmentId: state.inspectId, inspectionDate: $('inspectDate').value || today(), faulty: isFaulty, faultReason } }); if (!res) return;
     const json = await res.json().catch(() => null); if (!res.ok || json?.success === false) return alert(json?.message || '점검 저장 실패');
     const file = $('inspectPhoto')?.files?.[0]; if (file) await uploadImage(state.inspectId, file);
+    postFloorMessage('fireweb:floor-action-saved');
     bootstrapModal('inspectModal')?.hide(); showToast('점검이 완료되었습니다.'); await loadList();
   }
 
@@ -498,6 +518,7 @@
     if (!confirm(`${serial || label} 항목을 삭제할까요?`)) return;
     const res = await API.req(`${apiBase}/${encodeURIComponent(id)}`, { method: 'DELETE' }); const json = res && await res.json().catch(() => null);
     if (!res || !res.ok || json?.success === false) return alert(json?.message || '삭제 실패');
+    postFloorMessage('fireweb:floor-action-saved');
     showToast('삭제되었습니다.'); await loadList();
   }
 
@@ -528,11 +549,21 @@
   }
 
   async function handleInitialAction() {
-    const params = new URLSearchParams(location.search || '');
+    const params = initialQuery;
+    const addRequested = params.get('add') === '1' || params.get('embedAdd') === '1';
     const detailsId = params.get('details');
     const qrKey = params.get('qrKey');
     const editId = params.get('edit');
     const inspectId = params.get('inspect');
+    if (addRequested) {
+      await openUpsert(0, {
+        buildingId: params.get('buildingId') || '',
+        floorId: params.get('floorId') || '',
+        x: params.get('x') || '',
+        y: params.get('y') || ''
+      });
+      return;
+    }
     if (detailsId) {
       await openDetails(detailsId);
       return;
@@ -560,9 +591,12 @@
   }
 
   async function init() {
-    renderShell(); bindEvents(); fillTypeOptions();
+    renderShell(); applyEmbeddedShell(); bindEvents(); fillTypeOptions();
     await loadOptions(); await loadList();
     await handleInitialAction();
+    ['upsertModal','inspectModal','detailModal'].forEach(id => {
+      $(id)?.addEventListener('hidden.bs.modal', () => postFloorMessage('fireweb:floor-action-close'));
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

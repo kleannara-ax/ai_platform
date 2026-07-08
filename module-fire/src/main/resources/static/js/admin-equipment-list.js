@@ -77,7 +77,7 @@
   }
 
   function isEmbeddedMode() {
-    return query.get("embedEdit") === "1" || query.get("embedInspect") === "1" || query.get("embedDetails") === "1";
+    return query.get("embedAdd") === "1" || query.get("embedEdit") === "1" || query.get("embedInspect") === "1" || query.get("embedDetails") === "1" || query.get("returnTo") === "floor";
   }
 
   function readQueryCoord() {
@@ -111,6 +111,13 @@
     if (!isEmbeddedMode()) return;
     try {
       window.parent?.postMessage(message, "*");
+    } catch (_) {}
+  }
+
+  function postEmbedSaved() {
+    if (!isEmbeddedMode()) return;
+    try {
+      window.parent?.postMessage("fireweb:floor-action-saved", "*");
     } catch (_) {}
   }
 
@@ -816,6 +823,7 @@
         alert(config.singular + " 정보는 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
       }
     }
+    postEmbedSaved();
     state.itemModal.hide();
     await loadPeers();
     await loadList();
@@ -825,6 +833,7 @@
     if (!confirm(config.singular + "를 삭제하시겠습니까?")) return;
     await window.FireWebCsrf?.ensureToken?.();
     await apiFetch(config.apiBase + "/" + encodeURIComponent(id), { method: "DELETE" });
+    postEmbedSaved();
     await loadPeers();
     await loadList();
   }
@@ -1087,10 +1096,11 @@
         alert("점검은 저장됐지만 사진 업로드에 실패했습니다: " + (error.message || error));
       }
     }
+    postEmbedSaved();
     state.inspectModal.hide();
     await loadPeers();
     await loadList();
-    await openDetail(targetId);
+    if (!isEmbeddedMode()) await openDetail(targetId);
   }
 
   async function handleInitialAction() {
