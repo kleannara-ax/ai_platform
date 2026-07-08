@@ -308,9 +308,14 @@
   const SPRINKLER_ICON_URL = '/images/sprinkler-marker.png';
   const RECEIVER_ICON_URL = '/images/receiver.png';
   const PUMP_ICON_URL = '/images/pump.png';
-  const markerSvg = (bg, text) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="${bg}"/><text x="32" y="38" text-anchor="middle" font-size="20" font-family="Arial" font-weight="800" fill="#fff">${text}</text></svg>`)}`;
-  const AIRCON_ICON_URL = markerSvg('#2563eb', 'AC');
-  const WATER_ICON_URL = markerSvg('#0891b2', 'WP');
+  const AIRCON_ICON_URLS = {
+    system: '/images/facility/aircon_system.png',
+    wall: '/images/facility/aircon_wall.png',
+    stand: '/images/facility/aircon_stand.png',
+    outdoor: '/images/facility/aircon_outdoor_unit.png',
+    default: '/images/facility/aircon_system.png'
+  };
+  const WATER_ICON_URL = '/images/facility/water_purifier.png';
 
   const qs = new URLSearchParams(location.search);
   const $ = (id) => document.getElementById(id);
@@ -470,6 +475,20 @@
   function getAssetId(item, type = state.selectedAssetType){ return item ? item[assetMeta(type).idKey] : null; }
   function assetPage(type){ return assetMeta(type).page || ''; }
   function assetApi(type){ return assetMeta(type).api || ''; }
+  function airconIcon(equipmentType){
+    const t = normalize(equipmentType);
+    if (t.includes('실외') || t.includes('outdoor')) return AIRCON_ICON_URLS.outdoor;
+    if (t.includes('벽걸') || t.includes('wall')) return AIRCON_ICON_URLS.wall;
+    if (t.includes('스탠드') || t.includes('stand')) return AIRCON_ICON_URLS.stand;
+    if (t.includes('시스템') || t.includes('system')) return AIRCON_ICON_URLS.system;
+    return AIRCON_ICON_URLS.default;
+  }
+  function markerIconFor(type, item, meta){
+    if (type === 'hyd' && String(item?.hydrantType || '').toLowerCase() === 'outdoor') return HYDRANT_OUT_ICON_URL;
+    if (type === 'aircon') return airconIcon(item?.equipmentType);
+    if (type === 'water') return WATER_ICON_URL;
+    return meta.icon;
+  }
   function getSelectedItem(){
     const meta = selectedMeta();
     return (state[meta.stateKey] || []).find(x => String(x[meta.idKey]) === String(state.selectedAssetId)) || null;
@@ -619,8 +638,8 @@
       if (type === 'ext') btn.dataset.extId = String(id || '');
       if (type === 'hyd') btn.dataset.hydrantId = String(id || '');
       Object.assign(btn.style, markerPos(it.x, it.y));
-      const icon = type === 'hyd' && String(it.hydrantType || '').toLowerCase() === 'outdoor' ? HYDRANT_OUT_ICON_URL : meta.icon;
-      btn.innerHTML = `<img draggable="false" src="${icon}" alt="${esc(meta.label)}">`;
+      const icon = markerIconFor(type, it, meta);
+      btn.innerHTML = `<img draggable="false" src="${esc(icon)}" alt="${esc(meta.label)}">`;
       btn.onclick = (e) => { e.stopPropagation(); resetMoveArm(); selectAsset(type, id); showInfoFor(type, it, btn); };
       (type === 'ext' ? markersEl : type === 'hyd' ? hydrantMarkersEl : equipmentMarkersEl).appendChild(btn);
     }

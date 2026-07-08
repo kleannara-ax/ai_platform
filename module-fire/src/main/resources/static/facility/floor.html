@@ -90,8 +90,24 @@
   const fmtDate = v => v ? String(v).slice(0,10) : '-';
   const parseDate = d => { if(!d) return null; const x=new Date(d); return Number.isNaN(x.getTime()) ? null : x; };
   const today = new Date(); today.setHours(0,0,0,0);
-  const markerSvg = (bg, text) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48"><path d="M20 46C15.5 39.5 5 28.8 5 18.8 5 9.6 11.7 3 20 3s15 6.6 15 15.8c0 10-10.5 20.7-15 27.2Z" fill="${bg}" stroke="#fff" stroke-width="3"/><circle cx="20" cy="18" r="10" fill="rgba(255,255,255,.92)"/><text x="20" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="${bg}">${text}</text></svg>`)}`;
-  const ICONS = { AIRCON: markerSvg('#2563eb', 'AC'), WATER_PURIFIER: markerSvg('#0891b2', 'WP') };
+  const ICONS = {
+    AIRCON_SYSTEM: '/images/facility/aircon_system.png',
+    AIRCON_WALL: '/images/facility/aircon_wall.png',
+    AIRCON_STAND: '/images/facility/aircon_stand.png',
+    AIRCON_OUTDOOR: '/images/facility/aircon_outdoor_unit.png',
+    WATER_PURIFIER: '/images/facility/water_purifier.png'
+  };
+  function airconIcon(equipmentType){
+    const t = norm(equipmentType);
+    if (t.includes('실외') || t.includes('outdoor')) return ICONS.AIRCON_OUTDOOR;
+    if (t.includes('벽걸') || t.includes('wall')) return ICONS.AIRCON_WALL;
+    if (t.includes('스탠드') || t.includes('stand')) return ICONS.AIRCON_STAND;
+    if (t.includes('시스템') || t.includes('system')) return ICONS.AIRCON_SYSTEM;
+    return ICONS.AIRCON_SYSTEM;
+  }
+  function equipmentIcon(item){
+    return item?.category === 'AIRCON' ? airconIcon(item.equipmentType) : ICONS.WATER_PURIFIER;
+  }
   const planWrap = $('planWrap');
   const planInner = $('planInner');
   const planImg = $('planImg');
@@ -159,7 +175,7 @@
   function fitPlan(){ fitPlanToView(); centerPlanInView(); }
   function renderMarkers(){
     $('markers').innerHTML=''; $('hydrantMarkers').innerHTML=''; equipmentMarkersEl.innerHTML=''; if(!planImg.naturalWidth) return;
-    filteredItems().forEach(it=>{ const x=num(it.x), y=num(it.y); if(x==null||y==null)return; const btn=document.createElement('button'); btn.type='button'; btn.className='eqmarker'+(state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?' is-selected':''); btn.dataset.equipmentId=String(it.equipmentId||''); btn.dataset.equipmentType=it.category==='AIRCON'?'aircon':'water'; btn.style.left=x+'%'; btn.style.top=y+'%'; btn.title=(it.serialNumber||'')+' '+categoryLabel(it.category); btn.innerHTML=`<img draggable="false" src="${esc(ICONS[it.category])}" alt="${esc(categoryLabel(it.category))}" onerror="this.style.display='none'">`; btn.addEventListener('click', e=>{ e.stopPropagation(); selectItem(it.equipmentId); }); equipmentMarkersEl.appendChild(btn); });
+    filteredItems().forEach(it=>{ const x=num(it.x), y=num(it.y); if(x==null||y==null)return; const btn=document.createElement('button'); btn.type='button'; btn.className='eqmarker'+(state.selected&&String(state.selected.equipmentId)===String(it.equipmentId)?' is-selected':''); btn.dataset.equipmentId=String(it.equipmentId||''); btn.dataset.equipmentType=it.category==='AIRCON'?'aircon':'water'; btn.style.left=x+'%'; btn.style.top=y+'%'; btn.title=(it.serialNumber||'')+' '+categoryLabel(it.category); btn.innerHTML=`<img draggable="false" src="${esc(equipmentIcon(it))}" alt="${esc(categoryLabel(it.category))}" onerror="this.style.display='none'">`; btn.addEventListener('click', e=>{ e.stopPropagation(); selectItem(it.equipmentId); }); equipmentMarkersEl.appendChild(btn); });
     positionVisibleInfoCards();
   }
   function selectItem(id){ const it=state.currentItems.find(x=>String(x.equipmentId)===String(id)); if(!it)return; state.selected=it; renderList(); const marker=equipmentMarkersEl.querySelector(`.eqmarker[data-equipment-id="${CSS.escape(String(it.equipmentId))}"]`); showInfo(it, marker); }

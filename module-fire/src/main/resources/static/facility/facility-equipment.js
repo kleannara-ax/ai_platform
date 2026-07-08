@@ -4,10 +4,13 @@
   const CFG = window.FACILITY_PAGE_CONFIG || {};
   const label = CFG.itemLabel || '설비';
   const apiBase = CFG.apiBase || '/facility-api/air-conditioners';
-  const markerSvg = (bg, text) => `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48"><path d="M20 46C15.5 39.5 5 28.8 5 18.8 5 9.6 11.7 3 20 3s15 6.6 15 15.8c0 10-10.5 20.7-15 27.2Z" fill="${bg}" stroke="#fff" stroke-width="3"/><circle cx="20" cy="18" r="10" fill="rgba(255,255,255,.92)"/><text x="20" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="${bg}">${text}</text></svg>`)}`;
   const builtinMarkerImages = {
-    aircon: markerSvg('#2563eb', 'AC'),
-    water: markerSvg('#0891b2', 'WP')
+    airconSystem: '/images/facility/aircon_system.png',
+    airconWall: '/images/facility/aircon_wall.png',
+    airconStand: '/images/facility/aircon_stand.png',
+    airconOutdoor: '/images/facility/aircon_outdoor_unit.png',
+    aircon: '/images/facility/aircon_system.png',
+    water: '/images/facility/water_purifier.png'
   };
   const state = {
     items: [], buildings: [], floors: [], buildingFloorMap: {},
@@ -322,8 +325,17 @@
   }
 
   function markerImage(type) {
+    const t = String(type || '').replace(/\s+/g, '').replace(/[.,_\-]/g, '').toLowerCase();
     const fallback = isWaterPurifierPage() ? builtinMarkerImages.water : builtinMarkerImages.aircon;
-    return CFG.markerImages?.[type] || CFG.markerImages?.default || fallback;
+    const builtIn = (() => {
+      if (isWaterPurifierPage()) return builtinMarkerImages.water;
+      if (t.includes('실외') || t.includes('outdoor')) return builtinMarkerImages.airconOutdoor;
+      if (t.includes('벽걸') || t.includes('wall')) return builtinMarkerImages.airconWall;
+      if (t.includes('스탠드') || t.includes('stand')) return builtinMarkerImages.airconStand;
+      if (t.includes('시스템') || t.includes('system')) return builtinMarkerImages.airconSystem;
+      return fallback;
+    })();
+    return CFG.markerImages?.[type] || CFG.markerImages?.default || builtIn;
   }
 
   function airconExtraDetail(d) {
