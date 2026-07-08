@@ -22,19 +22,22 @@
     .btn-info { background:linear-gradient(135deg,#17a2b8 0%,#3dc1d3 100%); border:none; }
     .btn-danger { background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%); border:none; }
 
-    .page-wrap { padding:clamp(8px, 1vw, 12px); }
-    .wrap { display:flex !important; flex-direction:row !important; align-items:stretch; height:calc(100vh - 100px); gap:12px; box-sizing:border-box; min-height:0; }
-    .left { flex:0 0 clamp(280px, 28vw, 380px); width:clamp(280px, 28vw, 380px); min-width:260px; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:12px; overflow:auto; }
-    .right { flex:1 1 auto; min-width:0; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:12px; overflow:hidden; position:relative; }
+    .page-wrap { padding:10px; height:calc(100vh - 58px); box-sizing:border-box; }
+    .wrap { display:flex !important; flex-direction:column !important; align-items:stretch; height:100%; gap:10px; box-sizing:border-box; min-height:0; }
+    .left { flex:0 0 auto; width:100%; min-width:0; background:#fff; border:1px solid #e5e5e5; border-radius:14px; padding:12px; overflow:visible; box-shadow:0 10px 24px rgba(15,23,42,.06); }
+    .right { flex:1 1 auto; min-width:0; min-height:0; background:#fff; border:1px solid #e5e5e5; border-radius:14px; padding:8px; overflow:hidden; position:relative; box-shadow:0 10px 24px rgba(15,23,42,.06); display:flex; flex-direction:column; }
 
-    .titlebar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
-    .title { font-size:18px; font-weight:700; margin:0; }
+    .titlebar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .title { font-size:18px; font-weight:800; margin:0; letter-spacing:-.02em; }
     .titleSelect { width:min(220px, 100%); max-width:60vw; }
-    .sub { color:#666; font-size:13px; margin-bottom:12px; }
-    .toolbar { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-    .toolbar .btn { width:100%; white-space:nowrap; text-align:center; padding:10px 12px; }
+    .sub { color:#666; font-size:13px; margin-bottom:0; }
+    .control-grid { display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)) auto; gap:10px; align-items:end; }
+    .control-field label { display:block; font-size:12px; font-weight:800; color:#475569; margin-bottom:4px; }
+    .control-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; white-space:nowrap; }
+    .toolbar { display:flex; gap:8px; margin:0; }
+    .toolbar .btn { white-space:nowrap; text-align:center; padding:9px 14px; }
 
-    .planWrap { position:relative; width:100%; height:calc(100% - 10px); min-height:420px; border:1px dashed #222; border-radius:12px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+    .planWrap { position:relative; flex:1 1 auto; width:100%; height:100%; min-height:0; border:1px solid #111827; border-radius:14px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
     .planWrap.dragging { cursor:grabbing; }
     .planWrap.add-mode { cursor:crosshair; }
     .planWrap.add-mode .planImg { cursor:crosshair; }
@@ -86,12 +89,14 @@
     .modal-backdrop.show { background: rgba(17,24,39,.35) !important; backdrop-filter: blur(4px); }
 
     @media (max-width: 1180px) {
-      .wrap { flex-direction:column !important; height:auto; min-height:calc(100vh - 100px); }
-      .left { width:100%; flex:0 0 auto; min-width:0; max-height:42vh; }
-      .right { min-height:70vh; }
+      .page-wrap { height:auto; min-height:calc(100vh - 58px); }
+      .wrap { height:auto; min-height:calc(100vh - 78px); }
+      .control-grid { grid-template-columns:repeat(2, minmax(150px, 1fr)); }
+      .control-actions { grid-column:1 / -1; justify-content:flex-start; }
+      .right { min-height:72vh; }
       .titlebar { flex-wrap:wrap; }
       .titleSelect { max-width:100%; }
-      .planWrap { min-height:60vh; height:60vh; }
+      .planWrap { min-height:68vh; height:68vh; }
       .hint { right:12px; bottom:12px; max-width:min(260px, calc(100% - 24px)); }
     }
 
@@ -99,9 +104,11 @@
       .page-wrap { padding:8px; }
       .wrap { gap:8px; }
       .left, .right { padding:10px; border-radius:10px; }
-      .toolbar { grid-template-columns:1fr; }
+      .control-grid { grid-template-columns:1fr; }
+      .control-actions, .toolbar { flex-direction:column; align-items:stretch; width:100%; }
+      .toolbar .btn { width:100%; }
       .sub { font-size:12px; }
-      .planWrap { min-height:52vh; height:52vh; }
+      .planWrap { min-height:64vh; height:64vh; }
       .infoCard { width:min(280px, calc(100% - 16px)); max-width:calc(100% - 16px); }
       .kv { grid-template-columns:78px 1fr; gap:5px 7px; font-size:12px; }
       .action-embed-modal .modal-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); margin: .35rem auto; }
@@ -139,48 +146,40 @@
 <main class="page-wrap">
   <div class="wrap">
     <div class="left">
-      <div class="titlebar"><h3 class="title">도면 화면 편집</h3></div>
-      <div class="sub">건물, 층, 선택설비를 고른 뒤 도면에서 해당 설비만 확인·추가할 수 있습니다.</div>
-
-      <div class="toolbar">
-        <button id="saveBtn" class="btn btn-primary">선택 설비 수정</button>
-        <button id="clearBtn" class="btn btn-outline-danger">좌표 초기화</button>
-        <button id="addAssetBtn" class="btn btn-info text-white">설비 추가</button>
-        <button id="delAssetBtn" class="btn btn-outline-danger">설비 삭제</button>
-        <button id="inspectAssetBtn" class="btn btn-success">점검</button>
-        <button id="btnNeedInspect" class="btn btn-warning" title="최종 점검일로부터 한달이 지난 설비만 표시">점검 필요 설비</button>
+      <div class="titlebar">
+        <h3 class="title">층별 도면</h3>
+        <div class="sub">도면이 등록된 건물/층과 표시할 설비만 선택하세요. 목록은 표시하지 않습니다.</div>
       </div>
-
-      <div class="mb-2">
-        <label class="form-label mb-1" for="systemSelect">설비 구분</label>
-        <select id="systemSelect" class="form-select mb-2">
-          <option value="fire">소방설비</option>
-          <option value="other">기타설비</option>
-        </select>
-
-        <label class="form-label mb-1">현재 도면</label>
-        <div class="d-grid gap-2">
+      <div class="control-grid" aria-label="층별 도면 선택 영역">
+        <div class="control-field">
+          <label for="buildingSelect">건물</label>
           <select id="buildingSelect" class="form-select"></select>
+        </div>
+        <div class="control-field">
+          <label for="floorSelect">층</label>
           <select id="floorSelect" class="form-select"></select>
+        </div>
+        <div class="control-field">
+          <label for="systemSelect">설비 구분</label>
+          <select id="systemSelect" class="form-select">
+            <option value="fire">소방설비</option>
+            <option value="other">기타설비</option>
+          </select>
+        </div>
+        <div class="control-field">
+          <label for="assetSelect">선택설비</label>
           <select id="assetSelect" class="form-select"></select>
         </div>
-        <div class="form-text"><small>도면이 등록된 건물/층만 표시됩니다. 선택설비는 도면에 표시할 설비입니다.</small></div>
+        <div class="control-actions">
+          <div class="toolbar">
+            <button id="addAssetBtn" class="btn btn-info text-white" type="button">설비 추가</button>
+          </div>
+        </div>
       </div>
-
-      <hr />
-      <div class="fw-semibold mb-2" id="listTitle">선택 설비 목록</div>
-      <div id="list"></div>
     </div>
 
     <div class="right">
-      <div class="titlebar">
-        <h3 class="title" id="planTitle">도면</h3>
-        <div class="d-flex gap-2">
-          <button id="btnZoomReset" type="button" class="btn btn-outline-secondary btn-sm">확대 초기화</button>
-        </div>
-      </div>
-      <div class="sub">휠로 확대/축소, 드래그로 이동할 수 있습니다.</div>
-
+      <h3 class="visually-hidden" id="planTitle">도면</h3>
       <div class="planWrap" id="planWrap">
         <div class="planStage" id="planStage">
           <div class="planInner" id="planInner">
@@ -210,11 +209,11 @@
               </div>
               <div class="p-2 border-top bg-white">
                 <div class="row g-2">
-                  <div class="col-4"><button class="btn btn-sm btn-outline-dark w-100" id="miDetailBtn" type="button">상세</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-primary w-100" id="miInspectBtn" type="button">점검</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" id="miEditBtn" type="button">수정</button></div>
-                  <div class="col-6"><button class="btn btn-sm btn-success w-100" id="miAddHereBtn" type="button">소화기 추가</button></div>
-                  <div class="col-6"><button class="btn btn-sm btn-outline-secondary w-100" id="miCloseBtn" type="button">닫기</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-dark w-100" id="miDetailBtn" type="button">상세</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-primary w-100" id="miInspectBtn" type="button">점검</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-primary w-100" id="miEditBtn" type="button">수정</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-danger w-100" id="miDeleteBtn" type="button">삭제</button></div>
+                  <div class="col-12"><button class="btn btn-sm btn-outline-secondary w-100" id="miCloseBtn" type="button">닫기</button></div>
                 </div>
               </div>
             </div>
@@ -237,9 +236,10 @@
               </div>
               <div class="p-2 border-top bg-white">
                 <div class="row g-2">
-                  <div class="col-4"><button class="btn btn-sm btn-outline-dark w-100" id="hiDetailBtn" type="button">상세</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-primary w-100" id="hiInspectBtn" type="button">점검</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" id="hiEditBtn" type="button">수정</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-dark w-100" id="hiDetailBtn" type="button">상세</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-primary w-100" id="hiInspectBtn" type="button">점검</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-primary w-100" id="hiEditBtn" type="button">수정</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-danger w-100" id="hiDeleteBtn" type="button">삭제</button></div>
                   <div class="col-12"><button class="btn btn-sm btn-outline-secondary w-100" id="hiCloseBtn" type="button">닫기</button></div>
                 </div>
               </div>
@@ -262,9 +262,10 @@
               </div>
               <div class="p-2 border-top bg-white">
                 <div class="row g-2">
-                  <div class="col-4"><button class="btn btn-sm btn-outline-dark w-100" id="eiDetailBtn" type="button">상세</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-primary w-100" id="eiInspectBtn" type="button">점검</button></div>
-                  <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" id="eiEditBtn" type="button">수정</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-dark w-100" id="eiDetailBtn" type="button">상세</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-primary w-100" id="eiInspectBtn" type="button">점검</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-primary w-100" id="eiEditBtn" type="button">수정</button></div>
+                  <div class="col-3"><button class="btn btn-sm btn-outline-danger w-100" id="eiDeleteBtn" type="button">삭제</button></div>
                   <div class="col-12"><button class="btn btn-sm btn-outline-secondary w-100" id="eiCloseBtn" type="button">닫기</button></div>
                 </div>
               </div>
@@ -313,8 +314,6 @@
   const buildingSelect = $('buildingSelect');
   const floorSelect = $('floorSelect');
   const assetSelect = $('assetSelect');
-  const listTitle = $('listTitle');
-  const listEl = $('list');
   const markersEl = $('markers');
   const hydrantMarkersEl = $('hydrantMarkers');
   const equipmentMarkersEl = $('equipmentMarkers');
@@ -494,12 +493,18 @@
     });
   }
   function updateActionButtons(){
-    const ids = ['saveBtn','clearBtn','addAssetBtn','delAssetBtn','inspectAssetBtn'];
+    const ids = ['addAssetBtn'];
     ids.forEach(id => { const el = $(id); if (el) { el.disabled = !canEdit; el.title = canEdit ? '' : '권한이 필요합니다.'; } });
     const add = $('addAssetBtn'); if (add) add.textContent = `${assetLabel(state.selectedAssetType)} 추가`;
-    const del = $('delAssetBtn'); if (del) del.textContent = `${assetLabel(state.selectedAssetType)} 삭제`;
+    applyEditVisibility();
   }
-  function resetMoveArm(){ state.moveArmed = false; const b = $('saveBtn'); if (b) b.textContent = '선택 설비 수정'; }
+  function applyEditVisibility(){
+    ['miEditBtn','hiEditBtn','eiEditBtn','miInspectBtn','hiInspectBtn','eiInspectBtn','miDeleteBtn','hiDeleteBtn','eiDeleteBtn'].forEach(id => {
+      const el = $(id);
+      if (el) el.style.display = canEdit ? '' : 'none';
+    });
+  }
+  function resetMoveArm(){ state.moveArmed = false; }
   function resetAddMode(){ state.addMode = null; planWrap.classList.remove('add-mode'); }
   function hideCard(id){ const c = $(id); if (!c) return; const active = document.activeElement; if (active instanceof HTMLElement && c.contains(active)) active.blur(); c.setAttribute('inert', ''); c.style.display = 'none'; c.setAttribute('aria-hidden','true'); }
   function hideMarkerInfo(){ hideCard('markerInfo'); }
@@ -586,21 +591,8 @@
   }
 
   function renderList(){
-    const items = filteredAssetItems();
-    const label = assetLabel(state.selectedAssetType);
-    listTitle.textContent = `${label} 목록`;
-    if (!items.length) {
-      listEl.innerHTML = `<div class="text-muted small">현재 도면에 좌표가 등록된 ${label} 설비가 없습니다.</div>`;
-      return;
-    }
-    const rows = items.slice().sort((a,b) => Number(getAssetId(a)) - Number(getAssetId(b))).map(it => {
-      const id = getAssetId(it);
-      const selected = String(state.selectedAssetId) === String(id);
-      const title = it.serialNumber || it.equipmentType || it.extinguisherType || it.note || `${label} #${id}`;
-      const last = fmtDate(it.lastInspectionDate);
-      return `<div class="card mb-2 extRow${selected ? ' sel' : ''}" role="button" data-list-asset="${state.selectedAssetType}" data-list-id="${esc(id)}"><div class="card-body py-2"><div class="d-flex justify-content-between align-items-center"><div class="fw-semibold">${esc(label)} #${esc(id)}</div>${it.inspectionRequired ? '<span class="badge bg-warning text-dark">점검필요</span>' : ''}</div><div class="small text-muted">${esc(title || '-')}</div><div class="small text-muted">${last ? '최종 점검: ' + esc(last) : '점검 이력 없음'}</div></div></div>`;
-    }).join('');
-    listEl.innerHTML = rows;
+    // 사용자가 요청한 최종 UI에서는 도면 화면 안에 설비 목록을 표시하지 않는다.
+    // 목록 기반 선택/삭제 버튼도 제거하고, 마커 클릭 미니 모달에서만 작업한다.
   }
   function renderMarkers(){
     markersEl.innerHTML = ''; hydrantMarkersEl.innerHTML = ''; equipmentMarkersEl.innerHTML = '';
@@ -642,7 +634,8 @@
       $('miDetailBtn').onclick = () => openAssetAction('details', type, item);
       $('miInspectBtn').onclick = () => openAssetAction('inspect', type, item);
       $('miEditBtn').onclick = () => openAssetAction('edit', type, item);
-      $('miAddHereBtn').onclick = () => openAddAt(type, Number(item.x), Number(item.y));
+      $('miDeleteBtn').onclick = () => deleteSelected(type, item);
+      applyEditVisibility();
       $('miCloseBtn').onclick = hideMarkerInfo; $('miHeadCloseBtn').onclick = hideMarkerInfo;
       positionInfoCard('markerInfo', selectedBtn);
       return;
@@ -660,6 +653,8 @@
       $('hiDetailBtn').onclick = () => openAssetAction('details', type, item);
       $('hiInspectBtn').onclick = () => openAssetAction('inspect', type, item);
       $('hiEditBtn').onclick = () => openAssetAction('edit', type, item);
+      $('hiDeleteBtn').onclick = () => deleteSelected(type, item);
+      applyEditVisibility();
       $('hiCloseBtn').onclick = hideHydrantInfo; $('hiHeadCloseBtn').onclick = hideHydrantInfo;
       positionInfoCard('hydrantInfo', selectedBtn);
       return;
@@ -675,6 +670,8 @@
     $('eiDetailBtn').onclick = () => openAssetAction('details', type, item);
     $('eiInspectBtn').onclick = () => openAssetAction('inspect', type, item);
     $('eiEditBtn').onclick = () => openAssetAction('edit', type, item);
+    $('eiDeleteBtn').onclick = () => deleteSelected(type, item);
+    applyEditVisibility();
     $('eiCloseBtn').onclick = hideEquipmentInfo; $('eiHeadCloseBtn').onclick = hideEquipmentInfo;
     positionInfoCard('equipmentInfo', selectedBtn);
   }
@@ -729,9 +726,9 @@
     else { params.set('details', String(id)); params.set('embedDetails', '1'); }
     openActionModal(`${page}?${params.toString()}`);
   }
-  async function deleteSelected(){
+  async function deleteSelected(type = state.selectedAssetType, item = getSelectedItem()){
     if (!canEdit) return alert('권한이 필요합니다.');
-    const type = state.selectedAssetType, item = getSelectedItem(), id = getAssetId(item, type);
+    const id = getAssetId(item, type);
     if (!id) return alert(`삭제할 ${assetLabel(type)} 설비를 먼저 선택하세요.`);
     if (!confirm(`${assetLabel(type)} #${id}를 삭제하시겠습니까?`)) return;
     const r = await api(`${assetApi(type)}/${encodeURIComponent(id)}`, { method:'DELETE' });
@@ -834,8 +831,8 @@
     systemSelect.value = state.domainType;
     syncBuildingFloorSelectors(); syncCurrentFloor(false);
     renderAccountMenu(); window.FireWebNav?.mount?.(); updateActionButtons();
+    applyEditVisibility();
     if (!canEdit) {
-      ['miEditBtn','hiEditBtn','eiEditBtn','miAddHereBtn','miInspectBtn','hiInspectBtn','eiInspectBtn'].forEach(id => { const el = $(id); if (el) el.style.display = 'none'; });
       document.querySelectorAll('a[href*="/qr"]').forEach(el => { const li = el.closest('li.nav-item'); if (li) li.style.display='none'; else el.style.display='none'; });
     }
     focusRequestedMarkerFromQuery();
@@ -877,7 +874,6 @@
     state.current = b.floors.find(f => f.floorKey === floorSelect.value) || b.floors[0] || null; syncCurrentFloor(true);
   });
   assetSelect?.addEventListener('change', () => { state.selectedAssetType = assetSelect.value; state.selectedAssetId = null; hideInfo(); resetAddMode(); updateActionButtons(); updatePlanTitle(); renderList(); renderMarkers(); replaceCurrentHistory(); });
-  listEl?.addEventListener('click', (e) => { const row = e.target.closest('[data-list-asset]'); if (!row) return; const type = row.dataset.listAsset, id = row.dataset.listId; const meta = assetMeta(type); const it = (state[meta.stateKey] || []).find(x => String(x[meta.idKey]) === String(id)); if (!it) return; selectAsset(type, id); const btn = (type === 'ext' ? markersEl : type === 'hyd' ? hydrantMarkersEl : equipmentMarkersEl).querySelector(`[data-asset-id="${id}"]`); if (btn) { btn.scrollIntoView({block:'center', inline:'center', behavior:'smooth'}); showInfoFor(type, it, btn); } });
   planImg.addEventListener('click', (e) => {
     if (!canEdit) return;
     if (state.addMode) {
@@ -885,14 +881,8 @@
       const x = ((e.clientX - rect.left) / rect.width) * 100, y = ((e.clientY - rect.top) / rect.height) * 100;
       const type = state.addMode; resetAddMode(); openAddAt(type, x, y); return;
     }
-    if (state.moveArmed) { resetMoveArm(); openAssetAction('edit'); }
   });
-  $('saveBtn')?.addEventListener('click', () => openAssetAction('edit'));
-  $('clearBtn')?.addEventListener('click', clearSelectedCoord);
   $('addAssetBtn')?.addEventListener('click', openAddSelected);
-  $('delAssetBtn')?.addEventListener('click', deleteSelected);
-  $('inspectAssetBtn')?.addEventListener('click', () => openAssetAction('inspect'));
-  $('btnNeedInspect')?.addEventListener('click', () => { state.needInspectMode = !state.needInspectMode; $('btnNeedInspect').classList.toggle('active', state.needInspectMode); renderList(); renderMarkers(); });
   document.addEventListener('click', (e) => { if (state.suppressInfoDismissClick) { state.suppressInfoDismissClick = false; return; } const t = e.target; if (!t.closest('.marker') && !t.closest('#markerInfo')) hideMarkerInfo(); if (!t.closest('.hmarker') && !t.closest('#hydrantInfo')) hideHydrantInfo(); if (!t.closest('.eqmarker') && !t.closest('#equipmentInfo')) hideEquipmentInfo(); }, true);
   window.addEventListener('message', async (ev) => {
     const msg = typeof ev.data === 'string' ? ev.data : String(ev.data?.type || '');
@@ -908,7 +898,6 @@
       await refreshAfterAction();
     }
   });
-  $('btnZoomReset').onclick = () => { fitPlanToView(); centerPlanInView(); };
   planImg.addEventListener('load', () => { fitPlanToView(); centerPlanInView(); });
   planWrap.addEventListener('dragstart', (e) => { if (!e.target?.closest('.infoCard')) e.preventDefault(); });
   planWrap.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target?.closest('.marker, .hmarker, .eqmarker, .infoCard')) return; e.preventDefault(); state.dragging = true; state.dragMoved = false; state.dragStartX = e.clientX; state.dragStartY = e.clientY; state.panStartX = state.panX; state.panStartY = state.panY; planWrap.classList.add('dragging'); });
