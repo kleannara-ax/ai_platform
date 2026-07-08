@@ -27,23 +27,22 @@
     .system-strip { flex:0 0 auto; display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:3px 8px; box-shadow:0 6px 16px rgba(15,23,42,.05); }
     .system-strip label { flex:0 0 auto; font-size:13px; font-weight:900; color:#111827; margin:0; }
     .system-strip select { width:min(260px, 100%); min-height:32px; padding:.2rem .75rem; }
-    .left { flex:0 0 auto; width:100%; min-width:0; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:4px 8px; overflow:visible; box-shadow:0 8px 18px rgba(15,23,42,.05); }
     .right { flex:1 1 auto; min-width:0; min-height:0; background:#fff; border:1px solid #e5e5e5; border-radius:12px; padding:4px; overflow:hidden; position:relative; box-shadow:0 8px 18px rgba(15,23,42,.05); display:flex; flex-direction:column; }
 
     .titlebar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
     .title { font-size:18px; font-weight:800; margin:0; letter-spacing:-.02em; }
     .titleSelect { width:min(220px, 100%); max-width:60vw; }
     .sub { color:#666; font-size:13px; margin-bottom:0; }
-    .control-grid { display:grid; grid-template-columns:repeat(3, minmax(160px, 1fr)) auto; gap:6px; align-items:end; }
-    .control-field label { display:block; font-size:12px; font-weight:800; color:#475569; margin-bottom:1px; }
-    .control-grid .form-select { min-height:32px; padding:.2rem .75rem; }
+    .control-grid { display:grid; grid-template-columns:minmax(150px, 220px) minmax(110px, 160px) minmax(150px, 220px) auto; gap:6px; align-items:end; min-width:0; }
+    .control-field label { display:block; font-size:11px; font-weight:800; color:#475569; margin-bottom:1px; }
+    .control-grid .form-select { min-height:30px; padding:.15rem .65rem; font-size:13px; }
     .control-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; white-space:nowrap; }
     .toolbar { display:flex; gap:8px; margin:0; }
-    .toolbar .btn { white-space:nowrap; text-align:center; padding:5px 12px; }
+    .toolbar .btn { white-space:nowrap; text-align:center; padding:4px 10px; min-height:30px; font-size:13px; }
 
-    .map-card-head { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 2px 2px; }
-    .map-card-title { font-size:16px; font-weight:900; color:#111827; margin:0; letter-spacing:-.02em; }
-    .planWrap { position:relative; flex:1 1 auto; width:100%; height:calc(100vh - 112px); min-height:calc(100vh - 112px); border:1px solid #111827; border-radius:14px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+    .map-card-head { flex:0 0 auto; display:grid; grid-template-columns:auto minmax(0, 1fr) auto; align-items:end; gap:10px; padding:0 2px 3px; }
+    .map-card-title { font-size:16px; font-weight:900; color:#111827; margin:0 2px 6px 0; letter-spacing:-.02em; white-space:nowrap; }
+    .planWrap { position:relative; flex:1 1 auto; width:100%; height:calc(100vh - 108px); min-height:calc(100vh - 108px); border:1px solid #111827; border-radius:14px; overflow:auto; background:#0b1424; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
     .planWrap.dragging { cursor:grabbing; }
     .planWrap.add-mode { cursor:crosshair; }
     .planWrap.add-mode .planImg { cursor:crosshair; }
@@ -97,12 +96,14 @@
     @media (max-width: 1180px) {
       .page-wrap { height:auto; min-height:calc(100vh - 58px); }
       .wrap { height:auto; min-height:calc(100vh - 62px); }
-      .control-grid { grid-template-columns:repeat(2, minmax(150px, 1fr)); }
-      .control-actions { grid-column:1 / -1; justify-content:flex-start; }
+      .map-card-head { grid-template-columns:auto 1fr; align-items:end; }
+      .map-card-head #btnZoomReset { justify-self:end; }
+      .control-grid { grid-column:1 / -1; grid-row:2; grid-template-columns:repeat(3, minmax(140px, 1fr)) auto; }
+      .control-actions { justify-content:flex-end; }
       .right { min-height:90vh; }
       .titlebar { flex-wrap:wrap; }
       .titleSelect { max-width:100%; }
-      .planWrap { min-height:88vh; height:88vh; }
+      .planWrap { min-height:86vh; height:86vh; }
       .hint { right:12px; bottom:12px; max-width:min(260px, calc(100% - 24px)); }
     }
 
@@ -111,13 +112,15 @@
       .wrap { gap:6px; }
       .system-strip { flex-direction:column; align-items:stretch; gap:6px; padding:8px; border-radius:10px; }
       .system-strip select { width:100%; }
-      .left, .right { padding:8px; border-radius:10px; }
-      .control-grid { grid-template-columns:1fr; gap:8px; }
+      .right { padding:8px; border-radius:10px; }
+      .map-card-head { grid-template-columns:1fr; gap:6px; padding-bottom:6px; }
+      .map-card-title { margin:0; }
+      .map-card-head #btnZoomReset { justify-self:stretch; width:100%; }
+      .control-grid { grid-column:auto; grid-row:auto; grid-template-columns:1fr; gap:8px; }
       .control-actions, .toolbar { flex-direction:column; align-items:stretch; width:100%; }
       .toolbar .btn { width:100%; }
-      .map-card-head { padding-bottom:6px; }
       .sub { font-size:12px; }
-      .planWrap { min-height:84vh; height:84vh; }
+      .planWrap { min-height:80vh; height:80vh; }
       .infoCard { width:min(280px, calc(100% - 16px)); max-width:calc(100% - 16px); }
       .kv { grid-template-columns:78px 1fr; gap:5px 7px; font-size:12px; }
       .action-embed-modal .modal-dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); margin: .35rem auto; }
@@ -162,31 +165,28 @@
       </select>
     </div>
 
-    <div class="left">
-      <div class="control-grid" aria-label="층별 도면 선택 영역">
-        <div class="control-field">
-          <label for="buildingSelect">건물</label>
-          <select id="buildingSelect" class="form-select"></select>
-        </div>
-        <div class="control-field">
-          <label for="floorSelect">층</label>
-          <select id="floorSelect" class="form-select"></select>
-        </div>
-        <div class="control-field">
-          <label for="assetSelect">선택설비</label>
-          <select id="assetSelect" class="form-select"></select>
-        </div>
-        <div class="control-actions">
-          <div class="toolbar">
-            <button id="addAssetBtn" class="btn btn-info text-white" type="button">설비 추가</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="right">
       <div class="map-card-head">
         <h3 class="map-card-title" id="planTitle">도면</h3>
+        <div class="control-grid" aria-label="층별 도면 선택 영역">
+          <div class="control-field">
+            <label for="buildingSelect">건물</label>
+            <select id="buildingSelect" class="form-select"></select>
+          </div>
+          <div class="control-field">
+            <label for="floorSelect">층</label>
+            <select id="floorSelect" class="form-select"></select>
+          </div>
+          <div class="control-field">
+            <label for="assetSelect">선택설비</label>
+            <select id="assetSelect" class="form-select"></select>
+          </div>
+          <div class="control-actions">
+            <div class="toolbar">
+              <button id="addAssetBtn" class="btn btn-info text-white" type="button">설비 추가</button>
+            </div>
+          </div>
+        </div>
         <button id="btnZoomReset" type="button" class="btn btn-outline-secondary btn-sm">확대 초기화</button>
       </div>
       <div class="planWrap" id="planWrap">
