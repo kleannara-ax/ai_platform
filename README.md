@@ -7,7 +7,7 @@
   - JWT 로그인 및 사용자/역할/메뉴 권한 관리
   - 소방설비 관리: 소화기, 스프링클러, 소화전, 수신기, 소방펌프, QR, 모바일 점검
   - 스프링클러 목록 및 QR/모바일 점검 관리: 메뉴 전용 투명 아이콘, 목록/소화기 스타일 상세 모달/등록/수정/삭제, 대표 이미지 1장 업로드·덮어쓰기, 도면 클릭 기반 X/Y 좌표 선택, 상세 이미지·도면 클릭 확대 및 마우스 휠 확대/축소, QR 발급, QR 관리 페이지 내 상세 단독 모달, 모바일 QR 등록/점검, 미등록 QR 등록 화면의 건물/층 분리 선택 및 모바일 도면 두 손가락 확대/축소·드래그 이동, 90일 주기 점검필요 판정, 양호/불량 체크리스트, 고장 필터, 소화기 목록과 동일한 상단 버튼/검색 필터 배치 및 최근 1년 점검 이력 XLSX 다운로드
-  - 설비관리시스템 공통 도면 메뉴: `도면 (메인)`, `층별 도면`은 소방설비/기타설비 하위가 아니라 `설비관리시스템` 바로 아래에서 공통 관리
+  - 설비관리시스템 공통 메뉴: `도면 (메인)`, `층별 도면`, 소방설비 `QR코드`는 소방설비/기타설비 하위가 아니라 `설비관리시스템` 바로 아래에서 관리
   - 이상설비 집계: 소화기/소화전 비정상 설비와 수신기/소방펌프 불량·요정비 설비를 이상설비에 포함
   - 이상설비 도면 바로가기: 소화기/소화전/수신기/소방펌프 모두 층별 도면(`/maps/floor.html`)에서 마커 자동 선택, 강조 및 정보 카드 표시
   - 층별 도면: 설비 구분을 페이지 최상단으로 분리하고, 건물/층/선택설비/설비 추가 컨트롤은 별도 카드 없이 대형 도면 카드 상단 여유 공간 안에 한 줄로 배치한 반응형 UI입니다. `도면`/`층별 도면` 제목·설명과 도면 안 설비 목록은 표시하지 않습니다. 도면 카드 상단은 건물/층/선택설비 드롭다운과 `설비 추가`, `확대 초기화` 버튼만 표시하며, 소화기·소화전·스프링클러·에어컨·정수기 마커를 전환 표시합니다. 옥외 도면에서는 수신기·소방펌프를 추가 노출하며, 삭제는 상단 버튼이 아니라 마커 클릭 시 표시되는 미니 모달 안에서만 수행합니다. 상세/점검/추가/수정 작업은 투명 iframe 호스트 안의 해당 작업 모달 하나만 보이도록 처리해 중복 모달처럼 보이지 않게 했습니다.
@@ -33,11 +33,12 @@
 - **Local/Sandbox App**: `http://127.0.0.1:8080`
 - **Current Sandbox Public URL**: `https://8080-ii9lpfcjgvbj1ses03an2-ad490db5.sandbox.novita.ai`
 - **Health Check**: `/api/health`
-- **설비관리시스템 공통 도면 화면**:
+- **설비관리시스템 공통/QR 화면**:
   - `/fire-map.html` → `설비관리시스템 > 도면 (메인)` 공통 메뉴에서 로드
   - `/maps/floor.html` → `설비관리시스템 > 층별 도면` 공통 메뉴에서 로드. 최상단 설비 구분 드롭다운과 도면 카드 상단의 건물/층/선택설비 드롭다운, 설비 추가 버튼, 우측 `확대 초기화` 버튼을 한 줄로 표시하고 도면 카드 제목과 도면 내 목록은 표시하지 않음. `domainType=fire|other`, `assetType=ext|hyd|sprinkler|receiver|pump|aircon|water`, `buildingName`, `floorName`, `focusType`, `focusId` 지원
+  - `/qr` → `설비관리시스템 > QR코드` 공통 메뉴에서 소방설비 QR코드 발급/확인 화면 로드
 - **소방설비 화면**:
-  - `/extinguishers.html`, `/sprinklers.html`, `/hydrants.html`, `/receivers.html`, `/pumps.html`, `/qr`
+  - `/extinguishers.html`, `/sprinklers.html`, `/hydrants.html`, `/receivers.html`, `/pumps.html`
   - `/fire/sprinklers` → `sprinklers.html` 메뉴 URL 매핑
 - **소방설비 API**:
   - `/fire-api/sprinklers`: 스프링클러 목록/상세/등록/수정/삭제
@@ -87,14 +88,14 @@
 - `ROLE_EQUIPMENT_MANAGER`: 기타시설관리 — 기타설비만 접근
 - `ROLE_ADMIN`: 전체 접근
 - 설비관리시스템 메뉴는 `FIRE_MGMT`를 상위 메뉴로 유지하되 이름을 “설비관리시스템”으로 변경했습니다.
-- `V21__normalize_facility_menu_structure.sql` 기준으로 `설비관리시스템` 바로 아래 메뉴는 `도면 (메인)`(`FIRE_MAP`) → `층별 도면`(`FIRE_FLOOR`) → `소방설비`(`FIRE_EQUIPMENT_GROUP`) → `기타설비`(`OTHER_EQUIPMENT_GROUP`) 순서로 관리합니다. `FIRE_DASHBOARD`, `OTHER_DASHBOARD`, `OTHER_MAP`, `OTHER_FLOOR`는 메뉴관리/접근권한 대상에서 제거합니다.
+- `V30__move_fire_qr_to_facility_root.sql` 기준으로 `설비관리시스템` 바로 아래 메뉴는 `도면 (메인)`(`FIRE_MAP`) → `층별 도면`(`FIRE_FLOOR`) → `QR코드`(`FIRE_QR`) → `소방설비`(`FIRE_EQUIPMENT_GROUP`) → `기타설비`(`OTHER_EQUIPMENT_GROUP`) 순서로 관리합니다. `FIRE_DASHBOARD`, `OTHER_DASHBOARD`, `OTHER_MAP`, `OTHER_FLOOR`는 메뉴관리/접근권한 대상에서 제거합니다.
 - `V29__add_other_equipment_qr_menu.sql`로 기타설비 하위 `QR코드` 메뉴(`OTHER_QR`, `/facility/qr`)를 추가하고 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_EQUIPMENT_MANAGER`에 권한을 부여합니다. `ROLE_FIRE_MANAGER`에는 기타설비 QR 권한을 부여하지 않습니다.
 - 운영 DB에서 역할 공통코드가 중복되어 접근 권한 화면에 `소방시설관리`가 2개 표시되는 경우 `V20__fix_facility_role_duplicates.sql`로 ROLE 그룹/코드 중복을 정리하고 위 3개 설비 역할명을 보정합니다.
 
 ## User Guide
 1. 로그인 후 `설비관리시스템` 메뉴로 이동합니다.
-2. `설비관리시스템` 바로 아래의 공통 메뉴 `도면 (메인)`과 `층별 도면`에서 소방설비/기타설비가 함께 사용하는 도면을 확인합니다.
-3. `소방설비` 그룹에서는 소화기, 스프링클러 목록, 소화전, 수신기, 소방펌프, QR 메뉴를 통해 설비 목록, 상세, 등록/수정, 점검 이력을 관리합니다. 스프링클러 목록은 소화기 목록과 동일하게 상단 요약 카드 우측에 상태 필터, `📥 엑셀`, `스프링클러 추가` 버튼을 배치하고, 검색 필터 카드는 검색어/건물/층/검색/초기화만 표시합니다. 엑셀 버튼은 최근 1년 점검 이력을 XLSX로 다운로드합니다. 스프링클러 상세 모달은 소화기 상세와 동일한 카드형 기본정보/점검정보/이미지/도면/QR/점검이력 구조로 표시하되, 점검 이력은 읽기 전용으로만 제공합니다. 이미지 또는 도면을 클릭하면 확대 모달에서 마우스 휠로 확대·축소하고 드래그로 이동할 수 있습니다. 스프링클러 추가/수정 모달에서는 대표 이미지 파일을 선택해 1장만 저장/교체할 수 있고, 새 이미지를 선택하면 기존 이미지를 덮어씁니다. 건물/층 선택 아래의 `도면 위치 선택`에서는 도면을 클릭해 X/Y 좌표를 자동 입력할 수 있습니다. QR 메뉴에서는 스프링클러 QR을 조회/인쇄하고, 등록된 스프링클러 QR 카드를 클릭하면 페이지 이동 없이 QR 화면 안의 단일 상세 모달만 표시합니다. QR 상세 모달의 이미지, 도면, QR도 소화기 상세 모달과 동일하게 클릭 확대, 마우스 휠 확대·축소, 드래그 이동을 지원하며 도면 확대 시 스프링클러 위치 마커가 함께 표시됩니다. 미등록 QR을 스캔하면 `/minspection/sprinklers/{qrKey}`에서 다른 모바일 설비와 동일한 색상 테마로 건물과 층을 각각 선택하며, 실제 도면이 있는 건물/층만 표시한 뒤 모바일 등록 후 바로 점검할 수 있습니다. 이 모바일 등록 화면의 도면 위치 선택 영역은 한 손가락 탭 좌표 선택을 유지하면서 두 손가락 pinch 확대/축소, 확대 후 드래그 이동, 확대/이동 상태를 반영한 좌표 보정을 지원합니다. 최종 점검일로부터 90일 이상 지나면 점검필요로 표시됩니다.
+2. `설비관리시스템` 바로 아래의 공통 메뉴 `도면 (메인)`, `층별 도면`, `QR코드`를 확인합니다. QR코드는 소방설비 그룹 하위가 아니라 도면 메뉴들과 같은 상위 레벨에서 표시됩니다.
+3. `소방설비` 그룹에서는 소화기, 스프링클러 목록, 소화전, 수신기, 소방펌프 메뉴를 통해 설비 목록, 상세, 등록/수정, 점검 이력을 관리합니다. 스프링클러 목록은 소화기 목록과 동일하게 상단 요약 카드 우측에 상태 필터, `📥 엑셀`, `스프링클러 추가` 버튼을 배치하고, 검색 필터 카드는 검색어/건물/층/검색/초기화만 표시합니다. 엑셀 버튼은 최근 1년 점검 이력을 XLSX로 다운로드합니다. 스프링클러 상세 모달은 소화기 상세와 동일한 카드형 기본정보/점검정보/이미지/도면/QR/점검이력 구조로 표시하되, 점검 이력은 읽기 전용으로만 제공합니다. 이미지 또는 도면을 클릭하면 확대 모달에서 마우스 휠로 확대·축소하고 드래그로 이동할 수 있습니다. 스프링클러 추가/수정 모달에서는 대표 이미지 파일을 선택해 1장만 저장/교체할 수 있고, 새 이미지를 선택하면 기존 이미지를 덮어씁니다. 건물/층 선택 아래의 `도면 위치 선택`에서는 도면을 클릭해 X/Y 좌표를 자동 입력할 수 있습니다. QR 메뉴에서는 스프링클러 QR을 조회/인쇄하고, 등록된 스프링클러 QR 카드를 클릭하면 페이지 이동 없이 QR 화면 안의 단일 상세 모달만 표시합니다. QR 상세 모달의 이미지, 도면, QR도 소화기 상세 모달과 동일하게 클릭 확대, 마우스 휠 확대·축소, 드래그 이동을 지원하며 도면 확대 시 스프링클러 위치 마커가 함께 표시됩니다. 미등록 QR을 스캔하면 `/minspection/sprinklers/{qrKey}`에서 다른 모바일 설비와 동일한 색상 테마로 건물과 층을 각각 선택하며, 실제 도면이 있는 건물/층만 표시한 뒤 모바일 등록 후 바로 점검할 수 있습니다. 이 모바일 등록 화면의 도면 위치 선택 영역은 한 손가락 탭 좌표 선택을 유지하면서 두 손가락 pinch 확대/축소, 확대 후 드래그 이동, 확대/이동 상태를 반영한 좌표 보정을 지원합니다. 최종 점검일로부터 90일 이상 지나면 점검필요로 표시됩니다.
 4. `기타설비` 그룹에서는 에어컨, 정수기, QR코드 메뉴를 표시합니다. 기타설비 하위의 대시보드/도면(메인)/층별 도면 가상 메뉴는 제거되었고, QR코드 메뉴는 메뉴관리/접근권한 관리 대상입니다.
 5. 대시보드 메뉴(`FIRE_DASHBOARD`, `OTHER_DASHBOARD`)는 메뉴관리·접근권한 대상에서 제거되었으며, 이전 세션에 삭제된 페이지가 남아 있으면 기본 대시보드로 자동 복귀합니다.
 6. 층별 도면에서는 맨 위의 `설비 구분`을 먼저 선택하고, 도면 카드 상단에서 `건물`, `층`, `선택설비`를 선택합니다. 소방설비는 소화기/소화전/스프링클러를 표시하고, 옥외 도면에서는 수신기/소방펌프도 선택설비에 추가됩니다. 기타설비를 선택하면 에어컨/정수기만 표시됩니다. 도면 카드 상단에는 `도면` 제목 없이 건물/층/선택설비 드롭다운과 설비 추가, 확대 초기화 버튼만 한 줄로 표시하며, 별도 컨트롤 카드는 없습니다. 도면 영역은 목록 없이 크게 표시됩니다. `설비 추가`는 현재 선택설비를 현재 도면에서 클릭한 위치에 추가합니다. 설비 삭제는 상단 버튼이 아니라 마커 클릭 시 나타나는 미니 모달의 `삭제` 버튼으로 수행하고, 저장/점검/삭제 후 마커가 갱신됩니다.
@@ -111,13 +112,13 @@
 - **Build**: `./gradlew :app:bootJar`
 - **Process Manager**: PM2 (`platform`)
 - **Start script**: `/home/user/webapp/start-app.sh`
-- **Last Updated**: 2026-07-08
+- **Last Updated**: 2026-07-09
 
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
 - `V15__facility_management_system.sql`로 설비관리시스템 상위 메뉴와 소방설비/기타설비 그룹을 추가
 - `V20__fix_facility_role_duplicates.sql`로 운영 DB의 ROLE 공통코드 중복 표시 보정 추가: 기존 `ROLE_FIRE_MANAGER`/소방시설관리는 유지하고 `ROLE_FACILITY_MANAGER`/시설관리, `ROLE_EQUIPMENT_MANAGER`/기타시설관리를 명확히 정리
-- `V21__normalize_facility_menu_structure.sql`로 `설비관리시스템` 하위 정렬을 `도면 (메인)` → `층별 도면` → `소방설비` → `기타설비` 순서로 보정하고, `FIRE_DASHBOARD`, `OTHER_DASHBOARD`, `OTHER_MAP`, `OTHER_FLOOR` 메뉴/권한을 제거
+- `V30__move_fire_qr_to_facility_root.sql`로 `설비관리시스템` 하위 정렬을 `도면 (메인)` → `층별 도면` → `QR코드` → `소방설비` → `기타설비` 순서로 보정하고, `FIRE_QR` 권한을 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`에 유지
 - `index.html`에서 기타설비 하위에 프론트에서만 추가되던 대시보드/도면/층별도면 가상 메뉴 및 라우팅을 제거하고, 기타설비 QR 메뉴(`OTHER_QR`) 라우팅을 `/facility/qr`로 추가
 - 에어컨 식별 No. 및 제조사/위치/실외기 대수 관리 구현 완료: 식별 No.는 자동 생성하지 않고 사용자 입력을 필수로 검증하며, 실외기 좌표/연결선, 설치연도, 수량 입력은 `V17__simplify_facility_aircon_fields.sql` 기준으로 제거
 - 정수기 종류 입력 제거 및 단순 등록/수정 구현 완료: `V19__simplify_facility_water_purifier_fields.sql` 기준으로 기존 정수기 종류를 `정수기`로 통일하고, 화면 입력은 설치일/건물/층/X/Y 좌표만 표시
@@ -156,8 +157,8 @@
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
-- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__add_fluidized_bed_incinerator_map_zone.sql`, `V24__add_new_incinerator_map_zone_buildings.sql`, `V25__add_pad_tent_warehouse_map_zone_building.sql`, `V26__add_fire_sprinkler.sql`, `V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql`, `V28__add_fire_sprinkler_qr_mobile_fields.sql`, `V29__add_other_equipment_qr_menu.sql` 순서 적용 후 메뉴관리/접근권한, 신규 도면 구역, 스프링클러 목록/QR/모바일 점검, 기타설비 QR 메뉴 노출 검증
-- `설비관리시스템 > 도면 (메인)`, `설비관리시스템 > 층별 도면`, `소방설비`, `기타설비`의 사이드바 정렬과 권한별 표시 확인
+- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__add_fluidized_bed_incinerator_map_zone.sql`, `V24__add_new_incinerator_map_zone_buildings.sql`, `V25__add_pad_tent_warehouse_map_zone_building.sql`, `V26__add_fire_sprinkler.sql`, `V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql`, `V28__add_fire_sprinkler_qr_mobile_fields.sql`, `V29__add_other_equipment_qr_menu.sql`, `V30__move_fire_qr_to_facility_root.sql` 순서 적용 후 메뉴관리/접근권한, 신규 도면 구역, 스프링클러 목록/QR/모바일 점검, 기타설비 QR 메뉴 노출 검증
+- `설비관리시스템 > 도면 (메인)`, `설비관리시스템 > 층별 도면`, `설비관리시스템 > QR코드`, `소방설비`, `기타설비`의 사이드바 정렬과 권한별 표시 확인
 - 에어컨/정수기 실데이터 등록 후 공통 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장
 - 스프링클러 QR 미등록 등록, 등록 QR 점검 저장, PC 목록/점검 이력 반영을 운영 계정으로 통합 검증
