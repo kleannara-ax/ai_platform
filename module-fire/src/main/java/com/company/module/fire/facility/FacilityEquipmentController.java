@@ -58,7 +58,7 @@ public class FacilityEquipmentController {
     }
 
     @GetMapping("/qr/list")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_QR')")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_QR') or @coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_QR')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFacilityQrList(
             @RequestParam(required = false) Long buildingId,
             @RequestParam(required = false) Long floorId) {
