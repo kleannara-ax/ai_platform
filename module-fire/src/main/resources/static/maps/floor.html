@@ -344,17 +344,41 @@
   function authHeaders(extra = {}, method = 'GET') {
     return window.FireWebCsrf?.headers({ ...extra }, method) || { ...extra };
   }
-  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('fireweb_user') || 'null'); } catch (_) { return null; } })();
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('fireweb_user') || localStorage.getItem('fw_user') || 'null'); } catch (_) { return null; } })();
+  let canFireEdit = false;
+  let canOtherEdit = false;
   let canEdit = false;
+  function isCurrentUserListed(extraValue1) {
+    if (!currentUser?.loginId) return false;
+    return String(extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean).includes(currentUser.loginId);
+  }
+  function isOtherAssetType(type) {
+    return type === 'aircon' || type === 'water';
+  }
+  function canEditType(type) {
+    return isOtherAssetType(type) ? canOtherEdit : canFireEdit;
+  }
+  function refreshCurrentEditPermission() {
+    canEdit = state.domainType === 'other' || isOtherAssetType(state.selectedAssetType) ? canOtherEdit : canFireEdit;
+    return canEdit;
+  }
   async function loadFireAdminPermission() {
     try {
       if (!currentUser?.loginId) return;
       const res = await fetch('/api/codes/lookup/FIRE_PERM', { headers: authHeaders() });
       const json = await res.json().catch(() => null);
       const fireAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'FIRE_ADMIN') : null;
-      const ids = String(fireAdmin?.extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean);
-      canEdit = ids.includes(currentUser.loginId);
+      canFireEdit = isCurrentUserListed(fireAdmin?.extraValue1);
     } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+  }
+  async function loadOtherAdminPermission() {
+    try {
+      if (!currentUser?.loginId) return;
+      const res = await fetch('/api/codes/lookup/OTHER_PERM', { headers: authHeaders() });
+      const json = await res.json().catch(() => null);
+      const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
+      canOtherEdit = isCurrentUserListed(otherAdmin?.extraValue1);
+    } catch(e) { console.warn('OTHER_ADMIN 권한 조회 실패', e); }
   }
 
   const FIRE_ASSETS = [
@@ -526,8 +550,9 @@
     });
   }
   function updateActionButtons(){
+    refreshCurrentEditPermission();
     const ids = ['addAssetBtn'];
-    ids.forEach(id => { const el = $(id); if (el) { el.disabled = !canEdit; el.title = canEdit ? '' : '권한이 필요합니다.'; } });
+    ids.forEach(id => { const el = $(id); if (el) { el.disabled = !canEdit; el.style.display = canEdit ? '' : 'none'; el.title = canEdit ? '' : '권한이 필요합니다.'; } });
     const add = $('addAssetBtn'); if (add) add.textContent = `${assetLabel(state.selectedAssetType)} 추가`;
     applyEditVisibility();
   }
@@ -738,7 +763,7 @@
     };
   }
   function openAddAt(type, x, y){
-    if (!canEdit) return alert('권한이 필요합니다.');
+    if (!canEditType(type)) return alert('권한이 필요합니다.');
     const current = state.current;
     if (!current) return alert('현재 도면을 먼저 선택하세요.');
     const ids = numericCurrentIds();
@@ -753,13 +778,13 @@
     if (page) return openActionModal(`${page}?${params.toString()}`);
   }
   function openAddSelected(){
-    if (!canEdit) return alert('권한이 필요합니다.');
+    if (!canEditType(state.selectedAssetType)) return alert('권한이 필요합니다.');
     state.addMode = state.selectedAssetType;
     planWrap.classList.add('add-mode');
     alert(`${assetLabel(state.selectedAssetType)}를 추가할 위치를 도면에서 클릭하세요.`);
   }
   function openAssetAction(action, type = state.selectedAssetType, item = getSelectedItem()){
-    if ((action === 'edit' || action === 'inspect') && !canEdit) return alert('권한이 필요합니다.');
+    if ((action === 'edit' || action === 'inspect') && !canEditType(type)) return alert('권한이 필요합니다.');
     const id = getAssetId(item, type);
     if (!id) return alert(`먼저 ${assetLabel(type)} 설비를 선택하세요.`);
     if (type === 'ext') return window.FireWebExtinguisherModal?.open({ mode: action === 'details' ? 'details' : action, id, onClose: async ({mode, reason}) => { if (reason !== 'dismiss' && mode !== 'details') await refreshAfterAction(); } });
@@ -773,7 +798,7 @@
     openActionModal(`${page}?${params.toString()}`);
   }
   async function deleteSelected(type = state.selectedAssetType, item = getSelectedItem()){
-    if (!canEdit) return alert('권한이 필요합니다.');
+    if (!canEditType(type)) return alert('권한이 필요합니다.');
     const id = getAssetId(item, type);
     if (!id) return alert(`삭제할 ${assetLabel(type)} 설비를 먼저 선택하세요.`);
     if (!confirm(`${assetLabel(type)} #${id}를 삭제하시겠습니까?`)) return;
@@ -783,7 +808,7 @@
     state.selectedAssetId = null; hideInfo(); await refreshAfterAction();
   }
   function clearSelectedCoord(){
-    if (!canEdit) return alert('권한이 필요합니다.');
+    if (!canEditType(state.selectedAssetType)) return alert('권한이 필요합니다.');
     const item = getSelectedItem();
     if (!item) return alert('좌표를 초기화할 설비를 먼저 선택하세요.');
     item.x = null; item.y = null; hideInfo(); renderList(); renderMarkers();
@@ -815,6 +840,7 @@
 
   async function load(){
     await loadFireAdminPermission();
+    await loadOtherAdminPermission();
     state.domainType = qs.get('domainType') === 'other' ? 'other' : state.domainType;
     if (qs.get('assetType')) state.selectedAssetType = qs.get('assetType');
     const [exts, hyds, sprinklers, receivers, pumps, airConditioners, waterPurifiers] = await Promise.all([
@@ -878,9 +904,6 @@
     syncBuildingFloorSelectors(); syncCurrentFloor(false);
     renderAccountMenu(); window.FireWebNav?.mount?.(); updateActionButtons();
     applyEditVisibility();
-    if (!canEdit) {
-      document.querySelectorAll('a[href*="/qr"]').forEach(el => { const li = el.closest('li.nav-item'); if (li) li.style.display='none'; else el.style.display='none'; });
-    }
     focusRequestedMarkerFromQuery();
   }
   async function refreshAfterAction(){
@@ -921,7 +944,7 @@
   });
   assetSelect?.addEventListener('change', () => { state.selectedAssetType = assetSelect.value; state.selectedAssetId = null; hideInfo(); resetAddMode(); updateActionButtons(); updatePlanTitle(); renderList(); renderMarkers(); replaceCurrentHistory(); });
   planImg.addEventListener('click', (e) => {
-    if (!canEdit) return;
+    if (!state.addMode || !canEditType(state.addMode)) return;
     if (state.addMode) {
       const rect = planImg.getBoundingClientRect(); if (!rect.width || !rect.height) return;
       const x = ((e.clientX - rect.left) / rect.width) * 100, y = ((e.clientY - rect.top) / rect.height) * 100;

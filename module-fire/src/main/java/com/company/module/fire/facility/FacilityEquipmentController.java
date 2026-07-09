@@ -58,7 +58,7 @@ public class FacilityEquipmentController {
     }
 
     @GetMapping("/qr/list")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_QR') or @coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'FIRE_QR')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFacilityQrList(
             @RequestParam(required = false) Long buildingId,
             @RequestParam(required = false) Long floorId) {
@@ -81,25 +81,25 @@ public class FacilityEquipmentController {
     }
 
     @PostMapping("/air-conditioners")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> saveAirConditioner(@Valid @RequestBody FacilityEquipmentSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.saveEquipment(FacilityEquipmentService.CATEGORY_AIRCON, request)));
     }
 
     @PostMapping("/water-purifiers")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> saveWaterPurifier(@Valid @RequestBody FacilityEquipmentSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.saveEquipment(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, request)));
     }
 
     @PostMapping("/air-conditioners/{id}/image")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadAirConditionerImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         return uploadImage(FacilityEquipmentService.CATEGORY_AIRCON, "air-conditioners", id, file);
     }
 
     @PostMapping("/water-purifiers/{id}/image")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadWaterPurifierImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         return uploadImage(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, "water-purifiers", id, file);
     }
@@ -131,70 +131,70 @@ public class FacilityEquipmentController {
     }
 
     @PostMapping("/air-conditioners/inspect")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> inspectAirConditioner(@Valid @RequestBody FacilityEquipmentInspectRequest request, Principal principal) {
         inspect(FacilityEquipmentService.CATEGORY_AIRCON, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PostMapping("/water-purifiers/inspect")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> inspectWaterPurifier(@Valid @RequestBody FacilityEquipmentInspectRequest request, Principal principal) {
         inspect(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PostMapping("/air-conditioners/{id}/inspections")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> addAirConditionerInspection(@PathVariable Long id, @Valid @RequestBody FacilityEquipmentInspectionUpdateRequest request, Principal principal) {
         addInspection(FacilityEquipmentService.CATEGORY_AIRCON, id, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PostMapping("/water-purifiers/{id}/inspections")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> addWaterPurifierInspection(@PathVariable Long id, @Valid @RequestBody FacilityEquipmentInspectionUpdateRequest request, Principal principal) {
         addInspection(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PatchMapping("/air-conditioners/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> updateAirConditionerInspection(@PathVariable Long id, @PathVariable Long inspectionId, @Valid @RequestBody FacilityEquipmentInspectionUpdateRequest request, Principal principal) {
         updateInspection(FacilityEquipmentService.CATEGORY_AIRCON, id, inspectionId, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PatchMapping("/water-purifiers/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> updateWaterPurifierInspection(@PathVariable Long id, @PathVariable Long inspectionId, @Valid @RequestBody FacilityEquipmentInspectionUpdateRequest request, Principal principal) {
         updateInspection(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id, inspectionId, request, principal);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @DeleteMapping("/air-conditioners/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> deleteAirConditionerInspection(@PathVariable Long id, @PathVariable Long inspectionId) {
         facilityEquipmentService.deleteInspection(FacilityEquipmentService.CATEGORY_AIRCON, id, inspectionId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @DeleteMapping("/water-purifiers/{id}/inspections/{inspectionId}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> deleteWaterPurifierInspection(@PathVariable Long id, @PathVariable Long inspectionId) {
         facilityEquipmentService.deleteInspection(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id, inspectionId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @DeleteMapping("/air-conditioners/{id}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_AIRCON')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> deleteAirConditioner(@PathVariable Long id) {
         facilityEquipmentService.deleteEquipment(FacilityEquipmentService.CATEGORY_AIRCON, id);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     @DeleteMapping("/water-purifiers/{id}")
-    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'OTHER_WATER_PURIFIER')")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
     public ResponseEntity<ApiResponse<Void>> deleteWaterPurifier(@PathVariable Long id) {
         facilityEquipmentService.deleteEquipment(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id);
         return ResponseEntity.ok(ApiResponse.success());

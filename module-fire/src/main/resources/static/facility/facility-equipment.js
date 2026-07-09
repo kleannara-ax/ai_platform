@@ -55,7 +55,29 @@
   })();
 
   const initialQuery = new URLSearchParams(location.search || '');
-  const canEdit = () => API.canManage();
+  let hasOtherAdminPermission = false;
+  const canEdit = () => hasOtherAdminPermission;
+  const isCurrentUserListed = (extraValue1) => {
+    const user = API.getUser();
+    if (!user?.loginId) return false;
+    return String(extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean).includes(user.loginId);
+  };
+  async function loadOtherAdminPermission() {
+    hasOtherAdminPermission = false;
+    try {
+      const res = await API.req('/api/codes/lookup/OTHER_PERM');
+      const json = res && res.ok ? await res.json().catch(() => null) : null;
+      const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
+      hasOtherAdminPermission = isCurrentUserListed(otherAdmin?.extraValue1);
+    } catch (e) {
+      console.warn('OTHER_ADMIN 권한 조회 실패', e);
+    }
+  }
+  function requireEditPermission() {
+    if (canEdit()) return true;
+    alert('기타시설관리 권한이 필요합니다.');
+    return false;
+  }
   const isFloorEmbed = () => initialQuery.get('returnTo') === 'floor' || ['embedAdd','embedEdit','embedInspect','embedDetails'].some(k => initialQuery.get(k) === '1');
   function postFloorMessage(type) {
     if (!isFloorEmbed()) return;
@@ -352,14 +374,40 @@
     return json.data;
   }
 
+  function detailQrType() {
+    return isWaterPurifierPage() ? 'water' : 'aircon';
+  }
+
+  function detailQrImageUrl(qrKey) {
+    return `/fire-api/qr/image?type=${encodeURIComponent(detailQrType())}&id=${encodeURIComponent(qrKey || '')}`;
+  }
+
+  function renderDetailPhotoSection(d) {
+    const imageAlt = `${label} 사진`;
+    const body = d.imagePath
+      ? `<div class="fw-media-box text-center"><img src="${esc(d.imagePath)}" alt="${esc(imageAlt)}" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.closest('.fw-media-box').innerHTML='<div class=&quot;fw-empty-box&quot;>사진을 불러오지 못했습니다.</div>'"></div>`
+      : '<div class="fw-empty-box">등록된 사진이 없습니다.</div>';
+    return `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>사진</strong><span>사용자가 업로드한 사진</span></div>${body}</div>`;
+  }
+
+  function renderDetailQrSection(d) {
+    if (!canEdit()) return '';
+    const qrKey = d.qrKey || d.serialNumber || d.equipmentId;
+    if (!qrKey) {
+      return '<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong><span>OTHER_ADMIN 전용</span></div><div class="fw-empty-box">QR 키 정보가 없습니다.</div></div>';
+    }
+    return `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong><span>OTHER_ADMIN 전용</span></div><div class="fw-media-box text-center"><img src="${detailQrImageUrl(qrKey)}" alt="${esc(label)} QR코드" class="img-fluid rounded js-zoomable" style="width:220px;height:220px;object-fit:contain;background:#fff" loading="lazy"><div class="small text-muted fw-bold mt-2">${esc(qrKey)}</div></div></div>`;
+  }
+
   async function openDetails(id) {
     const d = await getDetail(id); if (!d) return;
     const plan = await fetchPlanImage(d.buildingId, d.floorId, d.buildingName, d.floorName);
     const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
     const typeDetail = isSimpleWaterPurifier() ? '' : detailItem(CFG.typeLabel || '종류', d.equipmentType);
     const noteBox = (!isSimpleWaterPurifier() && d.note) ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : '';
-    const imageSection = d.imagePath ? `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>업로드 이미지</strong><span>사용자가 업로드한 이미지</span></div><div class="fw-media-box text-center"><img src="${esc(d.imagePath)}" alt="${esc(label)} 업로드 이미지" class="img-fluid rounded shadow js-zoomable" style="max-height:300px;object-fit:contain" onerror="this.closest('.fw-edit-section')?.remove()"></div></div>` : '';
-    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div></div><div class="col-lg-6 d-flex flex-column gap-3">${imageSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative" id="detailPlanWrap" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
+    const photoSection = renderDetailPhotoSection(d);
+    const qrSection = renderDetailQrSection(d);
+    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div></div><div class="col-lg-6 d-flex flex-column gap-3">${photoSection}${qrSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative" id="detailPlanWrap" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
     bootstrapModal('detailsModal')?.show();
     if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, markerImage(d.equipmentType)), 80);
   }
@@ -392,6 +440,7 @@
   }
 
   async function openUpsert(id = 0, preset = {}) {
+    if (!requireEditPermission()) return;
     state.editingId = Number(id || 0); state.selectedCoord = null;
     $('upsertTitle').textContent = state.editingId ? `${label} 수정` : `${label} 등록`;
     $('equipmentId').value = state.editingId || '';
@@ -460,6 +509,7 @@
   }
 
   async function saveEquipment() {
+    if (!requireEditPermission()) return;
     const payload = {
       equipmentId: state.editingId || null,
       buildingId: Number($('buildingSel').value),
@@ -494,12 +544,14 @@
   }
 
   async function uploadImage(id, file) {
+    if (!requireEditPermission()) return;
     const fd = new FormData(); fd.append('file', file);
     const res = await API.req(`${apiBase}/${encodeURIComponent(id)}/image`, { method: 'POST', body: fd });
     if (!res || !res.ok) { const t = await res?.text().catch(() => ''); alert(t || '이미지 업로드 실패'); }
   }
 
   async function inspectEquipment() {
+    if (!requireEditPermission()) return;
     const isFaulty = $('inspectBad').checked; const faultReason = $('inspectFaultReason').value.trim();
     if (isFaulty && !faultReason) return alert('점검 사유를 입력하세요.');
     const res = await API.req(`${apiBase}/inspect`, { method: 'POST', body: { equipmentId: state.inspectId, inspectionDate: $('inspectDate').value || today(), faulty: isFaulty, faultReason } }); if (!res) return;
@@ -510,6 +562,7 @@
   }
 
   async function saveHistoryRow(tr, mode) {
+    if (!requireEditPermission()) return;
     const inspectionDate = tr.querySelector('.js-h-date')?.value; const isFaulty = tr.querySelector('.js-h-faulty')?.value === 'true'; const faultReason = tr.querySelector('.js-h-reason')?.value || '';
     if (!inspectionDate) return alert('점검일을 입력하세요.'); if (isFaulty && !faultReason.trim()) return alert('점검 사유를 입력하세요.');
     const url = mode === 'add' ? `${apiBase}/${state.editingId}/inspections` : `${apiBase}/${state.editingId}/inspections/${tr.dataset.id}`;
@@ -520,6 +573,7 @@
   }
 
   async function deleteHistoryRow(tr) {
+    if (!requireEditPermission()) return;
     if (!confirm('점검 이력을 삭제할까요?')) return;
     const res = await API.req(`${apiBase}/${state.editingId}/inspections/${tr.dataset.id}`, { method: 'DELETE' }); const json = res && await res.json().catch(() => null);
     if (!res || !res.ok || json?.success === false) return alert(json?.message || '점검 이력 삭제 실패');
@@ -527,6 +581,7 @@
   }
 
   async function deleteEquipment(id, serial) {
+    if (!requireEditPermission()) return;
     if (!confirm(`${serial || label} 항목을 삭제할까요?`)) return;
     const res = await API.req(`${apiBase}/${encodeURIComponent(id)}`, { method: 'DELETE' }); const json = res && await res.json().catch(() => null);
     if (!res || !res.ok || json?.success === false) return alert(json?.message || '삭제 실패');
@@ -538,9 +593,9 @@
     document.addEventListener('click', async (e) => {
       const sort = e.target.closest('.js-sort'); if (sort) { const key = sort.dataset.key; if (state.sort.key === key) state.sort.direction = state.sort.direction === 'asc' ? 'desc' : 'asc'; else state.sort = { key, direction: 'asc' }; renderTable(filteredItems()); return; }
       const detail = e.target.closest('.js-detail'); if (detail && !e.target.closest('button')) return openDetails(detail.dataset.id);
-      const edit = e.target.closest('.js-edit'); if (edit) { e.stopPropagation(); return openUpsert(edit.dataset.id); }
-      const insp = e.target.closest('.js-inspect'); if (insp) { e.stopPropagation(); state.inspectId = Number(insp.dataset.id); $('inspectDate').value = today(); $('inspectOk').checked = true; $('inspectFaultReason').value = ''; $('inspectPhoto').value = ''; return bootstrapModal('inspectModal')?.show(); }
-      const del = e.target.closest('.js-delete'); if (del) { e.stopPropagation(); return deleteEquipment(del.dataset.id, del.dataset.serial); }
+      const edit = e.target.closest('.js-edit'); if (edit) { e.stopPropagation(); if (!requireEditPermission()) return; return openUpsert(edit.dataset.id); }
+      const insp = e.target.closest('.js-inspect'); if (insp) { e.stopPropagation(); if (!requireEditPermission()) return; state.inspectId = Number(insp.dataset.id); $('inspectDate').value = today(); $('inspectOk').checked = true; $('inspectFaultReason').value = ''; $('inspectPhoto').value = ''; return bootstrapModal('inspectModal')?.show(); }
+      const del = e.target.closest('.js-delete'); if (del) { e.stopPropagation(); if (!requireEditPermission()) return; return deleteEquipment(del.dataset.id, del.dataset.serial); }
       const zoom = e.target.closest('.js-zoomable'); if (zoom) { $('zoomImage').src = zoom.src; return bootstrapModal('imageZoomModal')?.show(); }
       const addH = e.target.closest('.js-h-add'); if (addH) return saveHistoryRow(addH.closest('tr'), 'add');
       const saveH = e.target.closest('.js-h-save'); if (saveH) return saveHistoryRow(saveH.closest('tr'), 'save');
@@ -568,6 +623,7 @@
     const editId = params.get('edit');
     const inspectId = params.get('inspect');
     if (addRequested) {
+      if (!requireEditPermission()) return;
       await openUpsert(0, {
         buildingId: params.get('buildingId') || '',
         floorId: params.get('floorId') || '',
@@ -589,10 +645,12 @@
       alert('해당 QR 설비를 찾을 수 없습니다.');
     }
     if (editId) {
+      if (!requireEditPermission()) return;
       await openUpsert(editId);
       return;
     }
     if (inspectId) {
+      if (!requireEditPermission()) return;
       state.inspectId = Number(inspectId);
       $('inspectDate').value = today();
       $('inspectOk').checked = true;
@@ -603,6 +661,7 @@
   }
 
   async function init() {
+    await loadOtherAdminPermission();
     renderShell(); applyEmbeddedShell(); bindEvents(); fillTypeOptions();
     await loadOptions(); await loadList();
     await handleInitialAction();

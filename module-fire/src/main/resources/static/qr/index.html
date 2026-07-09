@@ -313,6 +313,7 @@
   let latestListData = {};
   let buildingFloors = [];  /* [{buildingId, buildingName, floors:[{floorId,floorName},...]}] */
   let isFireAdmin = false; /* FIRE_ADMIN 아이디 기반 권한 */
+  let isOtherAdmin = false; /* OTHER_ADMIN 아이디 기반 권한 */
   let spkQrZoomScale = 1;
   let spkQrZoomPanX = 0;
   let spkQrZoomPanY = 0;
@@ -345,7 +346,7 @@
         return null;
       }
       if (res.status === 403) {
-        window.location.href = '/fire-map.html';
+        console.warn('[QR] forbidden:', url);
         return null;
       }
       return res.json();
@@ -368,8 +369,32 @@
     return currentUser?.canManage !== false;
   }
 
-  function canAccessQr() {
-    return isFireAdmin;
+  function isCurrentUserListed(extraValue1) {
+    if (!currentUser?.loginId) return false;
+    return String(extraValue1 || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .includes(currentUser.loginId);
+  }
+
+  function canAccessGroup(groupKey) {
+    if (groupKey === 'fire') return isFireAdmin;
+    if (groupKey === 'other') return isOtherAdmin;
+    return false;
+  }
+
+  function getAccessibleGroups() {
+    return Object.values(EQUIPMENT_GROUPS).filter(group => canAccessGroup(group.key));
+  }
+
+  function ensureAccessibleSelection() {
+    const groups = getAccessibleGroups();
+    if (!groups.length) return false;
+    if (!canAccessGroup(currentGroup)) currentGroup = groups[0].key;
+    const keys = EQUIPMENT_GROUPS[currentGroup]?.keys || [];
+    if (!keys.includes(currentEquip)) currentEquip = keys[0] || '';
+    return Boolean(currentEquip);
   }
 
   async function loadFireAdminPermission() {
@@ -378,11 +403,20 @@
       if (res?.data) {
         const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
         if (fireAdmin?.extraValue1) {
-          const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
-          isFireAdmin = ids.includes(currentUser?.loginId);
+          isFireAdmin = isCurrentUserListed(fireAdmin.extraValue1);
         }
       }
     } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+  }
+
+  async function loadOtherAdminPermission() {
+    try {
+      const res = await apiFetch('/api/codes/lookup/OTHER_PERM');
+      if (res?.data) {
+        const otherAdmin = res.data.find(d => d.code === 'OTHER_ADMIN');
+        isOtherAdmin = isCurrentUserListed(otherAdmin?.extraValue1);
+      }
+    } catch(e) { console.warn('OTHER_ADMIN 권한 조회 실패', e); }
   }
 
   function qrImgUrl(type, id) {
@@ -453,13 +487,18 @@
   function renderMenu() {
     const categoryMenu = document.getElementById('equipCategoryMenu');
     if (categoryMenu) {
-      categoryMenu.innerHTML = Object.values(EQUIPMENT_GROUPS).map(function (group) {
+      const groups = getAccessibleGroups();
+      categoryMenu.innerHTML = groups.map(function (group) {
         return '<button type="button" class="category-btn' + (currentGroup === group.key ? ' active' : '') + '" data-group="' + group.key + '">' + group.label + '</button>';
       }).join('');
     }
 
     const menu = document.getElementById('equipMenu');
     if (!menu) return;
+    if (!ensureAccessibleSelection()) {
+      menu.innerHTML = '';
+      return;
+    }
     const groupKeys = EQUIPMENT_GROUPS[currentGroup]?.keys || [];
     menu.innerHTML = groupKeys.map((key) => {
       const item = EQUIPMENT[key];
@@ -479,6 +518,14 @@
     const registeredWrap = document.getElementById('registeredWrap');
     const unregisteredSection = document.getElementById('unregisteredSection');
     const unregisteredWrap = document.getElementById('unregisteredWrap');
+    if (!conf || !canAccessGroup(conf.group)) {
+      registeredWrap.className = 'empty-state';
+      registeredWrap.style.display = '';
+      registeredWrap.innerHTML = '표시할 수 있는 QR 설비 권한이 없습니다.';
+      unregisteredSection.style.display = 'none';
+      unregisteredWrap.innerHTML = '';
+      return;
+    }
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
     const gridEquipKey = conf.key || currentEquip;
 
@@ -582,7 +629,19 @@
 
   async function loadData() {
     try {
+      if (!ensureAccessibleSelection()) {
+        latestListData = {};
+        renderMenu();
+        renderCurrentSection([]);
+        return;
+      }
       const conf = EQUIPMENT[currentEquip];
+      if (!conf || !canAccessGroup(conf.group)) {
+        latestListData = {};
+        renderMenu();
+        renderCurrentSection([]);
+        return;
+      }
       const buildingId = document.getElementById('filterBuilding').value;
       const floorId = document.getElementById('filterFloor').value;
       const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
@@ -824,6 +883,8 @@
 
   function openQrDetails(type, id, qrKey) {
     if (!type) return;
+    const group = EQUIPMENT[type]?.group || (type === 'aircon' || type === 'water' ? 'other' : 'fire');
+    if (!canAccessGroup(group)) return;
     if (type === 'aircon' || type === 'water') {
       if (!qrKey) return;
       const path = type === 'aircon' ? '/minspection/air-conditioners/' : '/minspection/water-purifiers/';
@@ -861,7 +922,7 @@
       const btn = event.target.closest('.category-btn[data-group]');
       if (!btn) return;
       const nextGroup = btn.dataset.group;
-      if (!EQUIPMENT_GROUPS[nextGroup]) return;
+      if (!EQUIPMENT_GROUPS[nextGroup] || !canAccessGroup(nextGroup)) return;
       currentGroup = nextGroup;
       currentEquip = EQUIPMENT_GROUPS[nextGroup].keys[0] || currentEquip;
       document.getElementById('unregisteredCount').value = '0';
@@ -873,6 +934,7 @@
       if (!btn) return;
       currentEquip = btn.dataset.equip;
       currentGroup = EQUIPMENT[currentEquip]?.group || currentGroup;
+      if (!canAccessGroup(currentGroup)) return;
       updateFilterMode();
       loadData();
     });
@@ -963,13 +1025,17 @@
       return;
     }
     await loadFireAdminPermission();
-    if (!canAccessQr()) {
-      window.location.href = '/fire-map.html';
-      return;
-    }
+    await loadOtherAdminPermission();
+    ensureAccessibleSelection();
     renderNav();
     renderMenu();
     bindEvents();
+    if (!getAccessibleGroups().length) {
+      document.querySelector('.filter-grid')?.setAttribute('hidden', 'hidden');
+      document.getElementById('btnPrint')?.setAttribute('hidden', 'hidden');
+      renderCurrentSection([]);
+      return;
+    }
     await loadFilters();
     updateFilterMode();
     await loadData();

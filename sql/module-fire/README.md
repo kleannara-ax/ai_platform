@@ -20,6 +20,18 @@
 | `V18__add_fire_equipment_image_paths.sql` | 수신기/소방펌프 대표사진 경로 컬럼 추가 |
 | `V19__simplify_facility_water_purifier_fields.sql` | 정수기 입력 단순화: 종류를 '정수기'로 통일하고 설치일/건물/층/X/Y 중심 정책 정리 |
 | `V20__fix_facility_role_duplicates.sql` | 운영 DB 역할 공통코드 중복 보정: 기존 소방시설관리 유지, 시설관리/기타시설관리 역할명 정리 |
+| `V21__normalize_facility_menu_structure.sql` | 설비관리시스템 메뉴 구조 정규화 |
+| `V22__add_new_map_zone_buildings.sql` | 신규 도면 구역 건물 추가 |
+| `V23__add_fluidized_bed_incinerator_map_zone.sql` | 유동상소각로 도면 구역 추가 |
+| `V24__add_new_incinerator_map_zone_buildings.sql` | 신설소각로 구역 건물/층 추가 |
+| `V25__add_pad_tent_warehouse_map_zone_building.sql` | 패드동 천막창고 구역 추가 |
+| `V26__add_fire_sprinkler.sql` | 스프링클러 마스터/점검/메뉴 추가 |
+| `V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql` | 스프링클러 메뉴명 및 레거시 경로 보정 |
+| `V28__add_fire_sprinkler_qr_mobile_fields.sql` | 스프링클러 QR/모바일 필드 추가 |
+| `V29__add_other_equipment_qr_menu.sql` | 기타설비 QR 메뉴 및 목록 API 기반 추가 |
+| `V30__move_fire_qr_to_facility_root.sql` | QR코드 메뉴를 설비관리시스템 공통 메뉴로 이동 |
+| `V31__add_facility_mobile_qr_workflows.sql` | 에어컨 고장 접수/정수기 소독 완료 모바일 QR 업무 테이블 추가 |
+| `V32__add_other_facility_admin_code_group.sql` | 기타시설관리 권한 공통코드 `OTHER_PERM/OTHER_ADMIN` 추가 |
 
 ## 실행 순서
 
@@ -38,6 +50,18 @@
 12. V18__add_fire_equipment_image_paths.sql -- 수신기/소방펌프 대표사진 컬럼 추가
 13. V19__simplify_facility_water_purifier_fields.sql -- 정수기 입력 단순화 및 기타설비 컬럼 주석 정리
 14. V20__fix_facility_role_duplicates.sql -- ROLE 공통코드 중복 보정 및 시설관리/소방시설관리/기타시설관리 역할명 정리
+15. V21__normalize_facility_menu_structure.sql -- 설비관리시스템 메뉴 구조 정규화
+16. V22__add_new_map_zone_buildings.sql -- 신규 도면 구역 건물 추가
+17. V23__add_fluidized_bed_incinerator_map_zone.sql -- 유동상소각로 도면 구역 추가
+18. V24__add_new_incinerator_map_zone_buildings.sql -- 신설소각로 구역 건물/층 추가
+19. V25__add_pad_tent_warehouse_map_zone_building.sql -- 패드동 천막창고 구역 추가
+20. V26__add_fire_sprinkler.sql -- 스프링클러 테이블/메뉴 추가
+21. V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql -- 스프링클러 메뉴명/경로 보정
+22. V28__add_fire_sprinkler_qr_mobile_fields.sql -- 스프링클러 QR/모바일 필드 추가
+23. V29__add_other_equipment_qr_menu.sql -- 기타설비 QR 메뉴 추가
+24. V30__move_fire_qr_to_facility_root.sql -- QR 메뉴 공통 위치 이동
+25. V31__add_facility_mobile_qr_workflows.sql -- 기타설비 모바일 QR 업무 테이블 추가
+26. V32__add_other_facility_admin_code_group.sql -- 기타시설관리 권한 공통코드 추가
 ```
 
 ## 사전 조건
@@ -70,6 +94,18 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V18__add_fire_equipment_image_paths.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V19__simplify_facility_water_purifier_fields.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V20__fix_facility_role_duplicates.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V21__normalize_facility_menu_structure.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V22__add_new_map_zone_buildings.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V23__add_fluidized_bed_incinerator_map_zone.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V24__add_new_incinerator_map_zone_buildings.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V25__add_pad_tent_warehouse_map_zone_building.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V26__add_fire_sprinkler.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V28__add_fire_sprinkler_qr_mobile_fields.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V29__add_other_equipment_qr_menu.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V30__move_fire_qr_to_facility_root.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V31__add_facility_mobile_qr_workflows.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V32__add_other_facility_admin_code_group.sql
 ```
 
 ## 테이블 구조
@@ -90,6 +126,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 | `fire_pump_inspection` | 소방펌프 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
 | `facility_equipment` | 기타설비(에어컨/정수기) 마스터. 에어컨은 종류/제조사/상세 위치/실외기 대수/제조·설치일을 사용하고, 정수기는 종류를 '정수기'로 고정하며 설치일/건물/층/X/Y 좌표만 사용자 입력으로 사용 | - |
 | `facility_equipment_inspection` | 기타설비 점검 이력 | IS_FAULTY + FAULT_REASON |
+| `facility_aircon_fault_report` | 에어컨 모바일 QR 고장 접수 이력 | 고장 내용 + 선택 사진 |
+| `facility_water_disinfection` | 정수기 모바일 QR 소독 완료 이력 | 완료일 + 작업자 + 필수 사진 |
 
 ### 점검 방식 차이점
 
@@ -109,6 +147,10 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 
 ### 관리자 계정
 - ID: `admin` / PW: `admin1234` / 역할: `ADMIN`
+
+### 공통코드 권한
+- `FIRE_PERM/FIRE_ADMIN`: 소방시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다.
+- `OTHER_PERM/OTHER_ADMIN`: 기타시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 점검/이력 관리 버튼과 API를 사용할 수 있습니다.
 
 ### 건물 마스터 (10개)
 | ID | 건물명 |
