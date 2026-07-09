@@ -215,11 +215,18 @@
     return '<div class="col-12"><label class="form-label fw-bold">비고</label><textarea class="form-control" id="note" rows="2"></textarea></div><div class="col-12"><label class="form-label fw-bold">업로드 이미지</label><input type="file" class="form-control" id="photo" accept="image/*"><div class="form-text">저장 후 사용자가 업로드한 이미지로 저장되며, 기존 업로드 이미지는 1장 정책에 따라 갱신됩니다.</div></div>';
   }
 
+  function renderInspectModal() {
+    if (isAirconPage()) {
+      return `<div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검 요청</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>고장 접수</strong><span>접수자 이름, 소속, 고장내용만 입력합니다.</span></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">접수자 이름</label><input type="text" class="form-control" id="faultReporterName" maxlength="100" placeholder="선택 입력"></div><div class="col-md-6"><label class="form-label fw-bold">소속</label><input type="text" class="form-control" id="faultReporterDepartment" maxlength="100" placeholder="선택 입력"></div><div class="col-12"><label class="form-label fw-bold">고장내용 <span class="text-danger">*</span></label><textarea class="form-control" id="faultDescription" rows="5" maxlength="1000" placeholder="예: 냉방이 되지 않음, 물 샘, 소음 발생 등" required></textarea></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-primary" id="btnConfirmInspect">점검 요청 접수</button></div></div></div></div>`;
+    }
+    return `<div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 사용자가 업로드한 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>`;
+  }
+
   function renderModals() {
     return `
       <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="detailsModalBody"></div></div></div></div>
       <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1400px)"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img id="zoomImage" alt="확대 이미지" style="max-width:100%;max-height:84vh;object-fit:contain"></div></div></div></div>
-      <div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 사용자가 업로드한 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>
+      ${renderInspectModal()}
       <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span></div></div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
   }
 
@@ -330,20 +337,23 @@
       const typeCell = isSimpleWaterPurifier() ? '' : `<td><div class="fw-semibold text-truncate" title="${esc(it.equipmentType || '')}">${esc(it.equipmentType || '-')}</div>${isAirconPage() ? `<div class="small text-muted mt-1">${esc([it.manufacturer, it.locationDescription, it.outdoorUnitCount ? '실외기 ' + outdoorUnitCount(it.outdoorUnitCount) + '대' : ''].filter(Boolean).join(' · ') || '-')}</div>` : ''}</td>`;
       const coordCell = isSimpleWaterPurifier() ? `<td>${it.x != null && it.y != null ? `X ${Number(it.x).toFixed(2)} / Y ${Number(it.y).toFixed(2)}` : '-'}</td>` : '';
       const noteCell = isSimpleWaterPurifier() ? '' : `<td class="text-truncate" title="${esc(it.note || '')}">${esc(it.note || '-')}</td>`;
+      const inspectionCells = isAirconPage() ? '' : `<td>${fmtDate(it.lastInspectionDate)}</td><td class="text-truncate" title="${esc(it.lastInspectorName || '')}">${esc(it.lastInspectorName || '-')}</td>`;
+      const requestButton = isAirconPage()
+        ? `<button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검 요청</button>`
+        : `<button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검</button>`;
       return `<tr class="clickable-row js-detail" data-id="${it.equipmentId}">
         <td class="text-center">${idx + 1}</td><td class="text-center fw-bold">${esc(it.serialNumber || '-')}</td>
         <td class="text-truncate" title="${esc(it.buildingName || '')}">${esc(it.buildingName || '-')}</td>
         <td class="text-truncate" title="${esc(it.floorName || '')}">${esc(it.floorName || '-')}</td>
-        ${typeCell}<td>${displayInstallDate(it.manufactureDate)}</td>${coordCell}<td>${fmtDate(it.lastInspectionDate)}</td>
-        <td class="text-truncate" title="${esc(it.lastInspectorName || '')}">${esc(it.lastInspectorName || '-')}</td>
+        ${typeCell}<td>${displayInstallDate(it.manufactureDate)}</td>${coordCell}${inspectionCells}
         <td>${bucket(it).inspect ? `<span class="fw-status fw-warn">${esc(inspectStatusLabel())}</span>` : '<span class="fw-status fw-ok">정상</span>'}</td>
-        ${noteCell}<td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button><button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검</button><button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td>
+        ${noteCell}<td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button>${requestButton}<button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td>
       </tr>`;
     }).join('');
     const typeHead = isSimpleWaterPurifier() ? '' : th('종류', 'equipmentType', 'width:170px');
     const coordHead = isSimpleWaterPurifier() ? th('좌표', 'rowNo', 'width:130px') : '';
     const noteHead = isSimpleWaterPurifier() ? '' : th('비고', 'note', 'width:160px');
-    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${typeHead}${th(installDateLabel(), 'manufactureDate', 'width:110px')}${coordHead}${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}${th('상태', 'lastInspectionDate', 'width:100px')}${noteHead}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${typeHead}${th(installDateLabel(), 'manufactureDate', 'width:110px')}${coordHead}${isAirconPage() ? '' : `${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}`}${th('상태', 'lastInspectionDate', 'width:100px')}${noteHead}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function markerImage(type) {
@@ -394,9 +404,9 @@
     if (!canEdit()) return '';
     const qrKey = d.qrKey || d.serialNumber || d.equipmentId;
     if (!qrKey) {
-      return '<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong><span>OTHER_ADMIN 전용</span></div><div class="fw-empty-box">QR 키 정보가 없습니다.</div></div>';
+      return '<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong></div><div class="fw-empty-box">QR 키 정보가 없습니다.</div></div>';
     }
-    return `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong><span>OTHER_ADMIN 전용</span></div><div class="fw-media-box text-center"><img src="${detailQrImageUrl(qrKey)}" data-zoom-kind="qr" alt="${esc(label)} QR코드" class="img-fluid rounded js-zoomable" style="width:220px;height:220px;object-fit:contain;background:#fff" loading="lazy"><div class="small text-muted fw-bold mt-2">${esc(qrKey)}</div></div></div>`;
+    return `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>QR코드</strong></div><div class="fw-media-box text-center"><img src="${detailQrImageUrl(qrKey)}" data-zoom-kind="qr" alt="${esc(label)} QR코드" class="img-fluid rounded js-zoomable" style="width:220px;height:220px;object-fit:contain;background:#fff" loading="lazy"><div class="small text-muted fw-bold mt-2">${esc(qrKey)}</div></div></div>`;
   }
 
   async function openDetails(id) {
@@ -405,9 +415,10 @@
     const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
     const typeDetail = isSimpleWaterPurifier() ? '' : detailItem(CFG.typeLabel || '종류', d.equipmentType);
     const noteBox = (!isSimpleWaterPurifier() && d.note) ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : '';
+    const secondarySection = isAirconPage() ? noteBox : `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div>`;
     const photoSection = renderDetailPhotoSection(d);
     const qrSection = renderDetailQrSection(d);
-    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div></div><div class="col-lg-6 d-flex flex-column gap-3">${photoSection}${qrSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong></div>${plan ? `<div class="fw-media-box position-relative js-zoomable" id="detailPlanWrap" data-zoom-src="${esc(plan)}" data-zoom-kind="plan" style="height:400px;overflow:hidden"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="position:absolute;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
+    $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div>${secondarySection}</div><div class="col-lg-6 d-flex flex-column gap-3">${photoSection}${qrSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong><span>클릭하면 확대됩니다.</span></div>${plan ? `<div class="fw-media-box position-relative js-zoomable" id="detailPlanWrap" data-zoom-src="${esc(plan)}" data-zoom-kind="plan" style="height:320px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="max-width:100%;max-height:100%;object-fit:contain;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
     bootstrapModal('detailsModal')?.show();
     if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, markerImage(d.equipmentType)), 80);
   }
@@ -444,7 +455,7 @@
     state.editingId = Number(id || 0); state.selectedCoord = null;
     $('upsertTitle').textContent = state.editingId ? `${label} 수정` : `${label} 등록`;
     $('equipmentId').value = state.editingId || '';
-    $('historySection').style.display = state.editingId ? '' : 'none';
+    $('historySection').style.display = state.editingId && !isAirconPage() ? '' : 'none';
     if ($('photo')) $('photo').value = ''; fillTypeOptions(); resetFormDefaults();
     if (state.editingId) {
       const d = await getDetail(state.editingId); if (!d) return;
@@ -551,6 +562,7 @@
   }
 
   async function inspectEquipment() {
+    if (isAirconPage()) return submitAirconFaultRequest();
     if (!requireEditPermission()) return;
     const isFaulty = $('inspectBad').checked; const faultReason = $('inspectFaultReason').value.trim();
     if (isFaulty && !faultReason) return alert('점검 사유를 입력하세요.');
@@ -559,6 +571,30 @@
     const file = $('inspectPhoto')?.files?.[0]; if (file) await uploadImage(state.inspectId, file);
     postFloorMessage('fireweb:floor-action-saved');
     bootstrapModal('inspectModal')?.hide(); showToast('점검이 완료되었습니다.'); await loadList();
+  }
+
+  async function submitAirconFaultRequest() {
+    if (!requireEditPermission()) return;
+    const item = state.items.find(it => Number(it.equipmentId) === Number(state.inspectId));
+    let qrKey = item?.qrKey || '';
+    if (!qrKey && state.inspectId) {
+      const detail = await getDetail(state.inspectId);
+      qrKey = detail?.qrKey || '';
+    }
+    if (!qrKey) return alert('점검 요청에 사용할 QR 키 정보가 없습니다.');
+    const description = $('faultDescription')?.value?.trim() || '';
+    if (!description) { $('faultDescription')?.focus(); return alert('고장내용을 입력하세요.'); }
+    const fd = new FormData();
+    fd.append('reporterName', $('faultReporterName')?.value?.trim() || '');
+    fd.append('reporterDepartment', $('faultReporterDepartment')?.value?.trim() || '');
+    fd.append('faultDescription', description);
+    const res = await API.req(`/facility-api/mobile/air-conditioners/${encodeURIComponent(qrKey)}/fault-reports`, { method: 'POST', body: fd }); if (!res) return;
+    const json = await res.json().catch(() => null);
+    if (!res.ok || json?.success === false) return alert(json?.message || '점검 요청 접수 실패');
+    postFloorMessage('fireweb:floor-action-saved');
+    bootstrapModal('inspectModal')?.hide();
+    showToast('점검 요청이 접수되었습니다.');
+    await loadList();
   }
 
   async function saveHistoryRow(tr, mode) {
@@ -612,7 +648,7 @@
       const sort = e.target.closest('.js-sort'); if (sort) { const key = sort.dataset.key; if (state.sort.key === key) state.sort.direction = state.sort.direction === 'asc' ? 'desc' : 'asc'; else state.sort = { key, direction: 'asc' }; renderTable(filteredItems()); return; }
       const detail = e.target.closest('.js-detail'); if (detail && !e.target.closest('button')) return openDetails(detail.dataset.id);
       const edit = e.target.closest('.js-edit'); if (edit) { e.stopPropagation(); if (!requireEditPermission()) return; return openUpsert(edit.dataset.id); }
-      const insp = e.target.closest('.js-inspect'); if (insp) { e.stopPropagation(); if (!requireEditPermission()) return; state.inspectId = Number(insp.dataset.id); $('inspectDate').value = today(); $('inspectOk').checked = true; $('inspectFaultReason').value = ''; $('inspectPhoto').value = ''; return bootstrapModal('inspectModal')?.show(); }
+      const insp = e.target.closest('.js-inspect'); if (insp) { e.stopPropagation(); if (!requireEditPermission()) return; state.inspectId = Number(insp.dataset.id); if (isAirconPage()) { if ($('faultReporterName')) $('faultReporterName').value = ''; if ($('faultReporterDepartment')) $('faultReporterDepartment').value = ''; if ($('faultDescription')) $('faultDescription').value = ''; return bootstrapModal('inspectModal')?.show(); } $('inspectDate').value = today(); $('inspectOk').checked = true; $('inspectFaultReason').value = ''; $('inspectPhoto').value = ''; return bootstrapModal('inspectModal')?.show(); }
       const del = e.target.closest('.js-delete'); if (del) { e.stopPropagation(); if (!requireEditPermission()) return; return deleteEquipment(del.dataset.id, del.dataset.serial); }
       const zoom = e.target.closest('.js-zoomable'); if (zoom) return openZoomImage(zoom);
       const addH = e.target.closest('.js-h-add'); if (addH) return saveHistoryRow(addH.closest('tr'), 'add');
@@ -670,6 +706,13 @@
     if (inspectId) {
       if (!requireEditPermission()) return;
       state.inspectId = Number(inspectId);
+      if (isAirconPage()) {
+        if ($('faultReporterName')) $('faultReporterName').value = '';
+        if ($('faultReporterDepartment')) $('faultReporterDepartment').value = '';
+        if ($('faultDescription')) $('faultDescription').value = '';
+        bootstrapModal('inspectModal')?.show();
+        return;
+      }
       $('inspectDate').value = today();
       $('inspectOk').checked = true;
       $('inspectFaultReason').value = '';

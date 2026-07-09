@@ -30,7 +30,7 @@
 | `V28__add_fire_sprinkler_qr_mobile_fields.sql` | 스프링클러 QR/모바일 필드 추가 |
 | `V29__add_other_equipment_qr_menu.sql` | 기타설비 QR 메뉴 및 목록 API 기반 추가 |
 | `V30__move_fire_qr_to_facility_root.sql` | QR코드 메뉴를 설비관리시스템 공통 메뉴로 이동 |
-| `V31__add_facility_mobile_qr_workflows.sql` | 에어컨 고장 접수/정수기 소독 완료 모바일 QR 업무 테이블 추가 |
+| `V31__add_facility_mobile_qr_workflows.sql` | 에어컨 점검 요청/고장 접수(접수자 이름·소속·고장내용) 및 정수기 소독 완료 모바일 QR 업무 테이블 추가. 구버전 에어컨 접수 컬럼(`REPORTER_PHONE`, `PHOTO_PATH`) 보정 포함 |
 | `V32__add_other_facility_admin_code_group.sql` | 기타시설관리 권한 공통코드 `OTHER_PERM/OTHER_ADMIN` 추가 |
 
 ## 실행 순서
@@ -126,14 +126,15 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 | `fire_pump_inspection` | 소방펌프 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
 | `facility_equipment` | 기타설비(에어컨/정수기) 마스터. 에어컨은 종류/제조사/상세 위치/실외기 대수/제조·설치일을 사용하고, 정수기는 종류를 '정수기'로 고정하며 설치일/건물/층/X/Y 좌표만 사용자 입력으로 사용 | - |
 | `facility_equipment_inspection` | 기타설비 점검 이력 | IS_FAULTY + FAULT_REASON |
-| `facility_aircon_fault_report` | 에어컨 모바일 QR 고장 접수 이력 | 고장 내용 + 선택 사진 |
+| `facility_aircon_fault_report` | 에어컨 점검 요청/모바일 QR 고장 접수 이력 | 접수자 이름 + 소속 + 고장내용 |
 | `facility_water_disinfection` | 정수기 모바일 QR 소독 완료 이력 | 완료일 + 작업자 + 필수 사진 |
 
 ### 점검 방식 차이점
 
 - **소화기/소화전**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(불량 사유)
 - **수신기/소방펌프**: `INSPECTION_STATUS`(NORMAL/ABNORMAL) + 개별 항목별 상태 컬럼 + `NOTE`(비고)
-- **기타설비(에어컨/정수기)**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(고장 사유), 최근 12건 이력 유지
+- **기타설비(정수기)**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(고장 사유), 최근 12건 이력 유지
+- **기타설비(에어컨)**: 목록/상세에서 최종 점검일·점검자와 점검 이력 입력을 표시하지 않고, PC `점검 요청` 또는 모바일 QR 고장 접수로 `facility_aircon_fault_report`에 접수자 이름·소속·고장내용을 저장
 
 ## 뷰
 
@@ -150,7 +151,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 
 ### 공통코드 권한
 - `FIRE_PERM/FIRE_ADMIN`: 소방시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다.
-- `OTHER_PERM/OTHER_ADMIN`: 기타시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 점검/이력 관리 버튼과 API를 사용할 수 있습니다.
+- `OTHER_PERM/OTHER_ADMIN`: 기타시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 정수기 점검/이력 관리 및 에어컨 점검 요청 버튼과 API를 사용할 수 있습니다.
 
 ### 건물 마스터 (10개)
 | ID | 건물명 |

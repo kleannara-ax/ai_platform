@@ -14,7 +14,7 @@
     .hero .eyebrow{font-size:.86rem;font-weight:900;opacity:.78}.hero h1{font-size:1.62rem;font-weight:950;margin:.25rem 0 .35rem}.hero p{margin:0;color:rgba(255,255,255,.78);font-weight:700;line-height:1.45}
     .cardx{border:0;border-radius:24px;background:#fff;box-shadow:0 16px 36px rgba(15,23,42,.08);overflow:hidden}.cardx + .cardx{margin-top:14px}.cardx .card-body{padding:18px}
     .section-title{font-size:.95rem;font-weight:950;color:#1e293b;margin-bottom:12px}.info-grid{display:grid;gap:9px}.info-row{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;background:#f8fafc}.info-row span:first-child{font-size:.8rem;font-weight:900;color:var(--muted);flex:0 0 92px}.info-row span:last-child{font-weight:900;text-align:right;word-break:break-word}.form-label{font-weight:900;color:#334155}.form-control{border-radius:16px;border-color:#cbd5e1;min-height:48px}.btn-main{border:0;border-radius:18px;min-height:54px;font-weight:950;background:linear-gradient(135deg,#2563eb,#0f766e);box-shadow:0 14px 28px rgba(37,99,235,.22)}
-    .empty{padding:26px 14px;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-weight:800}.history{display:grid;gap:8px}.history-item{padding:11px 12px;border-radius:14px;background:#f8fafc}.history-item strong{display:block;font-size:.9rem}.history-item span{display:block;font-size:.82rem;color:var(--muted);margin-top:2px}.success-box{border-radius:24px;background:#ecfdf5;color:#166534;padding:22px;text-align:center;font-weight:900}.preview{max-width:100%;border-radius:16px;margin-top:10px;display:none}
+    .empty{padding:26px 14px;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-weight:800}.history{display:grid;gap:8px}.history-item{padding:11px 12px;border-radius:14px;background:#f8fafc}.history-item strong{display:block;font-size:.9rem}.history-item span{display:block;font-size:.82rem;color:var(--muted);margin-top:2px}.success-box{border-radius:24px;background:#ecfdf5;color:#166534;padding:22px;text-align:center;font-weight:900}
   </style>
 </head>
 <body>
@@ -44,17 +44,12 @@
             <input class="form-control" id="reporterName" name="reporterName" autocomplete="name" placeholder="선택 입력">
           </div>
           <div class="mb-3">
-            <label class="form-label" for="reporterPhone">연락처</label>
-            <input class="form-control" id="reporterPhone" name="reporterPhone" inputmode="tel" autocomplete="tel" placeholder="선택 입력">
+            <label class="form-label" for="reporterDepartment">소속</label>
+            <input class="form-control" id="reporterDepartment" name="reporterDepartment" autocomplete="organization" placeholder="선택 입력">
           </div>
           <div class="mb-3">
             <label class="form-label" for="faultDescription">고장 내용 <span class="text-danger">*</span></label>
             <textarea class="form-control" id="faultDescription" name="faultDescription" rows="5" required placeholder="예: 냉방이 되지 않음, 물 샘, 소음 발생 등"></textarea>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="photo">현장 사진</label>
-            <input class="form-control" type="file" id="photo" name="photo" accept="image/*" capture="environment">
-            <img id="photoPreview" class="preview" alt="선택 사진 미리보기">
           </div>
           <button type="submit" class="btn btn-primary btn-main w-100" id="btnSubmit">고장 접수하기</button>
         </form>
@@ -91,17 +86,10 @@
       const d = json.data || {};
       $('equipmentInfo').innerHTML = row('식별 No.', d.serialNumber) + row('건물 / 층', [d.buildingName, d.floorName].filter(Boolean).join(' / ')) + row('종류', d.equipmentType) + row('제조사', d.manufacturer) + row('상세 위치', d.locationDescription);
       const history = Array.isArray(d.recentFaultReports) ? d.recentFaultReports : [];
-      $('historyWrap').innerHTML = history.length ? history.map(h => `<div class="history-item"><strong>${esc(fmtDateTime(h.createdAt))} 접수</strong><span>${esc(h.faultDescription)}</span></div>`).join('') : '<div class="text-muted fw-bold">최근 접수 내역이 없습니다.</div>';
+      $('historyWrap').innerHTML = history.length ? history.map(h => `<div class="history-item"><strong>${esc(fmtDateTime(h.createdAt))} 접수</strong><span>${esc([h.reporterName, h.reporterDepartment].filter(Boolean).join(' / ') || '접수자 정보 없음')}</span><span>${esc(h.faultDescription)}</span></div>`).join('') : '<div class="text-muted fw-bold">최근 접수 내역이 없습니다.</div>';
       showContent();
     }catch(e){ setState('설비 정보를 불러오지 못했습니다.', true); }
   }
-
-  $('photo')?.addEventListener('change', () => {
-    const file = $('photo').files?.[0];
-    const img = $('photoPreview');
-    if(!file){ img.style.display='none'; img.removeAttribute('src'); return; }
-    img.src = URL.createObjectURL(file); img.style.display='block';
-  });
 
   $('faultForm')?.addEventListener('submit', async event => {
     event.preventDefault();

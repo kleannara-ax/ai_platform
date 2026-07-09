@@ -72,30 +72,18 @@ public class FacilityMobileQrController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> submitAirconFaultReport(
             @PathVariable String qrKey,
             @RequestParam(required = false) String reporterName,
-            @RequestParam(required = false) String reporterPhone,
-            @RequestParam String faultDescription,
-            @RequestParam(required = false) MultipartFile photo) {
+            @RequestParam(required = false) String reporterDepartment,
+            @RequestParam String faultDescription) {
         FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_AIRCON, qrKey);
         String description = trimToNull(faultDescription);
         if (description == null) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("고장 내용을 입력하세요."));
         }
-        String photoPath = null;
-        if (photo != null && !photo.isEmpty()) {
-            ResponseEntity<ApiResponse<Map<String, Object>>> validation = validateImage(photo, false);
-            if (validation != null) return validation;
-            try {
-                photoPath = saveMobileImage(photo, "aircon-faults");
-            } catch (IOException ex) {
-                return ResponseEntity.internalServerError().body(ApiResponse.fail("사진 저장에 실패했습니다."));
-            }
-        }
         FacilityAirconFaultReport report = airconFaultReportRepository.save(FacilityAirconFaultReport.builder()
                 .equipment(equipment)
                 .reporterName(trimToNull(reporterName))
-                .reporterPhone(trimToNull(reporterPhone))
+                .reporterDepartment(trimToNull(reporterDepartment))
                 .faultDescription(description)
-                .photoPath(photoPath)
                 .status("RECEIVED")
                 .build());
         Map<String, Object> result = new LinkedHashMap<>();
@@ -205,8 +193,8 @@ public class FacilityMobileQrController {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("reportId", report.getReportId());
         row.put("reporterName", report.getReporterName());
+        row.put("reporterDepartment", report.getReporterDepartment());
         row.put("faultDescription", report.getFaultDescription());
-        row.put("photoPath", report.getPhotoPath());
         row.put("status", report.getStatus());
         row.put("createdAt", report.getCreatedAt());
         return row;

@@ -2,17 +2,21 @@ SET NAMES utf8mb4;
 
 -- ============================================================
 -- V31: 기타설비 모바일 QR 업무 기록 추가
---   - 에어컨 QR: 모바일 고장 접수 기록
+--   - 에어컨 QR: 모바일 고장/점검요청 접수 기록
+--     · 입력 항목: 접수자 이름, 소속, 고장내용
 --   - 정수기 QR: 모바일 소독 완료 사진 기록
+--
+-- 이 파일은 신규 DB에는 최신 구조로 CREATE 하고,
+-- 이미 구버전 V31 구조(REPORTER_PHONE, PHOTO_PATH)가 존재하는 DB에서도
+-- 같은 SQL을 한 번 실행해 최신 구조로 보정할 수 있도록 작성했다.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS facility_aircon_fault_report (
     REPORT_ID BIGINT NOT NULL AUTO_INCREMENT,
     EQUIPMENT_ID BIGINT NOT NULL,
     REPORTER_NAME VARCHAR(100) NULL,
-    REPORTER_PHONE VARCHAR(50) NULL,
+    REPORTER_DEPARTMENT VARCHAR(100) NULL,
     FAULT_DESCRIPTION VARCHAR(1000) NOT NULL,
-    PHOTO_PATH VARCHAR(600) NULL,
     STATUS VARCHAR(30) NOT NULL DEFAULT 'RECEIVED',
     CREATED_AT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (REPORT_ID),
@@ -22,6 +26,57 @@ CREATE TABLE IF NOT EXISTS facility_aircon_fault_report (
         FOREIGN KEY (EQUIPMENT_ID) REFERENCES facility_equipment (EQUIPMENT_ID)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 구버전 V31이 이미 적용된 DB 보정: 연락처/사진 컬럼 제거, 소속 컬럼 추가
+SET @has_aircon_department := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'facility_aircon_fault_report'
+      AND COLUMN_NAME = 'REPORTER_DEPARTMENT'
+);
+SET @sql := IF(@has_aircon_department = 0,
+    'ALTER TABLE facility_aircon_fault_report ADD COLUMN REPORTER_DEPARTMENT VARCHAR(100) NULL AFTER REPORTER_NAME',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_aircon_phone := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'facility_aircon_fault_report'
+      AND COLUMN_NAME = 'REPORTER_PHONE'
+);
+SET @sql := IF(@has_aircon_phone > 0,
+    'UPDATE facility_aircon_fault_report SET REPORTER_DEPARTMENT = COALESCE(REPORTER_DEPARTMENT, REPORTER_PHONE) WHERE REPORTER_PHONE IS NOT NULL',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(@has_aircon_phone > 0,
+    'ALTER TABLE facility_aircon_fault_report DROP COLUMN REPORTER_PHONE',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_aircon_photo := (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'facility_aircon_fault_report'
+      AND COLUMN_NAME = 'PHOTO_PATH'
+);
+SET @sql := IF(@has_aircon_photo > 0,
+    'ALTER TABLE facility_aircon_fault_report DROP COLUMN PHOTO_PATH',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS facility_water_disinfection (
     DISINFECTION_ID BIGINT NOT NULL AUTO_INCREMENT,

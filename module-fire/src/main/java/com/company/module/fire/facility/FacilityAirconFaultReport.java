@@ -26,14 +26,11 @@ public class FacilityAirconFaultReport {
     @Column(name = "REPORTER_NAME", length = 100)
     private String reporterName;
 
-    @Column(name = "REPORTER_PHONE", length = 50)
-    private String reporterPhone;
+    @Column(name = "REPORTER_DEPARTMENT", length = 100)
+    private String reporterDepartment;
 
     @Column(name = "FAULT_DESCRIPTION", nullable = false, length = 1000)
     private String faultDescription;
-
-    @Column(name = "PHOTO_PATH", length = 600)
-    private String photoPath;
 
     @Column(name = "STATUS", nullable = false, length = 30)
     private String status;
@@ -50,13 +47,12 @@ public class FacilityAirconFaultReport {
     }
 
     @Builder
-    public FacilityAirconFaultReport(FacilityEquipment equipment, String reporterName, String reporterPhone,
-                                     String faultDescription, String photoPath, String status) {
+    public FacilityAirconFaultReport(FacilityEquipment equipment, String reporterName, String reporterDepartment,
+                                     String faultDescription, String status) {
         this.equipment = equipment;
         this.reporterName = reporterName;
-        this.reporterPhone = reporterPhone;
+        this.reporterDepartment = reporterDepartment;
         this.faultDescription = faultDescription;
-        this.photoPath = photoPath;
         this.status = (status == null || status.isBlank()) ? "RECEIVED" : status;
     }
 }
