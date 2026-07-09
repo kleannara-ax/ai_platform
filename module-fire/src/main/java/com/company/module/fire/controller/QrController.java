@@ -80,9 +80,9 @@ public class QrController {
 
         String url;
         if ("aircon".equalsIgnoreCase(type) || "ac".equalsIgnoreCase(type)) {
-            url = baseUrl + "/facility/air-conditioners?qrKey=" + id;
+            url = baseUrl + "/minspection/air-conditioners/" + id;
         } else if ("water".equalsIgnoreCase(type) || "water_purifier".equalsIgnoreCase(type) || "wp".equalsIgnoreCase(type)) {
-            url = baseUrl + "/facility/water-purifiers?qrKey=" + id;
+            url = baseUrl + "/minspection/water-purifiers/" + id;
         } else if ("hyd".equalsIgnoreCase(type)) {
             url = baseUrl + "/minspection/hydrants/" + id;
         } else if ("receiver".equalsIgnoreCase(type) || "rcv".equalsIgnoreCase(type)) {

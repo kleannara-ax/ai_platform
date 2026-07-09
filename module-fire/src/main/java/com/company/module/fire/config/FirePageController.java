@@ -142,6 +142,18 @@ public class FirePageController {
         return serveHtml("static/minspection/sprinklers/index.html");
     }
 
+    @GetMapping("/minspection/air-conditioners/{serial}")
+    @ResponseBody
+    public ResponseEntity<String> airConditionerMobileQrPage(@PathVariable String serial) throws IOException {
+        return serveHtml("static/minspection/air-conditioners/index.html");
+    }
+
+    @GetMapping("/minspection/water-purifiers/{serial}")
+    @ResponseBody
+    public ResponseEntity<String> waterPurifierMobileQrPage(@PathVariable String serial) throws IOException {
+        return serveHtml("static/minspection/water-purifiers/index.html");
+    }
+
     @GetMapping("/minspection/complete")
     @ResponseBody
     public ResponseEntity<String> completePage() throws IOException {

@@ -299,8 +299,8 @@
     rcv: { key: 'rcv', group: 'fire', label: '수신기', listKey: 'receivers', qrType: 'rcv', large: true },
     pmp: { key: 'pmp', group: 'fire', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true },
     spk: { key: 'spk', group: 'fire', label: '스프링클러', listKey: 'sprinklers', qrType: 'spk', large: true },
-    aircon: { key: 'aircon', group: 'other', label: '에어컨', listKey: 'airConditioners', qrType: 'aircon', large: false, pendingQr: true },
-    water: { key: 'water', group: 'other', label: '정수기', listKey: 'waterPurifiers', qrType: 'water', large: false, pendingQr: true }
+    aircon: { key: 'aircon', group: 'other', label: '에어컨', listKey: 'airConditioners', qrType: 'aircon', large: false },
+    water: { key: 'water', group: 'other', label: '정수기', listKey: 'waterPurifiers', qrType: 'water', large: false }
   };
   const EQUIPMENT_GROUPS = {
     fire: { key: 'fire', label: '소방설비', keys: ['ext', 'hyd', 'rcv', 'pmp', 'spk'] },
@@ -409,12 +409,13 @@
     const unregisteredBox = document.getElementById('unregisteredFilterBox');
     if (!buildingBox || !floorBox || !keywordBox) return;
     const textMode = isTextSearchEquip();
-    const pendingQr = EQUIPMENT[currentEquip]?.pendingQr === true;
+    const conf = EQUIPMENT[currentEquip] || {};
+    const supportsUnregistered = conf.group === 'fire';
     buildingBox.hidden = textMode;
     floorBox.hidden = textMode;
     keywordBox.hidden = !textMode;
-    if (unregisteredBox) unregisteredBox.hidden = pendingQr;
-    if (pendingQr) document.getElementById('unregisteredCount').value = '0';
+    if (unregisteredBox) unregisteredBox.hidden = !supportsUnregistered;
+    if (!supportsUnregistered) document.getElementById('unregisteredCount').value = '0';
     if (textMode) {
       document.getElementById('filterBuilding').value = '';
       document.getElementById('filterFloor').value = '';
@@ -431,7 +432,7 @@
     }
     if (extraMeta) meta += (meta ? ' / ' : '') + escHtml(extraMeta);
     return '' +
-      '<div class="qr-card" data-qr-type="' + escHtml(type) + '" data-qr-id="' + escHtml(String(itemId || '')) + '" style="cursor:pointer;">' +
+      '<div class="qr-card" data-qr-type="' + escHtml(type) + '" data-qr-id="' + escHtml(String(itemId || '')) + '" data-qr-key="' + escHtml(String(qrKey || '')) + '" style="cursor:pointer;">' +
       '  <div class="qr-card-row">' +
       '    <div class="qr-img"><img alt="QR" src="' + qrImgUrl(type, qrKey) + '" loading="lazy" /></div>' +
       '    <div class="qr-meta">' + (meta || '-') + '</div>' +
@@ -464,7 +465,7 @@
       const item = EQUIPMENT[key];
       if (!item) return '';
       const count = Array.isArray(latestListData[item.listKey]) ? latestListData[item.listKey].length : 0;
-      const countText = item.pendingQr ? '준비중' : (count + '건');
+      const countText = count + '건';
       return '' +
         '<button type="button" class="equip-btn' + (currentEquip === item.key ? ' active' : '') + '" data-equip="' + item.key + '">' +
         '  <span>' + item.label + '</span>' +
@@ -480,17 +481,6 @@
     const unregisteredWrap = document.getElementById('unregisteredWrap');
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
     const gridEquipKey = conf.key || currentEquip;
-
-    if (conf.pendingQr) {
-      registeredWrap.style.display = '';
-      registeredWrap.className = 'empty-state';
-      registeredWrap.removeAttribute('data-equip-key');
-      registeredWrap.innerHTML = conf.label + ' QR은 다음 단계에서 연결할 예정입니다.';
-      unregisteredSection.style.display = 'none';
-      unregisteredWrap.innerHTML = '';
-      unregisteredWrap.removeAttribute('data-equip-key');
-      return;
-    }
 
     /* 미등록 QR이 있으면 미등록만 표시, 등록된 설비는 숨김 */
     if (Array.isArray(unregisteredList) && unregisteredList.length) {
@@ -521,14 +511,16 @@
         registeredWrap.className = gridClass;
         registeredWrap.dataset.equipKey = gridEquipKey;
         registeredWrap.innerHTML = items.map(function (item) {
-          var qrKey = item.qrKey || item.noteKey || '';
-          var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || item.sprinklerId || '';
+          var qrKey = item.qrKey || item.noteKey || item.equipmentId || item.serialNumber || '';
+          var itemId = item.extinguisherId || item.hydrantId || item.receiverId || item.pumpId || item.sprinklerId || item.equipmentId || '';
           var extraMeta = '';
           if (currentEquip === 'ext') extraMeta = item.note || '';
           else if (currentEquip === 'hyd') extraMeta = item.locationDescription || '';
           else if (currentEquip === 'spk') extraMeta = item.note || '';
+          else if (currentEquip === 'aircon') extraMeta = item.locationDescription || item.equipmentType || '';
+          else if (currentEquip === 'water') extraMeta = item.locationDescription || item.equipmentType || '';
           else extraMeta = item.locationDescription || '';
-          return registeredCardHtml(conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta);
+          return registeredCardHtml(conf.qrType || conf.key, qrKey, item.buildingName, item.floorName, itemId, extraMeta);
         }).join('');
       }
     }
@@ -591,11 +583,6 @@
   async function loadData() {
     try {
       const conf = EQUIPMENT[currentEquip];
-      if (conf?.pendingQr) {
-        renderMenu();
-        renderCurrentSection([]);
-        return;
-      }
       const buildingId = document.getElementById('filterBuilding').value;
       const floorId = document.getElementById('filterFloor').value;
       const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
@@ -604,14 +591,15 @@
         if (buildingId) listParams.set('buildingId', buildingId);
         if (floorId) listParams.set('floorId', floorId);
       }
-      const listRes = await apiFetch(API_BASE + '/qr/list' + (listParams.toString() ? ('?' + listParams.toString()) : ''));
+      const listEndpoint = conf?.group === 'other' ? '/facility-api/qr/list' : (API_BASE + '/qr/list');
+      const listRes = await apiFetch(listEndpoint + (listParams.toString() ? ('?' + listParams.toString()) : ''));
       if (listRes && listRes.data) {
         latestListData = listRes.data;
       }
       renderMenu();
 
       let unregisteredList = [];
-      if (unregisteredCount > 0) {
+      if (conf?.group === 'fire' && unregisteredCount > 0) {
         const countParams = new URLSearchParams({
           extCount: currentEquip === 'ext' ? String(unregisteredCount) : '0',
           hydCount: currentEquip === 'hyd' ? String(unregisteredCount) : '0',
@@ -834,8 +822,15 @@
       </div>`;
   }
 
-  function openQrDetails(type, id) {
-    if (!type || !id) return;
+  function openQrDetails(type, id, qrKey) {
+    if (!type) return;
+    if (type === 'aircon' || type === 'water') {
+      if (!qrKey) return;
+      const path = type === 'aircon' ? '/minspection/air-conditioners/' : '/minspection/water-purifiers/';
+      window.open(path + encodeURIComponent(qrKey), '_blank', 'noopener');
+      return;
+    }
+    if (!id) return;
     if (type === 'ext') {
       window.FireWebExtinguisherModal?.open({ mode: 'details', id });
       return;
@@ -901,7 +896,7 @@
 
       const card = event.target.closest('.qr-card[data-qr-type][data-qr-id]');
       if (!card) return;
-      openQrDetails(card.dataset.qrType, card.dataset.qrId);
+      openQrDetails(card.dataset.qrType, card.dataset.qrId, card.dataset.qrKey);
     });
 
     const zoomStage = document.getElementById('spkQrZoomStage');
