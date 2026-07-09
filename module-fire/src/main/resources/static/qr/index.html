@@ -19,6 +19,14 @@
     .side-card { padding:18px; position:sticky; top:20px; height:fit-content; }
     .content-card { padding:20px; }
     .menu-title { font-size:13px; font-weight:800; color:#64748b; letter-spacing:.04em; text-transform:uppercase; margin-bottom:10px; }
+    .category-menu { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+    .category-btn {
+      border:1px solid rgba(148,163,184,.28); border-radius:16px; background:#fff; padding:12px 10px;
+      font-weight:900; color:#334155; box-shadow:0 8px 18px rgba(15,23,42,.04); transition:all .16s ease;
+    }
+    .category-btn:hover { border-color:rgba(37,99,235,.42); color:#1d4ed8; }
+    .category-btn.active { color:#fff; border-color:transparent; background:linear-gradient(135deg,#0f766e 0%,#2563eb 100%); box-shadow:0 14px 24px rgba(37,99,235,.22); }
+    .equip-section-title { margin-top:4px; }
     .equip-menu { display:grid; gap:8px; }
     .equip-btn {
       width:100%; border:1px solid rgba(148,163,184,.24); border-radius:16px; background:#f8fafc; padding:14px 16px;
@@ -186,7 +194,9 @@
 
 <main class="qr-shell">
   <aside class="side-card">
-    <div class="menu-title">설비 선택</div>
+    <div class="menu-title">설비 구분</div>
+    <div class="category-menu" id="equipCategoryMenu" aria-label="설비 구분 선택"></div>
+    <div class="menu-title equip-section-title">설비 선택</div>
     <div class="equip-menu" id="equipMenu"></div>
   </aside>
 
@@ -214,7 +224,7 @@
         <label for="filterKeyword">검색어</label>
         <input type="text" id="filterKeyword" placeholder="건물명을 입력하세요" />
       </div>
-      <div class="filter-box">
+      <div class="filter-box" id="unregisteredFilterBox">
         <label for="unregisteredCount">미등록 QR 수량</label>
         <input type="number" id="unregisteredCount" min="0" max="500" value="0" />
       </div>
@@ -284,14 +294,21 @@
 (function () {
   const API_BASE = '/fire-api';
   const EQUIPMENT = {
-    ext: { key: 'ext', label: '소화기', listKey: 'extinguishers', qrType: 'ext', large: false },
-    hyd: { key: 'hyd', label: '소화전', listKey: 'hydrants', qrType: 'hyd', large: true },
-    rcv: { key: 'rcv', label: '수신기', listKey: 'receivers', qrType: 'rcv', large: true },
-    pmp: { key: 'pmp', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true },
-    spk: { key: 'spk', label: '스프링클러', listKey: 'sprinklers', qrType: 'spk', large: true }
+    ext: { key: 'ext', group: 'fire', label: '소화기', listKey: 'extinguishers', qrType: 'ext', large: false },
+    hyd: { key: 'hyd', group: 'fire', label: '소화전', listKey: 'hydrants', qrType: 'hyd', large: true },
+    rcv: { key: 'rcv', group: 'fire', label: '수신기', listKey: 'receivers', qrType: 'rcv', large: true },
+    pmp: { key: 'pmp', group: 'fire', label: '소방펌프', listKey: 'pumps', qrType: 'pmp', large: true },
+    spk: { key: 'spk', group: 'fire', label: '스프링클러', listKey: 'sprinklers', qrType: 'spk', large: true },
+    aircon: { key: 'aircon', group: 'other', label: '에어컨', listKey: 'airConditioners', qrType: 'aircon', large: false, pendingQr: true },
+    water: { key: 'water', group: 'other', label: '정수기', listKey: 'waterPurifiers', qrType: 'water', large: false, pendingQr: true }
+  };
+  const EQUIPMENT_GROUPS = {
+    fire: { key: 'fire', label: '소방설비', keys: ['ext', 'hyd', 'rcv', 'pmp', 'spk'] },
+    other: { key: 'other', label: '기타설비', keys: ['aircon', 'water'] }
   };
 
   let currentUser = null;
+  let currentGroup = 'fire';
   let currentEquip = 'ext';
   let latestListData = {};
   let buildingFloors = [];  /* [{buildingId, buildingName, floors:[{floorId,floorName},...]}] */
@@ -389,11 +406,15 @@
     const buildingBox = document.getElementById('filterBuilding')?.closest('.filter-box');
     const floorBox = document.getElementById('filterFloor')?.closest('.filter-box');
     const keywordBox = document.getElementById('keywordFilterBox');
+    const unregisteredBox = document.getElementById('unregisteredFilterBox');
     if (!buildingBox || !floorBox || !keywordBox) return;
     const textMode = isTextSearchEquip();
+    const pendingQr = EQUIPMENT[currentEquip]?.pendingQr === true;
     buildingBox.hidden = textMode;
     floorBox.hidden = textMode;
     keywordBox.hidden = !textMode;
+    if (unregisteredBox) unregisteredBox.hidden = pendingQr;
+    if (pendingQr) document.getElementById('unregisteredCount').value = '0';
     if (textMode) {
       document.getElementById('filterBuilding').value = '';
       document.getElementById('filterFloor').value = '';
@@ -429,14 +450,25 @@
   }
 
   function renderMenu() {
+    const categoryMenu = document.getElementById('equipCategoryMenu');
+    if (categoryMenu) {
+      categoryMenu.innerHTML = Object.values(EQUIPMENT_GROUPS).map(function (group) {
+        return '<button type="button" class="category-btn' + (currentGroup === group.key ? ' active' : '') + '" data-group="' + group.key + '">' + group.label + '</button>';
+      }).join('');
+    }
+
     const menu = document.getElementById('equipMenu');
     if (!menu) return;
-    menu.innerHTML = Object.values(EQUIPMENT).map((item) => {
+    const groupKeys = EQUIPMENT_GROUPS[currentGroup]?.keys || [];
+    menu.innerHTML = groupKeys.map((key) => {
+      const item = EQUIPMENT[key];
+      if (!item) return '';
       const count = Array.isArray(latestListData[item.listKey]) ? latestListData[item.listKey].length : 0;
+      const countText = item.pendingQr ? '준비중' : (count + '건');
       return '' +
         '<button type="button" class="equip-btn' + (currentEquip === item.key ? ' active' : '') + '" data-equip="' + item.key + '">' +
         '  <span>' + item.label + '</span>' +
-        '  <span class="count">' + count + '건</span>' +
+        '  <span class="count">' + countText + '</span>' +
         '</button>';
     }).join('');
   }
@@ -448,6 +480,17 @@
     const unregisteredWrap = document.getElementById('unregisteredWrap');
     const gridClass = conf.large ? 'qr-grid large' : 'qr-grid';
     const gridEquipKey = conf.key || currentEquip;
+
+    if (conf.pendingQr) {
+      registeredWrap.style.display = '';
+      registeredWrap.className = 'empty-state';
+      registeredWrap.removeAttribute('data-equip-key');
+      registeredWrap.innerHTML = conf.label + ' QR은 다음 단계에서 연결할 예정입니다.';
+      unregisteredSection.style.display = 'none';
+      unregisteredWrap.innerHTML = '';
+      unregisteredWrap.removeAttribute('data-equip-key');
+      return;
+    }
 
     /* 미등록 QR이 있으면 미등록만 표시, 등록된 설비는 숨김 */
     if (Array.isArray(unregisteredList) && unregisteredList.length) {
@@ -547,6 +590,12 @@
 
   async function loadData() {
     try {
+      const conf = EQUIPMENT[currentEquip];
+      if (conf?.pendingQr) {
+        renderMenu();
+        renderCurrentSection([]);
+        return;
+      }
       const buildingId = document.getElementById('filterBuilding').value;
       const floorId = document.getElementById('filterFloor').value;
       const unregisteredCount = Math.max(0, Math.min(500, parseInt(document.getElementById('unregisteredCount').value || '0', 10) || 0));
@@ -813,10 +862,22 @@
   function bindEvents() {
     document.getElementById('btnApply')?.addEventListener('click', loadData);
     document.getElementById('btnPrint')?.addEventListener('click', printCurrentQrSection);
+    document.getElementById('equipCategoryMenu')?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.category-btn[data-group]');
+      if (!btn) return;
+      const nextGroup = btn.dataset.group;
+      if (!EQUIPMENT_GROUPS[nextGroup]) return;
+      currentGroup = nextGroup;
+      currentEquip = EQUIPMENT_GROUPS[nextGroup].keys[0] || currentEquip;
+      document.getElementById('unregisteredCount').value = '0';
+      updateFilterMode();
+      loadData();
+    });
     document.getElementById('equipMenu')?.addEventListener('click', (event) => {
       const btn = event.target.closest('.equip-btn[data-equip]');
       if (!btn) return;
       currentEquip = btn.dataset.equip;
+      currentGroup = EQUIPMENT[currentEquip]?.group || currentGroup;
       updateFilterMode();
       loadData();
     });
