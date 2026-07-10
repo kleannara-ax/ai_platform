@@ -33,6 +33,13 @@ SET EQUIPMENT_CODE = NULL
 WHERE CATEGORY = 'WATER_PURIFIER'
   AND EQUIPMENT_CODE REGEXP '^WP-[0-9]+$';
 
+-- 초기 개발 버전 적용 과정에서 AC-1.0000처럼 소수점이 포함된 값이 들어간 경우
+-- 정식 AC-000001 형식으로 다시 채울 수 있도록 먼저 비운다.
+UPDATE facility_equipment
+SET EQUIPMENT_CODE = NULL
+WHERE CATEGORY = 'AIRCON'
+  AND EQUIPMENT_CODE REGEXP '^AC-[0-9]+\\.[0-9]+$';
+
 SET @facility_ac_code_base := (
     SELECT COALESCE(MAX(CAST(SUBSTRING(EQUIPMENT_CODE, 4) AS UNSIGNED)), 0)
     FROM facility_equipment
@@ -42,7 +49,7 @@ SET @facility_ac_code_base := (
 UPDATE facility_equipment e
 JOIN (
     SELECT EQUIPMENT_ID,
-           CONCAT('AC-', LPAD(@facility_ac_code_base + ROW_NUMBER() OVER (ORDER BY EQUIPMENT_ID), 6, '0')) AS NEXT_CODE
+           CONCAT('AC-', LPAD(CAST(@facility_ac_code_base + ROW_NUMBER() OVER (ORDER BY EQUIPMENT_ID) AS UNSIGNED), 6, '0')) AS NEXT_CODE
     FROM facility_equipment
     WHERE CATEGORY = 'AIRCON'
       AND (EQUIPMENT_CODE IS NULL OR EQUIPMENT_CODE = '')
