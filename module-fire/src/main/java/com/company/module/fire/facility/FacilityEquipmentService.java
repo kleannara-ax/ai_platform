@@ -18,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -118,6 +120,67 @@ public class FacilityEquipmentService {
 
         log.info("Facility equipment saved: category={}, id={}, serial={}", normalizedCategory, entity.getEquipmentId(), entity.getSerialNumber());
         return FacilityEquipmentResponse.from(entity);
+    }
+
+    @Transactional
+    public FacilityEquipmentResponse registerMobileEquipment(String category, String qrKey, FacilityEquipmentSaveRequest req) {
+        String normalizedCategory = normalizeCategory(category);
+        String cleanQrKey = trimToNull(qrKey);
+        if (cleanQrKey == null) {
+            throw new BusinessException("QR 키가 비어 있습니다.");
+        }
+        equipmentRepository.findByQrKey(cleanQrKey).ifPresent(existing -> {
+            throw new BusinessException("이미 등록된 QR입니다.");
+        });
+
+        String equipmentType = normalizeEquipmentType(normalizedCategory, req.getEquipmentType());
+        validateType(normalizedCategory, equipmentType);
+        boolean waterPurifier = CATEGORY_WATER_PURIFIER.equals(normalizedCategory);
+        String manufacturer = waterPurifier ? null : trimToNull(req.getManufacturer());
+        String locationDescription = waterPurifier ? null : trimToNull(req.getLocationDescription());
+        int outdoorUnitCount = waterPurifier ? 1 : normalizeOutdoorUnitCount(req.getOutdoorUnitCount());
+        int replacementCycleYears = waterPurifier ? 10 : req.getReplacementCycleYears();
+        String note = waterPurifier ? trimToNull(req.getNote()) : req.getNote();
+
+        Building building = buildingRepository.findById(req.getBuildingId())
+                .orElseThrow(() -> new BusinessException("건물 정보를 찾을 수 없습니다."));
+        Floor floor = floorRepository.findById(req.getFloorId())
+                .orElseThrow(() -> new BusinessException("층 정보를 찾을 수 없습니다."));
+
+        String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), null);
+        FacilityEquipment entity = FacilityEquipment.builder()
+                .category(normalizedCategory)
+                .serialNumber(serialNumber)
+                .building(building)
+                .floor(floor)
+                .equipmentType(equipmentType)
+                .manufacturer(manufacturer)
+                .locationDescription(locationDescription)
+                .outdoorUnitCount(outdoorUnitCount)
+                .manufactureDate(req.getManufactureDate())
+                .replacementCycleYears(replacementCycleYears)
+                .x(normalizeCoord(req.getX()))
+                .y(normalizeCoord(req.getY()))
+                .note(note)
+                .qrKey(cleanQrKey)
+                .build();
+        equipmentRepository.save(entity);
+        log.info("Facility equipment mobile registered: category={}, id={}, serial={}, qrKey={}", normalizedCategory, entity.getEquipmentId(), entity.getSerialNumber(), cleanQrKey);
+        return FacilityEquipmentResponse.from(entity);
+    }
+
+    public List<String> generateUnregisteredQrKeys(String category, int count) {
+        String normalizedCategory = normalizeCategory(category);
+        int safeCount = Math.max(0, Math.min(count, 500));
+        List<String> result = new ArrayList<>(safeCount);
+        while (result.size() < safeCount) {
+            String key = UUID.randomUUID().toString().replace("-", "");
+            if (!equipmentRepository.existsByQrKey(key) && !result.contains(key)) {
+                result.add(key);
+            }
+        }
+        log.info("Generated unregistered facility QR keys: category={}, count={}", normalizedCategory, result.size());
+        return result;
     }
 
     @Transactional

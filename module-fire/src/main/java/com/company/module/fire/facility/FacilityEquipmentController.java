@@ -70,6 +70,19 @@ public class FacilityEquipmentController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
+    @GetMapping("/qr/unregistered-keys")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getUnregisteredFacilityQrKeys(
+            @RequestParam(defaultValue = "0") int airconCount,
+            @RequestParam(defaultValue = "0") int waterCount) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("unregisteredAirconQrKeys", facilityEquipmentService.generateUnregisteredQrKeys(
+                FacilityEquipmentService.CATEGORY_AIRCON, airconCount));
+        result.put("unregisteredWaterQrKeys", facilityEquipmentService.generateUnregisteredQrKeys(
+                FacilityEquipmentService.CATEGORY_WATER_PURIFIER, waterCount));
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     @GetMapping("/air-conditioners/{id}")
     public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> getAirConditioner(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.getDetail(FacilityEquipmentService.CATEGORY_AIRCON, id)));
@@ -250,7 +263,16 @@ public class FacilityEquipmentController {
     }
 
     private Path uploadDir(String kind) {
-        return Paths.get("/data/upload/module_fire/facility", kind);
+        String root = System.getenv("MODULE_FIRE_FACILITY_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            Path dataRoot = Paths.get("/data/upload/module_fire/facility");
+            if (Files.exists(dataRoot) || Files.isWritable(dataRoot.getParent())) {
+                root = dataRoot.toString();
+            } else {
+                root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire", "facility").toString();
+            }
+        }
+        return Paths.get(root).resolve(kind).normalize();
     }
 
     private void deleteOldImage(String oldPath, Path dir) throws IOException {

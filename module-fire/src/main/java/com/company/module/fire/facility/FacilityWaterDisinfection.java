@@ -33,7 +33,7 @@ public class FacilityWaterDisinfection {
     @Column(name = "NOTE", length = 500)
     private String note;
 
-    @Column(name = "PHOTO_PATH", nullable = false, length = 600)
+    @Column(name = "PHOTO_PATH", length = 600)
     private String photoPath;
 
     @Column(name = "CREATED_AT", nullable = false, updatable = false)

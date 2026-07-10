@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,6 +34,7 @@ public class FacilityMobileQrController {
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
 
     private final FacilityEquipmentRepository equipmentRepository;
+    private final FacilityEquipmentService facilityEquipmentService;
     private final FacilityAirconFaultReportRepository airconFaultReportRepository;
     private final FacilityWaterDisinfectionRepository waterDisinfectionRepository;
 
@@ -67,27 +69,79 @@ public class FacilityMobileQrController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
+
+    @PostMapping(value = "/air-conditioners/{qrKey}/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerAirConditioner(
+            @PathVariable String qrKey,
+            @RequestParam String serialNumber,
+            @RequestParam Long buildingId,
+            @RequestParam Long floorId,
+            @RequestParam String equipmentType,
+            @RequestParam(required = false) String manufacturer,
+            @RequestParam(required = false) String locationDescription,
+            @RequestParam(defaultValue = "1") int outdoorUnitCount,
+            @RequestParam(required = false) String manufactureDate,
+            @RequestParam(required = false) BigDecimal x,
+            @RequestParam(required = false) BigDecimal y,
+            @RequestParam(required = false) MultipartFile photo) {
+        FacilityEquipmentSaveRequest request = baseRegisterRequest(serialNumber, buildingId, floorId, manufactureDate, x, y);
+        request.setEquipmentType(equipmentType);
+        request.setManufacturer(manufacturer);
+        request.setLocationDescription(locationDescription);
+        request.setOutdoorUnitCount(outdoorUnitCount);
+        request.setReplacementCycleYears(10);
+        return registerFacilityEquipment(FacilityEquipmentService.CATEGORY_AIRCON, "air-conditioners", qrKey, request, photo);
+    }
+
+    @PostMapping(value = "/water-purifiers/{qrKey}/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> registerWaterPurifier(
+            @PathVariable String qrKey,
+            @RequestParam(required = false) String serialNumber,
+            @RequestParam Long buildingId,
+            @RequestParam Long floorId,
+            @RequestParam(required = false) String manufactureDate,
+            @RequestParam(required = false) BigDecimal x,
+            @RequestParam(required = false) BigDecimal y,
+            @RequestParam(required = false) String note,
+            @RequestParam(required = false) MultipartFile photo) {
+        FacilityEquipmentSaveRequest request = baseRegisterRequest(serialNumber, buildingId, floorId, manufactureDate, x, y);
+        request.setEquipmentType("정수기");
+        request.setNote(note);
+        request.setReplacementCycleYears(10);
+        return registerFacilityEquipment(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, "water-purifiers", qrKey, request, photo);
+    }
+
     @PostMapping(value = "/air-conditioners/{qrKey}/fault-reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> submitAirconFaultReport(
             @PathVariable String qrKey,
             @RequestParam(required = false) String reporterName,
-            @RequestParam(required = false) String reporterDepartment,
-            @RequestParam String faultDescription) {
+            @RequestParam(required = false) String inspectionResult,
+            @RequestParam(required = false) String faultDescription) {
         FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_AIRCON, qrKey);
-        String description = trimToNull(faultDescription);
-        if (description == null) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("고장 내용을 입력하세요."));
+        String inspector = trimToNull(reporterName);
+        if (inspector == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("점검자 이름을 입력하세요."));
+        }
+        String resultValue = trimToNull(inspectionResult);
+        if (resultValue == null) {
+            resultValue = trimToNull(faultDescription);
+        }
+        if (!Set.of("정상", "비정상").contains(resultValue)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("에어컨 작동 상태를 정상 또는 비정상으로 선택하세요."));
         }
         FacilityAirconFaultReport report = airconFaultReportRepository.save(FacilityAirconFaultReport.builder()
                 .equipment(equipment)
-                .reporterName(trimToNull(reporterName))
-                .reporterDepartment(trimToNull(reporterDepartment))
-                .faultDescription(description)
-                .status("RECEIVED")
+                .reporterName(inspector)
+                .reporterDepartment(null)
+                .faultDescription(resultValue)
+                .status("정상".equals(resultValue) ? "NORMAL" : "ABNORMAL")
                 .build());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("reportId", report.getReportId());
+        result.put("inspectionResult", report.getFaultDescription());
         result.put("status", report.getStatus());
         result.put("createdAt", report.getCreatedAt());
         return ResponseEntity.ok(ApiResponse.success(result));
@@ -97,38 +151,27 @@ public class FacilityMobileQrController {
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> submitWaterDisinfection(
             @PathVariable String qrKey,
-            @RequestParam(required = false) String disinfectionDate,
             @RequestParam String workerName,
-            @RequestParam(required = false) String note,
-            @RequestParam MultipartFile photo) {
+            @RequestParam(required = false) String inspectionResult) {
         FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, qrKey);
         String worker = trimToNull(workerName);
         if (worker == null) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("작업자 이름을 입력하세요."));
+            return ResponseEntity.badRequest().body(ApiResponse.fail("점검자 이름을 입력하세요."));
         }
-        ResponseEntity<ApiResponse<Map<String, Object>>> validation = validateImage(photo, true);
-        if (validation != null) return validation;
-        LocalDate workDate;
-        try {
-            workDate = trimToNull(disinfectionDate) == null ? LocalDate.now() : LocalDate.parse(disinfectionDate.trim());
-        } catch (Exception ex) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("소독 완료일 형식이 올바르지 않습니다."));
-        }
-        String photoPath;
-        try {
-            photoPath = saveMobileImage(photo, "water-disinfections");
-        } catch (IOException ex) {
-            return ResponseEntity.internalServerError().body(ApiResponse.fail("사진 저장에 실패했습니다."));
+        String resultValue = trimToNull(inspectionResult);
+        if (!Set.of("완료", "미완료").contains(resultValue)) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("정수기 점검 상태를 완료 또는 미완료로 선택하세요."));
         }
         FacilityWaterDisinfection disinfection = waterDisinfectionRepository.save(FacilityWaterDisinfection.builder()
                 .equipment(equipment)
-                .disinfectionDate(workDate)
+                .disinfectionDate(LocalDate.now())
                 .workerName(worker)
-                .note(trimToNull(note))
-                .photoPath(photoPath)
+                .note(resultValue)
+                .photoPath("")
                 .build());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("disinfectionId", disinfection.getDisinfectionId());
+        result.put("inspectionResult", disinfection.getNote());
         result.put("disinfectionDate", disinfection.getDisinfectionDate());
         result.put("createdAt", disinfection.getCreatedAt());
         return ResponseEntity.ok(ApiResponse.success(result));
@@ -184,6 +227,11 @@ public class FacilityMobileQrController {
         result.put("equipmentType", equipment.getEquipmentType());
         result.put("manufacturer", equipment.getManufacturer());
         result.put("locationDescription", equipment.getLocationDescription());
+        result.put("outdoorUnitCount", equipment.getOutdoorUnitCount());
+        result.put("manufactureDate", equipment.getManufactureDate());
+        result.put("replacementDueDate", equipment.getReplacementDueDate());
+        result.put("x", equipment.getX());
+        result.put("y", equipment.getY());
         result.put("imagePath", equipment.getImagePath());
         result.put("note", equipment.getNote());
         return result;
@@ -195,6 +243,7 @@ public class FacilityMobileQrController {
         row.put("reporterName", report.getReporterName());
         row.put("reporterDepartment", report.getReporterDepartment());
         row.put("faultDescription", report.getFaultDescription());
+        row.put("inspectionResult", report.getFaultDescription());
         row.put("status", report.getStatus());
         row.put("createdAt", report.getCreatedAt());
         return row;
@@ -206,9 +255,81 @@ public class FacilityMobileQrController {
         row.put("disinfectionDate", disinfection.getDisinfectionDate());
         row.put("workerName", disinfection.getWorkerName());
         row.put("note", disinfection.getNote());
+        row.put("inspectionResult", disinfection.getNote());
         row.put("photoPath", disinfection.getPhotoPath());
         row.put("createdAt", disinfection.getCreatedAt());
         return row;
+    }
+
+
+    private FacilityEquipmentSaveRequest baseRegisterRequest(String serialNumber, Long buildingId, Long floorId,
+                                                             String manufactureDate, BigDecimal x, BigDecimal y) {
+        FacilityEquipmentSaveRequest request = new FacilityEquipmentSaveRequest();
+        request.setSerialNumber(trimToNull(serialNumber));
+        request.setBuildingId(buildingId);
+        request.setFloorId(floorId);
+        request.setManufactureDate(parseDateOrToday(manufactureDate));
+        request.setX(x);
+        request.setY(y);
+        return request;
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> registerFacilityEquipment(String category, String kind, String qrKey,
+                                                                                       FacilityEquipmentSaveRequest request, MultipartFile photo) {
+        ResponseEntity<ApiResponse<Map<String, Object>>> validation = validateImage(photo, false);
+        if (validation != null) return validation;
+        String imagePath = null;
+        if (photo != null && !photo.isEmpty()) {
+            try {
+                imagePath = saveFacilityImage(photo, kind);
+            } catch (IOException ex) {
+                return ResponseEntity.internalServerError().body(ApiResponse.fail("사진 저장에 실패했습니다."));
+            }
+        }
+        FacilityEquipmentResponse saved = facilityEquipmentService.registerMobileEquipment(category, qrKey, request);
+        if (imagePath != null) {
+            facilityEquipmentService.updateImagePath(category, saved.getEquipmentId(), imagePath);
+        } else {
+            imagePath = saved.getImagePath();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("equipmentId", saved.getEquipmentId());
+        result.put("serialNumber", saved.getSerialNumber());
+        result.put("qrKey", saved.getQrKey());
+        result.put("imagePath", imagePath);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    private LocalDate parseDateOrToday(String value) {
+        String clean = trimToNull(value);
+        if (clean == null) return LocalDate.now();
+        try {
+            return LocalDate.parse(clean);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("설치일 형식이 올바르지 않습니다.");
+        }
+    }
+
+    private String saveFacilityImage(MultipartFile file, String kind) throws IOException {
+        Path dir = facilityUploadDir(kind);
+        Files.createDirectories(dir);
+        String ext = resolveExtension(file.getOriginalFilename());
+        String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        Files.copy(file.getInputStream(), dir.resolve(filename).normalize(), StandardCopyOption.REPLACE_EXISTING);
+        return "/facility-api/" + kind + "/files/" + filename;
+    }
+
+    private Path facilityUploadDir(String kind) {
+        String root = System.getenv("MODULE_FIRE_FACILITY_UPLOAD_ROOT");
+        if (root == null || root.isBlank()) {
+            Path dataRoot = Paths.get("/data/upload/module_fire/facility");
+            if (Files.exists(dataRoot) || Files.isWritable(dataRoot.getParent())) {
+                root = dataRoot.toString();
+            } else {
+                root = Paths.get(System.getProperty("user.dir", "."), "uploads", "module_fire", "facility").toString();
+            }
+        }
+        return Paths.get(root).resolve(kind).normalize();
     }
 
     private ResponseEntity<ApiResponse<Map<String, Object>>> validateImage(MultipartFile file, boolean required) {

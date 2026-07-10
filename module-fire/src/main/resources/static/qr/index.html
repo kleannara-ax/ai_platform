@@ -444,7 +444,7 @@
     if (!buildingBox || !floorBox || !keywordBox) return;
     const textMode = isTextSearchEquip();
     const conf = EQUIPMENT[currentEquip] || {};
-    const supportsUnregistered = conf.group === 'fire';
+    const supportsUnregistered = conf.group === 'fire' || conf.group === 'other';
     buildingBox.hidden = textMode;
     floorBox.hidden = textMode;
     keywordBox.hidden = !textMode;
@@ -673,6 +673,16 @@
           if (currentEquip === 'rcv') unregisteredList = unregisteredRes.data.unregisteredReceiverSerials || [];
           if (currentEquip === 'pmp') unregisteredList = unregisteredRes.data.unregisteredPumpSerials || [];
           if (currentEquip === 'spk') unregisteredList = unregisteredRes.data.unregisteredSprinklerSerials || [];
+        }
+      } else if (conf?.group === 'other' && unregisteredCount > 0) {
+        const countParams = new URLSearchParams({
+          airconCount: currentEquip === 'aircon' ? String(unregisteredCount) : '0',
+          waterCount: currentEquip === 'water' ? String(unregisteredCount) : '0'
+        });
+        const unregisteredRes = await apiFetch('/facility-api/qr/unregistered-keys?' + countParams.toString());
+        if (unregisteredRes?.data) {
+          if (currentEquip === 'aircon') unregisteredList = unregisteredRes.data.unregisteredAirconQrKeys || [];
+          if (currentEquip === 'water') unregisteredList = unregisteredRes.data.unregisteredWaterQrKeys || [];
         }
       }
 

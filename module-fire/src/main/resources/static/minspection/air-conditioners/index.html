@@ -3,66 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>에어컨 고장 접수</title>
+  <title>에어컨 QR</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root{--brand:#2563eb;--brand2:#0f766e;--bg:#eef6ff;--ink:#0f172a;--muted:#64748b;}
-    *{box-sizing:border-box} body{margin:0;font-family:'Pretendard Variable',Pretendard,system-ui,-apple-system,sans-serif;background:linear-gradient(180deg,#dbeafe 0%,#f8fafc 42%,#fff 100%);color:var(--ink)}
-    .mobile-shell{width:min(100%,560px);margin:0 auto;min-height:100vh;padding:18px 16px 28px;}
-    .hero{border-radius:28px;background:linear-gradient(135deg,#2563eb 0%,#0f766e 100%);color:#fff;padding:24px 20px;box-shadow:0 18px 40px rgba(37,99,235,.26)}
-    .hero .eyebrow{font-size:.86rem;font-weight:900;opacity:.78}.hero h1{font-size:1.62rem;font-weight:950;margin:.25rem 0 .35rem}.hero p{margin:0;color:rgba(255,255,255,.78);font-weight:700;line-height:1.45}
-    .cardx{border:0;border-radius:24px;background:#fff;box-shadow:0 16px 36px rgba(15,23,42,.08);overflow:hidden}.cardx + .cardx{margin-top:14px}.cardx .card-body{padding:18px}
-    .section-title{font-size:.95rem;font-weight:950;color:#1e293b;margin-bottom:12px}.info-grid{display:grid;gap:9px}.info-row{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;background:#f8fafc}.info-row span:first-child{font-size:.8rem;font-weight:900;color:var(--muted);flex:0 0 92px}.info-row span:last-child{font-weight:900;text-align:right;word-break:break-word}.form-label{font-weight:900;color:#334155}.form-control{border-radius:16px;border-color:#cbd5e1;min-height:48px}.btn-main{border:0;border-radius:18px;min-height:54px;font-weight:950;background:linear-gradient(135deg,#2563eb,#0f766e);box-shadow:0 14px 28px rgba(37,99,235,.22)}
-    .empty{padding:26px 14px;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-weight:800}.history{display:grid;gap:8px}.history-item{padding:11px 12px;border-radius:14px;background:#f8fafc}.history-item strong{display:block;font-size:.9rem}.history-item span{display:block;font-size:.82rem;color:var(--muted);margin-top:2px}.success-box{border-radius:24px;background:#ecfdf5;color:#166534;padding:22px;text-align:center;font-weight:900}
+    :root{--brand:#2563eb;--brand2:#0f766e;--ink:#0f172a;--muted:#64748b}*{box-sizing:border-box}body{margin:0;font-family:'Pretendard Variable',Pretendard,system-ui,-apple-system,sans-serif;background:linear-gradient(180deg,#dbeafe 0%,#f8fafc 42%,#fff 100%);color:var(--ink)}.mobile-shell{width:min(100%,560px);margin:0 auto;min-height:100vh;padding:18px 16px 28px}.hero{border-radius:28px;background:linear-gradient(135deg,#2563eb 0%,#0f766e 100%);color:#fff;padding:24px 20px;box-shadow:0 18px 40px rgba(37,99,235,.26)}.hero .eyebrow{font-size:.86rem;font-weight:900;opacity:.78}.hero h1{font-size:1.62rem;font-weight:950;margin:.25rem 0 .35rem}.hero p{margin:0;color:rgba(255,255,255,.78);font-weight:700;line-height:1.45}.cardx{border:0;border-radius:24px;background:#fff;box-shadow:0 16px 36px rgba(15,23,42,.08);overflow:hidden}.cardx+.cardx{margin-top:14px}.cardx .card-body{padding:18px}.section-title{font-size:.95rem;font-weight:950;color:#1e293b;margin-bottom:12px}.info-grid{display:grid;gap:9px}.info-row{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;background:#f8fafc}.info-row span:first-child{font-size:.8rem;font-weight:900;color:var(--muted);flex:0 0 92px}.info-row span:last-child{font-weight:900;text-align:right;word-break:break-word}.form-label{font-weight:900;color:#334155}.form-control,.form-select{border-radius:16px;border-color:#cbd5e1;min-height:48px}.btn-main{border:0;border-radius:18px;min-height:54px;font-weight:950;background:linear-gradient(135deg,#2563eb,#0f766e);box-shadow:0 14px 28px rgba(37,99,235,.22)}.empty{padding:26px 14px;border-radius:20px;background:#fff;text-align:center;color:var(--muted);font-weight:800}.history{display:grid;gap:8px}.history-item{padding:11px 12px;border-radius:14px;background:#f8fafc}.history-item strong{display:block;font-size:.9rem}.history-item span{display:block;font-size:.82rem;color:var(--muted);margin-top:2px}.success-box{border-radius:24px;background:#ecfdf5;color:#166534;padding:22px;text-align:center;font-weight:900}.preview{max-width:100%;border-radius:16px;margin-top:10px;display:none}.hint{font-size:.86rem;color:#64748b;font-weight:800;margin-top:6px;line-height:1.45}.qr-key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;word-break:break-all;color:#475569}
   </style>
 </head>
 <body>
 <main class="mobile-shell">
-  <section class="hero mb-3">
-    <div class="eyebrow">설비관리시스템 모바일 QR</div>
-    <h1>에어컨 고장 접수</h1>
-    <p>QR이 부착된 에어컨의 고장 내용을 현장에서 바로 접수합니다.</p>
-  </section>
-
+  <section class="hero mb-3"><div class="eyebrow">설비관리시스템 모바일 QR</div><h1 id="pageTitle">에어컨 QR</h1><p id="pageDesc">등록된 QR은 점검 처리, 미등록 QR은 신규 에어컨 등록으로 연결됩니다.</p></section>
   <section id="stateBox" class="empty">설비 정보를 불러오는 중...</section>
-
-  <section id="content" style="display:none">
-    <article class="cardx mb-3">
-      <div class="card-body">
-        <div class="section-title">설비 정보</div>
-        <div class="info-grid" id="equipmentInfo"></div>
-      </div>
-    </article>
-
-    <article class="cardx mb-3">
-      <div class="card-body">
-        <div class="section-title">고장 접수</div>
-        <form id="faultForm">
-          <div class="mb-3">
-            <label class="form-label" for="reporterName">접수자 이름</label>
-            <input class="form-control" id="reporterName" name="reporterName" autocomplete="name" placeholder="선택 입력">
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="reporterDepartment">소속</label>
-            <input class="form-control" id="reporterDepartment" name="reporterDepartment" autocomplete="organization" placeholder="선택 입력">
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="faultDescription">고장 내용 <span class="text-danger">*</span></label>
-            <textarea class="form-control" id="faultDescription" name="faultDescription" rows="5" required placeholder="예: 냉방이 되지 않음, 물 샘, 소음 발생 등"></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary btn-main w-100" id="btnSubmit">고장 접수하기</button>
-        </form>
-      </div>
-    </article>
-
-    <article class="cardx">
-      <div class="card-body">
-        <div class="section-title">최근 접수 내역</div>
-        <div id="historyWrap" class="history"></div>
-      </div>
-    </article>
-  </section>
+  <section id="content" style="display:none"></section>
 </main>
 <script>
 (() => {
@@ -70,44 +22,33 @@
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
   const qrKey = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
-  let submitting = false;
-
-  function setState(html, danger=false){ $('stateBox').className = 'empty' + (danger ? ' text-danger' : ''); $('stateBox').innerHTML = html; $('stateBox').style.display='block'; $('content').style.display='none'; }
-  function showContent(){ $('stateBox').style.display='none'; $('content').style.display='block'; }
-  function row(label, value){ return `<div class="info-row"><span>${esc(label)}</span><span>${esc(value || '-')}</span></div>`; }
-  function fmtDateTime(v){ if(!v) return '-'; return String(v).replace('T',' ').slice(0,16); }
-
-  async function load(){
-    if(!qrKey){ setState('QR 키가 비어 있습니다.', true); return; }
-    try{
-      const res = await fetch('/facility-api/mobile/air-conditioners/by-key?key=' + encodeURIComponent(qrKey));
-      const json = await res.json().catch(() => null);
-      if(!res.ok || json?.success === false){ setState(esc(json?.message || '설비 정보를 찾을 수 없습니다.'), true); return; }
-      const d = json.data || {};
-      $('equipmentInfo').innerHTML = row('식별 No.', d.serialNumber) + row('건물 / 층', [d.buildingName, d.floorName].filter(Boolean).join(' / ')) + row('종류', d.equipmentType) + row('제조사', d.manufacturer) + row('상세 위치', d.locationDescription);
-      const history = Array.isArray(d.recentFaultReports) ? d.recentFaultReports : [];
-      $('historyWrap').innerHTML = history.length ? history.map(h => `<div class="history-item"><strong>${esc(fmtDateTime(h.createdAt))} 접수</strong><span>${esc([h.reporterName, h.reporterDepartment].filter(Boolean).join(' / ') || '접수자 정보 없음')}</span><span>${esc(h.faultDescription)}</span></div>`).join('') : '<div class="text-muted fw-bold">최근 접수 내역이 없습니다.</div>';
-      showContent();
-    }catch(e){ setState('설비 정보를 불러오지 못했습니다.', true); }
+  let submitting = false, buildingFloors = [];
+  function setState(html,danger=false){$('stateBox').className='empty'+(danger?' text-danger':'');$('stateBox').innerHTML=html;$('stateBox').style.display='block';$('content').style.display='none'}
+  function show(html){$('stateBox').style.display='none';$('content').innerHTML=html;$('content').style.display='block'}
+  function row(label,value){return `<div class="info-row"><span>${esc(label)}</span><span>${esc(value||'-')}</span></div>`}
+  function fmtDateTime(v){return v?String(v).replace('T',' ').slice(0,16):'-'}
+  function today(){return new Date().toISOString().slice(0,10)}
+  async function loadBuildingFloors(){try{const r=await fetch('/fire-api/maps/building-floors');const j=await r.json();buildingFloors=Array.isArray(j?.data)?j.data:[]}catch(_){buildingFloors=[]}}
+  function buildingOptions(){return '<option value="">선택</option>'+buildingFloors.map(b=>`<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join('')}
+  function floorOptions(buildingId){const b=buildingFloors.find(x=>String(x.buildingId)===String(buildingId));const floors=b&&Array.isArray(b.floors)?b.floors:[];return '<option value="">선택</option>'+floors.map(f=>`<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('')}
+  function attachPreview(inputId,imgId){$(inputId)?.addEventListener('change',()=>{const f=$(inputId).files?.[0], img=$(imgId); if(!f){img.style.display='none';img.removeAttribute('src');return} img.src=URL.createObjectURL(f);img.style.display='block'})}
+  function renderFault(d){
+    $('pageTitle').textContent='에어컨 점검'; $('pageDesc').textContent='외부 점검자가 이름과 정상 작동 여부만 입력해 점검 완료를 처리합니다.';
+    const info=row('식별 No.',d.serialNumber)+row('건물 / 층',[d.buildingName,d.floorName].filter(Boolean).join(' / '))+row('종류',d.equipmentType)+row('제조사',d.manufacturer)+row('상세 위치',d.locationDescription);
+    const history=Array.isArray(d.recentFaultReports)?d.recentFaultReports:[];
+    const historyHtml=history.length?history.map(h=>`<div class="history-item"><strong>${esc(fmtDateTime(h.createdAt))} 점검</strong><span>${esc(h.reporterName||'점검자 정보 없음')}</span><span>작동 상태: ${esc(h.inspectionResult||h.faultDescription||'-')}</span></div>`).join(''):'<div class="text-muted fw-bold">최근 점검 내역이 없습니다.</div>';
+    show(`<article class="cardx mb-3"><div class="card-body"><div class="section-title">설비 정보</div><div class="info-grid">${info}</div></div></article><article class="cardx mb-3"><div class="card-body"><div class="section-title">에어컨 점검</div><form id="faultForm"><div class="mb-3"><label class="form-label" for="reporterName">점검자 이름 <span class="text-danger">*</span></label><input class="form-control" id="reporterName" name="reporterName" autocomplete="name" required placeholder="이름을 입력하세요"></div><div class="mb-3"><label class="form-label d-block">에어컨이 정상 작동 합니까?<br><span class="text-muted small">냉풍 및 실내 온도 하강 확인</span> <span class="text-danger">*</span></label><div class="d-grid gap-2"><label class="form-control d-flex align-items-center gap-2"><input type="radio" name="inspectionResult" value="정상" required> 정상</label><label class="form-control d-flex align-items-center gap-2"><input type="radio" name="inspectionResult" value="비정상" required> 비정상</label></div></div><button type="submit" class="btn btn-primary btn-main w-100" id="btnSubmit">점검 저장</button></form></div></article><article class="cardx"><div class="card-body"><div class="section-title">최근 점검 내역</div><div class="history">${historyHtml}</div></div></article>`);
+    $('faultForm').addEventListener('submit', submitFault);
   }
-
-  $('faultForm')?.addEventListener('submit', async event => {
-    event.preventDefault();
-    if(submitting) return;
-    const desc = $('faultDescription').value.trim();
-    if(!desc){ alert('고장 내용을 입력하세요.'); return; }
-    submitting = true; $('btnSubmit').disabled = true; $('btnSubmit').textContent = '접수 중...';
-    try{
-      const fd = new FormData(event.currentTarget);
-      const res = await fetch('/facility-api/mobile/air-conditioners/' + encodeURIComponent(qrKey) + '/fault-reports', { method:'POST', body: fd });
-      const json = await res.json().catch(() => null);
-      if(!res.ok || json?.success === false){ alert(json?.message || '고장 접수에 실패했습니다.'); return; }
-      $('content').innerHTML = '<div class="success-box"><div class="fs-4 mb-2">접수 완료</div><div>에어컨 고장 내용이 접수되었습니다.</div></div>';
-      showContent();
-    }catch(e){ alert('고장 접수 중 오류가 발생했습니다.'); }
-    finally{ submitting = false; $('btnSubmit') && ($('btnSubmit').disabled = false); }
-  });
-
+  async function renderRegister(){
+    $('pageTitle').textContent='에어컨 등록'; $('pageDesc').textContent='미등록 QR입니다. 현장 설비 정보를 입력하면 이 QR이 에어컨에 연결됩니다.';
+    await loadBuildingFloors();
+    show(`<article class="cardx"><div class="card-body"><div class="section-title">미등록 QR 등록</div><div class="hint mb-3">QR 키: <span class="qr-key">${esc(qrKey)}</span></div><form id="registerForm"><div class="mb-3"><label class="form-label" for="serialNumber">에어컨 식별 No. <span class="text-danger">*</span></label><input class="form-control" id="serialNumber" name="serialNumber" required maxlength="50"></div><div class="row g-2"><div class="col-6 mb-3"><label class="form-label" for="buildingId">건물 <span class="text-danger">*</span></label><select class="form-select" id="buildingId" name="buildingId" required>${buildingOptions()}</select></div><div class="col-6 mb-3"><label class="form-label" for="floorId">층 <span class="text-danger">*</span></label><select class="form-select" id="floorId" name="floorId" required><option value="">건물 선택</option></select></div></div><div class="mb-3"><label class="form-label" for="equipmentType">에어컨 종류 <span class="text-danger">*</span></label><select class="form-select" id="equipmentType" name="equipmentType" required><option value="시스템">시스템</option><option value="벽걸이">벽걸이</option><option value="스탠드형">스탠드형</option></select></div><div class="mb-3"><label class="form-label" for="manufacturer">제조사</label><input class="form-control" id="manufacturer" name="manufacturer" maxlength="100"></div><div class="mb-3"><label class="form-label" for="locationDescription">상세 위치</label><input class="form-control" id="locationDescription" name="locationDescription" maxlength="200"></div><div class="row g-2"><div class="col-6 mb-3"><label class="form-label" for="outdoorUnitCount">실외기 대수</label><input class="form-control" type="number" min="1" max="2" id="outdoorUnitCount" name="outdoorUnitCount" value="1"></div><div class="col-6 mb-3"><label class="form-label" for="manufactureDate">설치/제조일</label><input class="form-control" type="date" id="manufactureDate" name="manufactureDate" value="${today()}"></div></div><div class="row g-2"><div class="col-6 mb-3"><label class="form-label" for="x">도면 X(%)</label><input class="form-control" type="number" step="0.0001" min="0" max="100" id="x" name="x" placeholder="예: 45.2"></div><div class="col-6 mb-3"><label class="form-label" for="y">도면 Y(%)</label><input class="form-control" type="number" step="0.0001" min="0" max="100" id="y" name="y" placeholder="예: 61.8"></div></div><div class="mb-3"><label class="form-label" for="photo">대표 사진</label><input class="form-control" type="file" id="photo" name="photo" accept="image/*" capture="environment"><div class="hint">선택 시 등록과 동시에 대표 사진으로 저장됩니다.</div><img id="photoPreview" class="preview" alt="대표 사진 미리보기"></div><button type="submit" class="btn btn-primary btn-main w-100" id="btnRegister">에어컨 등록하기</button></form></div></article>`);
+    $('buildingId').addEventListener('change',()=>{$('floorId').innerHTML=floorOptions($('buildingId').value)}); attachPreview('photo','photoPreview'); $('registerForm').addEventListener('submit',submitRegister);
+  }
+  async function submitFault(e){e.preventDefault();if(submitting)return;if(!$('reporterName').value.trim()){alert('점검자 이름을 입력하세요.');return}if(!document.querySelector('input[name="inspectionResult"]:checked')){alert('에어컨 작동 상태를 선택하세요.');return}submitting=true;$('btnSubmit').disabled=true;$('btnSubmit').textContent='저장 중...';try{const res=await fetch('/facility-api/mobile/air-conditioners/'+encodeURIComponent(qrKey)+'/fault-reports',{method:'POST',body:new FormData(e.currentTarget)});const json=await res.json().catch(()=>null);if(!res.ok||json?.success===false){alert(json?.message||'점검 저장에 실패했습니다.');return}show('<div class="success-box"><div class="fs-4 mb-2">점검 저장 완료</div><div>에어컨 점검 결과가 저장되었습니다.</div></div>')}catch(_){alert('점검 저장 중 오류가 발생했습니다.')}finally{submitting=false;if($('btnSubmit'))$('btnSubmit').disabled=false}}
+  async function submitRegister(e){e.preventDefault();if(submitting)return;submitting=true;$('btnRegister').disabled=true;$('btnRegister').textContent='등록 중...';try{const res=await fetch('/facility-api/mobile/air-conditioners/'+encodeURIComponent(qrKey)+'/register',{method:'POST',body:new FormData(e.currentTarget)});const json=await res.json().catch(()=>null);if(!res.ok||json?.success===false){alert(json?.message||'에어컨 등록에 실패했습니다.');return}show('<div class="success-box"><div class="fs-4 mb-2">등록 완료</div><div>QR에 에어컨이 연결되었습니다. 잠시 후 점검 화면으로 전환됩니다.</div></div>');setTimeout(load,900)}catch(_){alert('에어컨 등록 중 오류가 발생했습니다.')}finally{submitting=false;if($('btnRegister'))$('btnRegister').disabled=false}}
+  async function load(){if(!qrKey){setState('QR 키가 비어 있습니다.',true);return}try{const res=await fetch('/facility-api/mobile/air-conditioners/by-key?key='+encodeURIComponent(qrKey));const json=await res.json().catch(()=>null);if(res.ok&&json?.success!==false){renderFault(json.data||{});return}const msg=String(json?.message||''); if(msg.includes('찾을 수 없습니다')){await renderRegister();return} setState(esc(msg||'설비 정보를 찾을 수 없습니다.'),true)}catch(_){setState('설비 정보를 불러오지 못했습니다.',true)}}
   load();
 })();
 </script>

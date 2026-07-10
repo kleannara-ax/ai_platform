@@ -14,6 +14,7 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
     Optional<FacilityEquipment> findBySerialNumber(String serialNumber);
     boolean existsBySerialNumber(String serialNumber);
     Optional<FacilityEquipment> findByQrKey(String qrKey);
+    boolean existsByQrKey(String qrKey);
 
     @Query(value =
             "SELECT e FROM FacilityEquipment e " +

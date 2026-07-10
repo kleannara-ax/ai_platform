@@ -101,7 +101,7 @@ public class FacilityEquipment {
                              String equipmentType, String manufacturer,
                              String locationDescription, int outdoorUnitCount,
                              LocalDate manufactureDate, int replacementCycleYears,
-                             BigDecimal x, BigDecimal y, String imagePath, String note) {
+                             BigDecimal x, BigDecimal y, String imagePath, String note, String qrKey) {
         this.category = category;
         this.serialNumber = serialNumber;
         this.building = building;
@@ -116,7 +116,7 @@ public class FacilityEquipment {
         this.y = y;
         this.imagePath = imagePath;
         this.note = note;
-        this.qrKey = UUID.randomUUID().toString();
+        this.qrKey = (qrKey == null || qrKey.isBlank()) ? UUID.randomUUID().toString() : qrKey.trim();
         calculateReplacementDueDate();
     }
 
