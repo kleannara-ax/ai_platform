@@ -19,6 +19,7 @@ import java.util.UUID;
 @Table(name = "facility_equipment",
         uniqueConstraints = {
                 @UniqueConstraint(name = "UK_FACILITY_EQUIPMENT_SERIAL", columnNames = "SERIAL_NUMBER"),
+                @UniqueConstraint(name = "UK_FACILITY_EQUIPMENT_CODE", columnNames = "EQUIPMENT_CODE"),
                 @UniqueConstraint(name = "UK_FACILITY_EQUIPMENT_QR_KEY", columnNames = "QR_KEY")
         })
 public class FacilityEquipment {
@@ -33,6 +34,9 @@ public class FacilityEquipment {
 
     @Column(name = "SERIAL_NUMBER", nullable = false, length = 50)
     private String serialNumber;
+
+    @Column(name = "EQUIPMENT_CODE", length = 50)
+    private String equipmentCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "BUILDING_ID", nullable = false)
@@ -97,13 +101,14 @@ public class FacilityEquipment {
     }
 
     @Builder
-    public FacilityEquipment(String category, String serialNumber, Building building, Floor floor,
+    public FacilityEquipment(String category, String serialNumber, String equipmentCode, Building building, Floor floor,
                              String equipmentType, String manufacturer,
                              String locationDescription, int outdoorUnitCount,
                              LocalDate manufactureDate, int replacementCycleYears,
                              BigDecimal x, BigDecimal y, String imagePath, String note, String qrKey) {
         this.category = category;
         this.serialNumber = serialNumber;
+        this.equipmentCode = equipmentCode;
         this.building = building;
         this.floor = floor;
         this.equipmentType = equipmentType;

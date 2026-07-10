@@ -15,6 +15,7 @@ public class FacilityEquipmentResponse {
     private final Long equipmentId;
     private final String category;
     private final String serialNumber;
+    private final String equipmentCode;
     private final String qrKey;
     private final Long buildingId;
     private final String buildingName;
@@ -44,6 +45,7 @@ public class FacilityEquipmentResponse {
                 .equipmentId(e.getEquipmentId())
                 .category(e.getCategory())
                 .serialNumber(e.getSerialNumber())
+                .equipmentCode(e.getEquipmentCode())
                 .qrKey(e.getQrKey())
                 .buildingId(e.getBuilding() != null ? e.getBuilding().getBuildingId() : null)
                 .buildingName(e.getBuilding() != null ? e.getBuilding().getBuildingName() : null)

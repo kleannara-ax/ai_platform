@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -125,6 +126,7 @@ public class SecurityConfig {
                 .requestMatchers("/fire-api/sprinklers/files/**").permitAll()
                 .requestMatchers("/fire-api/minspection/files/**").permitAll()
                 .requestMatchers("/facility-api/air-conditioners/files/**", "/facility-api/water-purifiers/files/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/facility-api/mobile/air-conditioners/*/register", "/facility-api/mobile/water-purifiers/*/register").authenticated()
                 .requestMatchers("/facility-api/mobile/**").permitAll()
                 // PS-INSP 모듈: 헬스체크·페이지(iframe)·정적리소스만 공개
                 // API(/ps-insp-api/inspections/**, /ps-insp-api/mes/**)는 인증+메뉴접근권한 필요

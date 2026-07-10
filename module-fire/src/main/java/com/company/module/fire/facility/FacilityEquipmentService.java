@@ -103,6 +103,7 @@ public class FacilityEquipmentService {
             entity = FacilityEquipment.builder()
                     .category(normalizedCategory)
                     .serialNumber(serialNumber)
+                    .equipmentCode(resolveEquipmentCode(normalizedCategory))
                     .building(building)
                     .floor(floor)
                     .equipmentType(equipmentType)
@@ -151,6 +152,7 @@ public class FacilityEquipmentService {
         FacilityEquipment entity = FacilityEquipment.builder()
                 .category(normalizedCategory)
                 .serialNumber(serialNumber)
+                .equipmentCode(resolveEquipmentCode(normalizedCategory))
                 .building(building)
                 .floor(floor)
                 .equipmentType(equipmentType)
@@ -314,7 +316,7 @@ public class FacilityEquipmentService {
     }
 
     private BigDecimal normalizeCoord(BigDecimal value) {
-        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
+        return value == null ? null : value.setScale(4, RoundingMode.HALF_UP);
     }
 
     private int normalizeOutdoorUnitCount(int value) {
@@ -345,15 +347,28 @@ public class FacilityEquipmentService {
         if (CATEGORY_AIRCON.equals(category)) {
             throw new BusinessException("에어컨 식별 No.는 자동 생성할 수 없습니다. 직접 입력하세요.");
         }
-        String prefix = "WP-";
-        List<String> serials = equipmentRepository.findByCategory(category).stream()
-                .map(FacilityEquipment::getSerialNumber)
+        return generateSequentialCode(category, "WP-", true);
+    }
+
+    private String resolveEquipmentCode(String category) {
+        if (CATEGORY_AIRCON.equals(category)) {
+            return generateSequentialCode(category, "AC-", false);
+        }
+        if (CATEGORY_WATER_PURIFIER.equals(category)) {
+            return null;
+        }
+        throw new BusinessException("지원하지 않는 기타설비 유형입니다.");
+    }
+
+    private String generateSequentialCode(String category, String prefix, boolean useSerialNumber) {
+        List<String> codes = equipmentRepository.findByCategory(category).stream()
+                .map(equipment -> useSerialNumber ? equipment.getSerialNumber() : equipment.getEquipmentCode())
                 .filter(s -> s != null && s.startsWith(prefix))
                 .toList();
         int maxNum = 0;
-        for (String serial : serials) {
+        for (String code : codes) {
             try {
-                int num = Integer.parseInt(serial.substring(prefix.length()));
+                int num = Integer.parseInt(code.substring(prefix.length()));
                 if (num > maxNum) maxNum = num;
             } catch (NumberFormatException ignored) { }
         }

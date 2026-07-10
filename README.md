@@ -15,7 +15,7 @@
   - 메인 도면 신규 구역: `화장지 원단창고`, `화장지 천막창고`, `원료장`, `유동상소각로`, `신설소각로 폐기물 처리동`, `신설소각로 증기터빈동`, `패드동 천막창고` polygon을 추가하고 각 구역의 층별 도면 이미지를 연결
   - 대시보드 이상설비 상세 모달: 넓은 전용 모달로 상세 화면 표시
   - 수신기/소방펌프 현황 그래프: 정상, 점검필요, 요정비, 불량 4상태 구분 표시(요정비/교체필요는 밝은 노란색 계열로 통일)
-  - 기타설비 관리: 에어컨, 정수기 목록/상세/등록/수정/삭제/이미지 업로드, 기타설비 QR코드 조회/인쇄, 에어컨 점검 요청, 에어컨/정수기 모바일 QR 점검 처리
+  - 기타설비 관리: 에어컨, 정수기 목록/상세/등록/수정/삭제/이미지 업로드, 기타설비 QR코드 조회/인쇄, 에어컨 점검 요청, 에어컨/정수기 모바일 QR 점검 처리. 에어컨은 자동 생성 ID(`AC-000001`)와 현장 식별 No.를 별도로 관리하고, 정수기는 기존 `WP-000001` 형식 순번 ID를 자동 생성합니다.
   - 기타설비 이미지/QR 정책: 목록에는 대표/마커 이미지를 표시하지 않고, 상세 모달에는 사진 섹션을 항상 표시해 업로드 사진이 없으면 안내 문구를 보여주며, 도면 마커는 업로드 이미지와 분리된 마커 전용 이미지만 사용. 상세 모달 QR코드는 `OTHER_ADMIN` 권한자에게만 표시
   - 에어컨 관리 단순화: 식별 No.는 자동 생성하지 않고 사용자가 직접 입력하며, 제조사, 상세 위치, 실외기 대수(최대 2대), 제조/설치월만 관리하고 실외기 좌표/연결선, 설치연도, 수량 입력은 제거
   - 정수기 관리 단순화: 정수기 종류는 `정수기` 단일 값으로 고정하고, 등록/수정 화면은 설치일, 건물, 층, X/Y 좌표만 사용자 입력으로 표시
@@ -60,10 +60,10 @@
   - `/facility-api/qr/list`: 기타설비 QR 목록 조회
   - `/facility-api/qr/unregistered-keys?airconCount={count}&waterCount={count}`: 에어컨/정수기 미등록 QR 키 생성
   - `/fire-api/qr/image?type=aircon&id={qrKey}`, `/fire-api/qr/image?type=water&id={qrKey}`: 기타설비 QR 이미지 생성. QR 스캔 대상은 각각 `/minspection/air-conditioners/{qrKey}`, `/minspection/water-purifiers/{qrKey}`
-  - `/minspection/air-conditioners/{qrKey}`: 등록 QR은 모바일 에어컨 점검(점검자 이름, 정상/비정상), 미등록 QR은 에어컨 신규 등록 페이지
-  - `/minspection/water-purifiers/{qrKey}`: 등록 QR은 모바일 정수기 점검(점검자 이름, 완료/미완료), 미등록 QR은 정수기 신규 등록 페이지
-  - `/facility-api/mobile/air-conditioners/by-key?key={qrKey}`, `/facility-api/mobile/air-conditioners/{qrKey}/register`, `/facility-api/mobile/air-conditioners/{qrKey}/fault-reports`: 모바일 에어컨 설비 조회/QR 등록/점검 저장 API
-  - `/facility-api/mobile/water-purifiers/by-key?key={qrKey}`, `/facility-api/mobile/water-purifiers/{qrKey}/register`, `/facility-api/mobile/water-purifiers/{qrKey}/disinfections`: 모바일 정수기 설비 조회/QR 등록/점검 저장 API
+  - `/minspection/air-conditioners/{qrKey}`: 등록 QR은 모바일 에어컨 점검(점검자 이름, 정상/비정상), 미등록 QR은 로그인 후 에어컨 신규 등록 페이지. 등록 화면은 건물/층 선택 시 도면을 표시하고, 모바일 두 손가락 확대/축소·이동 후 탭으로 위치 좌표를 자동 저장합니다.
+  - `/minspection/water-purifiers/{qrKey}`: 등록 QR은 모바일 정수기 점검(점검자 이름, 완료/미완료), 미등록 QR은 로그인 후 정수기 신규 등록 페이지. 정수기 ID 입력칸은 없고 순번 ID가 자동 생성되며, 등록 화면은 건물/층 도면 터치 좌표 선택을 지원합니다.
+  - `/facility-api/mobile/air-conditioners/by-key?key={qrKey}`, `/facility-api/mobile/air-conditioners/{qrKey}/register`, `/facility-api/mobile/air-conditioners/{qrKey}/fault-reports`: 모바일 에어컨 설비 조회/QR 등록/점검 저장 API. 최초 QR 등록 POST만 JWT 인증이 필요하고, 점검 저장은 외부 업체용으로 공개 유지합니다.
+  - `/facility-api/mobile/water-purifiers/by-key?key={qrKey}`, `/facility-api/mobile/water-purifiers/{qrKey}/register`, `/facility-api/mobile/water-purifiers/{qrKey}/disinfections`: 모바일 정수기 설비 조회/QR 등록/점검 저장 API. 최초 QR 등록 POST만 JWT 인증이 필요하고, 점검 저장은 외부 업체용으로 공개 유지합니다.
   - `/facility-api/mobile/files/{aircon-faults|water-disinfections}/{filename}`: 과거 모바일 QR 업무 사진 조회 호환 endpoint
 
 ## Data Architecture
@@ -72,7 +72,7 @@
 - **New Tables**:
   - `fire_sprinkler`: 스프링클러 마스터. `SPK-000001` 형식의 ID, 건물/층, X/Y 좌표, 비고, QR_KEY, IMAGE_PATH, 활성 여부 관리
   - `fire_sprinkler_inspection`: 스프링클러 점검 이력. 배관 5개 항목, 헤드 반사판 1개 항목, 제품 이격거리 1개 항목을 `NORMAL`/`FAULTY`로 저장하고 비고와 점검자 정보를 관리
-  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터. 에어컨은 사용자가 직접 입력한 `SERIAL_NUMBER`, `EQUIPMENT_TYPE`, `MANUFACTURER`, `LOCATION_DESCRIPTION`, `OUTDOOR_UNIT_COUNT`, `MANUFACTURE_DATE` 중심으로 관리하며 `INSTALLATION_YEAR`, `OUTDOOR_X`, `OUTDOOR_Y`, `QUANTITY`는 `V17__simplify_facility_aircon_fields.sql`에서 제거. 정수기는 `V19__simplify_facility_water_purifier_fields.sql` 기준으로 `EQUIPMENT_TYPE='정수기'` 고정, `MANUFACTURE_DATE`를 설치일로 사용하고 사용자 입력은 건물/층/X/Y 좌표와 설치일만 받음. `IMAGE_PATH`는 사용자가 업로드한 이미지 경로만 저장하며, 도면 마커 이미지는 별도 마커 전용 아이콘을 사용
+  - `facility_equipment`: 에어컨/정수기 공통 설비 마스터. `EQUIPMENT_CODE`는 에어컨 `AC-000001` 형식의 자동 생성 설비 ID이며, 에어컨은 `EQUIPMENT_CODE`와 별개로 사용자가 직접 입력한 `SERIAL_NUMBER`(식별 No.), `EQUIPMENT_TYPE`, `MANUFACTURER`, `LOCATION_DESCRIPTION`, `OUTDOOR_UNIT_COUNT`, `MANUFACTURE_DATE` 중심으로 관리합니다. 정수기는 별도 `EQUIPMENT_CODE`를 사용하지 않고 기존 `SERIAL_NUMBER`의 `WP-000001` 형식 순번 ID를 자동 생성합니다. `INSTALLATION_YEAR`, `OUTDOOR_X`, `OUTDOOR_Y`, `QUANTITY`는 `V17__simplify_facility_aircon_fields.sql`에서 제거. 정수기는 `V19__simplify_facility_water_purifier_fields.sql` 기준으로 `EQUIPMENT_TYPE='정수기'` 고정, `MANUFACTURE_DATE`를 설치일로 사용하고 사용자 입력은 건물/층/X/Y 좌표와 설치일만 받음. `IMAGE_PATH`는 사용자가 업로드한 이미지 경로만 저장하며, 도면 마커 이미지는 별도 마커 전용 아이콘을 사용
   - `facility_equipment_inspection`: 기타설비 점검 이력
   - `facility_aircon_fault_report`: 에어컨 점검 요청/모바일 QR 점검 기록. PC 점검 요청은 접수자 이름, 소속, 고장내용을 저장하고, 모바일 QR 점검은 점검자 이름과 정상/비정상 결과를 저장
   - `facility_water_disinfection`: 정수기 모바일 QR 점검 기록. 점검일, 점검자, 완료/미완료 결과를 저장하며 신규 모바일 QR 점검에서는 사진 업로드를 받지 않음
@@ -112,10 +112,10 @@
 5. 대시보드 메뉴(`FIRE_DASHBOARD`, `OTHER_DASHBOARD`)는 메뉴관리·접근권한 대상에서 제거되었으며, 이전 세션에 삭제된 페이지가 남아 있으면 기본 대시보드로 자동 복귀합니다.
 6. 층별 도면에서는 맨 위의 `설비 구분`을 먼저 선택하고, 도면 카드 상단에서 `건물`, `층`, `선택설비`를 선택합니다. 소방설비는 소화기/소화전/스프링클러를 표시하고, 옥외 도면에서는 수신기/소방펌프도 선택설비에 추가됩니다. 기타설비를 선택하면 에어컨/정수기만 표시됩니다. 도면 카드 상단에는 `도면` 제목 없이 건물/층/선택설비 드롭다운과 설비 추가, 확대 초기화 버튼만 한 줄로 표시하며, 별도 컨트롤 카드는 없습니다. 도면 영역은 목록 없이 크게 표시됩니다. `설비 추가`는 현재 선택설비를 현재 도면에서 클릭한 위치에 추가합니다. 설비 삭제는 상단 버튼이 아니라 마커 클릭 시 나타나는 미니 모달의 `삭제` 버튼으로 수행하고, 저장/점검/삭제 후 마커가 갱신됩니다.
 7. 도면의 설비 마커를 클릭하면 미니 모달에서 상세/점검/수정/삭제 작업을 바로 선택할 수 있습니다.
-8. 권한이 있는 사용자는 추가/수정/삭제/정수기 점검/에어컨 점검 요청 및 이미지 업로드를 수행할 수 있습니다. 에어컨 식별 No.는 자동 생성되지 않으므로 등록/수정 시 반드시 직접 입력해야 합니다. 에어컨 목록의 관리 버튼은 기존 `점검` 대신 `점검 요청`으로 표시되며 접수자 이름, 소속, 고장내용만 입력합니다. 정수기는 등록/수정 시 설치일, 건물, 층, X/Y 좌표만 입력하면 되며 종류는 자동으로 `정수기`로 저장됩니다.
+8. 권한이 있는 사용자는 추가/수정/삭제/정수기 점검/에어컨 점검 요청 및 이미지 업로드를 수행할 수 있습니다. 에어컨 ID는 `AC-000001` 형식으로 자동 생성되며, 현장 식별 No.는 별도 값이므로 등록/수정 시 반드시 직접 입력해야 합니다. 에어컨 목록의 관리 버튼은 기존 `점검` 대신 `점검 요청`으로 표시되며 접수자 이름, 소속, 고장내용만 입력합니다. 정수기는 등록/수정 시 설치일, 건물, 층, X/Y 좌표만 입력하면 되며 종류와 기존 `WP-000001` 형식 정수기 ID는 자동으로 저장됩니다.
 9. 수신기/소방펌프 수정 모달 상단 설비 기본정보 영역에서 사진 파일을 선택하면 해당 설비의 대표사진이 최신 1장으로 교체됩니다.
 10. 수신기/소방펌프 수정 모달의 점검 이력 영역에서는 기존 내역 `수정`/`삭제`와 신규 행 `추가`만 수행하며, 점검 이력 편집 테이블에는 사진 업로드 입력을 두지 않습니다. 점검사진은 별도 `점검` 모달에서 저장 시 업로드됩니다.
-11. 모바일 QR 점검에서 소화기(`/minspection/extinguishers/{qrKey}`), 소화전(`/minspection/hydrants/{qrKey}`), 스프링클러(`/minspection/sprinklers/{qrKey}`)는 점검 저장 후 선택한 사진을 최신 설비 이미지로 저장합니다. 수신기/소방펌프(`/minspection/receivers/{qrKey}`, `/minspection/pumps/{qrKey}`)는 각 점검 항목별로 `정상`, `요정비`, `불량` 중 하나를 선택하며, 요정비/불량 항목은 자동 요약되고 모바일에서 촬영/선택한 사진은 최신 점검 이력과 설비 대표사진에 연결됩니다. 에어컨(`/minspection/air-conditioners/{qrKey}`)은 점검자 이름과 `에어컨이 정상 작동 합니까?(냉풍 및 실내 온도 하강 확인)`의 정상/비정상만 저장하고, 정수기(`/minspection/water-purifiers/{qrKey}`)는 점검자 이름과 `점검을 완료 하셨습니까.`의 완료/미완료만 저장합니다. 에어컨/정수기 QR 점검 페이지에는 사진 업로드 입력을 두지 않습니다.
+11. 모바일 QR 점검에서 소화기(`/minspection/extinguishers/{qrKey}`), 소화전(`/minspection/hydrants/{qrKey}`), 스프링클러(`/minspection/sprinklers/{qrKey}`)는 점검 저장 후 선택한 사진을 최신 설비 이미지로 저장합니다. 수신기/소방펌프(`/minspection/receivers/{qrKey}`, `/minspection/pumps/{qrKey}`)는 각 점검 항목별로 `정상`, `요정비`, `불량` 중 하나를 선택하며, 요정비/불량 항목은 자동 요약되고 모바일에서 촬영/선택한 사진은 최신 점검 이력과 설비 대표사진에 연결됩니다. 에어컨(`/minspection/air-conditioners/{qrKey}`)은 점검자 이름과 `에어컨이 정상 작동 합니까?(냉풍 및 실내 온도 하강 확인)`의 정상/비정상만 저장하고, 정수기(`/minspection/water-purifiers/{qrKey}`)는 점검자 이름과 `점검을 완료 하셨습니까.`의 완료/미완료만 저장합니다. 에어컨/정수기 QR 점검 페이지에는 사진 업로드 입력을 두지 않습니다. 단, 미등록 QR 최초 등록은 로그인 후에만 가능하며 건물/층 선택 후 표시되는 도면에서 두 손가락 확대/축소, 확대 상태 이동, 탭 위치 선택으로 X/Y 좌표를 자동 입력합니다.
 12. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다.
 13. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨도 실내기 위치만 지정하며, 실외기는 좌표 연결 없이 대수만 입력합니다.
 
@@ -167,13 +167,14 @@
 - 새 투명 스프링클러 이미지는 좌측 메뉴 전용 `/images/sprinkler-menu.png`로 분리하고, 좌측 메뉴 아이콘의 흰 배경 스타일을 제거. 이후 낮은 가시성과 외곽 잔상을 줄이기 위해 아이콘 alpha를 정리한 마스크로 보정하고 `currentColor` 기반 CSS mask를 적용해 다른 사이드바 아이콘과 동일 색상으로 표시. 스프링클러 목록 기본 이미지는 기존 `/images/sprinkler.png`를 유지하며, 도면상 마커는 신규 `/images/sprinkler-marker.png` 아이콘을 사용하도록 분리
 - 에어컨/정수기 목록과 기타설비 층별 도면 좌측 목록에서 이미지 출력을 제거하고, 상세 모달의 업로드 이미지는 사용자가 업로드한 이미지가 있을 때만 표시하도록 변경. 기타설비 도면 마커는 업로드 이미지나 설비 기본 이미지를 사용하지 않고 마커 전용 아이콘만 사용하며, 원형 배경/크롭 프레임을 제거해 투명 외곽 여백이 보이지 않도록 개선
 - `V29__add_other_equipment_qr_menu.sql`, `/facility/qr`, `/facility-api/qr/list`를 추가해 기타설비 QR코드 메뉴를 메뉴관리/접근권한과 동일하게 관리하고, QR 이미지는 `/fire-api/qr/image?type=aircon|water&id={qrKey}`에서 생성
-- `V31__add_facility_mobile_qr_workflows.sql`로 에어컨 점검 요청/QR 점검(`facility_aircon_fault_report`)과 정수기 QR 점검(`facility_water_disinfection`) 테이블을 추가하고, `/facility-api/mobile/**` 및 `/minspection/air-conditioners|water-purifiers/{qrKey}` 모바일 QR 업무 흐름을 구현 완료. PC 에어컨 점검 요청 항목은 접수자 이름, 소속, 고장내용을 유지하고, 모바일 QR 점검 항목은 에어컨 점검자 이름+정상/비정상, 정수기 점검자 이름+완료/미완료만 받도록 단순화했습니다. 구버전 `REPORTER_PHONE`, `PHOTO_PATH` 컬럼 보정 SQL을 포함합니다.
+- `V31__add_facility_mobile_qr_workflows.sql`로 에어컨 점검 요청/QR 점검(`facility_aircon_fault_report`)과 정수기 QR 점검(`facility_water_disinfection`) 테이블을 추가했습니다. `/facility-api/mobile/**` 및 `/minspection/air-conditioners|water-purifiers/{qrKey}` 모바일 QR 업무 흐름을 구현 완료. PC 에어컨 점검 요청 항목은 접수자 이름, 소속, 고장내용을 유지하고, 모바일 QR 점검 항목은 에어컨 점검자 이름+정상/비정상, 정수기 점검자 이름+완료/미완료만 받도록 단순화했습니다. 미등록 QR 최초 등록 POST는 로그인 JWT가 필요하고, 등록 화면은 도면 터치 좌표 선택을 지원합니다. 구버전 `REPORTER_PHONE`, `PHOTO_PATH` 컬럼 보정 SQL을 포함합니다.
 - `V32__add_other_facility_admin_code_group.sql`로 `OTHER_PERM/OTHER_ADMIN` 공통코드를 추가하고, 기타설비 목록/층별 도면/상세 모달/QR 목록의 관리 버튼 및 mutation API를 `OTHER_ADMIN.EXTRA_VALUE1` 사용자 ID 목록 기준으로 제어하도록 구현 완료. 에어컨/정수기 상세 모달은 사진 섹션을 항상 표시하며, QR코드 이미지는 `OTHER_ADMIN` 권한자에게만 `/fire-api/qr/image?type=aircon|water&id={qrKey}`로 노출합니다.
-- QR 관리 페이지의 미등록 QR 생성 범위를 기타설비까지 확장했습니다. 에어컨/정수기 미등록 QR은 각각 `/minspection/air-conditioners/{qrKey}`, `/minspection/water-purifiers/{qrKey}` 모바일 등록 페이지로 연결되고, 등록 API는 전달받은 QR 키를 `facility_equipment.QR_KEY`에 그대로 저장합니다. 등록 대표사진 업로드는 실제 multipart POST 200 및 반환 이미지 URL GET 200으로 검증했으며, QR 점검 페이지의 사진 업로드 입력은 제거했습니다.
+- `V33__add_facility_aircon_equipment_code.sql`로 에어컨 전용 자동 ID 컬럼(`facility_equipment.EQUIPMENT_CODE`)을 신규 버전 SQL에 분리했습니다. 에어컨은 `AC-000001` 형식 ID와 식별 No.를 별도로 관리하고, 정수기는 기존 `SERIAL_NUMBER` 기반 `WP-000001` 자동 생성 정책만 유지합니다.
+- QR 관리 페이지의 미등록 QR 생성 범위를 기타설비까지 확장했습니다. 에어컨/정수기 미등록 QR은 각각 `/minspection/air-conditioners/{qrKey}`, `/minspection/water-purifiers/{qrKey}` 모바일 등록 페이지로 연결되고, 등록 API는 전달받은 QR 키를 `facility_equipment.QR_KEY`에 그대로 저장합니다. 미등록 QR 최초 등록은 로그인 후에만 가능하고, 등록 대표사진 업로드는 유지됩니다. QR 점검 페이지의 사진 업로드 입력은 제거했습니다.
 
 ## Recommended Next Steps
 - 실제 사용자 계정별 역할 부여 후 `ROLE_ADMIN`, `ROLE_FACILITY_MANAGER`, `ROLE_FIRE_MANAGER`, `ROLE_EQUIPMENT_MANAGER` 메뉴 노출 및 API 권한 검증
-- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__add_fluidized_bed_incinerator_map_zone.sql`, `V24__add_new_incinerator_map_zone_buildings.sql`, `V25__add_pad_tent_warehouse_map_zone_building.sql`, `V26__add_fire_sprinkler.sql`, `V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql`, `V28__add_fire_sprinkler_qr_mobile_fields.sql`, `V29__add_other_equipment_qr_menu.sql`, `V30__move_fire_qr_to_facility_root.sql`, `V31__add_facility_mobile_qr_workflows.sql`, `V32__add_other_facility_admin_code_group.sql` 순서 적용 후 메뉴관리/접근권한, 신규 도면 구역, 스프링클러 목록/QR/모바일 점검, 기타설비 QR 메뉴 및 에어컨/정수기 모바일 QR 업무 저장 검증
+- 운영 DB에 `V17__simplify_facility_aircon_fields.sql`, `V19__simplify_facility_water_purifier_fields.sql`, `V20__fix_facility_role_duplicates.sql`, `V21__normalize_facility_menu_structure.sql`, `V22__add_new_map_zone_buildings.sql`, `V23__add_fluidized_bed_incinerator_map_zone.sql`, `V24__add_new_incinerator_map_zone_buildings.sql`, `V25__add_pad_tent_warehouse_map_zone_building.sql`, `V26__add_fire_sprinkler.sql`, `V27__fix_fire_sprinkler_menu_name_and_legacy_route.sql`, `V28__add_fire_sprinkler_qr_mobile_fields.sql`, `V29__add_other_equipment_qr_menu.sql`, `V30__move_fire_qr_to_facility_root.sql`, `V31__add_facility_mobile_qr_workflows.sql`, `V32__add_other_facility_admin_code_group.sql`, `V33__add_facility_aircon_equipment_code.sql` 순서 적용 후 메뉴관리/접근권한, 신규 도면 구역, 스프링클러 목록/QR/모바일 점검, 기타설비 QR 메뉴 및 에어컨/정수기 모바일 QR 업무 저장 검증
 - `설비관리시스템 > 도면 (메인)`, `설비관리시스템 > 층별 도면`, `설비관리시스템 > QR코드`, `소방설비`, `기타설비`의 사이드바 정렬과 권한별 표시 확인
 - 에어컨/정수기 실데이터 등록 후 공통 도면 좌표 매칭 검증
 - 추가 운영 DB 반영 시 `mysql --default-character-set=utf8mb4` 사용 권장

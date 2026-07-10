@@ -221,6 +221,7 @@ public class FacilityMobileQrController {
         result.put("equipmentId", equipment.getEquipmentId());
         result.put("category", equipment.getCategory());
         result.put("serialNumber", equipment.getSerialNumber());
+        result.put("equipmentCode", equipment.getEquipmentCode());
         result.put("qrKey", equipment.getQrKey());
         result.put("buildingName", equipment.getBuilding() != null ? equipment.getBuilding().getBuildingName() : "-");
         result.put("floorName", equipment.getFloor() != null ? equipment.getFloor().getFloorName() : "-");
@@ -295,6 +296,7 @@ public class FacilityMobileQrController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("equipmentId", saved.getEquipmentId());
         result.put("serialNumber", saved.getSerialNumber());
+        result.put("equipmentCode", saved.getEquipmentCode());
         result.put("qrKey", saved.getQrKey());
         result.put("imagePath", imagePath);
         return ResponseEntity.ok(ApiResponse.success(result));
