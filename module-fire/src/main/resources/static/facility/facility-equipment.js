@@ -419,8 +419,11 @@
     const photoSection = renderDetailPhotoSection(d);
     const qrSection = renderDetailQrSection(d);
     $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div>${secondarySection}</div><div class="col-lg-6 d-flex flex-column gap-3">${photoSection}${qrSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong><span>클릭하면 확대됩니다.</span></div>${plan ? `<div class="fw-media-box position-relative js-zoomable" id="detailPlanWrap" data-zoom-src="${esc(plan)}" data-zoom-kind="plan" style="height:320px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="max-width:100%;max-height:100%;object-fit:contain;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
+    const modalEl = $('detailsModal');
+    const drawDetailPlanMarker = () => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, markerImage(d.equipmentType || fixedType()));
+    if (plan && modalEl) modalEl.addEventListener('shown.bs.modal', drawDetailPlanMarker, { once: true });
     bootstrapModal('detailsModal')?.show();
-    if (plan) setTimeout(() => drawSingleMarker('detailPlanWrap', 'detailPlanImg', 'detailMarkerLayer', d.x, d.y, markerImage(d.equipmentType)), 80);
+    if (plan) [80, 250, 600].forEach(delay => setTimeout(drawDetailPlanMarker, delay));
   }
 
   function detailItem(k, v) { return `<div class="fw-detail-item"><div class="fw-detail-item-label">${esc(k)}</div><div class="fw-detail-item-value">${esc(v || '-')}</div></div>`; }
