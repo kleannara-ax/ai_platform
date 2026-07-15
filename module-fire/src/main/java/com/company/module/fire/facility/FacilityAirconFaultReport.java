@@ -62,6 +62,10 @@ public class FacilityAirconFaultReport {
         this.status = "정상".equals(inspectionResult) ? "NORMAL" : "ABNORMAL";
     }
 
+    public void cancel() {
+        this.status = "CANCELLED";
+    }
+
     @Builder
     public FacilityAirconFaultReport(FacilityEquipment equipment, String reporterName, String reporterDepartment,
                                      String faultDescription, String status) {

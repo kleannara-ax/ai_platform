@@ -195,7 +195,7 @@
 
   function renderAirconFields() {
     if (!isAirconPage()) return '';
-    return `<div class="col-md-4"><label class="form-label fw-bold">에어컨 식별 No. <span class="text-muted small">(선택)</span></label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1"><div class="form-text">현장 식별 No.가 있을 때만 입력하세요.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div>`;
+    return `<div class="col-md-4"><label class="form-label fw-bold">에어컨 식별 No. <span class="text-muted small">(선택)</span></label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1"><div class="form-text">현장 식별 No.가 있을 때만 입력하세요.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div><div class="col-md-4"><label class="form-label fw-bold">상태</label><select class="form-select" id="inspectionRequested"><option value="false">정상</option><option value="true">점검요청</option></select><div class="form-text">점검요청은 QR 점검 완료 대상이 됩니다.</div></div>`;
   }
 
   function renderTypeField() {
@@ -471,6 +471,7 @@
         if ($('manufacturer')) $('manufacturer').value = d.manufacturer || '';
         if ($('locationDescription')) $('locationDescription').value = d.locationDescription || '';
         if ($('outdoorUnitCount')) $('outdoorUnitCount').value = String(outdoorUnitCount(d.outdoorUnitCount));
+        if ($('inspectionRequested')) $('inspectionRequested').value = String(Boolean(d.inspectionRequested));
       }
       setCoord(d.x, d.y); renderHistory(d.inspections || []);
     } else {
@@ -490,6 +491,7 @@
       if ($('manufacturer')) $('manufacturer').value = '';
       if ($('locationDescription')) $('locationDescription').value = '';
       if ($('outdoorUnitCount')) $('outdoorUnitCount').value = '1';
+      if ($('inspectionRequested')) $('inspectionRequested').value = 'false';
     }
   }
   function fillTypeOptions() { if (!$('equipmentType')) return; if (isSimpleWaterPurifier()) { $('equipmentType').value = fixedType(); return; } $('equipmentType').innerHTML = '<option value="">-- 종류 선택 --</option>' + (CFG.typeOptions || ['기타']).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join(''); }
@@ -551,6 +553,7 @@
       payload.manufacturer = $('manufacturer')?.value?.trim() || null;
       payload.locationDescription = $('locationDescription')?.value?.trim() || null;
       payload.outdoorUnitCount = outdoorUnitCount($('outdoorUnitCount')?.value);
+      if (state.editingId) payload.inspectionRequested = $('inspectionRequested')?.value === 'true';
     }
     if (isSimpleWaterPurifier()) {
       payload.equipmentType = fixedType();

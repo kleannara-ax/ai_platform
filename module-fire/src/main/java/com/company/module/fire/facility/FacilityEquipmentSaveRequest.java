@@ -27,6 +27,7 @@ public class FacilityEquipmentSaveRequest {
     private String manufacturer;
     private String locationDescription;
     private int outdoorUnitCount = 1;
+    private Boolean inspectionRequested;
 
     @NotNull(message = "설치/제조일을 입력하세요.")
     private LocalDate manufactureDate;
