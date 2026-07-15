@@ -1286,6 +1286,18 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/pad_tent_warehouse_1F.jpg";
             return null;
         }
+        if (bn.contains("60톤보일러") || bn.contains("60tonboiler")) {
+            if (floorNo == 1) return "/images/60_ton_boiler_1F.jpg";
+            return null;
+        }
+        if (bn.contains("20톤보일러") || bn.contains("20tonboiler")) {
+            if (floorNo == 1) return "/images/20_ton_boiler_1F.jpg";
+            return null;
+        }
+        if (bn.contains("천막창고56동") || bn.contains("tentwarehouse56")) {
+            if (floorNo == 1) return "/images/tent_warehouse_5_6_1F.jpg";
+            return null;
+        }
         if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
             if (floorNo == 1) return "/images/tissue_tent_warehouse_1F.jpg";
             return null;
@@ -1453,6 +1465,15 @@ public class MobileInspectionController {
         }
         if (bn.contains("패드동천막창고") || bn.contains("padtentwarehouse")) {
             return "/images/pad_tent_warehouse_1F.jpg";
+        }
+        if (bn.contains("60톤보일러") || bn.contains("60tonboiler")) {
+            return f.contains("1") ? "/images/60_ton_boiler_1F.jpg" : "";
+        }
+        if (bn.contains("20톤보일러") || bn.contains("20tonboiler")) {
+            return f.contains("1") ? "/images/20_ton_boiler_1F.jpg" : "";
+        }
+        if (bn.contains("천막창고56동") || bn.contains("tentwarehouse56")) {
+            return f.contains("1") ? "/images/tent_warehouse_5_6_1F.jpg" : "";
         }
         if (bn.contains("화장지천막창고") || bn.contains("천막창고") || bn.contains("tissuetentwarehouse")) {
             return "/images/tissue_tent_warehouse_1F.jpg";
