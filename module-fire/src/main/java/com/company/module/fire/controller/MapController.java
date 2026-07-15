@@ -162,7 +162,8 @@ public class MapController {
             if (floor.contains("1")) return "/images/pad_tent_warehouse_1F.jpg";
             return "";
         }
-        if (containsAny(building, "화장지천막창고", "천막창고", "tissue_tent_warehouse")) {
+        if (containsAny(building, "화장지천막창고", "천막창고", "tissue_tent_warehouse")
+                && !containsAny(building, "천막창고5,6동", "천막창고56동", "tentwarehouse56")) {
             if (isBasement(floor)) return "";
             if (floor.contains("1")) return "/images/tissue_tent_warehouse_1F.jpg";
             return "";
@@ -260,6 +261,21 @@ public class MapController {
             if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/boiler_ctrl_2F.png";
             if (floor.contains("1")) return "/images/boiler_ctrl_1F.png";
+            return "";
+        }
+        if (containsAny(building, "60톤보일러", "60tonboiler")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/60_ton_boiler_1F.jpg";
+            return "";
+        }
+        if (containsAny(building, "20톤보일러", "20tonboiler")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/20_ton_boiler_1F.jpg";
+            return "";
+        }
+        if (containsAny(building, "천막창고5,6동", "천막창고56동", "tentwarehouse56")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/tent_warehouse_5_6_1F.jpg";
             return "";
         }
         if (containsAny(building, "\uBCF5\uD569\uBCF4\uC77C\uB7EC", "comboboiler")) {

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 소방 모듈 필수 마스터 데이터 보장.
  * <p>
  * 앱 시작 시 building / floor 테이블에 필수 레코드가 없으면
- * INSERT IGNORE 로 자동 삽입한다.
+ * 동일한 건물명이 없을 때만 자동 삽입한다.
  * ddl-auto=none 환경이므로 JPA 가 아닌 네이티브 SQL 사용.
  */
 @Slf4j
@@ -55,6 +55,9 @@ public class FireDataInitializer implements ApplicationRunner {
         insertIgnoreBuilding(23, "신설소각로 폐기물 처리동");
         insertIgnoreBuilding(24, "신설소각로 증기터빈동");
         insertIgnoreBuilding(25, "패드동 천막창고");
+        insertIgnoreBuilding(26, "60톤 보일러");
+        insertIgnoreBuilding(27, "20톤 보일러");
+        insertIgnoreBuilding(28, "천막창고 5,6동");
         insertIgnoreBuilding(99, "옥외");
 
         // ── 층(floor) ──
@@ -116,13 +119,17 @@ public class FireDataInitializer implements ApplicationRunner {
     }
 
     // ----------------------------------------------------------------
-    //  INSERT IGNORE: 해당 PK 가 이미 존재하면 무시
+    //  Building name is the business key for map master data.
+    //  A fixed ID alone is insufficient because older migrations may have
+    //  created the same name with an auto-generated ID.
     // ----------------------------------------------------------------
 
     private void insertIgnoreBuilding(long id, String name) {
         int affected = jdbc.update(
-                "INSERT IGNORE INTO building (BUILDING_ID, BUILDING_NAME, IS_ACTIVE) VALUES (?, ?, 1)",
-                id, name);
+                "INSERT INTO building (BUILDING_ID, BUILDING_NAME, IS_ACTIVE) " +
+                        "SELECT ?, ?, 1 " +
+                        "WHERE NOT EXISTS (SELECT 1 FROM building WHERE BUILDING_NAME = ?)",
+                id, name, name);
         if (affected > 0) {
             log.info("[FireDataInitializer] building 추가: id={}, name={}", id, name);
         }

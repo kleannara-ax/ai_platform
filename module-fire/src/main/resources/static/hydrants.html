@@ -2048,7 +2048,7 @@ window.openHydrantDetails = openHydrantDetails;
         const r = await API.req(`/fire-api/maps/floor-data?${pr}`);
         if (r && r.ok) {
           const data = await r.json().catch(()=>null);
-          if (data && data.ok && data.data) {
+          if (data?.success && data.data) {
             mapUrl = data.data.planImagePath||'';
             existingExt = Array.isArray(data.data.extinguishers) ? data.data.extinguishers : [];
             existingHyd = Array.isArray(data.data.hydrants) ? data.data.hydrants : [];

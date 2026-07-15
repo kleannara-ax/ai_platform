@@ -73,6 +73,10 @@ public class FacilityEquipmentService {
             dto.setLastInspection(history.get(0));
         }
         dto.setInspectionHistory(history);
+        if (CATEGORY_AIRCON.equals(normalizeCategory(category))) {
+            dto.setInspectionRequested(airconFaultReportRepository
+                    .existsByEquipment_EquipmentIdAndStatus(equipmentId, "REQUESTED"));
+        }
         return dto;
     }
 
@@ -103,6 +107,9 @@ public class FacilityEquipmentService {
             entity.update(serialNumber, building, floor, equipmentType, manufacturer,
                     locationDescription, outdoorUnitCount,
                     req.getManufactureDate(), replacementCycleYears, x, y, note);
+            if (CATEGORY_AIRCON.equals(normalizedCategory) && req.getInspectionRequested() != null) {
+                updateAirconInspectionRequestStatus(entity, req.getInspectionRequested());
+            }
         } else {
             String serialNumber = resolveSerialNumber(normalizedCategory, req.getSerialNumber(), null);
             entity = FacilityEquipment.builder()
@@ -188,6 +195,22 @@ public class FacilityEquipmentService {
         }
         log.info("Generated unregistered facility QR keys: category={}, count={}", normalizedCategory, result.size());
         return result;
+    }
+
+    private void updateAirconInspectionRequestStatus(FacilityEquipment equipment, boolean inspectionRequested) {
+        List<FacilityAirconFaultReport> pendingReports = airconFaultReportRepository
+                .findByEquipment_EquipmentIdAndStatusOrderByCreatedAtDescReportIdDesc(
+                        equipment.getEquipmentId(), "REQUESTED");
+        if (inspectionRequested && pendingReports.isEmpty()) {
+            airconFaultReportRepository.save(FacilityAirconFaultReport.builder()
+                    .equipment(equipment)
+                    .reporterName("관리자")
+                    .faultDescription("관리자 목록에서 점검 요청 상태로 변경")
+                    .status("REQUESTED")
+                    .build());
+        } else if (!inspectionRequested) {
+            pendingReports.forEach(FacilityAirconFaultReport::cancel);
+        }
     }
 
     @Transactional
