@@ -62,18 +62,18 @@ public class IntegratedUserController {
     }
 
     /** 비활성화 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
-    @PatchMapping("/{loginId}/disable")
+    @PatchMapping("/{userId}/disable")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable String loginId) {
-        coreUserService.disableUserByLoginId(loginId);
+    public ResponseEntity<ApiResponse<Void>> disableUser(@PathVariable Long userId) {
+        coreUserService.disableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 
     /** 활성화 - 사용자관리 메뉴 접근 권한 보유 시 가능 */
-    @PatchMapping("/{loginId}/enable")
+    @PatchMapping("/{userId}/enable")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable String loginId) {
-        coreUserService.enableUserByLoginId(loginId);
+    public ResponseEntity<ApiResponse<Void>> enableUser(@PathVariable Long userId) {
+        coreUserService.enableUser(userId);
         return ResponseEntity.ok(ApiResponse.success());
     }
 

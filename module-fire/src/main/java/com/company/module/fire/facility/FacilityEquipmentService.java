@@ -94,12 +94,12 @@ public class FacilityEquipmentService {
         FacilityEquipment entity;
         if (req.getEquipmentId() != null && req.getEquipmentId() > 0) {
             entity = findOwned(normalizedCategory, req.getEquipmentId());
-            String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), entity);
+            String serialNumber = resolveSerialNumber(normalizedCategory, req.getSerialNumber(), entity);
             entity.update(serialNumber, building, floor, equipmentType, manufacturer,
                     locationDescription, outdoorUnitCount,
                     req.getManufactureDate(), replacementCycleYears, x, y, note);
         } else {
-            String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), null);
+            String serialNumber = resolveSerialNumber(normalizedCategory, req.getSerialNumber(), null);
             entity = FacilityEquipment.builder()
                     .category(normalizedCategory)
                     .serialNumber(serialNumber)
@@ -148,7 +148,7 @@ public class FacilityEquipmentService {
         Floor floor = floorRepository.findById(req.getFloorId())
                 .orElseThrow(() -> new BusinessException("층 정보를 찾을 수 없습니다."));
 
-        String serialNumber = resolveSerialNumber(normalizedCategory, building, req.getSerialNumber(), null);
+        String serialNumber = resolveSerialNumber(normalizedCategory, req.getSerialNumber(), null);
         FacilityEquipment entity = FacilityEquipment.builder()
                 .category(normalizedCategory)
                 .serialNumber(serialNumber)
@@ -329,24 +329,25 @@ public class FacilityEquipmentService {
         return value.trim();
     }
 
-    private String resolveSerialNumber(String category, Building building, String requestedSerialNumber, FacilityEquipment current) {
+    private String resolveSerialNumber(String category, String requestedSerialNumber, FacilityEquipment current) {
         String requested = trimToNull(requestedSerialNumber);
-        if (CATEGORY_AIRCON.equals(category) && requested == null) {
-            throw new BusinessException("에어컨 식별 No.를 입력하세요.");
+        String serialNumber = requested != null
+                ? requested
+                : (CATEGORY_AIRCON.equals(category)
+                ? null
+                : (current != null ? current.getSerialNumber() : generateNextSerialNumber(category)));
+
+        if (serialNumber != null) {
+            equipmentRepository.findBySerialNumber(serialNumber).ifPresent(found -> {
+                if (current == null || !found.getEquipmentId().equals(current.getEquipmentId())) {
+                    throw new BusinessException("이미 사용 중인 식별 No.입니다: " + serialNumber);
+                }
+            });
         }
-        String serialNumber = requested != null ? requested : (current != null ? current.getSerialNumber() : generateNextSerialNumber(category, building));
-        equipmentRepository.findBySerialNumber(serialNumber).ifPresent(found -> {
-            if (current == null || !found.getEquipmentId().equals(current.getEquipmentId())) {
-                throw new BusinessException("이미 사용 중인 식별 No.입니다: " + serialNumber);
-            }
-        });
         return serialNumber;
     }
 
-    private String generateNextSerialNumber(String category, Building building) {
-        if (CATEGORY_AIRCON.equals(category)) {
-            throw new BusinessException("에어컨 식별 No.는 자동 생성할 수 없습니다. 직접 입력하세요.");
-        }
+    private String generateNextSerialNumber(String category) {
         return generateSequentialCode(category, "WP-", true);
     }
 

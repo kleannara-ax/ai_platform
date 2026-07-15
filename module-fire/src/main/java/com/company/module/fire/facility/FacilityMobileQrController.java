@@ -74,7 +74,7 @@ public class FacilityMobileQrController {
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> registerAirConditioner(
             @PathVariable String qrKey,
-            @RequestParam String serialNumber,
+            @RequestParam(required = false) String serialNumber,
             @RequestParam Long buildingId,
             @RequestParam Long floorId,
             @RequestParam String equipmentType,

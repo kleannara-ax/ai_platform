@@ -321,7 +321,7 @@ JOIN floor f ON p.FLOOR_ID = f.FLOOR_ID;
 CREATE TABLE IF NOT EXISTS facility_equipment (
     EQUIPMENT_ID             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '기타설비 ID (PK)',
     CATEGORY                 VARCHAR(30)  NOT NULL                COMMENT '설비 분류 (AIRCON/WATER_PURIFIER)',
-    SERIAL_NUMBER            VARCHAR(50)  NOT NULL                COMMENT '일련번호 (AC-000001/WP-000001)',
+    SERIAL_NUMBER            VARCHAR(50)                          COMMENT '식별 No. (에어컨은 선택 입력, 정수기는 WP-000001 자동 생성)',
     BUILDING_ID              BIGINT       NOT NULL                COMMENT '건물 FK',
     FLOOR_ID                 BIGINT       NOT NULL                COMMENT '층 FK',
     EQUIPMENT_TYPE           VARCHAR(100) NOT NULL                COMMENT '설비 종류(에어컨 종류, 정수기는 정수기 고정)',

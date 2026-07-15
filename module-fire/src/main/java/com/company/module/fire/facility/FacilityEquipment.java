@@ -32,7 +32,7 @@ public class FacilityEquipment {
     @Column(name = "CATEGORY", nullable = false, length = 30)
     private String category;
 
-    @Column(name = "SERIAL_NUMBER", nullable = false, length = 50)
+    @Column(name = "SERIAL_NUMBER", length = 50)
     private String serialNumber;
 
     @Column(name = "EQUIPMENT_CODE", length = 50)
