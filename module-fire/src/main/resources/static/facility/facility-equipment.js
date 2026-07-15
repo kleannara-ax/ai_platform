@@ -195,7 +195,7 @@
 
   function renderAirconFields() {
     if (!isAirconPage()) return '';
-    return `<div class="col-md-4"><label class="form-label fw-bold">에어컨 식별 No. <span class="text-danger">*</span></label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1" required><div class="form-text">자동 생성되지 않습니다. 현장 식별 No.를 직접 입력하세요.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div>`;
+    return `<div class="col-md-4"><label class="form-label fw-bold">에어컨 식별 No. <span class="text-muted small">(선택)</span></label><input type="text" class="form-control" id="serialNumber" maxlength="50" placeholder="예: 1-1"><div class="form-text">현장 식별 No.가 있을 때만 입력하세요.</div></div><div class="col-md-4"><label class="form-label fw-bold">제조사</label><input type="text" class="form-control" id="manufacturer" maxlength="100" placeholder="예: LG, 삼성"></div><div class="col-md-4"><label class="form-label fw-bold">위치</label><input type="text" class="form-control" id="locationDescription" maxlength="200" placeholder="예: 사무실 출입문 상부"></div><div class="col-md-4"><label class="form-label fw-bold">실외기 대수</label><select class="form-select" id="outdoorUnitCount"><option value="1">1대</option><option value="2">2대</option></select></div>`;
   }
 
   function renderTypeField() {
@@ -282,6 +282,7 @@
   }
 
   function bucket(item) {
+    if (isAirconPage()) return { inspect: Boolean(item.inspectionRequested) };
     const now = new Date(); now.setHours(0,0,0,0);
     const last = item.lastInspectionDate ? new Date(item.lastInspectionDate) : null;
     const inspect = !last || new Date(last.getTime() + 30*24*3600*1000) <= now;
@@ -547,7 +548,6 @@
     };
     if (isAirconPage()) {
       payload.serialNumber = $('serialNumber')?.value?.trim() || null;
-      if (!payload.serialNumber) { $('serialNumber')?.focus(); return alert('에어컨 식별 No.를 입력하세요.'); }
       payload.manufacturer = $('manufacturer')?.value?.trim() || null;
       payload.locationDescription = $('locationDescription')?.value?.trim() || null;
       payload.outdoorUnitCount = outdoorUnitCount($('outdoorUnitCount')?.value);

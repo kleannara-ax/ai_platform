@@ -134,7 +134,12 @@
   }
   function categoryLabel(c){ return c === 'AIRCON' ? '에어컨' : '정수기'; }
   function detailPath(it, mode){ const base = it.category === 'AIRCON' ? '/facility/air-conditioners' : '/facility/water-purifiers'; const p = new URLSearchParams(); if(mode) p.set(mode, it.equipmentId); return base + (mode ? '?' + p.toString() : ''); }
-  function bucket(it){ const last=parseDate(it.lastInspectionDate); const inspect=!last || last < new Date(today.getTime()-30*24*3600*1000); return {inspect}; }
+  function bucket(it){
+    if (it?.category === 'AIRCON') return { inspect: it.inspectionRequested === true };
+    const last=parseDate(it.lastInspectionDate);
+    const inspect=!last || last < new Date(today.getTime()-30*24*3600*1000);
+    return {inspect};
+  }
   function inspectLabel(it){ return it?.category === 'AIRCON' ? '점검요청' : '점검필요'; }
   function statusHtml(it){ const b=bucket(it); if(b.inspect) return `<span class="status-pill ${it.category==='AIRCON'?'status-air':'status-inspect'}">${esc(inspectLabel(it))}</span>`; return '<span class="status-pill status-ok">정상</span>'; }
   async function loadData(){
