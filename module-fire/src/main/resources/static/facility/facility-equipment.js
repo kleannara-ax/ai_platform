@@ -17,7 +17,7 @@
     q: '', buildingId: '', floorId: '', status: null,
     sort: { key: 'serialNumber', direction: 'asc' },
     editingId: 0, inspectId: 0, selectedCoord: null,
-    planImagePath: '', existingMarkers: []
+    planImagePath: '', existingMarkers: [], planView: { scale: 1 }
   };
 
   const $ = (id) => document.getElementById(id);
@@ -227,7 +227,7 @@
       <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="detailsModalBody"></div></div></div></div>
       <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1400px)"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img id="zoomImage" alt="확대 이미지" style="max-width:100%;max-height:84vh;object-fit:contain"></div></div></div></div>
       ${renderInspectModal()}
-      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-12"><div class="fw-edit-section-title mb-2"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span></div></div></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
+      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-12"><div class="fw-edit-section-title mb-2"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><div id="planContent" style="position:absolute;transform-origin:center center"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span><span>마우스 휠로 도면을 확대/축소할 수 있습니다.</span></div></div></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
   }
 
   function renderNav() {
@@ -496,7 +496,7 @@
 
   async function loadPlanForModal() {
     const b = $('buildingSel')?.value, f = $('floorSel')?.value;
-    const img = $('planImg'); state.existingMarkers = []; state.planImagePath = '';
+    const img = $('planImg'); state.existingMarkers = []; state.planImagePath = ''; state.planView.scale = 1;
     if (!b || !f || !img) { img?.removeAttribute('src'); if (img) img.style.display = 'none'; renderPlanMarkers(); return; }
     state.planImagePath = await fetchPlanImage(b, f, $('buildingSel')?.selectedOptions?.[0]?.textContent, $('floorSel')?.selectedOptions?.[0]?.textContent);
     state.existingMarkers = state.items.filter(it => String(it.buildingId) === String(b) && String(it.floorId) === String(f) && Number(it.equipmentId) !== Number(state.editingId) && it.x != null && it.y != null);
@@ -505,14 +505,24 @@
   }
 
   function renderPlanMarkers() {
-    const canvas = $('planCanvas'), img = $('planImg'), layer = $('markerLayer'); if (!canvas || !img || !layer) return;
+    const canvas = $('planCanvas'), content = $('planContent'), img = $('planImg'), layer = $('markerLayer'); if (!canvas || !content || !img || !layer) return;
     layer.innerHTML = ''; if (!img.naturalWidth || !img.naturalHeight) return;
     const cw = canvas.clientWidth, ch = canvas.clientHeight, iw = img.naturalWidth, ih = img.naturalHeight;
     const scale = Math.min(cw/iw, ch/ih), w = iw*scale, h = ih*scale, ox = (cw-w)/2, oy = (ch-h)/2;
-    img.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;display:block;object-fit:contain`;
-    const add = (x, y, icon, selected, title) => { const nx = num(x), ny = num(y); if (nx == null || ny == null) return; const m = document.createElement('div'); m.className = `facility-map-marker${selected ? ' selected' : ''}`; m.title = title || ''; m.style.cssText = `position:absolute;left:${ox+w*nx/100}px;top:${oy+h*ny/100}px;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px;transform:translate(-50%,-50%);opacity:${selected ? 1 : .7};cursor:${selected ? 'default':'pointer'};z-index:${selected ? 4 : 2}`; m.innerHTML = `<img src="${esc(icon)}" alt="" class="facility-marker-img">`; if (!selected) m.addEventListener('click', e => { e.stopPropagation(); setCoord(nx, ny); }); layer.appendChild(m); };
+    content.style.cssText = `position:absolute;left:${ox}px;top:${oy}px;width:${w}px;height:${h}px;transform-origin:center center;transform:scale(${state.planView.scale})`;
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill';
+    const add = (x, y, icon, selected, title) => { const nx = num(x), ny = num(y); if (nx == null || ny == null) return; const m = document.createElement('div'); m.className = `facility-map-marker${selected ? ' selected' : ''}`; m.title = title || ''; m.style.cssText = `position:absolute;left:${w*nx/100}px;top:${h*ny/100}px;width:${selected ? 30 : 22}px;height:${selected ? 30 : 22}px;transform:translate(-50%,-50%);opacity:${selected ? 1 : .7};cursor:${selected ? 'default':'pointer'};z-index:${selected ? 4 : 2}`; m.innerHTML = `<img src="${esc(icon)}" alt="" class="facility-marker-img">`; if (!selected) m.addEventListener('click', e => { e.stopPropagation(); setCoord(nx, ny); }); layer.appendChild(m); };
     state.existingMarkers.forEach(it => add(it.x, it.y, markerImage(it.equipmentType), false, it.serialNumber));
     if (state.selectedCoord) add(state.selectedCoord.x, state.selectedCoord.y, markerImage($('equipmentType')?.value || fixedType()), true, '선택 위치');
+  }
+
+  function zoomPlanWithWheel(event) {
+    const canvas = $('planCanvas'), img = $('planImg'); if (!canvas || !img?.naturalWidth) return;
+    event.preventDefault();
+    const next = Math.max(1, Math.min(4, state.planView.scale * (event.deltaY < 0 ? 1.16 : 1 / 1.16)));
+    if (next === state.planView.scale) return;
+    state.planView.scale = next;
+    renderPlanMarkers();
   }
 
   function renderHistory(rows) {
@@ -669,7 +679,8 @@
     $('equipmentType')?.addEventListener('change', renderPlanMarkers);
     $('coordX')?.addEventListener('input', () => setCoord($('coordX').value, $('coordY').value));
     $('coordY')?.addEventListener('input', () => setCoord($('coordX').value, $('coordY').value));
-    $('planCanvas')?.addEventListener('click', (e) => { const img = $('planImg'); if (!img || !img.naturalWidth) return; const rect = img.getBoundingClientRect(); if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return; const x = ((e.clientX - rect.left) / rect.width) * 100; const y = ((e.clientY - rect.top) / rect.height) * 100; setCoord(x, y); });
+    $('planCanvas')?.addEventListener('click', (e) => { const content = $('planContent'), img = $('planImg'); if (!content || !img || !img.naturalWidth) return; const rect = content.getBoundingClientRect(); if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return; const x = ((e.clientX - rect.left) / rect.width) * 100; const y = ((e.clientY - rect.top) / rect.height) * 100; setCoord(x, y); });
+    $('planCanvas')?.addEventListener('wheel', zoomPlanWithWheel, { passive: false });
   }
 
   async function handleInitialAction() {
