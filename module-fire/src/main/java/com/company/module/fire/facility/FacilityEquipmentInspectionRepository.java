@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface FacilityEquipmentInspectionRepository extends JpaRepository<FacilityEquipmentInspection, Long> {
     boolean existsByEquipment_EquipmentIdAndInspectionDate(Long equipmentId, LocalDate date);
+    Optional<FacilityEquipmentInspection> findByEquipment_EquipmentIdAndInspectionDate(Long equipmentId, LocalDate date);
     boolean existsByEquipment_EquipmentIdAndInspectionDateAndInspectionIdNot(Long equipmentId, LocalDate date, Long inspectionId);
     Optional<FacilityEquipmentInspection> findTopByEquipment_EquipmentIdOrderByInspectionDateDescInspectionIdDesc(Long equipmentId);
     List<FacilityEquipmentInspection> findByEquipment_EquipmentIdOrderByInspectionDateDescInspectionIdDesc(Long equipmentId, Pageable pageable);

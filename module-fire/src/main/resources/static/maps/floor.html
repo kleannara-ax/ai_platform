@@ -450,6 +450,7 @@
     return byId || byName;
   }
   function needsInspection(item) {
+    if (state.selectedAssetType === 'aircon') return item?.inspectionRequested === true;
     const lastDate = item.lastInspectionDate || item.lastInspection;
     if (!lastDate) return true;
     const d = new Date(lastDate);

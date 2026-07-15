@@ -53,6 +53,11 @@ public class FacilityMobileQrController {
                 .stream()
                 .map(this::faultReportRow)
                 .toList());
+        result.put("pendingFaultReports", airconFaultReportRepository
+                .findByEquipment_EquipmentIdAndStatusOrderByCreatedAtDescReportIdDesc(equipment.getEquipmentId(), "REQUESTED")
+                .stream()
+                .map(this::faultReportRow)
+                .toList());
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
@@ -115,36 +120,54 @@ public class FacilityMobileQrController {
 
     @PostMapping(value = "/air-conditioners/{qrKey}/fault-reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
-    public ResponseEntity<ApiResponse<Map<String, Object>>> submitAirconFaultReport(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> requestAirconInspection(
             @PathVariable String qrKey,
             @RequestParam(required = false) String reporterName,
-            @RequestParam(required = false) String inspectionResult,
-            @RequestParam(required = false) String faultDescription) {
+            @RequestParam(required = false) String reporterDepartment,
+            @RequestParam String faultDescription) {
         FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_AIRCON, qrKey);
-        String inspector = trimToNull(reporterName);
+        String description = trimToNull(faultDescription);
+        if (description == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("점검 요청 내용을 입력하세요."));
+        }
+        FacilityAirconFaultReport report = airconFaultReportRepository.save(FacilityAirconFaultReport.builder()
+                .equipment(equipment)
+                .reporterName(trimToNull(reporterName))
+                .reporterDepartment(trimToNull(reporterDepartment))
+                .faultDescription(description)
+                .status("REQUESTED")
+                .build());
+        return ResponseEntity.ok(ApiResponse.success(faultReportRow(report)));
+    }
+
+    @PostMapping(value = "/air-conditioners/{qrKey}/fault-reports/{reportId}/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> completeAirconInspection(
+            @PathVariable String qrKey,
+            @PathVariable Long reportId,
+            @RequestParam String inspectorName,
+            @RequestParam String inspectionResult) {
+        FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_AIRCON, qrKey);
+        FacilityAirconFaultReport report = airconFaultReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("점검 요청을 찾을 수 없습니다."));
+        if (!equipment.getEquipmentId().equals(report.getEquipment().getEquipmentId())) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("QR 설비와 점검 요청이 일치하지 않습니다."));
+        }
+        if (!"REQUESTED".equals(report.getStatus())) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("접수된 점검 요청만 완료 처리할 수 있습니다."));
+        }
+        String inspector = trimToNull(inspectorName);
         if (inspector == null) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("점검자 이름을 입력하세요."));
         }
         String resultValue = trimToNull(inspectionResult);
-        if (resultValue == null) {
-            resultValue = trimToNull(faultDescription);
-        }
         if (!Set.of("정상", "비정상").contains(resultValue)) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("에어컨 작동 상태를 정상 또는 비정상으로 선택하세요."));
         }
-        FacilityAirconFaultReport report = airconFaultReportRepository.save(FacilityAirconFaultReport.builder()
-                .equipment(equipment)
-                .reporterName(inspector)
-                .reporterDepartment(null)
-                .faultDescription(resultValue)
-                .status("정상".equals(resultValue) ? "NORMAL" : "ABNORMAL")
-                .build());
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("reportId", report.getReportId());
-        result.put("inspectionResult", report.getFaultDescription());
-        result.put("status", report.getStatus());
-        result.put("createdAt", report.getCreatedAt());
-        return ResponseEntity.ok(ApiResponse.success(result));
+        report.complete(inspector, resultValue);
+        facilityEquipmentService.completeAirconInspection(
+                equipment.getEquipmentId(), inspector, resultValue, report.getFaultDescription());
+        return ResponseEntity.ok(ApiResponse.success(faultReportRow(report)));
     }
 
     @PostMapping(value = "/water-purifiers/{qrKey}/disinfections", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -244,9 +267,11 @@ public class FacilityMobileQrController {
         row.put("reporterName", report.getReporterName());
         row.put("reporterDepartment", report.getReporterDepartment());
         row.put("faultDescription", report.getFaultDescription());
-        row.put("inspectionResult", report.getFaultDescription());
+        row.put("inspectorName", report.getInspectorName());
+        row.put("inspectionResult", report.getInspectionResult());
         row.put("status", report.getStatus());
         row.put("createdAt", report.getCreatedAt());
+        row.put("completedAt", report.getCompletedAt());
         return row;
     }
 

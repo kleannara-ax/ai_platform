@@ -413,7 +413,8 @@
       const airItems = content(airRes);
       const waterItems = content(waterRes);
 
-      function isInspectionDue(item) {
+      function isInspectionDue(type, item) {
+        if (type === 'aircon') return item.inspectionRequested === true;
         const date = parseDate(item.lastInspectionDate);
         return !date || date < oneMonthAgo;
       }
@@ -438,12 +439,13 @@
         let inspect = 0, normal = 0;
         const inspectItems = [];
         items.forEach((item) => {
-          const due = isInspectionDue(item);
+          const due = isInspectionDue(type, item);
           if (due) {
             inspect += 1;
             inspectItems.push({
               type, label, id: item.equipmentId, name: nameText(item), location: locationText(item),
-              status: type === 'aircon' ? '점검요청' : '점검필요', reason: '최근 30일 기준 점검 대상',
+              status: type === 'aircon' ? '점검요청' : '점검필요',
+              reason: type === 'aircon' ? '접수된 점검 요청' : '최근 30일 기준 점검 대상',
               date: item.lastInspectionDate || item.createdAt, shortcut: shortcutUrl(type, item)
             });
           } else {

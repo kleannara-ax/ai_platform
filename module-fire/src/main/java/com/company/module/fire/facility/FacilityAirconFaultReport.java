@@ -35,6 +35,15 @@ public class FacilityAirconFaultReport {
     @Column(name = "STATUS", nullable = false, length = 30)
     private String status;
 
+    @Column(name = "INSPECTOR_NAME", length = 100)
+    private String inspectorName;
+
+    @Column(name = "INSPECTION_RESULT", length = 30)
+    private String inspectionResult;
+
+    @Column(name = "COMPLETED_AT")
+    private LocalDateTime completedAt;
+
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -44,6 +53,13 @@ public class FacilityAirconFaultReport {
             status = "RECEIVED";
         }
         createdAt = LocalDateTime.now();
+    }
+
+    public void complete(String inspectorName, String inspectionResult) {
+        this.inspectorName = inspectorName;
+        this.inspectionResult = inspectionResult;
+        this.completedAt = LocalDateTime.now();
+        this.status = "정상".equals(inspectionResult) ? "NORMAL" : "ABNORMAL";
     }
 
     @Builder

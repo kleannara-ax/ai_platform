@@ -38,6 +38,7 @@ public class FacilityEquipmentResponse {
     private String lastInspectorName;
     private Boolean lastIsFaulty;
     private String lastFaultReason;
+    private boolean inspectionRequested;
     private List<InspectionRow> inspections;
 
     public static FacilityEquipmentResponse from(FacilityEquipment e) {
@@ -73,6 +74,10 @@ public class FacilityEquipmentResponse {
             this.lastIsFaulty = inspection.isFaulty();
             this.lastFaultReason = inspection.getFaultReason();
         }
+    }
+
+    public void setInspectionRequested(boolean inspectionRequested) {
+        this.inspectionRequested = inspectionRequested;
     }
 
     public void setInspectionHistory(List<FacilityEquipmentInspection> list) {

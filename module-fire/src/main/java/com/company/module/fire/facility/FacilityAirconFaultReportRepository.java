@@ -6,4 +6,8 @@ import java.util.List;
 
 public interface FacilityAirconFaultReportRepository extends JpaRepository<FacilityAirconFaultReport, Long> {
     List<FacilityAirconFaultReport> findTop5ByEquipment_EquipmentIdOrderByCreatedAtDescReportIdDesc(Long equipmentId);
+
+    List<FacilityAirconFaultReport> findByEquipment_EquipmentIdAndStatusOrderByCreatedAtDescReportIdDesc(Long equipmentId, String status);
+
+    boolean existsByEquipment_EquipmentIdAndStatus(Long equipmentId, String status);
 }

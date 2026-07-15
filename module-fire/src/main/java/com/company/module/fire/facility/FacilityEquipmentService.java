@@ -38,6 +38,7 @@ public class FacilityEquipmentService {
 
     private final FacilityEquipmentRepository equipmentRepository;
     private final FacilityEquipmentInspectionRepository inspectionRepository;
+    private final FacilityAirconFaultReportRepository airconFaultReportRepository;
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
 
@@ -53,6 +54,10 @@ public class FacilityEquipmentService {
             FacilityEquipmentResponse dto = FacilityEquipmentResponse.from(e);
             inspectionRepository.findTopByEquipment_EquipmentIdOrderByInspectionDateDescInspectionIdDesc(e.getEquipmentId())
                     .ifPresent(dto::setLastInspection);
+            if (CATEGORY_AIRCON.equals(normalizedCategory)) {
+                dto.setInspectionRequested(airconFaultReportRepository
+                        .existsByEquipment_EquipmentIdAndStatus(e.getEquipmentId(), "REQUESTED"));
+            }
             return dto;
         });
     }
@@ -183,6 +188,27 @@ public class FacilityEquipmentService {
         }
         log.info("Generated unregistered facility QR keys: category={}, count={}", normalizedCategory, result.size());
         return result;
+    }
+
+    @Transactional
+    public void completeAirconInspection(Long equipmentId, String inspectorName, String inspectionResult, String faultDescription) {
+        FacilityEquipment equipment = findOwned(CATEGORY_AIRCON, equipmentId);
+        LocalDate inspectionDate = LocalDate.now();
+        boolean faulty = "비정상".equals(inspectionResult);
+        String reason = faulty ? trimToNull(faultDescription) : null;
+
+        inspectionRepository.findByEquipment_EquipmentIdAndInspectionDate(equipmentId, inspectionDate)
+                .ifPresentOrElse(
+                        inspection -> inspection.updateInspection(inspectionDate, faulty, reason, inspectorName),
+                        () -> inspectionRepository.save(FacilityEquipmentInspection.builder()
+                                .equipment(equipment)
+                                .inspectionDate(inspectionDate)
+                                .isFaulty(faulty)
+                                .faultReason(reason)
+                                .inspectedByName(inspectorName)
+                                .build())
+                );
+        inspectionRepository.trimInspectionsKeepLatest12(equipmentId);
     }
 
     @Transactional
