@@ -1387,6 +1387,10 @@ public class MobileInspectionController {
             if (floorNo == 1) return "/images/engine_1F.png";
             return null;
         }
+        if (bn.contains("\uC804\uAE30\uACF5\uBB34") || bn.contains("elecgm") || bn.contains("electricalpublicservice")) {
+            if (floorNo == 1) return "/images/electrical_public_service_1F.jpg";
+            return null;
+        }
         if ((bn.contains("\uC804\uAE30\uD604\uC7A5") || bn.contains("elec")) && !bn.contains("\uC804\uAE30\uACF5\uBB34")) {
             if (floorNo == 1) return "/images/elec_1F.png";
             if (floorNo == 2) return "/images/elec_2F.png";
@@ -1549,6 +1553,9 @@ public class MobileInspectionController {
         }
         if (bn.contains("\uAE30\uAD00\uC2E4") || bn.contains("engine")) {
             return "/images/engine_1F.png";
+        }
+        if (bn.contains("\uC804\uAE30\uACF5\uBB34") || bn.contains("elecgm") || bn.contains("electricalpublicservice")) {
+            return f.contains("1") ? "/images/electrical_public_service_1F.jpg" : "";
         }
         if ((bn.contains("\uC804\uAE30\uD604\uC7A5") || bn.contains("elec")) && !bn.contains("\uC804\uAE30\uACF5\uBB34")) {
             if (f.contains("2")) return "/images/elec_2F.png";
