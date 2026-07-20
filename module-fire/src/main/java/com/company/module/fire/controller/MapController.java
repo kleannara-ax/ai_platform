@@ -243,6 +243,11 @@ public class MapController {
             if (floor.contains("1")) return "/images/engine_1F.png";
             return "";
         }
+        if (containsAny(building, "\uC804\uAE30\uACF5\uBB34", "elecgm", "electricalpublicservice")) {
+            if (isBasement(floor)) return "";
+            if (floor.contains("1")) return "/images/electrical_public_service_1F.jpg";
+            return "";
+        }
         if (containsAny(building, "\uC804\uAE30\uD604\uC7A5", "elec") && !containsAny(building, "\uC804\uAE30\uACF5\uBB34", "elecgm")) {
             if (isBasement(floor)) return "";
             if (floor.contains("2")) return "/images/elec_2F.png";

@@ -143,6 +143,17 @@
       overflow:hidden;
       box-shadow: 0 1px 0 rgba(15,23,42,.04);
     }
+    .fw-table-wrap:has(.fw-list-scroll),
+    .fw-list-scroll{
+      overflow:visible;
+    }
+    .fw-list-scroll .table thead th{
+      position:sticky !important;
+      top:0;
+      z-index:3;
+      background-clip:padding-box;
+      box-shadow:0 1px 0 rgba(15,23,42,.16);
+    }
     .fw-main-list-card{
       border-top:0 !important;
     }
@@ -1139,7 +1150,7 @@ function renderTable(items) {
   }).join('');
 
   wrap.innerHTML=`
-    <div class="fw-table-wrap"><div class="table-responsive">
+    <div class="fw-table-wrap"><div class="table-responsive fw-list-scroll">
       <table class="table table-hover mb-0 hyd-list-table">
         <thead class="table-dark">
           <tr>
@@ -1226,7 +1237,7 @@ function renderStatusPanel(type) {
       </td>
     </tr>`).join('');
   body.innerHTML=`
-    <div class="fw-table-wrap"><div class="table-responsive">
+    <div class="fw-table-wrap"><div class="table-responsive fw-list-scroll">
       <table class="table table-hover mb-0 hyd-list-table">
         <thead class="table-dark"><tr>
           <th style="width:84px;text-align:center;">소화전 ID</th>
