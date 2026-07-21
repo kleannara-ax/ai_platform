@@ -7,11 +7,15 @@ import com.company.module.dailyreport.dto.CellAuthRequest;
 import com.company.module.dailyreport.dto.CellAuthResponse;
 import com.company.module.dailyreport.entity.CellAuth;
 import com.company.module.dailyreport.repository.CellAuthRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 셀 단위 접근 권한 CRUD 서비스 (★ Phase 4 신규)
@@ -24,41 +28,87 @@ import java.util.List;
 public class CellAuthService {
 
     private final CellAuthRepository cellAuthRepository;
+    private final EntityManager entityManager;
+
+    // ─────────────────────────────────────────────
+    //  아키텍처 Rule 4: core_user 참조는 EntityManager 네이티브 쿼리 사용
+    //  (InspectorNameResolver 패턴 준용)
+    // ─────────────────────────────────────────────
+
+    /**
+     * userId 목록에 해당하는 core_user의 USER_NAME, LOGIN_ID를 일괄 조회
+     * @return Map<userId, Object[]{userName, loginId}>
+     */
+    private Map<Long, Object[]> resolveUserNames(Set<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = entityManager.createNativeQuery(
+                "SELECT USER_ID, " +
+                "       COALESCE(NULLIF(TRIM(USER_NAME), ''), LOGIN_ID) AS USER_NAME, " +
+                "       LOGIN_ID " +
+                "FROM core_user WHERE USER_ID IN (:ids)")
+                .setParameter("ids", userIds)
+                .getResultList();
+
+        return rows.stream().collect(Collectors.toMap(
+                row -> ((Number) row[0]).longValue(),
+                row -> new Object[]{ (String) row[1], (String) row[2] },
+                (a, b) -> a   // 중복 시 첫 번째 유지
+        ));
+    }
+
+    /**
+     * CellAuth 엔티티 목록을 userName/loginId가 채워진 응답 DTO로 변환
+     */
+    private List<CellAuthResponse> toResponsesWithUserName(List<CellAuth> auths) {
+        Set<Long> userIds = auths.stream()
+                .map(CellAuth::getUserId)
+                .collect(Collectors.toSet());
+        Map<Long, Object[]> userMap = resolveUserNames(userIds);
+
+        return auths.stream()
+                .map(auth -> {
+                    Object[] user = userMap.get(auth.getUserId());
+                    if (user != null) {
+                        return CellAuthResponse.from(auth, (String) user[0], (String) user[1]);
+                    }
+                    return CellAuthResponse.from(auth);
+                })
+                .toList();
+    }
 
     /**
      * 전체 셀 권한 조회 (활성만)
      */
     public List<CellAuthResponse> getAllActiveAuths() {
-        return cellAuthRepository.findByIsActiveTrue().stream()
-                .map(CellAuthResponse::from)
-                .toList();
+        return toResponsesWithUserName(
+                cellAuthRepository.findByIsActiveTrue());
     }
 
     /**
      * 전체 셀 권한 조회 (비활성 포함, 관리자 페이지용)
      */
     public List<CellAuthResponse> getAllAuths() {
-        return cellAuthRepository.findAllByOrderByTableCodeAscUserIdAsc().stream()
-                .map(CellAuthResponse::from)
-                .toList();
+        return toResponsesWithUserName(
+                cellAuthRepository.findAllByOrderByTableCodeAscUserIdAsc());
     }
 
     /**
      * 사용자별 셀 권한 조회
      */
     public List<CellAuthResponse> getAuthsByUser(Long userId) {
-        return cellAuthRepository.findByUserIdAndIsActiveTrue(userId).stream()
-                .map(CellAuthResponse::from)
-                .toList();
+        return toResponsesWithUserName(
+                cellAuthRepository.findByUserIdAndIsActiveTrue(userId));
     }
 
     /**
      * 표 코드별 셀 권한 조회
      */
     public List<CellAuthResponse> getAuthsByTable(String tableCode) {
-        return cellAuthRepository.findByTableCodeAndIsActiveTrue(tableCode).stream()
-                .map(CellAuthResponse::from)
-                .toList();
+        return toResponsesWithUserName(
+                cellAuthRepository.findByTableCodeAndIsActiveTrue(tableCode));
     }
 
     /**
@@ -67,7 +117,7 @@ public class CellAuthService {
     public CellAuthResponse getAuth(Long authId) {
         CellAuth auth = cellAuthRepository.findById(authId)
                 .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
-        return CellAuthResponse.from(auth);
+        return toResponsesWithUserName(List.of(auth)).get(0);
     }
 
     /**

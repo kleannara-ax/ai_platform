@@ -67,10 +67,8 @@
     .cell-input { width:100%; min-height:32px; border:0; outline:none; background:transparent; padding:0; margin:0; font:inherit; color:inherit; text-align:inherit; }
     .cell-input:disabled { color:#94a3b8; cursor:not-allowed; }
 
-    /* ── 특이사항 ── */
-    .report-section-special { border:1px solid #000; box-shadow:none; }
-    .report-section-special .section-title { background:#fff; border-bottom:1px solid #000; }
-    .report-section-special .section-table-wrap { background:#fff; }
+    /* ── 특이사항 (다른 표와 동일한 카드 스타일, 표 안쪽만 테두리) ── */
+    .report-section-special { /* report-section 기본 스타일 그대로 사용 */ }
     .special-table { border-collapse:collapse; border:1px solid #000; }
     .special-head-left, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
     .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; }
@@ -311,7 +309,12 @@
         const err = await res.text().catch(() => res.statusText);
         throw new Error(`API 오류 (${res.status}): ${err}`);
       }
-      return res.json();
+      const json = await res.json();
+      // ApiResponse<T> 구조({ success, code, data })면 data를 언래핑
+      if (json && typeof json.success === 'boolean' && json.data !== undefined) {
+        return json.data;
+      }
+      return json;
     }
 
     // ═══════════════════════════════════════════════

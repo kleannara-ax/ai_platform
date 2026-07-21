@@ -31,4 +31,7 @@ public interface CellAuthRepository extends JpaRepository<CellAuth, Long> {
 
     /** 사용자 + 표 코드 (활성/비활성 무관) */
     Optional<CellAuth> findByUserIdAndTableCode(Long userId, String tableCode);
+
+    /** 사용자에게 활성 셀 권한이 1개라도 있는지 확인 (메뉴 접근 판단용) */
+    boolean existsByUserIdAndIsActiveTrue(Long userId);
 }

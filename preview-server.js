@@ -47,36 +47,57 @@ const mockUser = {
 };
 
 const mockMenus = [
+  // ── 코어 메뉴 ──
   { menuId:1, menuCode:'DASHBOARD', menuName:'대시보드', menuType:'MENU', menuUrl:'/dashboard', icon:'dashboard', parentId:null, sortOrder:0, isActive:true, isVisible:true, allowedIps:null, description:'메인 대시보드', children:[] },
   { menuId:2, menuCode:'USER_MGMT', menuName:'사용자 관리', menuType:'MENU', menuUrl:'/users', icon:'users', parentId:null, sortOrder:1, isActive:true, isVisible:true, allowedIps:null, description:'사용자 CRUD', children:[] },
   { menuId:3, menuCode:'MENU_MGMT', menuName:'메뉴 관리', menuType:'MENU', menuUrl:'/menus', icon:'menu', parentId:null, sortOrder:2, isActive:true, isVisible:true, allowedIps:null, description:'메뉴 관리', children:[] },
   { menuId:4, menuCode:'PERM_MGMT', menuName:'접근 권한', menuType:'MENU', menuUrl:'/permissions', icon:'lock', parentId:null, sortOrder:3, isActive:true, isVisible:true, allowedIps:null, description:'접근 권한 설정', children:[] },
   { menuId:5, menuCode:'CODE_MGMT', menuName:'공통코드 관리', menuType:'MENU', menuUrl:'/codes', icon:'code', parentId:null, sortOrder:4, isActive:true, isVisible:true, allowedIps:null, description:'공통코드 관리', children:[] },
-  { menuId:100, menuCode:'DAILY_REPORT', menuName:'세부공장일보', menuType:'CATEGORY', menuUrl:null, icon:'clipboard-list', parentId:null, sortOrder:6, isActive:true, isVisible:true, allowedIps:null, description:'세부공장일보 카테고리',
+  // ── 설비관리시스템 (V15+V21+V26+V29+V30 반영) ──
+  { menuId:6, menuCode:'FIRE_MGMT', menuName:'설비관리시스템', menuType:'MENU', menuUrl:'/fire', icon:'tools', parentId:null, sortOrder:5, isActive:true, isVisible:true, allowedIps:null, description:'소방설비와 기타설비를 통합 관리하는 설비관리시스템',
+    children: [
+      // 공통 메뉴 (설비관리시스템 바로 아래)
+      { menuId:62, menuCode:'FIRE_MAP', menuName:'도면 (메인)', menuType:'MENU', menuUrl:'/fire-map.html', parentId:6, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:67, menuCode:'FIRE_FLOOR', menuName:'층별 도면', menuType:'MENU', menuUrl:'/maps/floor.html', parentId:6, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:68, menuCode:'FIRE_QR', menuName:'QR코드', menuType:'MENU', menuUrl:'/qr', parentId:6, sortOrder:3, isActive:true, isVisible:true, allowedIps:null, description:'소방설비 QR코드 발급 및 조회' },
+      // 소방설비 그룹
+      { menuId:69, menuCode:'FIRE_EQUIPMENT_GROUP', menuName:'소방설비', menuType:'MENU', menuUrl:null, parentId:6, sortOrder:4, isActive:true, isVisible:true, allowedIps:null, description:'소방설비 관리 메뉴 그룹',
+        children: [
+          { menuId:63, menuCode:'FIRE_EXTINGUISHER', menuName:'소화기 목록', menuType:'MENU', menuUrl:'/extinguishers.html', parentId:69, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:64, menuCode:'FIRE_HYDRANT', menuName:'소화전 목록', menuType:'MENU', menuUrl:'/hydrants.html', parentId:69, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:65, menuCode:'FIRE_RECEIVER', menuName:'수신기 목록', menuType:'MENU', menuUrl:'/receivers.html', parentId:69, sortOrder:3, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:66, menuCode:'FIRE_PUMP', menuName:'소방펌프 목록', menuType:'MENU', menuUrl:'/pumps.html', parentId:69, sortOrder:4, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:70, menuCode:'FIRE_SPRINKLER', menuName:'스프링클러 목록', menuType:'MENU', menuUrl:'/sprinklers.html', parentId:69, sortOrder:5, isActive:true, isVisible:true, allowedIps:null },
+        ]
+      },
+      // 기타설비 그룹
+      { menuId:71, menuCode:'OTHER_EQUIPMENT_GROUP', menuName:'기타설비', menuType:'MENU', menuUrl:null, parentId:6, sortOrder:5, isActive:true, isVisible:true, allowedIps:null, description:'기타설비 관리 메뉴 그룹',
+        children: [
+          { menuId:72, menuCode:'OTHER_AIRCON', menuName:'에어컨', menuType:'MENU', menuUrl:'/facility/air-conditioners', parentId:71, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:73, menuCode:'OTHER_WATER_PURIFIER', menuName:'정수기', menuType:'MENU', menuUrl:'/facility/water-purifiers', parentId:71, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+          { menuId:74, menuCode:'OTHER_QR', menuName:'QR코드', menuType:'MENU', menuUrl:'/facility/other-qr', parentId:71, sortOrder:3, isActive:true, isVisible:true, allowedIps:null },
+        ]
+      },
+    ]
+  },
+  // ── PS 지분 검사 (03_menu_data + 04_rename_menu 반영) ──
+  { menuId:7, menuCode:'PS_INSP_MGMT', menuName:'PS 지분 검사', menuType:'MENU', menuUrl:'/ps-insp-api/page', icon:'ps_insp', parentId:null, sortOrder:30, isActive:true, isVisible:true, allowedIps:null, description:'PS 지분 검사 (점보롤 지분 검사)', children:[] },
+  // ── 세부공장일보 ──
+  { menuId:100, menuCode:'DAILY_REPORT', menuName:'세부공장일보', menuType:'CATEGORY', menuUrl:null, icon:'clipboard-list', parentId:null, sortOrder:31, isActive:true, isVisible:true, allowedIps:null, description:'세부공장일보 카테고리',
     children: [
       { menuId:101, menuCode:'DAILY_REPORT_INPUT', menuName:'세부공장일보 입력', menuType:'PAGE', menuUrl:'/dailyreport/index.html', parentId:100, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
       { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 접근권한', menuType:'PAGE', menuUrl:'/dailyreport/cell-auth-admin.html', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
-  { menuId:6, menuCode:'FIRE_MGMT', menuName:'소방시설관리', menuType:'MENU', menuUrl:'/fire', icon:'fire', parentId:null, sortOrder:5, isActive:true, isVisible:true, allowedIps:null, description:'소방시설 관리',
-    children: [
-      { menuId:61, menuCode:'FIRE_DASHBOARD', menuName:'소방 대시보드', menuType:'MENU', menuUrl:'/fire/dashboard', parentId:6, sortOrder:0, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:62, menuCode:'FIRE_MAP', menuName:'도면 (메인)', menuType:'MENU', menuUrl:'/fire-map.html', parentId:6, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:63, menuCode:'FIRE_EXTINGUISHER', menuName:'소화기 목록', menuType:'MENU', menuUrl:'/extinguishers.html', parentId:6, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:64, menuCode:'FIRE_HYDRANT', menuName:'소화전 목록', menuType:'MENU', menuUrl:'/hydrants.html', parentId:6, sortOrder:3, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:65, menuCode:'FIRE_RECEIVER', menuName:'수신기 목록', menuType:'MENU', menuUrl:'/receivers.html', parentId:6, sortOrder:4, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:66, menuCode:'FIRE_PUMP', menuName:'소방펌프 목록', menuType:'MENU', menuUrl:'/pumps.html', parentId:6, sortOrder:5, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:67, menuCode:'FIRE_FLOOR', menuName:'층별 도면', menuType:'MENU', menuUrl:'/maps/floor.html', parentId:6, sortOrder:6, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:68, menuCode:'FIRE_QR', menuName:'QR코드', menuType:'MENU', menuUrl:'/qr', parentId:6, sortOrder:7, isActive:true, isVisible:true, allowedIps:null },
-    ]
-  },
 ];
 
 const mockRoles = [
-  { code: 'ROLE_ADMIN', codeName: '관리자', sortOrder: 1 },
-  { code: 'ROLE_MANAGER', codeName: '매니저', sortOrder: 2 },
-  { code: 'ROLE_USER', codeName: '사용자', sortOrder: 3 },
-  { code: 'ROLE_FIRE_MANAGER', codeName: '소방관리자', sortOrder: 4 },
+  { code: 'ROLE_ADMIN',             codeName: '관리자',           sortOrder: 1 },
+  { code: 'ROLE_MANAGER',           codeName: 'PS 지분 검사 매니저', sortOrder: 2 },
+  { code: 'ROLE_USER',              codeName: '일반 사용자',       sortOrder: 3 },
+  { code: 'ROLE_FACILITY_MANAGER',  codeName: '시설관리',          sortOrder: 4 },
+  { code: 'ROLE_FIRE_MANAGER',      codeName: '소방시설관리',       sortOrder: 5 },
+  { code: 'ROLE_EQUIPMENT_MANAGER', codeName: '기타시설관리',       sortOrder: 6 },
 ];
 
 const mockDepts = [
@@ -107,18 +128,31 @@ const mockUsers = [
 const tokenToUser = {};
 
 const mockCodeGroups = [
-  { groupId:1, groupCode:'ROLE', groupName:'역할', description:'사용자 역할 분류', sortOrder:1, isActive:true, codeCount:4 },
+  { groupId:1, groupCode:'ROLE', groupName:'역할', description:'사용자 역할 분류', sortOrder:1, isActive:true, codeCount:6 },
   { groupId:2, groupCode:'DEPT', groupName:'부서', description:'부서 코드', sortOrder:2, isActive:true, codeCount:3 },
   { groupId:3, groupCode:'USER_STATUS', groupName:'사용자 상태', description:'사용자 활성/비활성 상태', sortOrder:3, isActive:true, codeCount:2 },
 ];
 
+// ── 역할별 메뉴 접근 권한 (운영 DB V21+V26+V29+V30 최종 기준) ──
+// 설비관리시스템 공통: 6(FIRE_MGMT), 62(도면), 67(층별도면)
+// 소방설비: 69(소방설비그룹), 63(소화기), 64(소화전), 65(수신기), 66(소방펌프), 70(스프링클러)
+// 소방QR: 68(QR코드)
+// 기타설비: 71(기타설비그룹), 72(에어컨), 73(정수기), 74(기타QR)
+// PS 지분 검사: 7(PS_INSP_MGMT)
+const _allFacilityMenus = [6,62,67,68,69,63,64,65,66,70,71,72,73,74];
+const _fireOnlyMenus    = [6,62,67,68,69,63,64,65,66,70];         // 공통도면+소방QR+소방설비
+const _otherOnlyMenus   = [6,62,67,71,72,73,74];                  // 공통도면+기타설비+기타QR (소방QR 제외)
 const mockPermissions = mockRoles.map(r => ({
   role: r.code,
   roleDescription: r.codeName,
-  menuIds: r.code === 'ROLE_ADMIN' ? [1,2,3,4,5,6,61,62,63,64,65,66,67,68] :
-           r.code === 'ROLE_MANAGER' ? [1,2,5,6,61,62,63,64,65,66,67,68] :
-           r.code === 'ROLE_FIRE_MANAGER' ? [1,6,61,62,63,64,65,66,67,68] :
-           [1,6,61]
+  // 세부공장일보(100,101,102)는 모든 역할에 개방 — 실제 접근은 cell_auth 프론트 필터링으로 제어
+  menuIds: r.code === 'ROLE_ADMIN'             ? [1,2,3,4,5, ..._allFacilityMenus, 7, 100,101,102] :
+           r.code === 'ROLE_MANAGER'           ? [1,2,5, 7, 100,101,102] :
+           r.code === 'ROLE_USER'              ? [1, 7, 100,101,102] :
+           r.code === 'ROLE_FACILITY_MANAGER'  ? [1, ..._allFacilityMenus, 100,101,102] :
+           r.code === 'ROLE_FIRE_MANAGER'      ? [1, ..._fireOnlyMenus, 100,101,102] :
+           r.code === 'ROLE_EQUIPMENT_MANAGER' ? [1, ..._otherOnlyMenus, 100,101,102] :
+           [1]
 }));
 
 // ── Helper: Mock PS-INSP Inspection Data (20건) ──
@@ -439,7 +473,26 @@ const server = http.createServer((req, res) => {
 
     // Menus - role
     if (pathname.startsWith('/api/core/menus/role/')) {
-      return apiOk(res, mockMenus);
+      // 역할별 메뉴 필터링: mockPermissions의 menuIds 기준으로 트리 필터
+      var reqRole = decodeURIComponent(pathname.split('/').pop());
+      var rolePerm = mockPermissions.find(function(p){ return p.role === reqRole; });
+      var allowedIds = rolePerm ? rolePerm.menuIds : [1]; // 기본: 대시보드만
+
+      function filterMenuTree(nodes, ids) {
+        var result = [];
+        nodes.forEach(function(node) {
+          // 이 노드 자체가 허용되었거나, 자식 중 허용된 게 있으면 포함
+          var childFiltered = node.children ? filterMenuTree(node.children, ids) : [];
+          if (ids.includes(node.menuId) || childFiltered.length > 0) {
+            var copy = Object.assign({}, node);
+            copy.children = childFiltered;
+            result.push(copy);
+          }
+        });
+        return result;
+      }
+      var filteredMenus = filterMenuTree(mockMenus, allowedIds);
+      return apiOk(res, filteredMenus);
     }
 
     // Menus - tree
@@ -476,37 +529,37 @@ const server = http.createServer((req, res) => {
       return apiOk(res, jsonBody);
     }
 
-    // Codes - lookup
-    if (pathname === '/api/codes/lookup/ROLE') {
+    // Codes - lookup (아키텍처 Rule 5: /common-api/ prefix)
+    if (pathname === '/common-api/codes/lookup/ROLE') {
       return apiOk(res, mockRoles);
     }
-    if (pathname === '/api/codes/lookup/DEPT') {
+    if (pathname === '/common-api/codes/lookup/DEPT') {
       return apiOk(res, mockDepts);
     }
 
     // Codes - groups
-    if (pathname === '/api/codes/groups' && method === 'GET') {
+    if (pathname === '/common-api/codes/groups' && method === 'GET') {
       return apiOk(res, mockCodeGroups);
     }
-    if (pathname.match(/^\/api\/codes\/groups\/\d+$/) && method === 'GET') {
+    if (pathname.match(/^\/common-api\/codes\/groups\/\d+$/) && method === 'GET') {
       const gid = parseInt(pathname.split('/').pop());
       const g = mockCodeGroups.find(x => x.groupId === gid);
       if (g) return apiOk(res, { ...g, details: mockRoles.map((r,i) => ({ codeId:i+1, code:r.code, codeName:r.codeName, sortOrder:r.sortOrder, isActive:true })) });
       return apiErr(res, 'Not found', 404);
     }
-    if (pathname === '/api/codes/groups' && method === 'POST') {
+    if (pathname === '/common-api/codes/groups' && method === 'POST') {
       return apiOk(res, { groupId: 100, ...jsonBody });
     }
-    if (pathname.match(/^\/api\/codes\/groups\/\d+$/) && method === 'PUT') {
+    if (pathname.match(/^\/common-api\/codes\/groups\/\d+$/) && method === 'PUT') {
       return apiOk(res, jsonBody);
     }
-    if (pathname.match(/^\/api\/codes\/groups\/\d+$/) && method === 'DELETE') {
+    if (pathname.match(/^\/common-api\/codes\/groups\/\d+$/) && method === 'DELETE') {
       return apiOk(res, null);
     }
-    if (pathname.match(/^\/api\/codes\/groups\/\d+\/details$/) && method === 'POST') {
+    if (pathname.match(/^\/common-api\/codes\/groups\/\d+\/details$/) && method === 'POST') {
       return apiOk(res, { codeId: 100, ...jsonBody });
     }
-    if (pathname.match(/^\/api\/codes\/details\/\d+$/) && (method === 'PUT' || method === 'DELETE')) {
+    if (pathname.match(/^\/common-api\/codes\/details\/\d+$/) && (method === 'PUT' || method === 'DELETE')) {
       return apiOk(res, jsonBody || null);
     }
 
@@ -716,16 +769,35 @@ const server = http.createServer((req, res) => {
       // ── 셀 데이터 (in-memory store) ──
       if (!global._drCellData) { global._drCellData = {}; }
 
-      // ── /view/my-permissions ──
+      // ── /view/my-permissions (cell_auth 기반 접근 판정) ──
       if (pathname === '/dailyreport-api/view/my-permissions') {
-        var canAccessInput = true;  // 모든 seed 사용자가 입력 페이지 접근 가능
-        var canWriteInput = true;
-        var canAccessAuth = drCurrentUser.loginId === 'admin';  // admin만 권한관리 접근
-        return jsonRes(res, {
-          userId: drCurrentUser.userId,
-          loginId: drCurrentUser.loginId,
-          permissions: { canAccessInput: canAccessInput, canWriteInput: canWriteInput, canAccessAuth: canAccessAuth }
+        // admin은 core_menu_permission.canAdmin으로 전체 접근
+        var isAdmin = drCurrentUser.loginId === 'admin';
+        // cell_auth에 활성 레코드가 있는 사용자만 입력 접근 가능
+        var hasActiveCellAuth = global._drCellAuths.some(function(a) {
+          return a.userId === drCurrentUser.userId && a.isActive;
         });
+        var canAccessInput = isAdmin || hasActiveCellAuth;
+        var canWriteInput = hasActiveCellAuth;
+        var canAccessAuth = isAdmin || hasActiveCellAuth;  // admin 또는 cell_auth 보유자
+        return jsonRes(res, {
+          success: true, code: 200, message: 'SUCCESS',
+          data: {
+            userId: drCurrentUser.userId,
+            loginId: drCurrentUser.loginId,
+            permissions: { canAccessInput: canAccessInput, canWriteInput: canWriteInput, canAccessAuth: canAccessAuth }
+          }
+        });
+      }
+
+      // ── /users (AI플랫폼 등록 사용자 목록 — 셀 권한 등록용 드롭다운) ──
+      // 프로덕션: EntityManager native query로 core_user 테이블 전체 조회
+      // Mock: drUsers(일보 모듈의 core_user 매핑)를 반환
+      if (pathname === '/dailyreport-api/users' && method === 'GET') {
+        var userList = drUsers.map(function(u) {
+          return { userId: u.userId, loginId: u.loginId, userName: u.userName, department: u.department, position: u.position };
+        });
+        return jsonRes(res, userList);
       }
 
       // ── /view/render?reportDate=... ──
@@ -1025,7 +1097,7 @@ const server = http.createServer((req, res) => {
           {rowIndex:6,colIndex:6,excelCoord:'P40',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
         ];
 
-        var result = {
+        var renderData = {
           report: { reportId: 3, reportDate: reportDate, title: reportDate + ' 세부공장일보', status: 'DRAFT' },
           tables: {
             'TBL_PRODUCTION_INDEX': { tableCode:'TBL_PRODUCTION_INDEX', tableName:'주요 생산 지표 현황', sortOrder:1, rowCount:10, colCount:15, cells: buildCells('TBL_PRODUCTION_INDEX', tbl1Cells) },
@@ -1035,9 +1107,9 @@ const server = http.createServer((req, res) => {
           },
           remarks: [{ remarkId:1, content:'공용 보기 화면 테스트 데이터입니다.', category:'GENERAL' }],
           images: [],
-          permissions: { canAccessInput:true, canWriteInput:true, canAccessAuth: drCurrentUser.loginId === 'admin' }
+          permissions: { canAccessInput:true, canWriteInput:true, canAccessAuth: drCurrentUser.loginId === 'admin' || global._drCellAuths.some(function(a){ return a.userId === drCurrentUser.userId && a.isActive; }) }
         };
-        return jsonRes(res, result);
+        return jsonRes(res, { success: true, code: 200, message: 'SUCCESS', data: renderData });
       }
 
       // ── /reports/:id/cells (POST - 셀 저장) ──
