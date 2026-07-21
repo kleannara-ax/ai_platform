@@ -86,12 +86,25 @@ const mockDepts = [
 ];
 
 const mockUsers = [
+  // 기존 플랫폼 사용자
   { userId:1, loginId:'admin', userName:'관리자', email:'admin@company.com', phone:'010-1234-5678', role:'ROLE_ADMIN', enabled:true, deptName:'경영지원팀', deptCode:'DEPT001', position:'부장', jobTitle:'팀장', employeeNo:'EMP-0001', joinDate:'2020-01-15', officePhone:'02-1234-5678', internalExt:'1001' },
   { userId:2, loginId:'manager01', userName:'김매니저', email:'manager@company.com', phone:'010-2345-6789', role:'ROLE_MANAGER', enabled:true, deptName:'기술개발팀', deptCode:'DEPT002', position:'과장', jobTitle:'팀원', employeeNo:'EMP-0002', joinDate:'2021-03-01', officePhone:'02-1234-5679', internalExt:'1002' },
   { userId:3, loginId:'user01', userName:'이사용자', email:'user01@company.com', phone:'010-3456-7890', role:'ROLE_USER', enabled:true, deptName:'영업팀', deptCode:'DEPT003', position:'대리', jobTitle:'팀원', employeeNo:'EMP-0003', joinDate:'2022-06-15', officePhone:'02-1234-5680', internalExt:'1003' },
   { userId:4, loginId:'fire01', userName:'박소방', email:'fire01@company.com', phone:'010-4567-8901', role:'ROLE_FIRE_MANAGER', enabled:true, deptName:'경영지원팀', deptCode:'DEPT001', position:'과장', jobTitle:'소방안전담당', employeeNo:'EMP-0004', joinDate:'2021-09-01', officePhone:'02-1234-5681', internalExt:'1004' },
   { userId:5, loginId:'user02', userName:'최직원', email:'user02@company.com', phone:'010-5678-9012', role:'ROLE_USER', enabled:false, deptName:'기술개발팀', deptCode:'DEPT002', position:'사원', jobTitle:'팀원', employeeNo:'EMP-0005', joinDate:'2023-01-10', officePhone:'02-1234-5682', internalExt:'1005' },
+  // 세부공장일보 담당자 (seed 데이터 기반)
+  { userId:101, loginId:'kim',   userName:'김완중 팀장',      email:'kim@company.com',    phone:'010-6001-0001', role:'ROLE_USER', enabled:true, deptName:'생산팀',       deptCode:'DEPT010', position:'팀장', jobTitle:'생산팀장',       employeeNo:'EMP-0101', joinDate:'2018-03-01', officePhone:'02-1234-6001', internalExt:'6001' },
+  { userId:102, loginId:'park',  userName:'박지권 책임',      email:'park@company.com',   phone:'010-6002-0001', role:'ROLE_USER', enabled:true, deptName:'환경에너지팀', deptCode:'DEPT011', position:'책임', jobTitle:'환경에너지담당', employeeNo:'EMP-0102', joinDate:'2019-05-01', officePhone:'02-1234-6002', internalExt:'6002' },
+  { userId:103, loginId:'yoo',   userName:'유동현 책임',      email:'yoo@company.com',    phone:'010-6003-0001', role:'ROLE_USER', enabled:true, deptName:'생산팀',       deptCode:'DEPT010', position:'책임', jobTitle:'수율담당',       employeeNo:'EMP-0103', joinDate:'2019-08-01', officePhone:'02-1234-6003', internalExt:'6003' },
+  { userId:104, loginId:'jung',  userName:'정상엽 책임',      email:'jung@company.com',   phone:'010-6004-0001', role:'ROLE_USER', enabled:true, deptName:'환경팀',       deptCode:'DEPT012', position:'책임', jobTitle:'환경담당',       employeeNo:'EMP-0104', joinDate:'2020-01-15', officePhone:'02-1234-6004', internalExt:'6004' },
+  { userId:105, loginId:'jang',  userName:'장석환 선임',      email:'jang@company.com',   phone:'010-6005-0001', role:'ROLE_USER', enabled:true, deptName:'생산팀',       deptCode:'DEPT010', position:'선임', jobTitle:'장기재고담당',   employeeNo:'EMP-0105', joinDate:'2021-02-01', officePhone:'02-1234-6005', internalExt:'6005' },
+  { userId:106, loginId:'lee',   userName:'이도형 사원',      email:'lee@company.com',    phone:'010-6006-0001', role:'ROLE_USER', enabled:true, deptName:'생산팀',       deptCode:'DEPT010', position:'사원', jobTitle:'장기재고담당',   employeeNo:'EMP-0106', joinDate:'2022-03-01', officePhone:'02-1234-6006', internalExt:'6006' },
+  { userId:107, loginId:'choi',  userName:'최민우 사원',      email:'choi@company.com',   phone:'010-6007-0001', role:'ROLE_USER', enabled:true, deptName:'환경에너지팀', deptCode:'DEPT011', position:'사원', jobTitle:'전력에너지담당', employeeNo:'EMP-0107', joinDate:'2022-07-01', officePhone:'02-1234-6007', internalExt:'6007' },
+  { userId:108, loginId:'energy',userName:'환경에너지팀 반장', email:'energy@company.com', phone:'010-6008-0001', role:'ROLE_USER', enabled:true, deptName:'환경에너지팀', deptCode:'DEPT011', position:'반장', jobTitle:'보일러운영담당', employeeNo:'EMP-0108', joinDate:'2017-06-01', officePhone:'02-1234-6008', internalExt:'6008' },
 ];
+
+// ── 로그인 세션 관리 (토큰 → 사용자 매핑) ──
+const tokenToUser = {};
 
 const mockCodeGroups = [
   { groupId:1, groupCode:'ROLE', groupName:'역할', description:'사용자 역할 분류', sortOrder:1, isActive:true, codeCount:4 },
@@ -372,9 +385,17 @@ const server = http.createServer((req, res) => {
       const { loginId, password } = jsonBody || {};
       const user = mockUsers.find(u => u.loginId === loginId);
       if (user) {
+        if (!user.enabled) {
+          return apiErr(res, '비활성화된 계정입니다. 관리자에게 문의하세요.', 403);
+        }
+        const accessToken = 'mock-jwt-' + loginId + '-' + Date.now();
+        const refreshToken = 'mock-refresh-' + loginId + '-' + Date.now();
+        // 토큰 → 사용자 매핑 저장 (로그인 세션)
+        tokenToUser[accessToken] = user;
+        tokenToUser[refreshToken] = user;
         return apiOk(res, {
-          accessToken: 'mock-jwt-access-token-' + Date.now(),
-          refreshToken: 'mock-jwt-refresh-token-' + Date.now(),
+          accessToken: accessToken,
+          refreshToken: refreshToken,
           tokenType: 'Bearer'
         });
       }
@@ -390,8 +411,24 @@ const server = http.createServer((req, res) => {
       });
     }
 
-    // Me
+    // Me — 토큰에서 실제 로그인 사용자를 찾아 반환
     if (pathname === '/api/auth/me') {
+      const authHeader = req.headers['authorization'] || '';
+      const bearerToken = authHeader.replace('Bearer ', '');
+      const loggedInUser = tokenToUser[bearerToken] || null;
+      if (loggedInUser) {
+        return apiOk(res, loggedInUser);
+      }
+      // 토큰에서 loginId 추출 시도 (mock-jwt-{loginId}-{timestamp} 형식)
+      const tokenMatch = bearerToken.match(/^mock-jwt-(.+?)-\d+$/);
+      if (tokenMatch) {
+        const foundUser = mockUsers.find(u => u.loginId === tokenMatch[1]);
+        if (foundUser) {
+          tokenToUser[bearerToken] = foundUser; // 캐시
+          return apiOk(res, foundUser);
+        }
+      }
+      // fallback: admin
       return apiOk(res, mockUser);
     }
 
@@ -654,7 +691,11 @@ const server = http.createServer((req, res) => {
 
       // ── 현재 로그인 사용자 결정 (쿼리파라미터 또는 기본값 admin) ──
       var drLoginId = parsedUrl.query.loginId || parsedUrl.query._loginId || 'admin';
-      var drCurrentUser = drUsers.find(function(u){return u.loginId===drLoginId;}) || drUsers[0];
+      var drCurrentUser = drUsers.find(function(u){return u.loginId===drLoginId;});
+      // drUsers에 없는 플랫폼 사용자(manager01 등)는 게스트로 처리 (일보 편집 권한 없음)
+      if (!drCurrentUser) {
+        drCurrentUser = { userId:0, loginId:drLoginId, userName:drLoginId, department:'기타', position:'-', role:'GUEST' };
+      }
 
       // ── 세부공장일보 셀 권한 (in-memory store) ──
       if (!global._drCellAuths) {
