@@ -399,7 +399,7 @@
 
   async function loadFireAdminPermission() {
     try {
-      const res = await apiFetch('/api/codes/lookup/FIRE_PERM');
+      const res = await apiFetch('/common-api/codes/lookup/FIRE_PERM');
       if (res?.data) {
         const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
         if (fireAdmin?.extraValue1) {
@@ -411,7 +411,7 @@
 
   async function loadOtherAdminPermission() {
     try {
-      const res = await apiFetch('/api/codes/lookup/OTHER_PERM');
+      const res = await apiFetch('/common-api/codes/lookup/OTHER_PERM');
       if (res?.data) {
         const otherAdmin = res.data.find(d => d.code === 'OTHER_ADMIN');
         isOtherAdmin = isCurrentUserListed(otherAdmin?.extraValue1);

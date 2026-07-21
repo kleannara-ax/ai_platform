@@ -365,7 +365,7 @@
   async function loadFireAdminPermission() {
     try {
       if (!currentUser?.loginId) return;
-      const res = await fetch('/api/codes/lookup/FIRE_PERM', { headers: authHeaders() });
+      const res = await fetch('/common-api/codes/lookup/FIRE_PERM', { headers: authHeaders() });
       const json = await res.json().catch(() => null);
       const fireAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'FIRE_ADMIN') : null;
       canFireEdit = isCurrentUserListed(fireAdmin?.extraValue1);
@@ -374,7 +374,7 @@
   async function loadOtherAdminPermission() {
     try {
       if (!currentUser?.loginId) return;
-      const res = await fetch('/api/codes/lookup/OTHER_PERM', { headers: authHeaders() });
+      const res = await fetch('/common-api/codes/lookup/OTHER_PERM', { headers: authHeaders() });
       const json = await res.json().catch(() => null);
       const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
       canOtherEdit = isCurrentUserListed(otherAdmin?.extraValue1);

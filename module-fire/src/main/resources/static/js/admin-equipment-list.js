@@ -41,7 +41,7 @@
     if (_user && _user.loginId) {
       const token = _user.token;
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-      const resp = await fetch('/api/codes/lookup/FIRE_PERM', { headers });
+      const resp = await fetch('/common-api/codes/lookup/FIRE_PERM', { headers });
       const json = await resp.json();
       if (json.success && Array.isArray(json.data)) {
         const fireAdmin = json.data.find(d => d.code === 'FIRE_ADMIN');

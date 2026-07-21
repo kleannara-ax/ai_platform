@@ -224,7 +224,7 @@ async function jsonOrThrow(res) {
 async function loadFireAdminPermission() {
   try {
     const u = API.getUser(); if (!u || !u.loginId) return;
-    const res = await API.req('/api/codes/lookup/FIRE_PERM');
+    const res = await API.req('/common-api/codes/lookup/FIRE_PERM');
     const data = await jsonOrThrow(res);
     const fireAdmin = Array.isArray(data) ? data.find(d => d.code === 'FIRE_ADMIN') : null;
     if (fireAdmin?.extraValue1) canEdit = fireAdmin.extraValue1.split(',').map(s => s.trim()).includes(u.loginId);

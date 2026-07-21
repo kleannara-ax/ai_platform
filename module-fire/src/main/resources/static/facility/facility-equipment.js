@@ -65,7 +65,7 @@
   async function loadOtherAdminPermission() {
     hasOtherAdminPermission = false;
     try {
-      const res = await API.req('/api/codes/lookup/OTHER_PERM');
+      const res = await API.req('/common-api/codes/lookup/OTHER_PERM');
       const json = res && res.ok ? await res.json().catch(() => null) : null;
       const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
       hasOtherAdminPermission = isCurrentUserListed(otherAdmin?.extraValue1);

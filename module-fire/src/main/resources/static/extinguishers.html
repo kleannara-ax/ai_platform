@@ -887,7 +887,7 @@ async function loadFireAdminPermission() {
   try {
     const u = API.getUser();
     if (!u || !u.loginId) return;
-    const res = await (await API.req('/api/codes/lookup/FIRE_PERM')).json();
+    const res = await (await API.req('/common-api/codes/lookup/FIRE_PERM')).json();
     if (res.success && Array.isArray(res.data)) {
       const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
       if (fireAdmin && fireAdmin.extraValue1) {
