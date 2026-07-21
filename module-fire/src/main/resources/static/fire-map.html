@@ -1208,7 +1208,7 @@ async function init() {
         // QR 메뉴는 FIRE_ADMIN 아이디만 접근 가능
         let isFireAdmin = false;
         try {
-            const permRes = await apiFetch('/api/codes/lookup/FIRE_PERM');
+            const permRes = await apiFetch('/common-api/codes/lookup/FIRE_PERM');
             const permJson = await permRes.json();
             if (permJson?.data) {
                 const fireAdmin = permJson.data.find(d => d.code === 'FIRE_ADMIN');
