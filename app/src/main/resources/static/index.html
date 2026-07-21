@@ -438,7 +438,7 @@ async function enterApp() {
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
   document.getElementById('userRole').textContent=currentUser.role||'';
   // 공통코드에서 역할 목록 로드
-  try{ const rr=await api('GET','/api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; Object.keys(_roleColorCache).forEach(k=>delete _roleColorCache[k]); }catch(e){ allRoles=[]; }
+  try{ const rr=await api('GET','/common-api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; Object.keys(_roleColorCache).forEach(k=>delete _roleColorCache[k]); }catch(e){ allRoles=[]; }
   // 현재 접속자 IP 조회
   try{ const ir=await api('GET','/api/core/menus/my-ip'); clientIp=ir.success?ir.data.ip:''; }catch(e){ clientIp=''; }
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
@@ -609,6 +609,31 @@ async function loadUserMenus() {
     const res = await api('GET', '/api/core/menus/role/' + encodeURIComponent(role));
     let menus = res.success ? (res.data || []) : [];
     userMenus = filterMenusByIp(menus);
+
+    // ── cell_auth 기반 세부공장일보 사이드바 필터링 ──
+    // admin이 아닌 사용자: cell_auth 보유 여부로 dailyreport 메뉴 표시 결정
+    // core_role_menu에는 ROLE_USER에 세부공장일보 열려있으나,
+    // 실제 담당자(cell_auth 보유자)만 사이드바에 표시
+    if (currentUser.role !== 'ROLE_ADMIN') {
+      try {
+        var loginId = currentUser.loginId || '';
+        var drRes = await fetch('/dailyreport-api/view/my-permissions?_loginId=' + encodeURIComponent(loginId));
+        var drJson = await drRes.json();
+        // ApiResponse 구조({ success, data }) 언래핑
+        var drData = (drJson && typeof drJson.success === 'boolean' && drJson.data !== undefined) ? drJson.data : drJson;
+        var canAccessInput = drData && drData.permissions && drData.permissions.canAccessInput;
+        if (!canAccessInput) {
+          // cell_auth 없는 사용자: DAILY_REPORT 관련 메뉴 전체 제거
+          userMenus = userMenus.filter(function(m) {
+            return !(m.menuCode && m.menuCode.startsWith('DAILY_REPORT'));
+          });
+        }
+      } catch(drErr) {
+        // dailyreport API 호출 실패 시 메뉴 유지 (접근은 일보 자체에서 재검증)
+        console.warn('cell_auth 확인 실패, 일보 메뉴 유지:', drErr);
+      }
+    }
+
     renderSidebarMenus();
   } catch(e) {
     nav.innerHTML = '<div style="padding:20px 24px;color:#ef4444;font-size:12px;">메뉴 로드 실패</div>';
@@ -842,7 +867,7 @@ async function renderUsers(){
   try {
     const [usersRes,deptsRes]=await Promise.all([
       fetchAllIntegratedUsers(),
-      api('GET','/api/codes/lookup/DEPT')
+      api('GET','/common-api/codes/lookup/DEPT')
     ]);
     allUsers=usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     allDepts=deptsRes.success?(deptsRes.data||[]):[];
@@ -1467,7 +1492,7 @@ async function renderCodes(){
   const canManage=hasMenuAccess('CODE_MGMT');
   document.getElementById('topbarActions').innerHTML=canManage?'<button class="btn btn-sm btn-primary" onclick="openCreateGroup()">+ 그룹 추가</button>':'';
   try{
-    const res=await api('GET','/api/codes/groups');
+    const res=await api('GET','/common-api/codes/groups');
     codeGroups=res.success?(res.data||[]):[];
     selectedGroup=null; codeDetails=[];
     drawCodePage(canManage);
@@ -1539,7 +1564,7 @@ function drawCodePage(canManage){
 
 async function selectCodeGroup(groupId){
   try{
-    const res=await api('GET','/api/codes/groups/'+groupId);
+    const res=await api('GET','/common-api/codes/groups/'+groupId);
     if(res.success){
       selectedGroup=res.data;
       codeDetails=res.data.details||[];
@@ -1571,7 +1596,7 @@ async function submitCreateGroup(){
   };
   if(!body.groupCode||!body.groupName){toast('그룹 코드와 그룹명은 필수입니다.','error');return;}
   try{
-    const res=await api('POST','/api/codes/groups',body);
+    const res=await api('POST','/common-api/codes/groups',body);
     if(res.success){toast('코드 그룹이 등록되었습니다.','success');closeModal();renderCodes();}
     else{showValidationErrors(res);}
   }catch(e){toast(e.message,'error');}
@@ -1601,7 +1626,7 @@ async function submitEditGroup(groupId){
   };
   if(!body.groupName){toast('그룹명은 필수입니다.','error');return;}
   try{
-    const res=await api('PUT','/api/codes/groups/'+groupId,body);
+    const res=await api('PUT','/common-api/codes/groups/'+groupId,body);
     if(res.success){toast('코드 그룹이 수정되었습니다.','success');closeModal();renderCodes();}
     else{showValidationErrors(res);}
   }catch(e){toast(e.message,'error');}
@@ -1610,7 +1635,7 @@ async function submitEditGroup(groupId){
 async function deleteCodeGroup(groupId){
   if(!confirm('이 코드 그룹과 하위 코드를 모두 삭제하시겠습니까?'))return;
   try{
-    const res=await api('DELETE','/api/codes/groups/'+groupId);
+    const res=await api('DELETE','/common-api/codes/groups/'+groupId);
     if(res.success){toast('코드 그룹이 삭제되었습니다.','success');selectedGroup=null;codeDetails=[];renderCodes();}
     else toast(res.message||'삭제 실패','error');
   }catch(e){toast(e.message,'error');}
@@ -1648,7 +1673,7 @@ async function submitCreateDetail(){
   };
   if(!body.code||!body.codeName){toast('코드와 코드명은 필수입니다.','error');return;}
   try{
-    const res=await api('POST','/api/codes/groups/'+selectedGroup.groupId+'/details',body);
+    const res=await api('POST','/common-api/codes/groups/'+selectedGroup.groupId+'/details',body);
     if(res.success){toast('코드가 등록되었습니다.','success');closeModal();selectCodeGroup(selectedGroup.groupId);}
     else{showValidationErrors(res);}
   }catch(e){toast(e.message,'error');}
@@ -1685,7 +1710,7 @@ async function submitEditDetail(codeId){
   };
   if(!body.code||!body.codeName){toast('코드와 코드명은 필수입니다.','error');return;}
   try{
-    const res=await api('PUT','/api/codes/details/'+codeId,body);
+    const res=await api('PUT','/common-api/codes/details/'+codeId,body);
     if(res.success){toast('코드가 수정되었습니다.','success');closeModal();selectCodeGroup(selectedGroup.groupId);}
     else{showValidationErrors(res);}
   }catch(e){toast(e.message,'error');}
@@ -1694,7 +1719,7 @@ async function submitEditDetail(codeId){
 async function deleteCodeDetail(codeId){
   if(!confirm('이 코드를 삭제하시겠습니까?'))return;
   try{
-    const res=await api('DELETE','/api/codes/details/'+codeId);
+    const res=await api('DELETE','/common-api/codes/details/'+codeId);
     if(res.success){toast('코드가 삭제되었습니다.','success');selectCodeGroup(selectedGroup.groupId);}
     else toast(res.message||'삭제 실패','error');
   }catch(e){toast(e.message,'error');}
