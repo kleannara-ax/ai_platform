@@ -15,11 +15,11 @@ import java.util.List;
 
 /**
  * 부서 관리 API
- * URL Prefix: /api/module-common/departments
- * → 모듈 단위 API Prefix 적용
+ * URL Prefix: /common-api/departments
+ * → 아키텍처 Rule 5: /{모듈명}-api/ prefix 적용
  */
 @RestController
-@RequestMapping("/api/module-common/departments")
+@RequestMapping("/common-api/departments")
 @RequiredArgsConstructor
 public class DepartmentController {
 

@@ -1,4 +1,4 @@
 dependencies {
-    // Core 모듈 의존
-    implementation project(':core')
+    // Core 모듈 의존 — 아키텍처 Rule 1: compileOnly (런타임은 app 모듈이 제공)
+    compileOnly project(':core')
 }

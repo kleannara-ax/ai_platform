@@ -19,7 +19,7 @@ import java.util.List;
  * <p>인증된 사용자: 코드 조회
  */
 @RestController
-@RequestMapping("/api/codes")
+@RequestMapping("/common-api/codes")
 @RequiredArgsConstructor
 public class CodeController {
 
