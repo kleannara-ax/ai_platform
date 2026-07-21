@@ -28,6 +28,8 @@
     .table thead.table-dark th{background-image:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;color:#fff!important;font-weight:700!important;padding:12px 12px!important;border-color:rgba(255,255,255,.14)!important;white-space:nowrap;}
     .table td{padding:13px 12px!important;vertical-align:middle!important;border-bottom-color:rgba(15,23,42,.1)!important;}
     .clickable-row{cursor:pointer;}.clickable-row:hover{background:rgba(99,102,241,.06)!important;}
+    .fw-list-scroll{overflow:visible;}
+    .fw-list-scroll .table thead th{position:sticky!important;top:0;z-index:3;background-clip:padding-box;box-shadow:0 1px 0 rgba(15,23,42,.16);}
     .fw-status{display:inline-block;padding:.18rem .68rem;border-radius:999px;font-weight:800;font-size:.78rem;line-height:1.25;color:#fff;}
     .fw-ok{background:#178a54;}.fw-bad{background:#d64545;}.fw-warn{background:#f59e0b;}.fw-muted{background:#64748b;}
     .btn-fw-edit{background:#fff!important;border:1px solid rgba(99,102,241,.45)!important;color:#2563eb!important;font-weight:700;padding:.28rem .62rem;border-radius:8px;}
@@ -292,7 +294,7 @@ function renderTable() {
       <td class="text-truncate" style="max-width:240px;" title="${esc(it.lastFaultReason || '')}">${val(it.lastFaultReason)}</td><td class="text-truncate" style="max-width:220px;" title="${esc(it.note || '')}">${val(it.note)}</td>
       <td><div class="d-inline-flex gap-1">${canEdit ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.sprinklerId}">수정</button><button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.sprinklerId}">점검</button><button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.sprinklerId}" data-serial="${esc(it.serialNumber)}">삭제</button>` : ''}</div></td>
     </tr>`).join('') || `<tr><td colspan="11" class="text-center text-muted py-5">등록된 스프링클러가 없습니다.</td></tr>`;
-  document.getElementById('mainTableWrap').innerHTML = `<div class="table-responsive"><table class="table mb-0"><thead class="table-dark"><tr><th style="width:70px" class="text-center">번호</th><th style="width:125px">ID</th><th>건물</th><th>층</th><th style="width:115px">좌표</th><th style="width:145px">최종점검일</th><th style="width:110px">점검자</th><th style="width:95px">고장유무</th><th>고장사유</th><th>비고</th><th style="width:170px">관리</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  document.getElementById('mainTableWrap').innerHTML = `<div class="table-responsive fw-list-scroll"><table class="table mb-0"><thead class="table-dark"><tr><th style="width:70px" class="text-center">번호</th><th style="width:125px">ID</th><th>건물</th><th>층</th><th style="width:115px">좌표</th><th style="width:145px">최종점검일</th><th style="width:110px">점검자</th><th style="width:95px">고장유무</th><th>고장사유</th><th>비고</th><th style="width:170px">관리</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function checklistHtml(prefix, values = {}) {
   return checklistGroups.map(group => `<section class="check-section"><div class="check-section-title">${esc(group.title)}</div>${group.items.map(item => {

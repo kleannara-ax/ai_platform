@@ -28,6 +28,8 @@
     .status-add-btn { background:linear-gradient(135deg,#22c7f2 0%,#0ea5e9 100%) !important; box-shadow:0 6px 14px rgba(14,165,233,.28) !important; }
     .table-card, .filter-card { border:0 !important; border-radius:18px !important; box-shadow:0 14px 30px rgba(15,23,42,.08) !important; }
     .fw-table-wrap { border-radius:18px; overflow:hidden; }
+    .fw-table-wrap:has(.fw-list-scroll), .fw-list-scroll { overflow:visible; }
+    .fw-list-scroll .table thead th { position:sticky !important; top:0; z-index:3; background-clip:padding-box; box-shadow:0 1px 0 rgba(15,23,42,.16); }
     .table thead th { background-image:linear-gradient(135deg,#667eea 0%,#764ba2 100%) !important; color:#fff !important; border:none !important; font-weight:700; padding:14px 16px !important; white-space:nowrap; }
     .table td { padding:14px 16px !important; vertical-align:middle !important; border-color:rgba(15,23,42,.08) !important; }
     .clickable-row { cursor:pointer; }
@@ -181,7 +183,7 @@
   <div class="card table-card shadow-sm">
     <div class="card-body p-0">
       <div class="fw-table-wrap">
-        <div class="table-responsive">
+        <div class="table-responsive fw-list-scroll">
           <table class="table align-middle mb-0">
             <thead>
               <tr>
