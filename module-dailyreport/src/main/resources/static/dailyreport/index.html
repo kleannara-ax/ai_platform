@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>세부공장일보 — 7월 공장일보(세부) 입력</title>
+  <style>
+    :root {
+      --bg:#eef2f7;
+      --panel:#ffffff;
+      --text:#111827;
+      --muted:#64748b;
+      --line:#cbd5e1;
+      --blue:#2563eb;
+      --blue-soft:#dbeafe;
+      --blue-hover:#e9f2ff;
+      --ok:#16a34a;
+      --warn:#b45309;
+      --disabled:#f3f4f6;
+      --shadow:0 14px 36px rgba(15,23,42,.08);
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:"Segoe UI","Malgun Gothic",sans-serif; }
+
+    /* ── 앱 쉘 ── */
+    .app-shell { min-height:100vh; display:flex; flex-direction:column; }
+    .topbar { position:sticky; top:0; z-index:30; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 18px; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); border-bottom:1px solid rgba(148,163,184,.35); }
+    .topbar-title { font-size:18px; font-weight:800; }
+    .topbar-subtitle { font-size:12px; color:var(--muted); margin-top:2px; }
+    .topbar-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .user-chip { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:999px; padding:8px 12px; font-size:13px; font-weight:700; }
+    .date-chip { border:1px solid #e2e8f0; background:#fff; color:#334155; border-radius:999px; padding:8px 12px; font-size:12px; font-weight:700; }
+    .save-chip.idle { background:#fff; color:#475569; border-color:#cbd5e1; }
+    .save-chip.dirty { background:#fff7ed; color:#9a3412; border-color:#fdba74; }
+    .save-chip.saved { background:#ecfdf5; color:#166534; border-color:#86efac; }
+    .toolbar-btn { border:1px solid #cbd5e1; background:#fff; color:#0f172a; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:800; cursor:pointer; transition:background .15s; }
+    .toolbar-btn:hover { background:#f1f5f9; }
+    .toolbar-btn.primary { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .toolbar-btn.primary:hover { background:#1d4ed8; }
+    .toolbar-btn.refresh { background:#f0fdf4; color:#166534; border-color:#86efac; }
+    .toolbar-btn.refresh:hover { background:#dcfce7; }
+
+    /* ── 알림/범례 ── */
+    .notice { width:min(1400px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
+    .notice small { display:block; margin-top:4px; color:#4f6fb8; font-weight:600; line-height:1.55; }
+    .legend { width:min(1400px, calc(100vw - 32px)); margin:12px auto 0; display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#475569; }
+    .legend-item { display:flex; align-items:center; gap:8px; }
+    .swatch { width:18px; height:18px; border-radius:6px; border:1px solid #cbd5e1; }
+    .swatch.mine { background:var(--blue-soft); border-color:#60a5fa; }
+    .swatch.locked { background:#f3f4f6; border-color:#d1d5db; }
+
+    /* ── 리포트 테이블 ── */
+    .page-wrap { width:min(1400px, calc(100vw - 32px)); margin:14px auto 32px; }
+    .sections-stack { display:flex; flex-direction:column; gap:16px; }
+    .report-section { background:#fff; border:1px solid #d7dee8; border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+    .section-title { padding:12px 16px; border-bottom:1px solid #e5e7eb; background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%); font-size:18px; font-weight:800; color:#0f172a; white-space:normal; word-break:keep-all; }
+    .section-table-wrap { padding:10px 12px 14px; overflow-x:auto; }
+    .report-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .cell { line-height:1.3; word-break:keep-all; }
+    .table-cell { min-height:28px; }
+    .wrap-cell { white-space:normal !important; word-break:break-word; }
+    .no-border { background:transparent !important; }
+    .cell.mine { background:var(--blue-soft) !important; box-shadow:inset 0 0 0 1px #60a5fa; }
+    .cell.locked { background:#f3f4f6 !important; color:#64748b !important; }
+    .cell.hover-own:hover { background:var(--blue-hover) !important; }
+    .cell-editor { width:100%; height:100%; }
+    .cell-input { width:100%; min-height:32px; border:0; outline:none; background:transparent; padding:0; margin:0; font:inherit; color:inherit; text-align:inherit; }
+    .cell-input:disabled { color:#94a3b8; cursor:not-allowed; }
+
+    /* ── 특이사항 ── */
+    .report-section-special { border:1px solid #000; box-shadow:none; }
+    .report-section-special .section-title { background:#fff; border-bottom:1px solid #000; }
+    .report-section-special .section-table-wrap { background:#fff; }
+    .special-table { border-collapse:collapse; border:1px solid #000; }
+    .special-head-left, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
+    .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; }
+    .special-note-wrap { padding:0; background:#fff; height:220px; border:1px solid #000; }
+    .special-note-input { width:100%; height:100%; min-height:220px; resize:vertical; border:0; outline:none; padding:12px 14px; font:inherit; line-height:1.55; color:#111827; background:#fff; box-shadow:none; }
+    .special-note-input:focus { box-shadow:none; background:#fff; }
+    .special-note-input[disabled] { background:#fff; color:#111827; cursor:not-allowed; opacity:1; }
+
+    /* ── 이미지 업로드 ── */
+    .report-section-upload { display:block; }
+    .report-section-upload .section-title { display:block; }
+    .upload-wrap { display:block; padding:14px 16px 18px; }
+    .upload-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .upload-input { display:none; }
+    .upload-btn { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 14px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; font-size:13px; font-weight:800; cursor:pointer; }
+    .upload-btn.disabled { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
+    .upload-help { font-size:12px; color:#64748b; }
+    .upload-dropzone { border:1px dashed #94a3b8; border-radius:14px; background:#f8fafc; padding:18px; text-align:center; color:#475569; }
+    .upload-dropzone.dragover { border-color:#2563eb; background:#eff6ff; color:#1d4ed8; }
+    .upload-dropzone-title { font-size:14px; font-weight:800; }
+    .upload-dropzone-desc { margin-top:6px; font-size:12px; }
+    .upload-preview-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:14px; }
+    .upload-empty { border:1px dashed #d1d5db; border-radius:12px; padding:22px 14px; text-align:center; color:#94a3b8; font-size:13px; }
+    .upload-card { border:1px solid #dbe4f0; border-radius:14px; overflow:hidden; background:#fff; }
+    .upload-thumb { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#f8fafc; }
+    .upload-card-body { padding:10px; }
+    .upload-card-name { font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .upload-card-meta { margin-top:4px; font-size:11px; color:#64748b; }
+    .upload-card-remove { margin-top:8px; width:100%; min-height:32px; border:1px solid #fecaca; border-radius:8px; background:#fff1f2; color:#be123c; font-size:12px; font-weight:800; cursor:pointer; }
+
+    /* ── 로딩/에러 ── */
+    .loading-overlay { position:fixed; inset:0; z-index:100; background:rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; }
+    .loading-spinner { font-size:16px; font-weight:700; color:var(--blue); }
+    .error-banner { width:min(1400px, calc(100vw - 32px)); margin:14px auto 0; padding:14px 18px; border-radius:14px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; font-size:13px; font-weight:600; }
+
+    /* ── 권한 없음 페이지 ── */
+    .no-access { min-height:60vh; display:flex; align-items:center; justify-content:center; padding:32px; }
+    .no-access-panel { text-align:center; max-width:500px; padding:40px; background:#fff; border-radius:18px; border:1px solid #d7dee8; box-shadow:var(--shadow); }
+    .no-access-icon { font-size:48px; margin-bottom:16px; }
+    .no-access-title { font-size:22px; font-weight:800; margin-bottom:12px; }
+    .no-access-desc { font-size:14px; color:var(--muted); line-height:1.65; }
+
+    /* ── 토스트 ── */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#0f172a; color:#fff; padding:12px 16px; border-radius:999px; font-size:13px; font-weight:700; box-shadow:0 12px 24px rgba(15,23,42,.18); opacity:0; pointer-events:none; transition:all .18s ease; z-index:40; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* ── 날짜 선택 ── */
+    .date-picker-wrap { display:flex; align-items:center; gap:8px; }
+    .date-picker-wrap input[type="date"] { padding:8px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:13px; font-weight:700; background:#fff; outline:none; color:#334155; }
+    .date-picker-wrap input[type="date"]:focus { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+
+    /* ── 자동 새로고침 표시 ── */
+    .auto-refresh-indicator { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+    .auto-refresh-indicator .dot { width:6px; height:6px; border-radius:50%; background:#86efac; display:inline-block; }
+    .auto-refresh-indicator.paused .dot { background:#fbbf24; }
+
+    @media (max-width:980px) {
+      .topbar { flex-direction:column; align-items:flex-start; }
+      .page-wrap, .notice, .legend { width:calc(100vw - 24px); }
+      .section-title { font-size:16px; }
+      .special-note-wrap, .special-note-input { min-height:180px; height:180px; }
+      .upload-preview-grid { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       앱 메인 쉘 (AI 플랫폼 로그인 후 진입)
+  ═══════════════════════════════════════════════════ -->
+  <section class="app-shell" id="appShell">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">7월 공장일보(세부)</div>
+        <div class="topbar-subtitle">표 1~4와 특이사항만 분리 표시</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="date-picker-wrap">
+          <input type="date" id="reportDateInput" />
+          <button class="toolbar-btn" type="button" onclick="loadReportByDate()">조회</button>
+        </div>
+        <div class="user-chip" id="userChip">인증 확인중...</div>
+        <div class="date-chip" id="dateChip">기준일</div>
+        <div class="date-chip save-chip idle" id="saveChip">저장 전</div>
+        <button class="toolbar-btn refresh" type="button" onclick="refreshData()" title="다른 사용자가 입력한 값을 최신으로 갱신합니다">&#8635; 새로고침</button>
+        <button class="toolbar-btn primary" type="button" onclick="saveInputs()">저장</button>
+        <button class="toolbar-btn" type="button" id="authAdminBtn" onclick="goToAuthAdmin()" style="display:none" title="셀 접근 권한 관리">&#9881; 권한관리</button>
+        <div class="auto-refresh-indicator" id="autoRefreshIndicator" style="display:none">
+          <span class="dot"></span>
+          <span id="autoRefreshLabel">자동 갱신 60초</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small></div>
+    <div class="legend">
+      <div class="legend-item"><span class="swatch mine"></span> 오늘 입력 가능한 본인 담당 셀</div>
+      <div class="legend-item"><span class="swatch locked"></span> 잠금 또는 비담당 셀</div>
+    </div>
+
+    <div id="errorBanner" class="error-banner" style="display:none"></div>
+
+    <div class="page-wrap">
+      <div class="sections-stack" id="sectionsStack">
+        <!-- 4개 표 + 특이사항 + 이미지 첨부: JS에서 동적 렌더링 -->
+      </div>
+    </div>
+  </section>
+
+  <!-- 권한 없음 화면 (필요 시 표시) -->
+  <section class="no-access" id="noAccessShell" style="display:none">
+    <div class="no-access-panel">
+      <div class="no-access-icon">&#128274;</div>
+      <div class="no-access-title">접근 권한이 없습니다</div>
+      <div class="no-access-desc" id="noAccessDesc">
+        세부공장일보 입력 페이지에 대한 접근 권한이 없습니다.<br>
+        관리자에게 권한 부여를 요청해 주세요.
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       JavaScript — AI 플랫폼 통합 프론트엔드 (Phase 4)
+       - 로그인: AI 플랫폼이 처리 (Spring Security)
+       - 권한: /my-permissions → 페이지 접근 여부 확인
+       - 셀 편집: 서버에서 editable 계산 (OWNER_IDS + CellAuth)
+       - 자동/수동 새로고침: 다른 사용자 입력 값 갱신
+  ═══════════════════════════════════════════════════ -->
+  <script>
+    // ── 설정 ──
+    const API_BASE = '/dailyreport-api';
+    const MAX_UPLOAD_IMAGES = 8;
+    const AUTO_REFRESH_INTERVAL_MS = 60000; // 60초마다 자동 새로고침
+
+    // ── 프리뷰 모드: 부모 iframe에서 전달한 _loginId 추출 ──
+    const _urlParams = new URLSearchParams(window.location.search);
+    const _previewLoginId = _urlParams.get('_loginId') || '';
+
+    // ── 상태 ──
+    let currentUser = null;        // { userId, loginId, permissions }
+    let currentReportId = null;
+    let currentReportDate = null;
+    let reportData = null;         // /view/render 응답 전체
+    let uploadedImages = [];
+    let dirtyCoords = new Set();   // 변경된 셀 좌표
+    let autoRefreshTimer = null;
+    let isRefreshing = false;
+
+    // ── 유틸리티 ──
+    function escapeHtml(v) {
+      return String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function getTodayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function getTodayParts() {
+      const d = new Date();
+      return { year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate() };
+    }
+
+    function canEditByFrequency(freqCode) {
+      const t = getTodayParts();
+      if (freqCode === 'daily' || freqCode === 'event') return true;
+      if (freqCode === 'monthly') return t.day === 1;
+      if (freqCode === 'yearly') return t.month === 1 && t.day === 1;
+      return false;
+    }
+
+    function getFrequencyHelp(freqCode) {
+      if (freqCode === 'daily') return '매일 입력 가능';
+      if (freqCode === 'event') return '발생 시 / 매일 입력 가능';
+      if (freqCode === 'monthly') return '매월 1일만 입력 가능';
+      if (freqCode === 'yearly') return '매년 1월 1일만 입력 가능';
+      return '입력 불가';
+    }
+
+    function humanFileSize(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B','KB','MB','GB'];
+      let v = bytes, i = 0;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    // ── 토스트 / 상태칩 ──
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    function setSaveState(text, mode) {
+      const chip = document.getElementById('saveChip');
+      chip.textContent = text;
+      chip.classList.remove('idle','dirty','saved');
+      chip.classList.add(mode || 'idle');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorBanner');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function hideError() {
+      document.getElementById('errorBanner').style.display = 'none';
+    }
+
+    // ── API 호출 ──
+    async function apiFetch(path, options = {}) {
+      // 프리뷰 모드일 때 _loginId 쿼리 파라미터를 자동 추가
+      let url = API_BASE + path;
+      if (_previewLoginId) {
+        const sep = url.includes('?') ? '&' : '?';
+        url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
+      }
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        credentials: 'same-origin', // AI 플랫폼 세션 쿠키 전송
+        ...options
+      });
+      if (res.status === 401) {
+        // 인증 만료 → 플랫폼 로그인 페이지로 리다이렉트
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        throw new Error('인증이 만료되었습니다. 로그인 페이지로 이동합니다.');
+      }
+      if (res.status === 403) {
+        throw new Error('접근 권한이 없습니다.');
+      }
+      if (!res.ok) {
+        const err = await res.text().catch(() => res.statusText);
+        throw new Error(`API 오류 (${res.status}): ${err}`);
+      }
+      return res.json();
+    }
+
+    // ═══════════════════════════════════════════════
+    //  AI 플랫폼 인증 + 권한 확인 (Phase 4 핵심)
+    // ═══════════════════════════════════════════════
+
+    /**
+     * 1계층 권한 확인: AI 플랫폼 로그인 → /my-permissions API
+     * - userId, loginId: Spring Security @AuthenticationPrincipal에서 추출
+     * - permissions: { canAccessInput, canWriteInput, canAccessAuth }
+     */
+    async function checkPermissionsAndInit() {
+      try {
+        const result = await apiFetch('/view/my-permissions');
+
+        currentUser = {
+          userId: result.userId,
+          loginId: result.loginId,
+          permissions: result.permissions || {}
+        };
+
+        // 1계층: 세부공장일보 입력 페이지 접근 권한 확인
+        if (!currentUser.permissions.canAccessInput) {
+          showNoAccessPage('세부공장일보 입력 페이지에 대한 접근 권한이 없습니다.\n관리자에게 권한 부여를 요청해 주세요.');
+          return;
+        }
+
+        // 권한 확인 성공 → UI 업데이트
+        updateUserUI();
+
+        // 3계층: 접근권한 관리 페이지 접근 가능 시 버튼 표시
+        if (currentUser.permissions.canAccessAuth) {
+          document.getElementById('authAdminBtn').style.display = '';
+        }
+
+        // 오늘 날짜로 일보 로드
+        const today = getTodayStr();
+        document.getElementById('reportDateInput').value = today;
+        await loadReport(today);
+
+        // 자동 새로고침 시작
+        startAutoRefresh();
+
+      } catch (err) {
+        console.error('권한 확인 실패:', err);
+
+        if (err.message.includes('401') || err.message.includes('인증')) {
+          // 로그인 안 된 상태 → 플랫폼 로그인으로
+          return;
+        }
+
+        // API 미연결 시 데모/폴백 모드
+        handleApiUnavailable(err);
+      }
+    }
+
+    /**
+     * 권한 없음 화면 표시
+     */
+    function showNoAccessPage(message) {
+      document.getElementById('appShell').style.display = 'none';
+      const noAccess = document.getElementById('noAccessShell');
+      noAccess.style.display = 'flex';
+      document.getElementById('noAccessDesc').innerHTML = message.replace(/\n/g, '<br>');
+    }
+
+    /**
+     * UI에 사용자 정보 반영
+     */
+    function updateUserUI() {
+      const userChip = document.getElementById('userChip');
+      if (currentUser) {
+        userChip.textContent = `${currentUser.loginId}`;
+        const noticeDetail = document.getElementById('noticeDetail');
+        const writeAccess = currentUser.permissions.canWriteInput;
+        noticeDetail.textContent = writeAccess
+          ? '담당 영역의 본인 셀만 입력 가능합니다. 다른 사용자가 입력한 값은 자동으로 갱신됩니다.'
+          : '읽기 전용 모드입니다. 쓰기 권한이 없습니다.';
+      }
+    }
+
+    /**
+     * API 서버 미연결 시 폴백 처리
+     */
+    function handleApiUnavailable(err) {
+      document.getElementById('userChip').textContent = '오프라인';
+      document.getElementById('noticeDetail').textContent = 'API 서버에 연결할 수 없습니다.';
+
+      const reportDate = getTodayStr();
+      document.getElementById('reportDateInput').value = reportDate;
+      document.getElementById('dateChip').textContent = `기준일 ${reportDate}`;
+
+      renderFallbackDemo(reportDate);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  새로고침 기능 (다른 사용자 값 갱신)
+    // ═══════════════════════════════════════════════
+
+    /**
+     * 수동 새로고침: 현재 입력중인 값은 보존하면서 다른 셀만 갱신
+     */
+    async function refreshData() {
+      if (isRefreshing) return;
+      if (!currentReportDate) { showToast('먼저 일보를 로드해 주세요.'); return; }
+
+      isRefreshing = true;
+      const refreshBtn = document.querySelector('.toolbar-btn.refresh');
+      if (refreshBtn) refreshBtn.textContent = '갱신중...';
+
+      try {
+        // 현재 내가 수정한 셀 값 보존
+        const myDirtyValues = collectMyDirtyValues();
+
+        // 서버에서 최신 데이터 다시 로드
+        await loadReport(currentReportDate, true /* silent */);
+
+        // 내가 수정중인 값 복원
+        restoreMyDirtyValues(myDirtyValues);
+
+        showToast('최신 데이터로 갱신되었습니다.');
+      } catch (err) {
+        console.error('새로고침 실패:', err);
+        showToast('갱신 실패: ' + err.message);
+      } finally {
+        isRefreshing = false;
+        if (refreshBtn) refreshBtn.innerHTML = '&#8635; 새로고침';
+      }
+    }
+
+    /**
+     * 내가 수정한 셀 값 수집
+     */
+    function collectMyDirtyValues() {
+      const values = {};
+      if (dirtyCoords.size === 0) return values;
+
+      document.querySelectorAll('td.mine .cell-input').forEach(input => {
+        const coord = input.dataset.coord;
+        if (coord && dirtyCoords.has(coord)) {
+          const tableCode = input.dataset.tableCode || '';
+          values[`${tableCode}__${coord}`] = input.value;
+        }
+      });
+      return values;
+    }
+
+    /**
+     * 새로고침 후 내가 수정한 값 복원
+     */
+    function restoreMyDirtyValues(savedValues) {
+      if (Object.keys(savedValues).length === 0) return;
+
+      document.querySelectorAll('td.mine .cell-input').forEach(input => {
+        const coord = input.dataset.coord;
+        const tableCode = input.dataset.tableCode || '';
+        const key = `${tableCode}__${coord}`;
+        if (savedValues[key] !== undefined) {
+          input.value = savedValues[key];
+          dirtyCoords.add(coord);
+        }
+      });
+
+      if (dirtyCoords.size > 0) {
+        setSaveState('저장 필요', 'dirty');
+      }
+    }
+
+    /**
+     * 자동 새로고침 시작 (60초 간격)
+     */
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      const indicator = document.getElementById('autoRefreshIndicator');
+      indicator.style.display = 'flex';
+
+      autoRefreshTimer = setInterval(async () => {
+        // 저장 필요 상태에서는 자동 갱신 일시정지
+        if (dirtyCoords.size > 0) {
+          indicator.classList.add('paused');
+          document.getElementById('autoRefreshLabel').textContent = '수정중 — 일시정지';
+          return;
+        }
+        indicator.classList.remove('paused');
+        document.getElementById('autoRefreshLabel').textContent = '자동 갱신중...';
+
+        try {
+          await loadReport(currentReportDate, true);
+          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 60초';
+        } catch (err) {
+          console.warn('자동 갱신 실패:', err);
+          document.getElementById('autoRefreshLabel').textContent = '갱신 실패';
+        }
+      }, AUTO_REFRESH_INTERVAL_MS);
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  일보 데이터 로드 + 렌더링
+    // ═══════════════════════════════════════════════
+
+    async function loadReportByDate() {
+      const dateVal = document.getElementById('reportDateInput').value;
+      if (!dateVal) { showToast('날짜를 선택해 주세요.'); return; }
+      await loadReport(dateVal);
+    }
+
+    /**
+     * 일보 로드
+     * @param reportDate 날짜 문자열
+     * @param silent true면 에러 배너를 표시하지 않음 (자동 새로고침 시)
+     */
+    async function loadReport(reportDate, silent = false) {
+      if (!silent) hideError();
+      if (!silent) dirtyCoords.clear();
+
+      const dateChip = document.getElementById('dateChip');
+      dateChip.textContent = `기준일 ${reportDate}`;
+      if (!silent) setSaveState('저장 전', 'idle');
+
+      try {
+        // API 호출: /view/render?reportDate=...
+        // ※ userId, loginId는 Spring Security에서 자동 주입 (세션 기반)
+        let path = `/view/render?reportDate=${reportDate}`;
+        reportData = await apiFetch(path);
+        currentReportDate = reportDate;
+
+        if (reportData.report) {
+          currentReportId = reportData.report.reportId;
+        }
+
+        // 권한 메타 정보 업데이트 (render 응답에 포함)
+        if (reportData.permissions && currentUser) {
+          currentUser.permissions = { ...currentUser.permissions, ...reportData.permissions };
+        }
+
+        renderAllSections();
+
+      } catch (err) {
+        console.error('일보 로드 실패:', err);
+        if (!silent) {
+          showError(`일보를 불러올 수 없습니다: ${err.message}`);
+          renderFallbackDemo(reportDate);
+        }
+      }
+    }
+
+    /**
+     * 접근권한 관리 페이지로 이동
+     */
+    function goToAuthAdmin() {
+      window.location.href = '/dailyreport/cell-auth-admin.html';
+    }
+
+    // ── 4개 표 + 특이사항 + 이미지 렌더링 ──
+    function renderAllSections() {
+      const stack = document.getElementById('sectionsStack');
+      stack.innerHTML = '';
+
+      const tableConfig = [
+        { code: 'TBL_PRODUCTION_INDEX', title: '1. 주요 생산 지표 현황',    id: 'table1' },
+        { code: 'TBL_INVENTORY',        title: '2. 제지 재공품 및 야적현황', id: 'table2' },
+        { code: 'TBL_ENERGY',           title: '3. 에너지 원단위',           id: 'table3' },
+        { code: 'TBL_BOILER',           title: '4. 보일러 운영 현황',        id: 'table4' },
+      ];
+
+      const tables = reportData?.tables || {};
+
+      // 4개 표 섹션
+      for (const cfg of tableConfig) {
+        const tableData = tables[cfg.code];
+        if (!tableData) continue;
+        const section = createTableSection(cfg, tableData);
+        stack.appendChild(section);
+      }
+
+      // 특이사항 섹션
+      stack.appendChild(createSpecialNoteSection());
+
+      // 이미지 첨부 섹션
+      stack.appendChild(createImageUploadSection());
+
+      // 이벤트 바인딩
+      bindImageUploadEvents();
+    }
+
+    // ── 표 섹션 생성 ──
+    function createTableSection(cfg, tableData) {
+      const section = document.createElement('section');
+      section.className = 'report-section';
+      section.dataset.section = cfg.id;
+
+      const cells = tableData.cells || [];
+
+      // 셀을 row/col 기준으로 그룹핑
+      const occupiedCells = new Set();
+
+      // 셀 데이터를 row/col로 정렬
+      cells.sort((a, b) => a.rowIndex !== b.rowIndex ? a.rowIndex - b.rowIndex : a.colIndex - b.colIndex);
+
+      // row 범위 파악
+      let minRow = Infinity, maxRow = -Infinity;
+      let minCol = Infinity, maxCol = -Infinity;
+      for (const c of cells) {
+        minRow = Math.min(minRow, c.rowIndex);
+        maxRow = Math.max(maxRow, c.rowIndex);
+        minCol = Math.min(minCol, c.colIndex);
+        maxCol = Math.max(maxCol, c.colIndex);
+      }
+
+      // 셀을 좌표로 인덱싱
+      const cellMap = {};
+      for (const c of cells) {
+        cellMap[`${c.rowIndex}_${c.colIndex}`] = c;
+      }
+
+      // colgroup 계산 (균등 분배)
+      const colCount = tableData.colCount || (maxCol - minCol + 1);
+
+      // HTML 구성
+      let html = `
+        <div class="section-title">${escapeHtml(cfg.title)}</div>
+        <div class="section-table-wrap">
+          <table class="report-table" id="${cfg.id}">
+            <colgroup>`;
+
+      // colgroup: 원본 HTML의 비율을 최대한 유지
+      const colWidths = getColWidths(cfg.code, colCount);
+      for (const w of colWidths) {
+        html += `<col style="width:${w}%">`;
+      }
+
+      html += `</colgroup><tbody>`;
+
+      // 각 행 렌더링
+      for (let r = minRow; r <= maxRow; r++) {
+        html += `<tr style="height:26px">`;
+        for (let c = minCol; c <= maxCol; c++) {
+          // rowspan/colspan으로 점유된 셀 건너뛰기
+          if (occupiedCells.has(`${r}_${c}`)) continue;
+
+          const cell = cellMap[`${r}_${c}`];
+          if (!cell) {
+            // 셀 데이터 없으면 빈 셀
+            html += `<td class="cell table-cell" style="border:1px solid #000000;padding:6px 8px">&nbsp;</td>`;
+            continue;
+          }
+
+          // rowspan/colspan 처리
+          const rs = cell.rowSpan || 1;
+          const cs = cell.colSpan || 1;
+          if (rs > 1 || cs > 1) {
+            for (let dr = 0; dr < rs; dr++) {
+              for (let dc = 0; dc < cs; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                occupiedCells.add(`${r + dr}_${c + dc}`);
+              }
+            }
+          }
+
+          html += renderCellTd(cell, rs, cs);
+        }
+        html += `</tr>`;
+      }
+
+      html += `</tbody></table></div>`;
+      section.innerHTML = html;
+      return section;
+    }
+
+    // ── 개별 셀 <td> 렌더링 ──
+    // ※ Phase 4: editable 여부는 서버에서 결정 (cell.editable 필드 사용)
+    //    서버가 OWNER_IDS + CellAuth + 주기 + 잠금을 모두 고려해서 editable을 계산
+    function renderCellTd(cell, rowSpan, colSpan) {
+      const isAssignable = cell.ownerIds && cell.ownerIds.trim().length > 0;
+      const isMyCell = cell.editable !== undefined ? cell.editable : (isAssignable && currentUser && isOwnedBy(cell.ownerIds, currentUser.loginId));
+      const freqEditable = isMyCell ? canEditByFrequency(cell.freqCode || '') : false;
+      const isEditable = cell.editable !== undefined
+        ? cell.editable
+        : (isMyCell && freqEditable && !cell.isLocked);
+
+      // 쓰기 권한이 없으면 편집 불가
+      const canWrite = currentUser?.permissions?.canWriteInput !== false;
+      const finalEditable = isEditable && canWrite;
+
+      // 스타일 결정
+      let bg = '#ffffff';
+      let color = '#000000';
+      let fontWeight = '700';
+      let fontSize = '9.0pt';
+      let textAlign = 'center';
+
+      // HEADER vs DATA 셀 구분
+      if (cell.cellType === 'DATA' || isAssignable) {
+        fontWeight = '500';
+        if (!isAssignable) {
+          textAlign = 'right';
+        }
+      }
+
+      // 값 결정
+      let displayValue = cell.cellValue || '';
+      let cellClasses = 'cell table-cell wrap-cell';
+
+      // assignable 클래스 추가
+      if (isAssignable) {
+        cellClasses += ' assignable';
+      }
+
+      // 셀 하이라이팅
+      if (isMyCell && finalEditable) {
+        cellClasses += ' mine hover-own';
+      } else if (isMyCell && !finalEditable) {
+        cellClasses += ' locked';
+      }
+
+      // data 속성
+      let dataAttrs = '';
+      dataAttrs += ` data-coord="${escapeHtml(cell.excelCoord || '')}"`;
+      dataAttrs += ` data-row="${cell.rowIndex}"`;
+      dataAttrs += ` data-col="${cell.colIndex}"`;
+      dataAttrs += ` data-original-text="${escapeHtml(displayValue)}"`;
+      if (cell.ownerIds) {
+        dataAttrs += ` data-owners="${escapeHtml(cell.ownerIds)}"`;
+        dataAttrs += ` data-owner-names="${escapeHtml(cell.ownerNames || '')}"`;
+        dataAttrs += ` data-freq-code="${escapeHtml(cell.freqCode || '')}"`;
+        dataAttrs += ` data-freq-label="${escapeHtml(cell.freqLabel || '')}"`;
+      }
+
+      // span 속성
+      let spanAttrs = '';
+      if (rowSpan > 1) spanAttrs += ` rowspan="${rowSpan}"`;
+      if (colSpan > 1) spanAttrs += ` colspan="${colSpan}"`;
+
+      // 스타일 문자열
+      const style = `background:${bg};color:${color};font-weight:${fontWeight};font-size:${fontSize};text-align:${textAlign};vertical-align:center;white-space:normal;border:1px solid #000000;padding:6px 8px;position:relative`;
+
+      // 셀 내용
+      let innerHtml;
+      if (isMyCell) {
+        // 편집 가능한 셀: input 필드
+        const savedVal = cell.cellValue || '';
+        const disabledAttr = finalEditable ? '' : 'disabled';
+        innerHtml = `<div class="cell-editor"><input class="cell-input" data-coord="${escapeHtml(cell.excelCoord || '')}" data-row="${cell.rowIndex}" data-col="${cell.colIndex}" data-table-code="${escapeHtml(cell.tableCode || '')}" value="${escapeHtml(savedVal)}" placeholder="값 입력" ${disabledAttr} oninput="onCellInput(this)" /></div>`;
+      } else {
+        // 읽기 전용 셀: 텍스트
+        innerHtml = displayValue ? displayValue.replace(/\n/g, '<br>') : '&nbsp;';
+      }
+
+      // title 속성
+      let titleAttr = '';
+      if (isAssignable) {
+        const fl = cell.freqLabel || '';
+        const fc = cell.freqCode || '';
+        titleAttr = ` title="${escapeHtml(displayValue)} / ${escapeHtml(fl)} / ${getFrequencyHelp(fc)}"`;
+      } else if (cell.ownerNames) {
+        titleAttr = ` title="${escapeHtml(cell.ownerNames)}"`;
+      }
+
+      return `<td class="${cellClasses}" style="${style}"${dataAttrs}${spanAttrs}${titleAttr}>${innerHtml}</td>`;
+    }
+
+    // ── 소유권 확인 ──
+    function isOwnedBy(ownerIds, loginId) {
+      if (!ownerIds || !loginId) return false;
+      return ownerIds.split(/\s+/).some(id => id.toLowerCase() === loginId.toLowerCase());
+    }
+
+    // ── 셀 입력 이벤트 ──
+    function onCellInput(inputEl) {
+      const coord = inputEl.dataset.coord;
+      if (coord) dirtyCoords.add(coord);
+      setSaveState('저장 필요', 'dirty');
+
+      // 자동 새로고침 표시 업데이트
+      const indicator = document.getElementById('autoRefreshIndicator');
+      if (indicator) {
+        indicator.classList.add('paused');
+        document.getElementById('autoRefreshLabel').textContent = '수정중 — 일시정지';
+      }
+    }
+
+    // ── 특이사항 섹션 ──
+    function createSpecialNoteSection() {
+      const section = document.createElement('section');
+      section.className = 'report-section report-section-special';
+      section.dataset.section = 'special';
+
+      const remarks = reportData?.remarks || [];
+      const noteContent = remarks.length > 0 ? remarks[0].content || '' : '';
+      const canWrite = currentUser?.permissions?.canWriteInput !== false;
+
+      section.innerHTML = `
+        <div class="section-title">특이사항</div>
+        <div class="section-table-wrap">
+          <table class="report-table special-table" id="specialNoteTable">
+            <colgroup>
+              <col style="width:12%">
+              <col style="width:88%">
+            </colgroup>
+            <tbody>
+              <tr>
+                <td class="special-head-left">구분</td>
+                <td class="special-head-right">비고</td>
+              </tr>
+              <tr>
+                <td class="special-side-label">특이사항</td>
+                <td class="special-note-wrap">
+                  <textarea id="specialNoteInput" class="special-note-input"
+                    placeholder="특이사항 입력"
+                    ${canWrite ? '' : 'disabled'}>${escapeHtml(noteContent)}</textarea>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // 변경 감지
+      setTimeout(() => {
+        const textarea = document.getElementById('specialNoteInput');
+        if (textarea) {
+          textarea.addEventListener('input', () => setSaveState('저장 필요', 'dirty'));
+        }
+      }, 0);
+
+      return section;
+    }
+
+    // ── 이미지 첨부 섹션 ──
+    function createImageUploadSection() {
+      const section = document.createElement('section');
+      section.className = 'report-section report-section-upload';
+      section.dataset.section = 'upload';
+
+      const canWrite = currentUser?.permissions?.canWriteInput !== false;
+      const disabledClass = canWrite ? '' : 'disabled';
+      const disabledAttr = canWrite ? '' : 'disabled';
+
+      // 기존 이미지 로드
+      const images = reportData?.images || [];
+      uploadedImages = images.map(img => ({
+        imageId: img.imageId,
+        name: img.originalName,
+        storedPath: img.storedPath,
+        sizeText: humanFileSize(img.fileSize),
+        dataUrl: img.storedPath  // 실제 구현에서는 이미지 URL
+      }));
+
+      section.innerHTML = `
+        <div class="section-title">이미지 첨부</div>
+        <div class="upload-wrap">
+          <div class="upload-toolbar">
+            <label class="upload-btn ${disabledClass}" for="imageUploadInput">이미지 선택</label>
+            <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple ${disabledAttr} />
+            <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()" ${disabledAttr}>이미지 비우기</button>
+            <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다.</div>
+          </div>
+          <div class="upload-dropzone" id="uploadDropzone">
+            <div class="upload-dropzone-title">이미지 파일 업로드 영역</div>
+            <div class="upload-dropzone-desc">PNG, JPG, GIF, WEBP 등 이미지 파일을 선택하거나 끌어다 놓을 수 있습니다.</div>
+          </div>
+          <div class="upload-preview-grid" id="uploadPreviewGrid"></div>
+        </div>
+      `;
+
+      setTimeout(() => renderUploadedImages(), 0);
+      return section;
+    }
+
+    // ── 이미지 업로드 이벤트 바인딩 ──
+    function bindImageUploadEvents() {
+      setTimeout(() => {
+        const input = document.getElementById('imageUploadInput');
+        const dropzone = document.getElementById('uploadDropzone');
+
+        if (input) {
+          input.addEventListener('change', (e) => {
+            handleImageFiles(e.target.files);
+            e.target.value = '';
+          });
+        }
+        if (dropzone) {
+          ['dragenter','dragover'].forEach(evt => {
+            dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+          });
+          ['dragleave','drop'].forEach(evt => {
+            dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+          });
+          dropzone.addEventListener('drop', (e) => handleImageFiles(e.dataTransfer.files));
+        }
+      }, 0);
+    }
+
+    function renderUploadedImages() {
+      const grid = document.getElementById('uploadPreviewGrid');
+      if (!grid) return;
+      if (!uploadedImages.length) {
+        grid.innerHTML = '<div class="upload-empty">업로드된 이미지가 없습니다.</div>';
+        return;
+      }
+      grid.innerHTML = uploadedImages.map((img, i) => `
+        <div class="upload-card">
+          <img class="upload-thumb" src="${img.dataUrl || ''}" alt="${escapeHtml(img.name || `image-${i+1}`)}" onerror="this.style.display='none'" />
+          <div class="upload-card-body">
+            <div class="upload-card-name" title="${escapeHtml(img.name || '')}">${escapeHtml(img.name || `image-${i+1}`)}</div>
+            <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}</div>
+            <button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})">삭제</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function removeUploadedImage(idx) {
+      uploadedImages.splice(idx, 1);
+      renderUploadedImages();
+      setSaveState('저장 필요', 'dirty');
+    }
+
+    function clearUploadedImages() {
+      uploadedImages = [];
+      renderUploadedImages();
+      const input = document.getElementById('imageUploadInput');
+      if (input) input.value = '';
+      setSaveState('저장 필요', 'dirty');
+    }
+
+    function handleImageFiles(fileList) {
+      const files = Array.from(fileList || []).filter(f => f.type && f.type.startsWith('image/'));
+      if (!files.length) return;
+      const available = Math.max(0, MAX_UPLOAD_IMAGES - uploadedImages.length);
+      const toLoad = files.slice(0, available);
+      if (!toLoad.length) { showToast(`이미지는 최대 ${MAX_UPLOAD_IMAGES}장까지 등록할 수 있습니다.`); return; }
+      let loaded = 0;
+      toLoad.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          uploadedImages.push({ name: file.name, sizeText: humanFileSize(file.size), type: file.type, dataUrl: reader.result });
+          loaded++;
+          if (loaded === toLoad.length) { renderUploadedImages(); setSaveState('저장 필요', 'dirty'); }
+        };
+        reader.readAsDataURL(file);
+      });
+      if (files.length > toLoad.length) showToast(`최대 ${MAX_UPLOAD_IMAGES}장까지만 표시됩니다.`);
+    }
+
+    // ── 저장 ──
+    async function saveInputs() {
+      if (!currentUser) { showToast('인증되지 않은 상태입니다.'); return; }
+      if (!currentUser.permissions.canWriteInput) { showToast('쓰기 권한이 없습니다.'); return; }
+      if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
+
+      try {
+        // 1. 셀 데이터 수집 (표별로 그룹핑)
+        const cellInputs = document.querySelectorAll('td.mine .cell-input:not(:disabled)');
+        const tableGroups = {};
+        cellInputs.forEach(input => {
+          const row = parseInt(input.dataset.row);
+          const col = parseInt(input.dataset.col);
+          const tableCode = input.dataset.tableCode || guessTableCode(row);
+          if (!tableGroups[tableCode]) tableGroups[tableCode] = [];
+          tableGroups[tableCode].push({ rowIndex: row, colIndex: col, cellValue: input.value });
+        });
+
+        // 2. 표별로 셀 저장 API 호출
+        let totalSaved = 0;
+        for (const [tableCode, cells] of Object.entries(tableGroups)) {
+          if (cells.length === 0) continue;
+          try {
+            await apiFetch(`/reports/${currentReportId}/cells`, {
+              method: 'POST',
+              body: JSON.stringify({ tableCode, cells })
+            });
+            totalSaved += cells.length;
+          } catch (err) {
+            console.warn(`표 ${tableCode} 저장 실패:`, err);
+          }
+        }
+
+        // 3. 특이사항 저장
+        const noteInput = document.getElementById('specialNoteInput');
+        if (noteInput) {
+          try {
+            await apiFetch(`/reports/${currentReportId}/remarks`, {
+              method: 'POST',
+              body: JSON.stringify({
+                tableCode: 'SPECIAL',
+                category: '특이사항',
+                content: noteInput.value
+              })
+            });
+          } catch (err) {
+            console.warn('특이사항 저장 실패:', err);
+          }
+        }
+
+        // 4. 저장 완료 표시
+        dirtyCoords.clear();
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        setSaveState(`저장됨 ${timeStr}`, 'saved');
+        showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 반영`);
+
+        // 자동 새로고침 표시 복원
+        const indicator = document.getElementById('autoRefreshIndicator');
+        if (indicator) {
+          indicator.classList.remove('paused');
+          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 60초';
+        }
+
+      } catch (err) {
+        console.error('저장 실패:', err);
+        showToast('저장 중 오류가 발생했습니다: ' + err.message);
+      }
+    }
+
+    // ── 표 코드 추론 (행 범위 기반) ──
+    function guessTableCode(row) {
+      if (row >= 5 && row <= 14) return 'TBL_PRODUCTION_INDEX';
+      if (row >= 19 && row <= 28) return 'TBL_INVENTORY';
+      if (row >= 34 && row <= 41) return 'TBL_ENERGY';
+      if (row >= 34 && row <= 40) return 'TBL_BOILER';
+      return 'UNKNOWN';
+    }
+
+    // ── 표별 colgroup 너비 (원본 HTML 기준) ──
+    function getColWidths(tableCode, colCount) {
+      switch (tableCode) {
+        case 'TBL_PRODUCTION_INDEX':
+          return [14.95, 4.89, 5.18, 5.29, 5.29, 5.29, 4.95, 4.95, 4.95, 4.95, 4.95, 4.95, 5.29, 6.90, 17.25];
+        case 'TBL_INVENTORY':
+          return [13.01, 11.15, 5.45, 6.82, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.70, 22.30];
+        case 'TBL_ENERGY':
+          return [21.92, 17.81, 15.07, 15.07, 15.07, 15.07];
+        case 'TBL_BOILER':
+          return [14.88, 8.26, 9.92, 8.26, 8.26, 9.92, 10.74, 29.75];
+        default: {
+          const w = 100 / colCount;
+          return Array(colCount).fill(w);
+        }
+      }
+    }
+
+    // ── API 미연결 시 폴백 데모 모드 ──
+    function renderFallbackDemo(reportDate) {
+      const stack = document.getElementById('sectionsStack');
+      stack.innerHTML = `
+        <div style="padding:40px; text-align:center; color:var(--muted);">
+          <p style="font-size:18px; font-weight:700; margin-bottom:12px;">&#128203; API 서버 미연결</p>
+          <p style="font-size:14px; line-height:1.7;">
+            Spring Boot 백엔드 서버가 실행 중이지 않습니다.<br>
+            아래 안내에 따라 서버를 시작한 뒤 새로고침해 주세요.
+          </p>
+          <div style="margin-top:24px; padding:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; text-align:left; max-width:600px; margin-left:auto; margin-right:auto;">
+            <p style="font-weight:700; margin-bottom:8px;">서버 시작 방법:</p>
+            <code style="display:block; background:#1e293b; color:#e2e8f0; padding:14px; border-radius:8px; font-size:13px; line-height:1.8; white-space:pre;">cd project-root
+./gradlew :module-dailyreport:bootRun</code>
+            <p style="margin-top:12px; font-size:12px; color:var(--muted);">
+              또는 IntelliJ에서 Application 클래스를 실행하세요.<br>
+              MariaDB가 필요합니다. sql/ 디렉토리의 스크립트를 먼저 실행하세요.
+            </p>
+          </div>
+          <div style="margin-top:24px;">
+            <button class="toolbar-btn primary" onclick="loadReport('${reportDate}')">다시 시도</button>
+          </div>
+        </div>
+      `;
+
+      // 특이사항과 이미지 섹션은 항상 표시
+      stack.appendChild(createSpecialNoteSection());
+      stack.appendChild(createImageUploadSection());
+      bindImageUploadEvents();
+    }
+
+    // ═══════════════════════════════════════════════
+    //  초기화 — AI 플랫폼 인증 기반
+    // ═══════════════════════════════════════════════
+    async function init() {
+      // 날짜 입력 기본값
+      document.getElementById('reportDateInput').value = getTodayStr();
+
+      // AI 플랫폼 인증 확인 + 1계층 권한 검증 + 일보 로드
+      await checkPermissionsAndInit();
+    }
+
+    init();
+  </script>
+</body>
+</html>

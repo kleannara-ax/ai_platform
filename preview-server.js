@@ -34,6 +34,7 @@ const STATIC_DIRS = [
   path.join(__dirname, 'app/src/main/resources/static'),
   path.join(__dirname, 'module-fire/src/main/resources/static'),
   path.join(__dirname, 'module-ps-insp/src/main/resources/static'),
+  path.join(__dirname, 'module-dailyreport/src/main/resources/static'),
 ];
 const TEMPLATE_DIR = path.join(__dirname, 'module-ps-insp/src/main/resources/templates');
 const TEST_UI_DIR = path.join(__dirname, 'test-ui');
@@ -51,6 +52,12 @@ const mockMenus = [
   { menuId:3, menuCode:'MENU_MGMT', menuName:'메뉴 관리', menuType:'MENU', menuUrl:'/menus', icon:'menu', parentId:null, sortOrder:2, isActive:true, isVisible:true, allowedIps:null, description:'메뉴 관리', children:[] },
   { menuId:4, menuCode:'PERM_MGMT', menuName:'접근 권한', menuType:'MENU', menuUrl:'/permissions', icon:'lock', parentId:null, sortOrder:3, isActive:true, isVisible:true, allowedIps:null, description:'접근 권한 설정', children:[] },
   { menuId:5, menuCode:'CODE_MGMT', menuName:'공통코드 관리', menuType:'MENU', menuUrl:'/codes', icon:'code', parentId:null, sortOrder:4, isActive:true, isVisible:true, allowedIps:null, description:'공통코드 관리', children:[] },
+  { menuId:100, menuCode:'DAILY_REPORT', menuName:'세부공장일보', menuType:'CATEGORY', menuUrl:null, icon:'clipboard-list', parentId:null, sortOrder:6, isActive:true, isVisible:true, allowedIps:null, description:'세부공장일보 카테고리',
+    children: [
+      { menuId:101, menuCode:'DAILY_REPORT_INPUT', menuName:'세부공장일보 입력', menuType:'PAGE', menuUrl:'/dailyreport/index.html', parentId:100, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 접근권한', menuType:'PAGE', menuUrl:'/dailyreport/cell-auth-admin.html', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+    ]
+  },
   { menuId:6, menuCode:'FIRE_MGMT', menuName:'소방시설관리', menuType:'MENU', menuUrl:'/fire', icon:'fire', parentId:null, sortOrder:5, isActive:true, isVisible:true, allowedIps:null, description:'소방시설 관리',
     children: [
       { menuId:61, menuCode:'FIRE_DASHBOARD', menuName:'소방 대시보드', menuType:'MENU', menuUrl:'/fire/dashboard', parentId:6, sortOrder:0, isActive:true, isVisible:true, allowedIps:null },
@@ -627,6 +634,448 @@ const server = http.createServer((req, res) => {
       return apiOk(res, { message: 'PS-INSP Mock API', path: pathname });
     }
 
+    // ══════════════════════════════════════════
+    //  세부공장일보 Mock API (dailyreport-api)
+    // ══════════════════════════════════════════
+    if (pathname.startsWith('/dailyreport-api/')) {
+
+      // ── 세부공장일보 사용자 목록 (core_user 기반) ──
+      var drUsers = [
+        { userId:1, loginId:'admin', userName:'관리자',           department:'공장관리부',   position:'부장', role:'ADMIN' },
+        { userId:2, loginId:'kim',   userName:'김완중 팀장',      department:'생산팀',       position:'팀장', role:'USER' },
+        { userId:3, loginId:'park',  userName:'박지권 책임',      department:'환경에너지팀', position:'책임', role:'USER' },
+        { userId:4, loginId:'yoo',   userName:'유동현 책임',      department:'생산팀',       position:'책임', role:'USER' },
+        { userId:5, loginId:'jung',  userName:'정상엽 책임',      department:'환경팀',       position:'책임', role:'USER' },
+        { userId:6, loginId:'jang',  userName:'장석환 선임',      department:'생산팀',       position:'선임', role:'USER' },
+        { userId:7, loginId:'lee',   userName:'이도형 사원',      department:'생산팀',       position:'사원', role:'USER' },
+        { userId:8, loginId:'choi',  userName:'최민우 사원',      department:'환경에너지팀', position:'사원', role:'USER' },
+        { userId:9, loginId:'energy',userName:'환경에너지팀 반장', department:'환경에너지팀', position:'반장', role:'USER' },
+      ];
+
+      // ── 현재 로그인 사용자 결정 (쿼리파라미터 또는 기본값 admin) ──
+      var drLoginId = parsedUrl.query.loginId || parsedUrl.query._loginId || 'admin';
+      var drCurrentUser = drUsers.find(function(u){return u.loginId===drLoginId;}) || drUsers[0];
+
+      // ── 세부공장일보 셀 권한 (in-memory store) ──
+      if (!global._drCellAuths) {
+        global._drCellAuths = [
+          { authId:1, userId:2, loginId:'kim',  userName:'김완중 팀장', tableCode:'TBL_INVENTORY', cellCoords:'["E21","E22","E23","E24"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'제지 재공품 적정재고 담당' },
+          { authId:2, userId:3, loginId:'park', userName:'박지권 책임', tableCode:'TBL_ENERGY', cellCoords:'["D39","D40","D41","F39","F40","F41"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'연료 에너지 원단위 담당' },
+          { authId:3, userId:3, loginId:'park', userName:'박지권 책임', tableCode:'TBL_BOILER', cellCoords:'["K36","K37","K38","K39","K40","L36","L37","L38","L39","L40","O36","O37","O38","O39","O40"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'보일러 운영 목표/단가/계획 담당' },
+          { authId:4, userId:4, loginId:'yoo',  userName:'유동현 책임', tableCode:'TBL_PRODUCTION_INDEX', cellCoords:'["O9","O10","O11"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'수율 담당' },
+          { authId:5, userId:5, loginId:'jung', userName:'정상엽 책임', tableCode:'TBL_PRODUCTION_INDEX', cellCoords:'["E13","E14","O13","O14"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'슬러지 원단위 담당' },
+          { authId:6, userId:6, loginId:'jang', userName:'장석환 선임', tableCode:'TBL_INVENTORY', cellCoords:'["M25","M26"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'장기재고 담당' },
+          { authId:7, userId:7, loginId:'lee',  userName:'이도형 사원', tableCode:'TBL_INVENTORY', cellCoords:'["M25","M26"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'장기재고 담당' },
+          { authId:8, userId:8, loginId:'choi', userName:'최민우 사원', tableCode:'TBL_ENERGY', cellCoords:'["D36","D37","D38","F36","F37","F38"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'전력 에너지 원단위 담당' },
+          { authId:9, userId:9, loginId:'energy',userName:'환경에너지팀 반장', tableCode:'TBL_BOILER', cellCoords:'["P36","P37","P38","P39","P40"]', freqCode:'daily', freqLabel:'매일', isActive:true, grantedBy:1, description:'보일러 운영 실적 담당' },
+        ];
+        global._drNextAuthId = 10;
+      }
+
+      // ── 셀 데이터 (in-memory store) ──
+      if (!global._drCellData) { global._drCellData = {}; }
+
+      // ── /view/my-permissions ──
+      if (pathname === '/dailyreport-api/view/my-permissions') {
+        var canAccessInput = true;  // 모든 seed 사용자가 입력 페이지 접근 가능
+        var canWriteInput = true;
+        var canAccessAuth = drCurrentUser.loginId === 'admin';  // admin만 권한관리 접근
+        return jsonRes(res, {
+          userId: drCurrentUser.userId,
+          loginId: drCurrentUser.loginId,
+          permissions: { canAccessInput: canAccessInput, canWriteInput: canWriteInput, canAccessAuth: canAccessAuth }
+        });
+      }
+
+      // ── /view/render?reportDate=... ──
+      if (pathname === '/dailyreport-api/view/render') {
+        var reportDate = parsedUrl.query.reportDate || '2024-07-20';
+        var savedData = global._drCellData[reportDate] || {};
+
+        // 셀 editable 계산 함수
+        function isCellEditable(cell, loginId) {
+          if (cell.cellType === 'HEADER' || cell.cellType === 'READONLY') return false;
+          if (cell.isLocked) return false;
+          if (!cell.ownerIds) return false;
+          var owners = cell.ownerIds.split(/\s+/);
+          return owners.some(function(o){return o.toLowerCase()===loginId.toLowerCase();});
+        }
+
+        // 실제 seed 데이터 기반 셀 생성
+        function buildCells(tableCode, seedCells) {
+          return seedCells.map(function(c) {
+            var key = tableCode + '__' + c.excelCoord;
+            var val = (savedData[key] !== undefined) ? savedData[key] : c.cellValue;
+            var editable = isCellEditable(c, drCurrentUser.loginId);
+            return Object.assign({}, c, { tableCode: tableCode, cellValue: val, editable: editable });
+          });
+        }
+
+        // 셀 seed 데이터 (02_seed_data.sql 기반)
+        var tbl1Cells = [
+          {rowIndex:0,colIndex:0,excelCoord:'B5',cellValue:'생산지표',cellType:'HEADER',rowSpan:2,colSpan:3,isLocked:1},
+          {rowIndex:0,colIndex:3,excelCoord:'E5',cellValue:'최종',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:4,excelCoord:'F5',cellValue:"'24년",cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:5,excelCoord:'G5',cellValue:"'25년",cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:6,excelCoord:'H5',cellValue:"'25년",cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:7,excelCoord:'I5',cellValue:"'26년",cellType:'HEADER',rowSpan:1,colSpan:7,isLocked:1},
+          {rowIndex:0,colIndex:14,excelCoord:'P5',cellValue:'비고 사항',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:3,excelCoord:'E6',cellValue:'목표',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:4,excelCoord:'F6',cellValue:'월평균',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:5,excelCoord:'G6',cellValue:'월평균',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:6,excelCoord:'H6',cellValue:'12월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:7,excelCoord:'I6',cellValue:'1월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:8,excelCoord:'J6',cellValue:'2월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:9,excelCoord:'K6',cellValue:'3월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:10,excelCoord:'L6',cellValue:'4월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:11,excelCoord:'M6',cellValue:'5월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:12,excelCoord:'N6',cellValue:'6월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:13,excelCoord:'O6',cellValue:'7월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:0,excelCoord:'B7',cellValue:'제지3 평균선속(m/분)',cellType:'READONLY',rowSpan:1,colSpan:3,isLocked:1},
+          {rowIndex:2,colIndex:3,excelCoord:'E7',cellValue:'640',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:4,excelCoord:'F7',cellValue:'583.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:5,excelCoord:'G7',cellValue:'587',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:6,excelCoord:'H7',cellValue:'588',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:7,excelCoord:'I7',cellValue:'597',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:8,excelCoord:'J7',cellValue:'584',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:9,excelCoord:'K7',cellValue:'577',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:10,excelCoord:'L7',cellValue:'597',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:11,excelCoord:'M7',cellValue:'597',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:12,excelCoord:'N7',cellValue:'594',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:13,excelCoord:'O7',cellValue:'DRS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:14,excelCoord:'P7',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:0,excelCoord:'B8',cellValue:'초지5 생산량(톤/日)',cellType:'READONLY',rowSpan:1,colSpan:3,isLocked:1},
+          {rowIndex:3,colIndex:3,excelCoord:'E8',cellValue:'85',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:4,excelCoord:'F8',cellValue:'83.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:5,excelCoord:'G8',cellValue:'76',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:6,excelCoord:'H8',cellValue:'83.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:7,excelCoord:'I8',cellValue:'80.4',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:8,excelCoord:'J8',cellValue:'85.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:9,excelCoord:'K8',cellValue:'79.9',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:10,excelCoord:'L8',cellValue:'83.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:11,excelCoord:'M8',cellValue:'83',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:12,excelCoord:'N8',cellValue:'79.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:13,excelCoord:'O8',cellValue:'SAP',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:14,excelCoord:'P8',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:0,excelCoord:'B9',cellValue:'수율(%)',cellType:'READONLY',rowSpan:3,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:1,excelCoord:'C9',cellValue:'PS',cellType:'READONLY',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:2,excelCoord:'D9',cellValue:'완제품',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:3,excelCoord:'E9',cellValue:'91',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:4,excelCoord:'F9',cellValue:'97.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:5,excelCoord:'G9',cellValue:'99.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:6,excelCoord:'H9',cellValue:'98.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:7,excelCoord:'I9',cellValue:'98.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:8,excelCoord:'J9',cellValue:'97.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:9,excelCoord:'K9',cellValue:'101.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:10,excelCoord:'L9',cellValue:'101.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:11,excelCoord:'M9',cellValue:'99.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:12,excelCoord:'N9',cellValue:'98.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:13,excelCoord:'O9',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'yoo',ownerNames:'유동현 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:14,excelCoord:'P9',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:2,excelCoord:'D10',cellValue:'코팅제외',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:3,excelCoord:'E10',cellValue:'78',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:4,excelCoord:'F10',cellValue:'83.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:5,excelCoord:'G10',cellValue:'85.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:6,excelCoord:'H10',cellValue:'84.1',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:7,excelCoord:'I10',cellValue:'84.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:8,excelCoord:'J10',cellValue:'83.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:9,excelCoord:'K10',cellValue:'87.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:10,excelCoord:'L10',cellValue:'88.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:11,excelCoord:'M10',cellValue:'86.3',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:12,excelCoord:'N10',cellValue:'84.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:13,excelCoord:'O10',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'yoo',ownerNames:'유동현 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:14,excelCoord:'P10',cellValue:'- 완제품내 코팅 비율 14.0%',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:1,excelCoord:'C11',cellValue:'화장지',cellType:'READONLY',rowSpan:1,colSpan:2,isLocked:1},
+          {rowIndex:6,colIndex:3,excelCoord:'E11',cellValue:'63.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:4,excelCoord:'F11',cellValue:'63.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:5,excelCoord:'G11',cellValue:'64.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:6,excelCoord:'H11',cellValue:'61.1',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:7,excelCoord:'I11',cellValue:'63.3',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:8,excelCoord:'J11',cellValue:'63.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:9,excelCoord:'K11',cellValue:'63.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:10,excelCoord:'L11',cellValue:'69.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:11,excelCoord:'M11',cellValue:'74.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:12,excelCoord:'N11',cellValue:'74.4',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:13,excelCoord:'O11',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'yoo',ownerNames:'유동현 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:14,excelCoord:'P11',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:0,excelCoord:'B12',cellValue:'고지감량율(%)',cellType:'READONLY',rowSpan:1,colSpan:3,isLocked:1},
+          {rowIndex:7,colIndex:3,excelCoord:'E12',cellValue:'-',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:4,excelCoord:'F12',cellValue:'15.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:5,excelCoord:'G12',cellValue:'14.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:6,excelCoord:'H12',cellValue:'12.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:7,excelCoord:'I12',cellValue:'11.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:8,excelCoord:'J12',cellValue:'11.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:9,excelCoord:'K12',cellValue:'13',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:10,excelCoord:'L12',cellValue:'14.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:11,excelCoord:'M12',cellValue:'15.9',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:12,excelCoord:'N12',cellValue:'16',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:13,excelCoord:'O12',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:14,excelCoord:'P12',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:0,excelCoord:'B13',cellValue:'슬러지원단위',cellType:'READONLY',rowSpan:2,colSpan:2,isLocked:1},
+          {rowIndex:8,colIndex:2,excelCoord:'D13',cellValue:'제   지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:3,excelCoord:'E13',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'jung',ownerNames:'정상엽 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:8,colIndex:4,excelCoord:'F13',cellValue:'89',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:5,excelCoord:'G13',cellValue:'91',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:6,excelCoord:'H13',cellValue:'94',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:7,excelCoord:'I13',cellValue:'99',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:8,excelCoord:'J13',cellValue:'104',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:9,excelCoord:'K13',cellValue:'96',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:10,excelCoord:'L13',cellValue:'84',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:11,excelCoord:'M13',cellValue:'82',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:12,excelCoord:'N13',cellValue:'84',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:13,excelCoord:'O13',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'jung',ownerNames:'정상엽 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:8,colIndex:14,excelCoord:'P13',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:2,excelCoord:'D14',cellValue:'화장지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:3,excelCoord:'E14',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'jung',ownerNames:'정상엽 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:9,colIndex:4,excelCoord:'F14',cellValue:'76',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:5,excelCoord:'G14',cellValue:'64',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:6,excelCoord:'H14',cellValue:'81',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:7,excelCoord:'I14',cellValue:'58',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:8,excelCoord:'J14',cellValue:'68',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:9,excelCoord:'K14',cellValue:'50',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:10,excelCoord:'L14',cellValue:'46',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:11,excelCoord:'M14',cellValue:'53',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:12,excelCoord:'N14',cellValue:'62',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:13,excelCoord:'O14',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'jung',ownerNames:'정상엽 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:9,colIndex:14,excelCoord:'P14',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+        ];
+
+        // TBL_INVENTORY abbreviated (key rows)
+        var tbl2Cells = [
+          {rowIndex:0,colIndex:0,excelCoord:'B19',cellValue:'구 분',cellType:'HEADER',rowSpan:2,colSpan:2,isLocked:1},
+          {rowIndex:0,colIndex:2,excelCoord:'D19',cellValue:'기준',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:3,excelCoord:'E19',cellValue:'적정재고',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:4,excelCoord:'F19',cellValue:"'25년",cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:5,excelCoord:'G19',cellValue:"'26년",cellType:'HEADER',rowSpan:1,colSpan:7,isLocked:1},
+          {rowIndex:0,colIndex:12,excelCoord:'N19',cellValue:'비 고',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:4,excelCoord:'F20',cellValue:'12월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:5,excelCoord:'G20',cellValue:'1월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:6,excelCoord:'H20',cellValue:'2월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:7,excelCoord:'I20',cellValue:'3월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:8,excelCoord:'J20',cellValue:'4월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:9,excelCoord:'K20',cellValue:'5월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:10,excelCoord:'L20',cellValue:'6월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:11,excelCoord:'M20',cellValue:'7월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:12,excelCoord:'N20',cellValue:null,cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:0,excelCoord:'B21',cellValue:'제지 재공품',cellType:'READONLY',rowSpan:4,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:1,excelCoord:'C21',cellValue:'밀롤창고',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:2,excelCoord:'D21',cellValue:'톤',cellType:'READONLY',rowSpan:4,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:3,excelCoord:'E21',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'kim',ownerNames:'김완중 팀장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:4,excelCoord:'F21',cellValue:'3826',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:5,excelCoord:'G21',cellValue:'3043',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:6,excelCoord:'H21',cellValue:'3296',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:7,excelCoord:'I21',cellValue:'2196',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:8,excelCoord:'J21',cellValue:'3037',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:9,excelCoord:'K21',cellValue:'3711',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:10,excelCoord:'L21',cellValue:'3006',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:11,excelCoord:'M21',cellValue:'MES',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:12,excelCoord:'N21',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:1,excelCoord:'C22',cellValue:'카타대기',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:3,excelCoord:'E22',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'kim',ownerNames:'김완중 팀장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:4,excelCoord:'F22',cellValue:'320',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:5,excelCoord:'G22',cellValue:'315',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:6,excelCoord:'H22',cellValue:'549',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:7,excelCoord:'I22',cellValue:'648',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:8,excelCoord:'J22',cellValue:'1360',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:9,excelCoord:'K22',cellValue:'1121',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:10,excelCoord:'L22',cellValue:'1110',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:11,excelCoord:'M22',cellValue:'MES',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:12,excelCoord:'N22',cellValue:'- 제지 카타 동시 가동/운휴에 따른 재공 증가',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:1,excelCoord:'C23',cellValue:'미포장',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:3,excelCoord:'E23',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'kim',ownerNames:'김완중 팀장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:4,excelCoord:'F23',cellValue:'212',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:5,excelCoord:'G23',cellValue:'764',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:6,excelCoord:'H23',cellValue:'702',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:7,excelCoord:'I23',cellValue:'149',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:8,excelCoord:'J23',cellValue:'86',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:9,excelCoord:'K23',cellValue:'173',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:10,excelCoord:'L23',cellValue:'266',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:11,excelCoord:'M23',cellValue:'MES',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:12,excelCoord:'N23',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:1,excelCoord:'C24',cellValue:'포장후 물류입고전',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:3,excelCoord:'E24',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'kim',ownerNames:'김완중 팀장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:4,excelCoord:'F24',cellValue:'83',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:5,excelCoord:'G24',cellValue:'139',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:6,excelCoord:'H24',cellValue:'151',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:7,excelCoord:'I24',cellValue:'88',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:8,excelCoord:'J24',cellValue:'58',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:9,excelCoord:'K24',cellValue:'288',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:10,excelCoord:'L24',cellValue:'423',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:11,excelCoord:'M24',cellValue:'MES',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:12,excelCoord:'N24',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:0,excelCoord:'B25',cellValue:'장기재고',cellType:'READONLY',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:1,excelCoord:'C25',cellValue:'3개월 초과',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:2,excelCoord:'D25',cellValue:'톤',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:3,excelCoord:'E25',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:4,excelCoord:'F25',cellValue:'4354',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:5,excelCoord:'G25',cellValue:'4372',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:6,excelCoord:'H25',cellValue:'4005',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:7,excelCoord:'I25',cellValue:'4236',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:8,excelCoord:'J25',cellValue:'3761',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:9,excelCoord:'K25',cellValue:'3404',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:10,excelCoord:'L25',cellValue:'3120',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:11,excelCoord:'M25',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'jang lee',ownerNames:'장석환 선임, 이도형 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:12,excelCoord:'N25',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:1,excelCoord:'C26',cellValue:'6개월 초과',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:2,excelCoord:'D26',cellValue:'톤',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:3,excelCoord:'E26',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:4,excelCoord:'F26',cellValue:'917',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:5,excelCoord:'G26',cellValue:'980',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:6,excelCoord:'H26',cellValue:'786',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:7,excelCoord:'I26',cellValue:'915',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:8,excelCoord:'J26',cellValue:'957',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:9,excelCoord:'K26',cellValue:'1543',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:7,colIndex:10,excelCoord:'L26',cellValue:'1130',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:11,excelCoord:'M26',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'jang lee',ownerNames:'장석환 선임, 이도형 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:7,colIndex:12,excelCoord:'N26',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:0,excelCoord:'B27',cellValue:'야적현황',cellType:'READONLY',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:8,colIndex:1,excelCoord:'C27',cellValue:'제지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:2,excelCoord:'D27',cellValue:'톤',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:3,excelCoord:'E27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:4,excelCoord:'F27',cellValue:'489',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:5,excelCoord:'G27',cellValue:'239',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:6,excelCoord:'H27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:7,excelCoord:'I27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:8,excelCoord:'J27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:9,excelCoord:'K27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:10,excelCoord:'L27',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:11,excelCoord:'M27',cellValue:'WMS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:8,colIndex:12,excelCoord:'N27',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:9,colIndex:1,excelCoord:'C28',cellValue:'생활',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:2,excelCoord:'D28',cellValue:'팔레트',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:3,excelCoord:'E28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:4,excelCoord:'F28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:5,excelCoord:'G28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:6,excelCoord:'H28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:7,excelCoord:'I28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:8,excelCoord:'J28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:9,excelCoord:'K28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:10,excelCoord:'L28',cellValue:'0',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:11,excelCoord:'M28',cellValue:'WMS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:9,colIndex:12,excelCoord:'N28',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+        ];
+
+        // TBL_ENERGY
+        var tbl3Cells = [
+          {rowIndex:0,colIndex:0,excelCoord:'B34',cellValue:'구분',cellType:'HEADER',rowSpan:2,colSpan:2,isLocked:1},
+          {rowIndex:0,colIndex:2,excelCoord:'D34',cellValue:'목표',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:3,excelCoord:'E34',cellValue:'6월 실적',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:4,excelCoord:'F34',cellValue:'7월 현재',cellType:'HEADER',rowSpan:1,colSpan:2,isLocked:1},
+          {rowIndex:1,colIndex:4,excelCoord:'F35',cellValue:'계 획',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:5,excelCoord:'G35',cellValue:'실 적',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:0,excelCoord:'B36',cellValue:'전력',cellType:'READONLY',rowSpan:3,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:1,excelCoord:'C36',cellValue:'제   지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:2,excelCoord:'D36',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:3,excelCoord:'E36',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:4,excelCoord:'F36',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:5,excelCoord:'G36',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:1,excelCoord:'C37',cellValue:'화장지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:2,excelCoord:'D37',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:3,excelCoord:'E37',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:4,excelCoord:'F37',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:5,excelCoord:'G37',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:1,excelCoord:'C38',cellValue:'화)초지5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:2,excelCoord:'D38',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:3,excelCoord:'E38',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:4,excelCoord:'F38',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'choi',ownerNames:'최민우 사원',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:5,excelCoord:'G38',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:0,excelCoord:'B39',cellValue:'연료',cellType:'READONLY',rowSpan:3,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:1,excelCoord:'C39',cellValue:'제   지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:2,excelCoord:'D39',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:3,excelCoord:'E39',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:4,excelCoord:'F39',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:5,excelCoord:'G39',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:1,excelCoord:'C40',cellValue:'화장지',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:2,excelCoord:'D40',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:3,excelCoord:'E40',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:4,excelCoord:'F40',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:5,excelCoord:'G40',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:1,excelCoord:'C41',cellValue:'화)초지5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:2,excelCoord:'D41',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:7,colIndex:3,excelCoord:'E41',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:7,colIndex:4,excelCoord:'F41',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:7,colIndex:5,excelCoord:'G41',cellValue:'EIS',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+        ];
+
+        // TBL_BOILER
+        var tbl4Cells = [
+          {rowIndex:0,colIndex:0,excelCoord:'J34',cellValue:'구분',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:1,excelCoord:'K34',cellValue:'목표',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:2,excelCoord:'L34',cellValue:'7월단가\n(천원/톤)',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:3,excelCoord:'M34',cellValue:'5월 실적',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:4,excelCoord:'N34',cellValue:'6월 실적',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:5,excelCoord:'O34',cellValue:'7월',cellType:'HEADER',rowSpan:1,colSpan:2,isLocked:1},
+          {rowIndex:0,colIndex:7,excelCoord:'Q34',cellValue:'비 고',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:5,excelCoord:'O35',cellValue:'계 획',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:1,colIndex:6,excelCoord:'P35',cellValue:'실 적',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:0,excelCoord:'J36',cellValue:'LNG보일러',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:1,excelCoord:'K36',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:2,excelCoord:'L36',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:3,excelCoord:'M36',cellValue:'2.4',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:4,excelCoord:'N36',cellValue:'0.4',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:2,colIndex:5,excelCoord:'O36',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:6,excelCoord:'P36',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:2,colIndex:7,excelCoord:'Q36',cellValue:'복합보일러 운휴...',cellType:'READONLY',rowSpan:5,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:0,excelCoord:'J37',cellValue:'유동상소각로',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:1,excelCoord:'K37',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:2,excelCoord:'L37',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:3,excelCoord:'M37',cellValue:'15.3',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:3,colIndex:4,excelCoord:'N37',cellValue:'14.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:3,colIndex:5,excelCoord:'O37',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:3,colIndex:6,excelCoord:'P37',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:0,excelCoord:'J38',cellValue:'복합보일러',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:1,excelCoord:'K38',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:2,excelCoord:'L38',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:3,excelCoord:'M38',cellValue:'56.8',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:4,colIndex:4,excelCoord:'N38',cellValue:'52.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:4,colIndex:5,excelCoord:'O38',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:4,colIndex:6,excelCoord:'P38',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:0,excelCoord:'J39',cellValue:'폐합성소각로',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:1,excelCoord:'K39',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:2,excelCoord:'L39',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:3,excelCoord:'M39',cellValue:'10.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:5,colIndex:4,excelCoord:'N39',cellValue:'11.6',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:5,colIndex:5,excelCoord:'O39',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:5,colIndex:6,excelCoord:'P39',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:0,excelCoord:'J40',cellValue:'합  계',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:1,excelCoord:'K40',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:2,excelCoord:'L40',cellValue:'',cellType:'DATA',freqCode:'yearly',freqLabel:'매년',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:3,excelCoord:'M40',cellValue:'84.7',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},{rowIndex:6,colIndex:4,excelCoord:'N40',cellValue:'79.2',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:6,colIndex:5,excelCoord:'O40',cellValue:'',cellType:'DATA',freqCode:'monthly',freqLabel:'매월',ownerIds:'park',ownerNames:'박지권 책임',isLocked:0,rowSpan:1,colSpan:1},
+          {rowIndex:6,colIndex:6,excelCoord:'P40',cellValue:'',cellType:'DATA',freqCode:'daily',freqLabel:'매일',ownerIds:'energy',ownerNames:'환경에너지팀 반장',isLocked:0,rowSpan:1,colSpan:1},
+        ];
+
+        var result = {
+          report: { reportId: 3, reportDate: reportDate, title: reportDate + ' 세부공장일보', status: 'DRAFT' },
+          tables: {
+            'TBL_PRODUCTION_INDEX': { tableCode:'TBL_PRODUCTION_INDEX', tableName:'주요 생산 지표 현황', sortOrder:1, rowCount:10, colCount:15, cells: buildCells('TBL_PRODUCTION_INDEX', tbl1Cells) },
+            'TBL_INVENTORY': { tableCode:'TBL_INVENTORY', tableName:'제지 재공품 및 야적현황', sortOrder:2, rowCount:10, colCount:13, cells: buildCells('TBL_INVENTORY', tbl2Cells) },
+            'TBL_ENERGY': { tableCode:'TBL_ENERGY', tableName:'에너지 원단위', sortOrder:3, rowCount:8, colCount:6, cells: buildCells('TBL_ENERGY', tbl3Cells) },
+            'TBL_BOILER': { tableCode:'TBL_BOILER', tableName:'보일러 운영 현황', sortOrder:4, rowCount:7, colCount:8, cells: buildCells('TBL_BOILER', tbl4Cells) },
+          },
+          remarks: [{ remarkId:1, content:'공용 보기 화면 테스트 데이터입니다.', category:'GENERAL' }],
+          images: [],
+          permissions: { canAccessInput:true, canWriteInput:true, canAccessAuth: drCurrentUser.loginId === 'admin' }
+        };
+        return jsonRes(res, result);
+      }
+
+      // ── /reports/:id/cells (POST - 셀 저장) ──
+      if (pathname.match(/^\/dailyreport-api\/reports\/\d+\/cells$/) && method === 'POST') {
+        var reportDate2 = parsedUrl.query.reportDate || '2024-07-20';
+        if (!global._drCellData[reportDate2]) global._drCellData[reportDate2] = {};
+        var payload = jsonBody || {};
+        var tc = payload.tableCode || '';
+        (payload.cells || []).forEach(function(c) {
+          var key = tc + '__' + (c.excelCoord || c.coord || '');
+          if (!key.includes('__')) return;
+          global._drCellData[reportDate2][key] = c.cellValue;
+        });
+        return jsonRes(res, { success:true, saved: (payload.cells||[]).length });
+      }
+
+      // ── /reports/:id/remarks (POST - 특이사항 저장) ──
+      if (pathname.match(/^\/dailyreport-api\/reports\/\d+\/remarks$/) && method === 'POST') {
+        return jsonRes(res, { success:true });
+      }
+
+      // ── /cell-auths (GET - 목록) ──
+      if (pathname === '/dailyreport-api/cell-auths' && method === 'GET') {
+        var userId = parsedUrl.query.userId ? parseInt(parsedUrl.query.userId) : null;
+        var tableCode = parsedUrl.query.tableCode || null;
+        var filtered = global._drCellAuths.filter(function(a){
+          if (userId && a.userId !== userId) return false;
+          if (tableCode && a.tableCode !== tableCode) return false;
+          return true;
+        });
+        return jsonRes(res, { data: filtered });
+      }
+
+      // ── /cell-auths (POST - 등록) ──
+      if (pathname === '/dailyreport-api/cell-auths' && method === 'POST') {
+        var newAuth = Object.assign({ authId: global._drNextAuthId++, isActive:true, grantedBy:drCurrentUser.userId }, jsonBody);
+        newAuth.cellCoords = typeof newAuth.cellCoords === 'object' ? JSON.stringify(newAuth.cellCoords) : newAuth.cellCoords;
+        var usr = drUsers.find(function(u){return u.userId===newAuth.userId;});
+        if(usr){newAuth.loginId=usr.loginId;newAuth.userName=usr.userName;}
+        global._drCellAuths.push(newAuth);
+        return jsonRes(res, { data: newAuth });
+      }
+
+      // ── /cell-auths/:id (PUT - 수정) ──
+      if (pathname.match(/^\/dailyreport-api\/cell-auths\/\d+$/) && method === 'PUT') {
+        var authId = parseInt(pathname.split('/').pop());
+        var auth = global._drCellAuths.find(function(a){return a.authId===authId;});
+        if(auth){
+          Object.assign(auth, jsonBody);
+          auth.cellCoords = typeof auth.cellCoords === 'object' ? JSON.stringify(auth.cellCoords) : auth.cellCoords;
+          return jsonRes(res, { data: auth });
+        }
+        return apiErr(res, 'Not found', 404);
+      }
+
+      // ── /cell-auths/:id/deactivate (PATCH) ──
+      if (pathname.match(/^\/dailyreport-api\/cell-auths\/\d+\/deactivate$/) && method === 'PATCH') {
+        var authId2 = parseInt(pathname.split('/')[3]);
+        var auth2 = global._drCellAuths.find(function(a){return a.authId===authId2;});
+        if(auth2){ auth2.isActive=false; return jsonRes(res, { data: auth2 }); }
+        return apiErr(res, 'Not found', 404);
+      }
+
+      // ── /cell-auths/:id (DELETE) ──
+      if (pathname.match(/^\/dailyreport-api\/cell-auths\/\d+$/) && method === 'DELETE') {
+        var authId3 = parseInt(pathname.split('/').pop());
+        global._drCellAuths = global._drCellAuths.filter(function(a){return a.authId!==authId3;});
+        return jsonRes(res, { success: true });
+      }
+
+      // ── /accounts (GET - 사용자 목록) ──
+      if (pathname === '/dailyreport-api/accounts') {
+        return jsonRes(res, { data: drUsers });
+      }
+
+      // ── Catch-all dailyreport-api ──
+      return jsonRes(res, { message: 'Daily Report Mock API', path: pathname });
+    }
+
     // ── Catch-all for unknown API paths ──
     if (pathname.startsWith('/api/') || pathname.startsWith('/fire-api/')) {
       return apiOk(res, null);
@@ -661,6 +1110,10 @@ const server = http.createServer((req, res) => {
     const psStaticPath = path.join(__dirname, 'module-ps-insp/src/main/resources/static', pathname);
     if (serveFile(psStaticPath, res)) return;
 
+    // Daily Report static files
+    const drStaticPath = path.join(__dirname, 'module-dailyreport/src/main/resources/static', pathname);
+    if (serveFile(drStaticPath, res)) return;
+
     // Favicon fallback
     if (pathname === '/favicon.ico') {
       const favPath = path.join(STATIC_DIRS[0], 'favicon.ico');
@@ -690,6 +1143,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('║    POST /api/auth/login   - 로그인 (admin/아무비밀번호)  ║');
   console.log('║    GET  /api/health       - 서버 상태 확인               ║');
   console.log('║    GET  /api/auth/me      - 현재 사용자 정보             ║');
+  console.log('║                                                           ║');
+  console.log('║  세부공장일보 (Daily Report):                             ║');
+  console.log('║    GET /dailyreport-api/view/my-permissions               ║');
+  console.log('║    GET /dailyreport-api/view/render?reportDate=...        ║');
+  console.log('║    * /cell-auths CRUD (GET/POST/PUT/PATCH/DELETE)         ║');
   console.log('║                                                           ║');
   console.log('║  Note: Backend DB 없이 Mock 데이터로 동작합니다.        ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');

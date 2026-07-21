@@ -2,14 +2,13 @@ module.exports = {
   apps: [
     {
       name: 'platform',
-      script: '/home/user/webapp/start-app.sh',
-      interpreter: 'bash',
+      script: 'preview-server.js',
       cwd: '/home/user/webapp',
-      env: { NODE_ENV: 'production' },
+      env: { NODE_ENV: 'production', PORT: 3000 },
       watch: false,
       instances: 1,
       exec_mode: 'fork',
-      autorestart: false
+      autorestart: true
     }
   ]
 }

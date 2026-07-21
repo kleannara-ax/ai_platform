@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>세부공장일보 — 접근권한 관리</title>
+  <style>
+    :root {
+      --bg:#eef2f7;
+      --panel:#ffffff;
+      --text:#111827;
+      --muted:#64748b;
+      --line:#cbd5e1;
+      --blue:#2563eb;
+      --blue-soft:#dbeafe;
+      --ok:#16a34a;
+      --warn:#b45309;
+      --danger:#dc2626;
+      --shadow:0 14px 36px rgba(15,23,42,.08);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Malgun Gothic",sans-serif; }
+
+    /* ── 레이아웃 ── */
+    .app-shell { min-height:100vh; display:flex; flex-direction:column; }
+    .topbar { position:sticky; top:0; z-index:30; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 18px; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); border-bottom:1px solid rgba(148,163,184,.35); }
+    .topbar-title { font-size:18px; font-weight:800; }
+    .topbar-subtitle { font-size:12px; color:var(--muted); margin-top:2px; }
+    .topbar-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .user-chip { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:999px; padding:8px 12px; font-size:13px; font-weight:700; }
+
+    .content-wrap { width:min(1200px, calc(100vw - 32px)); margin:20px auto 32px; }
+
+    /* ── 버튼 ── */
+    .btn { border:1px solid #cbd5e1; background:#fff; color:#0f172a; border-radius:10px; padding:9px 14px; font-size:13px; font-weight:700; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:6px; }
+    .btn:hover { background:#f1f5f9; }
+    .btn.primary { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .btn.primary:hover { background:#1d4ed8; }
+    .btn.danger { background:#fef2f2; color:var(--danger); border-color:#fecaca; }
+    .btn.danger:hover { background:#fee2e2; }
+    .btn.success { background:#f0fdf4; color:var(--ok); border-color:#86efac; }
+    .btn.success:hover { background:#dcfce7; }
+    .btn.sm { padding:6px 10px; font-size:12px; border-radius:8px; }
+
+    /* ── 카드 ── */
+    .card { background:#fff; border:1px solid #d7dee8; border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+    .card-header { padding:16px 20px; border-bottom:1px solid #e5e7eb; background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%); display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .card-header-title { font-size:16px; font-weight:800; }
+    .card-body { padding:16px 20px; }
+
+    /* ── 데이터 테이블 ── */
+    .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .data-table th { background:#f8fafc; padding:10px 12px; text-align:left; font-weight:700; color:#475569; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    .data-table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .data-table tr:hover td { background:#fafbfc; }
+    .data-table .col-actions { width:160px; text-align:right; white-space:nowrap; }
+
+    /* ── 테이블 코드 뱃지 ── */
+    .badge { display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; }
+    .badge-table { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .badge-freq { background:#f0fdf4; color:#166534; border:1px solid #86efac; }
+    .badge-inactive { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+    .badge-active { background:#f0fdf4; color:#166534; border:1px solid #86efac; }
+
+    /* ── 셀 좌표 태그 ── */
+    .coord-tags { display:flex; flex-wrap:wrap; gap:4px; max-width:320px; }
+    .coord-tag { display:inline-block; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600; background:#f8fafc; border:1px solid #e2e8f0; color:#334155; font-family:"Consolas","Courier New",monospace; }
+
+    /* ── 모달 ── */
+    .modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .modal-overlay.active { opacity:1; pointer-events:auto; }
+    .modal { background:#fff; border-radius:18px; width:min(600px, 100%); max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(15,23,42,.2); }
+    .modal-header { padding:20px 24px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; }
+    .modal-title { font-size:18px; font-weight:800; }
+    .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted); padding:4px; line-height:1; }
+    .modal-body { padding:20px 24px; }
+    .modal-footer { padding:16px 24px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+
+    /* ── 폼 ── */
+    .form-group { margin-bottom:16px; }
+    .form-label { display:block; font-size:13px; font-weight:700; margin-bottom:6px; color:#334155; }
+    .form-help { font-size:11px; color:var(--muted); margin-top:4px; }
+    .form-input { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; }
+    .form-input:focus { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    .form-select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; appearance:auto; }
+    .form-textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; resize:vertical; min-height:60px; font-family:inherit; }
+
+    /* ── 좌표 입력 영역 ── */
+    .coord-input-area { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; min-height:44px; cursor:text; }
+    .coord-input-area:focus-within { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    .coord-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; background:var(--blue-soft); color:#1d4ed8; border:1px solid #93c5fd; font-family:"Consolas",monospace; }
+    .coord-chip-remove { background:none; border:none; color:#1d4ed8; cursor:pointer; font-size:14px; line-height:1; padding:0; opacity:.6; }
+    .coord-chip-remove:hover { opacity:1; }
+    .coord-text-input { border:none; outline:none; font-size:13px; min-width:60px; flex:1; padding:2px 0; font-family:"Consolas",monospace; text-transform:uppercase; }
+
+    /* ── 권한 없음 ── */
+    .no-access { min-height:60vh; display:flex; align-items:center; justify-content:center; padding:32px; }
+    .no-access-panel { text-align:center; max-width:500px; padding:40px; background:#fff; border-radius:18px; border:1px solid #d7dee8; box-shadow:var(--shadow); }
+    .no-access-icon { font-size:48px; margin-bottom:16px; }
+    .no-access-title { font-size:22px; font-weight:800; margin-bottom:12px; }
+    .no-access-desc { font-size:14px; color:var(--muted); line-height:1.65; }
+
+    /* ── 필터 바 ── */
+    .filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .filter-bar .form-select, .filter-bar .form-input { width:auto; min-width:160px; padding:8px 10px; font-size:12px; }
+
+    /* ── 토스트 ── */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#0f172a; color:#fff; padding:12px 16px; border-radius:999px; font-size:13px; font-weight:700; box-shadow:0 12px 24px rgba(15,23,42,.18); opacity:0; pointer-events:none; transition:all .18s ease; z-index:200; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* ── 통계 ── */
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:20px; }
+    .stat-card { padding:16px; background:#fff; border:1px solid #d7dee8; border-radius:14px; text-align:center; }
+    .stat-value { font-size:28px; font-weight:800; color:var(--blue); }
+    .stat-label { font-size:12px; color:var(--muted); margin-top:4px; font-weight:600; }
+
+    /* ── 반응형 ── */
+    @media (max-width:768px) {
+      .topbar { flex-direction:column; align-items:flex-start; }
+      .content-wrap { width:calc(100vw - 16px); }
+      .card-header { flex-direction:column; align-items:flex-start; }
+      .data-table { font-size:12px; }
+      .data-table th, .data-table td { padding:8px 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       접근권한 관리 쉘
+  ═══════════════════════════════════════════════════ -->
+  <section class="app-shell" id="appShell">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">세부공장일보 접근권한 관리</div>
+        <div class="topbar-subtitle">사용자별 셀 단위 입력 권한을 설정합니다 (관리자 전용)</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="user-chip" id="userChip">인증 확인중...</div>
+        <button class="btn" type="button" onclick="goToInputPage()">&#8592; 일보 입력</button>
+      </div>
+    </div>
+
+    <div class="content-wrap">
+      <!-- 통계 -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">총 권한 수</div></div>
+        <div class="stat-card"><div class="stat-value" id="statUsers">-</div><div class="stat-label">담당자 수</div></div>
+        <div class="stat-card"><div class="stat-value" id="statTables">-</div><div class="stat-label">표 종류</div></div>
+        <div class="stat-card"><div class="stat-value" id="statCells">-</div><div class="stat-label">담당 셀 수</div></div>
+      </div>
+
+      <!-- 권한 목록 카드 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-title">셀 접근 권한 목록</div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div class="filter-bar">
+              <select class="form-select" id="filterTable" onchange="applyFilters()">
+                <option value="">전체 표</option>
+                <option value="TBL_PRODUCTION_INDEX">주요 생산 지표</option>
+                <option value="TBL_INVENTORY">재공품/야적</option>
+                <option value="TBL_ENERGY">에너지 원단위</option>
+                <option value="TBL_BOILER">보일러 운영</option>
+              </select>
+            </div>
+            <button class="btn primary" type="button" onclick="openCreateModal()">+ 권한 추가</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="authTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>사용자</th>
+                  <th>표</th>
+                  <th>담당 셀</th>
+                  <th>입력 주기</th>
+                  <th>상태</th>
+                  <th>설명</th>
+                  <th class="col-actions">관리</th>
+                </tr>
+              </thead>
+              <tbody id="authTableBody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">로딩중...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 권한 없음 화면 -->
+  <section class="no-access" id="noAccessShell" style="display:none">
+    <div class="no-access-panel">
+      <div class="no-access-icon">&#128274;</div>
+      <div class="no-access-title">접근 권한이 없습니다</div>
+      <div class="no-access-desc" id="noAccessDesc">
+        세부공장일보 접근권한 관리 페이지에 대한 권한이 없습니다.<br>
+        관리자에게 문의해 주세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════
+       등록/수정 모달
+  ═══════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">셀 권한 등록</div>
+        <button class="modal-close" type="button" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editAuthId" value="" />
+
+        <div class="form-group">
+          <label class="form-label" for="formUserId">사용자 ID (USER_ID)</label>
+          <input class="form-input" id="formUserId" type="number" min="1" placeholder="예: 2" />
+          <div class="form-help">core_user 테이블의 USER_ID (예: 2=kim, 3=park, 4=yoo ...)</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="formTableCode">대상 표</label>
+          <select class="form-select" id="formTableCode">
+            <option value="">선택하세요</option>
+            <option value="TBL_PRODUCTION_INDEX">주요 생산 지표 현황</option>
+            <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
+            <option value="TBL_ENERGY">에너지 원단위</option>
+            <option value="TBL_BOILER">보일러 운영 현황</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">담당 셀 좌표</label>
+          <div class="coord-input-area" id="coordInputArea" onclick="focusCoordInput()">
+            <!-- 좌표 칩들이 여기에 동적으로 추가됨 -->
+            <input class="coord-text-input" id="coordTextInput" placeholder="예: E21, F22 (Enter로 추가)" onkeydown="handleCoordKeydown(event)" />
+          </div>
+          <div class="form-help">엑셀 좌표를 입력하고 Enter 또는 쉼표로 추가합니다. 예: E21, E22, E23</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="formFreqCode">입력 주기</label>
+          <select class="form-select" id="formFreqCode" onchange="updateFreqLabel()">
+            <option value="">선택하세요</option>
+            <option value="daily">매일 (daily)</option>
+            <option value="event">발생 시 (event)</option>
+            <option value="monthly">매월 1일 (monthly)</option>
+            <option value="yearly">매년 1월 1일 (yearly)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="formFreqLabel">주기 라벨</label>
+          <input class="form-input" id="formFreqLabel" placeholder="예: 매일, 발생 시, 매월" />
+          <div class="form-help">화면에 표시되는 주기 설명 (자동으로 채워집니다)</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="formDescription">설명</label>
+          <textarea class="form-textarea" id="formDescription" placeholder="예: 제지 재공품 적정재고 담당 (밀롤창고/카타대기)"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" type="button" onclick="closeModal()">취소</button>
+        <button class="btn primary" type="button" id="modalSubmitBtn" onclick="submitForm()">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 삭제 확인 모달 -->
+  <div class="modal-overlay" id="deleteModalOverlay" onclick="closeDeleteModalOnOverlay(event)">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <div class="modal-title">권한 삭제 확인</div>
+        <button class="modal-close" type="button" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:14px; line-height:1.6;">
+          이 셀 접근 권한을 <strong>영구 삭제</strong>하시겠습니까?<br>
+          <span style="color:var(--muted); font-size:13px;">비활성화를 권장합니다. 삭제하면 복구할 수 없습니다.</span>
+        </p>
+        <input type="hidden" id="deleteAuthId" value="" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn" type="button" onclick="closeDeleteModal()">취소</button>
+        <button class="btn success" type="button" onclick="confirmDeactivate()">비활성화</button>
+        <button class="btn danger" type="button" onclick="confirmDelete()">영구 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       JavaScript — 셀 접근 권한 관리 (CRUD)
+  ═══════════════════════════════════════════════════ -->
+  <script>
+    const API_BASE = '/dailyreport-api';
+
+    // ── 프리뷰 모드: 부모 iframe에서 전달한 _loginId 추출 ──
+    const _urlParams = new URLSearchParams(window.location.search);
+    const _previewLoginId = _urlParams.get('_loginId') || '';
+
+    // ── 상태 ──
+    let currentUser = null;
+    let allAuths = [];           // 전체 권한 목록
+    let filteredAuths = [];      // 필터링된 목록
+    let editCoords = [];         // 현재 모달의 좌표 목록
+
+    // ── 표 코드 → 이름 매핑 ──
+    const TABLE_NAMES = {
+      'TBL_PRODUCTION_INDEX': '주요 생산 지표',
+      'TBL_INVENTORY': '재공품/야적',
+      'TBL_ENERGY': '에너지 원단위',
+      'TBL_BOILER': '보일러 운영'
+    };
+
+    const FREQ_LABELS = {
+      'daily': '매일',
+      'event': '발생 시',
+      'monthly': '매월',
+      'yearly': '매년'
+    };
+
+    // ── 유틸리티 ──
+    function escapeHtml(v) {
+      return String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    // ── API 호출 ──
+    async function apiFetch(path, options = {}) {
+      // 프리뷰 모드일 때 _loginId 쿼리 파라미터를 자동 추가
+      let url = API_BASE + path;
+      if (_previewLoginId) {
+        const sep = url.includes('?') ? '&' : '?';
+        url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
+      }
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        credentials: 'same-origin',
+        ...options
+      });
+      if (res.status === 401) {
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        throw new Error('인증이 만료되었습니다.');
+      }
+      if (res.status === 403) {
+        throw new Error('접근 권한이 없습니다.');
+      }
+      if (!res.ok) {
+        const err = await res.text().catch(() => res.statusText);
+        throw new Error(`API 오류 (${res.status}): ${err}`);
+      }
+      return res.json();
+    }
+
+    // ═══════════════════════════════════════════════
+    //  인증 + 3계층 권한 확인
+    // ═══════════════════════════════════════════════
+
+    async function checkPermissionsAndInit() {
+      try {
+        const result = await apiFetch('/view/my-permissions');
+
+        currentUser = {
+          userId: result.userId,
+          loginId: result.loginId,
+          permissions: result.permissions || {}
+        };
+
+        // 3계층: 세부공장일보 접근권한 페이지 접근 권한 확인
+        if (!currentUser.permissions.canAccessAuth) {
+          showNoAccessPage();
+          return;
+        }
+
+        document.getElementById('userChip').textContent = `${currentUser.loginId} (관리자)`;
+
+        // 권한 목록 로드
+        await loadAuths();
+
+      } catch (err) {
+        console.error('권한 확인 실패:', err);
+        if (err.message.includes('401') || err.message.includes('인증')) return;
+        document.getElementById('userChip').textContent = 'API 연결 실패';
+        document.getElementById('authTableBody').innerHTML =
+          '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--danger);">API 서버에 연결할 수 없습니다.</td></tr>';
+      }
+    }
+
+    function showNoAccessPage() {
+      document.getElementById('appShell').style.display = 'none';
+      document.getElementById('noAccessShell').style.display = 'flex';
+    }
+
+    function goToInputPage() {
+      window.location.href = '/dailyreport/index.html';
+    }
+
+    // ═══════════════════════════════════════════════
+    //  권한 목록 CRUD
+    // ═══════════════════════════════════════════════
+
+    async function loadAuths() {
+      try {
+        const result = await apiFetch('/cell-auths');
+        allAuths = result.data || result || [];
+        applyFilters();
+        updateStats();
+      } catch (err) {
+        console.error('권한 목록 로드 실패:', err);
+        showToast('목록 로드 실패: ' + err.message);
+      }
+    }
+
+    function applyFilters() {
+      const tableFilter = document.getElementById('filterTable').value;
+
+      filteredAuths = allAuths.filter(auth => {
+        if (tableFilter && auth.tableCode !== tableFilter) return false;
+        return true;
+      });
+
+      renderAuthTable();
+    }
+
+    function updateStats() {
+      const active = allAuths.filter(a => a.isActive !== false);
+      document.getElementById('statTotal').textContent = active.length;
+      document.getElementById('statUsers').textContent = new Set(active.map(a => a.userId)).size;
+      document.getElementById('statTables').textContent = new Set(active.map(a => a.tableCode)).size;
+
+      let totalCells = 0;
+      active.forEach(a => {
+        if (a.cellCoords) {
+          try {
+            const coords = typeof a.cellCoords === 'string' ? JSON.parse(a.cellCoords) : a.cellCoords;
+            totalCells += Array.isArray(coords) ? coords.length : 0;
+          } catch { /* ignore */ }
+        }
+      });
+      document.getElementById('statCells').textContent = totalCells;
+    }
+
+    function renderAuthTable() {
+      const tbody = document.getElementById('authTableBody');
+
+      if (filteredAuths.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">등록된 셀 권한이 없습니다.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filteredAuths.map(auth => {
+        const tableName = TABLE_NAMES[auth.tableCode] || auth.tableCode;
+        const isActive = auth.isActive !== false;
+
+        // 셀 좌표 파싱
+        let coords = [];
+        try {
+          coords = typeof auth.cellCoords === 'string' ? JSON.parse(auth.cellCoords) : (auth.cellCoords || []);
+        } catch { coords = []; }
+
+        const coordHtml = coords.length > 0
+          ? `<div class="coord-tags">${coords.map(c => `<span class="coord-tag">${escapeHtml(c)}</span>`).join('')}</div>`
+          : '<span style="color:var(--muted)">-</span>';
+
+        const statusBadge = isActive
+          ? '<span class="badge badge-active">활성</span>'
+          : '<span class="badge badge-inactive">비활성</span>';
+
+        const userLabel = auth.loginId
+          ? `${escapeHtml(auth.userName || '')} <span style="color:var(--muted);font-size:11px">(${escapeHtml(auth.loginId)})</span>`
+          : `USER_ID: ${auth.userId}`;
+
+        return `
+          <tr data-auth-id="${auth.authId}">
+            <td>${auth.authId}</td>
+            <td>${userLabel}</td>
+            <td><span class="badge badge-table">${escapeHtml(tableName)}</span></td>
+            <td>${coordHtml}</td>
+            <td><span class="badge badge-freq">${escapeHtml(auth.freqLabel || FREQ_LABELS[auth.freqCode] || auth.freqCode || '-')}</span></td>
+            <td>${statusBadge}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(auth.description || '')}">${escapeHtml(auth.description || '-')}</td>
+            <td class="col-actions">
+              <button class="btn sm" onclick="openEditModal(${auth.authId})">수정</button>
+              <button class="btn sm danger" onclick="openDeleteModal(${auth.authId})">삭제</button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════════
+    //  등록/수정 모달
+    // ═══════════════════════════════════════════════
+
+    function openCreateModal() {
+      document.getElementById('modalTitle').textContent = '셀 권한 등록';
+      document.getElementById('modalSubmitBtn').textContent = '등록';
+      document.getElementById('editAuthId').value = '';
+
+      // 폼 초기화
+      document.getElementById('formUserId').value = '';
+      document.getElementById('formTableCode').value = '';
+      document.getElementById('formFreqCode').value = '';
+      document.getElementById('formFreqLabel').value = '';
+      document.getElementById('formDescription').value = '';
+      editCoords = [];
+      renderCoordChips();
+
+      document.getElementById('formUserId').disabled = false;
+      document.getElementById('formTableCode').disabled = false;
+
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function openEditModal(authId) {
+      const auth = allAuths.find(a => a.authId === authId);
+      if (!auth) return;
+
+      document.getElementById('modalTitle').textContent = '셀 권한 수정';
+      document.getElementById('modalSubmitBtn').textContent = '수정';
+      document.getElementById('editAuthId').value = authId;
+
+      document.getElementById('formUserId').value = auth.userId;
+      document.getElementById('formTableCode').value = auth.tableCode;
+      document.getElementById('formFreqCode').value = auth.freqCode || '';
+      document.getElementById('formFreqLabel').value = auth.freqLabel || '';
+      document.getElementById('formDescription').value = auth.description || '';
+
+      // 좌표 파싱
+      try {
+        editCoords = typeof auth.cellCoords === 'string' ? JSON.parse(auth.cellCoords) : (auth.cellCoords || []);
+      } catch { editCoords = []; }
+      renderCoordChips();
+
+      // 수정 시 userId와 tableCode는 변경 불가 (UNIQUE 제약)
+      document.getElementById('formUserId').disabled = true;
+      document.getElementById('formTableCode').disabled = true;
+
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    function closeModalOnOverlay(e) {
+      if (e.target === document.getElementById('modalOverlay')) closeModal();
+    }
+
+    // ── 좌표 입력 처리 ──
+    function renderCoordChips() {
+      const area = document.getElementById('coordInputArea');
+      const input = document.getElementById('coordTextInput');
+
+      // 기존 칩 제거 (input은 유지)
+      area.querySelectorAll('.coord-chip').forEach(el => el.remove());
+
+      // 칩 추가
+      editCoords.forEach((coord, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'coord-chip';
+        chip.innerHTML = `${escapeHtml(coord)}<button class="coord-chip-remove" type="button" onclick="removeCoord(${i})">&times;</button>`;
+        area.insertBefore(chip, input);
+      });
+    }
+
+    function focusCoordInput() {
+      document.getElementById('coordTextInput').focus();
+    }
+
+    function handleCoordKeydown(e) {
+      const input = e.target;
+      const val = input.value.trim().toUpperCase();
+
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addCoord(val);
+        input.value = '';
+      } else if (e.key === 'Backspace' && val === '' && editCoords.length > 0) {
+        editCoords.pop();
+        renderCoordChips();
+      }
+    }
+
+    function addCoord(val) {
+      if (!val) return;
+      // 쉼표/공백으로 분리된 여러 좌표 처리
+      val.split(/[,\s]+/).forEach(coord => {
+        coord = coord.trim().toUpperCase();
+        if (coord && /^[A-Z]+\d+$/.test(coord) && !editCoords.includes(coord)) {
+          editCoords.push(coord);
+        }
+      });
+      renderCoordChips();
+    }
+
+    function removeCoord(idx) {
+      editCoords.splice(idx, 1);
+      renderCoordChips();
+    }
+
+    function updateFreqLabel() {
+      const code = document.getElementById('formFreqCode').value;
+      document.getElementById('formFreqLabel').value = FREQ_LABELS[code] || '';
+    }
+
+    // ── 폼 제출 ──
+    async function submitForm() {
+      const authId = document.getElementById('editAuthId').value;
+      const isEdit = !!authId;
+
+      const userId = parseInt(document.getElementById('formUserId').value);
+      const tableCode = document.getElementById('formTableCode').value;
+      const freqCode = document.getElementById('formFreqCode').value;
+      const freqLabel = document.getElementById('formFreqLabel').value;
+      const description = document.getElementById('formDescription').value;
+
+      // 유효성 검사
+      if (!userId || userId < 1) { showToast('사용자 ID를 입력해 주세요.'); return; }
+      if (!tableCode) { showToast('대상 표를 선택해 주세요.'); return; }
+      if (editCoords.length === 0) { showToast('담당 셀 좌표를 1개 이상 입력해 주세요.'); return; }
+      if (!freqCode) { showToast('입력 주기를 선택해 주세요.'); return; }
+
+      const body = {
+        userId,
+        tableCode,
+        cellCoords: editCoords,
+        freqCode,
+        freqLabel: freqLabel || FREQ_LABELS[freqCode],
+        description
+      };
+
+      try {
+        if (isEdit) {
+          await apiFetch(`/cell-auths/${authId}`, {
+            method: 'PUT',
+            body: JSON.stringify(body)
+          });
+          showToast('권한이 수정되었습니다.');
+        } else {
+          await apiFetch('/cell-auths', {
+            method: 'POST',
+            body: JSON.stringify(body)
+          });
+          showToast('권한이 등록되었습니다.');
+        }
+
+        closeModal();
+        await loadAuths();
+
+      } catch (err) {
+        console.error('저장 실패:', err);
+        showToast('저장 실패: ' + err.message);
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  삭제/비활성화 모달
+    // ═══════════════════════════════════════════════
+
+    function openDeleteModal(authId) {
+      document.getElementById('deleteAuthId').value = authId;
+      document.getElementById('deleteModalOverlay').classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModalOverlay').classList.remove('active');
+    }
+
+    function closeDeleteModalOnOverlay(e) {
+      if (e.target === document.getElementById('deleteModalOverlay')) closeDeleteModal();
+    }
+
+    async function confirmDeactivate() {
+      const authId = document.getElementById('deleteAuthId').value;
+      try {
+        await apiFetch(`/cell-auths/${authId}/deactivate`, { method: 'PATCH' });
+        showToast('권한이 비활성화되었습니다.');
+        closeDeleteModal();
+        await loadAuths();
+      } catch (err) {
+        showToast('비활성화 실패: ' + err.message);
+      }
+    }
+
+    async function confirmDelete() {
+      const authId = document.getElementById('deleteAuthId').value;
+      try {
+        await apiFetch(`/cell-auths/${authId}`, { method: 'DELETE' });
+        showToast('권한이 삭제되었습니다.');
+        closeDeleteModal();
+        await loadAuths();
+      } catch (err) {
+        showToast('삭제 실패: ' + err.message);
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  초기화
+    // ═══════════════════════════════════════════════
+
+    async function init() {
+      await checkPermissionsAndInit();
+    }
+
+    init();
+  </script>
+</body>
+</html>
