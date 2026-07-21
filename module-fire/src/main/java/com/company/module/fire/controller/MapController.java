@@ -52,8 +52,18 @@ public class MapController {
             String bName = b.getBuildingName() == null ? "" : b.getBuildingName();
             List<Map<String, Object>> matchedFloors = new ArrayList<>();
 
-            // 옥외 건물은 별도 처리 (floor.html에서 drone_photo 직접 매핑)
+            // 옥외 건물은 항공사진을 사용하므로 옥외 층 마스터를 함께 반환한다.
+            // 모바일 QR 등록 화면도 이 목록으로 층 선택값을 구성한다.
             if (bName.contains("옥외")) {
+                for (Floor f : floors) {
+                    String fName = f.getFloorName() == null ? "" : f.getFloorName();
+                    if (fName.contains("옥외")) {
+                        Map<String, Object> fm = new LinkedHashMap<>();
+                        fm.put("floorId", f.getFloorId());
+                        fm.put("floorName", fName);
+                        matchedFloors.add(fm);
+                    }
+                }
                 Map<String, Object> bm = new LinkedHashMap<>();
                 bm.put("buildingId", b.getBuildingId());
                 bm.put("buildingName", bName);

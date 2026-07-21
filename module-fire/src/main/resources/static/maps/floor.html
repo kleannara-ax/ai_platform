@@ -839,7 +839,7 @@
   function suppressNextInfoDismissClick(){ state.suppressInfoDismissClick = true; window.setTimeout(() => { state.suppressInfoDismissClick = false; }, 150); }
   function getPointerDistance(){ const pts = Array.from(activePointers.values()); if (pts.length < 2) return 0; const [a,b] = pts; return Math.hypot(b.x-a.x, b.y-a.y); }
 
-  async function load(){
+  async function load(preferredCurrent = null){
     await loadFireAdminPermission();
     await loadOtherAdminPermission();
     state.domainType = qs.get('domainType') === 'other' ? 'other' : state.domainType;
@@ -899,7 +899,11 @@
     state.buildings = Array.from(bMap.values()).filter(b => b.floors.length).map(b => ({ ...b, floors:b.floors.sort((x,y) => floorOrder(x.floorName) - floorOrder(y.floorName)) }));
     const qBuilding = (qs.get('buildingName') || '').trim();
     const qFloor = (qs.get('floorName') || '').trim();
-    state.current = state.floors.find(v => normalize(v.buildingName) === normalize(qBuilding) && normalize(v.floorName) === normalize(qFloor)) || state.floors[0] || null;
+    const keepCurrent = preferredCurrent || {};
+    state.current = state.floors.find(v =>
+      (keepCurrent.buildingId != null && keepCurrent.floorId != null && String(v.buildingId) === String(keepCurrent.buildingId) && String(v.floorId) === String(keepCurrent.floorId)) ||
+      (keepCurrent.buildingName && keepCurrent.floorName && normalize(v.buildingName) === normalize(keepCurrent.buildingName) && normalize(v.floorName) === normalize(keepCurrent.floorName))
+    ) || state.floors.find(v => normalize(v.buildingName) === normalize(qBuilding) && normalize(v.floorName) === normalize(qFloor)) || state.floors[0] || null;
     if (!currentAssetOptions().some(a => a.type === state.selectedAssetType)) state.selectedAssetType = currentAssetOptions()[0]?.type || 'ext';
     systemSelect.value = state.domainType;
     syncBuildingFloorSelectors(); syncCurrentFloor(false);
@@ -909,7 +913,13 @@
   }
   async function refreshAfterAction(){
     const keepType = state.selectedAssetType, keepId = state.selectedAssetId;
-    await load();
+    const keepCurrent = state.current ? {
+      buildingId: state.current.buildingId,
+      floorId: state.current.floorId,
+      buildingName: state.current.buildingName,
+      floorName: state.current.floorName
+    } : null;
+    await load(keepCurrent);
     state.selectedAssetType = keepType;
     state.selectedAssetId = keepId;
     syncAssetSelect(); renderList(); renderMarkers();
