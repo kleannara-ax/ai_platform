@@ -2,6 +2,7 @@ package com.company.module.dailyreport.controller;
 
 import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
+import com.company.core.common.response.ApiResponse;
 import com.company.module.dailyreport.dto.DailyReportResponse;
 import com.company.module.dailyreport.dto.ReportTableResponse;
 import com.company.module.dailyreport.service.CellService;
@@ -54,7 +55,7 @@ public class ViewRenderController {
      * @param loginId    로그인 ID (Spring Security 인증 정보)
      */
     @GetMapping("/render")
-    public Map<String, Object> renderReport(
+    public ApiResponse<Map<String, Object>> renderReport(
             @RequestParam LocalDate reportDate,
             @AuthenticationPrincipal(expression = "id") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
@@ -103,7 +104,7 @@ public class ViewRenderController {
         }
         result.put("permissions", permissions);
 
-        return result;
+        return ApiResponse.success(result);
     }
 
     /**
@@ -111,7 +112,7 @@ public class ViewRenderController {
      * - 로그인 후 어떤 페이지에 접근 가능한지 반환
      */
     @GetMapping("/my-permissions")
-    public Map<String, Object> getMyPermissions(
+    public ApiResponse<Map<String, Object>> getMyPermissions(
             @AuthenticationPrincipal(expression = "id") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
 
@@ -127,6 +128,6 @@ public class ViewRenderController {
         }
         result.put("permissions", permissions);
 
-        return result;
+        return ApiResponse.success(result);
     }
 }
