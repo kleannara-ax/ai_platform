@@ -8,8 +8,11 @@ import java.util.Optional;
 
 /**
  * AI 플랫폼 메뉴 마스터 리포지토리 (★ Phase 4 — 읽기 전용 참조)
+ *
+ * <p>Bean 이름 충돌 방지: core 모듈의 CoreMenuRepository와 동일 이름이므로
+ * 'DailyReportCoreMenuRepository'로 명명하여 Bean 등록 충돌을 회피한다.
  */
-public interface CoreMenuRepository extends JpaRepository<CoreMenu, Long> {
+public interface DailyReportCoreMenuRepository extends JpaRepository<CoreMenu, Long> {
 
     /** 메뉴 코드로 조회 */
     Optional<CoreMenu> findByMenuCode(String menuCode);
