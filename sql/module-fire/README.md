@@ -33,6 +33,8 @@
 | `V31__add_facility_mobile_qr_workflows.sql` | 에어컨 점검 요청/QR 점검 및 정수기 QR 점검 모바일 업무 테이블 추가. 미등록 에어컨/정수기 QR은 로그인 후 모바일 등록 페이지에서 `facility_equipment.QR_KEY`에 연결해 사용. 모바일 QR 점검은 에어컨 점검자 이름+정상/비정상, 정수기 점검자 이름+완료/미완료만 입력하며 사진 업로드는 받지 않음. 구버전 에어컨 접수 컬럼(`REPORTER_PHONE`, `PHOTO_PATH`) 보정 포함 |
 | `V32__add_other_facility_admin_code_group.sql` | 기타시설관리 권한 공통코드 `OTHER_PERM/OTHER_ADMIN` 추가 |
 | `V33__add_facility_aircon_equipment_code.sql` | 에어컨 자동 ID(`EQUIPMENT_CODE`, `AC-000001` 형식) 추가. 기존 식별 No.(`SERIAL_NUMBER`)와 별도 관리하며, 정수기는 기존 `SERIAL_NUMBER` 기반 `WP-000001` 자동 생성 정책을 유지 |
+| `V37__migrate_fire_permission_to_user_codes.sql` | FIRE_PERM 레거시 CSV 권한을 사용자별 코드값으로 전환 |
+| `V38__migrate_other_permission_to_user_codes.sql` | OTHER_PERM 레거시 CSV 권한을 사용자별 코드값으로 전환 |
 
 ## 실행 순서
 
@@ -64,6 +66,8 @@
 25. V31__add_facility_mobile_qr_workflows.sql -- 기타설비 모바일 QR 업무 테이블 추가
 26. V32__add_other_facility_admin_code_group.sql -- 기타시설관리 권한 공통코드 추가
 27. V33__add_facility_aircon_equipment_code.sql -- 에어컨 자동 ID 추가
+28. V37__migrate_fire_permission_to_user_codes.sql -- 소방 권한 사용자 코드 전환
+29. V38__migrate_other_permission_to_user_codes.sql -- 기타시설관리 권한 사용자 코드 전환
 ```
 
 ## 사전 조건
@@ -109,6 +113,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V31__add_facility_mobile_qr_workflows.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V32__add_other_facility_admin_code_group.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V33__add_facility_aircon_equipment_code.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V37__migrate_fire_permission_to_user_codes.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V38__migrate_other_permission_to_user_codes.sql
 ```
 
 ## 테이블 구조
@@ -156,7 +162,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 
 ### 공통코드 권한
 - `FIRE_PERM`: 소방시설관리 권한자별 로그인 ID를 `code_detail.CODE`에 한 건씩 저장합니다. `CODE_NAME`은 사용자 표시명으로 관리하며 `EXTRA_VALUE1`은 사용하지 않습니다.
-- `OTHER_PERM/OTHER_ADMIN`: 기타시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 정수기 점검/이력 관리 및 에어컨 점검 요청 버튼과 API를 사용할 수 있습니다.
+- `OTHER_PERM`: 기타시설관리 권한자별 로그인 ID를 `code_detail.CODE`에 한 건씩 저장합니다. `CODE_NAME`은 사용자 표시명으로 관리하며 `EXTRA_VALUE1`은 사용하지 않습니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 정수기 점검/이력 관리 및 에어컨 점검 요청 버튼과 API를 사용할 수 있습니다.
 
 ### 건물 마스터 (10개)
 | ID | 건물명 |
