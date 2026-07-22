@@ -870,6 +870,9 @@ const API = (() => {
 
  // ===== 상태 =====
 let allItems = [];
+// 상태 버튼을 선택했을 때는 검색 조건에 맞는 전체 페이지 데이터를 보관한다.
+// 일반 목록은 기존처럼 현재 서버 페이지(200건)만 유지한다.
+let statusSourceItems = [];
 let allItemTotalCount = 0;
 const listPageSize = 200;
 let currentListPage = 0;
@@ -1033,18 +1036,50 @@ function updateExtModalFloorOptions(buildingId) {
 }
 
 // ===== 소화기목록 로드 =====
-async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = currentListPage) {
-  const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
-  const params = new URLSearchParams({ size: String(listPageSize), page: String(requestedPage) });
+async function fetchExtinguisherPage(q='', buildingId='', floorId='', pageNo = 0) {
+  const params = new URLSearchParams({ size: String(listPageSize), page: String(Math.max(0, pageNo)) });
   if (q) params.set('q', q);
   if (buildingId) params.set('buildingId', buildingId);
   if (floorId) params.set('floorId', floorId);
 
   const res = await API.req(`/fire-api/extinguishers?${params}`);
-  if (!res) return;
+  if (!res) throw new Error('목록 조회가 취소되었습니다.');
   const json = await res.json().catch(() => null);
-  if ((res.ok || json?.success) && json?.data) {
-    const pageData = json.data;
+  if (!res.ok || json?.success === false || !json?.data) {
+    throw new Error(json?.message || '소화기 목록을 불러오지 못했습니다.');
+  }
+  return json.data;
+}
+
+async function fetchAllExtinguisherItems(q='', buildingId='', floorId='') {
+  const firstPage = await fetchExtinguisherPage(q, buildingId, floorId, 0);
+  const totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
+      fetchExtinguisherPage(q, buildingId, floorId, index + 1))
+  );
+  return [firstPage, ...remainingPages].flatMap(page =>
+    Array.isArray(page.content) ? page.content : []);
+}
+
+function renderGlobalStatusPage(pageNo = 0) {
+  const matchedItems = getStatusFilteredItems(statusSourceItems);
+  listTotalElements = matchedItems.length;
+  allItemTotalCount = matchedItems.length;
+  listTotalPages = Math.max(1, Math.ceil(matchedItems.length / listPageSize));
+  currentListPage = Math.min(Math.max(0, pageNo), listTotalPages - 1);
+  const start = currentListPage * listPageSize;
+  allItems = matchedItems.slice(start, start + listPageSize);
+  renderTable(allItems);
+  updateBucketCounts(statusSourceItems);
+  syncStatusButtons();
+}
+
+async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = currentListPage) {
+  const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
+  try {
+    const pageData = await fetchExtinguisherPage(q, buildingId, floorId, requestedPage);
+    if (pageData) {
     const totalElements = Number(pageData.totalElements);
     const totalPages = Number(pageData.totalPages);
     const pageContent = Array.isArray(pageData.content) ? pageData.content.slice() : [];
@@ -1063,7 +1098,9 @@ async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = curre
     currentListPage = Math.min(requestedPage, listTotalPages - 1);
     allItems = pageContent;
     allItemTotalCount = listTotalElements;
-  } else {
+    }
+  } catch (error) {
+    console.error('소화기 목록 조회 실패', error);
     allItems = [];
     allItemTotalCount = 0;
     listTotalElements = 0;
@@ -1079,6 +1116,16 @@ async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = curre
   if (floorId && filterFloor && Array.from(filterFloor.options).some(option => option.value === String(floorId))) {
     filterFloor.value = String(floorId);
   }
+  if (currentStatusType) {
+    try {
+      statusSourceItems = await fetchAllExtinguisherItems(q, buildingId, floorId);
+      renderGlobalStatusPage(0);
+      return;
+    } catch (error) {
+      showToast(error.message || '전체 상태 목록을 불러오지 못했습니다.', 'danger');
+    }
+  }
+  statusSourceItems = [];
   renderTable(getStatusFilteredItems(allItems));
   updateBucketCounts();
   syncStatusButtons();
@@ -1108,8 +1155,8 @@ function calcBuckets(items) {
   return { inspectCount, plannedCount, urgentCount };
 }
 
-function updateBucketCounts() {
-  const { inspectCount, plannedCount, urgentCount } = calcBuckets(allItems);
+function updateBucketCounts(items = allItems) {
+  const { inspectCount, plannedCount, urgentCount } = calcBuckets(items);
   document.getElementById('totalCount').textContent = allItemTotalCount;
   document.getElementById('countInspect').textContent = `(${inspectCount})`;
   document.getElementById('countPlanned').textContent = `(${plannedCount})`;
@@ -1196,7 +1243,7 @@ function renderListPagination(visibleCount) {
   const currentPage = Math.min(Math.max(0, currentListPage), totalPages - 1);
   const startNo = total > 0 ? currentPage * listPageSize + 1 : 0;
   const endNo = total > 0 ? Math.min(total, currentPage * listPageSize + allItems.length) : 0;
-  const statusNote = currentStatusType ? ` · 현재 페이지 필터 ${visibleCount}건` : '';
+  const statusNote = currentStatusType ? ` · 전체 목록 상태 필터 ${visibleCount}건` : '';
   const pageButtons = [];
   const addPageButton = (page) => {
     pageButtons.push(`<button type="button" class="btn btn-sm ${page === currentPage ? 'btn-primary' : 'btn-outline-secondary'} js-list-page" data-page="${page}" ${page === currentPage ? 'aria-current="page"' : ''}>${page + 1}</button>`);
@@ -1329,12 +1376,29 @@ function syncStatusButtons() {
   });
 }
 
-function applyStatusFilter(type) {
+async function applyStatusFilter(type) {
   currentStatusType = currentStatusType === type ? null : type;
   const panelEl = document.getElementById('statusPanel');
   if (panelEl?.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(panelEl).hide();
-  renderTable(getStatusFilteredItems(allItems));
-  syncStatusButtons();
+
+  const q = document.getElementById('filterQ')?.value || '';
+  const buildingId = document.getElementById('filterBuildingId')?.value || '';
+  const floorId = document.getElementById('filterFloorId')?.value || '';
+  if (!currentStatusType) {
+    statusSourceItems = [];
+    await loadExtinguishers(q, buildingId, floorId, 0);
+    return;
+  }
+
+  document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-muted py-4">전체 페이지의 상태 설비를 조회하는 중...</div>';
+  try {
+    statusSourceItems = await fetchAllExtinguisherItems(q, buildingId, floorId);
+    renderGlobalStatusPage(0);
+  } catch (error) {
+    statusSourceItems = [];
+    showToast(error.message || '전체 상태 목록을 불러오지 못했습니다.', 'danger');
+    await loadExtinguishers(q, buildingId, floorId, 0);
+  }
 }
 
 function renderStatusPanel(type) {
@@ -2710,12 +2774,16 @@ document.addEventListener('click', async (ev) => {
     if (pageBtn.disabled) return;
     const page = Number.parseInt(pageBtn.getAttribute('data-page') || '0', 10);
     if (!Number.isFinite(page) || page < 0 || page >= listTotalPages || page === currentListPage) return;
-    await loadExtinguishers(
-      document.getElementById('filterQ')?.value || '',
-      document.getElementById('filterBuildingId')?.value || '',
-      document.getElementById('filterFloorId')?.value || '',
-      page
-    );
+    if (currentStatusType) {
+      renderGlobalStatusPage(page);
+    } else {
+      await loadExtinguishers(
+        document.getElementById('filterQ')?.value || '',
+        document.getElementById('filterBuildingId')?.value || '',
+        document.getElementById('filterFloorId')?.value || '',
+        page
+      );
+    }
     return;
   }
 
@@ -2811,9 +2879,9 @@ document.getElementById('btnReset')?.addEventListener('click', () => {
   syncStatusButtons();
   loadExtinguishers('', '', '', 0);
 });
-document.getElementById('btnStatusInspect')?.addEventListener('click', () => applyStatusFilter('inspect'));
-document.getElementById('btnStatusPlanned')?.addEventListener('click', () => applyStatusFilter('planned'));
-document.getElementById('btnStatusUrgent')?.addEventListener('click', () => applyStatusFilter('urgent'));
+document.getElementById('btnStatusInspect')?.addEventListener('click', () => { void applyStatusFilter('inspect'); });
+document.getElementById('btnStatusPlanned')?.addEventListener('click', () => { void applyStatusFilter('planned'); });
+document.getElementById('btnStatusUrgent')?.addEventListener('click', () => { void applyStatusFilter('urgent'); });
 document.getElementById('btnExtAdd')?.addEventListener('click', () => window.openExtinguisherUpsertModal({ id: 0 }));
 
 // ===== 엑셀 다운로드 =====
