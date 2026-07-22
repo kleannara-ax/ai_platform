@@ -825,23 +825,72 @@ const server = http.createServer((req, res) => {
           });
         }
 
-        // 셀 seed 데이터 (02_seed_data.sql 기반)
-        var tbl1Cells = [
+        // ── 롤링 월 계산: reportDate 기준 직근 8개월 ──
+        // 예) 2026-07 → 2025-12 ~ 2026-07, 2026-08 → 2026-01 ~ 2026-08
+        //     2027-01 → 2026-06 ~ 2027-01
+        var rdParts = reportDate.split('-');
+        var rdYear = parseInt(rdParts[0], 10);
+        var rdMonth = parseInt(rdParts[1], 10); // 1~12
+        var rollingMonths = []; // [{year, month}] × 8
+        for (var mi = 7; mi >= 0; mi--) {
+          var m = rdMonth - mi;
+          var y = rdYear;
+          while (m <= 0) { m += 12; y--; }
+          rollingMonths.push({ year: y, month: m });
+        }
+        // 연도별 그룹핑 (Row 0 대 헤더용)
+        var yearGroups = [];
+        var prevYr = null;
+        for (var ri = 0; ri < rollingMonths.length; ri++) {
+          var rm = rollingMonths[ri];
+          if (rm.year !== prevYr) {
+            yearGroups.push({ year: rm.year, startCol: 6 + ri, count: 1 });
+            prevYr = rm.year;
+          } else {
+            yearGroups[yearGroups.length - 1].count++;
+          }
+        }
+        // 전전년도/전년도 계산 (고정 헤더용)
+        var prevYear2 = rollingMonths[0].year - 2; // '24년 월평균의 연도
+        var prevYear1 = rollingMonths[0].year - 1; // '25년 월평균의 연도
+        // 첫 번째 롤링월의 연도가 현재연도보다 작으면 전전년=첫롤링연도-1
+        // 단순화: 현재 reportDate 연도 기준
+        prevYear2 = rdYear - 2;
+        prevYear1 = rdYear - 1;
+
+        // 엑셀 컬럼 문자 (colIndex → A,B,...,P,Q...)
+        var excelCols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+        // Row 0~1 헤더 동적 생성
+        var tbl1Headers = [
           {rowIndex:0,colIndex:0,excelCoord:'B5',cellValue:'생산지표',cellType:'HEADER',rowSpan:2,colSpan:3,isLocked:1},
           {rowIndex:0,colIndex:3,excelCoord:'E5',cellValue:'최종\n목표',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
-          {rowIndex:0,colIndex:4,excelCoord:'F5',cellValue:"'24년\n월평균",cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
-          {rowIndex:0,colIndex:5,excelCoord:'G5',cellValue:"'25년\n월평균",cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
-          {rowIndex:0,colIndex:6,excelCoord:'H5',cellValue:"'25년",cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:0,colIndex:7,excelCoord:'I5',cellValue:"'26년",cellType:'HEADER',rowSpan:1,colSpan:7,isLocked:1},
-          {rowIndex:0,colIndex:14,excelCoord:'P5',cellValue:'비고 사항',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:6,excelCoord:'H6',cellValue:'12월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:7,excelCoord:'I6',cellValue:'1월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:8,excelCoord:'J6',cellValue:'2월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:9,excelCoord:'K6',cellValue:'3월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:10,excelCoord:'L6',cellValue:'4월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:11,excelCoord:'M6',cellValue:'5월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:12,excelCoord:'N6',cellValue:'6월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
-          {rowIndex:1,colIndex:13,excelCoord:'O6',cellValue:'7월',cellType:'HEADER',rowSpan:1,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:4,excelCoord:'F5',cellValue:"'" + String(prevYear2).slice(2) + "년\n월평균",cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+          {rowIndex:0,colIndex:5,excelCoord:'G5',cellValue:"'" + String(prevYear1).slice(2) + "년\n월평균",cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1},
+        ];
+        // 연도 대 헤더 (Row 0, colIndex 6+)
+        yearGroups.forEach(function(yg) {
+          tbl1Headers.push({
+            rowIndex:0, colIndex:yg.startCol,
+            excelCoord: excelCols[yg.startCol + 1] + '5',
+            cellValue: "'" + String(yg.year).slice(2) + "년",
+            cellType:'HEADER', rowSpan:1, colSpan:yg.count, isLocked:1
+          });
+        });
+        // 비고 사항 (항상 마지막 = colIndex 14)
+        tbl1Headers.push({rowIndex:0,colIndex:14,excelCoord:'P5',cellValue:'비고 사항',cellType:'HEADER',rowSpan:2,colSpan:1,isLocked:1});
+        // 월 소 헤더 (Row 1, colIndex 6~13)
+        rollingMonths.forEach(function(rm, idx) {
+          tbl1Headers.push({
+            rowIndex:1, colIndex: 6 + idx,
+            excelCoord: excelCols[6 + idx + 1] + '6',
+            cellValue: rm.month + '월',
+            cellType:'HEADER', rowSpan:1, colSpan:1, isLocked:1
+          });
+        });
+
+        // 셀 seed 데이터 — 데이터 행(Row 2~9)은 기존 하드코딩 유지
+        var tbl1Cells = tbl1Headers.concat([
           {rowIndex:2,colIndex:0,excelCoord:'B7',cellValue:'제지3 평균선속(m/분)',cellType:'READONLY',rowSpan:1,colSpan:3,isLocked:1},
           {rowIndex:2,colIndex:3,excelCoord:'E7',cellValue:'640',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
           {rowIndex:2,colIndex:4,excelCoord:'F7',cellValue:'583.5',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
@@ -949,7 +998,7 @@ const server = http.createServer((req, res) => {
           {rowIndex:9,colIndex:12,excelCoord:'N14',cellValue:'62',cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
           {rowIndex:9,colIndex:13,excelCoord:'O14',cellValue:'',cellType:'DATA',freqCode:'event',freqLabel:'발생 시',ownerIds:'jung',ownerNames:'정상엽 책임',isLocked:0,rowSpan:1,colSpan:1},
           {rowIndex:9,colIndex:14,excelCoord:'P14',cellValue:null,cellType:'READONLY',rowSpan:1,colSpan:1,isLocked:1},
-        ];
+        ]);
 
         // TBL_INVENTORY abbreviated (key rows)
         var tbl2Cells = [

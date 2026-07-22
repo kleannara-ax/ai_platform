@@ -72,7 +72,7 @@ public class DailyReportService {
                     if (cellsMissing) {
                         for (DailyReportTable table : report.getTables()) {
                             if (table.getCells().isEmpty()) {
-                                DefaultCellTemplate.populateDefaultCells(table);
+                                DefaultCellTemplate.populateDefaultCells(table, reportDate);
                             }
                         }
                     }
@@ -337,7 +337,7 @@ public class DailyReportService {
             report.addTable(table);
 
             // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
-            DefaultCellTemplate.populateDefaultCells(table);
+            DefaultCellTemplate.populateDefaultCells(table, report.getReportDate());
         }
     }
 

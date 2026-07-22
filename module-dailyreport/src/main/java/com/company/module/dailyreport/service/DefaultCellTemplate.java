@@ -3,7 +3,12 @@ package com.company.module.dailyreport.service;
 import com.company.module.dailyreport.entity.DailyReportCell;
 import com.company.module.dailyreport.entity.DailyReportTable;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 기본 셀 템플릿 — 일보 자동 생성 시 4개 표의 HEADER/READONLY/DATA 셀을 구성한다.
@@ -20,11 +25,13 @@ public final class DefaultCellTemplate {
 
     /**
      * 테이블 코드에 맞는 기본 셀을 생성하여 table 엔티티에 추가한다.
+     * @param table 대상 테이블 엔티티
+     * @param reportDate 일보 날짜 (헤더 롤링 월 계산용)
      */
-    public static void populateDefaultCells(DailyReportTable table) {
+    public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate) {
         String code = table.getTableCode();
         switch (code) {
-            case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table);
+            case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table, reportDate);
             case "TBL_INVENTORY"        -> addInventoryCells(table);
             case "TBL_ENERGY"           -> addEnergyCells(table);
             case "TBL_BOILER"           -> addBoilerCells(table);
@@ -32,31 +39,65 @@ public final class DefaultCellTemplate {
         }
     }
 
+    /** 하위 호환용 (reportDate 없이 호출 시 오늘 날짜 기준) */
+    public static void populateDefaultCells(DailyReportTable table) {
+        populateDefaultCells(table, LocalDate.now());
+    }
+
     // ═══════════════════════════════════════════════
     //  1. 주요 생산 지표 현황  (10행 × 15열)
     // ═══════════════════════════════════════════════
-    private static void addProductionIndexCells(DailyReportTable t) {
-        // ── Row 0: 대 헤더 ──
+    private static void addProductionIndexCells(DailyReportTable t, LocalDate reportDate) {
+        // ── 롤링 월 계산: reportDate 기준 직근 8개월 ──
+        // 예) 2026-07 → 2025-12 ~ 2026-07
+        //     2026-08 → 2026-01 ~ 2026-08
+        //     2027-01 → 2026-06 ~ 2027-01
+        YearMonth current = YearMonth.from(reportDate);
+        List<YearMonth> rolling = new ArrayList<>();
+        for (int i = 7; i >= 0; i--) {
+            rolling.add(current.minusMonths(i));
+        }
+
+        // 연도별 그룹핑 (Row 0 대 헤더의 colspan 계산용)
+        // LinkedHashMap으로 순서 보장
+        Map<Integer, int[]> yearGroups = new LinkedHashMap<>(); // year → [startCol, count]
+        for (int i = 0; i < rolling.size(); i++) {
+            int yr = rolling.get(i).getYear();
+            yearGroups.computeIfAbsent(yr, k -> new int[]{6 + i, 0});
+            yearGroups.get(yr)[1]++;
+        }
+
+        int prevYear2 = reportDate.getYear() - 2; // '24년 월평균
+        int prevYear1 = reportDate.getYear() - 1; // '25년 월평균
+        String excelCols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        // ── Row 0: 대 헤더 (고정부) ──
         h(t, 0, 0, "B5",  "생산지표",       2, 3);
         h(t, 0, 3, "E5",  "최종",           1, 1);
-        h(t, 0, 4, "F5",  "'24년",          1, 1);
-        h(t, 0, 5, "G5",  "'25년",          1, 1);
-        h(t, 0, 6, "H5",  "'25년",          1, 1);
-        h(t, 0, 7, "I5",  "'26년",          1, 7);
-        h(t, 0,14, "P5",  "비고 사항",       2, 1);
+        h(t, 0, 4, "F5",  "'" + String.valueOf(prevYear2).substring(2) + "년", 1, 1);
+        h(t, 0, 5, "G5",  "'" + String.valueOf(prevYear1).substring(2) + "년", 1, 1);
 
-        // ── Row 1: 소 헤더 ──
+        // ── Row 0: 대 헤더 (롤링 연도 그룹) ──
+        for (Map.Entry<Integer, int[]> entry : yearGroups.entrySet()) {
+            int yr = entry.getKey();
+            int startCol = entry.getValue()[0];
+            int count = entry.getValue()[1];
+            String coord = String.valueOf(excelCols.charAt(startCol + 1)) + "5";
+            h(t, 0, startCol, coord, "'" + String.valueOf(yr).substring(2) + "년", 1, count);
+        }
+        h(t, 0, 14, "P5", "비고 사항", 2, 1);
+
+        // ── Row 1: 소 헤더 (고정부) ──
         h(t, 1, 3, "E6",  "목표",    1, 1);
         h(t, 1, 4, "F6",  "월평균",  1, 1);
         h(t, 1, 5, "G6",  "월평균",  1, 1);
-        h(t, 1, 6, "H6",  "12월",   1, 1);
-        h(t, 1, 7, "I6",  "1월",    1, 1);
-        h(t, 1, 8, "J6",  "2월",    1, 1);
-        h(t, 1, 9, "K6",  "3월",    1, 1);
-        h(t, 1,10, "L6",  "4월",    1, 1);
-        h(t, 1,11, "M6",  "5월",    1, 1);
-        h(t, 1,12, "N6",  "6월",    1, 1);
-        h(t, 1,13, "O6",  "7월",    1, 1);
+
+        // ── Row 1: 소 헤더 (롤링 월) ──
+        for (int i = 0; i < rolling.size(); i++) {
+            int colIdx = 6 + i;
+            String coord = String.valueOf(excelCols.charAt(colIdx + 1)) + "6";
+            h(t, 1, colIdx, coord, rolling.get(i).getMonthValue() + "월", 1, 1);
+        }
 
         // ── Row 2: 제지3 평균선속 ──
         ro(t, 2, 0, "B7",  "제지3 평균선속(m/분)", 1, 3);
