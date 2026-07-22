@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  *
  * 읽기 전용 참조 목적 — 권한 부여/수정은 AI 플랫폼의 기존 접근 권한 페이지에서 관리
  */
-@Entity
+@Entity(name = "DrCoreMenuPermission")
 @Table(name = "core_menu_permission", uniqueConstraints = {
         @UniqueConstraint(name = "UK_MENU_PERM_USER_MENU",
                 columnNames = {"USER_ID", "MENU_ID"})

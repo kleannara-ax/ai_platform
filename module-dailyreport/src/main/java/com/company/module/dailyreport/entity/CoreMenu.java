@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  *     ├─ 세부공장일보 입력 (PAGE, MENU_ID=101)
  *     └─ 세부공장일보 접근권한 (PAGE, MENU_ID=102)
  */
-@Entity
+@Entity(name = "DrCoreMenu")
 @Table(name = "core_menu")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
