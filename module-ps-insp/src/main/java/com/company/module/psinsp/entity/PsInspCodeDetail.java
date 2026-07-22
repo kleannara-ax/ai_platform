@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * </ul>
  * <p>PS_INSP_AUTH 그룹 하위 코드:
  * <ul>
- *   <li>PPM_ADMIN    - extraValue1: 수정 권한자 ID 목록 (콤마 구분)</li>
+ *   <li>사용자 로그인 ID - 활성 CODE 한 건이 PPM 기준값 수정 권한자 한 명을 의미</li>
  * </ul>
  */
 @Entity
