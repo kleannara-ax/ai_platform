@@ -133,6 +133,9 @@ public class SecurityConfig {
                 .requestMatchers("/ps-insp-api/health").permitAll()
                 .requestMatchers("/ps-insp-api/page", "/ps-insp-api/page/**").permitAll()
                 .requestMatchers("/ps-insp/**").permitAll()
+                // 세부공장일보 모듈: 정적 리소스(iframe HTML/JS/CSS)만 공개
+                // API(/dailyreport-api/**)는 인증 필요
+                .requestMatchers("/dailyreport/**").permitAll()
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()
             )
