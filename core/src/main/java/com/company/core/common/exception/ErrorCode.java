@@ -18,6 +18,8 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C003", "허용되지 않은 HTTP 메서드입니다."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "C004", "요청한 리소스를 찾을 수 없습니다."),
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "타입이 올바르지 않습니다."),
+    INVALID_INPUT(HttpStatus.BAD_REQUEST, "C006", "잘못된 입력입니다."),
+    DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "C007", "이미 존재하는 리소스입니다."),
 
     // ── 인증 ──
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "A001", "인증에 실패했습니다."),
