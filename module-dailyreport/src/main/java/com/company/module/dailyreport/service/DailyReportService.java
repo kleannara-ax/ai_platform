@@ -62,7 +62,7 @@ public class DailyReportService {
      * 열었을 때 빈 일보가 자동으로 준비되어야 한다.
      */
     @Transactional
-    public DailyReportResponse getReportByDate(LocalDate reportDate) {
+    public DailyReportResponse getReportByDate(LocalDate reportDate, Long userId) {
         return reportRepository.findByReportDate(reportDate)
                 .map(DailyReportResponse::fromWithDetails)
                 .orElseGet(() -> {
@@ -71,7 +71,7 @@ public class DailyReportService {
                             .reportDate(reportDate)
                             .title(reportDate + " 세부공장일보")
                             .status("DRAFT")
-                            .createdBy(null)  // 시스템 자동 생성
+                            .createdBy(userId)
                             .build();
                     createDefaultTables(report);
                     reportRepository.save(report);

@@ -66,7 +66,7 @@ public class ViewRenderController {
                     "세부공장일보 입력 페이지에 대한 접근 권한이 없습니다.");
         }
 
-        DailyReportResponse report = reportService.getReportByDate(reportDate);
+        DailyReportResponse report = reportService.getReportByDate(reportDate, userId);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("report", report);

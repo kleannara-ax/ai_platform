@@ -57,8 +57,9 @@ public class DailyReportController {
      */
     @GetMapping("/by-date")
     public ResponseEntity<ApiResponse<DailyReportResponse>> getReportByDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ApiResponse.success(dailyReportService.getReportByDate(date)));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(dailyReportService.getReportByDate(date, userId)));
     }
 
     /**
