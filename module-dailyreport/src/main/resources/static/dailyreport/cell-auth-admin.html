@@ -339,7 +339,7 @@
         <div id="editSingleTableSection" style="display:none;">
           <div class="form-group">
             <label class="form-label" for="formTableCode">대상 표</label>
-            <select class="form-select" id="formTableCode" onchange="onTableCodeChange()" disabled>
+            <select class="form-select" id="formTableCode" onchange="onTableCodeChange()">
               <option value="">선택하세요</option>
               <option value="TBL_PRODUCTION_INDEX">주요 생산 지표 현황</option>
               <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
@@ -1116,17 +1116,22 @@
       document.getElementById('addedTablesSection').style.display = 'none';
       document.getElementById('editSingleTableSection').style.display = 'block';
 
-      // 수정 시 userId와 tableCode는 변경 불가 (UNIQUE 제약)
-      document.getElementById('userSearchInput').disabled = true;
+      // 사용자 검색: 활성 상태로 두되, 현재 사용자를 칩으로 표시
+      document.getElementById('userSearchInput').disabled = false;
       document.getElementById('userSearchInput').value = '';
       document.getElementById('userSearchClear').style.display = 'none';
+      document.getElementById('userSearchWrap').style.display = 'block';
       const editUser = platformUsers.find(u => u.userId === auth.userId);
       if (editUser) {
         document.getElementById('userSelectedChip').innerHTML = `
           <div class="user-selected-chip">
             <span>${escapeHtml(editUser.userName)} (${escapeHtml(editUser.loginId)})${editUser.department ? ' — ' + escapeHtml(editUser.department) : ''}</span>
+            <button class="chip-remove" type="button" onclick="deselectUser()">&times;</button>
           </div>`;
       }
+
+      // 대상 표도 변경 가능
+      document.getElementById('formTableCode').disabled = false;
 
       document.getElementById('modalOverlay').classList.add('active');
     }
