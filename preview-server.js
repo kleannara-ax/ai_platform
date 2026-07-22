@@ -798,7 +798,7 @@ const server = http.createServer((req, res) => {
         var userList = drUsers.map(function(u) {
           return { userId: u.userId, loginId: u.loginId, userName: u.userName, department: u.department, position: u.position };
         });
-        return jsonRes(res, userList);
+        return apiOk(res, userList);
       }
 
       // ── /view/render?reportDate=... ──
