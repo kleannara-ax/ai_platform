@@ -86,7 +86,7 @@ const mockMenus = [
   { menuId:100, menuCode:'DAILY_REPORT', menuName:'세부공장일보', menuType:'CATEGORY', menuUrl:null, icon:'clipboard-list', parentId:null, sortOrder:31, isActive:true, isVisible:true, allowedIps:null, description:'세부공장일보 카테고리',
     children: [
       { menuId:101, menuCode:'DAILY_REPORT_INPUT', menuName:'세부공장일보 입력', menuType:'PAGE', menuUrl:'/dailyreport/index.html', parentId:100, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 접근권한', menuType:'PAGE', menuUrl:'/dailyreport/cell-auth-admin.html', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 컬럼관리', menuType:'PAGE', menuUrl:'/dailyreport/cell-auth-admin.html', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
 ];

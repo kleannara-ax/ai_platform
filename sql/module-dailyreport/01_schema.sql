@@ -13,7 +13,7 @@
 --   v3.0 (현재): AI 플랫폼 통합 — 3계층 권한 체계
 --     - 1계층: core_menu_permission → '세부공장일보 입력' 페이지 접근 권한
 --     - 2계층: daily_report_cell_auth → 셀 단위 입력 권한 (관리자 설정)
---     - 3계층: core_menu_permission → '세부공장일보 접근권한' 관리 페이지 접근 권한
+--     - 3계층: core_menu_permission → '세부공장일보 컬럼관리' 관리 페이지 접근 권한
 --     ※ 레거시 daily_report_cell_permission 제거 → daily_report_cell_auth로 대체
 -- ============================================================
 
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS daily_report_cell (
 
 -- ────────────────────────────────────────────
 -- 4. ★★ daily_report_cell_auth (신규) — 셀 단위 접근 권한
---    관리자가 '세부공장일보 접근권한' 페이지에서 설정
+--    관리자가 '세부공장일보 컬럼관리' 페이지에서 설정
 --    → OWNER_IDS / OWNER_NAMES와 동기화
 -- ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_report_cell_auth (

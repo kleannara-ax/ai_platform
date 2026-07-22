@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * 셀 접근 권한 관리 REST Controller (★ Phase 4 신규)
- * - '세부공장일보 접근권한' 페이지의 백엔드 API
+ * - '세부공장일보 컬럼관리' 페이지의 백엔드 API
  * - 관리자가 사용자별 담당 셀 좌표 / 입력 주기를 설정·수정·삭제
  * - 접근 권한: core_menu_permission에서 DAILY_REPORT_AUTH (MENU_ID=102) 확인
  *
@@ -134,7 +134,7 @@ public class CellAuthController {
     private void verifyAuthPageAccess(Long userId) {
         if (!menuPermissionService.canAccessAuthPage(userId)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
-                    "세부공장일보 접근권한 페이지에 대한 접근 권한이 없습니다.");
+                    "세부공장일보 컬럼관리 페이지에 대한 접근 권한이 없습니다.");
         }
     }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>세부공장일보 — 접근권한 관리</title>
+  <title>세부공장일보 — 컬럼관리</title>
   <style>
     :root {
       --bg:#eef2f7;
@@ -187,13 +187,13 @@
 <body>
 
   <!-- ═══════════════════════════════════════════════════
-       접근권한 관리 쉘
+       컬럼관리 쉘
   ═══════════════════════════════════════════════════ -->
   <section class="app-shell" id="appShell">
     <div class="topbar">
       <div>
-        <div class="topbar-title">세부공장일보 접근권한 관리</div>
-        <div class="topbar-subtitle">사용자별 셀 단위 입력 권한을 설정합니다 (관리자 전용)</div>
+        <div class="topbar-title">세부공장일보 컬럼관리</div>
+        <div class="topbar-subtitle">사용자별 컬럼 단위 입력 권한을 설정합니다 (관리자 전용)</div>
       </div>
       <div class="topbar-actions">
         <div class="user-chip" id="userChip">인증 확인중...</div>
@@ -213,7 +213,7 @@
       <!-- 권한 목록 카드 -->
       <div class="card">
         <div class="card-header">
-          <div class="card-header-title">셀 접근 권한 목록</div>
+          <div class="card-header-title">컬럼 권한 목록</div>
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <div class="filter-bar">
               <select class="form-select" id="filterTable" onchange="applyFilters()">
@@ -258,7 +258,7 @@
       <div class="no-access-icon">&#128274;</div>
       <div class="no-access-title">접근 권한이 없습니다</div>
       <div class="no-access-desc" id="noAccessDesc">
-        세부공장일보 접근권한 관리 페이지에 대한 권한이 없습니다.<br>
+        세부공장일보 컬럼관리 페이지에 대한 권한이 없습니다.<br>
         관리자에게 문의해 주세요.
       </div>
     </div>
@@ -270,7 +270,7 @@
   <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-title" id="modalTitle">셀 권한 등록</div>
+        <div class="modal-title" id="modalTitle">컬럼 권한 등록</div>
         <button class="modal-close" type="button" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-body">
@@ -384,7 +384,7 @@
       </div>
       <div class="modal-body">
         <p style="font-size:14px; line-height:1.6;">
-          이 셀 접근 권한을 <strong>영구 삭제</strong>하시겠습니까?<br>
+          이 컬럼 권한을 <strong>영구 삭제</strong>하시겠습니까?<br>
           <span style="color:var(--muted); font-size:13px;">비활성화를 권장합니다. 삭제하면 복구할 수 없습니다.</span>
         </p>
         <input type="hidden" id="deleteAuthId" value="" />
@@ -400,7 +400,7 @@
   <div class="toast" id="toast"></div>
 
   <!-- ═══════════════════════════════════════════════════
-       JavaScript — 셀 접근 권한 관리 (CRUD)
+       JavaScript — 컬럼 권한 관리 (CRUD)
   ═══════════════════════════════════════════════════ -->
   <script>
     const API_BASE = '/dailyreport-api';
@@ -609,7 +609,7 @@
           permissions: result.permissions || {}
         };
 
-        // 3계층: 세부공장일보 접근권한 페이지 접근 권한 확인
+        // 3계층: 세부공장일보 컬럼관리 페이지 접근 권한 확인
         if (!currentUser.permissions.canAccessAuth) {
           showNoAccessPage();
           return;
@@ -1011,7 +1011,7 @@
       const tbody = document.getElementById('authTableBody');
 
       if (filteredAuths.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">등록된 셀 권한이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">등록된 컬럼 권한이 없습니다.</td></tr>';
         return;
       }
 
@@ -1058,7 +1058,7 @@
 
     function openCreateModal() {
       isCreateMode = true;
-      document.getElementById('modalTitle').textContent = '셀 권한 등록';
+      document.getElementById('modalTitle').textContent = '컬럼 권한 등록';
       document.getElementById('modalSubmitBtn').textContent = '등록';
       document.getElementById('editAuthId').value = '';
 
@@ -1094,7 +1094,7 @@
       if (!auth) return;
 
       isCreateMode = false;
-      document.getElementById('modalTitle').textContent = '셀 권한 수정';
+      document.getElementById('modalTitle').textContent = '컬럼 권한 수정';
       document.getElementById('modalSubmitBtn').textContent = '수정';
       document.getElementById('editAuthId').value = authId;
 

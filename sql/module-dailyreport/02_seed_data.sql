@@ -36,12 +36,12 @@ INSERT IGNORE INTO core_user (USER_ID, LOGIN_ID, USER_NAME, PASSWORD, EMAIL, DEP
 
 -- ═══════════════════════════════════════════════
 -- 1. ★★ core_menu — AI 플랫폼 메뉴 계층
---    세부공장일보(CATEGORY) → 세부공장일보 입력(PAGE) + 세부공장일보 접근권한(PAGE)
+--    세부공장일보(CATEGORY) → 세부공장일보 입력(PAGE) + 세부공장일보 컬럼관리(PAGE)
 -- ═══════════════════════════════════════════════
 INSERT IGNORE INTO core_menu (MENU_ID, PARENT_MENU_ID, MENU_CODE, MENU_NAME, MENU_TYPE, MENU_URL, ICON, SORT_ORDER, DESCRIPTION, IS_ACTIVE) VALUES
     (100, NULL, 'DAILY_REPORT',       '세부공장일보',         'CATEGORY', NULL,                                  'fa-solid fa-clipboard-list', 10, '세부공장일보 카테고리', 1),
     (101, 100,  'DAILY_REPORT_INPUT',  '세부공장일보 입력',    'PAGE',     '/dailyreport/index.html',             'fa-solid fa-edit',           1,  '세부공장일보 데이터 입력 페이지', 1),
-    (102, 100,  'DAILY_REPORT_AUTH',   '세부공장일보 접근권한', 'PAGE',     '/dailyreport/cell-auth-admin.html',   'fa-solid fa-user-shield',    2,  '셀 단위 접근 권한 관리 페이지 (관리자용)', 1);
+    (102, 100,  'DAILY_REPORT_AUTH',   '세부공장일보 컬럼관리', 'PAGE',     '/dailyreport/cell-auth-admin.html',   'fa-solid fa-user-shield',    2,  '셀 단위 접근 권한 관리 페이지 (관리자용)', 1);
 
 
 -- ═══════════════════════════════════════════════
@@ -51,7 +51,7 @@ INSERT IGNORE INTO core_menu (MENU_ID, PARENT_MENU_ID, MENU_CODE, MENU_NAME, MEN
 --      → admin: READ + WRITE + ADMIN
 --      → 8명 현업: READ + WRITE (자기 셀만 입력, 셀 레벨 권한은 cell_auth에서 제어)
 --
---    [3계층] 세부공장일보 접근권한 (MENU_ID=102)
+--    [3계층] 세부공장일보 컬럼관리 (MENU_ID=102)
 --      → admin: READ + WRITE + ADMIN (관리자만 접근 가능)
 -- ═══════════════════════════════════════════════
 
@@ -67,7 +67,7 @@ INSERT IGNORE INTO core_menu_permission (USER_ID, MENU_ID, CAN_READ, CAN_WRITE, 
     (8, 101, 1, 1, 0, 0, 1),   -- choi:   읽기+쓰기
     (9, 101, 1, 1, 0, 0, 1);   -- energy: 읽기+쓰기
 
--- 3계층: 세부공장일보 접근권한 관리 페이지 접근 권한 (관리자만)
+-- 3계층: 세부공장일보 컬럼관리 관리 페이지 접근 권한 (관리자만)
 INSERT IGNORE INTO core_menu_permission (USER_ID, MENU_ID, CAN_READ, CAN_WRITE, CAN_DELETE, CAN_ADMIN, GRANTED_BY) VALUES
     (1, 102, 1, 1, 1, 1, 1);   -- admin: 접근권한 관리 페이지 전체 권한
 
@@ -76,7 +76,7 @@ INSERT IGNORE INTO core_menu_permission (USER_ID, MENU_ID, CAN_READ, CAN_WRITE, 
 -- 3. ★★ daily_report_cell_auth — 셀 단위 접근 권한
 --    (레거시 daily_report_cell_permission 대체)
 --
---    관리자가 '세부공장일보 접근권한' 페이지에서 설정
+--    관리자가 '세부공장일보 컬럼관리' 페이지에서 설정
 --    각 사용자별로 담당 표의 셀 좌표(JSON 배열)와 입력 주기를 지정
 --
 --    ※ CELL_COORDS는 해당 사용자가 입력 담당하는 셀의 엑셀 좌표 목록
@@ -86,7 +86,7 @@ INSERT IGNORE INTO core_menu_permission (USER_ID, MENU_ID, CAN_READ, CAN_WRITE, 
 -- ═══════════════════════════════════════════════
 
 -- ※ 운영 배포 초기: cell_auth 데이터 없음 (빈 상태)
--- ※ admin이 '세부공장일보 접근권한' 페이지에서 담당자를 직접 배정
+-- ※ admin이 '세부공장일보 컬럼관리' 페이지에서 담당자를 직접 배정
 -- ※ 배정 전까지 admin만 세부공장일보 접근 가능
 
 
