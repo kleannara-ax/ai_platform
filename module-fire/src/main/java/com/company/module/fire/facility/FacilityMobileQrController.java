@@ -46,8 +46,12 @@ public class FacilityMobileQrController {
     @GetMapping("/air-conditioners/by-key")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAirConditionerByKey(@RequestParam String key) {
-        FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_AIRCON, key);
+        FacilityEquipment equipment = findRegisteredByQrKeyOrNull(FacilityEquipmentService.CATEGORY_AIRCON, key);
+        if (equipment == null) {
+            return ResponseEntity.ok(ApiResponse.success(unregisteredQrResult(key)));
+        }
         Map<String, Object> result = equipmentDetail(equipment);
+        result.put("registered", true);
         result.put("recentFaultReports", airconFaultReportRepository
                 .findTop5ByEquipment_EquipmentIdOrderByCreatedAtDescReportIdDesc(equipment.getEquipmentId())
                 .stream()
@@ -64,8 +68,12 @@ public class FacilityMobileQrController {
     @GetMapping("/water-purifiers/by-key")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getWaterPurifierByKey(@RequestParam String key) {
-        FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, key);
+        FacilityEquipment equipment = findRegisteredByQrKeyOrNull(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, key);
+        if (equipment == null) {
+            return ResponseEntity.ok(ApiResponse.success(unregisteredQrResult(key)));
+        }
         Map<String, Object> result = equipmentDetail(equipment);
+        result.put("registered", true);
         result.put("recentDisinfections", waterDisinfectionRepository
                 .findTop5ByEquipment_EquipmentIdOrderByDisinfectionDateDescDisinfectionIdDesc(equipment.getEquipmentId())
                 .stream()
@@ -227,16 +235,34 @@ public class FacilityMobileQrController {
     }
 
     private FacilityEquipment findByQrKey(String category, String key) {
+        FacilityEquipment equipment = findRegisteredByQrKeyOrNull(category, key);
+        if (equipment == null) {
+            throw new IllegalArgumentException("QR에 연결된 설비를 찾을 수 없습니다.");
+        }
+        return equipment;
+    }
+
+    /**
+     * Resolves a QR key for a lookup endpoint. A missing row is a valid state for a newly issued
+     * facility QR, because unregistered keys are generated before the facility row is created.
+     */
+    private FacilityEquipment findRegisteredByQrKeyOrNull(String category, String key) {
         String qrKey = trimToNull(key);
         if (qrKey == null) {
             throw new IllegalArgumentException("QR 키가 비어 있습니다.");
         }
-        FacilityEquipment equipment = equipmentRepository.findByQrKey(qrKey)
-                .orElseThrow(() -> new IllegalArgumentException("QR에 연결된 설비를 찾을 수 없습니다."));
-        if (!category.equals(equipment.getCategory())) {
+        FacilityEquipment equipment = equipmentRepository.findByQrKey(qrKey).orElse(null);
+        if (equipment != null && !category.equals(equipment.getCategory())) {
             throw new IllegalArgumentException("QR 설비 유형이 일치하지 않습니다.");
         }
         return equipment;
+    }
+
+    private Map<String, Object> unregisteredQrResult(String key) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("registered", false);
+        result.put("qrKey", trimToNull(key));
+        return result;
     }
 
     private Map<String, Object> equipmentDetail(FacilityEquipment equipment) {
