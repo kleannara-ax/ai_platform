@@ -95,6 +95,27 @@
     .form-select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; appearance:auto; }
     .form-textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; resize:vertical; min-height:60px; font-family:inherit; }
 
+    /* ── 사용자 검색 콤보박스 ── */
+    .user-search-wrap { position:relative; }
+    .user-search-input { width:100%; padding:10px 12px; padding-right:36px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; outline:none; background:#fff; }
+    .user-search-input:focus { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    .user-search-input::placeholder { color:#94a3b8; }
+    .user-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; font-size:16px; color:#94a3b8; cursor:pointer; padding:2px 4px; line-height:1; display:none; }
+    .user-search-clear:hover { color:#475569; }
+    .user-search-dropdown { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 8px 24px rgba(15,23,42,.12); max-height:240px; overflow-y:auto; display:none; }
+    .user-search-dropdown.open { display:block; }
+    .user-search-item { padding:10px 14px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #f1f5f9; transition:background .1s; }
+    .user-search-item:last-child { border-bottom:none; }
+    .user-search-item:hover, .user-search-item.focused { background:#eff6ff; }
+    .user-search-item.selected { background:#dbeafe; }
+    .user-search-item .user-name { font-weight:700; color:#0f172a; }
+    .user-search-item .user-id { color:#64748b; font-size:11px; }
+    .user-search-item .user-dept { color:#94a3b8; font-size:11px; margin-left:auto; }
+    .user-search-empty { padding:16px; text-align:center; color:#94a3b8; font-size:13px; }
+    .user-selected-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:#eff6ff; border:1px solid #93c5fd; border-radius:10px; font-size:13px; font-weight:600; color:#1d4ed8; margin-top:8px; }
+    .user-selected-chip .chip-remove { background:none; border:none; color:#1d4ed8; cursor:pointer; font-size:16px; line-height:1; padding:0 2px; opacity:.6; }
+    .user-selected-chip .chip-remove:hover { opacity:1; }
+
     /* ── 좌표 입력 영역 (chip 스타일 유지 — 테이블에서 사용) ── */
     .coord-input-area { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; min-height:44px; cursor:text; }
     .coord-input-area:focus-within { border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
@@ -238,12 +259,17 @@
         <input type="hidden" id="editAuthId" value="" />
 
         <div class="form-group">
-          <label class="form-label" for="formUserId">사용자</label>
-          <select class="form-select" id="formUserId">
-            <option value="">선택하세요</option>
-            <!-- 사용자 목록은 loadUserList()로 동적 로드 -->
-          </select>
-          <div class="form-help">AI플랫폼에 등록된 사용자 중 선택합니다.</div>
+          <label class="form-label">사용자</label>
+          <input type="hidden" id="formUserId" value="" />
+          <div class="user-search-wrap" id="userSearchWrap">
+            <input type="text" class="user-search-input" id="userSearchInput"
+                   placeholder="이름, 아이디, 부서로 검색..."
+                   autocomplete="off" />
+            <button class="user-search-clear" id="userSearchClear" type="button" onclick="clearUserSearch()">&times;</button>
+            <div class="user-search-dropdown" id="userSearchDropdown"></div>
+          </div>
+          <div id="userSelectedChip"></div>
+          <div class="form-help">AI플랫폼에 등록된 사용자를 검색하여 선택합니다.</div>
         </div>
 
         <div class="form-group">
@@ -569,16 +595,137 @@
       }
     }
 
-    function populateUserDropdown() {
-      const sel = document.getElementById('formUserId');
-      // 기존 옵션 제거 (첫 번째 '선택하세요' 유지)
-      while (sel.options.length > 1) sel.remove(1);
-      platformUsers.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.userId;
-        opt.textContent = `${u.userName} (${u.loginId}) — ${u.department || ''}`;
-        sel.appendChild(opt);
+    // ═══════════════════════════════════════════════
+    //  사용자 검색 콤보박스
+    // ═══════════════════════════════════════════════
+
+    let userSearchFocusIdx = -1;
+
+    function initUserSearch() {
+      const input = document.getElementById('userSearchInput');
+      const dropdown = document.getElementById('userSearchDropdown');
+      const clearBtn = document.getElementById('userSearchClear');
+
+      input.addEventListener('input', () => {
+        userSearchFocusIdx = -1;
+        renderUserDropdown(input.value.trim());
+        clearBtn.style.display = input.value ? 'block' : 'none';
       });
+
+      input.addEventListener('focus', () => {
+        renderUserDropdown(input.value.trim());
+      });
+
+      input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.user-search-item');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          userSearchFocusIdx = Math.min(userSearchFocusIdx + 1, items.length - 1);
+          updateUserDropdownFocus(items);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          userSearchFocusIdx = Math.max(userSearchFocusIdx - 1, 0);
+          updateUserDropdownFocus(items);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (userSearchFocusIdx >= 0 && items[userSearchFocusIdx]) {
+            items[userSearchFocusIdx].click();
+          }
+        } else if (e.key === 'Escape') {
+          closeUserDropdown();
+          input.blur();
+        }
+      });
+
+      // 바깥 클릭 시 드롭다운 닫기
+      document.addEventListener('click', (e) => {
+        if (!document.getElementById('userSearchWrap').contains(e.target)) {
+          closeUserDropdown();
+        }
+      });
+    }
+
+    function renderUserDropdown(query) {
+      const dropdown = document.getElementById('userSearchDropdown');
+      const q = (query || '').toLowerCase();
+
+      const filtered = platformUsers.filter(u => {
+        if (!q) return true;
+        return (u.userName || '').toLowerCase().includes(q)
+            || (u.loginId || '').toLowerCase().includes(q)
+            || (u.department || '').toLowerCase().includes(q)
+            || (u.position || '').toLowerCase().includes(q);
+      });
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = `<div class="user-search-empty">${q ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}</div>`;
+      } else {
+        const selectedId = document.getElementById('formUserId').value;
+        dropdown.innerHTML = filtered.map((u, i) => {
+          const isSelected = String(u.userId) === String(selectedId);
+          return `<div class="user-search-item${isSelected ? ' selected' : ''}" data-index="${i}" data-user-id="${u.userId}" onclick="selectUser(${u.userId})">
+            <div>
+              <span class="user-name">${escapeHtml(u.userName)}</span>
+              <span class="user-id">(${escapeHtml(u.loginId)})</span>
+            </div>
+            <span class="user-dept">${escapeHtml(u.department || '')}${u.position ? ' · ' + escapeHtml(u.position) : ''}</span>
+          </div>`;
+        }).join('');
+      }
+
+      dropdown.classList.add('open');
+    }
+
+    function updateUserDropdownFocus(items) {
+      items.forEach((el, i) => {
+        el.classList.toggle('focused', i === userSearchFocusIdx);
+      });
+      if (items[userSearchFocusIdx]) {
+        items[userSearchFocusIdx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function selectUser(userId) {
+      const user = platformUsers.find(u => u.userId === userId);
+      if (!user) return;
+
+      document.getElementById('formUserId').value = userId;
+      document.getElementById('userSearchInput').value = '';
+      document.getElementById('userSearchClear').style.display = 'none';
+      closeUserDropdown();
+
+      // 선택된 사용자 chip 표시
+      document.getElementById('userSelectedChip').innerHTML = `
+        <div class="user-selected-chip">
+          <span>${escapeHtml(user.userName)} (${escapeHtml(user.loginId)})${user.department ? ' — ' + escapeHtml(user.department) : ''}</span>
+          <button class="chip-remove" type="button" onclick="deselectUser()">&times;</button>
+        </div>`;
+    }
+
+    function deselectUser() {
+      document.getElementById('formUserId').value = '';
+      document.getElementById('userSelectedChip').innerHTML = '';
+      document.getElementById('userSearchInput').focus();
+    }
+
+    function clearUserSearch() {
+      const input = document.getElementById('userSearchInput');
+      input.value = '';
+      document.getElementById('userSearchClear').style.display = 'none';
+      input.focus();
+      renderUserDropdown('');
+    }
+
+    function closeUserDropdown() {
+      document.getElementById('userSearchDropdown').classList.remove('open');
+      userSearchFocusIdx = -1;
+    }
+
+    /** 기존 드롭다운 호환 — 더 이상 <select> 없으므로 빈 함수 */
+    function populateUserDropdown() {
+      // 검색 콤보박스 사용: initUserSearch()에서 처리
     }
 
     // ═══════════════════════════════════════════════
@@ -745,7 +892,12 @@
       editCoords = [];
       renderCoordCheckboxes(''); // 빈 상태
 
-      document.getElementById('formUserId').disabled = false;
+      // 사용자 검색 초기화
+      document.getElementById('userSearchInput').value = '';
+      document.getElementById('userSearchInput').disabled = false;
+      document.getElementById('userSearchClear').style.display = 'none';
+      document.getElementById('userSelectedChip').innerHTML = '';
+      document.getElementById('userSearchWrap').style.display = 'block';
       document.getElementById('formTableCode').disabled = false;
 
       document.getElementById('modalOverlay').classList.add('active');
@@ -774,7 +926,17 @@
       restoreCoordCheckboxes();
 
       // 수정 시 userId와 tableCode는 변경 불가 (UNIQUE 제약)
-      document.getElementById('formUserId').disabled = true;
+      // 사용자 검색 비활성화 → 선택된 칩만 표시
+      document.getElementById('userSearchInput').disabled = true;
+      document.getElementById('userSearchInput').value = '';
+      document.getElementById('userSearchClear').style.display = 'none';
+      const editUser = platformUsers.find(u => u.userId === auth.userId);
+      if (editUser) {
+        document.getElementById('userSelectedChip').innerHTML = `
+          <div class="user-selected-chip">
+            <span>${escapeHtml(editUser.userName)} (${escapeHtml(editUser.loginId)})${editUser.department ? ' — ' + escapeHtml(editUser.department) : ''}</span>
+          </div>`;
+      }
       document.getElementById('formTableCode').disabled = true;
 
       document.getElementById('modalOverlay').classList.add('active');
@@ -889,6 +1051,7 @@
     // ═══════════════════════════════════════════════
 
     async function init() {
+      initUserSearch();
       await checkPermissionsAndInit();
     }
 
