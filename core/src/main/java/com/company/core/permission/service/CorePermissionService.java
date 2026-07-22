@@ -20,8 +20,9 @@ public class CorePermissionService {
 
     private final CorePermissionRepository permRepo;
     private final CoreRoleMenuRepository roleMenuRepo;
-    private final CoreRolePermissionRepository rolePermRepo;
     private final RoleProvider roleProvider;
+    // 권한 관리는 core_role_menu(역할-메뉴 매핑)로만 수행.
+    // core_role_permission 테이블/Entity는 미사용으로 제거됨.
 
     // ── 권한 CRUD ──
 
@@ -62,14 +63,12 @@ public class CorePermissionService {
     public RoleMappingResponse getRoleMapping(String role) {
         List<Long> menuIds = roleMenuRepo.findByRole(role).stream()
                 .map(CoreRoleMenu::getMenuId).collect(Collectors.toList());
-        List<Long> permIds = rolePermRepo.findByRole(role).stream()
-                .map(CoreRolePermission::getPermId).collect(Collectors.toList());
         // 공통코드 ROLE 그룹에서 역할 설명을 조회
         Map<String, String> roleNameMap = roleProvider.getRoleNameMap();
         String desc = roleNameMap.getOrDefault(role, role);
         return RoleMappingResponse.builder()
                 .role(role).roleDescription(desc)
-                .menuIds(menuIds).permissionIds(permIds).build();
+                .menuIds(menuIds).permissionIds(Collections.emptyList()).build();
     }
 
     /**
@@ -94,20 +93,9 @@ public class CorePermissionService {
     }
 
     @Transactional
-    public RoleMappingResponse updateRolePermissions(String role, List<Long> permIds) {
-        rolePermRepo.deleteByRole(role);
-        rolePermRepo.flush();
-        if (permIds != null) {
-            permIds.forEach(pid -> rolePermRepo.save(
-                    CoreRolePermission.builder().role(role).permId(pid).build()));
-        }
-        return getRoleMapping(role);
-    }
-
-    @Transactional
     public RoleMappingResponse updateRoleMapping(RoleMappingRequest req) {
         if (req.getMenuIds() != null) updateRoleMenus(req.getRole(), req.getMenuIds());
-        if (req.getPermissionIds() != null) updateRolePermissions(req.getRole(), req.getPermissionIds());
+        // permissionIds는 현재 미사용 (core_role_permission 테이블 없음)
         return getRoleMapping(req.getRole());
     }
 }
