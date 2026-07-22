@@ -845,7 +845,7 @@ let allItems = [];
 let currentStatusType = null;
 let currentSort = { key: 'serialNumber', direction: 'asc' };
 const canManage = API.canManage();
-// FIRE_ADMIN 아이디 기반 권한
+// FIRE_PERM의 활성 코드값을 로그인 ID와 1:1로 비교해 권한을 확인한다.
 let canEdit = false;
 async function loadFireAdminPermission() {
   try {
@@ -853,13 +853,10 @@ async function loadFireAdminPermission() {
     if (!u || !u.loginId) return;
     const res = await (await API.req('/common-api/codes/lookup/FIRE_PERM')).json();
     if (res.success && Array.isArray(res.data)) {
-      const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
-      if (fireAdmin && fireAdmin.extraValue1) {
-        const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
-        canEdit = ids.includes(u.loginId);
-      }
+      const loginId = String(u.loginId).trim().toLowerCase();
+      canEdit = res.data.some(d => String(d.code || '').trim().toLowerCase() === loginId);
     }
-  } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+  } catch(e) { console.warn('FIRE_PERM 사용자 코드 권한 조회 실패', e); }
 }
 const EMBED_MODAL_MODE = (() => {
   const qs = new URLSearchParams(window.location.search);
@@ -2654,13 +2651,13 @@ document.addEventListener('hydrant:inspectionCompleted', reload);
     document.head.appendChild(embedStyle);
   }
 
-  // FIRE_ADMIN 권한 로드
+  // FIRE_PERM 사용자 코드 권한 로드
   await loadFireAdminPermission();
 
   if(!canEdit){
     const addBtn=document.getElementById('btnHydAdd');
     if(addBtn) addBtn.style.display='none';
-    // QR코드 네비게이션 링크 숨김 (FIRE_ADMIN만 접근 가능)
+    // QR코드 네비게이션 링크 숨김 (FIRE_PERM 권한 사용자만 접근 가능)
     document.querySelectorAll('a[href*="/qr"]').forEach(el => {
       const li = el.closest('li.nav-item');
       if (li) li.style.display = 'none'; else el.style.display = 'none';

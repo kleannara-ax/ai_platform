@@ -155,7 +155,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 - ID: `admin` / PW: `admin1234` / 역할: `ADMIN`
 
 ### 공통코드 권한
-- `FIRE_PERM/FIRE_ADMIN`: 소방시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다.
+- `FIRE_PERM`: 소방시설관리 권한자별 로그인 ID를 `code_detail.CODE`에 한 건씩 저장합니다. `CODE_NAME`은 사용자 표시명으로 관리하며 `EXTRA_VALUE1`은 사용하지 않습니다.
 - `OTHER_PERM/OTHER_ADMIN`: 기타시설관리 권한자 ID 목록을 `code_detail.EXTRA_VALUE1`에 콤마 구분으로 저장합니다. 해당 ID만 에어컨/정수기 추가, 삭제, 이동/좌표 변경, QR 확인, 정수기 점검/이력 관리 및 에어컨 점검 요청 버튼과 API를 사용할 수 있습니다.
 
 ### 건물 마스터 (10개)

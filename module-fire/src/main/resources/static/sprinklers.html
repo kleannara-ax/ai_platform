@@ -226,9 +226,9 @@ async function loadFireAdminPermission() {
     const u = API.getUser(); if (!u || !u.loginId) return;
     const res = await API.req('/common-api/codes/lookup/FIRE_PERM');
     const data = await jsonOrThrow(res);
-    const fireAdmin = Array.isArray(data) ? data.find(d => d.code === 'FIRE_ADMIN') : null;
-    if (fireAdmin?.extraValue1) canEdit = fireAdmin.extraValue1.split(',').map(s => s.trim()).includes(u.loginId);
-  } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+    const loginId = String(u.loginId).trim().toLowerCase();
+    canEdit = Array.isArray(data) && data.some(d => String(d.code || '').trim().toLowerCase() === loginId);
+  } catch(e) { console.warn('FIRE_PERM 사용자 코드 권한 조회 실패', e); }
 }
 async function loadBuildingOptions() {
   try {
