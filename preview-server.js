@@ -1151,6 +1151,9 @@ const server = http.createServer((req, res) => {
         if(auth){
           Object.assign(auth, jsonBody);
           auth.cellCoords = typeof auth.cellCoords === 'object' ? JSON.stringify(auth.cellCoords) : auth.cellCoords;
+          // userId 변경 시 loginId/userName 갱신
+          var usr = drUsers.find(function(u){return u.userId===auth.userId;});
+          if(usr){auth.loginId=usr.loginId;auth.userName=usr.userName;}
           return jsonRes(res, { data: auth });
         }
         return apiErr(res, 'Not found', 404);
