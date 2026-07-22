@@ -81,12 +81,12 @@ const mockMenus = [
     ]
   },
   // ── PS 지분 검사 (03_menu_data + 04_rename_menu 반영) ──
-  { menuId:7, menuCode:'PS_INSP_MGMT', menuName:'PS 지분 검사', menuType:'MENU', menuUrl:'/ps-insp-api/page', icon:'ps_insp', parentId:null, sortOrder:30, isActive:true, isVisible:true, allowedIps:null, description:'PS 지분 검사 (점보롤 지분 검사)', children:[] },
+  { menuId:7, menuCode:'PS_INSP_MGMT', menuName:'PS 지분 검사', menuType:'MENU', menuUrl:'/ps-insp/page', icon:'ps_insp', parentId:null, sortOrder:30, isActive:true, isVisible:true, allowedIps:null, description:'PS 지분 검사 (점보롤 지분 검사)', children:[] },
   // ── 세부공장일보 ──
   { menuId:100, menuCode:'DAILY_REPORT', menuName:'세부공장일보', menuType:'CATEGORY', menuUrl:null, icon:'clipboard-list', parentId:null, sortOrder:31, isActive:true, isVisible:true, allowedIps:null, description:'세부공장일보 카테고리',
     children: [
-      { menuId:101, menuCode:'DAILY_REPORT_INPUT', menuName:'세부공장일보 입력', menuType:'PAGE', menuUrl:'/dailyreport-api/page', parentId:100, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
-      { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 컬럼관리', menuType:'PAGE', menuUrl:'/dailyreport-api/page/column-mgmt', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:101, menuCode:'DAILY_REPORT_INPUT', menuName:'세부공장일보 입력', menuType:'PAGE', menuUrl:'/dailyreport/page', parentId:100, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 컬럼관리', menuType:'PAGE', menuUrl:'/dailyreport/page/column-mgmt', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
 ];
@@ -629,19 +629,19 @@ const server = http.createServer((req, res) => {
       return apiOk(res, { content: [], totalElements: 7 });
     }
 
+    // ── PS-INSP Page (clean URL → Thymeleaf template) ──
+    if (pathname === '/ps-insp/page') {
+      const tplPath = path.join(TEMPLATE_DIR, 'ps-insp/index.html');
+      if (fs.existsSync(tplPath)) {
+        let html = fs.readFileSync(tplPath, 'utf8');
+        html = html.replace(/\s+th:[a-z-]+="[^"]*"/g, '');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(html);
+      }
+    }
+
     // PS-INSP API — complete mock endpoints
     if (pathname.startsWith('/ps-insp-api/')) {
-
-      // ── PS-INSP Page (Thymeleaf template served as static HTML) ──
-      if (pathname === '/ps-insp-api/page') {
-        const tplPath = path.join(TEMPLATE_DIR, 'ps-insp/index.html');
-        if (fs.existsSync(tplPath)) {
-          let html = fs.readFileSync(tplPath, 'utf8');
-          html = html.replace(/\s+th:[a-z-]+="[^"]*"/g, '');
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          return res.end(html);
-        }
-      }
 
       // ── Health ──
       if (pathname === '/ps-insp-api/health') {
@@ -727,17 +727,17 @@ const server = http.createServer((req, res) => {
     // ══════════════════════════════════════════
     //  세부공장일보 Mock API (dailyreport-api)
     // ══════════════════════════════════════════
-    if (pathname.startsWith('/dailyreport-api/')) {
+    // ── 세부공장일보 페이지 라우팅 (clean URL → 실제 HTML) ──
+    if (pathname === '/dailyreport/page') {
+      var drPagePath = path.join(__dirname, 'module-dailyreport/src/main/resources/static/dailyreport/index.html');
+      if (serveFile(drPagePath, res)) return;
+    }
+    if (pathname === '/dailyreport/page/column-mgmt') {
+      var drColMgmtPath = path.join(__dirname, 'module-dailyreport/src/main/resources/static/dailyreport/cell-auth-admin.html');
+      if (serveFile(drColMgmtPath, res)) return;
+    }
 
-      // ── 세부공장일보 페이지 라우팅 (clean URL → 실제 HTML) ──
-      if (pathname === '/dailyreport-api/page') {
-        var drPagePath = path.join(__dirname, 'module-dailyreport/src/main/resources/static/dailyreport/index.html');
-        if (serveFile(drPagePath, res)) return;
-      }
-      if (pathname === '/dailyreport-api/page/column-mgmt') {
-        var drColMgmtPath = path.join(__dirname, 'module-dailyreport/src/main/resources/static/dailyreport/cell-auth-admin.html');
-        if (serveFile(drColMgmtPath, res)) return;
-      }
+    if (pathname.startsWith('/dailyreport-api/')) {
 
       // ── 세부공장일보 사용자 목록 (core_user 기반) ──
       var drUsers = [

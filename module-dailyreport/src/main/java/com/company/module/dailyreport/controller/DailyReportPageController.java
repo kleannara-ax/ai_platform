@@ -9,17 +9,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
  *
  * <p>clean URL → static HTML 포워딩
  * <ul>
- *   <li>GET /dailyreport-api/page          → dailyreport/index.html (일보 입력)</li>
- *   <li>GET /dailyreport-api/page/column-mgmt → dailyreport/cell-auth-admin.html (컬럼관리)</li>
+ *   <li>GET /dailyreport/page          → dailyreport/index.html (일보 입력)</li>
+ *   <li>GET /dailyreport/page/column-mgmt → dailyreport/cell-auth-admin.html (컬럼관리)</li>
  * </ul>
  */
 @Controller
-@RequestMapping("/dailyreport-api/page")
+@RequestMapping("/dailyreport/page")
 public class DailyReportPageController {
 
     /**
      * 세부공장일보 입력 페이지
-     * GET /dailyreport-api/page
+     * GET /dailyreport/page
      */
     @GetMapping({"", "/"})
     public String inputPage() {
@@ -28,7 +28,7 @@ public class DailyReportPageController {
 
     /**
      * 세부공장일보 컬럼관리 페이지
-     * GET /dailyreport-api/page/column-mgmt
+     * GET /dailyreport/page/column-mgmt
      */
     @GetMapping("/column-mgmt")
     public String columnMgmtPage() {

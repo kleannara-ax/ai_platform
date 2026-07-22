@@ -24,7 +24,7 @@ WHERE menu_code = 'PS_INSP_PAGE';
 -- 3. PS_INSP_MGMT를 단독 메뉴로 변경 (URL 할당, 명칭 변경)
 UPDATE core_menu
 SET menu_name   = 'PS 지분 검사',
-    menu_url    = '/ps-insp-api/page',
+    menu_url    = '/ps-insp/page',
     description = 'PS 지분 검사 (점보롤 지분 검사)',
     updated_at  = NOW()
 WHERE menu_code = 'PS_INSP_MGMT';
