@@ -348,9 +348,10 @@
   let canFireEdit = false;
   let canOtherEdit = false;
   let canEdit = false;
-  function isCurrentUserListed(extraValue1) {
-    if (!currentUser?.loginId) return false;
-    return String(extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean).includes(currentUser.loginId);
+  function hasCurrentUserOtherPermission(rows) {
+    if (!currentUser?.loginId || !Array.isArray(rows)) return false;
+    const loginId = String(currentUser.loginId).trim().toLowerCase();
+    return rows.some(row => String(row.code || '').trim().toLowerCase() === loginId);
   }
   function hasCurrentUserFirePermission(rows) {
     if (!currentUser?.loginId || !Array.isArray(rows)) return false;
@@ -380,9 +381,8 @@
       if (!currentUser?.loginId) return;
       const res = await fetch('/common-api/codes/lookup/OTHER_PERM', { headers: authHeaders() });
       const json = await res.json().catch(() => null);
-      const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
-      canOtherEdit = isCurrentUserListed(otherAdmin?.extraValue1);
-    } catch(e) { console.warn('OTHER_ADMIN 권한 조회 실패', e); }
+      canOtherEdit = hasCurrentUserOtherPermission(json?.data);
+    } catch(e) { console.warn('OTHER_PERM 사용자 코드 권한 조회 실패', e); }
   }
 
   const FIRE_ASSETS = [

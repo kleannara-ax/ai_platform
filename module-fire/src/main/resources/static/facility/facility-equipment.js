@@ -57,20 +57,20 @@
   const initialQuery = new URLSearchParams(location.search || '');
   let hasOtherAdminPermission = false;
   const canEdit = () => hasOtherAdminPermission;
-  const isCurrentUserListed = (extraValue1) => {
+  const hasCurrentUserOtherPermission = (rows) => {
     const user = API.getUser();
-    if (!user?.loginId) return false;
-    return String(extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean).includes(user.loginId);
+    if (!user?.loginId || !Array.isArray(rows)) return false;
+    const loginId = String(user.loginId).trim().toLowerCase();
+    return rows.some(row => String(row.code || '').trim().toLowerCase() === loginId);
   };
   async function loadOtherAdminPermission() {
     hasOtherAdminPermission = false;
     try {
       const res = await API.req('/common-api/codes/lookup/OTHER_PERM');
       const json = res && res.ok ? await res.json().catch(() => null) : null;
-      const otherAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'OTHER_ADMIN') : null;
-      hasOtherAdminPermission = isCurrentUserListed(otherAdmin?.extraValue1);
+      hasOtherAdminPermission = hasCurrentUserOtherPermission(json?.data);
     } catch (e) {
-      console.warn('OTHER_ADMIN 권한 조회 실패', e);
+      console.warn('OTHER_PERM 사용자 코드 권한 조회 실패', e);
     }
   }
   function requireEditPermission() {
