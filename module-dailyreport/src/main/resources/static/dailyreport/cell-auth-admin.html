@@ -79,7 +79,7 @@
     /* ── 모달 ── */
     .modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
     .modal-overlay.active { opacity:1; pointer-events:auto; }
-    .modal { background:#fff; border-radius:18px; width:min(600px, 100%); max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(15,23,42,.2); }
+    .modal { background:#fff; border-radius:18px; width:min(680px, 100%); max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(15,23,42,.2); }
     .modal-header { padding:20px 24px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; }
     .modal-title { font-size:18px; font-weight:800; }
     .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted); padding:4px; line-height:1; }
@@ -125,7 +125,7 @@
     .coord-text-input { border:none; outline:none; font-size:13px; min-width:60px; flex:1; padding:2px 0; font-family:"Consolas",monospace; text-transform:uppercase; }
 
     /* ── 좌표 체크박스 선택 UI (c5 모달용) ── */
-    .coord-selector { border:1px solid #cbd5e1; border-radius:10px; background:#fafbfc; padding:12px; max-height:260px; overflow-y:auto; }
+    .coord-selector { border:1px solid #cbd5e1; border-radius:10px; background:#fafbfc; padding:12px; max-height:220px; overflow-y:auto; }
     .coord-selector:empty::before { content:'⇐ 대상 표를 먼저 선택하세요'; color:var(--muted); font-size:12px; }
     .coord-section-title { font-size:12px; font-weight:700; color:#6366f1; margin:8px 0 4px; padding-bottom:3px; border-bottom:1px solid #e5e7eb; }
     .coord-section-title:first-child { margin-top:0; }
@@ -134,6 +134,24 @@
     .coord-cb-row input[type=checkbox] { accent-color:var(--blue); width:14px; height:14px; cursor:pointer; }
     .coord-cb-row label { cursor:pointer; flex:1; display:flex; align-items:center; gap:4px; }
     .coord-cb-row .cb-coord { color:var(--muted); font-size:10px; font-family:'Consolas',monospace; }
+
+    /* ── 다중 표 등록: 추가된 표 항목 카드 ── */
+    .added-tables-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+    .added-table-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; display:flex; align-items:flex-start; gap:12px; }
+    .added-table-card .atc-info { flex:1; min-width:0; }
+    .added-table-card .atc-title { font-size:13px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:6px; }
+    .added-table-card .atc-cells { font-size:11px; color:#475569; margin-top:4px; line-height:1.5; }
+    .added-table-card .atc-cells .coord-mini { display:inline-block; padding:1px 5px; background:#dbeafe; color:#1d4ed8; border-radius:4px; font-size:10px; font-weight:600; font-family:'Consolas',monospace; margin:1px 2px; }
+    .added-table-card .atc-meta { font-size:10px; color:var(--muted); margin-top:3px; }
+    .added-table-card .atc-remove { background:none; border:none; color:#94a3b8; cursor:pointer; font-size:18px; line-height:1; padding:2px; flex-shrink:0; }
+    .added-table-card .atc-remove:hover { color:var(--danger); }
+    .add-table-divider { display:flex; align-items:center; gap:10px; margin:16px 0 12px; }
+    .add-table-divider::before, .add-table-divider::after { content:''; flex:1; height:1px; background:#e2e8f0; }
+    .add-table-divider span { font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; }
+    .add-table-section { background:#fafbfc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; }
+    .add-table-section .form-group { margin-bottom:12px; }
+    .add-table-section .form-group:last-child { margin-bottom:0; }
+    .add-table-btn-row { display:flex; justify-content:flex-end; margin-top:10px; }
 
     /* ── 권한 없음 ── */
     .no-access { min-height:60vh; display:flex; align-items:center; justify-content:center; padding:32px; }
@@ -258,6 +276,7 @@
       <div class="modal-body">
         <input type="hidden" id="editAuthId" value="" />
 
+        <!-- ── 사용자 선택 ── -->
         <div class="form-group">
           <label class="form-label">사용자</label>
           <input type="hidden" id="formUserId" value="" />
@@ -272,41 +291,81 @@
           <div class="form-help">AI플랫폼에 등록된 사용자를 검색하여 선택합니다.</div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="formTableCode">대상 표</label>
-          <select class="form-select" id="formTableCode" onchange="onTableCodeChange()">
-            <option value="">선택하세요</option>
-            <option value="TBL_PRODUCTION_INDEX">주요 생산 지표 현황</option>
-            <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
-            <option value="TBL_ENERGY">에너지 원단위</option>
-            <option value="TBL_BOILER">보일러 운영 현황</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">담당 셀 선택</label>
-          <div class="coord-selector" id="coordSelector">
-            <!-- tableCode 선택 시 COORD_LABELS 기반 체크박스 동적 생성 -->
+        <!-- ── 등록 모드: 추가된 표 목록 ── -->
+        <div id="addedTablesSection">
+          <label class="form-label">담당 표/셀 목록</label>
+          <div id="addedTablesList" class="added-tables-list">
+            <!-- 추가된 표 카드들이 여기에 표시 -->
           </div>
-          <div class="form-help">선택한 표의 셀 항목을 체크하여 담당 셀을 지정합니다.</div>
+          <div id="addedTablesEmpty" style="padding:20px; text-align:center; color:var(--muted); font-size:13px; border:1px dashed #cbd5e1; border-radius:10px; margin-top:4px;">아래에서 표와 셀을 선택하여 추가하세요.</div>
+
+          <!-- ── 표 추가 UI ── -->
+          <div class="add-table-divider"><span>표 추가</span></div>
+          <div class="add-table-section">
+            <div class="form-group">
+              <label class="form-label" for="addTableCode">대상 표</label>
+              <select class="form-select" id="addTableCode" onchange="onAddTableCodeChange()">
+                <option value="">선택하세요</option>
+                <option value="TBL_PRODUCTION_INDEX">주요 생산 지표 현황</option>
+                <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
+                <option value="TBL_ENERGY">에너지 원단위</option>
+                <option value="TBL_BOILER">보일러 운영 현황</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">담당 셀 선택</label>
+              <div class="coord-selector" id="addCoordSelector"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="addFreqCode">입력 주기</label>
+              <select class="form-select" id="addFreqCode">
+                <option value="daily" selected>매일 (daily)</option>
+                <option value="event">발생 시 (event)</option>
+                <option value="monthly">매월 1일 (monthly)</option>
+                <option value="yearly">매년 1월 1일 (yearly)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="addDescription">설명 <span style="font-weight:400;color:var(--muted)">(선택)</span></label>
+              <textarea class="form-textarea" id="addDescription" placeholder="예: 제지 재공품 적정재고 담당" style="min-height:40px;"></textarea>
+            </div>
+            <div class="add-table-btn-row">
+              <button class="btn primary sm" type="button" onclick="addTableEntry()">+ 이 표 추가</button>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="formFreqCode">입력 주기</label>
-          <select class="form-select" id="formFreqCode">
-            <option value="">선택하세요</option>
-            <option value="daily">매일 (daily)</option>
-            <option value="event">발생 시 (event)</option>
-            <option value="monthly">매월 1일 (monthly)</option>
-            <option value="yearly">매년 1월 1일 (yearly)</option>
-          </select>
-        </div>
-
-        <!-- freqLabel 입력 필드 삭제 (c6): freqCode에서 자동 생성됨 -->
-
-        <div class="form-group">
-          <label class="form-label" for="formDescription">설명</label>
-          <textarea class="form-textarea" id="formDescription" placeholder="예: 제지 재공품 적정재고 담당 (밀롤창고/카타대기)"></textarea>
+        <!-- ── 수정 모드: 단일 표 (기존 방식) ── -->
+        <div id="editSingleTableSection" style="display:none;">
+          <div class="form-group">
+            <label class="form-label" for="formTableCode">대상 표</label>
+            <select class="form-select" id="formTableCode" onchange="onTableCodeChange()" disabled>
+              <option value="">선택하세요</option>
+              <option value="TBL_PRODUCTION_INDEX">주요 생산 지표 현황</option>
+              <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
+              <option value="TBL_ENERGY">에너지 원단위</option>
+              <option value="TBL_BOILER">보일러 운영 현황</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">담당 셀 선택</label>
+            <div class="coord-selector" id="coordSelector"></div>
+            <div class="form-help">선택한 표의 셀 항목을 체크하여 담당 셀을 지정합니다.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="formFreqCode">입력 주기</label>
+            <select class="form-select" id="formFreqCode">
+              <option value="">선택하세요</option>
+              <option value="daily">매일 (daily)</option>
+              <option value="event">발생 시 (event)</option>
+              <option value="monthly">매월 1일 (monthly)</option>
+              <option value="yearly">매년 1월 1일 (yearly)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="formDescription">설명</label>
+            <textarea class="form-textarea" id="formDescription" placeholder="예: 제지 재공품 적정재고 담당 (밀롤창고/카타대기)"></textarea>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -355,7 +414,9 @@
     let currentUser = null;
     let allAuths = [];           // 전체 권한 목록
     let filteredAuths = [];      // 필터링된 목록
-    let editCoords = [];         // 현재 모달의 좌표 목록
+    let editCoords = [];         // 현재 모달의 좌표 목록 (수정 모드용)
+    let addedTableEntries = [];  // 다중 표 등록용: [{tableCode, cells:[], freqCode, description}]
+    let isCreateMode = true;     // true=등록모드, false=수정모드
 
     // ── 표 코드 → 이름 매핑 ──
     const TABLE_NAMES = {
@@ -732,8 +793,8 @@
     //  좌표 체크박스 UI (c5 — COORD_LABELS 기반)
     // ═══════════════════════════════════════════════
 
-    function renderCoordCheckboxes(tableCode) {
-      const container = document.getElementById('coordSelector');
+    function renderCoordCheckboxes(tableCode, containerId) {
+      const container = document.getElementById(containerId || 'coordSelector');
       container.innerHTML = '';
       const coordMap = COORD_LABELS[tableCode];
       if (!coordMap) return;
@@ -757,22 +818,29 @@
         items.forEach(item => {
           const row = document.createElement('div');
           row.className = 'coord-cb-row';
-          const id = 'cb_' + item.coord;
-          row.innerHTML = `<input type="checkbox" id="${id}" value="${escapeHtml(item.coord)}" onchange="syncCoordCheckboxes()" />`
-            + `<label for="${id}">${escapeHtml(item.label)} <span class="cb-coord">${escapeHtml(item.coord)}</span></label>`;
+          const cbId = (containerId || 'coordSelector') + '_cb_' + item.coord;
+          const syncFn = (containerId === 'addCoordSelector') ? '' : 'syncCoordCheckboxes()';
+          row.innerHTML = `<input type="checkbox" id="${cbId}" value="${escapeHtml(item.coord)}" ${syncFn ? 'onchange="'+syncFn+'"' : ''} />`
+            + `<label for="${cbId}">${escapeHtml(item.label)} <span class="cb-coord">${escapeHtml(item.coord)}</span></label>`;
           container.appendChild(row);
         });
       });
     }
 
-    /** tableCode 변경 시 체크박스 재렌더링 */
+    /** tableCode 변경 시 체크박스 재렌더링 (수정 모드용) */
     function onTableCodeChange() {
       const tableCode = document.getElementById('formTableCode').value;
       editCoords = [];
       renderCoordCheckboxes(tableCode);
     }
 
-    /** 체크박스 → editCoords 동기화 */
+    /** 대상 표 변경 (추가 모드용) */
+    function onAddTableCodeChange() {
+      const tableCode = document.getElementById('addTableCode').value;
+      renderCoordCheckboxes(tableCode, 'addCoordSelector');
+    }
+
+    /** 체크박스 → editCoords 동기화 (수정 모드용) */
     function syncCoordCheckboxes() {
       const checks = document.querySelectorAll('#coordSelector input[type=checkbox]');
       editCoords = [];
@@ -783,6 +851,115 @@
     function restoreCoordCheckboxes() {
       const checks = document.querySelectorAll('#coordSelector input[type=checkbox]');
       checks.forEach(cb => { cb.checked = editCoords.includes(cb.value); });
+    }
+
+    // ═══════════════════════════════════════════════
+    //  다중 표 등록 — 표 항목 추가/삭제/렌더링
+    // ═══════════════════════════════════════════════
+
+    /** 추가 영역에서 선택된 셀 목록 반환 */
+    function getAddSelectedCoords() {
+      const checks = document.querySelectorAll('#addCoordSelector input[type=checkbox]');
+      const coords = [];
+      checks.forEach(cb => { if (cb.checked) coords.push(cb.value); });
+      return coords;
+    }
+
+    /** "이 표 추가" 버튼 클릭 */
+    function addTableEntry() {
+      const tableCode = document.getElementById('addTableCode').value;
+      const freqCode = document.getElementById('addFreqCode').value;
+      const description = document.getElementById('addDescription').value;
+      const cells = getAddSelectedCoords();
+
+      if (!tableCode) { showToast('대상 표를 선택해 주세요.'); return; }
+      if (cells.length === 0) { showToast('담당 셀을 1개 이상 선택해 주세요.'); return; }
+
+      // 이미 추가된 표인지 확인
+      const existing = addedTableEntries.find(e => e.tableCode === tableCode);
+      if (existing) {
+        // 기존 항목에 셀 병합
+        const merged = new Set([...existing.cells, ...cells]);
+        existing.cells = [...merged];
+        existing.freqCode = freqCode;
+        existing.description = description;
+        showToast(`${TABLE_NAMES[tableCode]} 표에 셀이 병합되었습니다.`);
+      } else {
+        addedTableEntries.push({ tableCode, cells, freqCode, description });
+        showToast(`${TABLE_NAMES[tableCode]} 표가 추가되었습니다.`);
+      }
+
+      // 추가 영역 초기화
+      document.getElementById('addTableCode').value = '';
+      document.getElementById('addFreqCode').value = 'daily';
+      document.getElementById('addDescription').value = '';
+      document.getElementById('addCoordSelector').innerHTML = '';
+
+      // 추가된 표 드롭다운에서 이미 추가된 표 비활성화
+      updateAddTableOptions();
+      renderAddedTableCards();
+    }
+
+    /** 추가된 표 카드 렌더링 */
+    function renderAddedTableCards() {
+      const container = document.getElementById('addedTablesList');
+      const emptyMsg = document.getElementById('addedTablesEmpty');
+
+      if (addedTableEntries.length === 0) {
+        container.innerHTML = '';
+        emptyMsg.style.display = 'block';
+        return;
+      }
+
+      emptyMsg.style.display = 'none';
+      container.innerHTML = addedTableEntries.map((entry, idx) => {
+        const tName = TABLE_NAMES[entry.tableCode] || entry.tableCode;
+        const tNum = TABLE_ORDER[entry.tableCode] || '?';
+        const fLabel = FREQ_LABELS[entry.freqCode] || entry.freqCode;
+        const cellMinis = entry.cells.map(c => {
+          const info = (COORD_LABELS[entry.tableCode] || {})[c];
+          const label = info ? (info.row || info.section) + (info.colType ? `(${info.colType})` : '') : c;
+          return `<span class="coord-mini" title="${escapeHtml(c)}">${escapeHtml(label)}</span>`;
+        }).join('');
+
+        return `<div class="added-table-card">
+          <div class="atc-info">
+            <div class="atc-title">
+              <span class="badge badge-table">${tNum}. ${escapeHtml(tName)}</span>
+              <span style="font-size:11px;color:var(--muted);">${entry.cells.length}개 셀</span>
+            </div>
+            <div class="atc-cells">${cellMinis}</div>
+            <div class="atc-meta">주기: ${escapeHtml(fLabel)}${entry.description ? ' · ' + escapeHtml(entry.description) : ''}</div>
+          </div>
+          <button class="atc-remove" type="button" onclick="removeTableEntry(${idx})" title="삭제">&times;</button>
+        </div>`;
+      }).join('');
+    }
+
+    /** 추가된 표 항목 삭제 */
+    function removeTableEntry(idx) {
+      addedTableEntries.splice(idx, 1);
+      updateAddTableOptions();
+      renderAddedTableCards();
+    }
+
+    /** 이미 추가된 표를 드롭다운에서 표시/비활성화 */
+    function updateAddTableOptions() {
+      const sel = document.getElementById('addTableCode');
+      const addedCodes = new Set(addedTableEntries.map(e => e.tableCode));
+      // 이미 서버에 등록된 표도 제외 (현재 userId 기준)
+      const userId = parseInt(document.getElementById('formUserId').value);
+      const serverCodes = userId ? new Set(allAuths.filter(a => a.userId === userId).map(a => a.tableCode)) : new Set();
+
+      Array.from(sel.options).forEach(opt => {
+        if (!opt.value) return; // placeholder
+        const alreadyAdded = addedCodes.has(opt.value);
+        const alreadyOnServer = serverCodes.has(opt.value);
+        opt.disabled = alreadyAdded || alreadyOnServer;
+        opt.textContent = (TABLE_NAMES[opt.value] || opt.value)
+          + (alreadyAdded ? ' (추가됨)' : '')
+          + (alreadyOnServer ? ' (등록됨)' : '');
+      });
     }
 
     // ═══════════════════════════════════════════════
@@ -880,17 +1057,14 @@
     // ═══════════════════════════════════════════════
 
     function openCreateModal() {
+      isCreateMode = true;
       document.getElementById('modalTitle').textContent = '셀 권한 등록';
       document.getElementById('modalSubmitBtn').textContent = '등록';
       document.getElementById('editAuthId').value = '';
 
       // 폼 초기화
       document.getElementById('formUserId').value = '';
-      document.getElementById('formTableCode').value = '';
-      document.getElementById('formFreqCode').value = '';
-      document.getElementById('formDescription').value = '';
-      editCoords = [];
-      renderCoordCheckboxes(''); // 빈 상태
+      addedTableEntries = [];
 
       // 사용자 검색 초기화
       document.getElementById('userSearchInput').value = '';
@@ -898,7 +1072,19 @@
       document.getElementById('userSearchClear').style.display = 'none';
       document.getElementById('userSelectedChip').innerHTML = '';
       document.getElementById('userSearchWrap').style.display = 'block';
-      document.getElementById('formTableCode').disabled = false;
+
+      // 등록 모드 UI 표시
+      document.getElementById('addedTablesSection').style.display = 'block';
+      document.getElementById('editSingleTableSection').style.display = 'none';
+
+      // 추가 영역 초기화
+      document.getElementById('addTableCode').value = '';
+      document.getElementById('addFreqCode').value = 'daily';
+      document.getElementById('addDescription').value = '';
+      document.getElementById('addCoordSelector').innerHTML = '';
+
+      renderAddedTableCards();
+      updateAddTableOptions();
 
       document.getElementById('modalOverlay').classList.add('active');
     }
@@ -907,6 +1093,7 @@
       const auth = allAuths.find(a => a.authId === authId);
       if (!auth) return;
 
+      isCreateMode = false;
       document.getElementById('modalTitle').textContent = '셀 권한 수정';
       document.getElementById('modalSubmitBtn').textContent = '수정';
       document.getElementById('editAuthId').value = authId;
@@ -925,8 +1112,11 @@
       renderCoordCheckboxes(auth.tableCode);
       restoreCoordCheckboxes();
 
+      // 수정 모드 UI 표시
+      document.getElementById('addedTablesSection').style.display = 'none';
+      document.getElementById('editSingleTableSection').style.display = 'block';
+
       // 수정 시 userId와 tableCode는 변경 불가 (UNIQUE 제약)
-      // 사용자 검색 비활성화 → 선택된 칩만 표시
       document.getElementById('userSearchInput').disabled = true;
       document.getElementById('userSearchInput').value = '';
       document.getElementById('userSearchClear').style.display = 'none';
@@ -937,7 +1127,6 @@
             <span>${escapeHtml(editUser.userName)} (${escapeHtml(editUser.loginId)})${editUser.department ? ' — ' + escapeHtml(editUser.department) : ''}</span>
           </div>`;
       }
-      document.getElementById('formTableCode').disabled = true;
 
       document.getElementById('modalOverlay').classList.add('active');
     }
@@ -958,50 +1147,79 @@
 
     // ── 폼 제출 ──
     async function submitForm() {
-      const authId = document.getElementById('editAuthId').value;
-      const isEdit = !!authId;
-
       const userId = parseInt(document.getElementById('formUserId').value);
-      const tableCode = document.getElementById('formTableCode').value;
-      const freqCode = document.getElementById('formFreqCode').value;
-      const description = document.getElementById('formDescription').value;
-
-      // 유효성 검사
       if (!userId || userId < 1) { showToast('사용자를 선택해 주세요.'); return; }
-      if (!tableCode) { showToast('대상 표를 선택해 주세요.'); return; }
-      if (editCoords.length === 0) { showToast('담당 셀을 1개 이상 선택해 주세요.'); return; }
-      if (!freqCode) { showToast('입력 주기를 선택해 주세요.'); return; }
 
-      const body = {
-        userId,
-        tableCode,
-        cellCoords: editCoords,
-        freqCode,
-        freqLabel: FREQ_LABELS[freqCode] || freqCode,
-        description
-      };
+      // ── 수정 모드 ──
+      if (!isCreateMode) {
+        const authId = document.getElementById('editAuthId').value;
+        const tableCode = document.getElementById('formTableCode').value;
+        const freqCode = document.getElementById('formFreqCode').value;
+        const description = document.getElementById('formDescription').value;
+
+        if (!tableCode) { showToast('대상 표를 선택해 주세요.'); return; }
+        if (editCoords.length === 0) { showToast('담당 셀을 1개 이상 선택해 주세요.'); return; }
+        if (!freqCode) { showToast('입력 주기를 선택해 주세요.'); return; }
+
+        const body = {
+          userId, tableCode, cellCoords: editCoords,
+          freqCode, freqLabel: FREQ_LABELS[freqCode] || freqCode, description
+        };
+
+        try {
+          await apiFetch(`/cell-auths/${authId}`, { method: 'PUT', body: JSON.stringify(body) });
+          showToast('권한이 수정되었습니다.');
+          closeModal();
+          await loadAuths();
+        } catch (err) {
+          console.error('수정 실패:', err);
+          showToast('수정 실패: ' + err.message);
+        }
+        return;
+      }
+
+      // ── 등록 모드 (다중 표) ──
+      if (addedTableEntries.length === 0) {
+        showToast('표를 1개 이상 추가해 주세요.'); return;
+      }
+
+      const btn = document.getElementById('modalSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = '등록중...';
+
+      let successCount = 0;
+      let errorMessages = [];
 
       try {
-        if (isEdit) {
-          await apiFetch(`/cell-auths/${authId}`, {
-            method: 'PUT',
-            body: JSON.stringify(body)
-          });
-          showToast('권한이 수정되었습니다.');
+        for (const entry of addedTableEntries) {
+          const body = {
+            userId,
+            tableCode: entry.tableCode,
+            cellCoords: entry.cells,
+            freqCode: entry.freqCode,
+            freqLabel: FREQ_LABELS[entry.freqCode] || entry.freqCode,
+            description: entry.description
+          };
+          try {
+            await apiFetch('/cell-auths', { method: 'POST', body: JSON.stringify(body) });
+            successCount++;
+          } catch (err) {
+            errorMessages.push(`${TABLE_NAMES[entry.tableCode]}: ${err.message}`);
+          }
+        }
+
+        if (errorMessages.length === 0) {
+          showToast(`${successCount}개 표 권한이 등록되었습니다.`);
         } else {
-          await apiFetch('/cell-auths', {
-            method: 'POST',
-            body: JSON.stringify(body)
-          });
-          showToast('권한이 등록되었습니다.');
+          showToast(`${successCount}개 성공, ${errorMessages.length}개 실패`);
+          console.error('등록 실패 상세:', errorMessages);
         }
 
         closeModal();
         await loadAuths();
-
-      } catch (err) {
-        console.error('저장 실패:', err);
-        showToast('저장 실패: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '등록';
       }
     }
 
