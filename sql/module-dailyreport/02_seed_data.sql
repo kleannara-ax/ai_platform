@@ -40,8 +40,8 @@ INSERT IGNORE INTO core_user (USER_ID, LOGIN_ID, USER_NAME, PASSWORD, EMAIL, DEP
 -- ═══════════════════════════════════════════════
 INSERT IGNORE INTO core_menu (MENU_ID, PARENT_MENU_ID, MENU_CODE, MENU_NAME, MENU_TYPE, MENU_URL, ICON, SORT_ORDER, DESCRIPTION, IS_ACTIVE) VALUES
     (100, NULL, 'DAILY_REPORT',       '세부공장일보',         'CATEGORY', NULL,                                  'fa-solid fa-clipboard-list', 10, '세부공장일보 카테고리', 1),
-    (101, 100,  'DAILY_REPORT_INPUT',  '세부공장일보 입력',    'PAGE',     '/dailyreport/index.html',             'fa-solid fa-edit',           1,  '세부공장일보 데이터 입력 페이지', 1),
-    (102, 100,  'DAILY_REPORT_AUTH',   '세부공장일보 컬럼관리', 'PAGE',     '/dailyreport/cell-auth-admin.html',   'fa-solid fa-user-shield',    2,  '셀 단위 접근 권한 관리 페이지 (관리자용)', 1);
+    (101, 100,  'DAILY_REPORT_INPUT',  '세부공장일보 입력',    'PAGE',     '/dailyreport-api/page',             'fa-solid fa-edit',           1,  '세부공장일보 데이터 입력 페이지', 1),
+    (102, 100,  'DAILY_REPORT_AUTH',   '세부공장일보 컬럼관리', 'PAGE',     '/dailyreport-api/page/column-mgmt',   'fa-solid fa-user-shield',    2,  '셀 단위 접근 권한 관리 페이지 (관리자용)', 1);
 
 
 -- ═══════════════════════════════════════════════
