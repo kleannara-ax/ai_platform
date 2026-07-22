@@ -64,9 +64,22 @@ public class DailyReportService {
     @Transactional
     public DailyReportResponse getReportByDate(LocalDate reportDate, Long userId) {
         return reportRepository.findByReportDate(reportDate)
-                .map(DailyReportResponse::fromWithDetails)
+                .map(report -> {
+                    // 기존 일보가 있지만 셀이 비어 있는 경우 기본 셀 보충
+                    // (이전 버전에서 테이블만 생성하고 셀을 누락한 데이터 보완)
+                    boolean cellsMissing = report.getTables().stream()
+                            .anyMatch(t -> t.getCells().isEmpty());
+                    if (cellsMissing) {
+                        for (DailyReportTable table : report.getTables()) {
+                            if (table.getCells().isEmpty()) {
+                                DefaultCellTemplate.populateDefaultCells(table);
+                            }
+                        }
+                    }
+                    return DailyReportResponse.fromWithDetails(report);
+                })
                 .orElseGet(() -> {
-                    // 자동 생성: 해당 날짜 일보 + 4개 기본 표 구조
+                    // 자동 생성: 해당 날짜 일보 + 4개 기본 표 + 기본 셀
                     DailyReport report = DailyReport.builder()
                             .reportDate(reportDate)
                             .title(reportDate + " 세부공장일보")
@@ -322,6 +335,9 @@ public class DailyReportService {
                     .colCount(Integer.parseInt(tableDefinitions[i][3]))
                     .build();
             report.addTable(table);
+
+            // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
+            DefaultCellTemplate.populateDefaultCells(table);
         }
     }
 

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,7 +73,7 @@ public class ViewRenderController {
         result.put("report", report);
 
         // 4개 표 데이터 (사용자별 editable 계산)
-        Map<String, ReportTableResponse> tables = new LinkedHashMap<>();
+        Map<String, Object> tables = new LinkedHashMap<>();
         for (String tableCode : TABLE_CODES) {
             try {
                 if (loginId != null && userId != null) {
@@ -84,7 +85,11 @@ public class ViewRenderController {
                             reportService.getTableData(report.getReportId(), tableCode));
                 }
             } catch (Exception e) {
-                // 표 없으면 건너뜀
+                // 표 조회 실패 시 빈 구조라도 반환 (프론트엔드에서 표 섹션 표시)
+                Map<String, Object> emptyTable = new LinkedHashMap<>();
+                emptyTable.put("tableCode", tableCode);
+                emptyTable.put("cells", List.of());
+                tables.put(tableCode, emptyTable);
             }
         }
         result.put("tables", tables);
