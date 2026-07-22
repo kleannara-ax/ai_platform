@@ -63,7 +63,8 @@ public final class DefaultCellTemplate {
         Map<Integer, int[]> yearGroups = new LinkedHashMap<>(); // year → [startCol, count]
         for (int i = 0; i < rolling.size(); i++) {
             int yr = rolling.get(i).getYear();
-            yearGroups.computeIfAbsent(yr, k -> new int[]{6 + i, 0});
+            final int col = 6 + i;
+            yearGroups.computeIfAbsent(yr, k -> new int[]{col, 0});
             yearGroups.get(yr)[1]++;
         }
 
@@ -112,7 +113,7 @@ public final class DefaultCellTemplate {
         ro(t, 2,11, "M7",  "597");
         ro(t, 2,12, "N7",  "594");
         ro(t, 2,13, "O7",  "DRS");
-        ro(t, 2,14, "P7",  null);
+        d(t,  2,14, "P7",  "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 3: 초지5 생산량 ──
         ro(t, 3, 0, "B8",  "초지5 생산량(톤/日)", 1, 3);
@@ -127,7 +128,7 @@ public final class DefaultCellTemplate {
         ro(t, 3,11, "M8",  "83");
         ro(t, 3,12, "N8",  "79.5");
         ro(t, 3,13, "O8",  "SAP");
-        ro(t, 3,14, "P8",  null);
+        d(t,  3,14, "P8",  "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 4: 수율 - PS 완제품 ──
         ro(t, 4, 0, "B9",  "수율(%)", 3, 1);
@@ -144,7 +145,7 @@ public final class DefaultCellTemplate {
         ro(t, 4,11, "M9",  "99.8");
         ro(t, 4,12, "N9",  "98.7");
         d(t,  4,13, "O9",  "event", "발생 시", "yoo", "유동현 책임");
-        ro(t, 4,14, "P9",  null);
+        d(t,  4,14, "P9",  "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 5: 수율 - PS 코팅제외 ──
         ro(t, 5, 2, "D10", "코팅제외", 1, 1);
@@ -159,7 +160,7 @@ public final class DefaultCellTemplate {
         ro(t, 5,11, "M10", "86.3");
         ro(t, 5,12, "N10", "84.7");
         d(t,  5,13, "O10", "event", "발생 시", "yoo", "유동현 책임");
-        ro(t, 5,14, "P10", "- 완제품내 코팅 비율 14.0%");
+        d(t,  5,14, "P10", "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 6: 수율 - 화장지 ──
         ro(t, 6, 1, "C11", "화장지", 1, 2);
@@ -174,7 +175,7 @@ public final class DefaultCellTemplate {
         ro(t, 6,11, "M11", "74.6");
         ro(t, 6,12, "N11", "74.4");
         d(t,  6,13, "O11", "event", "발생 시", "yoo", "유동현 책임");
-        ro(t, 6,14, "P11", null);
+        d(t,  6,14, "P11", "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 7: 고지감량율 ──
         ro(t, 7, 0, "B12", "고지감량율(%)", 1, 3);
@@ -189,7 +190,7 @@ public final class DefaultCellTemplate {
         ro(t, 7,11, "M12", "15.9");
         ro(t, 7,12, "N12", "16");
         ro(t, 7,13, "O12", "EIS");
-        ro(t, 7,14, "P12", null);
+        d(t,  7,14, "P12", "daily", "매일", "yoo", "유동현 책임");
 
         // ── Row 8: 슬러지원단위 - 제지 ──
         ro(t, 8, 0, "B13", "슬러지원단위", 2, 2);
@@ -205,7 +206,7 @@ public final class DefaultCellTemplate {
         ro(t, 8,11, "M13", "82");
         ro(t, 8,12, "N13", "84");
         d(t,  8,13, "O13", "event", "발생 시", "jung", "정상엽 책임");
-        ro(t, 8,14, "P13", null);
+        d(t,  8,14, "P13", "daily", "매일", "jung", "정상엽 책임");
 
         // ── Row 9: 슬러지원단위 - 화장지 ──
         ro(t, 9, 2, "D14", "화장지", 1, 1);
@@ -220,7 +221,7 @@ public final class DefaultCellTemplate {
         ro(t, 9,11, "M14", "53");
         ro(t, 9,12, "N14", "62");
         d(t,  9,13, "O14", "event", "발생 시", "jung", "정상엽 책임");
-        ro(t, 9,14, "P14", null);
+        d(t,  9,14, "P14", "daily", "매일", "jung", "정상엽 책임");
     }
 
     // ═══════════════════════════════════════════════
@@ -259,7 +260,7 @@ public final class DefaultCellTemplate {
         ro(t, 2, 9, "K21", "3711");
         ro(t, 2,10, "L21", "3006");
         ro(t, 2,11, "M21", "MES");
-        ro(t, 2,12, "N21", null);
+        d(t,  2,12, "N21", "daily", "매일", "kim", "김완중 팀장");
 
         // ── Row 3: 카타대기 ──
         ro(t, 3, 1, "C22", "카타대기", 1, 1);
@@ -272,7 +273,7 @@ public final class DefaultCellTemplate {
         ro(t, 3, 9, "K22", "1121");
         ro(t, 3,10, "L22", "1110");
         ro(t, 3,11, "M22", "MES");
-        ro(t, 3,12, "N22", "- 제지 카타 동시 가동/운휴에 따른 재공 증가");
+        d(t,  3,12, "N22", "daily", "매일", "kim", "김완중 팀장");
 
         // ── Row 4: 미포장 ──
         ro(t, 4, 1, "C23", "미포장", 1, 1);
@@ -285,7 +286,7 @@ public final class DefaultCellTemplate {
         ro(t, 4, 9, "K23", "173");
         ro(t, 4,10, "L23", "266");
         ro(t, 4,11, "M23", "MES");
-        ro(t, 4,12, "N23", null);
+        d(t,  4,12, "N23", "daily", "매일", "kim", "김완중 팀장");
 
         // ── Row 5: 포장후 물류입고전 ──
         ro(t, 5, 1, "C24", "포장후 물류입고전", 1, 1);
@@ -298,7 +299,7 @@ public final class DefaultCellTemplate {
         ro(t, 5, 9, "K24", "288");
         ro(t, 5,10, "L24", "423");
         ro(t, 5,11, "M24", "MES");
-        ro(t, 5,12, "N24", null);
+        d(t,  5,12, "N24", "daily", "매일", "kim", "김완중 팀장");
 
         // ── Row 6: 장기재고 3개월 초과 ──
         ro(t, 6, 0, "B25", "장기재고",      2, 1);
@@ -313,7 +314,7 @@ public final class DefaultCellTemplate {
         ro(t, 6, 9, "K25", "3404");
         ro(t, 6,10, "L25", "3120");
         d(t,  6,11, "M25", "monthly", "매월", "jang lee", "장석환 선임, 이도형 사원");
-        ro(t, 6,12, "N25", null);
+        d(t,  6,12, "N25", "daily", "매일", "jang lee", "장석환 선임, 이도형 사원");
 
         // ── Row 7: 장기재고 6개월 초과 ──
         ro(t, 7, 1, "C26", "6개월 초과", 1, 1);
@@ -327,7 +328,7 @@ public final class DefaultCellTemplate {
         ro(t, 7, 9, "K26", "1543");
         ro(t, 7,10, "L26", "1130");
         d(t,  7,11, "M26", "monthly", "매월", "jang lee", "장석환 선임, 이도형 사원");
-        ro(t, 7,12, "N26", null);
+        d(t,  7,12, "N26", "daily", "매일", "jang lee", "장석환 선임, 이도형 사원");
 
         // ── Row 8: 야적현황 - 제지 ──
         ro(t, 8, 0, "B27", "야적현황", 2, 1);
@@ -342,7 +343,7 @@ public final class DefaultCellTemplate {
         ro(t, 8, 9, "K27", "0");
         ro(t, 8,10, "L27", "0");
         ro(t, 8,11, "M27", "WMS");
-        ro(t, 8,12, "N27", null);
+        d(t,  8,12, "N27", "daily", "매일", "kim", "김완중 팀장");
 
         // ── Row 9: 야적현황 - 생활 ──
         ro(t, 9, 1, "C28", "생활",     1, 1);
@@ -356,7 +357,7 @@ public final class DefaultCellTemplate {
         ro(t, 9, 9, "K28", "0");
         ro(t, 9,10, "L28", "0");
         ro(t, 9,11, "M28", "WMS");
-        ro(t, 9,12, "N28", null);
+        d(t,  9,12, "N28", "daily", "매일", "kim", "김완중 팀장");
     }
 
     // ═══════════════════════════════════════════════
@@ -443,7 +444,7 @@ public final class DefaultCellTemplate {
         ro(t, 2, 4, "N36", "0.4");
         d(t,  2, 5, "O36", "monthly", "매월", "park",   "박지권 책임");
         d(t,  2, 6, "P36", "daily",   "매일", "energy", "환경에너지팀 반장");
-        ro(t, 2, 7, "Q36", "복합보일러 운휴...", 5, 1);
+        d(t,  2, 7, "Q36", "daily", "매일", "energy", "환경에너지팀 반장", 5, 1);
 
         // ── Row 3: 유동상소각로 ──
         ro(t, 3, 0, "J37", "유동상소각로", 1, 1);
@@ -523,6 +524,20 @@ public final class DefaultCellTemplate {
                 .rowIndex(row).colIndex(col).excelCoord(coord)
                 .cellValue("").cellType("DATA")
                 .isLocked(false).rowSpan(1).colSpan(1)
+                .freqCode(freqCode).freqLabel(freqLabel)
+                .ownerIds(ownerIds).ownerNames(ownerNames)
+                .build());
+    }
+
+    /** DATA 셀 (입력 가능, rowSpan/colSpan 지정) */
+    private static void d(DailyReportTable t, int row, int col, String coord,
+                           String freqCode, String freqLabel,
+                           String ownerIds, String ownerNames,
+                           int rs, int cs) {
+        t.addCell(DailyReportCell.builder()
+                .rowIndex(row).colIndex(col).excelCoord(coord)
+                .cellValue("").cellType("DATA")
+                .isLocked(false).rowSpan(rs).colSpan(cs)
                 .freqCode(freqCode).freqLabel(freqLabel)
                 .ownerIds(ownerIds).ownerNames(ownerNames)
                 .build());
