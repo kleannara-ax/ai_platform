@@ -1356,6 +1356,8 @@ async function renderPermissions(){
     allRoleMappings=roleRes.success?(roleRes.data||[]):[];
     allMenus=menuRes.success?(menuRes.data||[]):[];
     const tree=treeRes.success?(treeRes.data||[]):[];
+    console.log('[PERM DEBUG] roleRes:', JSON.stringify(roleRes).substring(0,300));
+    console.log('[PERM DEBUG] allRoleMappings length:', allRoleMappings.length, allRoleMappings.map(rm=>rm.role));
     // 공통코드에서 역할 목록을 동적으로 가져옴 (allRoleMappings 기반)
     const roles=allRoleMappings.map(rm=>rm.role);
     const roleLabels={};
