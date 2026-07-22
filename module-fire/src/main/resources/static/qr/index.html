@@ -312,7 +312,7 @@
   let currentEquip = 'ext';
   let latestListData = {};
   let buildingFloors = [];  /* [{buildingId, buildingName, floors:[{floorId,floorName},...]}] */
-  let isFireAdmin = false; /* FIRE_ADMIN 아이디 기반 권한 */
+  let isFireAdmin = false; /* FIRE_PERM 사용자 코드 기반 권한 */
   let isOtherAdmin = false; /* OTHER_ADMIN 아이디 기반 권한 */
   let spkQrZoomScale = 1;
   let spkQrZoomPanX = 0;
@@ -378,6 +378,12 @@
       .includes(currentUser.loginId);
   }
 
+  function hasCurrentUserFirePermission(rows) {
+    if (!currentUser?.loginId || !Array.isArray(rows)) return false;
+    const loginId = String(currentUser.loginId).trim().toLowerCase();
+    return rows.some(row => String(row.code || '').trim().toLowerCase() === loginId);
+  }
+
   function canAccessGroup(groupKey) {
     if (groupKey === 'fire') return isFireAdmin;
     if (groupKey === 'other') return isOtherAdmin;
@@ -400,13 +406,8 @@
   async function loadFireAdminPermission() {
     try {
       const res = await apiFetch('/common-api/codes/lookup/FIRE_PERM');
-      if (res?.data) {
-        const fireAdmin = res.data.find(d => d.code === 'FIRE_ADMIN');
-        if (fireAdmin?.extraValue1) {
-          isFireAdmin = isCurrentUserListed(fireAdmin.extraValue1);
-        }
-      }
-    } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+      isFireAdmin = hasCurrentUserFirePermission(res?.data);
+    } catch(e) { console.warn('FIRE_PERM 사용자 코드 권한 조회 실패', e); }
   }
 
   async function loadOtherAdminPermission() {

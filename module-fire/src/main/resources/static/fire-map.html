@@ -1205,19 +1205,16 @@ async function init() {
             accountBtn.textContent = currentUser.username || '사용자';
         }
         const qrMenuBtn = document.querySelector('.side-menu a[href="/qr"]');
-        // QR 메뉴는 FIRE_ADMIN 아이디만 접근 가능
+        // QR 메뉴는 FIRE_PERM에 현재 로그인 ID 코드가 등록된 경우에만 접근 가능
         let isFireAdmin = false;
         try {
             const permRes = await apiFetch('/common-api/codes/lookup/FIRE_PERM');
             const permJson = await permRes.json();
-            if (permJson?.data) {
-                const fireAdmin = permJson.data.find(d => d.code === 'FIRE_ADMIN');
-                if (fireAdmin?.extraValue1) {
-                    const ids = fireAdmin.extraValue1.split(',').map(s => s.trim());
-                    isFireAdmin = ids.includes(currentUser?.loginId);
-                }
-            }
-        } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+            const loginId = String(currentUser?.loginId || '').trim().toLowerCase();
+            isFireAdmin = Array.isArray(permJson?.data) && permJson.data.some(d =>
+                String(d.code || '').trim().toLowerCase() === loginId
+            );
+        } catch(e) { console.warn('FIRE_PERM 사용자 코드 권한 조회 실패', e); }
         if (qrMenuBtn) qrMenuBtn.style.display = isFireAdmin ? 'block' : 'none';
         if (canManage) {
             const adminLi = document.getElementById('adminMenuLi');

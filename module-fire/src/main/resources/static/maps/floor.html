@@ -352,6 +352,11 @@
     if (!currentUser?.loginId) return false;
     return String(extraValue1 || '').split(',').map(s => s.trim()).filter(Boolean).includes(currentUser.loginId);
   }
+  function hasCurrentUserFirePermission(rows) {
+    if (!currentUser?.loginId || !Array.isArray(rows)) return false;
+    const loginId = String(currentUser.loginId).trim().toLowerCase();
+    return rows.some(row => String(row.code || '').trim().toLowerCase() === loginId);
+  }
   function isOtherAssetType(type) {
     return type === 'aircon' || type === 'water';
   }
@@ -367,9 +372,8 @@
       if (!currentUser?.loginId) return;
       const res = await fetch('/common-api/codes/lookup/FIRE_PERM', { headers: authHeaders() });
       const json = await res.json().catch(() => null);
-      const fireAdmin = Array.isArray(json?.data) ? json.data.find(d => d.code === 'FIRE_ADMIN') : null;
-      canFireEdit = isCurrentUserListed(fireAdmin?.extraValue1);
-    } catch(e) { console.warn('FIRE_ADMIN 권한 조회 실패', e); }
+      canFireEdit = hasCurrentUserFirePermission(json?.data);
+    } catch(e) { console.warn('FIRE_PERM 사용자 코드 권한 조회 실패', e); }
   }
   async function loadOtherAdminPermission() {
     try {
