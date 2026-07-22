@@ -17,12 +17,12 @@ import java.util.Map;
  *
  * <p>URL API Prefix: /ps-insp-api/config
  * <p>PPM 기준값: code_group 'PS_INSP_DEFAULT' > 'PPM_LIMIT'
- * <p>PPM 수정 권한자: code_group 'PS_INSP_AUTH' > 'PPM_ADMIN' (extraValue1에 콤마 구분 ID)
+ * <p>PPM 수정 권한자: code_group 'PS_INSP_AUTH'의 활성 코드값(사용자 로그인 ID)
  *
  * <p>권한 체계:
  * <ul>
  *   <li>조회: PS_INSP_MGMT 메뉴 권한</li>
- *   <li>수정: PS_INSP_MGMT 메뉴 권한 + PS_INSP_AUTH 그룹 PPM_ADMIN에 등록된 사용자 ID</li>
+ *   <li>수정: PS_INSP_MGMT 메뉴 권한 + PS_INSP_AUTH에 코드값으로 등록된 사용자 ID</li>
  * </ul>
  */
 @Slf4j
@@ -54,7 +54,7 @@ public class PsInspConfigApiController {
     }
 
     /**
-     * PPM 기준값 저장 (PS_INSP_AUTH > PPM_ADMIN에 등록된 사용자만 가능)
+     * PPM 기준값 저장 (PS_INSP_AUTH 사용자 코드에 등록된 사용자만 가능)
      * POST /ps-insp-api/config/ppm-limit
      * Body: { "ppmLimit": 300.0 }
      */
@@ -102,7 +102,7 @@ public class PsInspConfigApiController {
     }
 
     /**
-     * PPM 수정 권한자 목록 업데이트 (기존 권한자만 가능)
+     * PPM 수정 권한자 목록 업데이트 (기존 권한자만 가능, 사용자별 코드 행으로 저장)
      * POST /ps-insp-api/config/ppm-admins
      * Body: { "adminIds": ["admin", "ykcho", "hsjeong"] }
      */
