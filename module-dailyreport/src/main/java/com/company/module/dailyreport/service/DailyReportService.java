@@ -56,13 +56,27 @@ public class DailyReportService {
     }
 
     /**
-     * 날짜별 일보 조회
+     * 날짜별 일보 조회 — 해당 날짜에 일보가 없으면 자동 생성 (DRAFT 상태)
+     *
+     * 세부공장일보는 매일 입력하는 문서이므로, 사용자가 해당 날짜 페이지를
+     * 열었을 때 빈 일보가 자동으로 준비되어야 한다.
      */
+    @Transactional
     public DailyReportResponse getReportByDate(LocalDate reportDate) {
-        DailyReport report = reportRepository.findByReportDate(reportDate)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "해당 날짜의 일보를 찾을 수 없습니다: " + reportDate));
-        return DailyReportResponse.fromWithDetails(report);
+        return reportRepository.findByReportDate(reportDate)
+                .map(DailyReportResponse::fromWithDetails)
+                .orElseGet(() -> {
+                    // 자동 생성: 해당 날짜 일보 + 4개 기본 표 구조
+                    DailyReport report = DailyReport.builder()
+                            .reportDate(reportDate)
+                            .title(reportDate + " 세부공장일보")
+                            .status("DRAFT")
+                            .createdBy(null)  // 시스템 자동 생성
+                            .build();
+                    createDefaultTables(report);
+                    reportRepository.save(report);
+                    return DailyReportResponse.fromWithDetails(report);
+                });
     }
 
     /**
