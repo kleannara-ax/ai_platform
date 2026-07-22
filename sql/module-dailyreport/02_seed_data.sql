@@ -85,48 +85,9 @@ INSERT IGNORE INTO core_menu_permission (USER_ID, MENU_ID, CAN_READ, CAN_WRITE, 
 --       → 셀별 개별 주기는 daily_report_cell.FREQ_CODE에 저장됨
 -- ═══════════════════════════════════════════════
 
--- kim (USER_ID=2): 제지 재공품 적정재고 — TBL_INVENTORY
--- 담당 셀: E21(밀롤창고), E22(카타대기), E23(미포장), E24(포장후 물류입고전) → event(발생 시)
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (2, 'TBL_INVENTORY', '["E21","E22","E23","E24"]', 'event', '발생 시', 1, 1, '제지 재공품 적정재고 담당 (밀롤창고/카타대기/미포장/포장후)');
-
--- park (USER_ID=3): 연료 에너지 원단위 + 보일러 운영 — TBL_ENERGY, TBL_BOILER
--- TBL_ENERGY: D39(제지목표), D40(화장지목표), D41(초지5목표)=yearly, F39,F40,F41(계획)=monthly
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (3, 'TBL_ENERGY', '["D39","D40","D41","F39","F40","F41"]', 'monthly', '매월', 1, 1, '연료 에너지 원단위 담당 (목표=yearly, 계획=monthly)');
--- TBL_BOILER: K36~K40(목표), L36~L40(단가)=yearly, O36~O40(계획)=monthly
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (3, 'TBL_BOILER', '["K36","K37","K38","K39","K40","L36","L37","L38","L39","L40","O36","O37","O38","O39","O40"]', 'monthly', '매월', 1, 1, '보일러 운영 목표/단가/계획 담당');
-
--- yoo (USER_ID=4): 수율 — TBL_PRODUCTION_INDEX
--- 담당 셀: O9(PS완제품), O10(코팅제외), O11(화장지) → event(발생 시)
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (4, 'TBL_PRODUCTION_INDEX', '["O9","O10","O11"]', 'event', '발생 시', 1, 1, '수율 담당 (PS 완제품/코팅제외/화장지)');
-
--- jung (USER_ID=5): 슬러지 원단위 — TBL_PRODUCTION_INDEX
--- 담당 셀: E13(제지 목표), E14(화장지 목표)=yearly, O13(제지 7월), O14(화장지 7월)=event
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (5, 'TBL_PRODUCTION_INDEX', '["E13","E14","O13","O14"]', 'event', '발생 시', 1, 1, '슬러지 원단위 담당 (목표=yearly, 실적=event)');
-
--- jang (USER_ID=6): 장기재고 — TBL_INVENTORY (lee와 공동)
--- 담당 셀: M25(3개월 초과), M26(6개월 초과) → monthly
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (6, 'TBL_INVENTORY', '["M25","M26"]', 'monthly', '매월', 1, 1, '장기재고 담당 (3개월/6개월 초과) — 이도형 사원과 공동');
-
--- lee (USER_ID=7): 장기재고 — TBL_INVENTORY (jang과 공동)
--- 담당 셀: M25(3개월 초과), M26(6개월 초과) → monthly
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (7, 'TBL_INVENTORY', '["M25","M26"]', 'monthly', '매월', 1, 1, '장기재고 담당 (3개월/6개월 초과) — 장석환 선임과 공동');
-
--- choi (USER_ID=8): 전력 에너지 원단위 — TBL_ENERGY
--- 담당 셀: D36(제지목표), D37(화장지목표), D38(초지5목표)=yearly, F36,F37,F38(계획)=monthly
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (8, 'TBL_ENERGY', '["D36","D37","D38","F36","F37","F38"]', 'monthly', '매월', 1, 1, '전력 에너지 원단위 담당 (목표=yearly, 계획=monthly)');
-
--- energy (USER_ID=9): 보일러 운영 실적 — TBL_BOILER
--- 담당 셀: P36~P40(실적) → daily
-INSERT IGNORE INTO daily_report_cell_auth (USER_ID, TABLE_CODE, CELL_COORDS, FREQ_CODE, FREQ_LABEL, IS_ACTIVE, GRANTED_BY, DESCRIPTION) VALUES
-    (9, 'TBL_BOILER', '["P36","P37","P38","P39","P40"]', 'daily', '매일', 1, 1, '보일러 운영 실적 담당 (LNG/유동상/복합/폐합성/합계)');
+-- ※ 운영 배포 초기: cell_auth 데이터 없음 (빈 상태)
+-- ※ admin이 '세부공장일보 접근권한' 페이지에서 담당자를 직접 배정
+-- ※ 배정 전까지 admin만 세부공장일보 접근 가능
 
 
 -- ═══════════════════════════════════════════════
@@ -527,5 +488,4 @@ INSERT INTO daily_report_image (REPORT_ID, ORIGINAL_NAME, STORED_PATH, FILE_SIZE
 SELECT '=== 02_seed_data.sql 실행 완료 ===' AS message;
 SELECT '  ★ core_menu: 3건 (세부공장일보 카테고리 + 2 하위 페이지)' AS info;
 SELECT '  ★ core_menu_permission: 10건 (입력 페이지 9건 + 접근권한 페이지 1건)' AS info;
-SELECT '  ★ daily_report_cell_auth: 9건 (8명 사용자 × 담당 표)' AS info;
-SELECT '  ※ 레거시 daily_report_cell_permission: 삭제됨 → cell_auth로 대체' AS info;
+SELECT '  ★ daily_report_cell_auth: 0건 (운영 초기 빈 상태 — admin이 접근권한 페이지에서 배정)' AS info;

@@ -752,18 +752,9 @@ const server = http.createServer((req, res) => {
 
       // ── 세부공장일보 셀 권한 (in-memory store) ──
       if (!global._drCellAuths) {
-        global._drCellAuths = [
-          { authId:1, userId:2, loginId:'kim',  userName:'김완중 팀장', tableCode:'TBL_INVENTORY', cellCoords:'["E21","E22","E23","E24"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'제지 재공품 적정재고 담당' },
-          { authId:2, userId:3, loginId:'park', userName:'박지권 책임', tableCode:'TBL_ENERGY', cellCoords:'["D39","D40","D41","F39","F40","F41"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'연료 에너지 원단위 담당' },
-          { authId:3, userId:3, loginId:'park', userName:'박지권 책임', tableCode:'TBL_BOILER', cellCoords:'["K36","K37","K38","K39","K40","L36","L37","L38","L39","L40","O36","O37","O38","O39","O40"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'보일러 운영 목표/단가/계획 담당' },
-          { authId:4, userId:4, loginId:'yoo',  userName:'유동현 책임', tableCode:'TBL_PRODUCTION_INDEX', cellCoords:'["O9","O10","O11"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'수율 담당' },
-          { authId:5, userId:5, loginId:'jung', userName:'정상엽 책임', tableCode:'TBL_PRODUCTION_INDEX', cellCoords:'["E13","E14","O13","O14"]', freqCode:'event', freqLabel:'발생 시', isActive:true, grantedBy:1, description:'슬러지 원단위 담당' },
-          { authId:6, userId:6, loginId:'jang', userName:'장석환 선임', tableCode:'TBL_INVENTORY', cellCoords:'["M25","M26"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'장기재고 담당' },
-          { authId:7, userId:7, loginId:'lee',  userName:'이도형 사원', tableCode:'TBL_INVENTORY', cellCoords:'["M25","M26"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'장기재고 담당' },
-          { authId:8, userId:8, loginId:'choi', userName:'최민우 사원', tableCode:'TBL_ENERGY', cellCoords:'["D36","D37","D38","F36","F37","F38"]', freqCode:'monthly', freqLabel:'매월', isActive:true, grantedBy:1, description:'전력 에너지 원단위 담당' },
-          { authId:9, userId:9, loginId:'energy',userName:'환경에너지팀 반장', tableCode:'TBL_BOILER', cellCoords:'["P36","P37","P38","P39","P40"]', freqCode:'daily', freqLabel:'매일', isActive:true, grantedBy:1, description:'보일러 운영 실적 담당' },
-        ];
-        global._drNextAuthId = 10;
+        // 운영 배포 초기 상태: 빈 배열 — admin이 접근권한 페이지에서 직접 배정
+        global._drCellAuths = [];
+        global._drNextAuthId = 1;
       }
 
       // ── 셀 데이터 (in-memory store) ──
