@@ -57,7 +57,7 @@ public class ViewRenderController {
     @GetMapping("/render")
     public ApiResponse<Map<String, Object>> renderReport(
             @RequestParam LocalDate reportDate,
-            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
 
         // ★ 1계층: 세부공장일보 입력 페이지 접근 권한 확인
@@ -113,7 +113,7 @@ public class ViewRenderController {
      */
     @GetMapping("/my-permissions")
     public ApiResponse<Map<String, Object>> getMyPermissions(
-            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
 
         Map<String, Object> result = new LinkedHashMap<>();

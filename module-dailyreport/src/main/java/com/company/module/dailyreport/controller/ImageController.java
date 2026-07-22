@@ -46,7 +46,7 @@ public class ImageController {
             @RequestParam String contentType,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) String tableCode,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(
                 ApiResponse.created(dailyReportService.addImage(
                         reportId, originalName, storedPath, fileSize,

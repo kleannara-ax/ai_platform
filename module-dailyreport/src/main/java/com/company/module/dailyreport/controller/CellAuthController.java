@@ -46,7 +46,7 @@ public class CellAuthController {
     public ResponseEntity<ApiResponse<List<CellAuthResponse>>> getAuths(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String tableCode,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAccess(currentUserId);
 
@@ -68,7 +68,7 @@ public class CellAuthController {
     @GetMapping("/{authId}")
     public ResponseEntity<ApiResponse<CellAuthResponse>> getAuth(
             @PathVariable Long authId,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAccess(currentUserId);
         return ResponseEntity.ok(ApiResponse.success(cellAuthService.getAuth(authId)));
@@ -80,7 +80,7 @@ public class CellAuthController {
     @PostMapping
     public ResponseEntity<ApiResponse<CellAuthResponse>> createAuth(
             @Valid @RequestBody CellAuthRequest request,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAdmin(currentUserId);
         return ResponseEntity.ok(
@@ -94,7 +94,7 @@ public class CellAuthController {
     public ResponseEntity<ApiResponse<CellAuthResponse>> updateAuth(
             @PathVariable Long authId,
             @Valid @RequestBody CellAuthRequest request,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAdmin(currentUserId);
         return ResponseEntity.ok(
@@ -107,7 +107,7 @@ public class CellAuthController {
     @PatchMapping("/{authId}/deactivate")
     public ResponseEntity<ApiResponse<Void>> deactivateAuth(
             @PathVariable Long authId,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAdmin(currentUserId);
         cellAuthService.deactivateAuth(authId);
@@ -120,7 +120,7 @@ public class CellAuthController {
     @DeleteMapping("/{authId}")
     public ResponseEntity<ApiResponse<Void>> deleteAuth(
             @PathVariable Long authId,
-            @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
 
         verifyAuthPageAdmin(currentUserId);
         cellAuthService.deleteAuth(authId);

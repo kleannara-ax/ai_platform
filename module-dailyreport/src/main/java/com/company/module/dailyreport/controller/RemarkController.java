@@ -41,7 +41,7 @@ public class RemarkController {
     public ResponseEntity<ApiResponse<RemarkResponse>> addRemark(
             @PathVariable Long reportId,
             @Valid @RequestBody RemarkRequest request,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(
                 ApiResponse.created(dailyReportService.addRemark(reportId, request, userId)));
     }

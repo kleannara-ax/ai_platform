@@ -39,7 +39,7 @@ public class CellController {
     public ResponseEntity<ApiResponse<ReportTableResponse>> getTableData(
             @PathVariable Long reportId,
             @RequestParam String tableCode,
-            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
 
         // ★ 1계층: 입력 페이지 접근 권한 확인
@@ -57,7 +57,7 @@ public class CellController {
     public ResponseEntity<ApiResponse<List<CellResponse>>> saveCells(
             @PathVariable Long reportId,
             @Valid @RequestBody CellSaveRequest request,
-            @AuthenticationPrincipal(expression = "id") Long userId,
+            @AuthenticationPrincipal(expression = "userId") Long userId,
             @AuthenticationPrincipal(expression = "username") String loginId) {
 
         // ★ 1계층: 입력 페이지 쓰기 권한 확인

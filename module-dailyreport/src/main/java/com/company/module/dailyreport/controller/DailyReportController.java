@@ -69,7 +69,7 @@ public class DailyReportController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<DailyReportResponse>> createReport(
             @Valid @RequestBody DailyReportRequest request,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(ApiResponse.created(dailyReportService.createReport(request, userId)));
     }
 
@@ -82,7 +82,7 @@ public class DailyReportController {
     public ResponseEntity<ApiResponse<DailyReportResponse>> updateStatus(
             @PathVariable Long reportId,
             @RequestParam String status,
-            @AuthenticationPrincipal(expression = "id") Long userId) {
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(
                 ApiResponse.success(dailyReportService.updateReportStatus(reportId, status, userId)));
     }
