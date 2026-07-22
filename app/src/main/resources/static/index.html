@@ -617,7 +617,9 @@ async function loadUserMenus() {
     if (currentUser.role !== 'ROLE_ADMIN') {
       try {
         var loginId = currentUser.loginId || '';
-        var drRes = await fetch('/dailyreport-api/view/my-permissions?_loginId=' + encodeURIComponent(loginId));
+        var drRes = await fetch('/dailyreport-api/view/my-permissions?_loginId=' + encodeURIComponent(loginId), {
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
         var drJson = await drRes.json();
         // ApiResponse 구조({ success, data }) 언래핑
         var drData = (drJson && typeof drJson.success === 'boolean' && drJson.data !== undefined) ? drJson.data : drJson;
@@ -1877,7 +1879,7 @@ function navigateToDailyReportPage(path) {
   iframe.id = 'dailyReportIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
   var sep = path.includes('?') ? '&' : '?';
-  iframe.src = path + sep + '_loginId=' + encodeURIComponent(loginId);
+  iframe.src = path + sep + '_loginId=' + encodeURIComponent(loginId) + '&_t=' + encodeURIComponent(token);
   el.innerHTML = '';
   el.appendChild(iframe);
 }

@@ -320,9 +320,10 @@
   <script>
     const API_BASE = '/dailyreport-api';
 
-    // ── 프리뷰 모드: 부모 iframe에서 전달한 _loginId 추출 ──
+    // ── 부모 iframe에서 전달한 파라미터 추출 ──
     const _urlParams = new URLSearchParams(window.location.search);
     const _previewLoginId = _urlParams.get('_loginId') || '';
+    const _jwtToken = _urlParams.get('_t') || '';
 
     // ── 상태 ──
     let currentUser = null;
@@ -481,8 +482,10 @@
         const sep = url.includes('?') ? '&' : '?';
         url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
       }
+      const hdrs = { 'Content-Type': 'application/json', ...options.headers };
+      if (_jwtToken) hdrs['Authorization'] = 'Bearer ' + _jwtToken;
       const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers: hdrs,
         credentials: 'same-origin',
         ...options
       });
