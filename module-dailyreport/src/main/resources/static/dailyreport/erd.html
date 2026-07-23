@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세부공장일보 DB ERD</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ── Top Header ── */
+        .header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 1px solid #334155;
+            padding: 12px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header h1 {
+            font-size: 18px; font-weight: 700; color: #f1f5f9;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .header h1 .icon { font-size: 22px; }
+        .header .badge {
+            font-size: 11px; padding: 3px 10px; border-radius: 12px;
+            background: #3b82f6; color: #fff; font-weight: 600;
+        }
+        .header .controls { display: flex; gap: 8px; }
+        .header .controls button {
+            background: #1e293b; border: 1px solid #475569; color: #94a3b8;
+            padding: 6px 14px; border-radius: 6px; cursor: pointer;
+            font-size: 12px; transition: all .2s;
+        }
+        .header .controls button:hover { background: #334155; color: #f1f5f9; }
+
+        /* ── Legend ── */
+        .legend {
+            position: fixed; top: 56px; left: 0; right: 0; z-index: 99;
+            background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+            border-bottom: 1px solid #1e293b; padding: 8px 24px;
+            display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
+        .legend-line { width: 30px; height: 2px; }
+
+        /* ── Canvas ── */
+        .canvas-wrapper {
+            position: absolute; top: 96px; left: 0; right: 0; bottom: 0;
+            overflow: hidden; cursor: grab;
+        }
+        .canvas-wrapper:active { cursor: grabbing; }
+        .canvas {
+            position: absolute; transform-origin: 0 0;
+            width: 2400px; height: 1600px;
+        }
+
+        /* ── SVG for lines ── */
+        .canvas svg {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 1;
+        }
+        .rel-line { fill: none; stroke-width: 2; }
+        .rel-line.fk { stroke: #3b82f6; }
+        .rel-line.ref { stroke: #f59e0b; stroke-dasharray: 8 4; }
+        .rel-marker { font-size: 11px; fill: #94a3b8; }
+        .rel-label-bg { fill: rgba(15, 23, 42, 0.85); rx: 4; }
+        .rel-label { font-size: 10px; fill: #94a3b8; font-family: 'Segoe UI', sans-serif; }
+
+        /* ── Table Card ── */
+        .table-card {
+            position: absolute; z-index: 10;
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 10px; min-width: 280px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.4);
+            transition: box-shadow .2s;
+        }
+        .table-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+        .table-card.stub { opacity: 0.7; border-style: dashed; }
+
+        .table-header {
+            padding: 10px 14px; border-radius: 10px 10px 0 0;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: move;
+        }
+        .table-header .name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+        .table-header .comment { font-size: 10px; color: rgba(255,255,255,.65); margin-top: 2px; }
+        .table-header .tag {
+            font-size: 9px; padding: 2px 8px; border-radius: 10px;
+            background: rgba(255,255,255,.15); color: rgba(255,255,255,.8);
+            font-weight: 600; white-space: nowrap;
+        }
+
+        /* Color themes per table */
+        .theme-master .table-header { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+        .theme-meta .table-header { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+        .theme-data .table-header { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+        .theme-auth .table-header { background: linear-gradient(135deg, #dc2626, #ef4444); }
+        .theme-sub .table-header { background: linear-gradient(135deg, #0891b2, #06b6d4); }
+        .theme-stub .table-header { background: linear-gradient(135deg, #4b5563, #6b7280); }
+
+        /* Columns */
+        .table-columns { padding: 0; }
+        .col-row {
+            display: grid; grid-template-columns: 26px 1fr 1fr 26px;
+            align-items: center; padding: 4px 12px;
+            border-bottom: 1px solid #1a2332; font-size: 11.5px;
+            transition: background .15s;
+        }
+        .col-row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
+        .col-row:hover { background: rgba(59, 130, 246, 0.08); }
+        .col-icon { text-align: center; font-size: 10px; }
+        .col-icon.pk { color: #facc15; }
+        .col-icon.fk { color: #3b82f6; }
+        .col-icon.uk { color: #a78bfa; }
+        .col-icon.idx { color: #6b7280; }
+        .col-name { color: #f1f5f9; font-weight: 500; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 11px; }
+        .col-name.nullable { color: #94a3b8; }
+        .col-type { color: #64748b; font-size: 10.5px; font-family: 'JetBrains Mono', monospace; }
+        .col-constraint { text-align: center; font-size: 9px; color: #64748b; }
+
+        /* Table footer */
+        .table-footer {
+            padding: 6px 12px; border-top: 1px solid #1a2332;
+            font-size: 10px; color: #475569;
+            border-radius: 0 0 10px 10px;
+        }
+        .table-footer .constraint-tag {
+            display: inline-block; padding: 1px 6px; margin: 1px 2px;
+            background: #1a2332; border-radius: 4px; color: #64748b; font-size: 9.5px;
+        }
+
+        /* ── Zoom info ── */
+        .zoom-info {
+            position: fixed; bottom: 12px; right: 16px; z-index: 100;
+            font-size: 11px; color: #64748b; background: #1e293b;
+            padding: 4px 12px; border-radius: 6px; border: 1px solid #334155;
+        }
+
+        /* ── Tooltip ── */
+        .tooltip {
+            display: none; position: fixed; z-index: 200;
+            background: #1e293b; border: 1px solid #475569;
+            padding: 8px 12px; border-radius: 8px; font-size: 11px;
+            color: #cbd5e1; max-width: 300px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.5);
+        }
+        .tooltip.visible { display: block; }
+        .tooltip .tt-title { font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>
+        <span class="icon">🗄️</span>
+        세부공장일보 DB ERD
+        <span class="badge">01_schema.sql v3.1</span>
+    </h1>
+    <div class="controls">
+        <button onclick="resetView()">🔄 초기화</button>
+        <button onclick="fitAll()">📐 전체보기</button>
+        <button onclick="zoomIn()">➕</button>
+        <button onclick="zoomOut()">➖</button>
+    </div>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:#2563eb"></div> 마스터</div>
+    <div class="legend-item"><div class="legend-color" style="background:#14b8a6"></div> 표 메타</div>
+    <div class="legend-item"><div class="legend-color" style="background:#8b5cf6"></div> 셀 데이터</div>
+    <div class="legend-item"><div class="legend-color" style="background:#ef4444"></div> 셀 권한 (★신규)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#06b6d4"></div> 부속 (특이사항/이미지)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#6b7280;opacity:.6;border:1px dashed #6b7280"></div> 플랫폼 스텁</div>
+    <div class="legend-item"><div class="legend-line" style="background:#3b82f6"></div> FK (CASCADE)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#f59e0b;border-top:2px dashed #f59e0b;height:0"></div> 논리 참조</div>
+    <div class="legend-item" style="margin-left:auto; color:#475569;">
+        🖱️ 드래그: 이동 &nbsp; 🔄 휠: 줌 &nbsp; 📌 테이블 드래그 가능
+    </div>
+</div>
+
+<div class="canvas-wrapper" id="canvasWrapper">
+    <div class="canvas" id="canvas">
+        <svg id="svgLayer"></svg>
+    </div>
+</div>
+
+<div class="zoom-info" id="zoomInfo">100%</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ═══════════════════════════════════════
+// Table definitions from 01_schema.sql
+// ═══════════════════════════════════════
+const tables = [
+    {
+        id: 'core_user', name: 'core_user',
+        comment: '[플랫폼 코어] 사용자 마스터 (V2.0.0)',
+        theme: 'stub', tag: 'STUB', stub: true,
+        x: 100, y: 80,
+        columns: [
+            { name: 'user_id', type: 'BIGINT', pk: true, ai: true, comment: '사용자 ID (PK)' },
+            { name: 'login_id', type: 'VARCHAR(50)', nn: true, uk: 'UK_CORE_USER_LOGIN', comment: '로그인 ID' },
+            { name: 'password', type: 'VARCHAR(255)', nn: true, comment: '비밀번호 (BCrypt)' },
+            { name: 'user_name', type: 'VARCHAR(100)', nn: true, comment: '사용자명' },
+            { name: 'email', type: 'VARCHAR(200)', comment: '이메일' },
+            { name: 'phone', type: 'VARCHAR(20)', comment: '전화번호' },
+            { name: 'role', type: 'VARCHAR(30)', nn: true, def: 'ROLE_USER', comment: '역할' },
+            { name: 'enabled', type: 'TINYINT(1)', nn: true, def: '1', comment: '활성화 여부' },
+            { name: 'created_at', type: 'DATETIME', nn: true, comment: '생성일시' },
+            { name: 'updated_at', type: 'DATETIME', comment: '수정일시' },
+            { name: 'created_by', type: 'VARCHAR(50)', comment: '생성자' },
+            { name: 'updated_by', type: 'VARCHAR(50)', comment: '수정자' },
+        ],
+        constraints: ['PK(user_id)', 'UK(login_id)']
+    },
+    {
+        id: 'daily_report', name: 'daily_report',
+        comment: '세부공장일보 마스터',
+        theme: 'master', tag: '마스터',
+        x: 520, y: 80,
+        columns: [
+            { name: 'REPORT_ID', type: 'BIGINT', pk: true, ai: true, comment: '일보 ID (PK)' },
+            { name: 'REPORT_DATE', type: 'DATE', nn: true, uk: 'UK_DAILY_REPORT_DATE', comment: '일보 대상 날짜' },
+            { name: 'TITLE', type: 'VARCHAR(200)', nn: true, comment: '일보 제목' },
+            { name: 'STATUS', type: 'VARCHAR(20)', nn: true, def: 'DRAFT', comment: 'DRAFT/SUBMITTED/CONFIRMED' },
+            { name: 'CREATED_BY', type: 'BIGINT', nn: true, fk: 'core_user', comment: '최초 작성자' },
+            { name: 'UPDATED_BY', type: 'BIGINT', fk: 'core_user', comment: '최종 수정자' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '생성일시' },
+            { name: 'UPDATED_AT', type: 'DATETIME', comment: '수정일시' },
+        ],
+        constraints: ['PK(REPORT_ID)', 'UK(REPORT_DATE)', 'IDX(STATUS)', 'IDX(CREATED_AT)']
+    },
+    {
+        id: 'daily_report_table', name: 'daily_report_table',
+        comment: '일보 표 메타',
+        theme: 'meta', tag: '표 메타',
+        x: 520, y: 460,
+        columns: [
+            { name: 'TABLE_ID', type: 'BIGINT', pk: true, ai: true, comment: '표 ID (PK)' },
+            { name: 'REPORT_ID', type: 'BIGINT', nn: true, fk: 'daily_report', comment: 'FK → daily_report' },
+            { name: 'TABLE_CODE', type: 'VARCHAR(50)', nn: true, comment: '표 코드' },
+            { name: 'TABLE_NAME', type: 'VARCHAR(100)', nn: true, comment: '표 제목' },
+            { name: 'SORT_ORDER', type: 'INT', nn: true, comment: '정렬 순서 (1~4)' },
+            { name: 'ROW_COUNT', type: 'INT', nn: true, comment: '표 행 수' },
+            { name: 'COL_COUNT', type: 'INT', nn: true, comment: '표 열 수' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '생성일시' },
+        ],
+        constraints: ['PK(TABLE_ID)', 'FK(REPORT_ID→daily_report)', 'IDX(REPORT_ID)']
+    },
+    {
+        id: 'daily_report_cell', name: 'daily_report_cell',
+        comment: '일보 표 셀 데이터',
+        theme: 'data', tag: '셀 데이터',
+        x: 520, y: 800,
+        columns: [
+            { name: 'CELL_ID', type: 'BIGINT', pk: true, ai: true, comment: '셀 ID (PK)' },
+            { name: 'TABLE_ID', type: 'BIGINT', nn: true, fk: 'daily_report_table', comment: 'FK → daily_report_table' },
+            { name: 'ROW_INDEX', type: 'INT', nn: true, comment: '행 인덱스' },
+            { name: 'COL_INDEX', type: 'INT', nn: true, comment: '열 인덱스' },
+            { name: 'EXCEL_COORD', type: 'VARCHAR(10)', comment: '엑셀 좌표 (B5 등)' },
+            { name: 'CELL_VALUE', type: 'VARCHAR(2000)', comment: '셀 값' },
+            { name: 'CELL_TYPE', type: 'VARCHAR(20)', nn: true, comment: 'HEADER/DATA/FORMULA/READONLY' },
+            { name: 'CELL_LABEL', type: 'VARCHAR(200)', comment: '헤더 라벨' },
+            { name: 'DATA_FORMAT', type: 'VARCHAR(20)', comment: 'TEXT/NUMBER/PERCENT/DATE' },
+            { name: 'FORMULA', type: 'VARCHAR(500)', comment: '수식' },
+            { name: 'INPUT_CYCLE', type: 'VARCHAR(20)', nn: true, def: 'NONE', comment: '레거시 입력 주기' },
+            { name: 'FREQ_CODE', type: 'VARCHAR(20)', comment: 'daily/monthly/yearly/event/none' },
+            { name: 'FREQ_LABEL', type: 'VARCHAR(50)', comment: '주기 라벨' },
+            { name: 'OWNER_IDS', type: 'VARCHAR(200)', comment: '★ 담당자 로그인ID 목록' },
+            { name: 'OWNER_NAMES', type: 'VARCHAR(500)', comment: '담당자 이름 (표시용)' },
+            { name: 'IS_LOCKED', type: 'TINYINT(1)', nn: true, def: '0', comment: '잠금 여부' },
+            { name: 'ROW_SPAN', type: 'INT', def: '1', comment: 'rowspan' },
+            { name: 'COL_SPAN', type: 'INT', def: '1', comment: 'colspan' },
+            { name: 'LAST_EDITOR_ID', type: 'BIGINT', fk: 'core_user', comment: '최종 입력자' },
+            { name: 'LAST_EDITED_AT', type: 'DATETIME', comment: '최종 입력 시각' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '생성일시' },
+        ],
+        constraints: ['PK(CELL_ID)', 'UK(TABLE_ID, ROW_INDEX, COL_INDEX)', 'FK(TABLE_ID→daily_report_table)', 'IDX(EXCEL_COORD)', 'IDX(OWNER_IDS)']
+    },
+    {
+        id: 'daily_report_cell_auth', name: 'daily_report_cell_auth',
+        comment: '★ 신규 — 셀 단위 접근 권한',
+        theme: 'auth', tag: '★ 신규',
+        x: 1050, y: 460,
+        columns: [
+            { name: 'AUTH_ID', type: 'BIGINT', pk: true, ai: true, comment: '권한 ID (PK)' },
+            { name: 'USER_ID', type: 'BIGINT', nn: true, fk: 'core_user', comment: '담당 사용자 (core_user FK)' },
+            { name: 'TABLE_CODE', type: 'VARCHAR(50)', nn: true, comment: '대상 표 코드' },
+            { name: 'CELL_COORDS', type: 'TEXT', nn: true, comment: 'JSON배열 ["B7","C7"]' },
+            { name: 'FREQ_CODE', type: 'VARCHAR(20)', nn: true, def: 'daily', comment: 'daily/monthly/yearly/event' },
+            { name: 'FREQ_LABEL', type: 'VARCHAR(50)', comment: '주기 라벨' },
+            { name: 'IS_ACTIVE', type: 'TINYINT(1)', nn: true, def: '1', comment: '활성 여부' },
+            { name: 'GRANTED_BY', type: 'BIGINT', fk: 'core_user', comment: '권한 부여자 (관리자)' },
+            { name: 'DESCRIPTION', type: 'VARCHAR(300)', comment: '설명' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '생성일시' },
+            { name: 'UPDATED_AT', type: 'DATETIME', comment: '수정일시' },
+        ],
+        constraints: ['PK(AUTH_ID)', 'UK(USER_ID, TABLE_CODE)', 'IDX(USER_ID)', 'IDX(TABLE_CODE)']
+    },
+    {
+        id: 'daily_report_remark', name: 'daily_report_remark',
+        comment: '일보 특이사항',
+        theme: 'sub', tag: '특이사항',
+        x: 1050, y: 80,
+        columns: [
+            { name: 'REMARK_ID', type: 'BIGINT', pk: true, ai: true, comment: '특이사항 ID (PK)' },
+            { name: 'REPORT_ID', type: 'BIGINT', nn: true, fk: 'daily_report', comment: 'FK → daily_report' },
+            { name: 'TABLE_CODE', type: 'VARCHAR(50)', comment: '관련 표 코드 (NULL=전체)' },
+            { name: 'CATEGORY', type: 'VARCHAR(30)', nn: true, def: 'GENERAL', comment: '카테고리' },
+            { name: 'CONTENT', type: 'TEXT', nn: true, comment: '특이사항 내용' },
+            { name: 'SORT_ORDER', type: 'INT', nn: true, def: '1', comment: '정렬 순서' },
+            { name: 'CREATED_BY', type: 'BIGINT', nn: true, fk: 'core_user', comment: '작성자' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '생성일시' },
+            { name: 'UPDATED_AT', type: 'DATETIME', comment: '수정일시' },
+        ],
+        constraints: ['PK(REMARK_ID)', 'FK(REPORT_ID→daily_report)', 'IDX(REPORT_ID)']
+    },
+    {
+        id: 'daily_report_image', name: 'daily_report_image',
+        comment: '일보 이미지 첨부',
+        theme: 'sub', tag: '이미지',
+        x: 1500, y: 80,
+        columns: [
+            { name: 'IMAGE_ID', type: 'BIGINT', pk: true, ai: true, comment: '이미지 ID (PK)' },
+            { name: 'REPORT_ID', type: 'BIGINT', nn: true, fk: 'daily_report', comment: 'FK → daily_report' },
+            { name: 'ORIGINAL_NAME', type: 'VARCHAR(255)', nn: true, comment: '원본 파일명' },
+            { name: 'STORED_PATH', type: 'VARCHAR(500)', nn: true, comment: '저장 경로' },
+            { name: 'FILE_SIZE', type: 'BIGINT', nn: true, def: '0', comment: '파일 크기 (bytes)' },
+            { name: 'CONTENT_TYPE', type: 'VARCHAR(100)', nn: true, comment: 'MIME 타입' },
+            { name: 'DESCRIPTION', type: 'VARCHAR(500)', comment: '이미지 설명' },
+            { name: 'TABLE_CODE', type: 'VARCHAR(50)', comment: '관련 표 코드' },
+            { name: 'SORT_ORDER', type: 'INT', nn: true, def: '1', comment: '정렬 순서' },
+            { name: 'UPLOADED_BY', type: 'BIGINT', nn: true, fk: 'core_user', comment: '업로드 사용자' },
+            { name: 'CREATED_AT', type: 'DATETIME', nn: true, comment: '등록일시' },
+        ],
+        constraints: ['PK(IMAGE_ID)', 'FK(REPORT_ID→daily_report)', 'IDX(REPORT_ID)']
+    },
+];
+
+// ═══════════════════════════════════════
+// Relationships
+// ═══════════════════════════════════════
+const relationships = [
+    // FK CASCADE relationships
+    { from: 'daily_report_table', fromCol: 'REPORT_ID', to: 'daily_report', toCol: 'REPORT_ID', type: 'fk', card: '1:N', label: 'FK CASCADE' },
+    { from: 'daily_report_cell', fromCol: 'TABLE_ID', to: 'daily_report_table', toCol: 'TABLE_ID', type: 'fk', card: '1:N', label: 'FK CASCADE' },
+    { from: 'daily_report_remark', fromCol: 'REPORT_ID', to: 'daily_report', toCol: 'REPORT_ID', type: 'fk', card: '1:N', label: 'FK CASCADE' },
+    { from: 'daily_report_image', fromCol: 'REPORT_ID', to: 'daily_report', toCol: 'REPORT_ID', type: 'fk', card: '1:N', label: 'FK CASCADE' },
+    // Logical references to core_user (no DDL FK constraint)
+    { from: 'daily_report', fromCol: 'CREATED_BY', to: 'core_user', toCol: 'user_id', type: 'ref', card: 'N:1', label: '논리 참조' },
+    { from: 'daily_report_cell_auth', fromCol: 'USER_ID', to: 'core_user', toCol: 'user_id', type: 'ref', card: 'N:1', label: '논리 참조' },
+    { from: 'daily_report_cell_auth', fromCol: 'GRANTED_BY', to: 'core_user', toCol: 'user_id', type: 'ref', card: 'N:1', label: '논리 참조 (부여자)' },
+    // Logical: cell_auth.TABLE_CODE <-> daily_report_table.TABLE_CODE
+    { from: 'daily_report_cell_auth', fromCol: 'TABLE_CODE', to: 'daily_report_table', toCol: 'TABLE_CODE', type: 'ref', card: 'N:1', label: 'TABLE_CODE 매핑' },
+];
+
+// ═══════════════════════════════════════
+// Rendering
+// ═══════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const svgLayer = document.getElementById('svgLayer');
+const canvasWrapper = document.getElementById('canvasWrapper');
+const zoomInfo = document.getElementById('zoomInfo');
+const tooltipEl = document.getElementById('tooltip');
+
+let scale = 0.85, panX = 20, panY = 0;
+let isPanning = false, panStartX, panStartY;
+let dragTarget = null, dragOffsetX, dragOffsetY;
+const tableElements = {};
+const tablePositions = {};
+
+function renderTables() {
+    tables.forEach(t => {
+        tablePositions[t.id] = { x: t.x, y: t.y };
+
+        const card = document.createElement('div');
+        card.className = `table-card theme-${t.theme}` + (t.stub ? ' stub' : '');
+        card.id = `table-${t.id}`;
+        card.style.left = t.x + 'px';
+        card.style.top = t.y + 'px';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'table-header';
+        header.innerHTML = `
+            <div>
+                <div class="name">${t.name}</div>
+                <div class="comment">${t.comment}</div>
+            </div>
+            <span class="tag">${t.tag}</span>
+        `;
+        card.appendChild(header);
+
+        // Columns
+        const colContainer = document.createElement('div');
+        colContainer.className = 'table-columns';
+        t.columns.forEach(col => {
+            const row = document.createElement('div');
+            row.className = 'col-row';
+
+            // Icon
+            let icon = '';
+            let iconClass = '';
+            if (col.pk) { icon = '🔑'; iconClass = 'pk'; }
+            else if (col.fk) { icon = '🔗'; iconClass = 'fk'; }
+            else if (col.uk) { icon = '◆'; iconClass = 'uk'; }
+
+            const nameClass = (!col.nn && !col.pk) ? 'col-name nullable' : 'col-name';
+
+            row.innerHTML = `
+                <span class="col-icon ${iconClass}">${icon}</span>
+                <span class="${nameClass}">${col.name}</span>
+                <span class="col-type">${col.type}${col.nn ? '' : ' ○'}</span>
+                <span class="col-constraint">${col.ai ? 'AI' : col.def ? '=' : ''}</span>
+            `;
+
+            // Tooltip
+            if (col.comment) {
+                row.addEventListener('mouseenter', (e) => {
+                    let ttHtml = `<div class="tt-title">${col.name}</div>`;
+                    ttHtml += col.comment;
+                    if (col.def) ttHtml += `<br>DEFAULT: ${col.def}`;
+                    if (col.uk) ttHtml += `<br>UNIQUE: ${col.uk}`;
+                    if (col.fk) ttHtml += `<br>참조 → ${col.fk}`;
+                    tooltipEl.innerHTML = ttHtml;
+                    tooltipEl.classList.add('visible');
+                    positionTooltip(e);
+                });
+                row.addEventListener('mousemove', positionTooltip);
+                row.addEventListener('mouseleave', () => tooltipEl.classList.remove('visible'));
+            }
+
+            colContainer.appendChild(row);
+        });
+        card.appendChild(colContainer);
+
+        // Footer — constraints
+        if (t.constraints && t.constraints.length) {
+            const footer = document.createElement('div');
+            footer.className = 'table-footer';
+            footer.innerHTML = t.constraints.map(c => `<span class="constraint-tag">${c}</span>`).join('');
+            card.appendChild(footer);
+        }
+
+        // Drag
+        header.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            dragTarget = t.id;
+            const rect = card.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+        });
+
+        canvas.appendChild(card);
+        tableElements[t.id] = card;
+    });
+}
+
+function getTableAnchor(tableId, colName, side) {
+    const card = tableElements[tableId];
+    const pos = tablePositions[tableId];
+    if (!card || !pos) return { x: 0, y: 0 };
+
+    const tDef = tables.find(t => t.id === tableId);
+    const colIdx = tDef.columns.findIndex(c => c.name === colName);
+    const headerH = 50;
+    const colRowH = 27;
+    const yOff = headerH + colIdx * colRowH + colRowH / 2;
+
+    const w = card.offsetWidth;
+    if (side === 'left') return { x: pos.x, y: pos.y + yOff };
+    if (side === 'right') return { x: pos.x + w, y: pos.y + yOff };
+    // auto — pick side closest to target
+    return { x: pos.x + w / 2, y: pos.y + yOff, w };
+}
+
+function renderRelationships() {
+    svgLayer.innerHTML = '';
+
+    // Arrow marker definitions
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    ['#3b82f6', '#f59e0b'].forEach((color, i) => {
+        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+        marker.setAttribute('id', `arrow-${i}`);
+        marker.setAttribute('viewBox', '0 0 10 6');
+        marker.setAttribute('refX', '10');
+        marker.setAttribute('refY', '3');
+        marker.setAttribute('markerWidth', '8');
+        marker.setAttribute('markerHeight', '6');
+        marker.setAttribute('orient', 'auto-start-reverse');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M 0 0 L 10 3 L 0 6 z');
+        path.setAttribute('fill', color);
+        marker.appendChild(path);
+        defs.appendChild(marker);
+    });
+    svgLayer.appendChild(defs);
+
+    relationships.forEach(rel => {
+        const fromPos = tablePositions[rel.from];
+        const toPos = tablePositions[rel.to];
+        if (!fromPos || !toPos) return;
+
+        const fromCard = tableElements[rel.from];
+        const toCard = tableElements[rel.to];
+        const fromW = fromCard.offsetWidth;
+        const toW = toCard.offsetWidth;
+        const fromCX = fromPos.x + fromW / 2;
+        const toCX = toPos.x + toW / 2;
+
+        // Determine sides
+        let fromSide, toSide;
+        if (fromCX < toCX - 50) { fromSide = 'right'; toSide = 'left'; }
+        else if (fromCX > toCX + 50) { fromSide = 'left'; toSide = 'right'; }
+        else {
+            // Vertically aligned — use vertical connection
+            const fromTop = fromPos.y;
+            const toTop = toPos.y;
+            if (fromTop > toTop) { fromSide = 'left'; toSide = 'left'; }
+            else { fromSide = 'right'; toSide = 'right'; }
+        }
+
+        const from = getTableAnchor(rel.from, rel.fromCol, fromSide);
+        const to = getTableAnchor(rel.to, rel.toCol, toSide);
+
+        // Cubic bezier
+        const dx = Math.abs(to.x - from.x);
+        const cp = Math.max(60, dx * 0.4);
+        const cpFromX = fromSide === 'right' ? from.x + cp : from.x - cp;
+        const cpToX = toSide === 'right' ? to.x + cp : to.x - cp;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${from.x} ${from.y} C ${cpFromX} ${from.y}, ${cpToX} ${to.y}, ${to.x} ${to.y}`);
+        path.setAttribute('class', `rel-line ${rel.type}`);
+        const markerIdx = rel.type === 'fk' ? 0 : 1;
+        path.setAttribute('marker-end', `url(#arrow-${markerIdx})`);
+        svgLayer.appendChild(path);
+
+        // Label at midpoint
+        const mx = (from.x + to.x) / 2;
+        const my = (from.y + to.y) / 2;
+
+        const labelText = `${rel.card}  ${rel.label}`;
+        const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bgRect.setAttribute('class', 'rel-label-bg');
+        bgRect.setAttribute('x', mx - labelText.length * 3.2);
+        bgRect.setAttribute('y', my - 8);
+        bgRect.setAttribute('width', labelText.length * 6.4);
+        bgRect.setAttribute('height', 16);
+        svgLayer.appendChild(bgRect);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('class', 'rel-label');
+        text.setAttribute('x', mx);
+        text.setAttribute('y', my + 4);
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = labelText;
+        svgLayer.appendChild(text);
+    });
+}
+
+// ═══════════════════════════════════════
+// Pan & Zoom
+// ═══════════════════════════════════════
+function applyTransform() {
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    zoomInfo.textContent = Math.round(scale * 100) + '%';
+}
+
+canvasWrapper.addEventListener('mousedown', (e) => {
+    if (dragTarget) return;
+    isPanning = true;
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (dragTarget) {
+        const wrapperRect = canvasWrapper.getBoundingClientRect();
+        const newX = (e.clientX - wrapperRect.left - panX) / scale - dragOffsetX;
+        const newY = (e.clientY - wrapperRect.top - panY) / scale - dragOffsetY;
+        tablePositions[dragTarget].x = newX;
+        tablePositions[dragTarget].y = newY;
+        const card = tableElements[dragTarget];
+        card.style.left = newX + 'px';
+        card.style.top = newY + 'px';
+        renderRelationships();
+        return;
+    }
+    if (!isPanning) return;
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    applyTransform();
+});
+
+document.addEventListener('mouseup', () => {
+    isPanning = false;
+    dragTarget = null;
+});
+
+canvasWrapper.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.06 : 0.06;
+    const newScale = Math.min(2, Math.max(0.25, scale + delta));
+
+    // Zoom toward cursor
+    const wrapperRect = canvasWrapper.getBoundingClientRect();
+    const mx = e.clientX - wrapperRect.left;
+    const my = e.clientY - wrapperRect.top;
+    panX = mx - (mx - panX) * (newScale / scale);
+    panY = my - (my - panY) * (newScale / scale);
+    scale = newScale;
+    applyTransform();
+}, { passive: false });
+
+function positionTooltip(e) {
+    tooltipEl.style.left = (e.clientX + 12) + 'px';
+    tooltipEl.style.top = (e.clientY + 12) + 'px';
+}
+
+// Controls
+function resetView() { scale = 0.85; panX = 20; panY = 0; applyTransform(); }
+function fitAll() {
+    // Compute bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    Object.entries(tablePositions).forEach(([id, pos]) => {
+        const card = tableElements[id];
+        minX = Math.min(minX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxX = Math.max(maxX, pos.x + card.offsetWidth);
+        maxY = Math.max(maxY, pos.y + card.offsetHeight);
+    });
+    const wrapperRect = canvasWrapper.getBoundingClientRect();
+    const padX = 60, padY = 60;
+    const contentW = maxX - minX + padX * 2;
+    const contentH = maxY - minY + padY * 2;
+    scale = Math.min(wrapperRect.width / contentW, wrapperRect.height / contentH, 1.2);
+    panX = (wrapperRect.width - contentW * scale) / 2 - (minX - padX) * scale;
+    panY = (wrapperRect.height - contentH * scale) / 2 - (minY - padY) * scale;
+    applyTransform();
+}
+function zoomIn() { scale = Math.min(2, scale + 0.1); applyTransform(); }
+function zoomOut() { scale = Math.max(0.25, scale - 0.1); applyTransform(); }
+
+// ═══════════════════════════════════════
+// Init
+// ═══════════════════════════════════════
+renderTables();
+applyTransform();
+// Delay relationship render to get correct card sizes
+requestAnimationFrame(() => {
+    renderRelationships();
+    // Auto fit
+    setTimeout(fitAll, 100);
+});
+</script>
+</body>
+</html>
