@@ -1,0 +1,132 @@
+digraph ERD {
+  rankdir=LR;
+  graph [fontname="Noto Sans CJK KR", bgcolor="#ffffff", pad=0.4, nodesep=0.6, ranksep=1.0, splines=spline];
+  node [shape=plain, fontname="Noto Sans CJK KR"];
+  edge [fontname="Noto Sans CJK KR", fontsize=11, color="#607d8b", penwidth=1.3];
+
+  labelloc="t";
+  label=<<FONT POINT-SIZE="22"><B>세부공장일보(daily_report) 모듈 ERD</B></FONT><BR/><FONT POINT-SIZE="13" COLOR="#555555">이번 세션 개발/수정 대상 데이터 구조 — OWNER_IDS/OWNER_NAMES 하드코딩 제거 &amp; CellAuth 동기화 구조</FONT>>;
+
+  // ───────────── core_user (변경 없음, 참조 전용) ─────────────
+  core_user [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#eef4fb">
+      <TR><TD COLSPAN="3" BGCOLOR="#3f6ea5"><FONT COLOR="white"><B>core_user</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#dbe7f3"><FONT POINT-SIZE="10">[플랫폼 코어 · 변경없음] 사용자 마스터</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="user_id">🔑 USER_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT">LOGIN_ID</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">UK, 로그인ID</TD></TR>
+      <TR><TD ALIGN="LEFT">USER_NAME</TD><TD ALIGN="LEFT">VARCHAR(100)</TD><TD ALIGN="LEFT">이름</TD></TR>
+      <TR><TD ALIGN="LEFT">PASSWORD</TD><TD ALIGN="LEFT">VARCHAR(255)</TD><TD ALIGN="LEFT">BCrypt</TD></TR>
+      <TR><TD ALIGN="LEFT">EMAIL / PHONE</TD><TD ALIGN="LEFT">VARCHAR</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ROLE</TD><TD ALIGN="LEFT">VARCHAR(30)</TD><TD ALIGN="LEFT">ROLE_ADMIN/USER</TD></TR>
+      <TR><TD ALIGN="LEFT">ENABLED</TD><TD ALIGN="LEFT">TINYINT(1)</TD><TD ALIGN="LEFT">활성여부</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report_cell_auth (원본 / Source of Truth) ─────────────
+  cell_auth [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#fff3e0">
+      <TR><TD COLSPAN="3" BGCOLOR="#e65100"><FONT COLOR="white"><B>daily_report_cell_auth</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#ffe0b2"><FONT POINT-SIZE="10">★ 원본(Source of Truth) · 관리자가 컬럼관리 대시보드에서 CRUD</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="auth_id">🔑 AUTH_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="user_id">🔗 USER_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+      <TR><TD ALIGN="LEFT">TABLE_CODE</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">대상 표 코드</TD></TR>
+      <TR><TD ALIGN="LEFT">CELL_COORDS</TD><TD ALIGN="LEFT">TEXT</TD><TD ALIGN="LEFT">JSON배열 좌표목록</TD></TR>
+      <TR><TD ALIGN="LEFT">FREQ_CODE</TD><TD ALIGN="LEFT">VARCHAR(20)</TD><TD ALIGN="LEFT">daily/monthly/yearly/event</TD></TR>
+      <TR><TD ALIGN="LEFT">FREQ_LABEL</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">매일/매월 등</TD></TR>
+      <TR><TD ALIGN="LEFT">IS_ACTIVE</TD><TD ALIGN="LEFT">TINYINT(1)</TD><TD ALIGN="LEFT">활성 여부</TD></TR>
+      <TR><TD ALIGN="LEFT">GRANTED_BY</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">권한 부여자</TD></TR>
+      <TR><TD ALIGN="LEFT">DESCRIPTION</TD><TD ALIGN="LEFT">VARCHAR(300)</TD><TD ALIGN="LEFT">담당 설명</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="LEFT" BGCOLOR="#ffe0b2"><FONT POINT-SIZE="9">UK_CELL_AUTH_USER_TABLE (USER_ID, TABLE_CODE)</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report (마스터) ─────────────
+  daily_report [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#eef6ee">
+      <TR><TD COLSPAN="3" BGCOLOR="#2e7d32"><FONT COLOR="white"><B>daily_report</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#d7ecd8"><FONT POINT-SIZE="10">일보 마스터 (날짜별 1건)</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="report_id">🔑 REPORT_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT">REPORT_DATE</TD><TD ALIGN="LEFT">DATE</TD><TD ALIGN="LEFT">UK, 대상 날짜</TD></TR>
+      <TR><TD ALIGN="LEFT">TITLE</TD><TD ALIGN="LEFT">VARCHAR(200)</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">STATUS</TD><TD ALIGN="LEFT">VARCHAR(20)</TD><TD ALIGN="LEFT">DRAFT/SUBMITTED/CONFIRMED</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="created_by">🔗 CREATED_BY</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+      <TR><TD ALIGN="LEFT">UPDATED_BY</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report_table ─────────────
+  daily_report_table [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#eef6ee">
+      <TR><TD COLSPAN="3" BGCOLOR="#2e7d32"><FONT COLOR="white"><B>daily_report_table</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#d7ecd8"><FONT POINT-SIZE="10">표 메타 (일보 1건당 4개 표)</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="table_id">🔑 TABLE_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="report_id">🔗 REPORT_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→daily_report (CASCADE)</TD></TR>
+      <TR><TD ALIGN="LEFT">TABLE_CODE</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">TBL_PRODUCTION_INDEX 등</TD></TR>
+      <TR><TD ALIGN="LEFT">TABLE_NAME</TD><TD ALIGN="LEFT">VARCHAR(100)</TD><TD ALIGN="LEFT">표 제목</TD></TR>
+      <TR><TD ALIGN="LEFT">SORT_ORDER</TD><TD ALIGN="LEFT">INT</TD><TD ALIGN="LEFT">1~4</TD></TR>
+      <TR><TD ALIGN="LEFT">ROW_COUNT / COL_COUNT</TD><TD ALIGN="LEFT">INT</TD><TD ALIGN="LEFT">표 크기</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report_cell (캐시) — 이번 세션 핵심 수정 대상 ─────────────
+  daily_report_cell [label=<
+    <TABLE BORDER="2" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#fdeaea" COLOR="#c62828">
+      <TR><TD COLSPAN="3" BGCOLOR="#c62828"><FONT COLOR="white"><B>daily_report_cell</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#f8d0d0"><FONT POINT-SIZE="10">★★ 이번 세션 핵심 수정 대상 — OWNER_IDS/OWNER_NAMES는 캐시(Read Cache)</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="cell_id">🔑 CELL_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="table_id">🔗 TABLE_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→daily_report_table (CASCADE)</TD></TR>
+      <TR><TD ALIGN="LEFT">ROW_INDEX / COL_INDEX</TD><TD ALIGN="LEFT">INT</TD><TD ALIGN="LEFT">UK(TABLE_ID,ROW,COL)</TD></TR>
+      <TR><TD ALIGN="LEFT">EXCEL_COORD</TD><TD ALIGN="LEFT">VARCHAR(10)</TD><TD ALIGN="LEFT">B5, O10 등</TD></TR>
+      <TR><TD ALIGN="LEFT">CELL_VALUE</TD><TD ALIGN="LEFT">VARCHAR(2000)</TD><TD ALIGN="LEFT">입력값</TD></TR>
+      <TR><TD ALIGN="LEFT">CELL_TYPE</TD><TD ALIGN="LEFT">VARCHAR(20)</TD><TD ALIGN="LEFT">HEADER/DATA/FORMULA/READONLY</TD></TR>
+      <TR><TD ALIGN="LEFT">FREQ_CODE / FREQ_LABEL</TD><TD ALIGN="LEFT">VARCHAR</TD><TD ALIGN="LEFT">이 셀만의 주기(정확도 우선)</TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffcdd2"><B>OWNER_IDS</B></TD><TD ALIGN="LEFT" BGCOLOR="#ffcdd2">VARCHAR(200)</TD><TD ALIGN="LEFT" BGCOLOR="#ffcdd2"><B>★캐시, 항상 NULL로 시작</B></TD></TR>
+      <TR><TD ALIGN="LEFT" BGCOLOR="#ffcdd2"><B>OWNER_NAMES</B></TD><TD ALIGN="LEFT" BGCOLOR="#ffcdd2">VARCHAR(500)</TD><TD ALIGN="LEFT" BGCOLOR="#ffcdd2"><B>★캐시, 하드코딩 금지</B></TD></TR>
+      <TR><TD ALIGN="LEFT">IS_LOCKED</TD><TD ALIGN="LEFT">TINYINT(1)</TD><TD ALIGN="LEFT">잠금 여부</TD></TR>
+      <TR><TD ALIGN="LEFT">LAST_EDITOR_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report_remark ─────────────
+  daily_report_remark [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#f3eef8">
+      <TR><TD COLSPAN="3" BGCOLOR="#6a1b9a"><FONT COLOR="white"><B>daily_report_remark</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#e2d5ee"><FONT POINT-SIZE="10">특이사항 (변경없음)</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="remark_id">🔑 REMARK_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="report_id">🔗 REPORT_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→daily_report (CASCADE)</TD></TR>
+      <TR><TD ALIGN="LEFT">TABLE_CODE</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">NULL=전체</TD></TR>
+      <TR><TD ALIGN="LEFT">CATEGORY</TD><TD ALIGN="LEFT">VARCHAR(30)</TD><TD ALIGN="LEFT">GENERAL 등</TD></TR>
+      <TR><TD ALIGN="LEFT">CONTENT</TD><TD ALIGN="LEFT">TEXT</TD><TD ALIGN="LEFT">내용</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="created_by">🔗 CREATED_BY</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── daily_report_image ─────────────
+  daily_report_image [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" BGCOLOR="#f3eef8">
+      <TR><TD COLSPAN="3" BGCOLOR="#6a1b9a"><FONT COLOR="white"><B>daily_report_image</B></FONT></TD></TR>
+      <TR><TD COLSPAN="3" BGCOLOR="#e2d5ee"><FONT POINT-SIZE="10">이미지 첨부 (변경없음)</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="image_id">🔑 IMAGE_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">PK</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="report_id">🔗 REPORT_ID</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→daily_report (CASCADE)</TD></TR>
+      <TR><TD ALIGN="LEFT">ORIGINAL_NAME / STORED_PATH</TD><TD ALIGN="LEFT">VARCHAR</TD><TD ALIGN="LEFT">파일 정보</TD></TR>
+      <TR><TD ALIGN="LEFT">TABLE_CODE</TD><TD ALIGN="LEFT">VARCHAR(50)</TD><TD ALIGN="LEFT">NULL=전체</TD></TR>
+      <TR><TD ALIGN="LEFT" PORT="uploaded_by">🔗 UPLOADED_BY</TD><TD ALIGN="LEFT">BIGINT</TD><TD ALIGN="LEFT">FK→core_user</TD></TR>
+    </TABLE>
+  >];
+
+  // ───────────── 관계선 ─────────────
+  daily_report:report_id -> daily_report_table:report_id [label="1:N\n(CASCADE)"];
+  daily_report_table:table_id -> daily_report_cell:table_id [label="1:N\n(CASCADE)"];
+  daily_report:report_id -> daily_report_remark:report_id [label="1:N\n(CASCADE)"];
+  daily_report:report_id -> daily_report_image:report_id [label="1:N\n(CASCADE)"];
+
+  core_user:user_id -> daily_report:created_by [label="작성자", style=dashed, color="#3f6ea5"];
+  core_user:user_id -> daily_report_remark:created_by [label="작성자", style=dashed, color="#3f6ea5"];
+  core_user:user_id -> daily_report_image:uploaded_by [label="업로더", style=dashed, color="#3f6ea5"];
+  core_user:user_id -> cell_auth:user_id [label="담당자 지정\n(관리자 CRUD)", color="#e65100", penwidth=2];
+
+  // ★ 핵심 흐름: cell_auth → cell 캐시 재계산 (물리적 FK 아님, 서비스 로직으로 동기화)
+  cell_auth -> daily_report_cell [label=<<B>CellOwnershipSyncService</B><BR/>TABLE_CODE + EXCEL_COORD 매칭<BR/>OWNER_IDS/OWNER_NAMES 재계산<BR/>(FK 아님 · 애플리케이션 동기화)>, color="#e65100", penwidth=2.5, style=bold, constraint=false];
+
+  { rank=same; core_user; cell_auth; }
+}

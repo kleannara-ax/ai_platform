@@ -6,6 +6,7 @@ import com.company.core.common.response.ApiResponse;
 import com.company.module.dailyreport.dto.CellAuthRequest;
 import com.company.module.dailyreport.dto.CellAuthResponse;
 import com.company.module.dailyreport.service.CellAuthService;
+import com.company.module.dailyreport.service.CellOwnershipSyncService;
 import com.company.module.dailyreport.service.MenuPermissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.List;
  *   PUT    /dailyreport-api/cell-auths/{authId}         → 수정
  *   PATCH  /dailyreport-api/cell-auths/{authId}/deactivate → 비활성화
  *   DELETE /dailyreport-api/cell-auths/{authId}         → 삭제
+ *   POST   /dailyreport-api/cell-auths/resync-all        → ★ 전체 담당자 캐시 재동기화 (관리자)
  */
 @RestController
 @RequestMapping("/dailyreport-api/cell-auths")
@@ -38,6 +40,7 @@ public class CellAuthController {
 
     private final CellAuthService cellAuthService;
     private final MenuPermissionService menuPermissionService;
+    private final CellOwnershipSyncService cellOwnershipSyncService;
 
     /**
      * 접근권한 관리 페이지 접근 가능 여부 확인 + 전체/필터 조회
@@ -124,6 +127,21 @@ public class CellAuthController {
 
         verifyAuthPageAdmin(currentUserId);
         cellAuthService.deleteAuth(authId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /**
+     * ★ 전체 표(TABLE_CODE)의 daily_report_cell.OWNER_IDS/OWNER_NAMES 캐시를
+     * daily_report_cell_auth 기준으로 일괄 재계산한다.
+     * - 하드코딩 제거 마이그레이션 직후, 또는 데이터 정합성이 의심될 때
+     *   관리자가 수동으로 실행하는 용도 (평상시엔 CRUD마다 자동 동기화되므로 불필요).
+     */
+    @PostMapping("/resync-all")
+    public ResponseEntity<ApiResponse<Void>> resyncAll(
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+
+        verifyAuthPageAdmin(currentUserId);
+        cellOwnershipSyncService.syncAllTables();
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

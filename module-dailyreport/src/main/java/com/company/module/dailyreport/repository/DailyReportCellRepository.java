@@ -38,6 +38,16 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
            "ORDER BY c.rowIndex ASC, c.colIndex ASC")
     List<DailyReportCell> findEditableCellsByTableId(@Param("tableId") Long tableId);
 
+    /**
+     * ★ 표 코드(TABLE_CODE) 기준 전체 DATA 셀 조회 (모든 일보 통틀어)
+     * - CellOwnershipSyncService가 CellAuth 변경 시 OWNER_IDS/OWNER_NAMES 캐시를
+     *   재계산하기 위해 사용 — 같은 tableCode를 가진 모든 일보(날짜)의 셀이 대상
+     */
+    @Query("SELECT c FROM DailyReportCell c " +
+           "WHERE c.reportTable.tableCode = :tableCode " +
+           "AND c.cellType = 'DATA'")
+    List<DailyReportCell> findDataCellsByTableCode(@Param("tableCode") String tableCode);
+
     /** 일보의 모든 표의 셀을 잠금 처리 (상태 확정 시) */
     @Modifying
     @Query("UPDATE DailyReportCell c SET c.isLocked = true " +

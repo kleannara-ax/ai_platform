@@ -21,4 +21,11 @@ public interface DailyReportTableRepository extends JpaRepository<DailyReportTab
 
     /** 일보 ID + 표 코드 존재 여부 */
     boolean existsByDailyReport_ReportIdAndTableCode(Long reportId, String tableCode);
+
+    /**
+     * ★ 존재하는 모든 표 코드(TABLE_CODE) 목록 (중복 제거)
+     * - CellOwnershipSyncService.syncAllTables()가 마이그레이션/전체 재동기화 시 사용
+     */
+    @Query("SELECT DISTINCT t.tableCode FROM DailyReportTable t")
+    List<String> findDistinctTableCodes();
 }

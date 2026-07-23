@@ -20,7 +20,9 @@ SELECT TABLE_NAME, TABLE_ROWS, TABLE_COMMENT
 -- 2. 사용자 확인 (9명: admin + 8명 담당자)
 -- ────────────────────────────────────────────
 SELECT '=== 2. 테스트 사용자 ===' AS section;
-SELECT USER_ID, LOGIN_ID, USER_NAME, DEPARTMENT, POSITION, ROLE, IS_ACTIVE,
+-- ★ V2.0.0 운영 스키마 동기화(01_schema.sql v3.1) 기준 컬럼명으로 수정
+--   DEPARTMENT/POSITION은 운영에 없음(user_profile로 분리), IS_ACTIVE→ENABLED
+SELECT USER_ID, LOGIN_ID, USER_NAME, ROLE, ENABLED,
        CASE WHEN PASSWORD IS NOT NULL THEN 'SET' ELSE 'NULL' END AS pwd_status
   FROM core_user ORDER BY USER_ID;
 
@@ -28,11 +30,12 @@ SELECT USER_ID, LOGIN_ID, USER_NAME, DEPARTMENT, POSITION, ROLE, IS_ACTIVE,
 -- 3. ★ 메뉴 계층 구조 확인 (3건)
 -- ────────────────────────────────────────────
 SELECT '=== 3. 메뉴 계층 (세부공장일보) ===' AS section;
-SELECT m.MENU_ID, m.PARENT_MENU_ID, m.MENU_CODE, m.MENU_NAME, m.MENU_TYPE,
+-- ★ V2.0.0 운영 스키마 동기화(01_schema.sql v3.1) 기준 컬럼명으로 수정: PARENT_MENU_ID → PARENT_ID
+SELECT m.MENU_ID, m.PARENT_ID, m.MENU_CODE, m.MENU_NAME, m.MENU_TYPE,
        m.MENU_URL, m.SORT_ORDER,
        pm.MENU_NAME AS parent_name
   FROM core_menu m
-  LEFT JOIN core_menu pm ON pm.MENU_ID = m.PARENT_MENU_ID
+  LEFT JOIN core_menu pm ON pm.MENU_ID = m.PARENT_ID
  WHERE m.MENU_CODE LIKE 'DAILY_REPORT%'
  ORDER BY m.MENU_ID;
 

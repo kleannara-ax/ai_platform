@@ -31,6 +31,7 @@ public class DailyReportService {
     private final DailyReportCellRepository cellRepository;
     private final DailyReportRemarkRepository remarkRepository;
     private final DailyReportImageRepository imageRepository;
+    private final CellOwnershipSyncService cellOwnershipSyncService;
 
     // ─────────────────────────────────────────────
     // 일보 CRUD
@@ -73,6 +74,8 @@ public class DailyReportService {
                         for (DailyReportTable table : report.getTables()) {
                             if (table.getCells().isEmpty()) {
                                 DefaultCellTemplate.populateDefaultCells(table, reportDate);
+                                // ★ 하드코딩 제거: 생성 즉시 현재 활성 CellAuth 담당자를 반영
+                                cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
                             }
                         }
                     }
@@ -337,7 +340,10 @@ public class DailyReportService {
             report.addTable(table);
 
             // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
+            // ★ 담당자(OWNER_IDS/OWNER_NAMES)는 하드코딩하지 않음 — 항상 NULL로 시작
             DefaultCellTemplate.populateDefaultCells(table, report.getReportDate());
+            // ★ 생성 즉시 현재 활성 CellAuth 담당자를 반영 (코드 수정/재배포 불필요)
+            cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
         }
     }
 

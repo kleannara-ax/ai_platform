@@ -177,12 +177,28 @@ public class DailyReportCell {
         this.inputCycle = inputCycle;
     }
 
-    /** 소유자 정보 업데이트 */
+    /** 소유자 정보 업데이트 (freqCode/freqLabel도 함께 변경) */
     public void updateOwnership(String ownerIds, String ownerNames, String freqCode, String freqLabel) {
         this.ownerIds = ownerIds;
         this.ownerNames = ownerNames;
         this.freqCode = freqCode;
         this.freqLabel = freqLabel;
+    }
+
+    /**
+     * ★ CellAuth 동기화 전용 — 담당자 캐시(OWNER_IDS/OWNER_NAMES)만 갱신한다.
+     *
+     * daily_report_cell_auth(관리자 설정)가 유일한 담당자 출처이며,
+     * 이 메서드는 {@code CellOwnershipSyncService}가 CellAuth 변경 시점에
+     * 호출하여 OWNER_IDS/OWNER_NAMES를 다시 계산해 넣는 용도로만 사용한다.
+     * FREQ_CODE/FREQ_LABEL은 셀 생성 시점(DefaultCellTemplate)에 정해진
+     * 값을 그대로 유지해야 하므로 여기서는 건드리지 않는다 — CellAuth 한 건은
+     * (user, tableCode)당 freqCode 하나만 가지므로, 이 값으로 셀의 FREQ_CODE를
+     * 덮어쓰면 yearly/monthly/daily가 섞인 셀들의 편집 가능 주기가 잘못 뭉개진다.
+     */
+    public void syncOwnerCache(String ownerIds, String ownerNames) {
+        this.ownerIds = ownerIds;
+        this.ownerNames = ownerNames;
     }
 
     /** 특정 사용자가 이 셀의 소유자인지 확인 */

@@ -29,6 +29,7 @@ public class CellAuthService {
 
     private final CellAuthRepository cellAuthRepository;
     private final EntityManager entityManager;
+    private final CellOwnershipSyncService cellOwnershipSyncService;
 
     // ─────────────────────────────────────────────
     //  아키텍처 Rule 4: core_user 참조는 EntityManager 네이티브 쿼리 사용
@@ -122,6 +123,8 @@ public class CellAuthService {
 
     /**
      * 셀 권한 등록
+     * - 성공 시 해당 tableCode의 daily_report_cell.OWNER_IDS/OWNER_NAMES 캐시를
+     *   즉시 재동기화한다 (★ 하드코딩 대체: 코드 배포 없이 담당자 반영).
      */
     @Transactional
     public CellAuthResponse createAuth(CellAuthRequest request, Long grantedBy) {
@@ -129,6 +132,7 @@ public class CellAuthService {
         java.util.Optional<CellAuth> existingOpt =
                 cellAuthRepository.findByUserIdAndTableCode(request.getUserId(), request.getTableCode());
 
+        CellAuthResponse response;
         if (existingOpt.isPresent()) {
             CellAuth existing = existingOpt.get();
             if (Boolean.TRUE.equals(existing.getIsActive())) {
@@ -146,33 +150,40 @@ public class CellAuthService {
                     request.getFreqLabel(),
                     request.getDescription(),
                     grantedBy);
-            return toResponsesWithUserName(List.of(existing)).get(0);
+            response = toResponsesWithUserName(List.of(existing)).get(0);
+        } else {
+            // 기존 레코드가 없는 경우에만 새로 생성
+            CellAuth auth = CellAuth.builder()
+                    .userId(request.getUserId())
+                    .tableCode(request.getTableCode())
+                    .cellCoords(request.getCellCoordsAsJson())
+                    .freqCode(request.getFreqCode())
+                    .freqLabel(request.getFreqLabel())
+                    .isActive(true)
+                    .grantedBy(grantedBy)
+                    .description(request.getDescription())
+                    .build();
+
+            cellAuthRepository.save(auth);
+            response = toResponsesWithUserName(List.of(auth)).get(0);
         }
 
-        // 기존 레코드가 없는 경우에만 새로 생성
-        CellAuth auth = CellAuth.builder()
-                .userId(request.getUserId())
-                .tableCode(request.getTableCode())
-                .cellCoords(request.getCellCoordsAsJson())
-                .freqCode(request.getFreqCode())
-                .freqLabel(request.getFreqLabel())
-                .isActive(true)
-                .grantedBy(grantedBy)
-                .description(request.getDescription())
-                .build();
-
-        cellAuthRepository.save(auth);
-        return toResponsesWithUserName(List.of(auth)).get(0);
+        cellOwnershipSyncService.syncTable(request.getTableCode());
+        return response;
     }
 
     /**
      * 셀 권한 수정
      * - userId 또는 tableCode 변경 시 UNIQUE(USER_ID, TABLE_CODE) 제약 위반 방지
+     * - 성공 시 원래 tableCode와 변경 후 tableCode 양쪽 모두 캐시를 재동기화한다
+     *   (표를 바꾼 경우 이전 표에 남아있던 담당자 캐시도 정리해야 하므로).
      */
     @Transactional
     public CellAuthResponse updateAuth(Long authId, CellAuthRequest request, Long grantedBy) {
         CellAuth auth = cellAuthRepository.findById(authId)
                 .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
+
+        String previousTableCode = auth.getTableCode();
 
         // userId 또는 tableCode가 변경되면 대상 조합의 기존 활성 레코드 확인
         boolean userChanged = !auth.getUserId().equals(request.getUserId());
@@ -197,28 +208,39 @@ public class CellAuthService {
                 request.getDescription(),
                 grantedBy);
 
-        return toResponsesWithUserName(List.of(auth)).get(0);
+        CellAuthResponse response = toResponsesWithUserName(List.of(auth)).get(0);
+
+        if (tableChanged) {
+            cellOwnershipSyncService.syncTable(previousTableCode);
+        }
+        cellOwnershipSyncService.syncTable(request.getTableCode());
+
+        return response;
     }
 
     /**
      * 셀 권한 비활성화 (논리 삭제)
+     * - 비활성화 즉시 해당 tableCode 캐시를 재동기화하여 OWNER_IDS에서 제거한다.
      */
     @Transactional
     public void deactivateAuth(Long authId) {
         CellAuth auth = cellAuthRepository.findById(authId)
                 .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
         auth.updateActive(false);
+        cellOwnershipSyncService.syncTable(auth.getTableCode());
     }
 
     /**
      * 셀 권한 물리 삭제
+     * - 삭제 즉시 해당 tableCode 캐시를 재동기화하여 OWNER_IDS에서 제거한다.
      */
     @Transactional
     public void deleteAuth(Long authId) {
-        if (!cellAuthRepository.existsById(authId)) {
-            throw new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId);
-        }
+        CellAuth auth = cellAuthRepository.findById(authId)
+                .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
+        String tableCode = auth.getTableCode();
         cellAuthRepository.deleteById(authId);
+        cellOwnershipSyncService.syncTable(tableCode);
     }
 
     /**

@@ -113,7 +113,7 @@ public final class DefaultCellTemplate {
         ro(t, 2,11, "M7",  "597");
         ro(t, 2,12, "N7",  "594");
         ro(t, 2,13, "O7",  "DRS");
-        d(t,  2,14, "P7",  "daily", "매일", "yoo", "유동현 책임");
+        d(t,  2,14, "P7",  "daily", "매일");
 
         // ── Row 3: 초지5 생산량 ──
         ro(t, 3, 0, "B8",  "초지5 생산량(톤/日)", 1, 3);
@@ -128,7 +128,7 @@ public final class DefaultCellTemplate {
         ro(t, 3,11, "M8",  "83");
         ro(t, 3,12, "N8",  "79.5");
         ro(t, 3,13, "O8",  "SAP");
-        d(t,  3,14, "P8",  "daily", "매일", "yoo", "유동현 책임");
+        d(t,  3,14, "P8",  "daily", "매일");
 
         // ── Row 4: 수율 - PS 완제품 ──
         ro(t, 4, 0, "B9",  "수율(%)", 3, 1);
@@ -144,8 +144,8 @@ public final class DefaultCellTemplate {
         ro(t, 4,10, "L9",  "101.8");
         ro(t, 4,11, "M9",  "99.8");
         ro(t, 4,12, "N9",  "98.7");
-        d(t,  4,13, "O9",  "event", "발생 시", "yoo", "유동현 책임");
-        d(t,  4,14, "P9",  "daily", "매일", "yoo", "유동현 책임");
+        d(t,  4,13, "O9",  "event", "발생 시");
+        d(t,  4,14, "P9",  "daily", "매일");
 
         // ── Row 5: 수율 - PS 코팅제외 ──
         ro(t, 5, 2, "D10", "코팅제외", 1, 1);
@@ -159,8 +159,8 @@ public final class DefaultCellTemplate {
         ro(t, 5,10, "L10", "88.2");
         ro(t, 5,11, "M10", "86.3");
         ro(t, 5,12, "N10", "84.7");
-        d(t,  5,13, "O10", "event", "발생 시", "yoo", "유동현 책임");
-        d(t,  5,14, "P10", "daily", "매일", "yoo", "유동현 책임");
+        d(t,  5,13, "O10", "event", "발생 시");
+        d(t,  5,14, "P10", "daily", "매일");
 
         // ── Row 6: 수율 - 화장지 ──
         ro(t, 6, 1, "C11", "화장지", 1, 2);
@@ -174,8 +174,8 @@ public final class DefaultCellTemplate {
         ro(t, 6,10, "L11", "69.6");
         ro(t, 6,11, "M11", "74.6");
         ro(t, 6,12, "N11", "74.4");
-        d(t,  6,13, "O11", "event", "발생 시", "yoo", "유동현 책임");
-        d(t,  6,14, "P11", "daily", "매일", "yoo", "유동현 책임");
+        d(t,  6,13, "O11", "event", "발생 시");
+        d(t,  6,14, "P11", "daily", "매일");
 
         // ── Row 7: 고지감량율 ──
         ro(t, 7, 0, "B12", "고지감량율(%)", 1, 3);
@@ -190,12 +190,12 @@ public final class DefaultCellTemplate {
         ro(t, 7,11, "M12", "15.9");
         ro(t, 7,12, "N12", "16");
         ro(t, 7,13, "O12", "EIS");
-        d(t,  7,14, "P12", "daily", "매일", "yoo", "유동현 책임");
+        d(t,  7,14, "P12", "daily", "매일");
 
         // ── Row 8: 슬러지원단위 - 제지 ──
         ro(t, 8, 0, "B13", "슬러지원단위", 2, 2);
         ro(t, 8, 2, "D13", "제   지", 1, 1);
-        d(t,  8, 3, "E13", "yearly", "매년", "jung", "정상엽 책임");
+        d(t,  8, 3, "E13", "yearly", "매년");
         ro(t, 8, 4, "F13", "89");
         ro(t, 8, 5, "G13", "91");
         ro(t, 8, 6, "H13", "94");
@@ -205,12 +205,12 @@ public final class DefaultCellTemplate {
         ro(t, 8,10, "L13", "84");
         ro(t, 8,11, "M13", "82");
         ro(t, 8,12, "N13", "84");
-        d(t,  8,13, "O13", "event", "발생 시", "jung", "정상엽 책임");
-        d(t,  8,14, "P13", "daily", "매일", "jung", "정상엽 책임");
+        d(t,  8,13, "O13", "event", "발생 시");
+        d(t,  8,14, "P13", "daily", "매일");
 
         // ── Row 9: 슬러지원단위 - 화장지 ──
         ro(t, 9, 2, "D14", "화장지", 1, 1);
-        d(t,  9, 3, "E14", "yearly", "매년", "jung", "정상엽 책임");
+        d(t,  9, 3, "E14", "yearly", "매년");
         ro(t, 9, 4, "F14", "76");
         ro(t, 9, 5, "G14", "64");
         ro(t, 9, 6, "H14", "81");
@@ -220,8 +220,8 @@ public final class DefaultCellTemplate {
         ro(t, 9,10, "L14", "46");
         ro(t, 9,11, "M14", "53");
         ro(t, 9,12, "N14", "62");
-        d(t,  9,13, "O14", "event", "발생 시", "jung", "정상엽 책임");
-        d(t,  9,14, "P14", "daily", "매일", "jung", "정상엽 책임");
+        d(t,  9,13, "O14", "event", "발생 시");
+        d(t,  9,14, "P14", "daily", "매일");
     }
 
     // ═══════════════════════════════════════════════
@@ -251,7 +251,7 @@ public final class DefaultCellTemplate {
         ro(t, 2, 0, "B21", "제지 재공품", 4, 1);
         ro(t, 2, 1, "C21", "밀롤창고",    1, 1);
         ro(t, 2, 2, "D21", "톤",           4, 1);
-        d(t,  2, 3, "E21", "event", "발생 시", "kim", "김완중 팀장");
+        d(t,  2, 3, "E21", "event", "발생 시");
         ro(t, 2, 4, "F21", "3826");
         ro(t, 2, 5, "G21", "3043");
         ro(t, 2, 6, "H21", "3296");
@@ -260,11 +260,11 @@ public final class DefaultCellTemplate {
         ro(t, 2, 9, "K21", "3711");
         ro(t, 2,10, "L21", "3006");
         ro(t, 2,11, "M21", "MES");
-        d(t,  2,12, "N21", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  2,12, "N21", "daily", "매일");
 
         // ── Row 3: 카타대기 ──
         ro(t, 3, 1, "C22", "카타대기", 1, 1);
-        d(t,  3, 3, "E22", "event", "발생 시", "kim", "김완중 팀장");
+        d(t,  3, 3, "E22", "event", "발생 시");
         ro(t, 3, 4, "F22", "320");
         ro(t, 3, 5, "G22", "315");
         ro(t, 3, 6, "H22", "549");
@@ -273,11 +273,11 @@ public final class DefaultCellTemplate {
         ro(t, 3, 9, "K22", "1121");
         ro(t, 3,10, "L22", "1110");
         ro(t, 3,11, "M22", "MES");
-        d(t,  3,12, "N22", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  3,12, "N22", "daily", "매일");
 
         // ── Row 4: 미포장 ──
         ro(t, 4, 1, "C23", "미포장", 1, 1);
-        d(t,  4, 3, "E23", "event", "발생 시", "kim", "김완중 팀장");
+        d(t,  4, 3, "E23", "event", "발생 시");
         ro(t, 4, 4, "F23", "212");
         ro(t, 4, 5, "G23", "764");
         ro(t, 4, 6, "H23", "702");
@@ -286,11 +286,11 @@ public final class DefaultCellTemplate {
         ro(t, 4, 9, "K23", "173");
         ro(t, 4,10, "L23", "266");
         ro(t, 4,11, "M23", "MES");
-        d(t,  4,12, "N23", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  4,12, "N23", "daily", "매일");
 
         // ── Row 5: 포장후 물류입고전 ──
         ro(t, 5, 1, "C24", "포장후 물류입고전", 1, 1);
-        d(t,  5, 3, "E24", "event", "발생 시", "kim", "김완중 팀장");
+        d(t,  5, 3, "E24", "event", "발생 시");
         ro(t, 5, 4, "F24", "83");
         ro(t, 5, 5, "G24", "139");
         ro(t, 5, 6, "H24", "151");
@@ -299,7 +299,7 @@ public final class DefaultCellTemplate {
         ro(t, 5, 9, "K24", "288");
         ro(t, 5,10, "L24", "423");
         ro(t, 5,11, "M24", "MES");
-        d(t,  5,12, "N24", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  5,12, "N24", "daily", "매일");
 
         // ── Row 6: 장기재고 3개월 초과 ──
         ro(t, 6, 0, "B25", "장기재고",      2, 1);
@@ -313,8 +313,8 @@ public final class DefaultCellTemplate {
         ro(t, 6, 8, "J25", "3761");
         ro(t, 6, 9, "K25", "3404");
         ro(t, 6,10, "L25", "3120");
-        d(t,  6,11, "M25", "monthly", "매월", "jang lee", "장석환 선임, 이도형 사원");
-        d(t,  6,12, "N25", "daily", "매일", "jang lee", "장석환 선임, 이도형 사원");
+        d(t,  6,11, "M25", "monthly", "매월");
+        d(t,  6,12, "N25", "daily", "매일");
 
         // ── Row 7: 장기재고 6개월 초과 ──
         ro(t, 7, 1, "C26", "6개월 초과", 1, 1);
@@ -327,8 +327,8 @@ public final class DefaultCellTemplate {
         ro(t, 7, 8, "J26", "957");
         ro(t, 7, 9, "K26", "1543");
         ro(t, 7,10, "L26", "1130");
-        d(t,  7,11, "M26", "monthly", "매월", "jang lee", "장석환 선임, 이도형 사원");
-        d(t,  7,12, "N26", "daily", "매일", "jang lee", "장석환 선임, 이도형 사원");
+        d(t,  7,11, "M26", "monthly", "매월");
+        d(t,  7,12, "N26", "daily", "매일");
 
         // ── Row 8: 야적현황 - 제지 ──
         ro(t, 8, 0, "B27", "야적현황", 2, 1);
@@ -343,7 +343,7 @@ public final class DefaultCellTemplate {
         ro(t, 8, 9, "K27", "0");
         ro(t, 8,10, "L27", "0");
         ro(t, 8,11, "M27", "WMS");
-        d(t,  8,12, "N27", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  8,12, "N27", "daily", "매일");
 
         // ── Row 9: 야적현황 - 생활 ──
         ro(t, 9, 1, "C28", "생활",     1, 1);
@@ -357,7 +357,7 @@ public final class DefaultCellTemplate {
         ro(t, 9, 9, "K28", "0");
         ro(t, 9,10, "L28", "0");
         ro(t, 9,11, "M28", "WMS");
-        d(t,  9,12, "N28", "daily", "매일", "kim", "김완중 팀장");
+        d(t,  9,12, "N28", "daily", "매일");
     }
 
     // ═══════════════════════════════════════════════
@@ -377,45 +377,45 @@ public final class DefaultCellTemplate {
         // ── Row 2: 전력 - 제지 ──
         ro(t, 2, 0, "B36", "전력",    3, 1);
         ro(t, 2, 1, "C36", "제   지", 1, 1);
-        d(t,  2, 2, "D36", "yearly", "매년", "choi", "최민우 사원");
+        d(t,  2, 2, "D36", "yearly", "매년");
         ro(t, 2, 3, "E36", "EIS");
-        d(t,  2, 4, "F36", "monthly", "매월", "choi", "최민우 사원");
+        d(t,  2, 4, "F36", "monthly", "매월");
         ro(t, 2, 5, "G36", "EIS");
 
         // ── Row 3: 전력 - 화장지 ──
         ro(t, 3, 1, "C37", "화장지", 1, 1);
-        d(t,  3, 2, "D37", "yearly", "매년", "choi", "최민우 사원");
+        d(t,  3, 2, "D37", "yearly", "매년");
         ro(t, 3, 3, "E37", "EIS");
-        d(t,  3, 4, "F37", "monthly", "매월", "choi", "최민우 사원");
+        d(t,  3, 4, "F37", "monthly", "매월");
         ro(t, 3, 5, "G37", "EIS");
 
         // ── Row 4: 전력 - 화)초지5 ──
         ro(t, 4, 1, "C38", "화)초지5", 1, 1);
-        d(t,  4, 2, "D38", "yearly", "매년", "choi", "최민우 사원");
+        d(t,  4, 2, "D38", "yearly", "매년");
         ro(t, 4, 3, "E38", "EIS");
-        d(t,  4, 4, "F38", "monthly", "매월", "choi", "최민우 사원");
+        d(t,  4, 4, "F38", "monthly", "매월");
         ro(t, 4, 5, "G38", "EIS");
 
         // ── Row 5: 연료 - 제지 ──
         ro(t, 5, 0, "B39", "연료",    3, 1);
         ro(t, 5, 1, "C39", "제   지", 1, 1);
-        d(t,  5, 2, "D39", "yearly", "매년", "park", "박지권 책임");
+        d(t,  5, 2, "D39", "yearly", "매년");
         ro(t, 5, 3, "E39", "EIS");
-        d(t,  5, 4, "F39", "monthly", "매월", "park", "박지권 책임");
+        d(t,  5, 4, "F39", "monthly", "매월");
         ro(t, 5, 5, "G39", "EIS");
 
         // ── Row 6: 연료 - 화장지 ──
         ro(t, 6, 1, "C40", "화장지", 1, 1);
-        d(t,  6, 2, "D40", "yearly", "매년", "park", "박지권 책임");
+        d(t,  6, 2, "D40", "yearly", "매년");
         ro(t, 6, 3, "E40", "EIS");
-        d(t,  6, 4, "F40", "monthly", "매월", "park", "박지권 책임");
+        d(t,  6, 4, "F40", "monthly", "매월");
         ro(t, 6, 5, "G40", "EIS");
 
         // ── Row 7: 연료 - 화)초지5 ──
         ro(t, 7, 1, "C41", "화)초지5", 1, 1);
-        d(t,  7, 2, "D41", "yearly", "매년", "park", "박지권 책임");
+        d(t,  7, 2, "D41", "yearly", "매년");
         ro(t, 7, 3, "E41", "EIS");
-        d(t,  7, 4, "F41", "monthly", "매월", "park", "박지권 책임");
+        d(t,  7, 4, "F41", "monthly", "매월");
         ro(t, 7, 5, "G41", "EIS");
     }
 
@@ -438,49 +438,49 @@ public final class DefaultCellTemplate {
 
         // ── Row 2: LNG보일러 ──
         ro(t, 2, 0, "J36", "LNG보일러", 1, 1);
-        d(t,  2, 1, "K36", "yearly",  "매년", "park",   "박지권 책임");
-        d(t,  2, 2, "L36", "yearly",  "매년", "park",   "박지권 책임");
+        d(t,  2, 1, "K36", "yearly",  "매년");
+        d(t,  2, 2, "L36", "yearly",  "매년");
         ro(t, 2, 3, "M36", "2.4");
         ro(t, 2, 4, "N36", "0.4");
-        d(t,  2, 5, "O36", "monthly", "매월", "park",   "박지권 책임");
-        d(t,  2, 6, "P36", "daily",   "매일", "energy", "환경에너지팀 반장");
-        d(t,  2, 7, "Q36", "daily", "매일", "energy", "환경에너지팀 반장", 5, 1);
+        d(t,  2, 5, "O36", "monthly", "매월");
+        d(t,  2, 6, "P36", "daily",   "매일");
+        d(t,  2, 7, "Q36", "daily", "매일", 5, 1);
 
         // ── Row 3: 유동상소각로 ──
         ro(t, 3, 0, "J37", "유동상소각로", 1, 1);
-        d(t,  3, 1, "K37", "yearly",  "매년", "park",   "박지권 책임");
-        d(t,  3, 2, "L37", "yearly",  "매년", "park",   "박지권 책임");
+        d(t,  3, 1, "K37", "yearly",  "매년");
+        d(t,  3, 2, "L37", "yearly",  "매년");
         ro(t, 3, 3, "M37", "15.3");
         ro(t, 3, 4, "N37", "14.7");
-        d(t,  3, 5, "O37", "monthly", "매월", "park",   "박지권 책임");
-        d(t,  3, 6, "P37", "daily",   "매일", "energy", "환경에너지팀 반장");
+        d(t,  3, 5, "O37", "monthly", "매월");
+        d(t,  3, 6, "P37", "daily",   "매일");
 
         // ── Row 4: 복합보일러 ──
         ro(t, 4, 0, "J38", "복합보일러", 1, 1);
-        d(t,  4, 1, "K38", "yearly",  "매년", "park",   "박지권 책임");
-        d(t,  4, 2, "L38", "yearly",  "매년", "park",   "박지권 책임");
+        d(t,  4, 1, "K38", "yearly",  "매년");
+        d(t,  4, 2, "L38", "yearly",  "매년");
         ro(t, 4, 3, "M38", "56.8");
         ro(t, 4, 4, "N38", "52.5");
-        d(t,  4, 5, "O38", "monthly", "매월", "park",   "박지권 책임");
-        d(t,  4, 6, "P38", "daily",   "매일", "energy", "환경에너지팀 반장");
+        d(t,  4, 5, "O38", "monthly", "매월");
+        d(t,  4, 6, "P38", "daily",   "매일");
 
         // ── Row 5: 폐합성소각로 ──
         ro(t, 5, 0, "J39", "폐합성소각로", 1, 1);
-        d(t,  5, 1, "K39", "yearly",  "매년", "park",   "박지권 책임");
-        d(t,  5, 2, "L39", "yearly",  "매년", "park",   "박지권 책임");
+        d(t,  5, 1, "K39", "yearly",  "매년");
+        d(t,  5, 2, "L39", "yearly",  "매년");
         ro(t, 5, 3, "M39", "10.2");
         ro(t, 5, 4, "N39", "11.6");
-        d(t,  5, 5, "O39", "monthly", "매월", "park",   "박지권 책임");
-        d(t,  5, 6, "P39", "daily",   "매일", "energy", "환경에너지팀 반장");
+        d(t,  5, 5, "O39", "monthly", "매월");
+        d(t,  5, 6, "P39", "daily",   "매일");
 
         // ── Row 6: 합계 ──
         ro(t, 6, 0, "J40", "합  계", 1, 1);
-        d(t,  6, 1, "K40", "yearly",  "매년", "park",   "박지권 책임");
-        d(t,  6, 2, "L40", "yearly",  "매년", "park",   "박지권 책임");
+        d(t,  6, 1, "K40", "yearly",  "매년");
+        d(t,  6, 2, "L40", "yearly",  "매년");
         ro(t, 6, 3, "M40", "84.7");
         ro(t, 6, 4, "N40", "79.2");
-        d(t,  6, 5, "O40", "monthly", "매월", "park",   "박지권 책임");
-        d(t,  6, 6, "P40", "daily",   "매일", "energy", "환경에너지팀 반장");
+        d(t,  6, 5, "O40", "monthly", "매월");
+        d(t,  6, 6, "P40", "daily",   "매일");
     }
 
     // ═══════════════════════════════════════════════
@@ -516,30 +516,40 @@ public final class DefaultCellTemplate {
                 .build());
     }
 
-    /** DATA 셀 (입력 가능, 빈 값으로 초기화) */
+    /**
+     * DATA 셀 (입력 가능, 빈 값으로 초기화)
+     *
+     * ★ 담당자(OWNER_IDS/OWNER_NAMES)는 여기서 절대 하드코딩하지 않는다.
+     *   모든 DATA 셀은 항상 OWNER_IDS=NULL 상태로 생성되며, 담당자 배정은
+     *   전적으로 관리자가 '컬럼관리(CellAuth)' 화면에서 설정한다.
+     *   설정 즉시 {@link CellOwnershipSyncService}가 daily_report_cell_auth →
+     *   daily_report_cell.OWNER_IDS/OWNER_NAMES 로 동기화한다.
+     */
     private static void d(DailyReportTable t, int row, int col, String coord,
-                           String freqCode, String freqLabel,
-                           String ownerIds, String ownerNames) {
+                           String freqCode, String freqLabel) {
         t.addCell(DailyReportCell.builder()
                 .rowIndex(row).colIndex(col).excelCoord(coord)
                 .cellValue("").cellType("DATA")
                 .isLocked(false).rowSpan(1).colSpan(1)
                 .freqCode(freqCode).freqLabel(freqLabel)
-                .ownerIds(ownerIds).ownerNames(ownerNames)
+                .ownerIds(null).ownerNames(null)
                 .build());
     }
 
-    /** DATA 셀 (입력 가능, rowSpan/colSpan 지정) */
+    /**
+     * DATA 셀 (입력 가능, rowSpan/colSpan 지정)
+     *
+     * ★ 담당자는 하드코딩하지 않는다 — 위 1-argument 버전 주석 참조.
+     */
     private static void d(DailyReportTable t, int row, int col, String coord,
                            String freqCode, String freqLabel,
-                           String ownerIds, String ownerNames,
                            int rs, int cs) {
         t.addCell(DailyReportCell.builder()
                 .rowIndex(row).colIndex(col).excelCoord(coord)
                 .cellValue("").cellType("DATA")
                 .isLocked(false).rowSpan(rs).colSpan(cs)
                 .freqCode(freqCode).freqLabel(freqLabel)
-                .ownerIds(ownerIds).ownerNames(ownerNames)
+                .ownerIds(null).ownerNames(null)
                 .build());
     }
 }
