@@ -25,7 +25,7 @@ import java.util.List;
  * <p>PS-INSP 모듈 전용 USERID 파라미터 자동 인증:
  * MES 등 외부 시스템에서 USERID 파라미터를 전달하면
  * DB 조회 없이 해당 값을 사용자 ID로 간주하여 인증을 통과시킨다.
- * (적용 범위: /ps-insp-api/** 경로만)
+ * (적용 범위: /ps-insp-api/** 및 /ps-insp/page** 경로)
  */
 @Slf4j
 @Component
@@ -36,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
     /** USERID 파라미터 자동 인증을 허용하는 경로 접두사 */
     private static final String PS_INSP_API_PREFIX = "/ps-insp-api/";
+    private static final String PS_INSP_PAGE_PREFIX = "/ps-insp/page";
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -67,11 +68,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * <p>MES 등 외부 시스템에서 USERID 파라미터를 URL에 포함하여 호출하는 경우,
      * DB 조회 없이 해당 USERID 값을 그대로 인증 주체로 사용하여 무조건 인증을 통과시킨다.
      * USERID에 어떤 값이든 입력되면 로그인 없이 접근 가능하다.
-     * 보안 범위를 /ps-insp-api/** 경로로 제한한다.
+     * 보안 범위를 /ps-insp-api/** 및 /ps-insp/page** 경로로 제한한다.
      */
     private void tryUserIdParamAuth(HttpServletRequest request) {
         String requestUri = request.getRequestURI();
-        if (!requestUri.startsWith(PS_INSP_API_PREFIX)) {
+        if (!requestUri.startsWith(PS_INSP_API_PREFIX) && !requestUri.startsWith(PS_INSP_PAGE_PREFIX)) {
             return; // PS-INSP 경로가 아니면 무시
         }
 

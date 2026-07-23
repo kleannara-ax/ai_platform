@@ -131,6 +131,7 @@ public class SecurityConfig {
                 // PS-INSP 모듈: 헬스체크·페이지(iframe)·정적리소스만 공개
                 // API(/ps-insp-api/inspections/**, /ps-insp-api/mes/**)는 인증+메뉴접근권한 필요
                 .requestMatchers("/ps-insp-api/health").permitAll()
+                .requestMatchers("/ps-insp-api/page", "/ps-insp-api/page/**").permitAll()
                 .requestMatchers("/ps-insp/page", "/ps-insp/page/**").permitAll()
                 .requestMatchers("/ps-insp/**").permitAll()
                 // 세부공장일보 모듈: 페이지(iframe)·정적리소스만 공개
