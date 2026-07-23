@@ -24,17 +24,28 @@ public class UserListService {
 
     /**
      * 활성 사용자 전체 목록 조회
-     * - IS_ACTIVE = true인 사용자만 반환
-     * - USER_NAME 기준 정렬
+     * - core_user.enabled = 1 인 사용자만 반환
+     * - user_profile LEFT JOIN으로 부서(dept_code)·직위(position) 조회
+     * - mod_user_department LEFT JOIN으로 부서명(DEPT_NAME) 조회
+     * - user_name 기준 정렬
+     *
+     * V2.0.0 이후 컬럼명:
+     *   core_user        : user_id, login_id, user_name, enabled (lowercase)
+     *   user_profile     : user_id, dept_code(VARCHAR), position (lowercase)
+     *   mod_user_department : DEPT_CODE, DEPT_NAME (uppercase — V2 미변경)
      */
     @SuppressWarnings("unchecked")
     public List<UserSimpleResponse> getActiveUsers() {
         List<Object[]> rows = entityManager
                 .createNativeQuery(
-                        "SELECT USER_ID, LOGIN_ID, USER_NAME, DEPARTMENT, POSITION " +
-                        "FROM core_user " +
-                        "WHERE IS_ACTIVE = true " +
-                        "ORDER BY USER_NAME")
+                        "SELECT u.user_id, u.login_id, u.user_name, " +
+                        "       COALESCE(d.DEPT_NAME, p.dept_code, '') AS department, " +
+                        "       COALESCE(p.position, '') AS position " +
+                        "FROM core_user u " +
+                        "LEFT JOIN user_profile p ON u.user_id = p.user_id " +
+                        "LEFT JOIN mod_user_department d ON p.dept_code = d.DEPT_CODE " +
+                        "WHERE u.enabled = 1 " +
+                        "ORDER BY u.user_name")
                 .getResultList();
 
         return rows.stream()
@@ -42,8 +53,8 @@ public class UserListService {
                         .userId(((Number) row[0]).longValue())
                         .loginId((String) row[1])
                         .userName((String) row[2])
-                        .department((String) row[3])
-                        .position((String) row[4])
+                        .department(row[3] != null ? (String) row[3] : "")
+                        .position(row[4] != null ? (String) row[4] : "")
                         .build())
                 .collect(Collectors.toList());
     }
