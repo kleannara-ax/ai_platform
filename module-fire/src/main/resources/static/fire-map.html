@@ -150,11 +150,19 @@
         body.ui-hidden .ui-hide-toggle .track::after{ transform:translateX(16px); }
         body.ui-hidden .top-left,
         body.ui-hidden .outdoor-toggle,
+        body.ui-hidden .outdoor-ext-toggle,
         body.ui-hidden .outdoor-equipment-toggle,
+        body.ui-hidden .outdoor-aircon-toggle,
         body.ui-hidden .outdoor-panel,
         body.ui-hidden .outdoor-equipment-panel,
         body.ui-hidden #outdoorSelect,
+        body.ui-hidden #outdoorExtSelect,
         body.ui-hidden #outdoorEquipmentSelect,
+        body.ui-hidden #outdoorAirconSelect,
+        body.ui-hidden #outdoorMarkers,
+        body.ui-hidden #outdoorExtMarkers,
+        body.ui-hidden #outdoorEquipmentMarkers,
+        body.ui-hidden #outdoorAirconMarkers,
         body.ui-hidden .info-panel,
         body.ui-hidden #zonePopup{
             display:none !important;
@@ -254,9 +262,23 @@
         .outdoor-equipment-toggle label{
             font-weight:800;
         }
+        .outdoor-aircon-toggle{
+            position:absolute;
+            top:172px;
+            right:16px;
+            z-index:340;
+            background:rgba(255,255,255,.95);
+            border-radius:999px;
+            padding:8px 12px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+            box-shadow:0 8px 24px rgba(0,0,0,.15);
+        }
+        .outdoor-aircon-toggle label{ font-weight:800; }
         .outdoor-equipment-panel{
             position:absolute;
-            top:174px;
+            top:226px;
             right:16px;
             z-index:340;
             width:clamp(220px, 24vw, 260px);
@@ -388,6 +410,11 @@
         .outdoor-equipment-mode .zone-overlay .zone:hover{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,0); }
         .outdoor-equipment-mode #zoneTooltip{ display:none !important; }
         .outdoor-equipment-mode #zonePopup{ display:none !important; }
+        .outdoor-aircon-mode #zoneOverlay{ pointer-events:none; opacity:.45; }
+        .outdoor-aircon-mode .zone-overlay .zone{ pointer-events:none; }
+        .outdoor-aircon-mode .zone-overlay .zone:hover{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,0); }
+        .outdoor-aircon-mode #zoneTooltip,
+        .outdoor-aircon-mode #zonePopup{ display:none !important; }
         .outdoor-panel{
             position:absolute;
             top:122px;
@@ -510,6 +537,17 @@
         .oxe-select{ display:flex; align-items:center; }
         #outdoorEquipmentMarkers{ position:absolute; inset:0; z-index:61; pointer-events:none; }
         #outdoorEquipmentMarkers .eqmarker{ pointer-events:auto; }
+        #outdoorAirconMarkers{ position:absolute; inset:0; z-index:61; pointer-events:none; }
+        #outdoorAirconMarkers .eqmarker{ pointer-events:auto; }
+        #outdoorAirconSelect{
+            right:16px;
+            bottom:120px;
+            z-index:340;
+        }
+        #outdoorAirconSelect.show{ display:block; }
+        #outdoorAirconSelect .infoHead{
+            background:linear-gradient(135deg,#0369a1 0%,#0891b2 100%) !important;
+        }
         .eqmarker{
             position:absolute;
             width:34px;
@@ -549,29 +587,34 @@
             background:linear-gradient(135deg,#0f766e 0%,#1d4ed8 100%) !important;
         }
         #outdoorSelect,
-        #outdoorEquipmentSelect{
+        #outdoorEquipmentSelect,
+        #outdoorAirconSelect{
             width:clamp(240px, 24vw, 280px);
             border-radius:16px;
             box-shadow:0 16px 36px rgba(15,23,42,.18);
             border:1px solid rgba(148,163,184,.22);
         }
         #outdoorSelect .infoBody,
-        #outdoorEquipmentSelect .infoBody{
+        #outdoorEquipmentSelect .infoBody,
+        #outdoorAirconSelect .infoBody{
             padding:10px;
             max-height:280px;
         }
         #outdoorSelect .kv,
-        #outdoorEquipmentSelect .kv{
+        #outdoorEquipmentSelect .kv,
+        #outdoorAirconSelect .kv{
             grid-template-columns:68px 1fr;
             gap:5px 8px;
             font-size:12px;
         }
         #outdoorSelect .p-2,
-        #outdoorEquipmentSelect .p-2{
+        #outdoorEquipmentSelect .p-2,
+        #outdoorAirconSelect .p-2{
             padding:10px !important;
         }
         #outdoorSelect .btn,
-        #outdoorEquipmentSelect .btn{
+        #outdoorEquipmentSelect .btn,
+        #outdoorAirconSelect .btn{
             font-size:12px;
             font-weight:800;
             padding:8px 10px;
@@ -765,6 +808,7 @@
             <div id="outdoorMarkers" aria-hidden="true"></div>
             <div id="outdoorExtMarkers" aria-hidden="true"></div>
             <div id="outdoorEquipmentMarkers" aria-hidden="true"></div>
+            <div id="outdoorAirconMarkers" aria-hidden="true"></div>
 
                         <svg id="zoneOverlay" class="zone-overlay"
                  viewBox="0 0 1955 985"
@@ -934,6 +978,14 @@
         </label>
     </div>
 
+    <div class="outdoor-aircon-toggle">
+        <label for="outdoorAirconToggle">옥외 에어컨</label>
+        <label class="toggle-switch">
+            <input type="checkbox" id="outdoorAirconToggle" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
     <div class="outdoor-equipment-panel" id="outdoorEquipmentPanel">
         <div class="panel-title">옥외 수신기 / 소방펌프</div>
         <div class="panel-sub">메인 화면에서 바로 등록하거나, 선택한 설비를 수정·이동할 수 있습니다.</div>
@@ -1019,6 +1071,26 @@
                 <div class="col-4" id="outdoorExtEditCol" style="display:none;"><button class="btn btn-outline-primary w-100" id="btnOutdoorExtEdit" type="button">수정</button></div>
                 <div class="col-12"><button class="btn btn-outline-secondary w-100" id="btnOutdoorExtClose" type="button">닫기</button></div>
             </div>
+        </div>
+    </div>
+
+    <div id="outdoorAirconSelect" class="infoCard" aria-hidden="true">
+        <div class="infoHead">
+            <div class="t">옥외 에어컨</div>
+            <button type="button" class="xbtn" id="outdoorAirconSelectCloseBtn" aria-label="닫기">&times;</button>
+        </div>
+        <div class="infoBody">
+            <div class="kv">
+                <div class="k">설비 ID</div><div class="v" id="oasCode">-</div>
+                <div class="k">식별 No.</div><div class="v" id="oasSerial">-</div>
+                <div class="k">유형</div><div class="v" id="oasType">-</div>
+                <div class="k">제조사</div><div class="v" id="oasManufacturer">-</div>
+                <div class="k">좌표</div><div class="v" id="oasCoord">-</div>
+                <div class="k">위치</div><div class="v" id="oasLocation">-</div>
+            </div>
+        </div>
+        <div class="p-2 border-top bg-white">
+            <button class="btn btn-outline-secondary w-100" id="btnOutdoorAirconSelectClose" type="button">닫기</button>
         </div>
     </div>
 
@@ -1150,6 +1222,9 @@ let outdoorByKey = new Map();
 let outdoorEquipmentMode = false;
 let outdoorReceivers = [];
 let outdoorPumps = [];
+let outdoorAirconMode = false;
+let outdoorAirConditioners = [];
+let currentOutdoorAirConditioner = null;
 let outdoorExtinguishers = [];
 let currentOutdoorExtId = null;
 let outdoorExtMode = false;
@@ -1241,6 +1316,7 @@ async function init() {
         }
         await loadOutdoorHydrants();
         await loadOutdoorEquipment();
+        await loadOutdoorAirConditioners();
         focusOutdoorEquipmentFromQuery();
         await loadOutdoorExtinguishers();
     } catch(e) {
@@ -1261,6 +1337,20 @@ async function loadOutdoorHydrants() {
         renderOutdoorMarkers();
     } catch(e) {
         console.error('옥외 소화전 로드 실패', e);
+    }
+}
+
+async function loadOutdoorAirConditioners() {
+    try {
+        const res = await apiFetch('/facility-api/air-conditioners?size=500&page=0');
+        if (!res) return;
+        const json = await res.json();
+        outdoorAirConditioners = Array.isArray(json?.data?.content)
+            ? json.data.content.filter(item => Number(item?.floorId) === 99 && item?.x != null && item?.y != null)
+            : [];
+        renderOutdoorAirconMarkers();
+    } catch (e) {
+        console.error('옥외 에어컨 로드 실패', e);
     }
 }
 
@@ -1316,11 +1406,14 @@ const infoBody = document.getElementById('infoBody');
 const outdoorToggle = document.getElementById('outdoorToggle');
 const outdoorExtToggle = document.getElementById('outdoorExtToggle');
 const outdoorEquipmentToggle = document.getElementById('outdoorEquipmentToggle');
+const outdoorAirconToggle = document.getElementById('outdoorAirconToggle');
 const outdoorPanel = document.getElementById('outdoorPanel');
 const outdoorEquipmentPanel = document.getElementById('outdoorEquipmentPanel');
 const outdoorMarkers = document.getElementById('outdoorMarkers');
 const outdoorExtMarkers = document.getElementById('outdoorExtMarkers');
 const outdoorEquipmentMarkers = document.getElementById('outdoorEquipmentMarkers');
+const outdoorAirconMarkers = document.getElementById('outdoorAirconMarkers');
+const outdoorAirconSelect = document.getElementById('outdoorAirconSelect');
 const outdoorEquipmentSelect = document.getElementById('outdoorEquipmentSelect');
 const outdoorSelect = document.getElementById('outdoorSelect');
 const outdoorSelectList = document.getElementById('outdoorSelectList');
@@ -1394,6 +1487,14 @@ const btnOutdoorEquipmentMove = document.getElementById('btnOutdoorEquipmentMove
 const outdoorEquipmentHint = document.getElementById('outdoorEquipmentHint');
 const btnOutdoorEquipmentSelectClose = document.getElementById('btnOutdoorEquipmentSelectClose');
 const btnOutdoorEquipmentSelectCloseBtn = document.getElementById('outdoorEquipmentSelectCloseBtn');
+const oasCode = document.getElementById('oasCode');
+const oasSerial = document.getElementById('oasSerial');
+const oasType = document.getElementById('oasType');
+const oasManufacturer = document.getElementById('oasManufacturer');
+const oasCoord = document.getElementById('oasCoord');
+const oasLocation = document.getElementById('oasLocation');
+const btnOutdoorAirconSelectClose = document.getElementById('btnOutdoorAirconSelectClose');
+const btnOutdoorAirconSelectCloseBtn = document.getElementById('outdoorAirconSelectCloseBtn');
 
 menuBtn.onclick = () => screen.classList.toggle('menu-open');
 overlay.onclick = () => screen.classList.remove('menu-open');
@@ -1578,7 +1679,7 @@ function bindZones() {
     if (!zoneSvg) return;
     let hoveredZone = null;
     zoneSvg.addEventListener('mousemove', (e) => {
-        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        if (outdoorMode || outdoorEquipmentMode || outdoorAirconMode || window.__pickEnabled) return;
         const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
         if (!zone) {
             if (hoveredZone) {
@@ -1595,14 +1696,14 @@ function bindZones() {
         positionTooltip(e);
     });
     zoneSvg.addEventListener('mouseleave', () => {
-        if (outdoorMode || outdoorEquipmentMode || window.__pickEnabled) return;
+        if (outdoorMode || outdoorEquipmentMode || outdoorAirconMode || window.__pickEnabled) return;
         hoveredZone = null;
         hideTooltip();
     });
     zoneSvg.addEventListener('click', (e) => {
         const zone = e.target instanceof Element ? e.target.closest('.zone') : null;
         if (!zone) return;
-        if (outdoorMode || outdoorEquipmentMode || outdoorExtMode || window.__pickEnabled) return;
+        if (outdoorMode || outdoorEquipmentMode || outdoorAirconMode || outdoorExtMode || window.__pickEnabled) return;
         if (Date.now() < suppressZoneClickUntil) return;
         e.stopPropagation();
         const name = (zone.dataset.name || '').trim();
@@ -1964,6 +2065,83 @@ function renderOutdoorExtMarkers(){
     });
 }
 
+function hideOutdoorAirconInfo(clearSelection = true){
+    if (outdoorAirconSelect) {
+        releaseFocus(outdoorAirconSelect);
+        outdoorAirconSelect.classList.remove('show');
+        outdoorAirconSelect.setAttribute('aria-hidden', 'true');
+        outdoorAirconSelect.setAttribute('inert', '');
+    }
+    if (clearSelection) {
+        currentOutdoorAirConditioner = null;
+        renderOutdoorAirconMarkers();
+    }
+}
+
+function fillOutdoorAirconInfo(item){
+    if (!item) return;
+    if (oasCode) oasCode.textContent = item.equipmentCode || item.id || '-';
+    if (oasSerial) oasSerial.textContent = item.serialNumber || '-';
+    if (oasType) oasType.textContent = item.equipmentType || '에어컨';
+    if (oasManufacturer) oasManufacturer.textContent = item.manufacturer || '-';
+    if (oasCoord) oasCoord.textContent = `${Number(item.x).toFixed(2)}%, ${Number(item.y).toFixed(2)}%`;
+    if (oasLocation) oasLocation.textContent = item.locationDescription || '-';
+}
+
+function positionOutdoorAirconSelect(markerEl){
+    if (!outdoorAirconSelect || !markerEl || !scene) return;
+    const sceneRect = scene.getBoundingClientRect();
+    const markerRect = markerEl.getBoundingClientRect();
+    const cardW = outdoorAirconSelect.offsetWidth || 300;
+    const cardH = outdoorAirconSelect.offsetHeight || 240;
+    let left = markerRect.right - sceneRect.left + 12;
+    let top = markerRect.top - sceneRect.top - 12;
+    if (left > sceneRect.width - cardW - 12) left = Math.max(12, markerRect.left - sceneRect.left - cardW - 12);
+    top = Math.max(12, Math.min(sceneRect.height - cardH - 12, top));
+    outdoorAirconSelect.style.left = `${left}px`;
+    outdoorAirconSelect.style.top = `${top}px`;
+    outdoorAirconSelect.style.right = 'auto';
+    outdoorAirconSelect.style.bottom = 'auto';
+}
+
+function findOutdoorAirconMarker(id){
+    return Array.from(outdoorAirconMarkers?.querySelectorAll('.eqmarker') || [])
+        .find(btn => btn.dataset.equipmentId === String(id)) || null;
+}
+
+function renderOutdoorAirconMarkers(){
+    if (!outdoorAirconMarkers) return;
+    outdoorAirconMarkers.innerHTML = '';
+    if (!outdoorAirconMode) return;
+    (outdoorAirConditioners || []).forEach(item => {
+        const id = item.equipmentId || item.id || item.equipmentCode || '';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'eqmarker aircon';
+        if (String(currentOutdoorAirConditioner?.equipmentId || currentOutdoorAirConditioner?.id || currentOutdoorAirConditioner?.equipmentCode || '') === String(id)) {
+            btn.classList.add('is-selected');
+        }
+        btn.style.left = `${item.x}%`;
+        btn.style.top = `${item.y}%`;
+        btn.dataset.equipmentId = String(id);
+        btn.title = `${item.equipmentCode || item.serialNumber || '에어컨'} - ${item.locationDescription || '옥외'}`;
+        btn.innerHTML = '<img src="/images/facility/aircon_outdoor_unit.png" alt="에어컨">';
+        btn.addEventListener('click', (e) => {
+            if (window.__mapDragLock || isPanning || panMoved) return;
+            e.stopPropagation();
+            currentOutdoorAirConditioner = item;
+            fillOutdoorAirconInfo(item);
+            renderOutdoorAirconMarkers();
+            const selectedMarker = findOutdoorAirconMarker(id) || btn;
+            outdoorAirconSelect?.removeAttribute('inert');
+            outdoorAirconSelect?.setAttribute('aria-hidden', 'false');
+            outdoorAirconSelect?.classList.add('show');
+            positionOutdoorAirconSelect(selectedMarker);
+        });
+        outdoorAirconMarkers.appendChild(btn);
+    });
+}
+
 function renderOutdoorEquipmentMarkers(){
     if(!outdoorEquipmentMarkers) return;
     outdoorEquipmentMarkers.innerHTML = '';
@@ -2162,6 +2340,13 @@ function positionVisibleOutdoorInfoCards(){
     if (outdoorExtSelect?.classList.contains('show') && currentOutdoorExtId) {
         const marker = findOutdoorExtMarkerById(currentOutdoorExtId);
         if (marker) positionOutdoorExtSelect(marker);
+    }
+    if (outdoorAirconSelect?.classList.contains('show') && currentOutdoorAirConditioner) {
+        const id = currentOutdoorAirConditioner.equipmentId ||
+            currentOutdoorAirConditioner.id ||
+            currentOutdoorAirConditioner.equipmentCode || '';
+        const marker = findOutdoorAirconMarker(id);
+        if (marker) positionOutdoorAirconSelect(marker);
     }
     if (outdoorEquipmentSelect?.classList.contains('show') && currentOutdoorEquipment) {
         const type = currentOutdoorEquipment.type;
@@ -2398,6 +2583,10 @@ function setOutdoorMode(on){
         if (outdoorExtToggle) outdoorExtToggle.checked = false;
         setOutdoorExtMode(false);
     }
+    if (outdoorMode && outdoorAirconMode) {
+        if (outdoorAirconToggle) outdoorAirconToggle.checked = false;
+        setOutdoorAirconMode(false);
+    }
     setOutdoorToolMode(null);
     if (outdoorPanel) outdoorPanel.classList.toggle('show', outdoorMode);
     document.body.classList.toggle('outdoor-mode', outdoorMode);
@@ -2429,6 +2618,10 @@ function setOutdoorExtMode(on){
         }
         if (outdoorEquipmentMode) {
             setOutdoorEquipmentMode(false);
+        }
+        if (outdoorAirconMode) {
+            if (outdoorAirconToggle) outdoorAirconToggle.checked = false;
+            setOutdoorAirconMode(false);
         }
         screen.classList.remove('menu-open');
         closePopup();
@@ -2462,6 +2655,10 @@ function setOutdoorEquipmentMode(on){
         if (outdoorExtToggle) outdoorExtToggle.checked = false;
         setOutdoorExtMode(false);
     }
+    if (outdoorEquipmentMode && outdoorAirconMode) {
+        if (outdoorAirconToggle) outdoorAirconToggle.checked = false;
+        setOutdoorAirconMode(false);
+    }
     document.body.classList.toggle('outdoor-equipment-mode', outdoorEquipmentMode);
     if (outdoorEquipmentToggle) {
         outdoorEquipmentToggle.checked = outdoorEquipmentMode;
@@ -2486,6 +2683,34 @@ function setOutdoorEquipmentMode(on){
     }
     renderOutdoorEquipmentMarkers();
 }
+
+function setOutdoorAirconMode(on){
+    outdoorAirconMode = !!on;
+    if (outdoorAirconMode && outdoorMode) {
+        if (outdoorToggle) outdoorToggle.checked = false;
+        sessionStorage.setItem('outdoorMode', '0');
+        setOutdoorMode(false);
+    }
+    if (outdoorAirconMode && outdoorExtMode) {
+        if (outdoorExtToggle) outdoorExtToggle.checked = false;
+        setOutdoorExtMode(false);
+    }
+    if (outdoorAirconMode && outdoorEquipmentMode) {
+        if (outdoorEquipmentToggle) outdoorEquipmentToggle.checked = false;
+        setOutdoorEquipmentMode(false);
+    }
+    if (outdoorAirconToggle) outdoorAirconToggle.checked = outdoorAirconMode;
+    document.body.classList.toggle('outdoor-aircon-mode', outdoorAirconMode);
+    if (outdoorAirconMode) {
+        screen.classList.remove('menu-open');
+        closePopup();
+    } else {
+        hideOutdoorAirconInfo();
+        resetMapTransform(true);
+    }
+    renderOutdoorAirconMarkers();
+}
+window.setOutdoorAirconMode = setOutdoorAirconMode;
 
 if (outdoorToggle){
     const keep = sessionStorage.getItem('outdoorMode');
@@ -2587,6 +2812,19 @@ btnOutdoorExtMoveSave?.addEventListener('click', ()=>{
         setOutdoorExtHint('이동 저장 실패: ' + (err?.message || err), 'error');
     });
 });
+if (outdoorAirconToggle) {
+    outdoorAirconToggle.checked = false;
+    outdoorAirconToggle.addEventListener('change', async (e) => {
+        const next = !!e.target.checked;
+        setOutdoorAirconMode(next);
+        if (next && !outdoorAirConditioners.length) {
+            await loadOutdoorAirConditioners();
+        }
+    });
+}
+btnOutdoorAirconSelectClose?.addEventListener('click', () => hideOutdoorAirconInfo(true));
+btnOutdoorAirconSelectCloseBtn?.addEventListener('click', () => hideOutdoorAirconInfo(true));
+
 if (outdoorEquipmentToggle) {
     outdoorEquipmentToggle.checked = false;
     outdoorEquipmentToggle.addEventListener('change', async (e)=> {
@@ -2646,12 +2884,14 @@ mapImg?.addEventListener('load', () => {
     requestMapTransform();
     renderOutdoorEquipmentMarkers();
     renderOutdoorExtMarkers();
+    renderOutdoorAirconMarkers();
 });
 window.addEventListener('resize', () => {
     clampMap();
     requestMapTransform();
     renderOutdoorEquipmentMarkers();
     renderOutdoorExtMarkers();
+    renderOutdoorAirconMarkers();
     if (zonePopup && zonePopup.style.display === 'block') {
         const pos = clampFloatingCardInScene(
             zonePopup,
@@ -2721,7 +2961,7 @@ btnOutdoorSelectClose2?.addEventListener('click', ()=> hideOutdoorInfo(false));
 
 // 추가/이동 모드 종료
 scene.addEventListener('wheel', (e) => {
-    if (!outdoorMode && !outdoorEquipmentMode && !outdoorExtMode) return;
+    if (!outdoorMode && !outdoorEquipmentMode && !outdoorExtMode && !outdoorAirconMode) return;
     e.preventDefault();
     const rect = scene.getBoundingClientRect();
     const cx = e.clientX - rect.left;
@@ -2733,8 +2973,8 @@ scene.addEventListener('wheel', (e) => {
 // 마커 기준 좌표 추출
 scene.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest('.outdoor-panel, #outdoorExtPanel, .outdoor-toggle, .outdoor-ext-toggle, .outdoor-equipment-toggle, .outdoor-equipment-panel, #outdoorMarkers, #outdoorExtMarkers, #outdoorExtSelect, #outdoorEquipmentMarkers, #outdoorEquipmentSelect, #outdoorSelect, .info-panel, #pickPanel, #zonePopup')) return;
-    if (!outdoorMode && !outdoorExtMode && !canPanMap()) return;
+    if (e.target && e.target.closest && e.target.closest('.outdoor-panel, #outdoorExtPanel, .outdoor-toggle, .outdoor-ext-toggle, .outdoor-equipment-toggle, .outdoor-aircon-toggle, .outdoor-equipment-panel, #outdoorMarkers, #outdoorExtMarkers, #outdoorExtSelect, #outdoorEquipmentMarkers, #outdoorEquipmentSelect, #outdoorAirconMarkers, #outdoorAirconSelect, #outdoorSelect, .info-panel, #pickPanel, #zonePopup')) return;
+    if (!outdoorMode && !outdoorExtMode && !outdoorAirconMode && !canPanMap()) return;
     isPanning = true;
     panMoved = false;
     window.__mapDragLock = true;
@@ -2764,8 +3004,12 @@ window.addEventListener('mouseup', () => {
 });
 
 scene.addEventListener('click', async (e)=>{
-    if(!outdoorMode && !outdoorEquipmentMode && !outdoorExtMode) return;
+    if(!outdoorMode && !outdoorEquipmentMode && !outdoorExtMode && !outdoorAirconMode) return;
     if (window.__mapDragLock || panMoved) { panMoved = false; return; }
+    if(outdoorAirconMode){
+        hideOutdoorAirconInfo(true);
+        return;
+    }
     if(outdoorExtMode){
         if(outdoorExtAddMode){
             const p = getSvgPoint(e.clientX, e.clientY);
