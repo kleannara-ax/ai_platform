@@ -436,21 +436,37 @@
     // ── 셀 좌표 → 사람이 읽을 수 있는 라벨 매핑 ──
     const COORD_LABELS = {
       'TBL_PRODUCTION_INDEX': {
+        'P7':  { section:'비고', row:'제지3 평균선속' },
+        'P8':  { section:'비고', row:'초지5 생산량' },
         'O9':  { section:'수율', row:'PS 완제품' },
+        'P9':  { section:'비고', row:'수율 PS 완제품' },
         'O10': { section:'수율', row:'PS 코팅제외' },
+        'P10': { section:'비고', row:'수율 PS 코팅제외' },
         'O11': { section:'수율', row:'화장지' },
+        'P11': { section:'비고', row:'수율 화장지' },
+        'P12': { section:'비고', row:'고지감량율' },
         'E13': { section:'슬러지원단위', row:'제지', colType:'목표' },
         'E14': { section:'슬러지원단위', row:'화장지', colType:'목표' },
         'O13': { section:'슬러지원단위', row:'제지', colType:'당월' },
         'O14': { section:'슬러지원단위', row:'화장지', colType:'당월' },
+        'P13': { section:'비고', row:'슬러지 제지' },
+        'P14': { section:'비고', row:'슬러지 화장지' },
       },
       'TBL_INVENTORY': {
         'E21': { section:'제지 재공품', row:'밀롤창고' },
+        'N21': { section:'제지 재공품', row:'밀롤창고', colType:'비고' },
         'E22': { section:'제지 재공품', row:'카타대기' },
+        'N22': { section:'제지 재공품', row:'카타대기', colType:'비고' },
         'E23': { section:'제지 재공품', row:'미포장' },
+        'N23': { section:'제지 재공품', row:'미포장', colType:'비고' },
         'E24': { section:'제지 재공품', row:'포장후 물류입고전' },
+        'N24': { section:'제지 재공품', row:'포장후 물류입고전', colType:'비고' },
         'M25': { section:'장기재고', row:'3개월 초과' },
+        'N25': { section:'장기재고', row:'3개월 초과', colType:'비고' },
         'M26': { section:'장기재고', row:'6개월 초과' },
+        'N26': { section:'장기재고', row:'6개월 초과', colType:'비고' },
+        'N27': { section:'야적현황', row:'제지', colType:'비고' },
+        'N28': { section:'야적현황', row:'생활', colType:'비고' },
       },
       'TBL_ENERGY': {
         'D36': { section:'전력', row:'제지', colType:'목표' },
@@ -487,6 +503,11 @@
         'P38': { section:'복합보일러', colType:'실적' },
         'P39': { section:'폐합성소각로', colType:'실적' },
         'P40': { section:'합계', colType:'실적' },
+        'Q36': { section:'LNG보일러', colType:'비고' },
+        'Q37': { section:'유동상소각로', colType:'비고' },
+        'Q38': { section:'복합보일러', colType:'비고' },
+        'Q39': { section:'폐합성소각로', colType:'비고' },
+        'Q40': { section:'합계', colType:'비고' },
       }
     };
 
