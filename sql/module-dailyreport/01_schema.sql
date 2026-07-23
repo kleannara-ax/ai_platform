@@ -10,81 +10,95 @@
 -- 변경이력:
 --   v1.0: 최초 작성
 --   v2.0: HTML 원본 기준 4개 표 재구성
---   v3.0 (현재): AI 플랫폼 통합 — 3계층 권한 체계
+--   v3.0: AI 플랫폼 통합 — 3계층 권한 체계
 --     - 1계층: core_menu_permission → '세부공장일보 입력' 페이지 접근 권한
 --     - 2계층: daily_report_cell_auth → 셀 단위 입력 권한 (관리자 설정)
 --     - 3계층: core_menu_permission → '세부공장일보 컬럼관리' 관리 페이지 접근 권한
 --     ※ 레거시 daily_report_cell_permission 제거 → daily_report_cell_auth로 대체
+--   v3.1 (현재): core_user/core_menu 스텁을 V2.0.0 운영 스키마로 동기화
+--     - core_user: IS_ACTIVE→enabled, DEPARTMENT/POSITION 제거, phone/created_by/updated_by 추가
+--     - core_menu: V2.0.0 소문자 컬럼명 + is_visible/allowed_ips 추가
+--     - core_menu_permission: 코드 미참조 명시 (CellAuth 기반으로 전환 완료)
 -- ============================================================
 
 USE dailyreport_dev;
 
 -- ────────────────────────────────────────────
 -- 0-1. core_user 스텁 (플랫폼 기존 테이블)
+--      ★ V2.0.0 운영 스키마 기준 (소문자 컬럼명)
+--      ※ 운영과 불일치 방지: 이 스텁은 개발/테스트 환경 초기화용
+--        DEPARTMENT, POSITION 컬럼은 운영에 없음 (user_profile 테이블로 분리됨)
+--        IS_ACTIVE → enabled, ROLE DEFAULT → 'ROLE_USER'
 -- ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS core_user (
-    USER_ID     BIGINT          NOT NULL AUTO_INCREMENT,
-    LOGIN_ID    VARCHAR(50)     NOT NULL,
-    USER_NAME   VARCHAR(100)    NOT NULL,
-    PASSWORD    VARCHAR(255)             COMMENT '암호화된 비밀번호 (BCrypt 등)',
-    EMAIL       VARCHAR(200),
-    DEPARTMENT  VARCHAR(100),
-    POSITION    VARCHAR(50),
-    ROLE        VARCHAR(20)     NOT NULL DEFAULT 'USER'  COMMENT 'ADMIN/USER',
-    IS_ACTIVE   TINYINT(1)      NOT NULL DEFAULT 1       COMMENT '활성 여부',
-    CREATED_AT  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UPDATED_AT  DATETIME                 ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (USER_ID),
-    UNIQUE KEY UK_CORE_USER_LOGIN (LOGIN_ID)
+    user_id     BIGINT          NOT NULL AUTO_INCREMENT  COMMENT '사용자 ID (PK)',
+    login_id    VARCHAR(50)     NOT NULL                 COMMENT '로그인 ID',
+    password    VARCHAR(255)    NOT NULL                 COMMENT '비밀번호 (BCrypt)',
+    user_name   VARCHAR(100)    NOT NULL                 COMMENT '사용자명',
+    email       VARCHAR(200)    NULL                     COMMENT '이메일',
+    phone       VARCHAR(20)     NULL                     COMMENT '전화번호',
+    role        VARCHAR(30)     NOT NULL DEFAULT 'ROLE_USER' COMMENT '역할 (ROLE_ADMIN/ROLE_USER)',
+    enabled     TINYINT(1)      NOT NULL DEFAULT 1       COMMENT '활성화 여부',
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    updated_at  DATETIME        NULL     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일시',
+    created_by  VARCHAR(50)     NULL                     COMMENT '생성자',
+    updated_by  VARCHAR(50)     NULL                     COMMENT '수정자',
+    PRIMARY KEY (user_id),
+    UNIQUE KEY UK_CORE_USER_LOGIN (login_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-  COMMENT='[플랫폼 코어] 사용자 마스터';
+  COMMENT='[플랫폼 코어] 사용자 마스터 (V2.0.0 운영 스키마 기준)';
 
 
 -- ────────────────────────────────────────────
 -- 0-2. core_menu 스텁 (플랫폼 기존 테이블)
---      AI 플랫폼의 카테고리/메뉴 계층 구조
+--      ★ V2.0.0 운영 스키마 기준 (소문자 컬럼명)
 -- ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS core_menu (
-    MENU_ID         BIGINT          NOT NULL AUTO_INCREMENT,
-    PARENT_MENU_ID  BIGINT                   COMMENT '상위 메뉴 ID (NULL=최상위)',
-    MENU_CODE       VARCHAR(50)     NOT NULL COMMENT '메뉴 고유 코드',
-    MENU_NAME       VARCHAR(100)    NOT NULL COMMENT '메뉴 표시명',
-    MENU_TYPE       VARCHAR(20)     NOT NULL DEFAULT 'PAGE'  COMMENT 'CATEGORY/PAGE/LINK',
-    MENU_URL        VARCHAR(300)             COMMENT '페이지 URL 경로',
-    ICON            VARCHAR(100)             COMMENT '아이콘 CSS 클래스',
-    SORT_ORDER      INT             NOT NULL DEFAULT 0       COMMENT '정렬 순서',
-    DESCRIPTION     VARCHAR(500)             COMMENT '메뉴 설명',
-    IS_ACTIVE       TINYINT(1)      NOT NULL DEFAULT 1       COMMENT '활성 여부',
-    CREATED_AT      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UPDATED_AT      DATETIME                 ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (MENU_ID),
-    UNIQUE KEY UK_CORE_MENU_CODE (MENU_CODE),
-    INDEX IDX_MENU_PARENT (PARENT_MENU_ID)
+    menu_id      BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '메뉴 ID (PK)',
+    menu_name    VARCHAR(100) NOT NULL                 COMMENT '메뉴명',
+    menu_code    VARCHAR(50)  NOT NULL                 COMMENT '메뉴 코드',
+    parent_id    BIGINT       NULL                     COMMENT '상위 메뉴 ID',
+    menu_url     VARCHAR(255) NULL                     COMMENT '메뉴 URL',
+    icon         VARCHAR(50)  NULL                     COMMENT '아이콘 식별자',
+    sort_order   INT          NULL     DEFAULT 0       COMMENT '정렬 순서',
+    menu_type    VARCHAR(20)  NULL     DEFAULT 'MENU'  COMMENT '메뉴 유형',
+    is_visible   TINYINT(1)   NULL     DEFAULT 1       COMMENT '사이드바 표시 여부',
+    is_active    TINYINT(1)   NULL     DEFAULT 1       COMMENT '활성화 여부',
+    description  VARCHAR(200) NULL                     COMMENT '설명',
+    allowed_ips  VARCHAR(1000) NULL                    COMMENT '허용 IP 목록',
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    updated_at   DATETIME     NULL     ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일시',
+    PRIMARY KEY (menu_id),
+    UNIQUE KEY UK_CORE_MENU_CODE (menu_code),
+    INDEX IDX_MENU_PARENT (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-  COMMENT='[플랫폼 코어] 메뉴 마스터 (카테고리·페이지 계층)';
+  COMMENT='[플랫폼 코어] 메뉴 마스터 (V2.0.0 운영 스키마 기준)';
 
 
 -- ────────────────────────────────────────────
 -- 0-3. core_menu_permission 스텁 (플랫폼 기존 테이블)
---      사용자별 메뉴(페이지) 접근 권한
+--      ※ Phase 4에서 MenuPermissionService가 이 테이블 의존을 제거함
+--        현재 코드에서 참조하지 않음 (CellAuth 기반으로 전환 완료)
+--        운영에 이 테이블이 있든 없든 동작에 영향 없음
+--        V2.0.0 마이그레이션 대상 아님 — 원본 유지
 -- ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS core_menu_permission (
-    PERM_ID     BIGINT          NOT NULL AUTO_INCREMENT,
-    USER_ID     BIGINT          NOT NULL  COMMENT '대상 사용자',
-    MENU_ID     BIGINT          NOT NULL  COMMENT '대상 메뉴',
-    CAN_READ    TINYINT(1)      NOT NULL DEFAULT 1  COMMENT '조회 권한',
-    CAN_WRITE   TINYINT(1)      NOT NULL DEFAULT 0  COMMENT '쓰기 권한',
-    CAN_DELETE  TINYINT(1)      NOT NULL DEFAULT 0  COMMENT '삭제 권한',
-    CAN_ADMIN   TINYINT(1)      NOT NULL DEFAULT 0  COMMENT '관리 권한',
-    GRANTED_BY  BIGINT                   COMMENT '권한 부여자',
-    CREATED_AT  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UPDATED_AT  DATETIME                 ON UPDATE CURRENT_TIMESTAMP,
+    PERM_ID     BIGINT          NOT NULL AUTO_INCREMENT  COMMENT '권한 ID (PK)',
+    USER_ID     BIGINT          NOT NULL                 COMMENT '대상 사용자',
+    MENU_ID     BIGINT          NOT NULL                 COMMENT '대상 메뉴',
+    CAN_READ    TINYINT(1)      NOT NULL DEFAULT 1       COMMENT '조회 권한',
+    CAN_WRITE   TINYINT(1)      NOT NULL DEFAULT 0       COMMENT '쓰기 권한',
+    CAN_DELETE  TINYINT(1)      NOT NULL DEFAULT 0       COMMENT '삭제 권한',
+    CAN_ADMIN   TINYINT(1)      NOT NULL DEFAULT 0       COMMENT '관리 권한',
+    GRANTED_BY  BIGINT                                   COMMENT '권한 부여자',
+    CREATED_AT  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    UPDATED_AT  DATETIME                 ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일시',
     PRIMARY KEY (PERM_ID),
     UNIQUE KEY UK_MENU_PERM_USER_MENU (USER_ID, MENU_ID),
     INDEX IDX_PERM_USER (USER_ID),
     INDEX IDX_PERM_MENU (MENU_ID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-  COMMENT='[플랫폼 코어] 사용자별 메뉴 접근 권한';
+  COMMENT='[플랫폼 코어] 사용자별 메뉴 접근 권한 (코드 미참조 — 레거시 스텁)';
 
 
 -- ════════════════════════════════════════════

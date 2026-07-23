@@ -75,14 +75,15 @@ public class MenuPermissionService {
     // ─────────────────────────────────────────────
 
     /**
-     * core_user 테이블에서 ROLE = 'ROLE_ADMIN' 여부 확인
+     * core_user 테이블에서 role = 'ROLE_ADMIN' 여부 확인
      * ※ core 모듈 Entity 직접 import 없이 native query 사용 (아키텍처 규칙 준수)
+     * ※ V2.0.0 운영 스키마 기준: 소문자 컬럼명 (user_id, role)
      */
     private boolean isAdmin(Long userId) {
         if (userId == null) return false;
         Number count = (Number) entityManager
                 .createNativeQuery(
-                        "SELECT COUNT(*) FROM core_user WHERE USER_ID = ?1 AND ROLE = 'ROLE_ADMIN'")
+                        "SELECT COUNT(*) FROM core_user WHERE user_id = ?1 AND role = 'ROLE_ADMIN'")
                 .setParameter(1, userId)
                 .getSingleResult();
         return count.longValue() > 0;

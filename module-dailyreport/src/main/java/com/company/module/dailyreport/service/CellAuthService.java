@@ -45,10 +45,10 @@ public class CellAuthService {
         }
         @SuppressWarnings("unchecked")
         List<Object[]> rows = entityManager.createNativeQuery(
-                "SELECT USER_ID, " +
-                "       COALESCE(NULLIF(TRIM(USER_NAME), ''), LOGIN_ID) AS USER_NAME, " +
-                "       LOGIN_ID " +
-                "FROM core_user WHERE USER_ID IN (:ids)")
+                "SELECT user_id, " +
+                "       COALESCE(NULLIF(TRIM(user_name), ''), login_id) AS user_name, " +
+                "       login_id " +
+                "FROM core_user WHERE user_id IN (:ids)")
                 .setParameter("ids", userIds)
                 .getResultList();
 
