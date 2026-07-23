@@ -150,9 +150,13 @@ public class CellService {
      *
      * 판단 순서:
      * 1. 잠금 셀이면 불가
-     * 2. OWNER_IDS 존재 시 → 소유권 + 주기 확인
-     * 3. DATA 셀 → CellAuth 좌표 권한 확인
+     * 2. OWNER_IDS 존재 + 본인 소유 → 소유권 주기 확인으로 결정
+     * 3. DATA 셀 + CellAuth 좌표 매칭 → CellAuth 주기 확인으로 결정
      * 4. 그 외 → 불가
+     *
+     * ※ 2순위 → 3순위 fallback: OWNER_IDS가 있지만 본인 소유가 아닌 셀도
+     *   CellAuth에 좌표가 등록되어 있으면 편집 가능 (관리자가 다른 사용자에게
+     *   특정 셀 편집 권한을 부여하는 유스케이스 지원)
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
@@ -162,16 +166,13 @@ public class CellService {
             return false;
         }
 
-        // 1순위: 소유권 기반 확인 (OWNER_IDS 존재 시)
-        if (cell.isAssignable()) {
-            if (!cell.isOwnedBy(loginId)) {
-                return false;
-            }
-            // 주기 확인
+        // 1순위: 소유권 기반 확인 (OWNER_IDS 존재 + 본인 소유)
+        if (cell.isAssignable() && cell.isOwnedBy(loginId)) {
             return canEditByFrequency(cell.getFreqCode());
         }
 
         // 2순위: CellAuth 좌표 기반 권한 확인
+        // (OWNER_IDS가 있지만 본인 소유가 아닌 경우에도 CellAuth로 편집 가능)
         if ("DATA".equals(cell.getCellType()) && cellAuth != null) {
             String coord = cell.getExcelCoord();
             if (coord != null && cellAuth.coversCoord(coord)) {

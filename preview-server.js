@@ -827,15 +827,15 @@ const server = http.createServer((req, res) => {
           if (cell.cellType === 'HEADER' || cell.cellType === 'READONLY') return false;
           if (cell.isLocked) return false;
 
-          // 1순위: 소유권 기반 (OWNER_IDS)
+          // 1순위: 소유권 기반 (OWNER_IDS + 본인 소유)
           if (cell.ownerIds && cell.ownerIds.trim().length > 0) {
             var owners = cell.ownerIds.split(/\s+/);
             var isOwner = owners.some(function(o){return o.toLowerCase()===loginId.toLowerCase();});
-            if (!isOwner) return false;
-            return canEditByFrequencyMock(cell.freqCode);
+            if (isOwner) return canEditByFrequencyMock(cell.freqCode);
+            // 본인 소유 아닌 경우 → CellAuth fallback으로 진행
           }
 
-          // 2순위: CellAuth 좌표 기반 권한 확인
+          // 2순위: CellAuth 좌표 기반 권한 확인 (OWNER_IDS 있지만 본인 소유 아닌 셀도 포함)
           if (cell.cellType === 'DATA' && cell.excelCoord) {
             var cellAuth = (global._drCellAuths || []).find(function(a) {
               return a.userId === drCurrentUser.userId
