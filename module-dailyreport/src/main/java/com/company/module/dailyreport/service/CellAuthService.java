@@ -126,25 +126,30 @@ public class CellAuthService {
     @Transactional
     public CellAuthResponse createAuth(CellAuthRequest request, Long grantedBy) {
         // 동일 사용자+표 코드 중복 확인
-        cellAuthRepository.findByUserIdAndTableCode(request.getUserId(), request.getTableCode())
-                .ifPresent(existing -> {
-                    if (Boolean.TRUE.equals(existing.getIsActive())) {
-                        throw new BusinessException(ErrorCode.INVALID_INPUT,
-                                String.format("이미 권한이 존재합니다. userId=%d, tableCode=%s",
-                                        request.getUserId(), request.getTableCode()));
-                    }
-                    // 비활성 상태면 재활성화
-                    existing.updateActive(true);
-                    existing.updateAll(
-                            request.getUserId(),
-                            request.getTableCode(),
-                            request.getCellCoordsAsJson(),
-                            request.getFreqCode(),
-                            request.getFreqLabel(),
-                            request.getDescription(),
-                            grantedBy);
-                });
+        java.util.Optional<CellAuth> existingOpt =
+                cellAuthRepository.findByUserIdAndTableCode(request.getUserId(), request.getTableCode());
 
+        if (existingOpt.isPresent()) {
+            CellAuth existing = existingOpt.get();
+            if (Boolean.TRUE.equals(existing.getIsActive())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT,
+                        String.format("이미 권한이 존재합니다. userId=%d, tableCode=%s",
+                                request.getUserId(), request.getTableCode()));
+            }
+            // 비활성 상태면 재활성화 후 반환 (새 레코드 INSERT 방지)
+            existing.updateActive(true);
+            existing.updateAll(
+                    request.getUserId(),
+                    request.getTableCode(),
+                    request.getCellCoordsAsJson(),
+                    request.getFreqCode(),
+                    request.getFreqLabel(),
+                    request.getDescription(),
+                    grantedBy);
+            return toResponsesWithUserName(List.of(existing)).get(0);
+        }
+
+        // 기존 레코드가 없는 경우에만 새로 생성
         CellAuth auth = CellAuth.builder()
                 .userId(request.getUserId())
                 .tableCode(request.getTableCode())
@@ -157,7 +162,7 @@ public class CellAuthService {
                 .build();
 
         cellAuthRepository.save(auth);
-        return CellAuthResponse.from(auth);
+        return toResponsesWithUserName(List.of(auth)).get(0);
     }
 
     /**

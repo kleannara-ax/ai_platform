@@ -1235,6 +1235,23 @@ const server = http.createServer((req, res) => {
 
       // ── /cell-auths (POST - 등록) ──
       if (pathname === '/dailyreport-api/cell-auths' && method === 'POST') {
+        // UNIQUE(userId, tableCode) 중복 확인
+        var existingAuth = global._drCellAuths.find(function(a){
+          return a.userId === jsonBody.userId && a.tableCode === jsonBody.tableCode;
+        });
+        if (existingAuth) {
+          if (existingAuth.isActive) {
+            return apiErr(res, '이미 권한이 존재합니다. userId=' + jsonBody.userId + ', tableCode=' + jsonBody.tableCode, 400);
+          }
+          // 비활성 레코드 재활성화
+          Object.assign(existingAuth, jsonBody);
+          existingAuth.isActive = true;
+          existingAuth.grantedBy = drCurrentUser.userId;
+          existingAuth.cellCoords = typeof existingAuth.cellCoords === 'object' ? JSON.stringify(existingAuth.cellCoords) : existingAuth.cellCoords;
+          var usr2 = drUsers.find(function(u){return u.userId===existingAuth.userId;});
+          if(usr2){existingAuth.loginId=usr2.loginId;existingAuth.userName=usr2.userName;}
+          return jsonRes(res, { data: existingAuth });
+        }
         var newAuth = Object.assign({ authId: global._drNextAuthId++, isActive:true, grantedBy:drCurrentUser.userId }, jsonBody);
         newAuth.cellCoords = typeof newAuth.cellCoords === 'object' ? JSON.stringify(newAuth.cellCoords) : newAuth.cellCoords;
         var usr = drUsers.find(function(u){return u.userId===newAuth.userId;});
