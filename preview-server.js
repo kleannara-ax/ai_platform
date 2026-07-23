@@ -1248,6 +1248,17 @@ const server = http.createServer((req, res) => {
         var authId = parseInt(pathname.split('/').pop());
         var auth = global._drCellAuths.find(function(a){return a.authId===authId;});
         if(auth){
+          // UNIQUE(userId, tableCode) 제약 위반 방지
+          var newUserId = jsonBody.userId !== undefined ? jsonBody.userId : auth.userId;
+          var newTableCode = jsonBody.tableCode !== undefined ? jsonBody.tableCode : auth.tableCode;
+          if (newUserId !== auth.userId || newTableCode !== auth.tableCode) {
+            var dup = global._drCellAuths.find(function(a2){
+              return a2.authId !== authId && a2.userId === newUserId && a2.tableCode === newTableCode;
+            });
+            if (dup) {
+              return apiErr(res, '변경하려는 사용자+표 조합에 이미 권한이 존재합니다.', 400);
+            }
+          }
           Object.assign(auth, jsonBody);
           auth.cellCoords = typeof auth.cellCoords === 'object' ? JSON.stringify(auth.cellCoords) : auth.cellCoords;
           // userId 변경 시 loginId/userName 갱신

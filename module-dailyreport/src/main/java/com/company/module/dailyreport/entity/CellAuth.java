@@ -145,8 +145,11 @@ public class CellAuth {
     }
 
     /** 전체 업데이트 (관리자 편집) */
-    public void updateAll(String cellCoords, String freqCode, String freqLabel,
+    public void updateAll(Long userId, String tableCode,
+                          String cellCoords, String freqCode, String freqLabel,
                           String description, Long grantedBy) {
+        this.userId = userId;
+        this.tableCode = tableCode;
         this.cellCoords = cellCoords;
         this.freqCode = freqCode;
         this.freqLabel = freqLabel;

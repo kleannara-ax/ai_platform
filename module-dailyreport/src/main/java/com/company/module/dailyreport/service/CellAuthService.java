@@ -136,6 +136,8 @@ public class CellAuthService {
                     // 비활성 상태면 재활성화
                     existing.updateActive(true);
                     existing.updateAll(
+                            request.getUserId(),
+                            request.getTableCode(),
                             request.getCellCoordsAsJson(),
                             request.getFreqCode(),
                             request.getFreqLabel(),
@@ -160,20 +162,37 @@ public class CellAuthService {
 
     /**
      * 셀 권한 수정
+     * - userId 또는 tableCode 변경 시 UNIQUE(USER_ID, TABLE_CODE) 제약 위반 방지
      */
     @Transactional
     public CellAuthResponse updateAuth(Long authId, CellAuthRequest request, Long grantedBy) {
         CellAuth auth = cellAuthRepository.findById(authId)
                 .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
 
+        // userId 또는 tableCode가 변경되면 대상 조합의 기존 활성 레코드 확인
+        boolean userChanged = !auth.getUserId().equals(request.getUserId());
+        boolean tableChanged = !auth.getTableCode().equals(request.getTableCode());
+        if (userChanged || tableChanged) {
+            cellAuthRepository.findByUserIdAndTableCode(request.getUserId(), request.getTableCode())
+                    .ifPresent(existing -> {
+                        if (!existing.getAuthId().equals(authId)) {
+                            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                                    String.format("변경하려는 사용자+표 조합에 이미 권한이 존재합니다. userId=%d, tableCode=%s",
+                                            request.getUserId(), request.getTableCode()));
+                        }
+                    });
+        }
+
         auth.updateAll(
+                request.getUserId(),
+                request.getTableCode(),
                 request.getCellCoordsAsJson(),
                 request.getFreqCode(),
                 request.getFreqLabel(),
                 request.getDescription(),
                 grantedBy);
 
-        return CellAuthResponse.from(auth);
+        return toResponsesWithUserName(List.of(auth)).get(0);
     }
 
     /**
