@@ -695,14 +695,20 @@
     }
 
     // ── 개별 셀 <td> 렌더링 ──
-    // ※ Phase 4: editable 여부는 서버에서 결정 (cell.editable 필드 사용)
-    //    서버가 OWNER_IDS + CellAuth + 주기 + 잠금을 모두 고려해서 editable을 계산
+    // ※ Phase 4: editable 여부는 서버에서 결정 (cell.isEditable 필드 사용)
+    //    서버가 OWNER_IDS + CellAuth + 주기 + 잠금을 모두 고려해서 isEditable을 계산
+    //    서버 CellResponse.isEditable → Jackson 직렬화 → JSON "isEditable"
+    //    Mock 서버는 cell.editable(하위 호환)도 지원
     function renderCellTd(cell, rowSpan, colSpan) {
+      // 서버 응답: isEditable (Java CellResponse), Mock 서버: editable (레거시)
+      const serverEditable = cell.isEditable !== undefined ? cell.isEditable
+                           : cell.editable !== undefined   ? cell.editable
+                           : undefined;
       const isAssignable = cell.ownerIds && cell.ownerIds.trim().length > 0;
-      const isMyCell = cell.editable !== undefined ? cell.editable : (isAssignable && currentUser && isOwnedBy(cell.ownerIds, currentUser.loginId));
+      const isMyCell = serverEditable !== undefined ? serverEditable : (isAssignable && currentUser && isOwnedBy(cell.ownerIds, currentUser.loginId));
       const freqEditable = isMyCell ? canEditByFrequency(cell.freqCode || '') : false;
-      const isEditable = cell.editable !== undefined
-        ? cell.editable
+      const isEditable = serverEditable !== undefined
+        ? serverEditable
         : (isMyCell && freqEditable && !cell.isLocked);
 
       // 쓰기 권한이 없으면 편집 불가

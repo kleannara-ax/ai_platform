@@ -806,13 +806,56 @@ const server = http.createServer((req, res) => {
         var reportDate = parsedUrl.query.reportDate || '2024-07-20';
         var savedData = global._drCellData[reportDate] || {};
 
-        // 셀 editable 계산 함수
-        function isCellEditable(cell, loginId) {
+        // 셀 editable 계산 함수 (Java CellService.isCellEditableForUser 로직과 동일)
+        // 판단 순서:
+        //   1. HEADER/READONLY/잠금 → 불가
+        //   2. OWNER_IDS 존재 시 → 소유권 + 주기 확인 (1순위)
+        //   3. DATA 셀 + CellAuth 좌표 → CellAuth 주기 확인 (2순위)
+        //   4. 그 외 → 불가
+        function canEditByFrequencyMock(freqCode) {
+          if (!freqCode) return false;
+          var today = new Date();
+          switch (freqCode.toLowerCase()) {
+            case 'daily': case 'event': return true;
+            case 'monthly': return today.getDate() === 1;
+            case 'yearly': return today.getMonth() === 0 && today.getDate() === 1;
+            default: return false;
+          }
+        }
+
+        function isCellEditable(cell, loginId, tableCode) {
           if (cell.cellType === 'HEADER' || cell.cellType === 'READONLY') return false;
           if (cell.isLocked) return false;
-          if (!cell.ownerIds) return false;
-          var owners = cell.ownerIds.split(/\s+/);
-          return owners.some(function(o){return o.toLowerCase()===loginId.toLowerCase();});
+
+          // 1순위: 소유권 기반 (OWNER_IDS)
+          if (cell.ownerIds && cell.ownerIds.trim().length > 0) {
+            var owners = cell.ownerIds.split(/\s+/);
+            var isOwner = owners.some(function(o){return o.toLowerCase()===loginId.toLowerCase();});
+            if (!isOwner) return false;
+            return canEditByFrequencyMock(cell.freqCode);
+          }
+
+          // 2순위: CellAuth 좌표 기반 권한 확인
+          if (cell.cellType === 'DATA' && cell.excelCoord) {
+            var cellAuth = (global._drCellAuths || []).find(function(a) {
+              return a.userId === drCurrentUser.userId
+                  && a.tableCode === tableCode
+                  && a.isActive;
+            });
+            if (cellAuth && cellAuth.cellCoords) {
+              // cellCoords: JSON 배열 문자열 ["B7","C7","D7"]
+              var coordList;
+              try { coordList = JSON.parse(cellAuth.cellCoords); } catch(e) { coordList = []; }
+              var covered = coordList.some(function(coord) {
+                return coord.toUpperCase() === cell.excelCoord.toUpperCase();
+              });
+              if (covered) {
+                return canEditByFrequencyMock(cellAuth.freqCode);
+              }
+            }
+          }
+
+          return false;
         }
 
         // 실제 seed 데이터 기반 셀 생성
@@ -820,8 +863,8 @@ const server = http.createServer((req, res) => {
           return seedCells.map(function(c) {
             var key = tableCode + '__' + c.excelCoord;
             var val = (savedData[key] !== undefined) ? savedData[key] : c.cellValue;
-            var editable = isCellEditable(c, drCurrentUser.loginId);
-            return Object.assign({}, c, { tableCode: tableCode, cellValue: val, editable: editable });
+            var editable = isCellEditable(c, drCurrentUser.loginId, tableCode);
+            return Object.assign({}, c, { tableCode: tableCode, cellValue: val, editable: editable, isEditable: editable });
           });
         }
 
