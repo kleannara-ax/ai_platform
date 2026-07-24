@@ -146,17 +146,21 @@ public class CellService {
     // ─────────────────────────────────────────────
 
     /**
-     * 셀이 사용자에게 편집 가능한지 판단 (★ Phase 4 개선)
+     * 셀이 사용자에게 편집 가능한지 판단 (★ Phase 4 개선 → ★★ CellAuth 단일 소스 전환)
      *
      * 판단 순서:
      * 1. 잠금 셀이면 불가
-     * 2. OWNER_IDS 존재 + 본인 소유 → 소유권 주기 확인으로 결정
-     * 3. DATA 셀 + CellAuth 좌표 매칭 → CellAuth 주기 확인으로 결정
-     * 4. 그 외 → 불가
+     * 2. DATA 셀 + CellAuth 좌표 매칭 → CellAuth의 주기(FREQ_CODE) 확인으로 결정
+     * 3. 그 외(CellAuth 없음/좌표 불일치) → 불가 (빈값 취급)
      *
-     * ※ 2순위 → 3순위 fallback: OWNER_IDS가 있지만 본인 소유가 아닌 셀도
-     *   CellAuth에 좌표가 등록되어 있으면 편집 가능 (관리자가 다른 사용자에게
-     *   특정 셀 편집 권한을 부여하는 유스케이스 지원)
+     * ※ daily_report_cell.OWNER_IDS/FREQ_CODE는 화면 표시용 캐시일 뿐이며
+     *   진짜 신뢰 소스(single source of truth)는 항상 daily_report_cell_auth이다.
+     *   과거에는 "OWNER_IDS 존재 + 본인 소유"를 1순위로 셀 자체의 낡은 FREQ_CODE로
+     *   판단했는데, 이 캐시는 CellOwnershipSyncService.syncOwnerCache()가
+     *   OWNER_IDS/OWNER_NAMES만 갱신하고 FREQ_CODE는 건드리지 않으므로, 관리자가
+     *   컬럼관리 대시보드에서 주기를 변경해도(CellAuth.FREQ_CODE만 바뀜) 셀의 낡은
+     *   FREQ_CODE로 먼저 매칭되어 최신 주기가 반영되지 않는 버그가 있었다.
+     *   → CellAuth 매칭 하나로 판단을 단일화하여 이 불일치를 제거한다.
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
@@ -166,13 +170,7 @@ public class CellService {
             return false;
         }
 
-        // 1순위: 소유권 기반 확인 (OWNER_IDS 존재 + 본인 소유)
-        if (cell.isAssignable() && cell.isOwnedBy(loginId)) {
-            return canEditByFrequency(cell.getFreqCode());
-        }
-
-        // 2순위: CellAuth 좌표 기반 권한 확인
-        // (OWNER_IDS가 있지만 본인 소유가 아닌 경우에도 CellAuth로 편집 가능)
+        // CellAuth 좌표 기반 권한 확인 (유일한 판단 기준)
         if ("DATA".equals(cell.getCellType()) && cellAuth != null) {
             String coord = cell.getExcelCoord();
             if (coord != null && cellAuth.coversCoord(coord)) {
@@ -180,6 +178,7 @@ public class CellService {
             }
         }
 
+        // CellAuth가 없거나 이 좌표를 커버하지 않으면 빈값(편집 불가) 취급
         return false;
     }
 

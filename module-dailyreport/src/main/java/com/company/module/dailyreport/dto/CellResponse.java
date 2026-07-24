@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 public class CellResponse {
 
     private Long cellId;
+    /** 이 셀이 속한 표의 코드 (예: TBL_PRODUCTION_INDEX). 프론트 저장 요청 시 사용. */
+    private String tableCode;
     private Integer rowIndex;
     private Integer colIndex;
     private String excelCoord;
@@ -37,6 +39,7 @@ public class CellResponse {
     public static CellResponse from(DailyReportCell entity) {
         return CellResponse.builder()
                 .cellId(entity.getCellId())
+                .tableCode(entity.getReportTable() != null ? entity.getReportTable().getTableCode() : null)
                 .rowIndex(entity.getRowIndex())
                 .colIndex(entity.getColIndex())
                 .excelCoord(entity.getExcelCoord())
@@ -63,6 +66,7 @@ public class CellResponse {
     public static CellResponse fromWithEditability(DailyReportCell entity, boolean editable) {
         return CellResponse.builder()
                 .cellId(entity.getCellId())
+                .tableCode(entity.getReportTable() != null ? entity.getReportTable().getTableCode() : null)
                 .rowIndex(entity.getRowIndex())
                 .colIndex(entity.getColIndex())
                 .excelCoord(entity.getExcelCoord())

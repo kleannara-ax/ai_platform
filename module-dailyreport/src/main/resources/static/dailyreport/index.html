@@ -996,6 +996,7 @@
 
         // 2. 표별로 셀 저장 API 호출
         let totalSaved = 0;
+        const failedGroups = [];
         for (const [tableCode, cells] of Object.entries(tableGroups)) {
           if (cells.length === 0) continue;
           try {
@@ -1006,6 +1007,7 @@
             totalSaved += cells.length;
           } catch (err) {
             console.warn(`표 ${tableCode} 저장 실패:`, err);
+            failedGroups.push({ tableCode, count: cells.length, message: err.message || '알 수 없는 오류' });
           }
         }
 
@@ -1026,12 +1028,20 @@
           }
         }
 
-        // 4. 저장 완료 표시
+        // 4. 저장 완료/실패 표시
         dirtyCoords.clear();
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-        setSaveState(`저장됨 ${timeStr}`, 'saved');
-        showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 반영`);
+
+        if (failedGroups.length > 0) {
+          // 일부 또는 전체 표 저장 실패 → 성공으로 오인하지 않도록 명확히 실패로 표시
+          setSaveState(`저장 실패 있음 ${timeStr}`, 'dirty');
+          const detail = failedGroups.map(f => `${f.tableCode}(${f.count}개): ${f.message}`).join(' / ');
+          showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 실패 - ${detail}`);
+        } else {
+          setSaveState(`저장됨 ${timeStr}`, 'saved');
+          showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 반영`);
+        }
 
         // 자동 새로고침 표시 복원
         const indicator = document.getElementById('autoRefreshIndicator');
