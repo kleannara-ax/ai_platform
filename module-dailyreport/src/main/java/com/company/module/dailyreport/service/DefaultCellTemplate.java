@@ -112,7 +112,7 @@ public final class DefaultCellTemplate {
         ro(t, 2,10, "L7",  "597");
         ro(t, 2,11, "M7",  "597");
         ro(t, 2,12, "N7",  "594");
-        ro(t, 2,13, "O7",  "DRS");
+        d(t,  2,13, "O7",  null, null);
         d(t,  2,14, "P7",  "daily", "매일");
 
         // ── Row 3: 초지5 생산량 ──
@@ -127,7 +127,7 @@ public final class DefaultCellTemplate {
         ro(t, 3,10, "L8",  "83.6");
         ro(t, 3,11, "M8",  "83");
         ro(t, 3,12, "N8",  "79.5");
-        ro(t, 3,13, "O8",  "SAP");
+        d(t,  3,13, "O8",  null, null);
         d(t,  3,14, "P8",  "daily", "매일");
 
         // ── Row 4: 수율 - PS 완제품 ──
@@ -189,7 +189,7 @@ public final class DefaultCellTemplate {
         ro(t, 7,10, "L12", "14.2");
         ro(t, 7,11, "M12", "15.9");
         ro(t, 7,12, "N12", "16");
-        ro(t, 7,13, "O12", "EIS");
+        d(t,  7,13, "O12", null, null);
         d(t,  7,14, "P12", "daily", "매일");
 
         // ── Row 8: 슬러지원단위 - 제지 ──
@@ -259,7 +259,7 @@ public final class DefaultCellTemplate {
         ro(t, 2, 8, "J21", "3037");
         ro(t, 2, 9, "K21", "3711");
         ro(t, 2,10, "L21", "3006");
-        ro(t, 2,11, "M21", "MES");
+        d(t,  2,11, "M21", null, null);
         d(t,  2,12, "N21", "daily", "매일");
 
         // ── Row 3: 카타대기 ──
@@ -272,7 +272,7 @@ public final class DefaultCellTemplate {
         ro(t, 3, 8, "J22", "1360");
         ro(t, 3, 9, "K22", "1121");
         ro(t, 3,10, "L22", "1110");
-        ro(t, 3,11, "M22", "MES");
+        d(t,  3,11, "M22", null, null);
         d(t,  3,12, "N22", "daily", "매일");
 
         // ── Row 4: 미포장 ──
@@ -285,7 +285,7 @@ public final class DefaultCellTemplate {
         ro(t, 4, 8, "J23", "86");
         ro(t, 4, 9, "K23", "173");
         ro(t, 4,10, "L23", "266");
-        ro(t, 4,11, "M23", "MES");
+        d(t,  4,11, "M23", null, null);
         d(t,  4,12, "N23", "daily", "매일");
 
         // ── Row 5: 포장후 물류입고전 ──
@@ -298,7 +298,7 @@ public final class DefaultCellTemplate {
         ro(t, 5, 8, "J24", "58");
         ro(t, 5, 9, "K24", "288");
         ro(t, 5,10, "L24", "423");
-        ro(t, 5,11, "M24", "MES");
+        d(t,  5,11, "M24", null, null);
         d(t,  5,12, "N24", "daily", "매일");
 
         // ── Row 6: 장기재고 3개월 초과 ──
@@ -342,7 +342,7 @@ public final class DefaultCellTemplate {
         ro(t, 8, 8, "J27", "0");
         ro(t, 8, 9, "K27", "0");
         ro(t, 8,10, "L27", "0");
-        ro(t, 8,11, "M27", "WMS");
+        d(t,  8,11, "M27", null, null);
         d(t,  8,12, "N27", "daily", "매일");
 
         // ── Row 9: 야적현황 - 생활 ──
@@ -356,7 +356,7 @@ public final class DefaultCellTemplate {
         ro(t, 9, 8, "J28", "0");
         ro(t, 9, 9, "K28", "0");
         ro(t, 9,10, "L28", "0");
-        ro(t, 9,11, "M28", "WMS");
+        d(t,  9,11, "M28", null, null);
         d(t,  9,12, "N28", "daily", "매일");
     }
 
@@ -378,45 +378,45 @@ public final class DefaultCellTemplate {
         ro(t, 2, 0, "B36", "전력",    3, 1);
         ro(t, 2, 1, "C36", "제   지", 1, 1);
         d(t,  2, 2, "D36", "yearly", "매년");
-        ro(t, 2, 3, "E36", "EIS");
+        d(t,  2, 3, "E36", null, null);
         d(t,  2, 4, "F36", "monthly", "매월");
-        ro(t, 2, 5, "G36", "EIS");
+        d(t,  2, 5, "G36", null, null);
 
         // ── Row 3: 전력 - 화장지 ──
         ro(t, 3, 1, "C37", "화장지", 1, 1);
         d(t,  3, 2, "D37", "yearly", "매년");
-        ro(t, 3, 3, "E37", "EIS");
+        d(t,  3, 3, "E37", null, null);
         d(t,  3, 4, "F37", "monthly", "매월");
-        ro(t, 3, 5, "G37", "EIS");
+        d(t,  3, 5, "G37", null, null);
 
         // ── Row 4: 전력 - 화)초지5 ──
         ro(t, 4, 1, "C38", "화)초지5", 1, 1);
         d(t,  4, 2, "D38", "yearly", "매년");
-        ro(t, 4, 3, "E38", "EIS");
+        d(t,  4, 3, "E38", null, null);
         d(t,  4, 4, "F38", "monthly", "매월");
-        ro(t, 4, 5, "G38", "EIS");
+        d(t,  4, 5, "G38", null, null);
 
         // ── Row 5: 연료 - 제지 ──
         ro(t, 5, 0, "B39", "연료",    3, 1);
         ro(t, 5, 1, "C39", "제   지", 1, 1);
         d(t,  5, 2, "D39", "yearly", "매년");
-        ro(t, 5, 3, "E39", "EIS");
+        d(t,  5, 3, "E39", null, null);
         d(t,  5, 4, "F39", "monthly", "매월");
-        ro(t, 5, 5, "G39", "EIS");
+        d(t,  5, 5, "G39", null, null);
 
         // ── Row 6: 연료 - 화장지 ──
         ro(t, 6, 1, "C40", "화장지", 1, 1);
         d(t,  6, 2, "D40", "yearly", "매년");
-        ro(t, 6, 3, "E40", "EIS");
+        d(t,  6, 3, "E40", null, null);
         d(t,  6, 4, "F40", "monthly", "매월");
-        ro(t, 6, 5, "G40", "EIS");
+        d(t,  6, 5, "G40", null, null);
 
         // ── Row 7: 연료 - 화)초지5 ──
         ro(t, 7, 1, "C41", "화)초지5", 1, 1);
         d(t,  7, 2, "D41", "yearly", "매년");
-        ro(t, 7, 3, "E41", "EIS");
+        d(t,  7, 3, "E41", null, null);
         d(t,  7, 4, "F41", "monthly", "매월");
-        ro(t, 7, 5, "G41", "EIS");
+        d(t,  7, 5, "G41", null, null);
     }
 
     // ═══════════════════════════════════════════════
@@ -524,6 +524,12 @@ public final class DefaultCellTemplate {
      *   전적으로 관리자가 '컬럼관리(CellAuth)' 화면에서 설정한다.
      *   설정 즉시 {@link CellOwnershipSyncService}가 daily_report_cell_auth →
      *   daily_report_cell.OWNER_IDS/OWNER_NAMES 로 동기화한다.
+     *
+     * ★ freqCode/freqLabel도 null로 호출 가능하다 — 아직 관리자가 컬럼관리에서
+     *   주기(CellAuth)를 지정하지 않은 신규 DATA 셀은 담당자와 마찬가지로
+     *   주기 미지정(NULL) 상태로 생성하고, 관리자가 배정하는 즉시 CellAuth
+     *   기준으로 반영된다 (CellService.isCellEditableForUser()가 CellAuth를
+     *   단일 소스로 판단하므로, 이 셀 자체의 freqCode는 표시용일 뿐이다).
      */
     private static void d(DailyReportTable t, int row, int col, String coord,
                            String freqCode, String freqLabel) {
