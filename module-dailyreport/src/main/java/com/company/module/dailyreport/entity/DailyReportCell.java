@@ -164,6 +164,20 @@ public class DailyReportCell {
         this.lastEditedAt = LocalDateTime.now();
     }
 
+    /**
+     * ★ 이전 일보 값 이어받기 전용 — 새로 생성된 표의 DATA 셀에 직전 일보의
+     *   값을 초기값으로 채워 넣을 때 사용한다.
+     *
+     * updateValue()와 달리 LAST_EDITOR_ID/LAST_EDITED_AT은 절대 변경하지
+     * 않는다 — 오늘 표에서는 아직 아무도 실제로 입력한 적이 없으므로
+     * "누가 언제 입력했는지" 기록은 비워둔 상태를 그대로 유지해야 한다
+     * (해당 정보는 DB 컬럼에는 존재하지만 화면 툴팁 등 표시용일 뿐이며,
+     * 이 메서드는 값만 이어받고 그 기록은 건드리지 않는다).
+     */
+    public void carryOverValue(String cellValue) {
+        this.cellValue = cellValue;
+    }
+
     /** 셀 잠금/해제 */
     public void updateLock(boolean locked) {
         this.isLocked = locked;

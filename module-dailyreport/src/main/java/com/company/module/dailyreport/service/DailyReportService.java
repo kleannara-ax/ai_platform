@@ -15,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 세부공장일보 핵심 비즈니스 로직
@@ -71,9 +74,12 @@ public class DailyReportService {
                     boolean cellsMissing = report.getTables().stream()
                             .anyMatch(t -> t.getCells().isEmpty());
                     if (cellsMissing) {
+                        // ★ 값 이어받기: 보충되는 표에도 직전 일보의 값을 초기값으로 반영
+                        Map<String, String> previousValues = findPreviousCellValues(reportDate);
                         for (DailyReportTable table : report.getTables()) {
                             if (table.getCells().isEmpty()) {
                                 DefaultCellTemplate.populateDefaultCells(table, reportDate);
+                                applyCarriedOverValues(table, previousValues);
                                 // ★ 하드코딩 제거: 생성 즉시 현재 활성 CellAuth 담당자를 반영
                                 cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
                             }
@@ -89,7 +95,9 @@ public class DailyReportService {
                             .status("DRAFT")
                             .createdBy(userId)
                             .build();
-                    createDefaultTables(report);
+                    // ★ 값 이어받기: 직전 일보의 DATA 셀 값을 새 표의 초기값으로 반영
+                    Map<String, String> previousValues = findPreviousCellValues(reportDate);
+                    createDefaultTables(report, previousValues);
                     reportRepository.save(report);
                     return DailyReportResponse.fromWithDetails(report);
                 });
@@ -117,8 +125,9 @@ public class DailyReportService {
                 .createdBy(userId)
                 .build();
 
-        // 4개 기본 표 구조 생성
-        createDefaultTables(report);
+        // 4개 기본 표 구조 생성 (★ 값 이어받기: 직전 일보의 DATA 셀 값을 초기값으로 반영)
+        Map<String, String> previousValues = findPreviousCellValues(request.getReportDate());
+        createDefaultTables(report, previousValues);
 
         reportRepository.save(report);
         return DailyReportResponse.fromWithDetails(report);
@@ -321,7 +330,7 @@ public class DailyReportService {
      *   3. 에너지 원단위 (table3) — 8행 6열
      *   4. 보일러 운영 현황 (table4) — 7행 8열
      */
-    private void createDefaultTables(DailyReport report) {
+    private void createDefaultTables(DailyReport report, Map<String, String> previousValues) {
         String[][] tableDefinitions = {
                 {"TBL_PRODUCTION_INDEX", "주요 생산 지표 현황",     "10", "15"},
                 {"TBL_INVENTORY",        "제지 재공품 및 야적현황", "10", "13"},
@@ -342,9 +351,79 @@ public class DailyReportService {
             // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
             // ★ 담당자(OWNER_IDS/OWNER_NAMES)는 하드코딩하지 않음 — 항상 NULL로 시작
             DefaultCellTemplate.populateDefaultCells(table, report.getReportDate());
+            // ★ 값 이어받기: 직전 일보에 입력되어 있던 DATA 셀 값을 새 표의 초기값으로 반영
+            applyCarriedOverValues(table, previousValues);
             // ★ 생성 즉시 현재 활성 CellAuth 담당자를 반영 (코드 수정/재배포 불필요)
             cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
         }
+    }
+
+    /**
+     * ★ 값 이어받기(carry-over) — 주어진 날짜 이전(과거)의 가장 최근 일보에서
+     *   모든 표의 DATA 셀 값을 (tableCode + excelCoord) 키로 모아 반환한다.
+     *
+     * - HEADER/READONLY 셀은 대상이 아니며, DefaultCellTemplate이 자체적으로
+     *   고정값을 채우므로 여기서는 조회조차 하지 않는다 (findEditableCellsByTableId는
+     *   cellType='DATA' 조건이 있어 자동으로 제외됨 — 단, 이 메서드는 표 단위가
+     *   아니라 일보 전체 단위 조회이므로 findDataCellsByTableCode가 아닌
+     *   report.getTables() 순회로 직접 필터링한다).
+     * - 빈 값("")이나 null인 셀은 이어받을 필요가 없으므로 맵에서 제외한다.
+     *
+     * @return key = "tableCode:excelCoord", value = 직전 일보에 입력된 값
+     */
+    private Map<String, String> findPreviousCellValues(LocalDate reportDate) {
+        Optional<DailyReport> previous = reportRepository
+                .findTopByReportDateLessThanOrderByReportDateDesc(reportDate);
+        if (previous.isEmpty()) {
+            return Map.of();
+        }
+
+        return previous.get().getTables().stream()
+                .flatMap(table -> table.getCells().stream()
+                        .filter(cell -> "DATA".equals(cell.getCellType()))
+                        .filter(cell -> cell.getCellValue() != null && !cell.getCellValue().isBlank())
+                        .filter(cell -> cell.getExcelCoord() != null)
+                        .map(cell -> Map.entry(
+                                carryOverKey(table.getTableCode(), cell.getExcelCoord()),
+                                cell.getCellValue())))
+                // 동일 키가 중복될 경우(이론상 발생하지 않아야 하나 방어적으로) 나중 값 우선
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (existing, replacement) -> replacement));
+    }
+
+    /**
+     * ★ 값 이어받기 — 새로 생성된 표의 DATA 셀 중, previousValues 맵에 대응하는
+     *   값이 있는 셀에 한해 초기값을 채워 넣는다.
+     *
+     * - DefaultCellTemplate이 생성한 직후의 셀은 항상 cellValue=""(빈 값)이므로,
+     *   "이미 값이 있는 셀을 덮어쓸 위험"은 이 호출 시점에는 없다. 그래도 향후
+     *   호출 순서가 바뀔 가능성에 대비해 방어적으로 빈 값인 셀만 채운다.
+     * - HEADER/READONLY 셀은 cellType이 DATA가 아니므로 자동으로 건너뛴다.
+     * - 수정자(LAST_EDITOR_ID)/수정일시(LAST_EDITED_AT)는 절대 건드리지 않는다
+     *   (carryOverValue()가 값만 변경) — 오늘 아직 누구도 입력하지 않았다는
+     *   사실은 그대로 유지된다.
+     */
+    private void applyCarriedOverValues(DailyReportTable table, Map<String, String> previousValues) {
+        if (previousValues.isEmpty()) {
+            return;
+        }
+        for (DailyReportCell cell : table.getCells()) {
+            if (!"DATA".equals(cell.getCellType())) {
+                continue;
+            }
+            if (cell.getCellValue() != null && !cell.getCellValue().isBlank()) {
+                continue; // 이미 값이 있으면 덮어쓰지 않음
+            }
+            String key = carryOverKey(table.getTableCode(), cell.getExcelCoord());
+            String previousValue = previousValues.get(key);
+            if (previousValue != null) {
+                cell.carryOverValue(previousValue);
+            }
+        }
+    }
+
+    private String carryOverKey(String tableCode, String excelCoord) {
+        return tableCode + ":" + excelCoord;
     }
 
     /**

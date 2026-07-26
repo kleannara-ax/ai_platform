@@ -18,6 +18,12 @@ public interface DailyReportRepository extends JpaRepository<DailyReport, Long> 
     /** 날짜 존재 여부 확인 */
     boolean existsByReportDate(LocalDate reportDate);
 
+    /**
+     * ★ 값 이어받기(carry-over) 전용 — 주어진 날짜 이전(과거)의 가장 최근 일보 1건 조회
+     * - 신규 일보/표 생성 시, 이 일보의 DATA 셀 값을 새 표의 초기값으로 채워 넣는다
+     */
+    Optional<DailyReport> findTopByReportDateLessThanOrderByReportDateDesc(LocalDate reportDate);
+
     /** 기간별 일보 목록 페이징 조회 */
     @Query("SELECT r FROM DailyReport r " +
            "WHERE (:startDate IS NULL OR r.reportDate >= :startDate) " +
