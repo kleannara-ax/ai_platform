@@ -250,6 +250,24 @@
       return '입력 불가';
     }
 
+    /**
+     * 숫자 셀 서식 — 천 단위 콤마 + 소수점 1자리까지만 표시
+     * - 숫자로 해석 불가능한 값(텍스트, "-", 빈 문자열 등)은 원본 그대로 반환
+     * - 이미 콤마가 포함된 값(재편집 시)도 다시 파싱 가능하도록 콤마 제거 후 판별
+     */
+    function formatNumber(v) {
+      if (v === null || v === undefined) return v;
+      const raw = String(v);
+      const trimmed = raw.trim();
+      if (trimmed === '') return raw;
+      const cleaned = trimmed.replace(/,/g, '');
+      if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return raw; // 숫자 형식이 아니면 그대로
+      const num = Number(cleaned);
+      if (isNaN(num)) return raw;
+      const rounded = Math.round(num * 10) / 10; // 소수점 1자리까지 반올림
+      return rounded.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+    }
+
     function humanFileSize(bytes) {
       if (!bytes) return '0 B';
       const units = ['B','KB','MB','GB'];
@@ -717,8 +735,9 @@
         }
       }
 
-      // 값 결정
+      // 값 결정 (숫자 셀은 천 단위 콤마 + 소수점 1자리 서식 적용)
       let displayValue = cell.cellValue || '';
+      const formattedDisplayValue = formatNumber(displayValue);
       let cellClasses = 'cell table-cell wrap-cell';
 
       // assignable 클래스 추가
@@ -758,12 +777,15 @@
       let innerHtml;
       if (isMyCell) {
         // 편집 가능한 셀: input 필드
+        // - 표시(비포커스): 천 단위 콤마 + 소수점 1자리 서식 적용
+        // - 편집(포커스): 콤마 없는 원본 숫자로 전환하여 입력 편의성 유지
         const savedVal = cell.cellValue || '';
+        const displayVal = formatNumber(savedVal);
         const disabledAttr = finalEditable ? '' : 'disabled';
-        innerHtml = `<div class="cell-editor"><input class="cell-input" data-coord="${escapeHtml(cell.excelCoord || '')}" data-row="${cell.rowIndex}" data-col="${cell.colIndex}" data-table-code="${escapeHtml(cell.tableCode || '')}" value="${escapeHtml(savedVal)}" placeholder="값 입력" ${disabledAttr} oninput="onCellInput(this)" /></div>`;
+        innerHtml = `<div class="cell-editor"><input class="cell-input" data-coord="${escapeHtml(cell.excelCoord || '')}" data-row="${cell.rowIndex}" data-col="${cell.colIndex}" data-table-code="${escapeHtml(cell.tableCode || '')}" value="${escapeHtml(displayVal)}" placeholder="값 입력" ${disabledAttr} oninput="onCellInput(this)" onfocus="onCellFocus(this)" onblur="onCellBlur(this)" /></div>`;
       } else {
-        // 읽기 전용 셀: 텍스트
-        innerHtml = displayValue ? displayValue.replace(/\n/g, '<br>') : '&nbsp;';
+        // 읽기 전용 셀: 텍스트 (숫자면 천 단위 콤마 + 소수점 1자리 서식 적용)
+        innerHtml = formattedDisplayValue ? escapeHtml(formattedDisplayValue).replace(/\n/g, '<br>') : '&nbsp;';
       }
 
       // title 속성
@@ -771,7 +793,7 @@
       if (isAssignable) {
         const fl = cell.freqLabel || '';
         const fc = cell.freqCode || '';
-        titleAttr = ` title="${escapeHtml(displayValue)} / ${escapeHtml(fl)} / ${getFrequencyHelp(fc)}"`;
+        titleAttr = ` title="${escapeHtml(formattedDisplayValue)} / ${escapeHtml(fl)} / ${getFrequencyHelp(fc)}"`;
       } else if (cell.ownerNames) {
         titleAttr = ` title="${escapeHtml(cell.ownerNames)}"`;
       }
@@ -797,6 +819,25 @@
         indicator.classList.add('paused');
         document.getElementById('autoRefreshLabel').textContent = '수정중 — 일시정지';
       }
+    }
+
+    /**
+     * 숫자 셀 편집 시작 — 콤마가 포함된 서식 값을 콤마 없는 원본 숫자로 되돌려
+     * 사용자가 편하게 이어서 입력/수정할 수 있도록 한다.
+     */
+    function onCellFocus(inputEl) {
+      const cleaned = String(inputEl.value || '').replace(/,/g, '');
+      if (/^-?\d+(\.\d+)?$/.test(cleaned.trim())) {
+        inputEl.value = cleaned;
+      }
+    }
+
+    /**
+     * 숫자 셀 편집 종료 — 입력된 값을 다시 천 단위 콤마 + 소수점 1자리 서식으로 표시
+     * (실제 저장/전송 시에는 saveInputs()에서 콤마를 제거한 원본 숫자를 서버로 보낸다)
+     */
+    function onCellBlur(inputEl) {
+      inputEl.value = formatNumber(inputEl.value);
     }
 
     // ── 특이사항 섹션 ──
@@ -978,7 +1019,9 @@
           const col = parseInt(input.dataset.col);
           const tableCode = input.dataset.tableCode || guessTableCode(row);
           if (!tableGroups[tableCode]) tableGroups[tableCode] = [];
-          tableGroups[tableCode].push({ rowIndex: row, colIndex: col, cellValue: input.value });
+          // ★ 서식(천 단위 콤마)은 화면 표시용일 뿐 — 서버에는 콤마 없는 원본 값으로 저장
+          const rawValue = String(input.value || '').replace(/,/g, '');
+          tableGroups[tableCode].push({ rowIndex: row, colIndex: col, cellValue: rawValue });
         });
 
         // 2. 표별로 셀 저장 API 호출
