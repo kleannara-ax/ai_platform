@@ -185,6 +185,12 @@ CREATE TABLE IF NOT EXISTS daily_report_cell (
 -- 4. ★★ daily_report_cell_auth (신규) — 셀 단위 접근 권한
 --    관리자가 '세부공장일보 컬럼관리' 페이지에서 설정
 --    → OWNER_IDS / OWNER_NAMES와 동기화
+--
+--    ★★★ 다중 주기 지원(2026-07, 06_allow_multi_freq_cell_auth.sql 참고):
+--    과거에는 (USER_ID, TABLE_CODE)에 UNIQUE 제약이 있어 한 사용자가 같은 표에서
+--    서로 다른 주기(예: 매일 담당 셀 + 매년 담당 셀)를 나눠서 담당할 수 없었다.
+--    실제로 이런 경우가 존재하므로 UNIQUE 제약을 두지 않는다 — 한 사용자가 같은
+--    표에 대해 여러 CellAuth 행(좌표 그룹별 서로 다른 FREQ_CODE)을 가질 수 있다.
 -- ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_report_cell_auth (
     AUTH_ID         BIGINT          NOT NULL AUTO_INCREMENT,
@@ -200,8 +206,9 @@ CREATE TABLE IF NOT EXISTS daily_report_cell_auth (
     UPDATED_AT      DATETIME                 ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (AUTH_ID),
     INDEX IDX_CELL_AUTH_USER (USER_ID),
-    INDEX IDX_CELL_AUTH_TABLE (TABLE_CODE),
-    UNIQUE KEY UK_CELL_AUTH_USER_TABLE (USER_ID, TABLE_CODE)
+    INDEX IDX_CELL_AUTH_TABLE (TABLE_CODE)
+    -- ★ UNIQUE KEY UK_CELL_AUTH_USER_TABLE (USER_ID, TABLE_CODE) 제거됨 (2026-07)
+    --   한 사용자가 같은 표에서 여러 주기 그룹을 동시에 담당할 수 있도록 허용
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='★ 신규 — 셀 단위 접근 권한 (관리자 설정, 접근권한 페이지에서 관리)';
 

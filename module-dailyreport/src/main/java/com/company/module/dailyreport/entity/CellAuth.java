@@ -17,13 +17,16 @@ import java.util.List;
  * - 사용자별 담당 표의 셀 좌표(JSON 배열)와 입력 주기를 관리
  * - 레거시 daily_report_cell_permission 을 대체
  *
+ * ★★ 다중 주기 지원(2026-07): 과거에는 (USER_ID, TABLE_CODE) 조합에 UNIQUE 제약이
+ * 있어 한 사용자가 같은 표에서 서로 다른 주기(예: 매일 담당 셀 + 매년 담당 셀)를
+ * 동시에 가질 수 없었다. 실제로 같은 사용자가 같은 표 안에서 주기가 다른 셀들을
+ * 나눠서 담당하는 경우가 존재하므로, 이 제약을 제거하여 한 사용자가 같은 표에 대해
+ * 여러 CellAuth 레코드(좌표 그룹별로 서로 다른 FREQ_CODE)를 가질 수 있도록 허용한다.
+ *
  * @see <a href="daily_report_cell_auth 테이블">01_schema.sql</a>
  */
 @Entity
-@Table(name = "daily_report_cell_auth", uniqueConstraints = {
-        @UniqueConstraint(name = "UK_CELL_AUTH_USER_TABLE",
-                columnNames = {"USER_ID", "TABLE_CODE"})
-})
+@Table(name = "daily_report_cell_auth")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CellAuth {

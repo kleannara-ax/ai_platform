@@ -54,14 +54,15 @@ public class CellService {
                         "표를 찾을 수 없습니다. reportId=" + reportId + ", tableCode=" + tableCode));
 
         // CellAuth 기반 권한 조회 (JSON 좌표 목록)
-        CellAuth cellAuth = cellAuthRepository
-                .findByUserIdAndTableCodeAndIsActiveTrue(userId, tableCode)
-                .orElse(null);
+        // ★★ 다중 주기 지원: 한 사용자가 같은 표에서 여러 CellAuth(주기별 좌표 그룹)를
+        // 가질 수 있으므로 List로 조회한다.
+        List<CellAuth> cellAuths = cellAuthRepository
+                .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, tableCode);
 
         // 각 셀에 편집 가능 여부 설정
         List<CellResponse> cellResponses = table.getCells().stream()
                 .map(cell -> {
-                    boolean editable = isCellEditableForUser(cell, loginId, cellAuth);
+                    boolean editable = isCellEditableForUser(cell, loginId, cellAuths);
                     return CellResponse.fromWithEditability(cell, editable);
                 })
                 .toList();
@@ -96,10 +97,9 @@ public class CellService {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "표를 찾을 수 없습니다: " + request.getTableCode()));
 
-        // CellAuth 기반 권한 조회
-        CellAuth cellAuth = cellAuthRepository
-                .findByUserIdAndTableCodeAndIsActiveTrue(userId, request.getTableCode())
-                .orElse(null);
+        // CellAuth 기반 권한 조회 (★★ 다중 주기 지원: List로 조회)
+        List<CellAuth> cellAuths = cellAuthRepository
+                .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, request.getTableCode());
 
         List<CellResponse> savedCells = new ArrayList<>();
 
@@ -119,7 +119,7 @@ public class CellService {
             }
 
             // 소유권 + CellAuth 권한 검증
-            if (!isCellEditableForUser(cell, loginId, cellAuth)) {
+            if (!isCellEditableForUser(cell, loginId, cellAuths)) {
                 throw new BusinessException(ErrorCode.ACCESS_DENIED,
                         String.format("해당 셀에 대한 편집 권한이 없습니다. row=%d, col=%d (%s)",
                                 item.getRowIndex(), item.getColIndex(),
@@ -146,11 +146,13 @@ public class CellService {
     // ─────────────────────────────────────────────
 
     /**
-     * 셀이 사용자에게 편집 가능한지 판단 (★ Phase 4 개선 → ★★ CellAuth 단일 소스 전환)
+     * 셀이 사용자에게 편집 가능한지 판단 (★ Phase 4 개선 → ★★ CellAuth 단일 소스 전환
+     * → ★★★ 다중 주기 지원, 2026-07)
      *
      * 판단 순서:
      * 1. 잠금 셀이면 불가
-     * 2. DATA 셀 + CellAuth 좌표 매칭 → CellAuth의 주기(FREQ_CODE) 확인으로 결정
+     * 2. DATA 셀 + 이 좌표를 커버하는 CellAuth를 목록에서 찾음 → 그 CellAuth의
+     *    주기(FREQ_CODE) 확인으로 결정
      * 3. 그 외(CellAuth 없음/좌표 불일치) → 불가 (빈값 취급)
      *
      * ※ daily_report_cell.OWNER_IDS/FREQ_CODE는 화면 표시용 캐시일 뿐이며
@@ -161,20 +163,30 @@ public class CellService {
      *   컬럼관리 대시보드에서 주기를 변경해도(CellAuth.FREQ_CODE만 바뀜) 셀의 낡은
      *   FREQ_CODE로 먼저 매칭되어 최신 주기가 반영되지 않는 버그가 있었다.
      *   → CellAuth 매칭 하나로 판단을 단일화하여 이 불일치를 제거한다.
+     *
+     * ★★★ 다중 주기 지원: 한 사용자가 같은 표에서 서로 다른 주기(예: 매일 담당 셀 +
+     * 매년 담당 셀)를 나눠서 담당할 수 있으므로, 이제 CellAuth를 단일 객체가 아닌
+     * List로 받아 "이 좌표를 커버하는" 항목을 찾아 그 항목의 FREQ_CODE로 판단한다.
+     * (좌표 그룹은 등록 시 서로 겹치지 않도록 CellAuthService에서 검증하므로,
+     * 정상적으로는 최대 1건만 매칭된다.)
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
-                                           CellAuth cellAuth) {
+                                           List<CellAuth> cellAuths) {
         // 잠금 상태면 편집 불가
         if (Boolean.TRUE.equals(cell.getIsLocked())) {
             return false;
         }
 
         // CellAuth 좌표 기반 권한 확인 (유일한 판단 기준)
-        if ("DATA".equals(cell.getCellType()) && cellAuth != null) {
+        if ("DATA".equals(cell.getCellType()) && cellAuths != null && !cellAuths.isEmpty()) {
             String coord = cell.getExcelCoord();
-            if (coord != null && cellAuth.coversCoord(coord)) {
-                return canEditByFrequency(cellAuth.getFreqCode());
+            if (coord != null) {
+                for (CellAuth cellAuth : cellAuths) {
+                    if (cellAuth.coversCoord(coord)) {
+                        return canEditByFrequency(cellAuth.getFreqCode());
+                    }
+                }
             }
         }
 
