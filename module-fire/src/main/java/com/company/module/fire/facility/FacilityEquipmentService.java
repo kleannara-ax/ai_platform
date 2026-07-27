@@ -44,13 +44,22 @@ public class FacilityEquipmentService {
 
     public Page<FacilityEquipmentResponse> getEquipmentList(String category, Long buildingId, Long floorId,
                                                             String keyword, int page, int size) {
+        return getEquipmentList(category, buildingId == null ? null : List.of(buildingId), floorId, keyword, page, size);
+    }
+
+    public Page<FacilityEquipmentResponse> getEquipmentList(String category, List<Long> buildingIds, Long floorId,
+                                                            String keyword, int page, int size) {
         String normalizedCategory = normalizeCategory(category);
         Pageable pageable = PageRequest.of(page, size, Sort.by("equipmentId").ascending());
-        Long bId = (buildingId != null && buildingId > 0) ? buildingId : null;
+        List<Long> bIds = buildingIds == null ? null : buildingIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (bIds != null && bIds.isEmpty()) bIds = null;
         Long fId = (floorId != null && floorId > 0) ? floorId : null;
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
-        return equipmentRepository.search(normalizedCategory, bId, fId, kw, pageable).map(e -> {
+        return equipmentRepository.search(normalizedCategory, bIds, fId, kw, pageable).map(e -> {
             FacilityEquipmentResponse dto = FacilityEquipmentResponse.from(e);
             inspectionRepository.findTopByEquipment_EquipmentIdOrderByInspectionDateDescInspectionIdDesc(e.getEquipmentId())
                     .ifPresent(dto::setLastInspection);

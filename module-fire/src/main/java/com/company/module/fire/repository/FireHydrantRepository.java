@@ -31,7 +31,7 @@ public interface FireHydrantRepository extends JpaRepository<FireHydrant, Long> 
            "LEFT JOIN FETCH h.building b " +
            "LEFT JOIN FETCH h.floor f " +
            "WHERE h.active = true " +
-           "AND (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+           "AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
            "AND (:floorId IS NULL OR f.floorId = :floorId) " +
            "AND (:keyword IS NULL OR " +
            "     LOWER(h.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -44,7 +44,7 @@ public interface FireHydrantRepository extends JpaRepository<FireHydrant, Long> 
            "LEFT JOIN h.building b " +
            "LEFT JOIN h.floor f " +
            "WHERE h.active = true " +
-           "AND (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+           "AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
            "AND (:floorId IS NULL OR f.floorId = :floorId) " +
            "AND (:keyword IS NULL OR " +
            "     LOWER(h.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -53,7 +53,7 @@ public interface FireHydrantRepository extends JpaRepository<FireHydrant, Long> 
            "     LOWER(h.hydrantType) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "     LOWER(h.locationDescription) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<FireHydrant> searchHydrants(
-            @Param("buildingId") Long buildingId,
+            @Param("buildingIds") List<Long> buildingIds,
             @Param("floorId") Long floorId,
             @Param("keyword") String keyword,
             Pageable pageable);

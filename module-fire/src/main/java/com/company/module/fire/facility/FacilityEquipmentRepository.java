@@ -21,7 +21,7 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
             "JOIN FETCH e.building b " +
             "JOIN FETCH e.floor f " +
             "WHERE e.category = :category " +
-            "AND (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+            "AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
             "AND (:floorId IS NULL OR f.floorId = :floorId) " +
             "AND (:keyword IS NULL OR " +
             "     LOWER(b.buildingName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -36,7 +36,7 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
             "JOIN e.building b " +
             "JOIN e.floor f " +
             "WHERE e.category = :category " +
-            "AND (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+            "AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
             "AND (:floorId IS NULL OR f.floorId = :floorId) " +
             "AND (:keyword IS NULL OR " +
             "     LOWER(b.buildingName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -48,7 +48,7 @@ public interface FacilityEquipmentRepository extends JpaRepository<FacilityEquip
             "     LOWER(e.note) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<FacilityEquipment> search(
             @Param("category") String category,
-            @Param("buildingId") Long buildingId,
+            @Param("buildingIds") List<Long> buildingIds,
             @Param("floorId") Long floorId,
             @Param("keyword") String keyword,
             Pageable pageable);
