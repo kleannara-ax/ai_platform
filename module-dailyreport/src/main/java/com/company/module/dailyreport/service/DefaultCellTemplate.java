@@ -24,39 +24,171 @@ public final class DefaultCellTemplate {
     private DefaultCellTemplate() { /* utility class */ }
 
     /**
+     * ★ 표1/표2 "진짜 값 롤링" 기능 시작일 — 실측 데이터는 이 날짜 이후부터만
+     *   존재할 수 있다 (해당 서비스가 실제로 개발/운영 시작된 날짜).
+     *
+     * - 롤링 대상 월의 월말(monthEnd)이 이 날짜보다 이전이면, 그 달은 실측
+     *   조회 자체를 시도하지 않고 곧바로 하드코딩 샘플(anchor 매핑값)로 대체한다.
+     * - 월말이 이 날짜 이후(또는 같음)면, 실측 조회 범위를
+     *   [max(월초, FEATURE_CUTOFF_DATE), 월말] 로 제한해서 조회하고,
+     *   실측이 없으면 마찬가지로 하드코딩 샘플로 대체한다.
+     */
+    public static final LocalDate FEATURE_CUTOFF_DATE = LocalDate.of(2026, 7, 22);
+
+    /**
+     * ★ 롤링 실측값 조회 콜백 — DailyReportService가 DailyReportCellRepository를
+     *   이용해 구현체를 넘겨준다 (DefaultCellTemplate은 정적 유틸이라 리포지토리를
+     *   직접 주입받을 수 없으므로, 호출부가 조회 로직을 람다로 넘기는 구조).
+     *
+     * @return 해당 (표코드, 행, 실측(라이브) 열, 대상 연월)의 월말 대표값(누적값).
+     *         실측 데이터가 아직 없으면 null.
+     */
+    @FunctionalInterface
+    public interface HistoricalValueLookup {
+        String find(String tableCode, int rowIndex, int liveColIndex, YearMonth targetMonth);
+    }
+
+    /**
      * 테이블 코드에 맞는 기본 셀을 생성하여 table 엔티티에 추가한다.
      * @param table 대상 테이블 엔티티
      * @param reportDate 일보 날짜 (헤더 롤링 월 계산용)
+     * @param lookup 과거 달의 실측(월말 대표값) 조회 콜백 — null이면 항상
+     *               하드코딩 샘플/"일보 없음"만 사용 (실측 조회 시도 안 함)
      */
-    public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate) {
+    public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate,
+                                             HistoricalValueLookup lookup) {
         String code = table.getTableCode();
         switch (code) {
-            case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table, reportDate);
-            case "TBL_INVENTORY"        -> addInventoryCells(table);
+            case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table, reportDate, lookup);
+            case "TBL_INVENTORY"        -> addInventoryCells(table, reportDate, lookup);
             case "TBL_ENERGY"           -> addEnergyCells(table);
             case "TBL_BOILER"           -> addBoilerCells(table);
             default -> { /* unknown table code — skip */ }
         }
     }
 
-    /** 하위 호환용 (reportDate 없이 호출 시 오늘 날짜 기준) */
+    /** 하위 호환용 (lookup 없이 호출 시 실측 조회 없이 하드코딩 샘플/"일보 없음"만 사용) */
+    public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate) {
+        populateDefaultCells(table, reportDate, null);
+    }
+
+    /** 하위 호환용 (reportDate/lookup 없이 호출 시 오늘 날짜 기준, 실측 조회 없음) */
     public static void populateDefaultCells(DailyReportTable table) {
-        populateDefaultCells(table, LocalDate.now());
+        populateDefaultCells(table, LocalDate.now(), null);
+    }
+
+    /**
+     * ★ 롤링 실측값 해석 — 대상 연월의 월말이 커트오프 이후일 때만 실측 조회를
+     *   시도하고, 실측이 없으면(또는 커트오프 이전 달이면) 하드코딩 샘플
+     *   (해당 연월 귀속값)로 대체한다. 그마저 없으면 "-".
+     */
+    private static String resolveHistoricalValue(HistoricalValueLookup lookup, String tableCode,
+                                                   int rowIndex, int liveColIndex, YearMonth targetMonth,
+                                                   String hardcodedFallback) {
+        LocalDate monthEnd = targetMonth.atEndOfMonth();
+        if (lookup != null && !monthEnd.isBefore(FEATURE_CUTOFF_DATE)) {
+            String realValue = lookup.find(tableCode, rowIndex, liveColIndex, targetMonth);
+            if (realValue != null && !realValue.isBlank()) {
+                return realValue;
+            }
+        }
+        return hardcodedFallback != null ? hardcodedFallback : "-";
+    }
+
+    /** 엑셀 열 문자 (A=col-1 오프셋, 실제로는 col+1번째 문자가 해당 엑셀 열) */
+    private static final String EXCEL_COLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    /**
+     * ★ 하드코딩 샘플이 처음 작성되었을 때 가정한 "기준월(anchor month)" — 2026년 7월.
+     * 표1/표2의 과거 7개 컬럼 하드코딩 리터럴 값은 이 기준월의 직전 7개월
+     * (2025-12 ~ 2026-06)에 대응한다. 실측 데이터가 없을 때 폴백으로 쓰기 위해
+     * 값을 리터럴이 아니라 "그 값이 원래 어느 연월의 값이었는지" 캘린더 월에
+     * 재귀속시켜 두어야, 롤링 윈도우가 이동해도 항상 올바른 연월의 폴백값을
+     * 찾을 수 있다.
+     */
+    private static final YearMonth ANCHOR_MONTH = YearMonth.of(2026, 7);
+
+    /** anchor 기준 직근 8개월 목록 (index 0=anchor-7 ~ index 7=anchor) — 캐시 */
+    private static List<YearMonth> anchorRollingMonths() {
+        return rollingMonths(ANCHOR_MONTH);
+    }
+
+    /** 특정 currentMonth 기준 직근 8개월 목록 계산 (index 0=current-7 ~ index 7=current) */
+    private static List<YearMonth> rollingMonths(YearMonth current) {
+        List<YearMonth> rolling = new ArrayList<>();
+        for (int i = 7; i >= 0; i--) {
+            rolling.add(current.minusMonths(i));
+        }
+        return rolling;
+    }
+
+    /**
+     * anchor 기준 과거 7개월(oldest→newest 순)에 하드코딩 값 7개를 매핑해
+     * "연월 → 폴백값" 맵을 만든다.
+     */
+    private static Map<YearMonth, String> anchorFallbackMap(String... valuesOldestToNewest7) {
+        List<YearMonth> anchorRolling = anchorRollingMonths();
+        Map<YearMonth, String> map = new LinkedHashMap<>();
+        for (int i = 0; i < 7 && i < valuesOldestToNewest7.length; i++) {
+            map.put(anchorRolling.get(i), valuesOldestToNewest7[i]);
+        }
+        return map;
+    }
+
+    /**
+     * ★ 롤링 과거 컬럼의 값 결정 — 표1/표2 공용.
+     * 1) 대상 연월의 월말이 FEATURE_CUTOFF_DATE 이후 → 실측 조회(lookup) 시도
+     *    → 있으면 실측값 사용
+     * 2) 커트오프 이전이거나 실측이 없으면 → anchor 기준 하드코딩 샘플
+     *    (fallbackMap)에서 해당 연월 값 사용
+     * 3) 그마저 없으면 "-"
+     */
+    private static String rollingValue(HistoricalValueLookup lookup, String tableCode,
+                                        int rowIndex, int liveColIndex, YearMonth targetMonth,
+                                        Map<YearMonth, String> fallbackMap) {
+        return resolveHistoricalValue(lookup, tableCode, rowIndex, liveColIndex, targetMonth,
+                fallbackMap.get(targetMonth));
+    }
+
+    /**
+     * ★ 롤링 과거 컬럼 한 행(row) 전체를 채우는 공용 헬퍼 — 표1/표2 공용.
+     *
+     * @param row 행 인덱스
+     * @param startCol 과거 첫 컬럼의 colIndex (표1=6, 표2=4)
+     * @param coords 과거 컬럼들의 엑셀좌표 (oldest→newest 순, 보통 7개)
+     * @param rolling 전체 8개월 롤링 목록 (index 0=oldest ~ index 7=최신(라이브))
+     *                — 과거 컬럼은 index 0..coords.length-1 만 사용한다
+     * @param tableCode 대상 표코드
+     * @param liveCol 이 행의 라이브(실측 입력) DATA 컬럼 colIndex
+     * @param lookup 실측값 조회 콜백 (null 가능)
+     * @param anchorValuesOldestToNewest anchor(기준월) 기준 과거 7개월 하드코딩
+     *        샘플값 (oldest→newest 순) — 실측 없을 때 폴백으로 사용
+     */
+    private static void addHistoricalRollingRow(DailyReportTable t, int row, int startCol,
+                                                  String[] coords, List<YearMonth> rolling,
+                                                  String tableCode, int liveCol,
+                                                  HistoricalValueLookup lookup,
+                                                  String... anchorValuesOldestToNewest) {
+        Map<YearMonth, String> fallbackMap = anchorFallbackMap(anchorValuesOldestToNewest);
+        for (int i = 0; i < coords.length; i++) {
+            String value = rollingValue(lookup, tableCode, row, liveCol, rolling.get(i), fallbackMap);
+            ro(t, row, startCol + i, coords[i], value);
+        }
     }
 
     // ═══════════════════════════════════════════════
     //  1. 주요 생산 지표 현황  (10행 × 15열)
     // ═══════════════════════════════════════════════
-    private static void addProductionIndexCells(DailyReportTable t, LocalDate reportDate) {
+    private static void addProductionIndexCells(DailyReportTable t, LocalDate reportDate,
+                                                  HistoricalValueLookup lookup) {
         // ── 롤링 월 계산: reportDate 기준 직근 8개월 ──
         // 예) 2026-07 → 2025-12 ~ 2026-07
         //     2026-08 → 2026-01 ~ 2026-08
         //     2027-01 → 2026-06 ~ 2027-01
         YearMonth current = YearMonth.from(reportDate);
-        List<YearMonth> rolling = new ArrayList<>();
-        for (int i = 7; i >= 0; i--) {
-            rolling.add(current.minusMonths(i));
-        }
+        List<YearMonth> rolling = rollingMonths(current);
+        final String tableCode = t.getTableCode();
+        final int liveCol = 13; // O열 — 실측(라이브 입력) 컬럼은 항상 col13
 
         // 연도별 그룹핑 (Row 0 대 헤더의 colspan 계산용)
         // LinkedHashMap으로 순서 보장
@@ -100,18 +232,16 @@ public final class DefaultCellTemplate {
             h(t, 1, colIdx, coord, rolling.get(i).getMonthValue() + "월", 1, 1);
         }
 
+        // 과거 7개월 컬럼(colIdx 6~12)의 엑셀열 접두문자 (H~N)
+        String[] histCols = {"H", "I", "J", "K", "L", "M", "N"};
+
         // ── Row 2: 제지3 평균선속 ──
         ro(t, 2, 0, "B7",  "제지3 평균선속(m/분)", 1, 3);
         ro(t, 2, 3, "E7",  "640");
         ro(t, 2, 4, "F7",  "583.5");
         ro(t, 2, 5, "G7",  "587");
-        ro(t, 2, 6, "H7",  "588");
-        ro(t, 2, 7, "I7",  "597");
-        ro(t, 2, 8, "J7",  "584");
-        ro(t, 2, 9, "K7",  "577");
-        ro(t, 2,10, "L7",  "597");
-        ro(t, 2,11, "M7",  "597");
-        ro(t, 2,12, "N7",  "594");
+        addHistoricalRollingRow(t, 2, 6, coordsForRow(histCols, 7), rolling, tableCode, liveCol, lookup,
+                "588", "597", "584", "577", "597", "597", "594");
         d(t,  2,13, "O7",  null, null);
         d(t,  2,14, "P7",  "daily", "매일");
 
@@ -120,13 +250,8 @@ public final class DefaultCellTemplate {
         ro(t, 3, 3, "E8",  "85");
         ro(t, 3, 4, "F8",  "83.8");
         ro(t, 3, 5, "G8",  "76");
-        ro(t, 3, 6, "H8",  "83.5");
-        ro(t, 3, 7, "I8",  "80.4");
-        ro(t, 3, 8, "J8",  "85.6");
-        ro(t, 3, 9, "K8",  "79.9");
-        ro(t, 3,10, "L8",  "83.6");
-        ro(t, 3,11, "M8",  "83");
-        ro(t, 3,12, "N8",  "79.5");
+        addHistoricalRollingRow(t, 3, 6, coordsForRow(histCols, 8), rolling, tableCode, liveCol, lookup,
+                "83.5", "80.4", "85.6", "79.9", "83.6", "83", "79.5");
         d(t,  3,13, "O8",  null, null);
         d(t,  3,14, "P8",  "daily", "매일");
 
@@ -137,13 +262,8 @@ public final class DefaultCellTemplate {
         ro(t, 4, 3, "E9",  "91");
         ro(t, 4, 4, "F9",  "97.7");
         ro(t, 4, 5, "G9",  "99.2");
-        ro(t, 4, 6, "H9",  "98.6");
-        ro(t, 4, 7, "I9",  "98.7");
-        ro(t, 4, 8, "J9",  "97.2");
-        ro(t, 4, 9, "K9",  "101.5");
-        ro(t, 4,10, "L9",  "101.8");
-        ro(t, 4,11, "M9",  "99.8");
-        ro(t, 4,12, "N9",  "98.7");
+        addHistoricalRollingRow(t, 4, 6, coordsForRow(histCols, 9), rolling, tableCode, liveCol, lookup,
+                "98.6", "98.7", "97.2", "101.5", "101.8", "99.8", "98.7");
         d(t,  4,13, "O9",  "event", "발생 시");
         d(t,  4,14, "P9",  "daily", "매일");
 
@@ -152,13 +272,8 @@ public final class DefaultCellTemplate {
         ro(t, 5, 3, "E10", "78");
         ro(t, 5, 4, "F10", "83.8");
         ro(t, 5, 5, "G10", "85.2");
-        ro(t, 5, 6, "H10", "84.1");
-        ro(t, 5, 7, "I10", "84.6");
-        ro(t, 5, 8, "J10", "83.5");
-        ro(t, 5, 9, "K10", "87.6");
-        ro(t, 5,10, "L10", "88.2");
-        ro(t, 5,11, "M10", "86.3");
-        ro(t, 5,12, "N10", "84.7");
+        addHistoricalRollingRow(t, 5, 6, coordsForRow(histCols, 10), rolling, tableCode, liveCol, lookup,
+                "84.1", "84.6", "83.5", "87.6", "88.2", "86.3", "84.7");
         d(t,  5,13, "O10", "event", "발생 시");
         d(t,  5,14, "P10", "daily", "매일");
 
@@ -167,13 +282,8 @@ public final class DefaultCellTemplate {
         ro(t, 6, 3, "E11", "63.5");
         ro(t, 6, 4, "F11", "63.5");
         ro(t, 6, 5, "G11", "64.6");
-        ro(t, 6, 6, "H11", "61.1");
-        ro(t, 6, 7, "I11", "63.3");
-        ro(t, 6, 8, "J11", "63.6");
-        ro(t, 6, 9, "K11", "63.6");
-        ro(t, 6,10, "L11", "69.6");
-        ro(t, 6,11, "M11", "74.6");
-        ro(t, 6,12, "N11", "74.4");
+        addHistoricalRollingRow(t, 6, 6, coordsForRow(histCols, 11), rolling, tableCode, liveCol, lookup,
+                "61.1", "63.3", "63.6", "63.6", "69.6", "74.6", "74.4");
         d(t,  6,13, "O11", "event", "발생 시");
         d(t,  6,14, "P11", "daily", "매일");
 
@@ -182,13 +292,8 @@ public final class DefaultCellTemplate {
         ro(t, 7, 3, "E12", "-");
         ro(t, 7, 4, "F12", "15.8");
         ro(t, 7, 5, "G12", "14.8");
-        ro(t, 7, 6, "H12", "12.7");
-        ro(t, 7, 7, "I12", "11.2");
-        ro(t, 7, 8, "J12", "11.8");
-        ro(t, 7, 9, "K12", "13");
-        ro(t, 7,10, "L12", "14.2");
-        ro(t, 7,11, "M12", "15.9");
-        ro(t, 7,12, "N12", "16");
+        addHistoricalRollingRow(t, 7, 6, coordsForRow(histCols, 12), rolling, tableCode, liveCol, lookup,
+                "12.7", "11.2", "11.8", "13", "14.2", "15.9", "16");
         d(t,  7,13, "O12", null, null);
         d(t,  7,14, "P12", "daily", "매일");
 
@@ -198,13 +303,8 @@ public final class DefaultCellTemplate {
         d(t,  8, 3, "E13", "yearly", "매년");
         ro(t, 8, 4, "F13", "89");
         ro(t, 8, 5, "G13", "91");
-        ro(t, 8, 6, "H13", "94");
-        ro(t, 8, 7, "I13", "99");
-        ro(t, 8, 8, "J13", "104");
-        ro(t, 8, 9, "K13", "96");
-        ro(t, 8,10, "L13", "84");
-        ro(t, 8,11, "M13", "82");
-        ro(t, 8,12, "N13", "84");
+        addHistoricalRollingRow(t, 8, 6, coordsForRow(histCols, 13), rolling, tableCode, liveCol, lookup,
+                "94", "99", "104", "96", "84", "82", "84");
         d(t,  8,13, "O13", "event", "발생 시");
         d(t,  8,14, "P13", "daily", "매일");
 
@@ -213,92 +313,100 @@ public final class DefaultCellTemplate {
         d(t,  9, 3, "E14", "yearly", "매년");
         ro(t, 9, 4, "F14", "76");
         ro(t, 9, 5, "G14", "64");
-        ro(t, 9, 6, "H14", "81");
-        ro(t, 9, 7, "I14", "58");
-        ro(t, 9, 8, "J14", "68");
-        ro(t, 9, 9, "K14", "50");
-        ro(t, 9,10, "L14", "46");
-        ro(t, 9,11, "M14", "53");
-        ro(t, 9,12, "N14", "62");
+        addHistoricalRollingRow(t, 9, 6, coordsForRow(histCols, 14), rolling, tableCode, liveCol, lookup,
+                "81", "58", "68", "50", "46", "53", "62");
         d(t,  9,13, "O14", "event", "발생 시");
         d(t,  9,14, "P14", "daily", "매일");
+    }
+
+    /** 엑셀열 접두배열 + 행번호 → {"H7","I7",...,"N7"} 형태의 엑셀좌표 배열 생성 */
+    private static String[] coordsForRow(String[] colLetters, int excelRow) {
+        String[] result = new String[colLetters.length];
+        for (int i = 0; i < colLetters.length; i++) {
+            result[i] = colLetters[i] + excelRow;
+        }
+        return result;
     }
 
     // ═══════════════════════════════════════════════
     //  2. 제지 재공품 및 야적현황  (10행 × 13열)
     // ═══════════════════════════════════════════════
-    private static void addInventoryCells(DailyReportTable t) {
-        // ── Row 0: 대 헤더 ──
+    private static void addInventoryCells(DailyReportTable t, LocalDate reportDate,
+                                           HistoricalValueLookup lookup) {
+        // ── 롤링 월 계산: reportDate 기준 직근 8개월 (표1과 동일한 규칙) ──
+        // 과거 7개월(index 0~6, colIdx 4~10) + 라이브(현재)달 1개(index 7, colIdx 11)
+        YearMonth current = YearMonth.from(reportDate);
+        List<YearMonth> rolling = rollingMonths(current);
+        final String tableCode = t.getTableCode();
+        final int liveCol = 11; // M열 — 실측(라이브 입력) 컬럼은 항상 col11
+
+        // 연도별 그룹핑 (Row 0 대 헤더의 colspan 계산용) — colIdx 4~11(8개월) 대상
+        Map<Integer, int[]> yearGroups = new LinkedHashMap<>(); // year → [startCol, count]
+        for (int i = 0; i < rolling.size(); i++) {
+            int yr = rolling.get(i).getYear();
+            final int col = 4 + i;
+            yearGroups.computeIfAbsent(yr, k -> new int[]{col, 0});
+            yearGroups.get(yr)[1]++;
+        }
+
+        // ── Row 0: 대 헤더 (고정부) ──
         h(t, 0, 0, "B19", "구 분",        2, 2);
         h(t, 0, 2, "D19", "기준",          2, 1);
         h(t, 0, 3, "E19", "적정재고",      2, 1);
-        h(t, 0, 4, "F19", "'25년",         1, 1);
-        h(t, 0, 5, "G19", "'26년",         1, 7);
+
+        // ── Row 0: 대 헤더 (롤링 연도 그룹) ──
+        for (Map.Entry<Integer, int[]> entry : yearGroups.entrySet()) {
+            int yr = entry.getKey();
+            int startCol = entry.getValue()[0];
+            int count = entry.getValue()[1];
+            String coord = String.valueOf(EXCEL_COLS.charAt(startCol + 1)) + "19";
+            h(t, 0, startCol, coord, "'" + String.valueOf(yr).substring(2) + "년", 1, count);
+        }
         // ★ "비고" 헤더는 아래 행(Row1)의 헤더 셀과 세로로 병합 (rowSpan=2)
         h(t, 0,12, "N19", "비 고",         2, 1);
 
-        // ── Row 1: 소 헤더 ──
-        h(t, 1, 4, "F20", "12월", 1, 1);
-        h(t, 1, 5, "G20", "1월",  1, 1);
-        h(t, 1, 6, "H20", "2월",  1, 1);
-        h(t, 1, 7, "I20", "3월",  1, 1);
-        h(t, 1, 8, "J20", "4월",  1, 1);
-        h(t, 1, 9, "K20", "5월",  1, 1);
-        h(t, 1,10, "L20", "6월",  1, 1);
-        h(t, 1,11, "M20", "7월",  1, 1);
+        // ── Row 1: 소 헤더 (롤링 월) ──
+        for (int i = 0; i < rolling.size(); i++) {
+            int colIdx = 4 + i;
+            String coord = String.valueOf(EXCEL_COLS.charAt(colIdx + 1)) + "20";
+            h(t, 1, colIdx, coord, rolling.get(i).getMonthValue() + "월", 1, 1);
+        }
         // ★ N20은 위 N19("비고")와 병합되어 흡수됨 — 별도 헤더 셀 생성 안 함
+
+        // 과거 7개월 컬럼(colIdx 4~10)의 엑셀열 접두문자 (F~L)
+        String[] histCols = {"F", "G", "H", "I", "J", "K", "L"};
 
         // ── Row 2: 밀롤창고 ──
         ro(t, 2, 0, "B21", "제지 재공품", 4, 1);
         ro(t, 2, 1, "C21", "밀롤창고",    1, 1);
         ro(t, 2, 2, "D21", "톤",           4, 1);
         d(t,  2, 3, "E21", "event", "발생 시");
-        ro(t, 2, 4, "F21", "3826");
-        ro(t, 2, 5, "G21", "3043");
-        ro(t, 2, 6, "H21", "3296");
-        ro(t, 2, 7, "I21", "2196");
-        ro(t, 2, 8, "J21", "3037");
-        ro(t, 2, 9, "K21", "3711");
-        ro(t, 2,10, "L21", "3006");
+        addHistoricalRollingRow(t, 2, 4, coordsForRow(histCols, 21), rolling, tableCode, liveCol, lookup,
+                "3826", "3043", "3296", "2196", "3037", "3711", "3006");
         d(t,  2,11, "M21", null, null);
         d(t,  2,12, "N21", "daily", "매일");
 
         // ── Row 3: 카타대기 ──
         ro(t, 3, 1, "C22", "카타대기", 1, 1);
         d(t,  3, 3, "E22", "event", "발생 시");
-        ro(t, 3, 4, "F22", "320");
-        ro(t, 3, 5, "G22", "315");
-        ro(t, 3, 6, "H22", "549");
-        ro(t, 3, 7, "I22", "648");
-        ro(t, 3, 8, "J22", "1360");
-        ro(t, 3, 9, "K22", "1121");
-        ro(t, 3,10, "L22", "1110");
+        addHistoricalRollingRow(t, 3, 4, coordsForRow(histCols, 22), rolling, tableCode, liveCol, lookup,
+                "320", "315", "549", "648", "1360", "1121", "1110");
         d(t,  3,11, "M22", null, null);
         d(t,  3,12, "N22", "daily", "매일");
 
         // ── Row 4: 미포장 ──
         ro(t, 4, 1, "C23", "미포장", 1, 1);
         d(t,  4, 3, "E23", "event", "발생 시");
-        ro(t, 4, 4, "F23", "212");
-        ro(t, 4, 5, "G23", "764");
-        ro(t, 4, 6, "H23", "702");
-        ro(t, 4, 7, "I23", "149");
-        ro(t, 4, 8, "J23", "86");
-        ro(t, 4, 9, "K23", "173");
-        ro(t, 4,10, "L23", "266");
+        addHistoricalRollingRow(t, 4, 4, coordsForRow(histCols, 23), rolling, tableCode, liveCol, lookup,
+                "212", "764", "702", "149", "86", "173", "266");
         d(t,  4,11, "M23", null, null);
         d(t,  4,12, "N23", "daily", "매일");
 
         // ── Row 5: 포장후 물류입고전 ──
         ro(t, 5, 1, "C24", "포장후 물류입고전", 1, 1);
         d(t,  5, 3, "E24", "event", "발생 시");
-        ro(t, 5, 4, "F24", "83");
-        ro(t, 5, 5, "G24", "139");
-        ro(t, 5, 6, "H24", "151");
-        ro(t, 5, 7, "I24", "88");
-        ro(t, 5, 8, "J24", "58");
-        ro(t, 5, 9, "K24", "288");
-        ro(t, 5,10, "L24", "423");
+        addHistoricalRollingRow(t, 5, 4, coordsForRow(histCols, 24), rolling, tableCode, liveCol, lookup,
+                "83", "139", "151", "88", "58", "288", "423");
         d(t,  5,11, "M24", null, null);
         d(t,  5,12, "N24", "daily", "매일");
 
@@ -307,13 +415,8 @@ public final class DefaultCellTemplate {
         ro(t, 6, 1, "C25", "3개월 초과",    1, 1);
         ro(t, 6, 2, "D25", "톤",            1, 1);
         ro(t, 6, 3, "E25", "0");
-        ro(t, 6, 4, "F25", "4354");
-        ro(t, 6, 5, "G25", "4372");
-        ro(t, 6, 6, "H25", "4005");
-        ro(t, 6, 7, "I25", "4236");
-        ro(t, 6, 8, "J25", "3761");
-        ro(t, 6, 9, "K25", "3404");
-        ro(t, 6,10, "L25", "3120");
+        addHistoricalRollingRow(t, 6, 4, coordsForRow(histCols, 25), rolling, tableCode, liveCol, lookup,
+                "4354", "4372", "4005", "4236", "3761", "3404", "3120");
         d(t,  6,11, "M25", "monthly", "매월");
         d(t,  6,12, "N25", "daily", "매일");
 
@@ -321,13 +424,8 @@ public final class DefaultCellTemplate {
         ro(t, 7, 1, "C26", "6개월 초과", 1, 1);
         ro(t, 7, 2, "D26", "톤",          1, 1);
         ro(t, 7, 3, "E26", "0");
-        ro(t, 7, 4, "F26", "917");
-        ro(t, 7, 5, "G26", "980");
-        ro(t, 7, 6, "H26", "786");
-        ro(t, 7, 7, "I26", "915");
-        ro(t, 7, 8, "J26", "957");
-        ro(t, 7, 9, "K26", "1543");
-        ro(t, 7,10, "L26", "1130");
+        addHistoricalRollingRow(t, 7, 4, coordsForRow(histCols, 26), rolling, tableCode, liveCol, lookup,
+                "917", "980", "786", "915", "957", "1543", "1130");
         d(t,  7,11, "M26", "monthly", "매월");
         d(t,  7,12, "N26", "daily", "매일");
 
@@ -336,13 +434,8 @@ public final class DefaultCellTemplate {
         ro(t, 8, 1, "C27", "제지",     1, 1);
         ro(t, 8, 2, "D27", "톤",       1, 1);
         ro(t, 8, 3, "E27", "0");
-        ro(t, 8, 4, "F27", "489");
-        ro(t, 8, 5, "G27", "239");
-        ro(t, 8, 6, "H27", "0");
-        ro(t, 8, 7, "I27", "0");
-        ro(t, 8, 8, "J27", "0");
-        ro(t, 8, 9, "K27", "0");
-        ro(t, 8,10, "L27", "0");
+        addHistoricalRollingRow(t, 8, 4, coordsForRow(histCols, 27), rolling, tableCode, liveCol, lookup,
+                "489", "239", "0", "0", "0", "0", "0");
         d(t,  8,11, "M27", null, null);
         d(t,  8,12, "N27", "daily", "매일");
 
@@ -350,13 +443,8 @@ public final class DefaultCellTemplate {
         ro(t, 9, 1, "C28", "생활",     1, 1);
         ro(t, 9, 2, "D28", "팔레트",   1, 1);
         ro(t, 9, 3, "E28", "0");
-        ro(t, 9, 4, "F28", "0");
-        ro(t, 9, 5, "G28", "0");
-        ro(t, 9, 6, "H28", "0");
-        ro(t, 9, 7, "I28", "0");
-        ro(t, 9, 8, "J28", "0");
-        ro(t, 9, 9, "K28", "0");
-        ro(t, 9,10, "L28", "0");
+        addHistoricalRollingRow(t, 9, 4, coordsForRow(histCols, 28), rolling, tableCode, liveCol, lookup,
+                "0", "0", "0", "0", "0", "0", "0");
         d(t,  9,11, "M28", null, null);
         d(t,  9,12, "N28", "daily", "매일");
     }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,4 +65,28 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
     int updateLockByCycle(@Param("tableId") Long tableId,
                           @Param("inputCycle") String inputCycle,
                           @Param("locked") boolean locked);
+
+    /**
+     * ★ 표 롤링(월 이동) 실측값 조회 전용 — 특정 표코드 + 좌표(rowIndex/colIndex)의
+     * "매일(daily)" 입력 컬럼에서, 주어진 기간(start~end, 보통 해당 연월의
+     * [조회가능 시작일, 월말]) 내 가장 최근 값이 채워진 셀부터 최신순으로 반환한다.
+     *
+     * - 호출측(DailyReportService)이 결과 리스트의 첫 번째(가장 최근 날짜) 값을
+     *   그 달의 "월말 대표값(누적값)"으로 사용한다.
+     * - 이 쿼리 자체는 커트오프(개발 시작일 이전 조회 금지) 정책을 모른다 —
+     *   호출측이 start 파라미터를 커트오프 날짜 이후로 제한해서 넘겨야 한다.
+     */
+    @Query("SELECT c FROM DailyReportCell c " +
+           "WHERE c.reportTable.tableCode = :tableCode " +
+           "AND c.rowIndex = :rowIndex AND c.colIndex = :colIndex " +
+           "AND c.cellType = 'DATA' " +
+           "AND c.cellValue IS NOT NULL AND c.cellValue <> '' " +
+           "AND c.reportTable.dailyReport.reportDate BETWEEN :startDate AND :endDate " +
+           "ORDER BY c.reportTable.dailyReport.reportDate DESC")
+    List<DailyReportCell> findMonthlyValueCandidates(
+            @Param("tableCode") String tableCode,
+            @Param("rowIndex") int rowIndex,
+            @Param("colIndex") int colIndex,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

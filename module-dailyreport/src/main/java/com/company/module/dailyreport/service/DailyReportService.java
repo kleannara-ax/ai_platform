@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,7 +79,7 @@ public class DailyReportService {
                         Map<String, String> previousValues = findPreviousCellValues(reportDate);
                         for (DailyReportTable table : report.getTables()) {
                             if (table.getCells().isEmpty()) {
-                                DefaultCellTemplate.populateDefaultCells(table, reportDate);
+                                DefaultCellTemplate.populateDefaultCells(table, reportDate, historicalValueLookup());
                                 applyCarriedOverValues(table, previousValues);
                                 // ★ 하드코딩 제거: 생성 즉시 현재 활성 CellAuth 담당자를 반영
                                 cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
@@ -384,12 +385,42 @@ public class DailyReportService {
 
             // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
             // ★ 담당자(OWNER_IDS/OWNER_NAMES)는 하드코딩하지 않음 — 항상 NULL로 시작
-            DefaultCellTemplate.populateDefaultCells(table, report.getReportDate());
+            // ★ 표1/표2 "진짜 값 롤링" — 과거 달의 월말 실측값을 DB에서 조회하는
+            //   콜백(historicalValueLookup)을 넘긴다 (커트오프 이전 달은 템플릿
+            //   내부에서 실측 조회를 시도하지 않고 하드코딩 샘플로 대체하므로
+            //   이 콜백은 호출되지 않음)
+            DefaultCellTemplate.populateDefaultCells(table, report.getReportDate(), historicalValueLookup());
             // ★ 값 이어받기: 직전 일보에 입력되어 있던 DATA 셀 값을 새 표의 초기값으로 반영
             applyCarriedOverValues(table, previousValues);
             // ★ 생성 즉시 현재 활성 CellAuth 담당자를 반영 (코드 수정/재배포 불필요)
             cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
         }
+    }
+
+    /**
+     * ★ 표1/표2 롤링 과거 컬럼의 실측(월말 대표값=누적값) 조회 콜백 생성.
+     *
+     * - {@link DefaultCellTemplate}이 커트오프(2026-07-22) 이후 달에 대해서만
+     *   이 콜백을 호출한다 — 커트오프 이전 달은 이 메서드에 도달하지 않는다.
+     * - "그 달의 월말 대표값"은 해당 연월 범위 내에서 가장 최근 날짜에 기록된
+     *   실측(라이브 DATA 컬럼) 값으로 정의한다(사용자 확인: 월말값=그 달의
+     *   누적/대표값). 조회 시작일은 커트오프 날짜로 하한을 두어, 월초가
+     *   커트오프보다 이르더라도 커트오프 이전 데이터는 절대 사용하지 않는다.
+     */
+    private DefaultCellTemplate.HistoricalValueLookup historicalValueLookup() {
+        return (tableCode, rowIndex, liveColIndex, targetMonth) -> {
+            LocalDate monthStart = targetMonth.atDay(1);
+            LocalDate monthEnd = targetMonth.atEndOfMonth();
+            LocalDate rangeStart = monthStart.isBefore(DefaultCellTemplate.FEATURE_CUTOFF_DATE)
+                    ? DefaultCellTemplate.FEATURE_CUTOFF_DATE
+                    : monthStart;
+            if (rangeStart.isAfter(monthEnd)) {
+                return null; // 이론상 도달 불가 (호출측이 커트오프 이전 달을 걸러냄)
+            }
+            List<DailyReportCell> candidates = cellRepository.findMonthlyValueCandidates(
+                    tableCode, rowIndex, liveColIndex, rangeStart, monthEnd);
+            return candidates.isEmpty() ? null : candidates.get(0).getCellValue();
+        };
     }
 
     /**
