@@ -33,7 +33,7 @@ public interface ExtinguisherRepository extends JpaRepository<Extinguisher, Long
            "SELECT e FROM Extinguisher e " +
            "JOIN FETCH e.building b " +
            "JOIN FETCH e.floor f " +
-           "WHERE (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+           "WHERE (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
            "AND (:floorId IS NULL OR f.floorId = :floorId) " +
            "AND (:keyword IS NULL OR " +
            "     LOWER(b.buildingName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -44,7 +44,7 @@ public interface ExtinguisherRepository extends JpaRepository<Extinguisher, Long
            "SELECT COUNT(e) FROM Extinguisher e " +
            "JOIN e.building b " +
            "JOIN e.floor f " +
-           "WHERE (:buildingId IS NULL OR b.buildingId = :buildingId) " +
+           "WHERE (:buildingIds IS NULL OR b.buildingId IN :buildingIds) " +
            "AND (:floorId IS NULL OR f.floorId = :floorId) " +
            "AND (:keyword IS NULL OR " +
            "     LOWER(b.buildingName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -52,7 +52,7 @@ public interface ExtinguisherRepository extends JpaRepository<Extinguisher, Long
            "     LOWER(e.extinguisherType) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "     LOWER(e.note) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Extinguisher> searchExtinguishers(
-            @Param("buildingId") Long buildingId,
+            @Param("buildingIds") List<Long> buildingIds,
             @Param("floorId") Long floorId,
             @Param("keyword") String keyword,
             Pageable pageable);

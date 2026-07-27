@@ -65,12 +65,20 @@ public class FireSprinklerService {
     private final ObjectMapper objectMapper;
 
     public Page<FireSprinklerResponse> getSprinklers(Long buildingId, Long floorId, String keyword, int page, int size) {
+        return getSprinklers(buildingId == null ? null : List.of(buildingId), floorId, keyword, page, size);
+    }
+
+    public Page<FireSprinklerResponse> getSprinklers(List<Long> buildingIds, Long floorId, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("sprinklerId").ascending());
-        Long bId = (buildingId != null && buildingId > 0) ? buildingId : null;
+        List<Long> bIds = buildingIds == null ? null : buildingIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (bIds != null && bIds.isEmpty()) bIds = null;
         Long fId = (floorId != null && floorId > 0) ? floorId : null;
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
-        return fireSprinklerRepository.search(bId, fId, kw, pageable).map(sprinkler -> {
+        return fireSprinklerRepository.search(bIds, fId, kw, pageable).map(sprinkler -> {
             FireSprinklerResponse response = FireSprinklerResponse.from(sprinkler);
             fireSprinklerInspectionRepository
                     .findTopBySprinkler_SprinklerIdOrderByInspectionDateDescInspectionIdDesc(sprinkler.getSprinklerId())

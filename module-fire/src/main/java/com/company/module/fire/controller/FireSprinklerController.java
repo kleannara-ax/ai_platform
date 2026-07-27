@@ -39,6 +39,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -55,11 +56,15 @@ public class FireSprinklerController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<FireSprinklerResponse>>> getList(
             @RequestParam(required = false) Long buildingId,
+            @RequestParam(required = false) List<Long> buildingIds,
             @RequestParam(required = false) Long floorId,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return ResponseEntity.ok(ApiResponse.success(fireSprinklerService.getSprinklers(buildingId, floorId, q, page, size)));
+        List<Long> selectedBuildingIds = buildingIds == null || buildingIds.isEmpty()
+                ? (buildingId == null ? null : List.of(buildingId))
+                : buildingIds;
+        return ResponseEntity.ok(ApiResponse.success(fireSprinklerService.getSprinklers(selectedBuildingIds, floorId, q, page, size)));
     }
 
     @GetMapping("/{id}")

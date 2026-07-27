@@ -14,7 +14,7 @@
   };
   const state = {
     items: [], buildings: [], floors: [], buildingFloorMap: {},
-    q: '', buildingId: '', floorId: '', status: null,
+    q: '', buildingIds: [], floorId: '', status: null,
     sort: { key: 'serialNumber', direction: 'asc' },
     editingId: 0, inspectId: 0, selectedCoord: null,
     planImagePath: '', existingMarkers: [], planView: { scale: 1 }
@@ -180,7 +180,7 @@
           <div class="card-body">
             <div class="row g-2 align-items-center">
               <div class="col-lg-4"><input id="filterQ" class="form-control" placeholder="검색어(건물/층/종류/제조사/위치/비고)"></div>
-              <div class="col-lg-3"><select id="filterBuildingId" class="form-select"><option value="">-- 건물 전체 --</option></select></div>
+              <div class="col-lg-3"><div id="filterBuildingIds"></div></div>
               <div class="col-lg-3"><select id="filterFloorId" class="form-select"><option value="">-- 층 전체 --</option></select></div>
               <div class="col-lg-2 d-flex gap-2"><button class="btn btn-primary w-100" id="btnSearch">검색</button><button class="btn btn-outline-secondary w-100" id="btnReset">초기화</button></div>
             </div>
@@ -256,7 +256,7 @@
   function fillSelects() {
     const bOpts = '<option value="">-- 건물 전체 --</option>' + state.buildings.map(b => `<option value="${esc(b.buildingId)}">${esc(b.buildingName)}</option>`).join('');
     const fOpts = '<option value="">-- 층 전체 --</option>' + state.floors.map(f => `<option value="${esc(f.floorId)}">${esc(f.floorName)}</option>`).join('');
-    if ($('filterBuildingId')) $('filterBuildingId').innerHTML = bOpts;
+    window.FireWebBuildingMultiFilter?.mount('filterBuildingIds', state.buildings, state.buildingIds);
     if ($('filterFloorId')) $('filterFloorId').innerHTML = fOpts;
     if ($('buildingSel')) $('buildingSel').innerHTML = bOpts.replace('건물 전체', '건물 선택');
     updateModalFloorOptions();
@@ -272,7 +272,7 @@
   async function loadList() {
     const params = new URLSearchParams({ page: '0', size: '500' });
     if (state.q) params.set('q', state.q);
-    if (state.buildingId) params.set('buildingId', state.buildingId);
+    state.buildingIds.forEach(id => params.append('buildingIds', id));
     if (state.floorId) params.set('floorId', state.floorId);
     const res = await API.req(`${apiBase}?${params}`); if (!res) return;
     const json = await res.json().catch(() => null);
@@ -670,8 +670,8 @@
       const delH = e.target.closest('.js-h-del'); if (delH) return deleteHistoryRow(delH.closest('tr'));
     });
     $('btnAdd')?.addEventListener('click', () => openUpsert(0));
-    $('btnSearch')?.addEventListener('click', () => { state.q = $('filterQ').value.trim(); state.buildingId = $('filterBuildingId').value; state.floorId = $('filterFloorId').value; loadList(); });
-    $('btnReset')?.addEventListener('click', () => { state.q = state.buildingId = state.floorId = ''; $('filterQ').value = ''; $('filterBuildingId').value = ''; $('filterFloorId').value = ''; loadList(); });
+    $('btnSearch')?.addEventListener('click', () => { state.q = $('filterQ').value.trim(); state.buildingIds = window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || []; state.floorId = $('filterFloorId').value; loadList(); });
+    $('btnReset')?.addEventListener('click', () => { state.q = state.floorId = ''; state.buildingIds = []; $('filterQ').value = ''; window.FireWebBuildingMultiFilter?.clear('filterBuildingIds'); $('filterFloorId').value = ''; loadList(); });
     $('btnStatusInspect')?.addEventListener('click', () => { state.status = state.status === 'inspect' ? null : 'inspect'; renderTable(filteredItems()); });
     $('btnSave')?.addEventListener('click', saveEquipment);
     $('btnConfirmInspect')?.addEventListener('click', inspectEquipment);
