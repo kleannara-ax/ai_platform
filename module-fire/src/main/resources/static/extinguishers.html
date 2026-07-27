@@ -1057,12 +1057,15 @@ async function fetchExtinguisherPage(q='', buildingIds=[], floorId='', pageNo = 
 async function fetchAllExtinguisherItems(q='', buildingIds=[], floorId='') {
   const firstPage = await fetchExtinguisherPage(q, buildingIds, floorId, 0);
   const totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
-  const remainingPages = await Promise.all(
-    Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
-      fetchExtinguisherPage(q, buildingIds, floorId, index + 1))
-  );
-  return [firstPage, ...remainingPages].flatMap(page =>
-    Array.isArray(page.content) ? page.content : []);
+  const items = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+
+  // Export/status filtering must include every matching server page. Fetch sequentially
+  // to avoid opening an unbounded number of requests for large equipment inventories.
+  for (let pageNo = 1; pageNo < totalPages; pageNo += 1) {
+    const page = await fetchExtinguisherPage(q, buildingIds, floorId, pageNo);
+    if (Array.isArray(page.content)) items.push(...page.content);
+  }
+  return items;
 }
 
 function renderGlobalStatusPage(pageNo = 0) {
@@ -2885,11 +2888,23 @@ document.getElementById('btnStatusUrgent')?.addEventListener('click', () => { vo
 document.getElementById('btnExtAdd')?.addEventListener('click', () => window.openExtinguisherUpsertModal({ id: 0 }));
 
 // ===== 엑셀 다운로드 =====
-document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
+document.getElementById('btnExcelDownload')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const originalLabel = button.innerHTML;
   try {
     if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해 주세요.'); return; }
-    if (!allItems || !allItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
-    const rows = allItems.map((item, i) => ({
+
+    button.disabled = true;
+    button.textContent = '엑셀 준비 중...';
+    const items = await fetchAllExtinguisherItems(
+      document.getElementById('filterQ')?.value.trim() || '',
+      getSelectedBuildingIds(),
+      document.getElementById('filterFloorId')?.value || ''
+    );
+    const filteredItems = getStatusFilteredItems(items);
+    if (!filteredItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+
+    const rows = filteredItems.map((item, i) => ({
       'No.': i + 1,
       '소화기 ID': item.serialNumber || '-',
       '건물': item.buildingName || '-',
@@ -2914,6 +2929,9 @@ document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
   } catch(e) {
     console.error('엑셀 다운로드 오류:', e);
     alert('엑셀 다운로드 중 오류가 발생했습니다: ' + (e.message || e));
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalLabel;
   }
 });
 
