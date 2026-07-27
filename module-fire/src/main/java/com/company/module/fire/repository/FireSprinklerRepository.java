@@ -17,7 +17,7 @@ public interface FireSprinklerRepository extends JpaRepository<FireSprinkler, Lo
             JOIN FETCH s.building b
             JOIN FETCH s.floor f
             WHERE s.active = true
-            AND (:buildingId IS NULL OR b.buildingId = :buildingId)
+            AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds)
             AND (:floorId IS NULL OR f.floorId = :floorId)
             AND (:keyword IS NULL OR
                  LOWER(s.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
@@ -30,7 +30,7 @@ public interface FireSprinklerRepository extends JpaRepository<FireSprinkler, Lo
             JOIN s.building b
             JOIN s.floor f
             WHERE s.active = true
-            AND (:buildingId IS NULL OR b.buildingId = :buildingId)
+            AND (:buildingIds IS NULL OR b.buildingId IN :buildingIds)
             AND (:floorId IS NULL OR f.floorId = :floorId)
             AND (:keyword IS NULL OR
                  LOWER(s.serialNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
@@ -39,7 +39,7 @@ public interface FireSprinklerRepository extends JpaRepository<FireSprinkler, Lo
                  LOWER(COALESCE(s.note, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<FireSprinkler> search(
-            @Param("buildingId") Long buildingId,
+            @Param("buildingIds") List<Long> buildingIds,
             @Param("floorId") Long floorId,
             @Param("keyword") String keyword,
             Pageable pageable);

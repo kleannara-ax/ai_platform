@@ -550,9 +550,7 @@
           <input id="filterQ" class="form-control" placeholder="검색어(건물/층/종류/비고)" />
         </div>
         <div class="col-md-3">
-          <select id="filterBuildingId" class="form-select">
-            <option value="">-- 건물 전체 --</option>
-          </select>
+          <div id="filterBuildingIds"></div>
         </div>
         <div class="col-md-3">
           <select id="filterFloorId" class="form-select">
@@ -839,6 +837,7 @@
 <script src="/js/xlsx.full.min.js"></script>
 <script>if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';document.head.appendChild(s);}</script>
 <script src="/js/csrf.js"></script>
+<script src="/js/building-multi-filter.js"></script>
 <script>
  // ===== JWT & 공용 API =====
 const API = (() => {
@@ -999,10 +998,8 @@ async function loadBuildingOptions() {
     extBuildingFloorMap = {};
   }
 
-  const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
-  bSel.innerHTML = '<option value="">-- 건물 전체 --</option>' +
-    buildings.map(x => `<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  window.FireWebBuildingMultiFilter?.mount('filterBuildingIds', buildings, getSelectedBuildingIds());
   fSel.innerHTML = '<option value="">-- 층 전체 --</option>' +
     floors.map(x => `<option value="${x.floorId}">${x.floorName}</option>`).join('');
 
@@ -1036,10 +1033,16 @@ function updateExtModalFloorOptions(buildingId) {
 }
 
 // ===== 소화기목록 로드 =====
-async function fetchExtinguisherPage(q='', buildingId='', floorId='', pageNo = 0) {
+function getSelectedBuildingIds() {
+  return window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || [];
+}
+function appendBuildingIds(params, buildingIds) {
+  (Array.isArray(buildingIds) ? buildingIds : (buildingIds ? [buildingIds] : [])).forEach(id => params.append('buildingIds', id));
+}
+async function fetchExtinguisherPage(q='', buildingIds=[], floorId='', pageNo = 0) {
   const params = new URLSearchParams({ size: String(listPageSize), page: String(Math.max(0, pageNo)) });
   if (q) params.set('q', q);
-  if (buildingId) params.set('buildingId', buildingId);
+  appendBuildingIds(params, buildingIds);
   if (floorId) params.set('floorId', floorId);
 
   const res = await API.req(`/fire-api/extinguishers?${params}`);
@@ -1051,15 +1054,18 @@ async function fetchExtinguisherPage(q='', buildingId='', floorId='', pageNo = 0
   return json.data;
 }
 
-async function fetchAllExtinguisherItems(q='', buildingId='', floorId='') {
-  const firstPage = await fetchExtinguisherPage(q, buildingId, floorId, 0);
+async function fetchAllExtinguisherItems(q='', buildingIds=[], floorId='') {
+  const firstPage = await fetchExtinguisherPage(q, buildingIds, floorId, 0);
   const totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
-  const remainingPages = await Promise.all(
-    Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
-      fetchExtinguisherPage(q, buildingId, floorId, index + 1))
-  );
-  return [firstPage, ...remainingPages].flatMap(page =>
-    Array.isArray(page.content) ? page.content : []);
+  const items = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+
+  // Export/status filtering must include every matching server page. Fetch sequentially
+  // to avoid opening an unbounded number of requests for large equipment inventories.
+  for (let pageNo = 1; pageNo < totalPages; pageNo += 1) {
+    const page = await fetchExtinguisherPage(q, buildingIds, floorId, pageNo);
+    if (Array.isArray(page.content)) items.push(...page.content);
+  }
+  return items;
 }
 
 function renderGlobalStatusPage(pageNo = 0) {
@@ -1075,10 +1081,10 @@ function renderGlobalStatusPage(pageNo = 0) {
   syncStatusButtons();
 }
 
-async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = currentListPage) {
+async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = currentListPage) {
   const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
   try {
-    const pageData = await fetchExtinguisherPage(q, buildingId, floorId, requestedPage);
+    const pageData = await fetchExtinguisherPage(q, buildingIds, floorId, requestedPage);
     if (pageData) {
     const totalElements = Number(pageData.totalElements);
     const totalPages = Number(pageData.totalPages);
@@ -1091,7 +1097,7 @@ async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = curre
     if (!pageContent.length && listTotalElements > 0 && requestedPage > 0) {
       const correctedPage = Math.max(0, listTotalPages - 1);
       if (correctedPage !== requestedPage) {
-        return loadExtinguishers(q, buildingId, floorId, correctedPage);
+        return loadExtinguishers(q, buildingIds, floorId, correctedPage);
       }
     }
 
@@ -1108,17 +1114,13 @@ async function loadExtinguishers(q='', buildingId='', floorId='', pageNo = curre
     currentListPage = 0;
   }
   await loadBuildingOptions();
-  const filterBuilding = document.getElementById('filterBuildingId');
   const filterFloor = document.getElementById('filterFloorId');
-  if (buildingId && filterBuilding && Array.from(filterBuilding.options).some(option => option.value === String(buildingId))) {
-    filterBuilding.value = String(buildingId);
-  }
   if (floorId && filterFloor && Array.from(filterFloor.options).some(option => option.value === String(floorId))) {
     filterFloor.value = String(floorId);
   }
   if (currentStatusType) {
     try {
-      statusSourceItems = await fetchAllExtinguisherItems(q, buildingId, floorId);
+      statusSourceItems = await fetchAllExtinguisherItems(q, buildingIds, floorId);
       renderGlobalStatusPage(0);
       return;
     } catch (error) {
@@ -1382,22 +1384,22 @@ async function applyStatusFilter(type) {
   if (panelEl?.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(panelEl).hide();
 
   const q = document.getElementById('filterQ')?.value || '';
-  const buildingId = document.getElementById('filterBuildingId')?.value || '';
+  const buildingIds = getSelectedBuildingIds();
   const floorId = document.getElementById('filterFloorId')?.value || '';
   if (!currentStatusType) {
     statusSourceItems = [];
-    await loadExtinguishers(q, buildingId, floorId, 0);
+    await loadExtinguishers(q, buildingIds, floorId, 0);
     return;
   }
 
   document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-muted py-4">전체 페이지의 상태 설비를 조회하는 중...</div>';
   try {
-    statusSourceItems = await fetchAllExtinguisherItems(q, buildingId, floorId);
+    statusSourceItems = await fetchAllExtinguisherItems(q, buildingIds, floorId);
     renderGlobalStatusPage(0);
   } catch (error) {
     statusSourceItems = [];
     showToast(error.message || '전체 상태 목록을 불러오지 못했습니다.', 'danger');
-    await loadExtinguishers(q, buildingId, floorId, 0);
+    await loadExtinguishers(q, buildingIds, floorId, 0);
   }
 }
 
@@ -2439,7 +2441,8 @@ async function openDetails(id) {
     setCreateMode(!id); // 추가모드(id=0)이면 다중 항목 UI, 수정모드이면 단일 항목 UI
 
     if(!id){
-      const fb = document.getElementById('filterBuildingId')?.value || '';
+      const selectedBuildingIds = getSelectedBuildingIds();
+      const fb = selectedBuildingIds.length === 1 ? selectedBuildingIds[0] : '';
       const ff = document.getElementById('filterFloorId')?.value || '';
       if (buildingSel) {
         selectOptionSmart(buildingSel, (opts?.buildingId ?? fb ?? ''), (opts?.buildingName ?? ''));
@@ -2779,7 +2782,7 @@ document.addEventListener('click', async (ev) => {
     } else {
       await loadExtinguishers(
         document.getElementById('filterQ')?.value || '',
-        document.getElementById('filterBuildingId')?.value || '',
+        getSelectedBuildingIds(),
         document.getElementById('filterFloorId')?.value || '',
         page
       );
@@ -2829,7 +2832,7 @@ document.addEventListener('click', async (ev) => {
     showToast('Deleted.', 'success');
     await loadExtinguishers(
       document.getElementById('filterQ')?.value||'',
-      document.getElementById('filterBuildingId')?.value||'',
+      getSelectedBuildingIds(),
       document.getElementById('filterFloorId')?.value||'',
       currentListPage);
     return;
@@ -2864,7 +2867,7 @@ document.addEventListener('click', async (ev) => {
 // ===== 버튼 이벤트 =====
 document.getElementById('btnSearch')?.addEventListener('click', () => {
   const q = document.getElementById('filterQ')?.value || '';
-  const b = document.getElementById('filterBuildingId')?.value || '';
+  const b = getSelectedBuildingIds();
   const f = document.getElementById('filterFloorId')?.value || '';
   loadExtinguishers(q, b, f, 0);
 });
@@ -2873,11 +2876,11 @@ document.getElementById('filterQ')?.addEventListener('keydown', (e) => {
 });
 document.getElementById('btnReset')?.addEventListener('click', () => {
   document.getElementById('filterQ').value = '';
-  document.getElementById('filterBuildingId').value = '';
+  window.FireWebBuildingMultiFilter?.clear('filterBuildingIds');
   document.getElementById('filterFloorId').value = '';
   currentStatusType = null;
   syncStatusButtons();
-  loadExtinguishers('', '', '', 0);
+  loadExtinguishers('', [], '', 0);
 });
 document.getElementById('btnStatusInspect')?.addEventListener('click', () => { void applyStatusFilter('inspect'); });
 document.getElementById('btnStatusPlanned')?.addEventListener('click', () => { void applyStatusFilter('planned'); });
@@ -2885,11 +2888,23 @@ document.getElementById('btnStatusUrgent')?.addEventListener('click', () => { vo
 document.getElementById('btnExtAdd')?.addEventListener('click', () => window.openExtinguisherUpsertModal({ id: 0 }));
 
 // ===== 엑셀 다운로드 =====
-document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
+document.getElementById('btnExcelDownload')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const originalLabel = button.innerHTML;
   try {
     if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해 주세요.'); return; }
-    if (!allItems || !allItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
-    const rows = allItems.map((item, i) => ({
+
+    button.disabled = true;
+    button.textContent = '엑셀 준비 중...';
+    const items = await fetchAllExtinguisherItems(
+      document.getElementById('filterQ')?.value.trim() || '',
+      getSelectedBuildingIds(),
+      document.getElementById('filterFloorId')?.value || ''
+    );
+    const filteredItems = getStatusFilteredItems(items);
+    if (!filteredItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+
+    const rows = filteredItems.map((item, i) => ({
       'No.': i + 1,
       '소화기 ID': item.serialNumber || '-',
       '건물': item.buildingName || '-',
@@ -2914,18 +2929,21 @@ document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
   } catch(e) {
     console.error('엑셀 다운로드 오류:', e);
     alert('엑셀 다운로드 중 오류가 발생했습니다: ' + (e.message || e));
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalLabel;
   }
 });
 
 // 등록/점검 완료 후 목록 새로고침
 document.addEventListener('inspection:completed', () => loadExtinguishers(
   document.getElementById('filterQ')?.value||'',
-  document.getElementById('filterBuildingId')?.value||'',
+  getSelectedBuildingIds(),
   document.getElementById('filterFloorId')?.value||'',
   currentListPage));
 document.addEventListener('extinguisher:upsertCompleted', () => loadExtinguishers(
   document.getElementById('filterQ')?.value||'',
-  document.getElementById('filterBuildingId')?.value||'',
+  getSelectedBuildingIds(),
   document.getElementById('filterFloorId')?.value||'',
   currentListPage));
 
@@ -3154,16 +3172,17 @@ if (!EMBED_MODAL_MODE) {
   const localOpenExtinguisherUpsertModal = window.openExtinguisherUpsertModal;
 
   function buildListAddOptions() {
-    const buildingSel = document.getElementById('filterBuildingId');
+    const selectedBuildingIds = getSelectedBuildingIds();
+    const buildingId = selectedBuildingIds.length === 1 ? selectedBuildingIds[0] : '';
+    const selectedBuilding = optionBuildings.find(building => String(building.buildingId) === String(buildingId));
     const floorSel = document.getElementById('filterFloorId');
-    const buildingId = buildingSel?.value || '';
     const floorId = floorSel?.value || '';
     return {
       mode: 'edit',
       add: true,
       buildingId,
       floorId,
-      buildingName: buildingId ? (buildingSel?.selectedOptions?.[0]?.textContent || '') : '',
+      buildingName: selectedBuilding?.buildingName || '',
       floorName: floorId ? (floorSel?.selectedOptions?.[0]?.textContent || '') : ''
     };
   }
@@ -3171,7 +3190,7 @@ if (!EMBED_MODAL_MODE) {
   function refreshCurrentList() {
     return loadExtinguishers(
       document.getElementById('filterQ')?.value || '',
-      document.getElementById('filterBuildingId')?.value || '',
+      getSelectedBuildingIds(),
       document.getElementById('filterFloorId')?.value || '',
       currentListPage
     );

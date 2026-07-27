@@ -41,13 +41,22 @@ public class FireHydrantService {
 
     public Page<FireHydrantResponse> getHydrants(Long buildingId, Long floorId,
                                                   String keyword, int page, int size) {
+        return getHydrants(buildingId == null ? null : List.of(buildingId), floorId, keyword, page, size);
+    }
+
+    public Page<FireHydrantResponse> getHydrants(List<Long> buildingIds, Long floorId,
+                                                  String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("hydrantId").ascending());
 
-        Long bId = (buildingId != null && buildingId > 0) ? buildingId : null;
+        List<Long> bIds = buildingIds == null ? null : buildingIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (bIds != null && bIds.isEmpty()) bIds = null;
         Long fId = (floorId != null && floorId > 0) ? floorId : null;
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
-        Page<FireHydrant> entityPage = hydrantRepository.searchHydrants(bId, fId, kw, pageable);
+        Page<FireHydrant> entityPage = hydrantRepository.searchHydrants(bIds, fId, kw, pageable);
         return entityPage.map(h -> {
             FireHydrantResponse dto = FireHydrantResponse.from(h);
             inspectionRepository

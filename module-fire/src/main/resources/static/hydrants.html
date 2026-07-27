@@ -541,9 +541,7 @@
           <input id="filterQ" class="form-control" placeholder="검색어(건물/층/구분/상세 위치)" />
         </div>
         <div class="col-md-3">
-          <select id="filterBuildingId" class="form-select">
-            <option value="">-- 건물 전체 --</option>
-          </select>
+          <div id="filterBuildingIds"></div>
         </div>
         <div class="col-md-3">
           <select id="filterFloorId" class="form-select">
@@ -813,6 +811,7 @@
 <script src="/js/xlsx.full.min.js"></script>
 <script>if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';document.head.appendChild(s);}</script>
 <script src="/js/csrf.js"></script>
+<script src="/js/building-multi-filter.js"></script>
 <script>
 // ===== JWT & 공용 API =====
 const API = (() => {
@@ -957,9 +956,8 @@ async function loadBuildingFloorOptions() {
     buildingFloorMap = {};
   }
 
-  const bSel = document.getElementById('filterBuildingId');
   const fSel = document.getElementById('filterFloorId');
-  bSel.innerHTML='<option value="">-- 건물 전체 --</option>'+buildings.map(x=>`<option value="${x.buildingId}">${x.buildingName}</option>`).join('');
+  window.FireWebBuildingMultiFilter?.mount('filterBuildingIds', buildings, getSelectedBuildingIds());
   fSel.innerHTML='<option value="">-- 층 전체 --</option>'+floors.map(x=>`<option value="${x.floorId}">${x.floorName}</option>`).join('');
 
   const hb = document.getElementById('hydBuildingSel');
@@ -1001,29 +999,51 @@ async function ensureHydModalOptions() {
 }
 
 // ===== 소화전목록 로드 =====
-async function loadHydrants(q='', buildingId='', floorId='') {
-  const params = new URLSearchParams({ size:200, page:0 });
+function getSelectedBuildingIds() { return window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || []; }
+function appendBuildingIds(params, buildingIds) {
+  (Array.isArray(buildingIds) ? buildingIds : (buildingIds ? [buildingIds] : [])).forEach(id => params.append('buildingIds', id));
+}
+async function fetchHydrantPage(q='', buildingIds=[], floorId='', pageNo=0) {
+  const params = new URLSearchParams({ size: '200', page: String(Math.max(0, pageNo)) });
   if (q) params.set('q',q);
-  if (buildingId) params.set('buildingId',buildingId);
+  appendBuildingIds(params, buildingIds);
   if (floorId) params.set('floorId',floorId);
   const res = await API.req(`/fire-api/hydrants?${params}`);
-  if (!res) return;
-  const json = await res.json();
-  if ((res.ok || json.success) && json.data) {
-    allItems = (json.data.content || []).slice().sort((a, b) => {
+  if (!res) throw new Error('목록 조회가 취소되었습니다.');
+  const json = await res.json().catch(() => null);
+  if (!res.ok || json?.success === false || !json?.data) {
+    throw new Error(json?.message || '소화전 목록을 불러오지 못했습니다.');
+  }
+  return json.data;
+}
+
+async function fetchAllHydrantItems(q='', buildingIds=[], floorId='') {
+  const firstPage = await fetchHydrantPage(q, buildingIds, floorId, 0);
+  const totalPages = Math.max(1, Number(firstPage.totalPages) || 1);
+  const items = Array.isArray(firstPage.content) ? firstPage.content.slice() : [];
+
+  // Keep the export unlimited while fetching pages one at a time for large inventories.
+  for (let pageNo = 1; pageNo < totalPages; pageNo += 1) {
+    const page = await fetchHydrantPage(q, buildingIds, floorId, pageNo);
+    if (Array.isArray(page.content)) items.push(...page.content);
+  }
+  return items;
+}
+
+async function loadHydrants(q='', buildingIds=[], floorId='') {
+  try {
+    const page = await fetchHydrantPage(q, buildingIds, floorId, 0);
+    allItems = (page.content || []).slice().sort((a, b) => {
       const left = String(a?.serialNumber || '');
       const right = String(b?.serialNumber || '');
       return left.localeCompare(right, 'ko');
     });
-  } else {
+  } catch (error) {
+    console.error('소화전 목록 조회 실패', error);
     allItems = [];
   }
   await loadBuildingFloorOptions();
-  const filterBuilding = document.getElementById('filterBuildingId');
   const filterFloor = document.getElementById('filterFloorId');
-  if (buildingId && filterBuilding && Array.from(filterBuilding.options).some(option => option.value === String(buildingId))) {
-    filterBuilding.value = String(buildingId);
-  }
   if (floorId && filterFloor && Array.from(filterFloor.options).some(option => option.value === String(floorId))) {
     filterFloor.value = String(floorId);
   }
@@ -1274,7 +1294,7 @@ async function deleteHydrant(id, serialNumber='') {
 
   await loadHydrants(
     document.getElementById('filterQ')?.value || '',
-    document.getElementById('filterBuildingId')?.value || '',
+    getSelectedBuildingIds(),
     document.getElementById('filterFloorId')?.value || ''
   );
   const detailModalEl = document.getElementById('hydrantDetailsModal');
@@ -2560,12 +2580,12 @@ window.addEventListener('resize', () => {
   }
 });
 document.getElementById('btnSearch')?.addEventListener('click',()=>{
-  loadHydrants(document.getElementById('filterQ')?.value||'',document.getElementById('filterBuildingId')?.value||'',document.getElementById('filterFloorId')?.value||'');
+  loadHydrants(document.getElementById('filterQ')?.value||'',getSelectedBuildingIds(),document.getElementById('filterFloorId')?.value||'');
 });
 document.getElementById('filterQ')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('btnSearch')?.click(); });
 document.getElementById('btnReset')?.addEventListener('click',()=>{
   document.getElementById('filterQ').value='';
-  document.getElementById('filterBuildingId').value='';
+  window.FireWebBuildingMultiFilter?.clear('filterBuildingIds');
   document.getElementById('filterFloorId').value='';
   currentStatusType = null;
   syncStatusButtons();
@@ -2575,11 +2595,25 @@ document.getElementById('btnStatusInspect')?.addEventListener('click',()=>applyS
 document.getElementById('btnStatusFaulty')?.addEventListener('click',()=>applyStatusFilter('faulty'));
 
 // ===== 엑셀 다운로드 =====
-document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
+document.getElementById('btnExcelDownload')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const originalLabel = button.innerHTML;
   try {
     if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리가 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해 주세요.'); return; }
-    if (!allItems || !allItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
-    const rows = allItems.map((item, i) => ({
+
+    button.disabled = true;
+    button.textContent = '엑셀 준비 중...';
+    const items = await fetchAllHydrantItems(
+      document.getElementById('filterQ')?.value.trim() || '',
+      getSelectedBuildingIds(),
+      document.getElementById('filterFloorId')?.value || ''
+    );
+    const filteredItems = getStatusFilteredItems(items).sort((a, b) =>
+      String(a?.serialNumber || '').localeCompare(String(b?.serialNumber || ''), 'ko')
+    );
+    if (!filteredItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+
+    const rows = filteredItems.map((item, i) => ({
       'No.': i + 1,
       '소화전 ID': item.serialNumber || '-',
       '구분': String(item.hydrantType || '').toLowerCase() === 'outdoor' ? '옥외' : '옥내',
@@ -2604,13 +2638,16 @@ document.getElementById('btnExcelDownload')?.addEventListener('click', () => {
   } catch(e) {
     console.error('엑셀 다운로드 오류:', e);
     alert('엑셀 다운로드 중 오류가 발생했습니다: ' + (e.message || e));
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalLabel;
   }
 });
 
 // 점검/저장 완료 후 갱신
 const reload = () => loadHydrants(
   document.getElementById('filterQ')?.value||'',
-  document.getElementById('filterBuildingId')?.value||'',
+  getSelectedBuildingIds(),
   document.getElementById('filterFloorId')?.value||'');
 document.addEventListener('hydrant:upsertCompleted', reload);
 document.addEventListener('hydrant:inspectionCompleted', reload);
@@ -2772,9 +2809,10 @@ if (!EMBED_MODAL_MODE) {
   const localOpenHydrantUpsertModal = window.openHydrantUpsertModal;
 
   function buildListHydrantAddOptions() {
-    const buildingSel = document.getElementById('filterBuildingId');
+    const selectedBuildingIds = getSelectedBuildingIds();
+    const buildingId = selectedBuildingIds.length === 1 ? selectedBuildingIds[0] : '';
+    const selectedBuilding = allBuildingOptions.find(building => String(building.buildingId) === String(buildingId));
     const floorSel = document.getElementById('filterFloorId');
-    const buildingId = buildingSel?.value || '';
     const floorId = floorSel?.value || '';
     return {
       mode: 'edit',
@@ -2783,7 +2821,7 @@ if (!EMBED_MODAL_MODE) {
       operationType: 'Manual',
       buildingId,
       floorId,
-      buildingName: buildingId ? (buildingSel?.selectedOptions?.[0]?.textContent || '') : '',
+      buildingName: selectedBuilding?.buildingName || '',
       floorName: floorId ? (floorSel?.selectedOptions?.[0]?.textContent || '') : ''
     };
   }
@@ -2791,7 +2829,7 @@ if (!EMBED_MODAL_MODE) {
   function refreshCurrentList() {
     return loadHydrants(
       document.getElementById('filterQ')?.value || '',
-      document.getElementById('filterBuildingId')?.value || '',
+      getSelectedBuildingIds(),
       document.getElementById('filterFloorId')?.value || ''
     );
   }
