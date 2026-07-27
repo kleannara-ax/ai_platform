@@ -264,7 +264,30 @@ public class DailyReportService {
     }
 
     /**
-     * 이미지 메타 저장 (실제 파일 업로드는 별도 처리)
+     * 일보에 등록된 이미지 개수 (업로드 개수 제한 검증용)
+     */
+    public long countImages(Long reportId) {
+        return imageRepository.countByDailyReport_ReportId(reportId);
+    }
+
+    /**
+     * ★ 다운로드 전용 — reportId + imageId가 모두 일치하는 이미지 메타 조회
+     * (다른 일보의 이미지를 imageId만으로 조회하는 것을 방지)
+     */
+    public ImageResponse getImageForDownload(Long reportId, Long imageId) {
+        DailyReportImage image = imageRepository
+                .findByImageIdAndDailyReport_ReportId(imageId, reportId)
+                .orElseThrow(() -> new EntityNotFoundException("이미지를 찾을 수 없습니다. ID: " + imageId));
+        return ImageResponse.from(image);
+    }
+
+    /** 일보당 최대 첨부 이미지 개수 (프론트엔드 MAX_UPLOAD_IMAGES와 동일하게 서버에서도 강제) */
+    private static final int MAX_IMAGES_PER_REPORT = 8;
+
+    /**
+     * 이미지 메타 저장
+     * - ★ 실제 파일 바이너리는 ImageController가 로컬 디스크에 먼저 저장한 뒤,
+     *   그 결과(storedPath 등)를 파라미터로 넘겨 이 메서드가 DB 메타 레코드만 생성한다.
      */
     @Transactional
     public ImageResponse addImage(Long reportId, String originalName, String storedPath,
@@ -275,7 +298,13 @@ public class DailyReportService {
 
         validateReportEditable(report);
 
-        int sortOrder = (int) imageRepository.countByDailyReport_ReportId(reportId) + 1;
+        long currentCount = imageRepository.countByDailyReport_ReportId(reportId);
+        if (currentCount >= MAX_IMAGES_PER_REPORT) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    String.format("이미지는 일보당 최대 %d장까지 등록할 수 있습니다.", MAX_IMAGES_PER_REPORT));
+        }
+
+        int sortOrder = (int) currentCount + 1;
 
         DailyReportImage image = DailyReportImage.builder()
                 .originalName(originalName)
@@ -308,14 +337,19 @@ public class DailyReportService {
 
     /**
      * 이미지 삭제
+     * - DB 메타 레코드를 삭제하고, 실제 파일도 함께 지울 수 있도록 storedPath를 반환한다.
+     *   (물리 파일 삭제는 ImageController가 이 값을 받아 처리 — 파일시스템 접근은
+     *   컨트롤러/전용 헬퍼에서만 하도록 서비스 계층 책임을 분리)
      */
     @Transactional
-    public void deleteImage(Long imageId) {
+    public String deleteImage(Long imageId) {
         DailyReportImage image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new EntityNotFoundException("이미지를 찾을 수 없습니다. ID: " + imageId));
 
         validateReportEditable(image.getDailyReport());
+        String storedPath = image.getStoredPath();
         imageRepository.delete(image);
+        return storedPath;
     }
 
     // ─────────────────────────────────────────────

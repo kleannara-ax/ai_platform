@@ -4,6 +4,7 @@ import com.company.module.dailyreport.entity.DailyReportImage;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface DailyReportImageRepository extends JpaRepository<DailyReportImage, Long> {
 
@@ -16,4 +17,10 @@ public interface DailyReportImageRepository extends JpaRepository<DailyReportIma
 
     /** 일보에 속한 이미지 개수 */
     long countByDailyReport_ReportId(Long reportId);
+
+    /**
+     * ★ 다운로드/미리보기 전용 — imageId와 reportId가 모두 일치하는 경우에만 조회.
+     * (URL의 imageId만으로 다른 일보에 속한 이미지를 열람하는 것을 방지)
+     */
+    Optional<DailyReportImage> findByImageIdAndDailyReport_ReportId(Long imageId, Long reportId);
 }

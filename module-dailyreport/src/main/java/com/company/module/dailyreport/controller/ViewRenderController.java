@@ -106,6 +106,11 @@ public class ViewRenderController {
             permissions.put("canAccessInput", menuPermissionService.canAccessInputPage(userId));
             permissions.put("canWriteInput", menuPermissionService.canWriteInputPage(userId));
             permissions.put("canAccessAuth", menuPermissionService.canAccessAuthPage(userId));
+            // ★ canManageAuth == canAccessAuth (2026-07부터 동일 기준) — 컬럼관리 대시보드에
+            //   등록된 사용자는 admin과 동일하게 등록/수정/삭제/재동기화 가능
+            permissions.put("canManageAuth", menuPermissionService.canAdminAuthPage(userId));
+            // ★ 화면 라벨 분기용(실제 admin 계정인지) — 권한 범위와는 무관
+            permissions.put("isAdmin", menuPermissionService.isRealAdmin(userId));
         }
         result.put("permissions", permissions);
 
@@ -130,6 +135,8 @@ public class ViewRenderController {
             permissions.put("canAccessInput", menuPermissionService.canAccessInputPage(userId));
             permissions.put("canWriteInput", menuPermissionService.canWriteInputPage(userId));
             permissions.put("canAccessAuth", menuPermissionService.canAccessAuthPage(userId));
+            permissions.put("canManageAuth", menuPermissionService.canAdminAuthPage(userId));
+            permissions.put("isAdmin", menuPermissionService.isRealAdmin(userId));
         }
         result.put("permissions", permissions);
 

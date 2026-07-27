@@ -94,6 +94,7 @@
     .upload-empty { border:1px dashed #d1d5db; border-radius:12px; padding:22px 14px; text-align:center; color:#94a3b8; font-size:13px; }
     .upload-card { border:1px solid #dbe4f0; border-radius:14px; overflow:hidden; background:#fff; }
     .upload-thumb { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#f8fafc; }
+    .upload-thumb-loading { display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8; }
     .upload-card-body { padding:10px; }
     .upload-card-name { font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upload-card-meta { margin-top:4px; font-size:11px; color:#64748b; }
@@ -335,6 +336,64 @@
         return json.data;
       }
       return json;
+    }
+
+    /**
+     * 멀티파트(FormData) 업로드 전용 fetch 래퍼
+     * - apiFetch와 달리 Content-Type을 직접 지정하지 않는다
+     *   (브라우저가 FormData의 multipart boundary를 자동으로 설정해야 함)
+     */
+    async function apiUpload(path, formData) {
+      let url = API_BASE + path;
+      if (_previewLoginId) {
+        const sep = url.includes('?') ? '&' : '?';
+        url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
+      }
+      const hdrs = {};
+      if (_jwtToken) hdrs['Authorization'] = 'Bearer ' + _jwtToken;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: hdrs,
+        credentials: 'same-origin',
+        body: formData
+      });
+      if (res.status === 401) {
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        throw new Error('인증이 만료되었습니다. 로그인 페이지로 이동합니다.');
+      }
+      if (res.status === 403) {
+        throw new Error('접근 권한이 없습니다.');
+      }
+      if (!res.ok) {
+        const err = await res.text().catch(() => res.statusText);
+        throw new Error(`업로드 오류 (${res.status}): ${err}`);
+      }
+      const json = await res.json();
+      if (json && typeof json.success === 'boolean' && json.data !== undefined) {
+        return json.data;
+      }
+      return json;
+    }
+
+    /**
+     * 인증이 필요한 이미지 파일 URL을 blob으로 받아 화면 표시용 Object URL로 변환
+     * - <img src="...">는 Authorization 헤더를 보낼 수 없으므로, 인증된 fetch로 받은
+     *   blob을 URL.createObjectURL()로 변환해 사용한다.
+     * - storedPath는 서버가 반환하는 절대 API 경로(예: /dailyreport-api/reports/{id}/images/files/{filename})
+     */
+    async function fetchImageBlobUrl(storedPath) {
+      if (!storedPath) return '';
+      let url = storedPath;
+      if (_previewLoginId) {
+        const sep = url.includes('?') ? '&' : '?';
+        url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
+      }
+      const hdrs = {};
+      if (_jwtToken) hdrs['Authorization'] = 'Bearer ' + _jwtToken;
+      const res = await fetch(url, { headers: hdrs, credentials: 'same-origin' });
+      if (!res.ok) throw new Error('이미지 조회 실패 (' + res.status + ')');
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
     }
 
     // ═══════════════════════════════════════════════
@@ -897,14 +956,15 @@
       const disabledClass = canWrite ? '' : 'disabled';
       const disabledAttr = canWrite ? '' : 'disabled';
 
-      // 기존 이미지 로드
+      // 기존 이미지 로드 (dataUrl은 인증된 blob fetch로 나중에 채워짐)
       const images = reportData?.images || [];
       uploadedImages = images.map(img => ({
         imageId: img.imageId,
         name: img.originalName,
         storedPath: img.storedPath,
         sizeText: humanFileSize(img.fileSize),
-        dataUrl: img.storedPath  // 실제 구현에서는 이미지 URL
+        dataUrl: '',
+        loading: true
       }));
 
       section.innerHTML = `
@@ -924,8 +984,28 @@
         </div>
       `;
 
-      setTimeout(() => renderUploadedImages(), 0);
+      setTimeout(() => {
+        renderUploadedImages();
+        loadExistingImageThumbnails();
+      }, 0);
       return section;
+    }
+
+    /**
+     * 서버에 이미 저장된 이미지들의 미리보기 썸네일을 인증된 blob fetch로 순차 로드
+     */
+    async function loadExistingImageThumbnails() {
+      for (const img of uploadedImages) {
+        if (!img.imageId || !img.storedPath || img.dataUrl) continue;
+        try {
+          img.dataUrl = await fetchImageBlobUrl(img.storedPath);
+        } catch (err) {
+          console.warn('이미지 미리보기 로드 실패:', img.name, err);
+        } finally {
+          img.loading = false;
+        }
+        renderUploadedImages();
+      }
     }
 
     // ── 이미지 업로드 이벤트 바인딩 ──
@@ -961,47 +1041,116 @@
       }
       grid.innerHTML = uploadedImages.map((img, i) => `
         <div class="upload-card">
-          <img class="upload-thumb" src="${img.dataUrl || ''}" alt="${escapeHtml(img.name || `image-${i+1}`)}" onerror="this.style.display='none'" />
+          ${img.loading
+            ? '<div class="upload-thumb upload-thumb-loading">불러오는 중...</div>'
+            : `<img class="upload-thumb" src="${img.dataUrl || ''}" alt="${escapeHtml(img.name || `image-${i+1}`)}" onerror="this.style.display='none'" />`}
           <div class="upload-card-body">
             <div class="upload-card-name" title="${escapeHtml(img.name || '')}">${escapeHtml(img.name || `image-${i+1}`)}</div>
-            <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}</div>
-            <button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})">삭제</button>
+            <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}${img.uploading ? ' · 업로드 중...' : ''}</div>
+            <button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})" ${img.uploading ? 'disabled' : ''}>삭제</button>
           </div>
         </div>
       `).join('');
     }
 
-    function removeUploadedImage(idx) {
+    /**
+     * 이미지 삭제
+     * - 이미 서버에 저장된 이미지(imageId 존재)는 DELETE API를 호출해
+     *   DB 메타 + 물리 파일을 함께 제거한다 (업로드가 즉시 반영되는 구조이므로
+     *   "저장" 버튼과 무관하게 바로 삭제됨).
+     */
+    async function removeUploadedImage(idx) {
+      const img = uploadedImages[idx];
+      if (!img) return;
+
+      if (img.imageId) {
+        try {
+          await apiFetch(`/reports/${currentReportId}/images/${img.imageId}`, { method: 'DELETE' });
+        } catch (err) {
+          showToast('이미지 삭제 실패: ' + err.message);
+          return;
+        }
+      }
+      if (img.dataUrl && img.dataUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(img.dataUrl);
+      }
       uploadedImages.splice(idx, 1);
       renderUploadedImages();
-      setSaveState('저장 필요', 'dirty');
+      showToast('이미지가 삭제되었습니다.');
     }
 
-    function clearUploadedImages() {
+    /**
+     * 전체 이미지 비우기 — 서버에 저장된 이미지는 모두 DELETE API로 제거
+     */
+    async function clearUploadedImages() {
+      if (!uploadedImages.length) return;
+      const toDelete = uploadedImages.filter(img => img.imageId);
+      for (const img of toDelete) {
+        try {
+          await apiFetch(`/reports/${currentReportId}/images/${img.imageId}`, { method: 'DELETE' });
+        } catch (err) {
+          console.warn('이미지 삭제 실패:', img.name, err);
+        }
+      }
+      uploadedImages.forEach(img => {
+        if (img.dataUrl && img.dataUrl.startsWith('blob:')) URL.revokeObjectURL(img.dataUrl);
+      });
       uploadedImages = [];
       renderUploadedImages();
       const input = document.getElementById('imageUploadInput');
       if (input) input.value = '';
-      setSaveState('저장 필요', 'dirty');
+      showToast('이미지를 모두 삭제했습니다.');
     }
 
-    function handleImageFiles(fileList) {
+    /**
+     * 이미지 파일 선택/드롭 시 즉시 서버로 업로드
+     * - 서버가 최종 개수 제한(최대 8장)을 강제하므로, 프론트는 UX용 사전 안내만 수행
+     */
+    async function handleImageFiles(fileList) {
+      if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
       const files = Array.from(fileList || []).filter(f => f.type && f.type.startsWith('image/'));
       if (!files.length) return;
+
       const available = Math.max(0, MAX_UPLOAD_IMAGES - uploadedImages.length);
-      const toLoad = files.slice(0, available);
-      if (!toLoad.length) { showToast(`이미지는 최대 ${MAX_UPLOAD_IMAGES}장까지 등록할 수 있습니다.`); return; }
-      let loaded = 0;
-      toLoad.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          uploadedImages.push({ name: file.name, sizeText: humanFileSize(file.size), type: file.type, dataUrl: reader.result });
-          loaded++;
-          if (loaded === toLoad.length) { renderUploadedImages(); setSaveState('저장 필요', 'dirty'); }
-        };
-        reader.readAsDataURL(file);
-      });
-      if (files.length > toLoad.length) showToast(`최대 ${MAX_UPLOAD_IMAGES}장까지만 표시됩니다.`);
+      const toUpload = files.slice(0, available);
+      if (!toUpload.length) { showToast(`이미지는 최대 ${MAX_UPLOAD_IMAGES}장까지 등록할 수 있습니다.`); return; }
+      if (files.length > toUpload.length) showToast(`최대 ${MAX_UPLOAD_IMAGES}장까지만 업로드됩니다.`);
+
+      for (const file of toUpload) {
+        // 업로드 진행 중 placeholder 카드 표시
+        const placeholder = { name: file.name, sizeText: humanFileSize(file.size), dataUrl: '', uploading: true };
+        uploadedImages.push(placeholder);
+        renderUploadedImages();
+
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const saved = await apiUpload(`/reports/${currentReportId}/images/upload`, formData);
+
+          placeholder.imageId = saved.imageId;
+          placeholder.name = saved.originalName;
+          placeholder.storedPath = saved.storedPath;
+          placeholder.sizeText = humanFileSize(saved.fileSize);
+          placeholder.uploading = false;
+          placeholder.loading = true;
+          renderUploadedImages();
+
+          try {
+            placeholder.dataUrl = await fetchImageBlobUrl(saved.storedPath);
+          } catch (err) {
+            console.warn('업로드된 이미지 미리보기 로드 실패:', err);
+          } finally {
+            placeholder.loading = false;
+            renderUploadedImages();
+          }
+        } catch (err) {
+          // 업로드 실패 → placeholder 제거
+          const idx = uploadedImages.indexOf(placeholder);
+          if (idx > -1) uploadedImages.splice(idx, 1);
+          renderUploadedImages();
+          showToast(`이미지 업로드 실패 (${file.name}): ${err.message}`);
+        }
+      }
     }
 
     // ── 저장 ──

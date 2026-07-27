@@ -195,7 +195,7 @@
     <div class="topbar">
       <div>
         <div class="topbar-title">세부공장일보 컬럼관리</div>
-        <div class="topbar-subtitle">사용자별 컬럼 단위 입력 권한을 설정합니다 (관리자 전용)</div>
+        <div class="topbar-subtitle">사용자별 컬럼 단위 입력 권한을 설정합니다 (관리자 및 등록된 담당자)</div>
       </div>
       <div class="topbar-actions">
         <div class="user-chip" id="userChip">인증 확인중...</div>
@@ -658,7 +658,8 @@
           return;
         }
 
-        document.getElementById('userChip').textContent = `${currentUser.loginId} (관리자)`;
+        const roleLabel = currentUser.permissions.isAdmin ? '관리자' : '컬럼관리 담당자';
+        document.getElementById('userChip').textContent = `${currentUser.loginId} (${roleLabel})`;
 
         // 사용자 목록 로드 (모달 드롭다운용)
         await loadUserList();

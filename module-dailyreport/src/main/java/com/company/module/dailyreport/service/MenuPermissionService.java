@@ -63,10 +63,25 @@ public class MenuPermissionService {
     }
 
     /**
-     * 사용자가 접근권한 관리 페이지에서 관리 작업(CRUD) 가능한지 확인
-     *   → admin만 가능
+     * 사용자가 '세부공장일보 컬럼관리' 페이지에서 관리 작업(등록/수정/삭제/재동기화) 가능한지 확인
+     *   → admin이면 무조건 허용
+     *   → 일반 사용자: 활성 cell_auth가 있으면(=컬럼관리 대시보드에 등록된 사용자) 허용
+     *
+     * ★ 2026-07 변경: 기존에는 admin만 CRUD 가능했으나, "컬럼관리 대시보드에 등록된
+     *   일반 사용자도 관리자와 동일하게 전체 기능(등록/수정/삭제/재동기화)을 제어할 수
+     *   있어야 한다"는 요구사항에 따라 canAccessAuthPage와 동일한 기준으로 통일한다.
+     *   (페이지 접근 가능 = 모든 CRUD 가능)
      */
     public boolean canAdminAuthPage(Long userId) {
+        return canAccessAuthPage(userId);
+    }
+
+    /**
+     * ★ 프론트엔드 UI 라벨 분기용 — 실제 core_user.ROLE = 'ROLE_ADMIN' 여부를 그대로 노출.
+     * (canAdminAuthPage는 "컬럼관리 CRUD 가능 여부"이고, isRealAdmin은 "진짜 관리자 계정인지"
+     *  구분이 필요한 경우에만 사용 — 예: 화면에 "관리자" 대신 "담당자"로 표시)
+     */
+    public boolean isRealAdmin(Long userId) {
         return isAdmin(userId);
     }
 

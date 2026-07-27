@@ -19,8 +19,11 @@ import java.util.List;
 /**
  * 셀 접근 권한 관리 REST Controller (★ Phase 4 신규)
  * - '세부공장일보 컬럼관리' 페이지의 백엔드 API
- * - 관리자가 사용자별 담당 셀 좌표 / 입력 주기를 설정·수정·삭제
- * - 접근 권한: core_menu_permission에서 DAILY_REPORT_AUTH (MENU_ID=102) 확인
+ * - 사용자별 담당 셀 좌표 / 입력 주기를 설정·수정·삭제
+ *
+ * ★ 2026-07 변경: admin뿐 아니라 "컬럼관리 대시보드에 등록된(=활성 cell_auth 보유)
+ *   일반 사용자"도 admin과 동일하게 등록/수정/삭제/재동기화 전체 기능을 사용할 수
+ *   있다 (MenuPermissionService.canAdminAuthPage == canAccessAuthPage로 통일).
  *
  * 엔드포인트:
  *   GET    /dailyreport-api/cell-auths                  → 전체 조회
@@ -31,7 +34,7 @@ import java.util.List;
  *   PUT    /dailyreport-api/cell-auths/{authId}         → 수정
  *   PATCH  /dailyreport-api/cell-auths/{authId}/deactivate → 비활성화
  *   DELETE /dailyreport-api/cell-auths/{authId}         → 삭제
- *   POST   /dailyreport-api/cell-auths/resync-all        → ★ 전체 담당자 캐시 재동기화 (관리자)
+ *   POST   /dailyreport-api/cell-auths/resync-all        → ★ 전체 담당자 캐시 재동기화
  */
 @RestController
 @RequestMapping("/dailyreport-api/cell-auths")
@@ -159,7 +162,7 @@ public class CellAuthController {
     private void verifyAuthPageAdmin(Long userId) {
         if (!menuPermissionService.canAdminAuthPage(userId)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
-                    "셀 권한 관리에 대한 관리자 권한이 없습니다.");
+                    "세부공장일보 컬럼관리 페이지에 대한 권한이 없습니다.");
         }
     }
 }
