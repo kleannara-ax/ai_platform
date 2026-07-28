@@ -61,8 +61,8 @@ public final class DefaultCellTemplate {
         switch (code) {
             case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table, reportDate, lookup);
             case "TBL_INVENTORY"        -> addInventoryCells(table, reportDate, lookup);
-            case "TBL_ENERGY"           -> addEnergyCells(table);
-            case "TBL_BOILER"           -> addBoilerCells(table);
+            case "TBL_ENERGY"           -> addEnergyCells(table, reportDate);
+            case "TBL_BOILER"           -> addBoilerCells(table, reportDate, lookup);
             default -> { /* unknown table code — skip */ }
         }
     }
@@ -369,6 +369,19 @@ public final class DefaultCellTemplate {
         d(t,  9,14, "P14", "daily", "매일");
     }
 
+    /**
+     * ★ 보일러(표4) 전용 2개월 anchor 폴백맵 — 표1/표2의 7개월짜리
+     * {@link #anchorFallbackMap(String...)}와 달리, 보일러는 M(전전월)/N(전월)
+     * 2개 컬럼만 과거값을 가지므로 ANCHOR_MONTH 기준 -2개월/-1개월에
+     * 하드코딩 값 2개만 매핑한다.
+     */
+    private static Map<YearMonth, String> boilerAnchorFallback(String m2Value, String m1Value) {
+        Map<YearMonth, String> map = new LinkedHashMap<>();
+        map.put(ANCHOR_MONTH.minusMonths(2), m2Value);
+        map.put(ANCHOR_MONTH.minusMonths(1), m1Value);
+        return map;
+    }
+
     /** 엑셀열 접두배열 + 행번호 → {"H7","I7",...,"N7"} 형태의 엑셀좌표 배열 생성 */
     private static String[] coordsForRow(String[] colLetters, int excelRow) {
         String[] result = new String[colLetters.length];
@@ -502,12 +515,16 @@ public final class DefaultCellTemplate {
     // ═══════════════════════════════════════════════
     //  3. 에너지 원단위  (8행 × 6열)
     // ═══════════════════════════════════════════════
-    private static void addEnergyCells(DailyReportTable t) {
+    private static void addEnergyCells(DailyReportTable t, LocalDate reportDate) {
+        // ── 헤더 월 롤링: reportDate 기준 "전월 실적" / "당월 현재" ──
+        YearMonth current = YearMonth.from(reportDate);
+        YearMonth prevMonth = current.minusMonths(1);
+
         // ── Row 0: 대 헤더 ──
         h(t, 0, 0, "B34", "구분",       2, 2);
         h(t, 0, 2, "D34", "목표",       2, 1);
-        h(t, 0, 3, "E34", "6월 실적",   2, 1);
-        h(t, 0, 4, "F34", "7월 현재",   1, 2);
+        h(t, 0, 3, "E34", prevMonth.getMonthValue() + "월 실적",   2, 1);
+        h(t, 0, 4, "F34", current.getMonthValue() + "월 현재",     1, 2);
 
         // ── Row 1: 소 헤더 ──
         h(t, 1, 4, "F35", "계 획", 1, 1);
@@ -561,14 +578,22 @@ public final class DefaultCellTemplate {
     // ═══════════════════════════════════════════════
     //  4. 보일러 운영 현황  (7행 × 8열)
     // ═══════════════════════════════════════════════
-    private static void addBoilerCells(DailyReportTable t) {
+    private static void addBoilerCells(DailyReportTable t, LocalDate reportDate,
+                                        HistoricalValueLookup lookup) {
+        // ── 헤더 월 롤링: reportDate 기준 "당월 단가" / "전전월 실적" / "전월 실적" / "당월" ──
+        final String tableCode = t.getTableCode();
+        final int liveCol = 6; // P열 — 실측(라이브 입력) 컬럼은 항상 col6
+        YearMonth current = YearMonth.from(reportDate);
+        YearMonth mMinus2 = current.minusMonths(2);
+        YearMonth mMinus1 = current.minusMonths(1);
+
         // ── Row 0: 대 헤더 ──
         h(t, 0, 0, "J34", "구분",              2, 1);
         h(t, 0, 1, "K34", "목표",              2, 1);
-        h(t, 0, 2, "L34", "7월단가\n(천원/톤)", 2, 1);
-        h(t, 0, 3, "M34", "5월 실적",          2, 1);
-        h(t, 0, 4, "N34", "6월 실적",          2, 1);
-        h(t, 0, 5, "O34", "7월",               1, 2);
+        h(t, 0, 2, "L34", current.getMonthValue() + "월단가\n(천원/톤)", 2, 1);
+        h(t, 0, 3, "M34", mMinus2.getMonthValue() + "월 실적",          2, 1);
+        h(t, 0, 4, "N34", mMinus1.getMonthValue() + "월 실적",          2, 1);
+        h(t, 0, 5, "O34", current.getMonthValue() + "월",               1, 2);
         h(t, 0, 7, "Q34", "비 고",             2, 1);
 
         // ── Row 1: 소 헤더 ──
@@ -576,48 +601,53 @@ public final class DefaultCellTemplate {
         h(t, 1, 6, "P35", "실 적", 1, 1);
 
         // ── Row 2: LNG보일러 ──
+        Map<YearMonth, String> fbLng = boilerAnchorFallback("2.4", "0.4");
         ro(t, 2, 0, "J36", "LNG보일러", 1, 1);
         d(t,  2, 1, "K36", "yearly",  "매년");
         d(t,  2, 2, "L36", "yearly",  "매년");
-        ro(t, 2, 3, "M36", "2.4");
-        ro(t, 2, 4, "N36", "0.4");
+        ro(t, 2, 3, "M36", rollingValue(lookup, tableCode, 2, liveCol, mMinus2, fbLng));
+        ro(t, 2, 4, "N36", rollingValue(lookup, tableCode, 2, liveCol, mMinus1, fbLng));
         d(t,  2, 5, "O36", "monthly", "매월");
         d(t,  2, 6, "P36", "daily",   "매일");
         d(t,  2, 7, "Q36", "daily", "매일", 5, 1);
 
         // ── Row 3: 유동상소각로 ──
+        Map<YearMonth, String> fbFluid = boilerAnchorFallback("15.3", "14.7");
         ro(t, 3, 0, "J37", "유동상소각로", 1, 1);
         d(t,  3, 1, "K37", "yearly",  "매년");
         d(t,  3, 2, "L37", "yearly",  "매년");
-        ro(t, 3, 3, "M37", "15.3");
-        ro(t, 3, 4, "N37", "14.7");
+        ro(t, 3, 3, "M37", rollingValue(lookup, tableCode, 3, liveCol, mMinus2, fbFluid));
+        ro(t, 3, 4, "N37", rollingValue(lookup, tableCode, 3, liveCol, mMinus1, fbFluid));
         d(t,  3, 5, "O37", "monthly", "매월");
         d(t,  3, 6, "P37", "daily",   "매일");
 
         // ── Row 4: 복합보일러 ──
+        Map<YearMonth, String> fbComplex = boilerAnchorFallback("56.8", "52.5");
         ro(t, 4, 0, "J38", "복합보일러", 1, 1);
         d(t,  4, 1, "K38", "yearly",  "매년");
         d(t,  4, 2, "L38", "yearly",  "매년");
-        ro(t, 4, 3, "M38", "56.8");
-        ro(t, 4, 4, "N38", "52.5");
+        ro(t, 4, 3, "M38", rollingValue(lookup, tableCode, 4, liveCol, mMinus2, fbComplex));
+        ro(t, 4, 4, "N38", rollingValue(lookup, tableCode, 4, liveCol, mMinus1, fbComplex));
         d(t,  4, 5, "O38", "monthly", "매월");
         d(t,  4, 6, "P38", "daily",   "매일");
 
         // ── Row 5: 폐합성소각로 ──
+        Map<YearMonth, String> fbWaste = boilerAnchorFallback("10.2", "11.6");
         ro(t, 5, 0, "J39", "폐합성소각로", 1, 1);
         d(t,  5, 1, "K39", "yearly",  "매년");
         d(t,  5, 2, "L39", "yearly",  "매년");
-        ro(t, 5, 3, "M39", "10.2");
-        ro(t, 5, 4, "N39", "11.6");
+        ro(t, 5, 3, "M39", rollingValue(lookup, tableCode, 5, liveCol, mMinus2, fbWaste));
+        ro(t, 5, 4, "N39", rollingValue(lookup, tableCode, 5, liveCol, mMinus1, fbWaste));
         d(t,  5, 5, "O39", "monthly", "매월");
         d(t,  5, 6, "P39", "daily",   "매일");
 
         // ── Row 6: 합계 ──
+        Map<YearMonth, String> fbTotal = boilerAnchorFallback("84.7", "79.2");
         ro(t, 6, 0, "J40", "합  계", 1, 1);
         d(t,  6, 1, "K40", "yearly",  "매년");
         d(t,  6, 2, "L40", "yearly",  "매년");
-        ro(t, 6, 3, "M40", "84.7");
-        ro(t, 6, 4, "N40", "79.2");
+        ro(t, 6, 3, "M40", rollingValue(lookup, tableCode, 6, liveCol, mMinus2, fbTotal));
+        ro(t, 6, 4, "N40", rollingValue(lookup, tableCode, 6, liveCol, mMinus1, fbTotal));
         d(t,  6, 5, "O40", "monthly", "매월");
         d(t,  6, 6, "P40", "daily",   "매일");
     }
