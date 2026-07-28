@@ -161,19 +161,69 @@ public final class DefaultCellTemplate {
      * @param tableCode 대상 표코드
      * @param liveCol 이 행의 라이브(실측 입력) DATA 컬럼 colIndex
      * @param lookup 실측값 조회 콜백 (null 가능)
-     * @param anchorValuesOldestToNewest anchor(기준월) 기준 과거 7개월 하드코딩
-     *        샘플값 (oldest→newest 순) — 실측 없을 때 폴백으로 사용
+     * @param fallbackMap anchor(기준월) 기준 연월→하드코딩 샘플값 맵 —
+     *        {@link #anchorFallbackMap(String...)}로 미리 만들어 전달한다.
+     *        (표1의 경우 '24/'25년 월평균 계산에도 동일한 맵을 재사용한다)
      */
     private static void addHistoricalRollingRow(DailyReportTable t, int row, int startCol,
                                                   String[] coords, List<YearMonth> rolling,
                                                   String tableCode, int liveCol,
                                                   HistoricalValueLookup lookup,
-                                                  String... anchorValuesOldestToNewest) {
-        Map<YearMonth, String> fallbackMap = anchorFallbackMap(anchorValuesOldestToNewest);
+                                                  Map<YearMonth, String> fallbackMap) {
         for (int i = 0; i < coords.length; i++) {
             String value = rollingValue(lookup, tableCode, row, liveCol, rolling.get(i), fallbackMap);
             ro(t, row, startCol + i, coords[i], value);
         }
+    }
+
+    /**
+     * ★ 연도별 월평균 산정 — 표1 F/G열('24년/'25년 월평균) 전용.
+     *
+     * - targetYear가 ANCHOR_MONTH의 연도(2026)보다 이전이면, 그 해는 월별 데이터
+     *   (실측도 하드코딩도) 자체가 없으므로 기존처럼 완성된 평균 리터럴값을
+     *   그대로 사용한다 (변경 없음 — 예: '25년 587, '24년 583.5는 항상 고정).
+     * - targetYear가 2026 이상이면, 해당 연도 1~12월 각 달의 값을 아래 순서로
+     *   구해 합산한 뒤 ÷12 (소수점 1자리 반올림)한다. 하드코딩이든 실측이든
+     *   구분 없이 "그 달에 저장된 값"을 그대로 더하는 방식이다:
+     *     1) anchor 하드코딩 폴백맵에 있는 달(2025-12~2026-06) → 그 값 사용
+     *     2) 그 외(2026-07 이후, 또는 2027년 이후 전체) → DB 실측 조회,
+     *        값이 없으면 0으로 간주 (요청: "데이터 공백 시 0")
+     */
+    private static String yearlyAverage(HistoricalValueLookup lookup, String tableCode,
+                                         int rowIndex, int liveColIndex, int targetYear,
+                                         Map<YearMonth, String> fallbackMap, String literalAverage) {
+        if (targetYear < ANCHOR_MONTH.getYear()) {
+            return literalAverage;
+        }
+        double sum = 0;
+        for (int month = 1; month <= 12; month++) {
+            YearMonth ym = YearMonth.of(targetYear, month);
+            String raw = fallbackMap.get(ym);
+            if (raw == null && lookup != null) {
+                raw = lookup.find(tableCode, rowIndex, liveColIndex, ym);
+            }
+            sum += parseNumberOrZero(raw);
+        }
+        return formatOneDecimal(sum / 12.0);
+    }
+
+    /** 숫자로 해석 불가능하거나(빈 값, "-", null 등) 데이터가 없는 경우 0으로 간주 */
+    private static double parseNumberOrZero(String raw) {
+        if (raw == null) return 0;
+        String cleaned = raw.replace(",", "").trim();
+        if (cleaned.isEmpty() || "-".equals(cleaned)) return 0;
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** 소수점 1자리까지 반올림 후, 정수형이면 ".0" 접미사를 제거해 기존 하드코딩 값들과 표기 스타일을 맞춘다 */
+    private static String formatOneDecimal(double v) {
+        java.math.BigDecimal bd = java.math.BigDecimal.valueOf(v).setScale(1, java.math.RoundingMode.HALF_UP);
+        String s = bd.toPlainString();
+        return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
     }
 
     // ═══════════════════════════════════════════════
@@ -236,85 +286,85 @@ public final class DefaultCellTemplate {
         String[] histCols = {"H", "I", "J", "K", "L", "M", "N"};
 
         // ── Row 2: 제지3 평균선속 ──
+        Map<YearMonth, String> fb7 = anchorFallbackMap("588", "597", "584", "577", "597", "597", "594");
         ro(t, 2, 0, "B7",  "제지3 평균선속(m/분)", 1, 3);
         ro(t, 2, 3, "E7",  "640");
-        ro(t, 2, 4, "F7",  "583.5");
-        ro(t, 2, 5, "G7",  "587");
-        addHistoricalRollingRow(t, 2, 6, coordsForRow(histCols, 7), rolling, tableCode, liveCol, lookup,
-                "588", "597", "584", "577", "597", "597", "594");
+        ro(t, 2, 4, "F7",  yearlyAverage(lookup, tableCode, 2, liveCol, prevYear2, fb7, "583.5"));
+        ro(t, 2, 5, "G7",  yearlyAverage(lookup, tableCode, 2, liveCol, prevYear1, fb7, "587"));
+        addHistoricalRollingRow(t, 2, 6, coordsForRow(histCols, 7), rolling, tableCode, liveCol, lookup, fb7);
         d(t,  2,13, "O7",  null, null);
         d(t,  2,14, "P7",  "daily", "매일");
 
         // ── Row 3: 초지5 생산량 ──
+        Map<YearMonth, String> fb8 = anchorFallbackMap("83.5", "80.4", "85.6", "79.9", "83.6", "83", "79.5");
         ro(t, 3, 0, "B8",  "초지5 생산량(톤/日)", 1, 3);
         ro(t, 3, 3, "E8",  "85");
-        ro(t, 3, 4, "F8",  "83.8");
-        ro(t, 3, 5, "G8",  "76");
-        addHistoricalRollingRow(t, 3, 6, coordsForRow(histCols, 8), rolling, tableCode, liveCol, lookup,
-                "83.5", "80.4", "85.6", "79.9", "83.6", "83", "79.5");
+        ro(t, 3, 4, "F8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear2, fb8, "83.8"));
+        ro(t, 3, 5, "G8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear1, fb8, "76"));
+        addHistoricalRollingRow(t, 3, 6, coordsForRow(histCols, 8), rolling, tableCode, liveCol, lookup, fb8);
         d(t,  3,13, "O8",  null, null);
         d(t,  3,14, "P8",  "daily", "매일");
 
         // ── Row 4: 수율 - PS 완제품 ──
+        Map<YearMonth, String> fb9 = anchorFallbackMap("98.6", "98.7", "97.2", "101.5", "101.8", "99.8", "98.7");
         ro(t, 4, 0, "B9",  "수율(%)", 3, 1);
         ro(t, 4, 1, "C9",  "PS",      2, 1);
         ro(t, 4, 2, "D9",  "완제품",  1, 1);
         ro(t, 4, 3, "E9",  "91");
-        ro(t, 4, 4, "F9",  "97.7");
-        ro(t, 4, 5, "G9",  "99.2");
-        addHistoricalRollingRow(t, 4, 6, coordsForRow(histCols, 9), rolling, tableCode, liveCol, lookup,
-                "98.6", "98.7", "97.2", "101.5", "101.8", "99.8", "98.7");
+        ro(t, 4, 4, "F9",  yearlyAverage(lookup, tableCode, 4, liveCol, prevYear2, fb9, "97.7"));
+        ro(t, 4, 5, "G9",  yearlyAverage(lookup, tableCode, 4, liveCol, prevYear1, fb9, "99.2"));
+        addHistoricalRollingRow(t, 4, 6, coordsForRow(histCols, 9), rolling, tableCode, liveCol, lookup, fb9);
         d(t,  4,13, "O9",  "event", "발생 시");
         d(t,  4,14, "P9",  "daily", "매일");
 
         // ── Row 5: 수율 - PS 코팅제외 ──
+        Map<YearMonth, String> fb10 = anchorFallbackMap("84.1", "84.6", "83.5", "87.6", "88.2", "86.3", "84.7");
         ro(t, 5, 2, "D10", "코팅제외", 1, 1);
         ro(t, 5, 3, "E10", "78");
-        ro(t, 5, 4, "F10", "83.8");
-        ro(t, 5, 5, "G10", "85.2");
-        addHistoricalRollingRow(t, 5, 6, coordsForRow(histCols, 10), rolling, tableCode, liveCol, lookup,
-                "84.1", "84.6", "83.5", "87.6", "88.2", "86.3", "84.7");
+        ro(t, 5, 4, "F10", yearlyAverage(lookup, tableCode, 5, liveCol, prevYear2, fb10, "83.8"));
+        ro(t, 5, 5, "G10", yearlyAverage(lookup, tableCode, 5, liveCol, prevYear1, fb10, "85.2"));
+        addHistoricalRollingRow(t, 5, 6, coordsForRow(histCols, 10), rolling, tableCode, liveCol, lookup, fb10);
         d(t,  5,13, "O10", "event", "발생 시");
         d(t,  5,14, "P10", "daily", "매일");
 
         // ── Row 6: 수율 - 화장지 ──
+        Map<YearMonth, String> fb11 = anchorFallbackMap("61.1", "63.3", "63.6", "63.6", "69.6", "74.6", "74.4");
         ro(t, 6, 1, "C11", "화장지", 1, 2);
         ro(t, 6, 3, "E11", "63.5");
-        ro(t, 6, 4, "F11", "63.5");
-        ro(t, 6, 5, "G11", "64.6");
-        addHistoricalRollingRow(t, 6, 6, coordsForRow(histCols, 11), rolling, tableCode, liveCol, lookup,
-                "61.1", "63.3", "63.6", "63.6", "69.6", "74.6", "74.4");
+        ro(t, 6, 4, "F11", yearlyAverage(lookup, tableCode, 6, liveCol, prevYear2, fb11, "63.5"));
+        ro(t, 6, 5, "G11", yearlyAverage(lookup, tableCode, 6, liveCol, prevYear1, fb11, "64.6"));
+        addHistoricalRollingRow(t, 6, 6, coordsForRow(histCols, 11), rolling, tableCode, liveCol, lookup, fb11);
         d(t,  6,13, "O11", "event", "발생 시");
         d(t,  6,14, "P11", "daily", "매일");
 
         // ── Row 7: 고지감량율 ──
+        Map<YearMonth, String> fb12 = anchorFallbackMap("12.7", "11.2", "11.8", "13", "14.2", "15.9", "16");
         ro(t, 7, 0, "B12", "고지감량율(%)", 1, 3);
         ro(t, 7, 3, "E12", "-");
-        ro(t, 7, 4, "F12", "15.8");
-        ro(t, 7, 5, "G12", "14.8");
-        addHistoricalRollingRow(t, 7, 6, coordsForRow(histCols, 12), rolling, tableCode, liveCol, lookup,
-                "12.7", "11.2", "11.8", "13", "14.2", "15.9", "16");
+        ro(t, 7, 4, "F12", yearlyAverage(lookup, tableCode, 7, liveCol, prevYear2, fb12, "15.8"));
+        ro(t, 7, 5, "G12", yearlyAverage(lookup, tableCode, 7, liveCol, prevYear1, fb12, "14.8"));
+        addHistoricalRollingRow(t, 7, 6, coordsForRow(histCols, 12), rolling, tableCode, liveCol, lookup, fb12);
         d(t,  7,13, "O12", null, null);
         d(t,  7,14, "P12", "daily", "매일");
 
         // ── Row 8: 슬러지원단위 - 제지 ──
+        Map<YearMonth, String> fb13 = anchorFallbackMap("94", "99", "104", "96", "84", "82", "84");
         ro(t, 8, 0, "B13", "슬러지원단위", 2, 2);
         ro(t, 8, 2, "D13", "제   지", 1, 1);
         d(t,  8, 3, "E13", "yearly", "매년");
-        ro(t, 8, 4, "F13", "89");
-        ro(t, 8, 5, "G13", "91");
-        addHistoricalRollingRow(t, 8, 6, coordsForRow(histCols, 13), rolling, tableCode, liveCol, lookup,
-                "94", "99", "104", "96", "84", "82", "84");
+        ro(t, 8, 4, "F13", yearlyAverage(lookup, tableCode, 8, liveCol, prevYear2, fb13, "89"));
+        ro(t, 8, 5, "G13", yearlyAverage(lookup, tableCode, 8, liveCol, prevYear1, fb13, "91"));
+        addHistoricalRollingRow(t, 8, 6, coordsForRow(histCols, 13), rolling, tableCode, liveCol, lookup, fb13);
         d(t,  8,13, "O13", "event", "발생 시");
         d(t,  8,14, "P13", "daily", "매일");
 
         // ── Row 9: 슬러지원단위 - 화장지 ──
+        Map<YearMonth, String> fb14 = anchorFallbackMap("81", "58", "68", "50", "46", "53", "62");
         ro(t, 9, 2, "D14", "화장지", 1, 1);
         d(t,  9, 3, "E14", "yearly", "매년");
-        ro(t, 9, 4, "F14", "76");
-        ro(t, 9, 5, "G14", "64");
-        addHistoricalRollingRow(t, 9, 6, coordsForRow(histCols, 14), rolling, tableCode, liveCol, lookup,
-                "81", "58", "68", "50", "46", "53", "62");
+        ro(t, 9, 4, "F14", yearlyAverage(lookup, tableCode, 9, liveCol, prevYear2, fb14, "76"));
+        ro(t, 9, 5, "G14", yearlyAverage(lookup, tableCode, 9, liveCol, prevYear1, fb14, "64"));
+        addHistoricalRollingRow(t, 9, 6, coordsForRow(histCols, 14), rolling, tableCode, liveCol, lookup, fb14);
         d(t,  9,13, "O14", "event", "발생 시");
         d(t,  9,14, "P14", "daily", "매일");
     }
@@ -382,7 +432,7 @@ public final class DefaultCellTemplate {
         ro(t, 2, 2, "D21", "톤",           4, 1);
         d(t,  2, 3, "E21", "event", "발생 시");
         addHistoricalRollingRow(t, 2, 4, coordsForRow(histCols, 21), rolling, tableCode, liveCol, lookup,
-                "3826", "3043", "3296", "2196", "3037", "3711", "3006");
+                anchorFallbackMap("3826", "3043", "3296", "2196", "3037", "3711", "3006"));
         d(t,  2,11, "M21", null, null);
         d(t,  2,12, "N21", "daily", "매일");
 
@@ -390,7 +440,7 @@ public final class DefaultCellTemplate {
         ro(t, 3, 1, "C22", "카타대기", 1, 1);
         d(t,  3, 3, "E22", "event", "발생 시");
         addHistoricalRollingRow(t, 3, 4, coordsForRow(histCols, 22), rolling, tableCode, liveCol, lookup,
-                "320", "315", "549", "648", "1360", "1121", "1110");
+                anchorFallbackMap("320", "315", "549", "648", "1360", "1121", "1110"));
         d(t,  3,11, "M22", null, null);
         d(t,  3,12, "N22", "daily", "매일");
 
@@ -398,7 +448,7 @@ public final class DefaultCellTemplate {
         ro(t, 4, 1, "C23", "미포장", 1, 1);
         d(t,  4, 3, "E23", "event", "발생 시");
         addHistoricalRollingRow(t, 4, 4, coordsForRow(histCols, 23), rolling, tableCode, liveCol, lookup,
-                "212", "764", "702", "149", "86", "173", "266");
+                anchorFallbackMap("212", "764", "702", "149", "86", "173", "266"));
         d(t,  4,11, "M23", null, null);
         d(t,  4,12, "N23", "daily", "매일");
 
@@ -406,7 +456,7 @@ public final class DefaultCellTemplate {
         ro(t, 5, 1, "C24", "포장후 물류입고전", 1, 1);
         d(t,  5, 3, "E24", "event", "발생 시");
         addHistoricalRollingRow(t, 5, 4, coordsForRow(histCols, 24), rolling, tableCode, liveCol, lookup,
-                "83", "139", "151", "88", "58", "288", "423");
+                anchorFallbackMap("83", "139", "151", "88", "58", "288", "423"));
         d(t,  5,11, "M24", null, null);
         d(t,  5,12, "N24", "daily", "매일");
 
@@ -416,7 +466,7 @@ public final class DefaultCellTemplate {
         ro(t, 6, 2, "D25", "톤",            1, 1);
         ro(t, 6, 3, "E25", "0");
         addHistoricalRollingRow(t, 6, 4, coordsForRow(histCols, 25), rolling, tableCode, liveCol, lookup,
-                "4354", "4372", "4005", "4236", "3761", "3404", "3120");
+                anchorFallbackMap("4354", "4372", "4005", "4236", "3761", "3404", "3120"));
         d(t,  6,11, "M25", "monthly", "매월");
         d(t,  6,12, "N25", "daily", "매일");
 
@@ -425,7 +475,7 @@ public final class DefaultCellTemplate {
         ro(t, 7, 2, "D26", "톤",          1, 1);
         ro(t, 7, 3, "E26", "0");
         addHistoricalRollingRow(t, 7, 4, coordsForRow(histCols, 26), rolling, tableCode, liveCol, lookup,
-                "917", "980", "786", "915", "957", "1543", "1130");
+                anchorFallbackMap("917", "980", "786", "915", "957", "1543", "1130"));
         d(t,  7,11, "M26", "monthly", "매월");
         d(t,  7,12, "N26", "daily", "매일");
 
@@ -435,7 +485,7 @@ public final class DefaultCellTemplate {
         ro(t, 8, 2, "D27", "톤",       1, 1);
         ro(t, 8, 3, "E27", "0");
         addHistoricalRollingRow(t, 8, 4, coordsForRow(histCols, 27), rolling, tableCode, liveCol, lookup,
-                "489", "239", "0", "0", "0", "0", "0");
+                anchorFallbackMap("489", "239", "0", "0", "0", "0", "0"));
         d(t,  8,11, "M27", null, null);
         d(t,  8,12, "N27", "daily", "매일");
 
@@ -444,7 +494,7 @@ public final class DefaultCellTemplate {
         ro(t, 9, 2, "D28", "팔레트",   1, 1);
         ro(t, 9, 3, "E28", "0");
         addHistoricalRollingRow(t, 9, 4, coordsForRow(histCols, 28), rolling, tableCode, liveCol, lookup,
-                "0", "0", "0", "0", "0", "0", "0");
+                anchorFallbackMap("0", "0", "0", "0", "0", "0", "0"));
         d(t,  9,11, "M28", null, null);
         d(t,  9,12, "N28", "daily", "매일");
     }
