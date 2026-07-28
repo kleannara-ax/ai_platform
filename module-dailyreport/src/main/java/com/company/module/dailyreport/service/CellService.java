@@ -59,10 +59,12 @@ public class CellService {
         List<CellAuth> cellAuths = cellAuthRepository
                 .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, tableCode);
 
+        LocalDate reportDate = table.getDailyReport().getReportDate();
+
         // 각 셀에 편집 가능 여부 설정
         List<CellResponse> cellResponses = table.getCells().stream()
                 .map(cell -> {
-                    boolean editable = isCellEditableForUser(cell, loginId, cellAuths);
+                    boolean editable = isCellEditableForUser(cell, loginId, cellAuths, reportDate);
                     return CellResponse.fromWithEditability(cell, editable);
                 })
                 .toList();
@@ -119,7 +121,7 @@ public class CellService {
             }
 
             // 소유권 + CellAuth 권한 검증
-            if (!isCellEditableForUser(cell, loginId, cellAuths)) {
+            if (!isCellEditableForUser(cell, loginId, cellAuths, report.getReportDate())) {
                 throw new BusinessException(ErrorCode.ACCESS_DENIED,
                         String.format("해당 셀에 대한 편집 권한이 없습니다. row=%d, col=%d (%s)",
                                 item.getRowIndex(), item.getColIndex(),
@@ -169,12 +171,28 @@ public class CellService {
      * List로 받아 "이 좌표를 커버하는" 항목을 찾아 그 항목의 FREQ_CODE로 판단한다.
      * (좌표 그룹은 등록 시 서로 겹치지 않도록 CellAuthService에서 검증하므로,
      * 정상적으로는 최대 1건만 매칭된다.)
+     *
+     * ★★★★ 편집 가능 일보를 "오늘"로 한정 (2026-07): 이 셀이 속한 일보의
+     * REPORT_DATE가 실제 오늘(LocalDate.now())과 정확히 일치하지 않으면 —
+     * 과거든 미래든 상관없이 — freqCode(daily/event/monthly/yearly)와 무관하게
+     * 항상 편집 불가 처리한다. 오늘 날짜 일보에 한해서만 아래 주기별 규칙이
+     * 적용된다:
+     *   - daily/event: 오늘이면 무조건 활성화
+     *   - monthly: 오늘이 매월 1일인 경우에만 활성화
+     *   - yearly: 오늘이 매년 1월 1일인 경우에만 활성화
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
-                                           List<CellAuth> cellAuths) {
+                                           List<CellAuth> cellAuths,
+                                           LocalDate reportDate) {
         // 잠금 상태면 편집 불가
         if (Boolean.TRUE.equals(cell.getIsLocked())) {
+            return false;
+        }
+
+        // 오늘 날짜의 일보가 아니면(과거/미래 모두) 주기 불문 항상 편집 불가
+        LocalDate today = LocalDate.now();
+        if (reportDate == null || !reportDate.isEqual(today)) {
             return false;
         }
 
@@ -184,7 +202,7 @@ public class CellService {
             if (coord != null) {
                 for (CellAuth cellAuth : cellAuths) {
                     if (cellAuth.coversCoord(coord)) {
-                        return canEditByFrequency(cellAuth.getFreqCode());
+                        return canEditByFrequency(cellAuth.getFreqCode(), today);
                     }
                 }
             }
@@ -195,15 +213,16 @@ public class CellService {
     }
 
     /**
-     * 주기(freqCode)에 따라 오늘 입력 가능한지 판단
-     * - daily: 매일 입력 가능
-     * - event: 발생 시 입력 = 매일 입력 가능
-     * - monthly: 매월 1일만 입력 가능
-     * - yearly: 매년 1월 1일만 입력 가능
+     * 주기(freqCode)에 따라, 오늘(today) 기준으로 입력 가능한지 판단.
+     * (호출측에서 이미 "이 일보가 오늘 날짜인지"를 확인했으므로, 여기서는
+     * today == reportDate == 오늘이 보장된 상태로 호출된다)
+     * - daily: 무조건 활성화
+     * - event: 발생 시 입력 = 무조건 활성화
+     * - monthly: 오늘이 매월 1일인 경우만 활성화
+     * - yearly: 오늘이 매년 1월 1일인 경우만 활성화
      */
-    private boolean canEditByFrequency(String freqCode) {
-        if (freqCode == null) return false;
-        LocalDate today = LocalDate.now();
+    private boolean canEditByFrequency(String freqCode, LocalDate today) {
+        if (freqCode == null || today == null) return false;
         return switch (freqCode.toLowerCase()) {
             case "daily", "event" -> true;
             case "monthly" -> today.getDayOfMonth() == 1;
