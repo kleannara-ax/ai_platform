@@ -125,13 +125,12 @@ SET @tbl_4 := (SELECT TABLE_ID FROM daily_report_table WHERE REPORT_ID = @rpt_07
 -- ═══════════════════════════════════════════════
 INSERT INTO daily_report_cell (TABLE_ID, ROW_INDEX, COL_INDEX, EXCEL_COORD, CELL_VALUE, CELL_TYPE, CELL_LABEL, DATA_FORMAT, INPUT_CYCLE, FREQ_CODE, FREQ_LABEL, OWNER_IDS, OWNER_NAMES, IS_LOCKED, ROW_SPAN, COL_SPAN) VALUES
     (@tbl_1, 0, 0, 'B5', '생산지표', 'HEADER', '생산지표', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 2, 3),
-    (@tbl_1, 0, 3, 'E5', '최종', 'HEADER', '최종', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
+    (@tbl_1, 0, 3, 'E5', '최종\n목표', 'HEADER', '최종\n목표', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 2, 1),
     (@tbl_1, 0, 4, 'F5', '\'24년', 'HEADER', '\'24년', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 0, 5, 'G5', '\'25년', 'HEADER', '\'25년', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 0, 6, 'H5', '\'25년', 'HEADER', '\'25년', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 0, 7, 'I5', '\'26년', 'HEADER', '\'26년', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 7),
     (@tbl_1, 0, 14, 'P5', '비고 사항', 'HEADER', '비고 사항', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 2, 1),
-    (@tbl_1, 1, 3, 'E6', '목표', 'HEADER', '목표', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 1, 4, 'F6', '월평균', 'HEADER', '월평균', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 1, 5, 'G6', '월평균', 'HEADER', '월평균', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),
     (@tbl_1, 1, 6, 'H6', '12월', 'HEADER', '12월', NULL, 'NONE', NULL, NULL, NULL, NULL, 1, 1, 1),

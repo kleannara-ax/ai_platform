@@ -70,6 +70,13 @@
     /* ── 리포트 테이블 ── */
     .page-wrap { width:min(1400px, calc(100vw - 32px)); margin:14px auto 32px; }
     .sections-stack { display:flex; flex-direction:column; gap:16px; }
+    .dual-table-row { display:flex; gap:16px; align-items:flex-start; }
+    .dual-table-row > .report-section { min-width:0; }
+    /* 에너지 원단위(표3) 폭 = 위 "제지 재공품" 표의 "적정재고" 칼럼 우측 끝까지(약 37%),
+       보일러 운영 현황(표4)는 나머지 약 63%를 차지 */
+    .dual-table-row > .report-section.dual-narrow { flex:37 1 0; }
+    .dual-table-row > .report-section.dual-wide { flex:63 1 0; }
+    .dual-table-row .section-table-wrap { padding:8px 6px 10px; }
     .report-section { background:#fff; border:1px solid #d7dee8; border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
     .section-title { padding:12px 16px; border-bottom:1px solid #e5e7eb; background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%); font-size:18px; font-weight:800; color:#0f172a; white-space:normal; word-break:keep-all; }
     .section-table-wrap { padding:10px 12px 14px; overflow-x:auto; }
@@ -77,6 +84,7 @@
     .cell { line-height:1.3; word-break:keep-all; }
     .table-cell { min-height:28px; }
     .wrap-cell { white-space:normal !important; word-break:keep-all; overflow-wrap:break-word; }
+    .nowrap-cell { white-space:nowrap !important; }
     .no-border { background:transparent !important; }
     .cell.mine { background:var(--blue-soft) !important; box-shadow:inset 0 0 0 1px #60a5fa; }
     .cell.locked { background:#f3f4f6 !important; color:#64748b !important; }
@@ -84,6 +92,9 @@
     .cell-editor { width:100%; height:100%; display:flex; align-items:center; }
     .cell-input { width:100%; min-height:28px; line-height:1.3; border:0; outline:none; background:transparent; padding:0; margin:0; font:inherit; color:inherit; text-align:inherit; vertical-align:middle; box-sizing:border-box; }
     .cell-input:disabled { color:#94a3b8; cursor:not-allowed; }
+    /* 값이 입력된 셀은 글자를 굵게만 강조하고, 크기는 빈 셀(placeholder "값 입력")과
+       완전히 동일하게 유지한다 (입력/조회 상태에 관계없이 폰트 크기 통일 요청 반영). */
+    .cell-input:not(:placeholder-shown) { font-weight:800; }
     .cell-value { width:100%; min-height:28px; line-height:1.3; display:flex; align-items:center; box-sizing:border-box; }
 
     /* ── 특이사항 (다른 표와 동일한 카드 스타일, 표 안쪽만 테두리) ── */
@@ -151,6 +162,7 @@
       .section-title { font-size:16px; }
       .special-note-wrap, .special-note-input { min-height:180px; height:180px; }
       .upload-preview-grid { grid-template-columns:1fr 1fr; }
+      .dual-table-row { flex-direction:column; }
     }
   </style>
 </head>
@@ -285,9 +297,12 @@
     }
 
     /**
-     * 숫자 셀 서식 — 천 단위 콤마 + 소수점 1자리까지만 표시
+     * 숫자 셀 서식 — 천 단위 콤마 적용, 정수부 자릿수에 따라 소수점 표시 여부 결정
      * - 숫자로 해석 불가능한 값(텍스트, "-", 빈 문자열 등)은 원본 그대로 반환
      * - 이미 콤마가 포함된 값(재편집 시)도 다시 파싱 가능하도록 콤마 제거 후 판별
+     * - 정수부(부호 제외) 3자리 이하: 소수점 1자리까지 표시 (예: 640 -> 640.0, -999.9 -> -999.9)
+     * - 정수부 4자리 이상: 소수점 없이 정수로 반올림 표시 (예: 1234.5 -> 1,235, 3826.0 -> 3,826)
+     * - 값이 정확히 0인 경우는 예외적으로 소수점 없이 "0"만 표시
      */
     function formatNumber(v) {
       if (v === null || v === undefined) return v;
@@ -298,6 +313,16 @@
       if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return raw; // 숫자 형식이 아니면 그대로
       const num = Number(cleaned);
       if (isNaN(num)) return raw;
+
+      // 0은 예외적으로 그냥 "0"만 표시
+      if (num === 0) return '0';
+
+      // 정수부(부호 제외) 자릿수로 소수점 표시 여부 결정
+      const integerDigits = Math.trunc(Math.abs(num)).toString().length;
+      if (integerDigits >= 4) {
+        const roundedInt = Math.round(num);
+        return roundedInt.toLocaleString('ko-KR');
+      }
       const rounded = Math.round(num * 10) / 10; // 소수점 1자리까지 반올림
       return rounded.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     }
@@ -736,12 +761,29 @@
 
       const tables = reportData?.tables || {};
 
-      // 4개 표 섹션: 기존처럼 세로로 한 줄씩 각각 분리 배치
+      // 표 1, 2: 기존처럼 세로로 한 줄씩 각각 전체 폭 배치
+      // 표 3(에너지 원단위) + 표 4(보일러 운영 현황): 한 줄에 나란히 배치
+      const dualCodes = new Set(['TBL_ENERGY', 'TBL_BOILER']);
+      const dualSections = [];
+
       for (const cfg of tableConfig) {
         const tableData = tables[cfg.code];
         if (!tableData) continue;
-        const section = createTableSection(cfg, tableData);
+        const isDual = dualCodes.has(cfg.code);
+        const section = createTableSection(cfg, tableData, isDual);
+
+        if (isDual) {
+          dualSections.push(section);
+          continue;
+        }
         stack.appendChild(section);
+      }
+
+      if (dualSections.length > 0) {
+        const dualRow = document.createElement('div');
+        dualRow.className = 'dual-table-row';
+        dualSections.forEach((sec) => dualRow.appendChild(sec));
+        stack.appendChild(dualRow);
       }
 
       // 특이사항 섹션
@@ -755,9 +797,18 @@
     }
 
     // ── 표 섹션 생성 ──
-    function createTableSection(cfg, tableData) {
+    // isDual: 표3(에너지 원단위)/표4(보일러 운영 현황)처럼 한 줄에 2개를 나란히
+    //         배치하는 경우 true — 헤더 셀 폰트/패딩을 축소해 폭이 좁아져도
+    //         데이터 셀("값 입력" 안내문구 및 실제 입력값)이 잘리지 않도록 한다.
+    function createTableSection(cfg, tableData, isDual) {
       const section = document.createElement('section');
-      section.className = 'report-section';
+      if (isDual) {
+        // 표3(에너지 원단위)은 좁게(narrow), 표4(보일러 운영 현황)는 넓게(wide) — 1:2 비율
+        const sizeClass = cfg.code === 'TBL_ENERGY' ? 'dual-narrow' : 'dual-wide';
+        section.className = `report-section report-section-dual ${sizeClass}`;
+      } else {
+        section.className = 'report-section';
+      }
       section.dataset.section = cfg.id;
 
       const cells = tableData.cells || [];
@@ -812,7 +863,8 @@
           const cell = cellMap[`${r}_${c}`];
           if (!cell) {
             // 셀 데이터 없으면 빈 셀
-            html += `<td class="cell table-cell" style="border:1px solid #000000;padding:6px 8px">&nbsp;</td>`;
+            const emptyPad = isDual ? '4px 4px' : '6px 8px';
+            html += `<td class="cell table-cell" style="border:1px solid #000000;padding:${emptyPad}">&nbsp;</td>`;
             continue;
           }
 
@@ -828,7 +880,7 @@
             }
           }
 
-          html += renderCellTd(cell, rs, cs, minRow, maxRow);
+          html += renderCellTd(cell, rs, cs, minRow, maxRow, isDual);
         }
         html += `</tr>`;
       }
@@ -852,7 +904,7 @@
       }
     }
 
-    function renderCellTd(cell, rowSpan, colSpan, minRow, maxRow) {
+    function renderCellTd(cell, rowSpan, colSpan, minRow, maxRow, isDual) {
       // 서버 응답: isEditable (Java CellResponse), Mock 서버: editable (레거시)
       const serverEditable = cell.isEditable !== undefined ? cell.isEditable
                            : cell.editable !== undefined   ? cell.editable
@@ -872,21 +924,51 @@
       let bg = '#ffffff';
       let color = '#000000';
       let fontWeight = '700';
-      let fontSize = '11.0pt';
+      // isDual(표3/표4 나란히 배치)인 경우의 크기 조정:
+      //  - 표3(에너지 원단위): 폰트 크기는 원본(11.0pt)으로 유지하고, 폭만 좁게(패딩만 축소)
+      //  - 표4(보일러 운영 현황): 헤더가 줄바꿈되지 않도록 폭을 넉넉히 배분(컬럼폭 조정)
+      // 두 표의 실제 높이는 렌더링 후 equalizeDualTableHeights()가 동적으로 맞춘다
+      // (매월 헤더 텍스트가 바뀌어도 항상 두 표 높이가 같도록 보장하기 위함)
+      const isDataLike = cell.cellType === 'DATA' || isAssignable;
+      const isEnergyTable = cell.tableCode === 'TBL_ENERGY';
+      const isBoilerTable = cell.tableCode === 'TBL_BOILER';
+
+      // 표 1~4 전체에 동일한 폰트 크기를 적용(가독성 향상 + 통일감).
+      // 표4(보일러)는 컬럼 폭이 좁아 기존에는 폰트를 줄였으나,
+      // 요청에 따라 크기를 통일하고 대신 컬럼폭/패딩으로 줄바꿈·잘림을 방지한다.
+      let fontSize = '12.0pt';
+      let cellPadding = '6px 8px';
+      if (isDual) {
+        if (isEnergyTable) {
+          // 폭만 좁은 레이아웃에 맞춰 패딩만 축소, 폰트 크기는 동일하게 유지
+          cellPadding = isDataLike ? '5px 4px' : '4px 4px';
+        } else if (isBoilerTable) {
+          cellPadding = isDataLike ? '9px 4px' : '4px 3px';
+        } else {
+          cellPadding = isDataLike ? '5px 4px' : '3px 3px';
+        }
+      }
       let textAlign = 'center';
 
       // HEADER vs DATA 셀 구분
-      if (cell.cellType === 'DATA' || isAssignable) {
+      if (isDataLike) {
         fontWeight = '500';
         if (!isAssignable) {
           textAlign = 'right';
         }
       }
 
+      // 보일러 운영 현황(표4)의 "전전월 실적"/"전월 실적" 헤더(M34/N34, colIndex 3/4)는
+      // 줄바꿈되면 안 됨 — 컬럼폭을 넉넉히 배분(getColWidths)한 것과 함께
+      // 헤더 셀 자체도 강제 nowrap 처리한다. (단, "7월단가\n(천원/톤)" 헤더는
+      // 의도적인 2줄 줄바꿈이므로 대상에서 제외)
+      const forceNoWrap = isDual && isBoilerTable && !isDataLike
+        && cell.rowIndex === 0 && (cell.colIndex === 3 || cell.colIndex === 4);
+
       // 값 결정 (숫자 셀은 천 단위 콤마 + 소수점 1자리 서식 적용)
       let displayValue = cell.cellValue || '';
       const formattedDisplayValue = formatNumber(displayValue);
-      let cellClasses = 'cell table-cell wrap-cell';
+      let cellClasses = 'cell table-cell ' + (forceNoWrap ? 'nowrap-cell' : 'wrap-cell');
 
       // assignable 클래스 추가
       if (isAssignable) {
@@ -934,7 +1016,8 @@
       }
 
       // 스타일 문자열
-      const style = `background:${bg};color:${color};font-weight:${fontWeight};font-size:${fontSize};text-align:${textAlign};vertical-align:center;white-space:normal;border:1px solid #000000;padding:6px 8px;position:relative;${extraBorder}`;
+      const whiteSpaceRule = forceNoWrap ? 'nowrap' : 'normal';
+      const style = `background:${bg};color:${color};font-weight:${fontWeight};font-size:${fontSize};text-align:${textAlign};vertical-align:center;white-space:${whiteSpaceRule};border:1px solid #000000;padding:${cellPadding};position:relative;${extraBorder}`;
 
       // 셀 내용
       let innerHtml;
@@ -1365,9 +1448,12 @@
         case 'TBL_INVENTORY':
           return [13.01, 11.15, 5.45, 6.82, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.70, 22.30];
         case 'TBL_ENERGY':
-          return [24, 20, 14, 14, 14, 14];
+          // "구분"(col0+1 병합) 폭을 줄이고 "6월 실적" 등 나머지 헤더가
+          // 좁은 폭에서도 한 줄로 들어가도록 재배분
+          return [18, 16, 16.5, 16.5, 16.5, 16.5];
         case 'TBL_BOILER':
-          return [15, 7, 8, 7, 7, 8, 9, 39];
+          // "구분" 컬럼만 넓게, 나머지 7개 컬럼(목표/7월단가/전전월실적/전월실적/계획/실적/비고)은 모두 동일한 폭
+          return [16, 12, 12, 12, 12, 12, 12, 12];
         default: {
           const w = 100 / colCount;
           return Array(colCount).fill(w);
@@ -1476,6 +1562,12 @@
       inner.style.gap = '16px';
       offscreen.appendChild(inner);
 
+      // 표3(에너지 원단위)+표4(보일러 운영 현황)는 화면에서와 동일하게
+      // 나란히 배치된 .dual-table-row 구조 그대로 캡처되어야 함
+      // (그렇지 않으면 각 표가 세로로 풀폭으로 쌓여 실제 화면 구조와 달라짐)
+      const dualSectionIds = new Set(['table3', 'table4']);
+      let dualRowClone = null;
+
       sourceSections.forEach((sec) => {
         const clone = sec.cloneNode(true);
         // input/textarea는 cloneNode 시 현재 값(.value)이 속성에 반영 안될 수 있어 동기화
@@ -1500,16 +1592,29 @@
           const editor = td.querySelector('.cell-editor');
           const input = editor ? editor.querySelector('.cell-input') : null;
           if (editor && input) {
-            const formatted = formatNumber(input.value || '');
-            const displayText = formatted && String(formatted).trim() !== ''
-              ? escapeHtml(formatted).replace(/\n/g, '<br>')
-              : '&nbsp;';
+            const rawValue = input.value || '';
+            const formatted = formatNumber(rawValue);
+            const hasValue = formatted && String(formatted).trim() !== '';
+            const displayText = hasValue ? escapeHtml(formatted).replace(/\n/g, '<br>') : '&nbsp;';
             const textAlign = (td.style.textAlign || 'center').trim();
             const justify = textAlign === 'right' ? 'flex-end' : textAlign === 'left' ? 'flex-start' : 'center';
-            editor.outerHTML = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign}">${displayText}</div>`;
+            // 화면에서 값이 입력된 셀은 .cell-input:not(:placeholder-shown) 규칙으로
+            // 굵게만 강조되고 크기는 동일하므로, 캡처본에서도 동일하게 굵기만 적용
+            const valueStyle = hasValue ? 'font-weight:800;' : '';
+            editor.outerHTML = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};${valueStyle}">${displayText}</div>`;
           }
         });
-        inner.appendChild(clone);
+
+        if (dualSectionIds.has(sec.dataset.section)) {
+          if (!dualRowClone) {
+            dualRowClone = document.createElement('div');
+            dualRowClone.className = 'dual-table-row';
+            inner.appendChild(dualRowClone);
+          }
+          dualRowClone.appendChild(clone);
+        } else {
+          inner.appendChild(clone);
+        }
       });
 
       document.body.appendChild(offscreen);

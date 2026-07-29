@@ -256,7 +256,7 @@ public final class DefaultCellTemplate {
 
         // ── Row 0: 대 헤더 (고정부) ──
         h(t, 0, 0, "B5",  "생산지표",       2, 3);
-        h(t, 0, 3, "E5",  "최종",           1, 1);
+        h(t, 0, 3, "E5",  "최종\n목표",     2, 1);
         h(t, 0, 4, "F5",  "'" + String.valueOf(prevYear2).substring(2) + "년", 1, 1);
         h(t, 0, 5, "G5",  "'" + String.valueOf(prevYear1).substring(2) + "년", 1, 1);
 
@@ -271,7 +271,7 @@ public final class DefaultCellTemplate {
         h(t, 0, 14, "P5", "비고 사항", 2, 1);
 
         // ── Row 1: 소 헤더 (고정부) ──
-        h(t, 1, 3, "E6",  "목표",    1, 1);
+        // "최종목표"(E5)는 위에서 rowSpan=2로 세로 병합했으므로 E6는 별도 헤더 생성 안 함
         h(t, 1, 4, "F6",  "월평균",  1, 1);
         h(t, 1, 5, "G6",  "월평균",  1, 1);
 
