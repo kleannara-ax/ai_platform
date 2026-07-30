@@ -210,6 +210,16 @@
   // ══════════════════════════════════════════════
   function extractToken() {
     var params = new URLSearchParams(window.location.search);
+
+    // USERID 파라미터 추출 (MES 등 외부 시스템 연동 시 JWT 없이 인증)
+    if (params.has('USERID')) urlUserId = params.get('USERID').trim();
+
+    // USERID가 있으면 JWT 토큰을 사용하지 않음 (만료 토큰으로 인한 401 방지)
+    if (urlUserId) {
+      token = '';
+      return;
+    }
+
     if (params.has('_t')) token = params.get('_t');
     if (!token) {
       try {
@@ -217,8 +227,6 @@
         if (raw) { var u = JSON.parse(raw); if (u && u.token) token = u.token; }
       } catch (e) { }
     }
-    // USERID 파라미터 추출 (MES 등 외부 시스템 연동 시 JWT 없이 인증)
-    if (params.has('USERID')) urlUserId = params.get('USERID').trim();
   }
 
   // ══════════════════════════════════════════════
