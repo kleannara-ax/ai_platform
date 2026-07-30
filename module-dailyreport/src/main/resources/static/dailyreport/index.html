@@ -261,6 +261,7 @@
     let currentUser = null;        // { userId, loginId, permissions }
     let currentReportId = null;
     let currentReportDate = null;
+    let currentRemarkId = null;    // 특이사항 기존 레코드 ID (있으면 PUT 수정, 없으면 POST 신규)
     let reportData = null;         // /view/render 응답 전체
     let uploadedImages = [];
     let dirtyCoords = new Set();   // 변경된 셀 좌표
@@ -1116,7 +1117,16 @@
 
       const remarks = reportData?.remarks || [];
       const noteContent = remarks.length > 0 ? remarks[0].content || '' : '';
+      // ★★ 기존 레코드 ID를 기억해 둔다 — 저장 시 이 값이 있으면 PUT(수정),
+      //    없으면 POST(신규)로 분기한다. (이전 버그: 항상 POST만 호출해
+      //    매번 새 행이 계속 생성되고, 화면에는 항상 remarks[0](최초 작성분)만
+      //    표시되어 수정 내용이 반영되지 않는 것처럼 보였음)
+      currentRemarkId = remarks.length > 0 ? remarks[0].remarkId : null;
+
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
+      // ★★ 셀/이미지와 동일하게 오늘/어제 일보에서만 특이사항 등록/수정 가능
+      const isEditableDate = isImageEditableDate(currentReportDate);
+      const canEditNote = canWrite && isEditableDate;
 
       section.innerHTML = `
         <div class="section-title">특이사항</div>
@@ -1136,7 +1146,8 @@
                 <td class="special-note-wrap">
                   <textarea id="specialNoteInput" class="special-note-input"
                     placeholder="특이사항 입력"
-                    ${canWrite ? '' : 'disabled'}>${escapeHtml(noteContent)}</textarea>
+                    ${canEditNote ? '' : 'disabled'}>${escapeHtml(noteContent)}</textarea>
+                  ${canEditNote ? '' : '<div class="upload-help">특이사항은 오늘·어제 일보에서만 등록/수정할 수 있습니다.</div>'}
                 </td>
               </tr>
             </tbody>
@@ -1446,19 +1457,37 @@
         }
 
         // 3. 특이사항 저장
+        // ★★ 오늘/어제 일보에서만 활성화되므로(disabled 여부로 판단), 그 외 날짜에서는
+        //    애초에 textarea가 비활성화되어 값 변경이 불가능 — 저장 시도 자체를 건너뛴다.
+        // ★★ 기존 레코드(currentRemarkId)가 있으면 PUT으로 "수정", 없으면 POST로 "신규 생성"
+        //    (이전 버그: 항상 POST만 호출해 매번 새 행이 쌓이고 화면엔 최초 작성분만 표시됨)
+        let noteSaveFailed = false;
         const noteInput = document.getElementById('specialNoteInput');
-        if (noteInput) {
+        if (noteInput && !noteInput.disabled) {
           try {
-            await apiFetch(`/reports/${currentReportId}/remarks`, {
-              method: 'POST',
-              body: JSON.stringify({
-                tableCode: 'SPECIAL',
-                category: '특이사항',
-                content: noteInput.value
-              })
-            });
+            if (currentRemarkId) {
+              await apiFetch(`/reports/${currentReportId}/remarks/${currentRemarkId}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  tableCode: 'SPECIAL',
+                  category: '특이사항',
+                  content: noteInput.value
+                })
+              });
+            } else {
+              const created = await apiFetch(`/reports/${currentReportId}/remarks`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  tableCode: 'SPECIAL',
+                  category: '특이사항',
+                  content: noteInput.value
+                })
+              });
+              currentRemarkId = created?.remarkId ?? currentRemarkId;
+            }
           } catch (err) {
             console.warn('특이사항 저장 실패:', err);
+            noteSaveFailed = true;
           }
         }
 
@@ -1467,11 +1496,12 @@
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
-        if (failedGroups.length > 0) {
-          // 일부 또는 전체 표 저장 실패 → 성공으로 오인하지 않도록 명확히 실패로 표시
+        if (failedGroups.length > 0 || noteSaveFailed) {
+          // 일부 또는 전체 저장 실패 → 성공으로 오인하지 않도록 명확히 실패로 표시
           setSaveState(`저장 실패 있음 ${timeStr}`, 'dirty');
           const detail = failedGroups.map(f => `${f.tableCode}(${f.count}개): ${f.message}`).join(' / ');
-          showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 실패 - ${detail}`);
+          const noteDetail = noteSaveFailed ? (detail ? ' / 특이사항 저장 실패' : '특이사항 저장 실패') : '';
+          showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 셀 실패${detail ? ' - ' + detail : ''}${noteDetail}`);
         } else {
           setSaveState(`저장됨 ${timeStr}`, 'saved');
           showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 반영`);
