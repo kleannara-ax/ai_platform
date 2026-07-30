@@ -129,6 +129,8 @@
     .upload-card-name { font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upload-card-meta { margin-top:4px; font-size:11px; color:#64748b; }
     .upload-card-remove { margin-top:8px; width:100%; min-height:32px; border:1px solid #fecaca; border-radius:8px; background:#fff1f2; color:#be123c; font-size:12px; font-weight:800; cursor:pointer; }
+    .upload-card-download { margin-top:8px; width:100%; min-height:32px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:800; cursor:pointer; }
+    .upload-card-download:disabled { opacity:.6; cursor:not-allowed; }
 
     /* ── 로딩/에러 ── */
     .loading-overlay { position:fixed; inset:0; z-index:100; background:rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; }
@@ -273,6 +275,22 @@
     function getTodayStr() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function getYesterdayStr() {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    /**
+     * ★★ 이미지 첨부 업로드/삭제 가능 여부: 오늘 또는 어제 날짜의 일보에서만 true.
+     * (백엔드 DailyReportService.validateImageEditableDate와 동일한 기준 —
+     *  프론트는 UX용 버튼 표시/숨김 판단, 실제 강제는 서버가 담당)
+     */
+    function isImageEditableDate(reportDate) {
+      if (!reportDate) return false;
+      return reportDate === getTodayStr() || reportDate === getYesterdayStr();
     }
 
     function getTodayParts() {
@@ -1144,8 +1162,11 @@
       section.dataset.section = 'upload';
 
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
-      const disabledClass = canWrite ? '' : 'disabled';
-      const disabledAttr = canWrite ? '' : 'disabled';
+      // ★★ 오늘/어제 일보에서만 업로드·삭제 가능 (그 외 과거/미래는 조회+다운로드 전용)
+      const isEditableDate = isImageEditableDate(currentReportDate);
+      const canUpload = canWrite && isEditableDate;
+      const disabledClass = canUpload ? '' : 'disabled';
+      const disabledAttr = canUpload ? '' : 'disabled';
 
       // 기존 이미지 로드 (dataUrl은 인증된 blob fetch로 나중에 채워짐)
       const images = reportData?.images || [];
@@ -1158,19 +1179,32 @@
         loading: true
       }));
 
+      const uploadToolbarHtml = canUpload
+        ? `
+          <label class="upload-btn" for="imageUploadInput">이미지 선택</label>
+          <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple />
+          <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()">이미지 비우기</button>
+          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (오늘/어제 일보에서만 등록·삭제 가능)</div>
+        `
+        : `
+          <label class="upload-btn disabled" for="imageUploadInput">이미지 선택</label>
+          <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple disabled />
+          <button class="toolbar-btn" type="button" id="clearImagesBtn" disabled>이미지 비우기</button>
+          <div class="upload-help">이미지는 오늘·어제 일보에서만 등록/삭제할 수 있습니다. 이 날짜의 이미지는 조회 및 다운로드만 가능합니다.</div>
+        `;
+
       section.innerHTML = `
         <div class="section-title">이미지 첨부</div>
         <div class="upload-wrap">
           <div class="upload-toolbar">
-            <label class="upload-btn ${disabledClass}" for="imageUploadInput">이미지 선택</label>
-            <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple ${disabledAttr} />
-            <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()" ${disabledAttr}>이미지 비우기</button>
-            <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다.</div>
+            ${uploadToolbarHtml}
           </div>
+          ${canUpload ? `
           <div class="upload-dropzone" id="uploadDropzone">
             <div class="upload-dropzone-title">이미지 파일 업로드 영역</div>
             <div class="upload-dropzone-desc">PNG, JPG, GIF, WEBP 등 이미지 파일을 선택하거나 끌어다 놓을 수 있습니다.</div>
           </div>
+          ` : ''}
           <div class="upload-preview-grid" id="uploadPreviewGrid"></div>
         </div>
       `;
@@ -1230,6 +1264,13 @@
         grid.innerHTML = '<div class="upload-empty">업로드된 이미지가 없습니다.</div>';
         return;
       }
+
+      // ★★ 다운로드는 날짜와 무관하게 항상 가능.
+      //    삭제는 오늘/어제 일보(=수정 가능 기간)일 때만 추가로 노출.
+      const isEditableDate = isImageEditableDate(currentReportDate);
+      const canWrite = currentUser?.permissions?.canWriteInput !== false;
+      const canDelete = canWrite && isEditableDate;
+
       grid.innerHTML = uploadedImages.map((img, i) => `
         <div class="upload-card">
           ${img.loading
@@ -1238,10 +1279,28 @@
           <div class="upload-card-body">
             <div class="upload-card-name" title="${escapeHtml(img.name || '')}">${escapeHtml(img.name || `image-${i+1}`)}</div>
             <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}${img.uploading ? ' · 업로드 중...' : ''}</div>
-            <button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})" ${img.uploading ? 'disabled' : ''}>삭제</button>
+            <button class="upload-card-download" type="button" onclick="downloadUploadedImage(${i})" ${(img.loading || !img.dataUrl) ? 'disabled' : ''}>다운로드</button>
+            ${canDelete
+              ? `<button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})" ${img.uploading ? 'disabled' : ''}>삭제</button>`
+              : ''}
           </div>
         </div>
       `).join('');
+    }
+
+    /**
+     * 조회 전용 기간(오늘/어제가 아닌 일보)의 이미지 다운로드
+     * - 이미 blob으로 로드된 dataUrl(Object URL)을 이용해 <a download>로 저장
+     */
+    function downloadUploadedImage(idx) {
+      const img = uploadedImages[idx];
+      if (!img || !img.dataUrl) { showToast('이미지를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+      const a = document.createElement('a');
+      a.href = img.dataUrl;
+      a.download = img.name || `image-${idx + 1}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
 
     /**
