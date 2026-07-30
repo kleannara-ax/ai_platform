@@ -172,14 +172,18 @@ public class CellService {
      * (좌표 그룹은 등록 시 서로 겹치지 않도록 CellAuthService에서 검증하므로,
      * 정상적으로는 최대 1건만 매칭된다.)
      *
-     * ★★★★ 편집 가능 일보를 "오늘"로 한정 (2026-07): 이 셀이 속한 일보의
-     * REPORT_DATE가 실제 오늘(LocalDate.now())과 정확히 일치하지 않으면 —
-     * 과거든 미래든 상관없이 — freqCode(daily/event/monthly/yearly)와 무관하게
-     * 항상 편집 불가 처리한다. 오늘 날짜 일보에 한해서만 아래 주기별 규칙이
-     * 적용된다:
-     *   - daily/event: 오늘이면 무조건 활성화
-     *   - monthly: 오늘이 매월 1일인 경우에만 활성화
-     *   - yearly: 오늘이 매년 1월 1일인 경우에만 활성화
+     * ★★★★★ 편집 가능 일보를 "오늘 또는 어제"로 한정 (2026-07 → 2026-07 확장):
+     * 이 셀이 속한 일보의 REPORT_DATE가 실제 오늘(LocalDate.now()) 또는
+     * 어제(today.minusDays(1))가 아니면 — 그 외 과거든 미래든 상관없이 —
+     * freqCode(daily/event/monthly/yearly)와 무관하게 항상 편집 불가(조회 전용)
+     * 처리한다. 오늘/어제 일보에 한해서만 아래 주기별 규칙이 적용된다:
+     *   - daily/event: 무조건 활성화
+     *   - monthly: 해당 일보의 REPORT_DATE가 매월 1일인 경우에만 활성화
+     *   - yearly: 해당 일보의 REPORT_DATE가 매년 1월 1일인 경우에만 활성화
+     * ※ 주기 판정은 "실제 오늘"이 아니라 "편집하려는 리포트의 REPORT_DATE"
+     *   기준으로 한다. 예) 오늘이 4/2이고 어제(4/1)치 리포트를 늦게 입력하는
+     *   경우, 어제(4/1)가 매월 1일이므로 월간 셀도 정상적으로 편집 가능해야
+     *   한다.
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
@@ -190,9 +194,10 @@ public class CellService {
             return false;
         }
 
-        // 오늘 날짜의 일보가 아니면(과거/미래 모두) 주기 불문 항상 편집 불가
+        // 오늘/어제 날짜의 일보가 아니면(그 외 과거·미래 모두) 주기 불문 항상 편집 불가(조회만 가능)
         LocalDate today = LocalDate.now();
-        if (reportDate == null || !reportDate.isEqual(today)) {
+        LocalDate yesterday = today.minusDays(1);
+        if (reportDate == null || (!reportDate.isEqual(today) && !reportDate.isEqual(yesterday))) {
             return false;
         }
 
@@ -202,7 +207,7 @@ public class CellService {
             if (coord != null) {
                 for (CellAuth cellAuth : cellAuths) {
                     if (cellAuth.coversCoord(coord)) {
-                        return canEditByFrequency(cellAuth.getFreqCode(), today);
+                        return canEditByFrequency(cellAuth.getFreqCode(), reportDate);
                     }
                 }
             }
@@ -213,20 +218,24 @@ public class CellService {
     }
 
     /**
-     * 주기(freqCode)에 따라, 오늘(today) 기준으로 입력 가능한지 판단.
-     * (호출측에서 이미 "이 일보가 오늘 날짜인지"를 확인했으므로, 여기서는
-     * today == reportDate == 오늘이 보장된 상태로 호출된다)
+     * 주기(freqCode)에 따라, 편집 대상 리포트 날짜(targetDate) 기준으로
+     * 입력 가능한지 판단.
+     * (호출측에서 이미 "이 일보가 오늘 또는 어제 날짜인지"를 확인했으므로,
+     * 여기서는 targetDate가 오늘 또는 어제인 상태로 호출된다. 주기 판정
+     * 기준일은 실제 "오늘"이 아니라 targetDate(=편집하려는 리포트의
+     * REPORT_DATE) 그 자체이다 — 어제치를 늦게 입력하는 경우에도 어제
+     * 날짜가 매월/매년 1일인지로 판단해야 하기 때문이다.)
      * - daily: 무조건 활성화
      * - event: 발생 시 입력 = 무조건 활성화
-     * - monthly: 오늘이 매월 1일인 경우만 활성화
-     * - yearly: 오늘이 매년 1월 1일인 경우만 활성화
+     * - monthly: targetDate가 매월 1일인 경우만 활성화
+     * - yearly: targetDate가 매년 1월 1일인 경우만 활성화
      */
-    private boolean canEditByFrequency(String freqCode, LocalDate today) {
-        if (freqCode == null || today == null) return false;
+    private boolean canEditByFrequency(String freqCode, LocalDate targetDate) {
+        if (freqCode == null || targetDate == null) return false;
         return switch (freqCode.toLowerCase()) {
             case "daily", "event" -> true;
-            case "monthly" -> today.getDayOfMonth() == 1;
-            case "yearly" -> today.getMonthValue() == 1 && today.getDayOfMonth() == 1;
+            case "monthly" -> targetDate.getDayOfMonth() == 1;
+            case "yearly" -> targetDate.getMonthValue() == 1 && targetDate.getDayOfMonth() == 1;
             default -> false;
         };
     }

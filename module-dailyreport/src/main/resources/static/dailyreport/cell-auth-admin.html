@@ -524,11 +524,11 @@
         'P38': { section:'복합보일러', colType:'실적' },
         'P39': { section:'폐합성소각로', colType:'실적' },
         'P40': { section:'합계', colType:'실적' },
-        'Q36': { section:'LNG보일러', colType:'비고' },
-        'Q37': { section:'유동상소각로', colType:'비고' },
-        'Q38': { section:'복합보일러', colType:'비고' },
-        'Q39': { section:'폐합성소각로', colType:'비고' },
-        'Q40': { section:'합계', colType:'비고' },
+        // ★ Q36은 LNG보일러~합계 5개 행을 세로 병합(rowSpan=5)한 "공용 비고 1칸"이며,
+        //   실제 DB에도 이 좌표 하나만 셀로 존재한다(Q37~Q40은 병합에 흡수되어
+        //   실존하지 않는 좌표이므로 담당자 배정 대상에서 제외한다).
+        //   다른 표(TBL_PRODUCTION_INDEX)와 동일하게 "비고"를 별도 섹션으로 분리해 표시.
+        'Q36': { section:'비고', row:'보일러 전체 공용(5행 병합)' },
       }
     };
 
