@@ -59,23 +59,23 @@
     .confirm-modal-btn.confirm:hover { background:#1d4ed8; }
 
     /* ── 알림/범례 ── */
-    .notice { width:min(1400px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
+    .notice { width:min(1551px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
     .notice small { display:block; margin-top:4px; color:#4f6fb8; font-weight:600; line-height:1.55; }
-    .legend { width:min(1400px, calc(100vw - 32px)); margin:12px auto 0; display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#475569; }
+    .legend { width:min(1551px, calc(100vw - 32px)); margin:12px auto 0; display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#475569; }
     .legend-item { display:flex; align-items:center; gap:8px; }
     .swatch { width:18px; height:18px; border-radius:6px; border:1px solid #cbd5e1; }
     .swatch.mine { background:var(--blue-soft); border-color:#60a5fa; }
     .swatch.locked { background:#f3f4f6; border-color:#d1d5db; }
 
     /* ── 리포트 테이블 ── */
-    .page-wrap { width:min(1400px, calc(100vw - 32px)); margin:14px auto 32px; }
+    .page-wrap { width:min(1551px, calc(100vw - 32px)); margin:14px auto 32px; }
     .sections-stack { display:flex; flex-direction:column; gap:16px; }
     .dual-table-row { display:flex; gap:16px; align-items:flex-start; }
     .dual-table-row > .report-section { min-width:0; }
-    /* 에너지 원단위(표3) 폭 = 위 "제지 재공품" 표의 "적정재고" 칼럼 우측 끝까지(약 37%),
-       보일러 운영 현황(표4)는 나머지 약 63%를 차지 */
-    .dual-table-row > .report-section.dual-narrow { flex:37 1 0; }
-    .dual-table-row > .report-section.dual-wide { flex:63 1 0; }
+    /* 에너지 원단위(표3) 폭 = 위 "제지 재공품" 표의 "적정재고" 칼럼 중간 지점까지(27.55%),
+       보일러 운영 현황(표4)는 그만큼 좌측으로 넓어진 나머지 72.45%를 차지 */
+    .dual-table-row > .report-section.dual-narrow { flex:27.55 1 0; }
+    .dual-table-row > .report-section.dual-wide { flex:72.45 1 0; }
     .dual-table-row .section-table-wrap { padding:8px 6px 10px; }
     .report-section { background:#fff; border:1px solid #d7dee8; border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
     .section-title { padding:12px 16px; border-bottom:1px solid #e5e7eb; background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%); font-size:18px; font-weight:800; color:#0f172a; white-space:normal; word-break:keep-all; }
@@ -103,7 +103,7 @@
     .special-head-left, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
     .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; }
     .special-note-wrap { padding:0; background:#fff; height:220px; border:1px solid #000; }
-    .special-note-input { width:100%; height:100%; min-height:220px; resize:vertical; border:0; outline:none; padding:12px 14px; font:inherit; line-height:1.55; color:#111827; background:#fff; box-shadow:none; }
+    .special-note-input { width:100%; height:100%; min-height:220px; resize:vertical; border:0; outline:none; padding:12px 14px; font:inherit; line-height:1.55; color:#111827; background:#fff; box-shadow:none; text-align:left; }
     .special-note-input:focus { box-shadow:none; background:#fff; }
     .special-note-input[disabled] { background:#fff; color:#111827; cursor:not-allowed; opacity:1; }
 
@@ -865,9 +865,12 @@
             <colgroup>`;
 
       // colgroup: 원본 HTML의 비율을 최대한 유지
+      // (getColWidths()는 숫자(%) 또는 'NNpx' 형태의 문자열을 섞어서 반환할 수 있음 —
+      //  특정 컬럼만 화면 크기와 무관하게 고정폭을 유지해야 할 때 px 단위 사용)
       const colWidths = getColWidths(cfg.code, colCount);
       for (const w of colWidths) {
-        html += `<col style="width:${w}%">`;
+        const widthCss = typeof w === 'string' ? w : `${w}%`;
+        html += `<col style="width:${widthCss}">`;
       }
 
       html += `</colgroup><tbody>`;
@@ -977,12 +980,30 @@
         }
       }
 
-      // 보일러 운영 현황(표4)의 "전전월 실적"/"전월 실적" 헤더(M34/N34, colIndex 3/4)는
-      // 줄바꿈되면 안 됨 — 컬럼폭을 넉넉히 배분(getColWidths)한 것과 함께
-      // 헤더 셀 자체도 강제 nowrap 처리한다. (단, "7월단가\n(천원/톤)" 헤더는
-      // 의도적인 2줄 줄바꿈이므로 대상에서 제외)
-      const forceNoWrap = isDual && isBoilerTable && !isDataLike
-        && cell.rowIndex === 0 && (cell.colIndex === 3 || cell.colIndex === 4);
+      // 표1(주요 생산 지표 현황)/표2(제지 재공품 및 야적현황)/표4(보일러 운영 현황)의
+      // "비고"(또는 "비고 사항") 열은 데이터 셀만 좌측 정렬로 변경한다.
+      // 헤더 셀("비고"/"비고 사항" 텍스트)은 기존과 동일하게 중앙 정렬 유지.
+      // (표1 colIndex14="비고 사항", 표2 colIndex12="비고", 표4 colIndex7="비고")
+      const remarkColIndex = { TBL_PRODUCTION_INDEX: 14, TBL_INVENTORY: 12, TBL_BOILER: 7 }[cell.tableCode];
+      if (remarkColIndex !== undefined && cell.colIndex === remarkColIndex && isDataLike) {
+        textAlign = 'left';
+      }
+
+      // 보일러 운영 현황(표4)의 "비고"(colIndex 7) 칸을 최대한 넓히기 위해
+      // 나머지 칼럼(구분/목표/8월단가/계획/실적 = colIndex 0,1,2,5,6)은 컬럼폭이
+      // 줄어도 항상 절대 줄바꿈되지 않도록 강제 nowrap 처리한다.
+      // (단, "8월단가\n(천원/톤)" 헤더(colIndex 2)는 의도적인 2줄 줄바꿈이므로
+      //  헤더 셀은 예외로 두고, 실제 값이 들어가는 DATA 셀만 강제 nowrap 처리)
+      // colIndex 3/4("N월 실적")은 사용자 요청에 따라 줄바꿈을 허용하므로
+      // 강제 nowrap 대상에서 제외(과거에는 반대로 강제 nowrap 처리했었음).
+      // 에너지 원단위(표3) col1의 소분류 라벨("제 지"/"화장지"/"화)초지5")도
+      // 화면 폭이 좁아져 컬럼폭(%)이 줄어들 때 줄바꿈되지 않도록 강제 nowrap +
+      // 컬럼폭에 맞춰 셀 자체가 늘어나도록 처리(작은 화면에서도 항상 한 줄 유지)
+      const forceNoWrap = (isDual && isBoilerTable && (
+          cell.colIndex === 0 || cell.colIndex === 1 || cell.colIndex === 5 || cell.colIndex === 6
+          || (cell.colIndex === 2 && isDataLike)
+        ))
+        || (isDual && isEnergyTable && !isDataLike && cell.colIndex === 1);
 
       // 값 결정 (숫자 셀은 천 단위 콤마 + 소수점 1자리 서식 적용)
       let displayValue = cell.cellValue || '';
@@ -1054,7 +1075,13 @@
         // 편집 가능 셀(day=오늘)과 읽기 전용 셀(과거/미래 날짜) 간 행 높이가 달라지지 않도록 함
         const justify = textAlign === 'right' ? 'flex-end' : textAlign === 'left' ? 'flex-start' : 'center';
         const valueText = formattedDisplayValue ? escapeHtml(formattedDisplayValue).replace(/\n/g, '<br>') : '&nbsp;';
-        innerHtml = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign}">${valueText}</div>`;
+        // 표4(보일러) "N월단가\n(천원/톤)" 헤더(colIndex 2)는 요청에 따라 나머지
+        // 컬럼과 동일한 46px로 좁혔기 때문에, 좁은 화면에서 "(천원/톤)" 한 줄이
+        // 넘칠 수 있어 이 헤더 셀만 word-break:break-all을 추가해 필요시
+        // 음절 단위로 줄바꿈되도록(절대 가로 넘침이 발생하지 않도록) 처리한다.
+        const isBoilerCol2Header = isBoilerTable && !isDataLike && cell.colIndex === 2;
+        const wordBreakStyle = isBoilerCol2Header ? 'word-break:break-all;' : '';
+        innerHtml = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};${wordBreakStyle}">${valueText}</div>`;
       }
 
       // title 속성
@@ -1533,16 +1560,49 @@
     function getColWidths(tableCode, colCount) {
       switch (tableCode) {
         case 'TBL_PRODUCTION_INDEX':
-          return [14.95, 4.89, 5.18, 5.29, 5.29, 5.29, 4.95, 4.95, 4.95, 4.95, 4.95, 4.95, 5.29, 6.90, 17.25];
+          // "생산지표" 라벨 그룹(원래 col0+1+2 = 14.95+4.89+5.18 = 25.02%)을
+          // 그 안의 실제 텍스트(수율(%)/PS/완제품/코팅제외/화장지/제 지 등)가
+          // 잘리지 않는 최소 폭까지만 압축(5.11+2.91+5.77 = 13.78%)하고,
+          // 그만큼 확보된 폭(11.24%)을 "비고 사항"(17.25% → 28.49%) 열에 배분
+          return [5.11, 2.91, 5.77, 5.29, 5.29, 5.29, 4.95, 4.95, 4.95, 4.95, 4.95, 4.95, 5.29, 6.90, 28.49];
         case 'TBL_INVENTORY':
-          return [13.01, 11.15, 5.45, 6.82, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.70, 22.30];
+          // "구분" 라벨 그룹(원래 col0+1 = 13.01+11.15 = 24.16%)을
+          // 표1의 "최종목표" 열 우측 경계(=표1 비고 좌측 경계 71.55%)에 맞춰
+          // 텍스트가 잘리지 않는 선까지 압축(7.27+10.75 = 18.02%)하고,
+          // 그만큼 확보된 폭(6.14%)을 "비고"(22.30% → 28.45%) 열에 배분해
+          // 표1의 "비고 사항" 열 좌측 경계와 정확히 일치시킴
+          return [7.27, 10.75, 5.45, 6.82, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.08, 5.70, 28.45];
         case 'TBL_ENERGY':
           // "구분"(col0+1 병합) 폭을 줄이고 "6월 실적" 등 나머지 헤더가
-          // 좁은 폭에서도 한 줄로 들어가도록 재배분
-          return [18, 16, 16.5, 16.5, 16.5, 16.5];
+          // 좁은 폭에서도 한 줄로 들어가도록 재배분.
+          // col1("화)초지5" 등 소분류 라벨)은 %) 기반 폭으로는 화면이 좁아지면
+          // (예: 1440px 이하 노트북 해상도) 절대 픽셀폭도 함께 줄어 다시
+          // 줄바꿈되므로, 텍스트 최소 요구폭(약 70px)보다 여유있는 76px로
+          // 고정(px)하여 화면 크기와 무관하게 항상 한 줄 유지되도록 함.
+          // 나머지 5개 컬럼은 그대로 %로 균등 배분(표 전체 폭에 맞춰 자동 조정).
+          return ['16.5%', '76px', '16.5%', '16.5%', '16.5%', '16.5%'];
         case 'TBL_BOILER':
-          // "구분" 컬럼만 넓게, 나머지 7개 컬럼(목표/7월단가/전전월실적/전월실적/계획/실적/비고)은 모두 동일한 폭
-          return [16, 12, 12, 12, 12, 12, 12, 12];
+          // "비고"(7번)를 최대한 크게 하기 위해 나머지 7개 컬럼을 모두
+          // Playwright로 실측한 "절대 최소 안전폭(px)"까지 최대한 좁힌다.
+          // %) 기반 폭은 화면이 좁아지면(예: 1440px 이하) 절대 픽셀폭도 함께
+          // 줄어 줄바꿈/잘림이 재발하므로, 반드시 줄바꿈이 없어야 하는
+          // "구분/목표/8월단가/계획/실적"(0,1,2,5,6)은 화면 크기와 무관하게
+          // 항상 안전하도록 고정폭(px)으로 지정한다.
+          // - col0(구분): 최장 라벨 "유동상소각로"/"폐합성소각로"(96px)+패딩
+          // - col1(목표)/col2(N월단가)/col5(계획)/col6(실적): 다른 숫자/헤더 열과
+          //   동일한 46px로 통일(요청에 따라 col2도 나머지 컬럼과 같은 폭으로 맞춤).
+          //   col2 헤더("N월단가\n(천원/톤)")는 2줄로 줄바꿈은 허용하되, 46px로
+          //   좁아진 상태에서도 "(천원/톤)" 한 줄이 넘치지 않도록 헤더 셀에만
+          //   word-break:break-all을 추가로 적용해 필요시 음절 단위로 줄바꿈되게 함
+          //   (renderCellTd()의 boilerCol2HeaderBreakAll 참고).
+          // "5월 실적/6월 실적"(3,4번)은 헤더 줄바꿈이 허용되므로 데이터(숫자)만
+          // 한 줄로 들어갈 최소폭(px)으로 좁힌다.
+          // "비고"(7번)는 2번표("제지 재공품") 비고란과 동일한 크기가 되도록,
+          // Playwright로 실측한 2번표 비고 폭/표4 전체 폭 비율(≈39.6%, 뷰포트
+          // 1000~1920px 구간에서 39.54~39.71%로 거의 일정)을 그대로 적용함.
+          // (2번표 비고는 28.45%지만 표4의 전체 폭이 표2보다 좁으므로,
+          //  같은 절대 픽셀 크기가 되려면 표4 기준으로는 약 39.6%가 필요함)
+          return ['106px', '46px', '46px', '46px', '46px', '48px', '48px', '39.6%'];
         default: {
           const w = 100 / colCount;
           return Array(colCount).fill(w);
