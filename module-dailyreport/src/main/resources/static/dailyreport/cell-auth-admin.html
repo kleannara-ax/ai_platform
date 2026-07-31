@@ -202,6 +202,9 @@
         <div class="topbar-subtitle">사용자별 컬럼 단위 입력 권한을 설정합니다 (관리자 및 등록된 담당자)</div>
       </div>
       <div class="topbar-actions">
+        <button class="btn" type="button" id="btnRefreshRollingHeaders" style="display:none;" onclick="openRefreshHeadersModal()">
+          &#128260; 월 롤링 헤더 재계산
+        </button>
         <div class="user-chip" id="userChip">인증 확인중...</div>
       </div>
     </div>
@@ -401,6 +404,33 @@
         <button class="btn" type="button" onclick="closeDeleteModal()">취소</button>
         <button class="btn success" type="button" onclick="confirmDeactivate()">비활성화</button>
         <button class="btn danger" type="button" onclick="confirmDelete()">영구 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       월 롤링 헤더 재계산 확인 모달
+  ═══════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="refreshHeadersModalOverlay" onclick="closeRefreshHeadersModalOnOverlay(event)">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <div class="modal-title">월 롤링 헤더 재계산</div>
+        <button class="modal-close" type="button" onclick="closeRefreshHeadersModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:14px; line-height:1.7;">
+          표1~4의 <strong>월 헤더/과거 컬럼 값</strong>을 최신 롤링 로직 기준으로
+          전체 일보(과거·미래 전체)에 대해 다시 계산합니다.<br><br>
+          <span style="color:var(--muted); font-size:13px;">
+            ※ 사용자가 직접 입력한 실제 데이터(각 셀 값)는 전혀 건드리지 않으며,
+            헤더/읽기전용 셀만 갱신됩니다. 이미 정상인 값은 그대로 유지되어
+            여러 번 실행해도 안전합니다.
+          </span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" type="button" onclick="closeRefreshHeadersModal()">취소</button>
+        <button class="btn primary" type="button" id="refreshHeadersConfirmBtn" onclick="confirmRefreshRollingHeaders()">실행</button>
       </div>
     </div>
   </div>
@@ -685,6 +715,12 @@
 
         const roleLabel = currentUser.permissions.isAdmin ? '관리자' : '컬럼관리 담당자';
         document.getElementById('userChip').textContent = `${currentUser.loginId} (${roleLabel})`;
+
+        // ★★ 월 롤링 헤더 재계산 버튼 — 백엔드가 실제 ROLE_ADMIN만 허용(@PreAuthorize)
+        //   하므로, 화면에서도 isAdmin(진짜 관리자)일 때만 노출한다.
+        if (currentUser.permissions.isAdmin) {
+          document.getElementById('btnRefreshRollingHeaders').style.display = 'inline-flex';
+        }
 
         // 사용자 목록 로드 (모달 드롭다운용)
         await loadUserList();
@@ -1417,6 +1453,43 @@
         await loadAuths();
       } catch (err) {
         showToast('삭제 실패: ' + err.message);
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  월 롤링 헤더 재계산 (2026-07 추가)
+    //  - 표1~4 헤더/읽기전용 셀만 최신 롤링 로직으로 일괄 재계산.
+    //  - 배포 이전에 미리 생성된 미래 일보들의 헤더가 예전 값으로
+    //    고정되어 있는 문제를 관리자가 버튼 클릭 한 번으로 해결.
+    //  - DATA 셀(실제 입력값)은 백엔드에서 절대 건드리지 않음(검증됨).
+    // ═══════════════════════════════════════════════
+
+    function openRefreshHeadersModal() {
+      document.getElementById('refreshHeadersModalOverlay').classList.add('active');
+    }
+
+    function closeRefreshHeadersModal() {
+      document.getElementById('refreshHeadersModalOverlay').classList.remove('active');
+    }
+
+    function closeRefreshHeadersModalOnOverlay(e) {
+      if (e.target === document.getElementById('refreshHeadersModalOverlay')) closeRefreshHeadersModal();
+    }
+
+    async function confirmRefreshRollingHeaders() {
+      const btn = document.getElementById('refreshHeadersConfirmBtn');
+      btn.disabled = true;
+      btn.textContent = '처리중...';
+      try {
+        // 파라미터 없이 호출 → 전체 일보(과거/미래 전체) 대상 (검증 완료된 안전한 방식)
+        const updatedCount = await apiFetch('/reports/refresh-rolling-headers', { method: 'POST' });
+        closeRefreshHeadersModal();
+        showToast(`✅ 헤더 재계산 완료 — ${updatedCount}개 셀이 갱신되었습니다.`);
+      } catch (err) {
+        showToast('재계산 실패: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '실행';
       }
     }
 

@@ -98,4 +98,27 @@ public class DailyReportController {
         dailyReportService.deleteReport(reportId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
+
+    /**
+     * ★★ 롤링(월 이동) 헤더/읽기전용 셀 일괄 재계산 (2026-07 추가)
+     *
+     * 표1~4의 월 헤더/과거 컬럼은 일보가 "처음 생성되는 시점"에 한 번 계산되어
+     * DB에 고정 저장되므로, 롤링 계산 로직이 배포되기 이전에 미리 생성해 둔
+     * 미래 날짜 일보에는 예전 로직으로 계산된 값이 그대로 남는다 — 코드
+     * 재배포만으로는 자동 반영되지 않는다. 이 API를 한 번 호출하면 지정한
+     * 날짜 범위(생략 시 전체)의 모든 일보에 대해 헤더/읽기전용 셀만 최신
+     * 로직으로 재계산해 갱신한다. 사용자가 입력한 실제 값(DATA 셀)은 이 API가
+     * 절대 조회·수정하지 않는다.
+     *
+     * POST /dailyreport-api/reports/refresh-rolling-headers
+     *      ?startDate=2026-08-01&endDate=2027-12-31   (둘 다 생략 가능 → 전체 대상)
+     */
+    @PostMapping("/refresh-rolling-headers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Integer>> refreshRollingHeaders(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        int updatedCount = dailyReportService.refreshRollingHeaders(startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(updatedCount));
+    }
 }

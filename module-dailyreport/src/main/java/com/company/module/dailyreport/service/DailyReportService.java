@@ -202,6 +202,81 @@ public class DailyReportService {
         reportRepository.delete(report);
     }
 
+    /**
+     * ★★ 롤링(월 이동) 헤더/읽기전용 셀 일괄 재계산 (2026-07 추가)
+     *
+     * 배경: 표1~4의 월 헤더/과거 컬럼(HEADER, READONLY 타입 셀)은 일보가
+     * "처음 생성되는 시점"에 {@link DefaultCellTemplate#populateDefaultCells}로
+     * 한 번 계산되어 DB에 고정 저장된다. 이후 그 일보를 다시 열람할 때는
+     * (셀이 이미 존재하는 한) 절대 재계산하지 않는다. 따라서 롤링 계산 로직이
+     * 수정/배포된 뒤에도, 그 배포 "이전"에 미리 생성해 둔 미래 날짜 일보들은
+     * 예전 로직으로 계산된 값이 DB에 그대로 남아 화면에 표시된다 — 코드 재배포
+     * 만으로는 기존 레코드가 갱신되지 않는다 (신규 생성되는 일보부터만 반영).
+     *
+     * 이 메서드는 그 문제를 해결하기 위해, 지정한 날짜 범위의 모든 일보에 대해
+     * DefaultCellTemplate을 "메모리상 임시 표"에 다시 실행해 최신 로직으로
+     * HEADER/READONLY 셀 값을 계산한 뒤, 좌표(EXCEL_COORD) 기준으로 매칭되는
+     * 기존 DB 셀의 cellValue만 덮어쓴다.
+     *
+     * ★ 안전장치: DATA 타입 셀(사용자가 실제로 입력한 값)은 이 메서드가 절대
+     *   조회·수정하지 않는다 — 임시 표에서 나온 DATA 셀은 애초에 무시하고,
+     *   DB 쪽 매칭 대상도 HEADER/READONLY로만 필터링한다.
+     * ★ 표 구조(행/열 수, 좌표 배치)가 바뀌지 않았다는 전제하에 동작한다 —
+     *   좌표가 안 맞으면(신규 좌표가 옛 표에 없거나 그 반대) 해당 셀은 그냥
+     *   건너뛴다(추가/삭제하지 않고 값 갱신만 수행).
+     *
+     * @param startDate 갱신 대상 시작일(포함, null이면 하한 없음)
+     * @param endDate   갱신 대상 종료일(포함, null이면 상한 없음)
+     * @return 실제로 값이 변경된 셀 개수 (검증/로그용)
+     */
+    @Transactional
+    public int refreshRollingHeaders(LocalDate startDate, LocalDate endDate) {
+        List<DailyReport> targets = reportRepository.findByReportDateRangeOrAll(startDate, endDate);
+        int updatedCount = 0;
+
+        for (DailyReport report : targets) {
+            for (DailyReportTable table : report.getTables()) {
+                // 최신 로직으로 헤더/읽기전용 셀을 다시 계산할 "메모리 전용" 임시 표
+                // (영속화하지 않음 — DB에는 절대 저장되지 않고 값 비교용으로만 사용)
+                DailyReportTable freshTable = DailyReportTable.builder()
+                        .tableCode(table.getTableCode())
+                        .tableName(table.getTableName())
+                        .sortOrder(table.getSortOrder())
+                        .rowCount(table.getRowCount())
+                        .colCount(table.getColCount())
+                        .build();
+                DefaultCellTemplate.populateDefaultCells(freshTable, report.getReportDate(), historicalValueLookup());
+
+                // 좌표(EXCEL_COORD) → 새로 계산된 값, HEADER/READONLY만 대상
+                Map<String, String> freshValuesByCoord = new LinkedHashMap<>();
+                for (DailyReportCell freshCell : freshTable.getCells()) {
+                    if ("HEADER".equals(freshCell.getCellType()) || "READONLY".equals(freshCell.getCellType())) {
+                        if (freshCell.getExcelCoord() != null) {
+                            freshValuesByCoord.put(freshCell.getExcelCoord(), freshCell.getCellValue());
+                        }
+                    }
+                }
+
+                for (DailyReportCell dbCell : table.getCells()) {
+                    // ★ DATA 셀은 절대 건드리지 않는다 (사용자 실입력값 보호)
+                    if (!"HEADER".equals(dbCell.getCellType()) && !"READONLY".equals(dbCell.getCellType())) {
+                        continue;
+                    }
+                    String coord = dbCell.getExcelCoord();
+                    if (coord == null || !freshValuesByCoord.containsKey(coord)) {
+                        continue; // 좌표 불일치(표 구조 변경 등) — 안전하게 건너뜀
+                    }
+                    String newValue = freshValuesByCoord.get(coord);
+                    if (!Objects.equals(dbCell.getCellValue(), newValue)) {
+                        dbCell.carryOverValue(newValue); // 값만 교체, 편집자/시각 기록 안 건드림
+                        updatedCount++;
+                    }
+                }
+            }
+        }
+        return updatedCount;
+    }
+
     // ─────────────────────────────────────────────
     // 표별 셀 데이터 조회
     // ─────────────────────────────────────────────

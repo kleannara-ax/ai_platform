@@ -40,4 +40,16 @@ public interface DailyReportRepository extends JpaRepository<DailyReport, Long> 
     @Query(value = "SELECT * FROM daily_report ORDER BY REPORT_DATE DESC LIMIT :limit",
            nativeQuery = true)
     java.util.List<DailyReport> findRecentReports(@Param("limit") int limit);
+
+    /**
+     * ★ 롤링 헤더 일괄 재계산(refreshRollingHeaders) 전용 — 날짜 범위로 일보 조회.
+     * startDate/endDate가 null이면 해당 방향 제한 없음(전체 과거/미래 포함).
+     */
+    @Query("SELECT r FROM DailyReport r " +
+           "WHERE (:startDate IS NULL OR r.reportDate >= :startDate) " +
+           "AND (:endDate IS NULL OR r.reportDate <= :endDate) " +
+           "ORDER BY r.reportDate ASC")
+    java.util.List<DailyReport> findByReportDateRangeOrAll(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
