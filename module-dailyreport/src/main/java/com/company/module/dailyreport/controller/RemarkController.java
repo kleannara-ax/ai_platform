@@ -24,13 +24,14 @@ public class RemarkController {
     private final DailyReportService dailyReportService;
 
     /**
-     * 특이사항 목록 조회
+     * 특이사항 목록 조회 (사업부별 5행 고정, 담당자/편집가능여부/최종저장자 포함)
      * GET /dailyreport-api/reports/{reportId}/remarks
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<RemarkResponse>>> getRemarks(
-            @PathVariable Long reportId) {
-        return ResponseEntity.ok(ApiResponse.success(dailyReportService.getRemarks(reportId)));
+            @PathVariable Long reportId,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(dailyReportService.getRemarksForUser(reportId, userId)));
     }
 
     /**
@@ -54,9 +55,10 @@ public class RemarkController {
     public ResponseEntity<ApiResponse<RemarkResponse>> updateRemark(
             @PathVariable Long reportId,
             @PathVariable Long remarkId,
-            @Valid @RequestBody RemarkRequest request) {
+            @Valid @RequestBody RemarkRequest request,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(
-                ApiResponse.success(dailyReportService.updateRemark(remarkId, request)));
+                ApiResponse.success(dailyReportService.updateRemark(remarkId, request, userId)));
     }
 
     /**
@@ -66,8 +68,9 @@ public class RemarkController {
     @DeleteMapping("/{remarkId}")
     public ResponseEntity<ApiResponse<Void>> deleteRemark(
             @PathVariable Long reportId,
-            @PathVariable Long remarkId) {
-        dailyReportService.deleteRemark(remarkId);
+            @PathVariable Long remarkId,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
+        dailyReportService.deleteRemark(remarkId, userId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

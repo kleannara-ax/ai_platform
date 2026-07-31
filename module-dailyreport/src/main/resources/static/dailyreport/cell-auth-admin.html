@@ -227,6 +227,7 @@
                 <option value="TBL_INVENTORY">재공품/야적</option>
                 <option value="TBL_ENERGY">에너지 원단위</option>
                 <option value="TBL_BOILER">보일러 운영</option>
+                <option value="TBL_SPECIAL_NOTE">특이사항</option>
               </select>
             </div>
             <button class="btn primary" type="button" onclick="openCreateModal()">+ 권한 추가</button>
@@ -315,6 +316,7 @@
                 <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
                 <option value="TBL_ENERGY">에너지 원단위</option>
                 <option value="TBL_BOILER">보일러 운영 현황</option>
+                <option value="TBL_SPECIAL_NOTE">특이사항</option>
               </select>
             </div>
             <div class="form-group">
@@ -350,6 +352,7 @@
               <option value="TBL_INVENTORY">제지 재공품 및 야적현황</option>
               <option value="TBL_ENERGY">에너지 원단위</option>
               <option value="TBL_BOILER">보일러 운영 현황</option>
+              <option value="TBL_SPECIAL_NOTE">특이사항</option>
             </select>
           </div>
           <div class="form-group">
@@ -435,13 +438,15 @@
       'TBL_PRODUCTION_INDEX': '주요 생산 지표',
       'TBL_INVENTORY': '재공품/야적',
       'TBL_ENERGY': '에너지 원단위',
-      'TBL_BOILER': '보일러 운영'
+      'TBL_BOILER': '보일러 운영',
+      'TBL_SPECIAL_NOTE': '특이사항'
     };
     const TABLE_ORDER = {
       'TBL_PRODUCTION_INDEX': '1',
       'TBL_INVENTORY': '2',
       'TBL_ENERGY': '3',
-      'TBL_BOILER': '4'
+      'TBL_BOILER': '4',
+      'TBL_SPECIAL_NOTE': '5'
     };
 
     // ── 셀 좌표 → 사람이 읽을 수 있는 라벨 매핑 ──
@@ -540,6 +545,15 @@
         //   실존하지 않는 좌표이므로 담당자 배정 대상에서 제외한다).
         //   다른 표(TBL_PRODUCTION_INDEX)와 동일하게 "비고"를 별도 섹션으로 분리해 표시.
         'Q36': { section:'비고', row:'보일러 전체 공용(5행 병합)' },
+      },
+      // ★ 특이사항: 실제 셀 좌표가 아닌 사업부 구분 코드를 "좌표"로 재사용
+      //   (DailyReportService.SPECIAL_NOTE_CATEGORIES와 동일 코드/순서 유지)
+      'TBL_SPECIAL_NOTE': {
+        'PAPER':  { section:'특이사항', row:'제지' },
+        'TISSUE': { section:'특이사항', row:'화장지' },
+        'PAD':    { section:'특이사항', row:'패드' },
+        'SAFETY': { section:'특이사항', row:'사고/안전사고' },
+        'ETC':    { section:'특이사항', row:'기타' },
       }
     };
 

@@ -6,6 +6,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.module.dailyreport.dto.*;
 import com.company.module.dailyreport.entity.*;
 import com.company.module.dailyreport.repository.*;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,10 +15,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +43,32 @@ public class DailyReportService {
     private final DailyReportRemarkRepository remarkRepository;
     private final DailyReportImageRepository imageRepository;
     private final CellOwnershipSyncService cellOwnershipSyncService;
+    private final CellAuthRepository cellAuthRepository;
+    private final EntityManager entityManager;
+
+    /** ★★ 특이사항(사업부별 5행) 전용 가상 표 코드 — daily_report_cell_auth의
+     *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
+    public static final String SPECIAL_NOTE_TABLE_CODE = "TBL_SPECIAL_NOTE";
+
+    /** 사업부 코드 → 한글 라벨, 화면에 표시할 고정 5행 순서 그대로 */
+    public static final Map<String, String> SPECIAL_NOTE_CATEGORIES = new LinkedHashMap<>();
+    static {
+        SPECIAL_NOTE_CATEGORIES.put("PAPER", "제지");
+        SPECIAL_NOTE_CATEGORIES.put("TISSUE", "화장지");
+        SPECIAL_NOTE_CATEGORIES.put("PAD", "패드");
+        SPECIAL_NOTE_CATEGORIES.put("SAFETY", "사고/안전사고");
+        SPECIAL_NOTE_CATEGORIES.put("ETC", "기타");
+    }
+
+    /** ★★ 특이사항 분량 제한 (2026-07 추가)
+     *  - 줄바꿈/전체 글자수는 5개 사업부 행 전체를 합산한 "공유 총량"이다
+     *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
+     *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
+     *  프론트(index.html)에서도 동일한 상수로 실시간 검증을 하지만, 프론트 검증은
+     *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
+    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 21;
+    private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
+    private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 84;
 
     // ─────────────────────────────────────────────
     // 일보 CRUD
@@ -185,11 +218,11 @@ public class DailyReportService {
     }
 
     // ─────────────────────────────────────────────
-    // 특이사항 CRUD
+    // 특이사항 CRUD (★★ 2026-07 개편: 사업부별 5행 + CellAuth 기반 담당자 배정)
     // ─────────────────────────────────────────────
 
     /**
-     * 특이사항 목록 조회
+     * 특이사항 목록 조회 (사용자 미지정 — 편집 가능 여부 없이 원본만 반환)
      */
     public List<RemarkResponse> getRemarks(Long reportId) {
         return remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId)
@@ -199,7 +232,93 @@ public class DailyReportService {
     }
 
     /**
-     * 특이사항 추가
+     * 특이사항 목록 조회 (사용자 기준) — 각 사업부 행에 대해:
+     * - editable: 이 사용자가 이 사업부 행을 편집할 수 있는지 (CellAuth 기반, 셀과 동일 원칙:
+     *   담당자가 배정되지 않은 행은 아무도 편집 불가)
+     * - ownerNames: 이 사업부 행의 담당자 이름 (쉼표 구분)
+     * - savedByName: 마지막으로 저장(작성/수정)한 사람의 이름
+     */
+    public List<RemarkResponse> getRemarksForUser(Long reportId, Long userId) {
+        List<DailyReportRemark> remarks =
+                remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId);
+
+        // 특이사항(TBL_SPECIAL_NOTE)의 활성 CellAuth 전체 조회 → 사업부코드별 담당자 매핑
+        List<CellAuth> specialAuths =
+                cellAuthRepository.findByTableCodeAndIsActiveTrue(SPECIAL_NOTE_TABLE_CODE);
+        Map<String, List<Long>> categoryToUserIds = new LinkedHashMap<>();
+        for (CellAuth auth : specialAuths) {
+            for (String coord : auth.getCellCoordList()) {
+                String normalized = coord == null ? null : coord.trim().toUpperCase();
+                if (normalized == null || normalized.isEmpty()) continue;
+                categoryToUserIds.computeIfAbsent(normalized, k -> new ArrayList<>()).add(auth.getUserId());
+            }
+        }
+
+        // 등장하는 모든 userId(담당자 + 작성자 + 수정자)의 이름을 일괄 조회
+        Set<Long> allUserIds = new LinkedHashSet<>();
+        categoryToUserIds.values().forEach(allUserIds::addAll);
+        for (DailyReportRemark r : remarks) {
+            if (r.getCreatedBy() != null) allUserIds.add(r.getCreatedBy());
+            if (r.getUpdatedBy() != null) allUserIds.add(r.getUpdatedBy());
+        }
+        Map<Long, String> userNameMap = resolveUserNames(allUserIds);
+
+        boolean userIsOwnerSomewhere = userId != null && categoryToUserIds.values().stream()
+                .anyMatch(ids -> ids.contains(userId));
+
+        Map<String, DailyReportRemark> byCategory = remarks.stream()
+                .collect(Collectors.toMap(DailyReportRemark::getCategory, r -> r,
+                        (a, b) -> a, LinkedHashMap::new));
+
+        List<RemarkResponse> result = new ArrayList<>();
+        for (Map.Entry<String, String> catEntry : SPECIAL_NOTE_CATEGORIES.entrySet()) {
+            String category = catEntry.getKey();
+            List<Long> ownerIds = categoryToUserIds.getOrDefault(category, List.of());
+            String ownerNames = ownerIds.stream()
+                    .map(userNameMap::get)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.joining(", "));
+            boolean editable = userId != null && ownerIds.contains(userId);
+
+            DailyReportRemark existing = byCategory.get(category);
+            RemarkResponse.RemarkResponseBuilder builder = RemarkResponse.builder()
+                    .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                    .category(category)
+                    .editable(editable)
+                    .ownerNames(ownerNames.isBlank() ? null : ownerNames);
+
+            if (existing != null) {
+                Long lastEditorId = existing.getUpdatedBy() != null ? existing.getUpdatedBy() : existing.getCreatedBy();
+                LocalDateTime savedAt = existing.getUpdatedAt() != null ? existing.getUpdatedAt() : existing.getCreatedAt();
+                builder.remarkId(existing.getRemarkId())
+                        .content(existing.getContent())
+                        .sortOrder(existing.getSortOrder())
+                        .createdBy(existing.getCreatedBy())
+                        .updatedBy(existing.getUpdatedBy())
+                        .createdAt(existing.getCreatedAt())
+                        .updatedAt(existing.getUpdatedAt())
+                        .savedByName(userNameMap.get(lastEditorId))
+                        .savedAt(savedAt);
+            } else {
+                builder.content("");
+            }
+            result.add(builder.build());
+        }
+
+        // 참고용: userIsOwnerSomewhere는 향후 "내 담당 행만 보기" 등 확장에 대비해 계산해 둔 값
+        // (현재는 응답에 직접 포함하지 않음 — 필요 시 DTO 확장)
+        if (userIsOwnerSomewhere) {
+            // no-op: 계산은 위 editable 값에 이미 반영됨
+        }
+
+        return result;
+    }
+
+    /**
+     * 특이사항 추가 (사업부 1행 신규 작성)
+     * - CellAuth 기반 권한 검증: 이 사용자가 이 사업부(category)에 배정된 담당자여야 한다
+     *   (셀과 동일 원칙 — 담당자 미배정 행은 아무도 편집 불가).
      */
     @Transactional
     public RemarkResponse addRemark(Long reportId, RemarkRequest request, Long userId) {
@@ -208,13 +327,16 @@ public class DailyReportService {
 
         validateReportEditable(report);
         validateRemarkEditableDate(report);
+        validateSpecialNoteCategory(request.getCategory());
+        validateRemarkOwnership(request.getCategory(), userId);
+        validateSpecialNoteLimits(reportId, request.getCategory(), request.getContent());
 
         int sortOrder = request.getSortOrder() != null
                 ? request.getSortOrder()
                 : (int) remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId).size() + 1;
 
         DailyReportRemark remark = DailyReportRemark.builder()
-                .tableCode(request.getTableCode())
+                .tableCode(SPECIAL_NOTE_TABLE_CODE)
                 .category(request.getCategory())
                 .content(request.getContent())
                 .sortOrder(sortOrder)
@@ -228,15 +350,19 @@ public class DailyReportService {
 
     /**
      * 특이사항 수정
+     * - updatedBy를 기록하여 "누가 마지막으로 저장했는지" 추적한다.
      */
     @Transactional
-    public RemarkResponse updateRemark(Long remarkId, RemarkRequest request) {
+    public RemarkResponse updateRemark(Long remarkId, RemarkRequest request, Long userId) {
         DailyReportRemark remark = remarkRepository.findById(remarkId)
                 .orElseThrow(() -> new EntityNotFoundException("특이사항을 찾을 수 없습니다. ID: " + remarkId));
 
         validateReportEditable(remark.getDailyReport());
         validateRemarkEditableDate(remark.getDailyReport());
-        remark.updateContent(request.getContent(), request.getCategory());
+        validateRemarkOwnership(remark.getCategory(), userId);
+        validateSpecialNoteLimits(remark.getDailyReport().getReportId(), remark.getRemarkId(),
+                remark.getCategory(), request.getContent());
+        remark.updateContent(request.getContent(), request.getCategory(), userId);
         return RemarkResponse.from(remark);
     }
 
@@ -244,13 +370,126 @@ public class DailyReportService {
      * 특이사항 삭제
      */
     @Transactional
-    public void deleteRemark(Long remarkId) {
+    public void deleteRemark(Long remarkId, Long userId) {
         DailyReportRemark remark = remarkRepository.findById(remarkId)
                 .orElseThrow(() -> new EntityNotFoundException("특이사항을 찾을 수 없습니다. ID: " + remarkId));
 
         validateReportEditable(remark.getDailyReport());
         validateRemarkEditableDate(remark.getDailyReport());
+        validateRemarkOwnership(remark.getCategory(), userId);
         remarkRepository.delete(remark);
+    }
+
+    /**
+     * 사업부 코드 유효성 검증 (제지/화장지/패드/사고·안전사고/기타 중 하나)
+     */
+    private void validateSpecialNoteCategory(String category) {
+        if (category == null || !SPECIAL_NOTE_CATEGORIES.containsKey(category)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "올바르지 않은 사업부 구분입니다: " + category);
+        }
+    }
+
+    /**
+     * ★★ 특이사항 분량 제한 검증 (신규 작성)
+     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(21회/789자)를
+     *   넘지 않는지 확인한다. 다른 사업부 행에 이미 저장된 내용까지 합산 대상이다.
+     * - 자신이 입력하는 내용 자체의 한 줄(개행 기준) 길이가 84자를 넘지 않는지 확인한다.
+     */
+    private void validateSpecialNoteLimits(Long reportId, String category, String content) {
+        validateSpecialNoteLimits(reportId, null, category, content);
+    }
+
+    /**
+     * ★★ 특이사항 분량 제한 검증 (수정) — excludeRemarkId: 수정 대상 자신의 기존
+     * 레코드는 합산에서 제외하고 새 content로 교체하여 계산한다.
+     */
+    private void validateSpecialNoteLimits(Long reportId, Long excludeRemarkId, String category, String content) {
+        String safeContent = content == null ? "" : content;
+
+        // 1) 한 줄(개행 기준) 길이 제한 — 자신이 입력한 내용만 검사
+        for (String line : safeContent.split("\n", -1)) {
+            if (line.length() > SPECIAL_NOTE_MAX_LINE_LENGTH) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT,
+                        String.format("한 줄에 입력 가능한 최대 글자수는 %d자입니다. %d/%d",
+                                SPECIAL_NOTE_MAX_LINE_LENGTH, line.length(), SPECIAL_NOTE_MAX_LINE_LENGTH));
+            }
+        }
+
+        // 2) 5개 사업부 행 전체 합산 — 다른 행의 기존 저장 내용 + 이번에 저장하려는 내용
+        List<DailyReportRemark> remarks =
+                remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId);
+
+        int totalNewlines = 0;
+        int totalChars = 0;
+        for (DailyReportRemark r : remarks) {
+            if (excludeRemarkId != null && excludeRemarkId.equals(r.getRemarkId())) continue;
+            String cat = r.getCategory();
+            if (category != null && category.equals(cat)) {
+                // 같은 사업부(자기 자신 행) 기존 내용은 새 content로 대체되므로 건너뛴다
+                continue;
+            }
+            String c = r.getContent() == null ? "" : r.getContent();
+            totalNewlines += countNewlines(c);
+            totalChars += c.length();
+        }
+        // 자기 자신(이번에 저장할 content)을 합산
+        totalNewlines += countNewlines(safeContent);
+        totalChars += safeContent.length();
+
+        if (totalNewlines > SPECIAL_NOTE_MAX_TOTAL_NEWLINES) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    String.format("줄바꿈 %d회를 모두 사용했습니다.", SPECIAL_NOTE_MAX_TOTAL_NEWLINES));
+        }
+        if (totalChars > SPECIAL_NOTE_MAX_TOTAL_CHARS) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    String.format("글자수 %d자 이상 기재할 수 없습니다.", SPECIAL_NOTE_MAX_TOTAL_CHARS));
+        }
+    }
+
+    private int countNewlines(String s) {
+        if (s == null || s.isEmpty()) return 0;
+        int count = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\n') count++;
+        }
+        return count;
+    }
+
+    /**
+     * ★★ 셀과 동일한 원칙: 이 사업부(category) 행에 대해 활성 CellAuth로 배정된
+     * 담당자만 편집 가능. 담당자가 아예 배정되지 않은 행은 아무도 편집할 수 없다.
+     */
+    private void validateRemarkOwnership(String category, Long userId) {
+        List<CellAuth> auths = cellAuthRepository
+                .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, SPECIAL_NOTE_TABLE_CODE);
+        boolean isOwner = auths.stream().anyMatch(auth -> auth.coversCoord(category));
+        if (!isOwner) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED,
+                    "해당 특이사항 항목에 대한 편집 권한이 없습니다: " + category);
+        }
+    }
+
+    /**
+     * userId 목록에 해당하는 core_user.USER_NAME(없으면 LOGIN_ID)을 일괄 조회
+     * - Architecture Rule #4: core 모듈 Entity를 직접 import하지 않고 native query 사용
+     */
+    @SuppressWarnings("unchecked")
+    private Map<Long, String> resolveUserNames(Set<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> rows = entityManager.createNativeQuery(
+                        "SELECT user_id, COALESCE(NULLIF(TRIM(user_name), ''), login_id) AS user_name " +
+                        "FROM core_user WHERE user_id IN (:ids)")
+                .setParameter("ids", userIds)
+                .getResultList();
+
+        return rows.stream().collect(Collectors.toMap(
+                row -> ((Number) row[0]).longValue(),
+                row -> (String) row[1],
+                (a, b) -> a
+        ));
     }
 
     // ─────────────────────────────────────────────

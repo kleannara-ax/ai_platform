@@ -216,14 +216,21 @@ CREATE TABLE IF NOT EXISTS daily_report_cell_auth (
 -- ────────────────────────────────────────────
 -- 5. daily_report_remark — 특이사항
 -- ────────────────────────────────────────────
+-- ★★ 2026-07 개편(08_restructure_special_note_by_division.sql): 리포트당
+-- 자유 텍스트 1건이던 구조를 "사업부별 5행"(제지/화장지/패드/사고·안전사고/기타)
+-- 구조로 변경. TABLE_CODE='TBL_SPECIAL_NOTE'(가상 표코드), CATEGORY를
+-- 사업부 코드(PAPER/TISSUE/PAD/SAFETY/ETC)로 사용. daily_report_cell_auth와
+-- 동일한 방식(TABLE_CODE='TBL_SPECIAL_NOTE', CELL_COORDS에 사업부 코드)으로
+-- 담당자를 배정하여 "담당자 미배정 사업부 행은 편집 불가"를 셀과 동일하게 적용.
 CREATE TABLE IF NOT EXISTS daily_report_remark (
     REMARK_ID   BIGINT          NOT NULL AUTO_INCREMENT,
     REPORT_ID   BIGINT          NOT NULL,
-    TABLE_CODE  VARCHAR(50)               COMMENT '관련 표 코드 (NULL=전체)',
-    CATEGORY    VARCHAR(30)     NOT NULL DEFAULT 'GENERAL',
+    TABLE_CODE  VARCHAR(50)               COMMENT '관련 표 코드 (TBL_SPECIAL_NOTE=특이사항)',
+    CATEGORY    VARCHAR(30)     NOT NULL DEFAULT 'GENERAL' COMMENT '사업부 코드: PAPER/TISSUE/PAD/SAFETY/ETC',
     CONTENT     TEXT            NOT NULL  COMMENT '특이사항 내용',
     SORT_ORDER  INT             NOT NULL DEFAULT 1,
-    CREATED_BY  BIGINT          NOT NULL  COMMENT '작성자',
+    CREATED_BY  BIGINT          NOT NULL  COMMENT '최초 작성자',
+    UPDATED_BY  BIGINT                    COMMENT '최종 수정자 (core_user FK)',
     CREATED_AT  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UPDATED_AT  DATETIME                 ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (REMARK_ID),
@@ -231,7 +238,7 @@ CREATE TABLE IF NOT EXISTS daily_report_remark (
     CONSTRAINT FK_REMARK_REPORT
         FOREIGN KEY (REPORT_ID) REFERENCES daily_report (REPORT_ID) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-  COMMENT='일보 특이사항';
+  COMMENT='일보 특이사항 (사업부별 5행: 제지/화장지/패드/사고·안전사고/기타)';
 
 
 -- ────────────────────────────────────────────

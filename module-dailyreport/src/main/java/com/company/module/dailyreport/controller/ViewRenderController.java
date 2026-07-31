@@ -94,8 +94,8 @@ public class ViewRenderController {
         }
         result.put("tables", tables);
 
-        // 특이사항
-        result.put("remarks", reportService.getRemarks(report.getReportId()));
+        // 특이사항 (사업부별 5행 고정, 담당자/편집가능여부/최종저장자 포함)
+        result.put("remarks", reportService.getRemarksForUser(report.getReportId(), userId));
 
         // 이미지
         result.put("images", reportService.getImages(report.getReportId()));

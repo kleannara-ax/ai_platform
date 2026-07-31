@@ -119,15 +119,28 @@
     .cell-input-remark { resize:none; overflow:hidden; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; }
     .cell-value { width:100%; min-height:28px; line-height:1.3; display:flex; align-items:center; box-sizing:border-box; }
 
-    /* ── 특이사항 (다른 표와 동일한 카드 스타일, 표 안쪽만 테두리) ── */
+    /* ── 특이사항 (구분/사업부/비고 5행 — 사업부별 담당자 배정 + 저장자/시각 표시) ── */
     .report-section-special { /* report-section 기본 스타일 그대로 사용 */ }
     .special-table { border-collapse:collapse; border:1px solid #000; }
-    .special-head-left, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
+    .special-head-left, .special-head-mid, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
     .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; }
-    .special-note-wrap { padding:0; background:#fff; height:220px; border:1px solid #000; }
-    .special-note-input { width:100%; height:100%; min-height:220px; resize:vertical; border:0; outline:none; padding:12px 14px; font:inherit; line-height:1.55; color:#111827; background:#fff; box-shadow:none; text-align:left; }
+    .special-division-label { background:#f8fafc; text-align:center; vertical-align:middle; font-size:13px; font-weight:700; color:#0f172a; border:1px solid #000; padding:8px 6px; }
+    .special-note-wrap { padding:0; background:#fff; border:1px solid #000; }
+    .special-note-input { display:block; width:100%; min-height:64px; resize:vertical; border:0; outline:none; padding:10px 14px; font:inherit; line-height:1.5; color:#111827; background:#fff; box-shadow:none; text-align:left; }
     .special-note-input:focus { box-shadow:none; background:#fff; }
-    .special-note-input[disabled] { background:#fff; color:#111827; cursor:not-allowed; opacity:1; }
+    .special-note-input[disabled] { background:#f3f4f6; color:#94a3b8; cursor:not-allowed; opacity:1; }
+    /* 저장자/담당자 정보 캡션 — "누가 언제 저장했는지" 화면 표시 (셀 시스템에는 없는
+       특이사항 전용 확장: 사용자가 명시적으로 화면 표시를 요청함) */
+    .special-note-meta { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:4px 14px 8px; font-size:11px; color:#64748b; border-top:1px dashed #e2e8f0; background:#fff; }
+    .special-note-meta .special-note-owner { font-weight:700; color:#334155; }
+    .special-note-meta .special-note-saved { color:#64748b; }
+    /* 담당자 미배정 등으로 잠긴 행 — 셀 시스템의 .cell.locked와 동일한 회색조 */
+    .special-row-locked .special-note-wrap { background:#f3f4f6; }
+    .special-row-locked .special-note-meta { background:#f3f4f6; }
+    /* 특이사항 전체(5행 합산) 줄바꿈/글자수 사용량 표시 — 섹션 타이틀 바 우측 */
+    .report-section-special .section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .special-note-counter { font-size:12px; font-weight:700; color:#64748b; white-space:nowrap; }
+    .special-note-counter .counter-warn { color:#dc2626; }
 
     /* ── 이미지 업로드 ── */
     .report-section-upload { display:block; }
@@ -184,7 +197,7 @@
       .topbar { flex-direction:column; align-items:flex-start; }
       .page-wrap, .notice, .legend { width:calc(100vw - 24px); }
       .section-title { font-size:16px; }
-      .special-note-wrap, .special-note-input { min-height:180px; height:180px; }
+      .special-note-input { min-height:56px; }
       .upload-preview-grid { grid-template-columns:1fr 1fr; }
       .dual-table-row { flex-direction:column; }
       /* 세로로 쌓일 때는 우측 경계선 대신 하단 경계선으로 전환 */
@@ -260,6 +273,16 @@
     </div>
   </div>
 
+  <!-- 특이사항 분량 제한(줄바꿈 21회 / 글자수 789자 / 한 줄 84자) 초과 시 표시되는 알림 전용 팝업 -->
+  <div class="confirm-modal-overlay" id="limitAlertOverlay">
+    <div class="confirm-modal-box">
+      <div class="confirm-modal-message" id="limitAlertMessage"></div>
+      <div class="confirm-modal-actions">
+        <button class="confirm-modal-btn confirm" type="button" id="limitAlertOkBtn" style="flex:1;">확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PPT 캡처 기능용: DOM 영역을 canvas 이미지로 렌더링 -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -285,7 +308,26 @@
     let currentUser = null;        // { userId, loginId, permissions }
     let currentReportId = null;
     let currentReportDate = null;
-    let currentRemarkId = null;    // 특이사항 기존 레코드 ID (있으면 PUT 수정, 없으면 POST 신규)
+    // 특이사항 기존 레코드 ID — 사업부 코드(PAPER/TISSUE/PAD/SAFETY/ETC)별로 관리.
+    // 값이 있으면 PUT(수정), 없으면 POST(신규)로 분기한다.
+    let currentRemarkIds = {};
+    // 특이사항 각 사업부 textarea의 "직전 유효 값" — 분량 제한 검증 시 이번 입력으로
+    // 새로 추가된 부분(삽입분)만 골라내기 위한 기준값으로 사용한다 (사업부 코드별 관리).
+    let specialNoteLastValue = {};
+    // 특이사항 사업부 표시 순서/라벨 (백엔드 DailyReportService.SPECIAL_NOTE_CATEGORIES와 동일)
+    const SPECIAL_NOTE_CATEGORIES = [
+      { code: 'PAPER',  label: '제지' },
+      { code: 'TISSUE', label: '화장지' },
+      { code: 'PAD',    label: '패드' },
+      { code: 'SAFETY', label: '사고/안전사고' },
+      { code: 'ETC',    label: '기타' },
+    ];
+    // ★★ 특이사항 분량 제한 (백엔드 DailyReportService의 동일 상수와 반드시 일치시킬 것)
+    // - 줄바꿈/전체 글자수: 5개 사업부 행 "전체 합산" 공유 총량
+    // - 한 줄(개행 기준) 글자수: 각 행 자신만의 독립된 제한
+    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 21;
+    const SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
+    const SPECIAL_NOTE_MAX_LINE_LENGTH = 84;
     let reportData = null;         // /view/render 응답 전체
     let uploadedImages = [];
     let dirtyCoords = new Set();   // 변경된 셀 좌표
@@ -382,6 +424,22 @@
     }
 
     /**
+     * 특이사항 "저장자/시각" 표시용 — 서버가 내려주는 LocalDateTime 문자열
+     * (예: "2026-07-31T14:05:30" 또는 밀리초 포함)을 "07.31 14:05" 형식으로 변환.
+     * (셀 시스템의 lastEditedAt과 달리 특이사항은 사용자 요청에 따라 화면에 직접 표시)
+     */
+    function formatSavedAt(dateTimeStr) {
+      if (!dateTimeStr) return '';
+      const d = new Date(dateTimeStr);
+      if (isNaN(d.getTime())) return String(dateTimeStr);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${mm}.${dd} ${hh}:${mi}`;
+    }
+
+    /**
      * 커스텀 확인 모달 — 브라우저 기본 confirm() 대체
      * - 브라우저 기본 confirm()은 보안상 사이트 주소(origin)가 강제로 함께 표시되어
      *   순수 문구만 보여줄 수 없음 → 화면 내 커스텀 모달로 대체
@@ -417,6 +475,45 @@
         cancelBtn.addEventListener('click', onCancel);
         overlay.addEventListener('click', onOverlayClick);
         document.addEventListener('keydown', onKeydown);
+      });
+    }
+
+    /**
+     * 특이사항 분량 제한 초과 알림 전용 팝업 (확인 버튼 1개, showConfirmModal과 별도)
+     * - 동시에 여러 번 트리거되어도 마지막 것만 보이도록 매번 새로 바인딩한다.
+     * - isHtml=true면 msgEl.innerHTML로 렌더링(예: 초과 글자수를 빨간색으로 강조).
+     *   메시지는 항상 이 코드가 숫자/고정문구로만 조립하므로 innerHTML 사용이 안전하다.
+     */
+    let _limitAlertHandler = null;
+    function showLimitAlert(message, isHtml) {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('limitAlertOverlay');
+        const msgEl = document.getElementById('limitAlertMessage');
+        const okBtn = document.getElementById('limitAlertOkBtn');
+
+        if (isHtml) { msgEl.innerHTML = message; } else { msgEl.textContent = message; }
+        overlay.classList.add('show');
+
+        if (_limitAlertHandler) {
+          okBtn.removeEventListener('click', _limitAlertHandler);
+          overlay.removeEventListener('click', _limitAlertHandler.overlayFn);
+        }
+        function cleanup() {
+          overlay.classList.remove('show');
+          okBtn.removeEventListener('click', onOk);
+          overlay.removeEventListener('click', onOverlayClick);
+          document.removeEventListener('keydown', onKeydown);
+          resolve();
+        }
+        function onOk() { cleanup(); }
+        function onOverlayClick(e) { if (e.target === overlay) cleanup(); }
+        function onKeydown(e) { if (e.key === 'Escape' || e.key === 'Enter') cleanup(); }
+
+        okBtn.addEventListener('click', onOk);
+        overlay.addEventListener('click', onOverlayClick);
+        document.addEventListener('keydown', onKeydown);
+        _limitAlertHandler = onOk;
+        _limitAlertHandler.overlayFn = onOverlayClick;
       });
     }
 
@@ -1187,58 +1284,283 @@
       inputEl.value = formatNumber(inputEl.value);
     }
 
+    // ── 특이사항 분량 제한 헬퍼 ──
+
+    /** 문자열의 개행(\n) 개수 */
+    function countNewlines(s) {
+      if (!s) return 0;
+      const m = s.match(/\n/g);
+      return m ? m.length : 0;
+    }
+
+    /**
+     * 특이사항 5개 사업부 textarea 전체(현재 DOM 값 기준)의 줄바꿈/글자수 합계를 구한다.
+     * - 잠긴(disabled) 행도 이미 저장된 내용이 있으면 공유 총량에 포함되어야 하므로
+     *   disabled 여부와 무관하게 존재하는 모든 specialNoteInput_* textarea 값을 합산한다.
+     * - excludeCode를 지정하면 해당 사업부는 합산에서 제외(그 자리에 override 값을 더함).
+     */
+    function getSpecialNoteTotals(excludeCode, overrideValue) {
+      let totalNewlines = 0;
+      let totalChars = 0;
+      SPECIAL_NOTE_CATEGORIES.forEach(({ code }) => {
+        const textarea = document.getElementById(`specialNoteInput_${code}`);
+        if (!textarea) return;
+        const value = (code === excludeCode) ? (overrideValue ?? '') : textarea.value;
+        totalNewlines += countNewlines(value);
+        totalChars += value.length;
+      });
+      return { totalNewlines, totalChars };
+    }
+
+    /** 특이사항 섹션 타이틀 바의 "(줄바꿈: n/21회) (글자 수: nnn/789자)" 카운터를 갱신한다. */
+    function updateSpecialNoteCounter() {
+      const el = document.getElementById('specialNoteCounter');
+      if (!el) return;
+      const { totalNewlines, totalChars } = getSpecialNoteTotals();
+      const nlWarn = totalNewlines >= SPECIAL_NOTE_MAX_TOTAL_NEWLINES ? ' counter-warn' : '';
+      const chWarn = totalChars >= SPECIAL_NOTE_MAX_TOTAL_CHARS ? ' counter-warn' : '';
+      el.innerHTML =
+        `<span class="${nlWarn}">(줄바꿈: ${totalNewlines}/${SPECIAL_NOTE_MAX_TOTAL_NEWLINES}회)</span> ` +
+        `<span class="${chWarn}">(글자 수: ${totalChars}/${SPECIAL_NOTE_MAX_TOTAL_CHARS}자)</span>`;
+    }
+
+    /**
+     * 특이사항 textarea 입력값을 분량 제한에 맞게 다듬는다.
+     * - 공유 총량(줄바꿈 21회 / 글자수 789자)을 넘는 "신규 입력분"은 넘치는 부분만 잘라낸다
+     *   (붙여넣기로 한 번에 대량 입력된 경우에도 가능한 곳까지만 반영).
+     * - 한 줄(개행 기준) 84자 제한은 하드 블록 대상 — 이 함수에서는 자르지 않고
+     *   호출부(onSpecialNoteInput)에서 별도로 감지해 팝업 + 되돌리기를 수행한다.
+     * @returns {{ text: string, newlineBlocked: boolean, charBlocked: boolean }}
+     */
+    function trimToSpecialNoteBudget(code, newValue) {
+      const before = specialNoteLastValue[code] || '';
+
+      // 이번 입력으로 실제 늘어난 글자수/줄바꿈 수만큼만 잘라내면 되므로,
+      // "다른 4개 행의 현재 합계"를 기준으로 이 textarea가 쓸 수 있는 남은 예산을 구한다.
+      const others = getSpecialNoteTotals(code, '');
+      const remainingNewlines = SPECIAL_NOTE_MAX_TOTAL_NEWLINES - others.totalNewlines;
+      const remainingChars = SPECIAL_NOTE_MAX_TOTAL_CHARS - others.totalChars;
+
+      let text = newValue;
+      let newlineBlocked = false;
+      let charBlocked = false;
+
+      // 1) 글자수 예산 초과 — 예산만큼만 남기고 뒷부분 절단
+      if (remainingChars >= 0 && text.length > remainingChars) {
+        text = text.slice(0, Math.max(0, remainingChars));
+        charBlocked = true;
+      } else if (remainingChars < 0) {
+        // 이미 다른 행들만으로 예산 초과(이론상 발생하면 안 되지만 방어적으로 처리)
+        text = before;
+        charBlocked = true;
+      }
+
+      // 2) 줄바꿈 예산 초과 — 허용된 줄바꿈 개수까지만 남기고, 그 뒤는 이어붙임(잘라내지 않고
+      //    줄바꿈만 제거 — 글자수 예산은 이미 위에서 별도로 처리했으므로 내용 손실 최소화)
+      if (remainingNewlines >= 0) {
+        const parts = text.split('\n');
+        if (parts.length - 1 > remainingNewlines) {
+          const head = parts.slice(0, remainingNewlines + 1).join('\n');
+          const tail = parts.slice(remainingNewlines + 1).join(''); // 남는 줄바꿈은 제거하고 이어붙임
+          text = head + tail;
+          newlineBlocked = true;
+        }
+      } else {
+        text = before;
+        newlineBlocked = true;
+      }
+
+      return { text, newlineBlocked, charBlocked };
+    }
+
+    /**
+     * 특이사항 textarea 한 줄(개행 기준) 길이 검사 — 84자 초과 시 하드 블록.
+     * 초과한 줄이 있으면 직전 값으로 되돌리고 팝업을 띄운다.
+     * @returns {boolean} true면 초과(블록됨), false면 정상
+     */
+    function checkSpecialNoteLineLength(value) {
+      const lines = value.split('\n');
+      for (const line of lines) {
+        if (line.length > SPECIAL_NOTE_MAX_LINE_LENGTH) {
+          return line.length;
+        }
+      }
+      return 0;
+    }
+
+    /**
+     * 특이사항 textarea input 이벤트 핸들러 — 공유 총량(21회/789자) 초과분은 잘라내고,
+     * 한 줄 84자 초과는 하드 블록 + 팝업으로 되돌린다.
+     * (한글 등 IME 조합 중에는 검증을 건너뛰어 조합 자체가 깨지지 않도록 한다.)
+     */
+    function onSpecialNoteInput(code, textarea) {
+      const isComposing = textarea.dataset.composing === '1';
+      const before = specialNoteLastValue[code] !== undefined ? specialNoteLastValue[code] : textarea.value;
+
+      if (isComposing) {
+        // 조합 중에는 자르거나 되돌리지 않고 자동 높이 조절 + 카운터만 갱신
+        autoGrowTextarea(textarea);
+        updateSpecialNoteCounter();
+        return;
+      }
+
+      const raw = textarea.value;
+      const caretAtEnd = textarea.selectionStart === raw.length;
+
+      // 1) 한 줄 84자 초과 — 하드 블록(되돌리기) + 팝업
+      const overLen = checkSpecialNoteLineLength(raw);
+      if (overLen > 0) {
+        textarea.value = before;
+        specialNoteLastValue[code] = before;
+        autoGrowTextarea(textarea);
+        updateSpecialNoteCounter();
+        showLimitAlert(
+          `한 줄에 입력 가능한 최대 글자수는 ${SPECIAL_NOTE_MAX_LINE_LENGTH}자입니다. ` +
+          `<span class="count-current">${overLen}</span>/${SPECIAL_NOTE_MAX_LINE_LENGTH}`,
+          true
+        );
+        return;
+      }
+
+      // 2) 공유 총량(줄바꿈 21회 / 글자수 789자) 초과 — 넘치는 부분만 잘라서 반영
+      const { text, newlineBlocked, charBlocked } = trimToSpecialNoteBudget(code, raw);
+      if (text !== raw) {
+        textarea.value = text;
+        // 커서가 끝부분에 있던 경우(대부분의 타이핑/붙여넣기) 잘린 텍스트 끝으로 커서 이동
+        if (caretAtEnd) {
+          textarea.selectionStart = textarea.selectionEnd = text.length;
+        }
+      }
+      specialNoteLastValue[code] = textarea.value;
+      autoGrowTextarea(textarea);
+      updateSpecialNoteCounter();
+
+      if (newlineBlocked) {
+        showLimitAlert(`줄바꿈 ${SPECIAL_NOTE_MAX_TOTAL_NEWLINES}회를 모두 사용했습니다.`);
+      } else if (charBlocked) {
+        showLimitAlert(`글자수 ${SPECIAL_NOTE_MAX_TOTAL_CHARS}자 이상 기재할 수 없습니다.`);
+      }
+    }
+
     // ── 특이사항 섹션 ──
     function createSpecialNoteSection() {
       const section = document.createElement('section');
       section.className = 'report-section report-section-special';
       section.dataset.section = 'special';
 
+      // 서버는 항상 사업부 5개(PAPER/TISSUE/PAD/SAFETY/ETC) 고정 순서로 5건을 반환한다
+      // (DailyReportService.getRemarksForUser — DB에 레코드가 없는 사업부는
+      //  content:"", remarkId:null 로 채워져 내려온다).
       const remarks = reportData?.remarks || [];
-      const noteContent = remarks.length > 0 ? remarks[0].content || '' : '';
-      // ★★ 기존 레코드 ID를 기억해 둔다 — 저장 시 이 값이 있으면 PUT(수정),
-      //    없으면 POST(신규)로 분기한다. (이전 버그: 항상 POST만 호출해
-      //    매번 새 행이 계속 생성되고, 화면에는 항상 remarks[0](최초 작성분)만
-      //    표시되어 수정 내용이 반영되지 않는 것처럼 보였음)
-      currentRemarkId = remarks.length > 0 ? remarks[0].remarkId : null;
+      const remarksByCategory = {};
+      remarks.forEach(r => { if (r.category) remarksByCategory[r.category] = r; });
+
+      // 기존 레코드 ID를 사업부별로 기억해 둔다 — 저장 시 이 값이 있으면 PUT(수정),
+      // 없으면 POST(신규)로 분기한다.
+      currentRemarkIds = {};
+      SPECIAL_NOTE_CATEGORIES.forEach(({ code }) => {
+        const r = remarksByCategory[code];
+        currentRemarkIds[code] = r ? r.remarkId : null;
+      });
 
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
       // ★★ 셀/이미지와 동일하게 오늘/어제 일보에서만 특이사항 등록/수정 가능
       const isEditableDate = isImageEditableDate(currentReportDate);
-      const canEditNote = canWrite && isEditableDate;
+
+      const rowsHtml = SPECIAL_NOTE_CATEGORIES.map(({ code, label }, idx) => {
+        const r = remarksByCategory[code] || {};
+        const content = r.content || '';
+        // ★★ 셀과 동일 원칙: 담당자(CellAuth)가 배정되지 않은 사업부 행은
+        //    editable이 서버에서 false로 내려오며, 이 경우 아무도 편집 불가(잠금).
+        //    담당자가 배정되어 있어도 canWrite/오늘·어제 날짜가 아니면 편집 불가.
+        const serverEditable = r.editable === true;
+        const canEditRow = canWrite && isEditableDate && serverEditable;
+        const isLockedRow = !serverEditable; // 담당자 미배정 = 잠금 (셀과 동일)
+
+        const ownerNames = r.ownerNames || '';
+        const ownerLabel = ownerNames ? `담당자: ${ownerNames}` : '담당자 미배정';
+        const savedLabel = r.savedByName && r.savedAt
+          ? `${escapeHtml(r.savedByName)} · ${formatSavedAt(r.savedAt)} 저장`
+          : '저장 이력 없음';
+
+        let helpMsg = '';
+        if (isLockedRow) {
+          helpMsg = '이 항목은 담당자가 배정되지 않아 편집할 수 없습니다.';
+        } else if (!isEditableDate) {
+          helpMsg = '특이사항은 오늘·어제 일보에서만 등록/수정할 수 있습니다.';
+        } else if (!canWrite) {
+          helpMsg = '쓰기 권한이 없습니다.';
+        }
+
+        const rowSpanAttr = idx === 0 ? ` rowspan="${SPECIAL_NOTE_CATEGORIES.length}"` : '';
+        const sideLabelCell = idx === 0
+          ? `<td class="special-side-label"${rowSpanAttr}>특이사항</td>`
+          : '';
+
+        return `
+              <tr class="${isLockedRow ? 'special-row-locked' : ''}">
+                ${sideLabelCell}
+                <td class="special-division-label">${escapeHtml(label)}</td>
+                <td class="special-note-wrap">
+                  <textarea id="specialNoteInput_${code}" class="special-note-input"
+                    data-category="${code}"
+                    placeholder="${escapeHtml(label)} 특이사항 입력"
+                    title="${escapeHtml(ownerLabel)}"
+                    ${canEditRow ? '' : 'disabled'}>${escapeHtml(content)}</textarea>
+                  <div class="special-note-meta">
+                    <span class="special-note-owner">${escapeHtml(ownerLabel)}</span>
+                    <span class="special-note-saved">${savedLabel}</span>
+                  </div>
+                  ${helpMsg ? `<div class="upload-help" style="padding:0 14px 8px;">${escapeHtml(helpMsg)}</div>` : ''}
+                </td>
+              </tr>`;
+      }).join('');
 
       section.innerHTML = `
-        <div class="section-title">특이사항</div>
+        <div class="section-title">
+          <span>특이사항</span>
+          <span class="special-note-counter" id="specialNoteCounter"></span>
+        </div>
         <div class="section-table-wrap">
           <table class="report-table special-table" id="specialNoteTable">
             <colgroup>
+              <col style="width:9%">
               <col style="width:12%">
-              <col style="width:88%">
+              <col style="width:79%">
             </colgroup>
             <tbody>
               <tr>
                 <td class="special-head-left">구분</td>
+                <td class="special-head-mid">사업부</td>
                 <td class="special-head-right">비고</td>
               </tr>
-              <tr>
-                <td class="special-side-label">특이사항</td>
-                <td class="special-note-wrap">
-                  <textarea id="specialNoteInput" class="special-note-input"
-                    placeholder="특이사항 입력"
-                    ${canEditNote ? '' : 'disabled'}>${escapeHtml(noteContent)}</textarea>
-                  ${canEditNote ? '' : '<div class="upload-help">특이사항은 오늘·어제 일보에서만 등록/수정할 수 있습니다.</div>'}
-                </td>
-              </tr>
+              ${rowsHtml}
             </tbody>
           </table>
         </div>
       `;
 
-      // 변경 감지
+      // 변경 감지 (행별 textarea 각각에 바인딩) + 분량 제한(줄바꿈 21회/글자수 789자
+      // 공유 총량, 한 줄 84자 개별 제한) 실시간 검증
       setTimeout(() => {
-        const textarea = document.getElementById('specialNoteInput');
-        if (textarea) {
-          textarea.addEventListener('input', () => setSaveState('저장 필요', 'dirty'));
-        }
+        specialNoteLastValue = {};
+        SPECIAL_NOTE_CATEGORIES.forEach(({ code }) => {
+          const textarea = document.getElementById(`specialNoteInput_${code}`);
+          if (textarea) {
+            specialNoteLastValue[code] = textarea.value;
+            // 한글 등 IME 조합 중에는 검증을 건너뛰기 위한 플래그
+            // (compositionend 이후 브라우저가 최종 input 이벤트를 다시 발생시키므로
+            //  그 시점에 dataset.composing이 '0'이 되어 정상적으로 검증이 수행된다.)
+            textarea.addEventListener('compositionstart', () => { textarea.dataset.composing = '1'; });
+            textarea.addEventListener('compositionend', () => { textarea.dataset.composing = '0'; });
+            textarea.addEventListener('input', () => {
+              onSpecialNoteInput(code, textarea);
+              setSaveState('저장 필요', 'dirty');
+            });
+            autoGrowTextarea(textarea);
+          }
+        });
+        updateSpecialNoteCounter();
       }, 0);
 
       return section;
@@ -1534,21 +1856,29 @@
           }
         }
 
-        // 3. 특이사항 저장
-        // ★★ 오늘/어제 일보에서만 활성화되므로(disabled 여부로 판단), 그 외 날짜에서는
-        //    애초에 textarea가 비활성화되어 값 변경이 불가능 — 저장 시도 자체를 건너뛴다.
-        // ★★ 기존 레코드(currentRemarkId)가 있으면 PUT으로 "수정", 없으면 POST로 "신규 생성"
-        //    (이전 버그: 항상 POST만 호출해 매번 새 행이 쌓이고 화면엔 최초 작성분만 표시됨)
+        // 3. 특이사항 저장 (사업부별 5행 — 담당자로 배정된 행만 활성화되어 있으므로
+        //    disabled 여부로 저장 대상을 판별한다. 잠긴 행/오늘·어제가 아닌 날짜의
+        //    행은 애초에 textarea가 비활성화되어 저장 시도 자체를 건너뛴다.)
+        // ★★ 사업부(category)별로 기존 레코드(currentRemarkIds[code])가 있으면
+        //    PUT으로 "수정", 없으면 POST로 "신규 생성"
         let noteSaveFailed = false;
-        const noteInput = document.getElementById('specialNoteInput');
-        if (noteInput && !noteInput.disabled) {
+        let noteSaveCount = 0;
+        for (const { code } of SPECIAL_NOTE_CATEGORIES) {
+          const noteInput = document.getElementById(`specialNoteInput_${code}`);
+          if (!noteInput || noteInput.disabled) continue;
+          const existingId = currentRemarkIds[code];
+          // ★★ 버그 수정(2026-07): 아직 한 번도 저장된 적 없고(신규 생성 대상) 값도
+          // 비어있는 칸은 저장 시도 자체를 건너뛴다. 그렇지 않으면 사용자가 손대지 않은
+          // 다른 사업부 칸 때문에 매번 백엔드 @NotBlank 검증(400)에 걸려, 정작 자신이
+          // 입력한 내용은 정상 저장됐는데도 "특이사항 저장 실패" 토스트가 잘못 표시된다.
+          if (!existingId && !noteInput.value.trim()) continue;
           try {
-            if (currentRemarkId) {
-              await apiFetch(`/reports/${currentReportId}/remarks/${currentRemarkId}`, {
+            if (existingId) {
+              await apiFetch(`/reports/${currentReportId}/remarks/${existingId}`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                  tableCode: 'SPECIAL',
-                  category: '특이사항',
+                  tableCode: 'TBL_SPECIAL_NOTE',
+                  category: code,
                   content: noteInput.value
                 })
               });
@@ -1556,15 +1886,16 @@
               const created = await apiFetch(`/reports/${currentReportId}/remarks`, {
                 method: 'POST',
                 body: JSON.stringify({
-                  tableCode: 'SPECIAL',
-                  category: '특이사항',
+                  tableCode: 'TBL_SPECIAL_NOTE',
+                  category: code,
                   content: noteInput.value
                 })
               });
-              currentRemarkId = created?.remarkId ?? currentRemarkId;
+              currentRemarkIds[code] = created?.remarkId ?? existingId;
             }
+            noteSaveCount++;
           } catch (err) {
-            console.warn('특이사항 저장 실패:', err);
+            console.warn(`특이사항(${code}) 저장 실패:`, err);
             noteSaveFailed = true;
           }
         }
@@ -1582,7 +1913,7 @@
           showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 셀 실패${detail ? ' - ' + detail : ''}${noteDetail}`);
         } else {
           setSaveState(`저장됨 ${timeStr}`, 'saved');
-          showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 반영`);
+          showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 ${noteSaveCount}건 반영`);
         }
 
         // 자동 새로고침 표시 복원
@@ -1590,6 +1921,12 @@
         if (indicator) {
           indicator.classList.remove('paused');
           document.getElementById('autoRefreshLabel').textContent = '자동 갱신 60초';
+        }
+
+        // ★★ 특이사항은 서버에서 remarkId/savedByName/savedAt이 갱신되므로
+        //    저장 직후 최신 상태를 다시 불러와 화면에 반영한다 (silent 새로고침).
+        if (noteSaveCount > 0) {
+          await loadReport(currentReportDate, true);
         }
 
       } catch (err) {
