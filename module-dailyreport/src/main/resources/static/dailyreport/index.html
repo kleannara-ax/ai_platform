@@ -14,6 +14,8 @@
       --blue:#2563eb;
       --blue-soft:#dbeafe;
       --blue-hover:#e9f2ff;
+      --yellow-soft:#fef9c3;
+      --yellow-hover:#fef3c7;
       --ok:#16a34a;
       --warn:#b45309;
       --disabled:#f3f4f6;
@@ -65,6 +67,7 @@
     .legend-item { display:flex; align-items:center; gap:8px; }
     .swatch { width:18px; height:18px; border-radius:6px; border:1px solid #cbd5e1; }
     .swatch.mine { background:var(--blue-soft); border-color:#60a5fa; }
+    .swatch.auto { background:var(--yellow-soft); border-color:#eab308; }
     .swatch.locked { background:#f3f4f6; border-color:#d1d5db; }
 
     /* ── 리포트 테이블 ── */
@@ -104,8 +107,10 @@
     .nowrap-cell { white-space:nowrap !important; }
     .no-border { background:transparent !important; }
     .cell.mine { background:var(--blue-soft) !important; box-shadow:inset 0 0 0 1px #60a5fa; }
+    .cell.mine.auto-cell { background:var(--yellow-soft) !important; box-shadow:inset 0 0 0 1px #eab308; }
     .cell.locked { background:#f3f4f6 !important; color:#64748b !important; }
     .cell.hover-own:hover { background:var(--blue-hover) !important; }
+    .cell.hover-own.auto-cell:hover { background:var(--yellow-hover) !important; }
     .cell-editor { width:100%; height:100%; display:flex; align-items:center; }
     .cell-input { width:100%; min-height:28px; line-height:1.3; border:0; outline:none; background:transparent; padding:0; margin:0; font:inherit; color:inherit; text-align:inherit; vertical-align:middle; box-sizing:border-box; }
     .cell-input:disabled { color:#94a3b8; cursor:not-allowed; }
@@ -235,7 +240,8 @@
 
     <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small></div>
     <div class="legend">
-      <div class="legend-item"><span class="swatch mine"></span> 입력 가능한 본인 담당 셀 (어제/오늘/미래)</div>
+      <div class="legend-item"><span class="swatch mine"></span> 파란색: 사람이 수기로 입력하는 셀 (본인 담당, 어제/오늘/미래)</div>
+      <div class="legend-item"><span class="swatch auto"></span> 노란색: 자동화 시스템이 값을 기입하는 셀 (본인 담당, 어제/오늘/미래)</div>
       <div class="legend-item"><span class="swatch locked"></span> 잠금 또는 비담당 셀</div>
     </div>
 
@@ -1056,6 +1062,19 @@
       }
     }
 
+    // ── 자동화 시스템이 값을 기입하는 셀(엑셀 좌표) 목록 ──
+    // 이 셀들은 "본인 담당(mine)" 상태여도 파란색이 아니라 노란색으로 표시해서,
+    // 사람이 직접 수기 입력하는 셀과 시각적으로 구분한다.
+    //  - 1.주요 생산 지표 현황: 제지3 평균선속(O7)/초지5 생산량(O8)/고지감량율(O12) 당월
+    //  - 2.제지 재공품 및 야적현황: 제지 재공품(M21~M24)/장기재고(M25~M26)/야적현황(M27~M28) 당월
+    //  - 3.에너지 원단위: 전월 실적(E36~E41)/당월 실적(G36~G41) 전체
+    const AUTO_FILLED_COORDS = new Set([
+      'O7', 'O8', 'O12',
+      'M21', 'M22', 'M23', 'M24', 'M25', 'M26', 'M27', 'M28',
+      'E36', 'E37', 'E38', 'E39', 'E40', 'E41',
+      'G36', 'G37', 'G38', 'G39', 'G40', 'G41',
+    ]);
+
     function renderCellTd(cell, rowSpan, colSpan, minRow, maxRow, isDual) {
       // 서버 응답: isEditable (Java CellResponse), Mock 서버: editable (레거시)
       const serverEditable = cell.isEditable !== undefined ? cell.isEditable
@@ -1146,8 +1165,14 @@
       }
 
       // 셀 하이라이팅
+      // 자동화 시스템이 값을 기입하는 셀(AUTO_FILLED_COORDS)은 "본인 담당"이어도
+      // 파란색이 아니라 노란색(auto-cell)으로 표시해 사람 수기 입력 셀과 구분한다.
+      const isAutoFilledCell = AUTO_FILLED_COORDS.has(cell.excelCoord || '');
       if (isMyCell && finalEditable) {
         cellClasses += ' mine hover-own';
+        if (isAutoFilledCell) {
+          cellClasses += ' auto-cell';
+        }
       } else if (isMyCell && !finalEditable) {
         cellClasses += ' locked';
       }
@@ -2124,13 +2149,13 @@
             cloneEl.setAttribute('value', origEl.value);
           }
         });
-        // 캡처용 사본에서는 "내가 입력 가능한 셀(파란 강조 + 입력창)"을
+        // 캡처용 사본에서는 "내가 입력 가능한 셀(파란/노란 강조 + 입력창)"을
         // 다른 사람들이 보는 일반 읽기전용 셀과 똑같은 모습으로 표시한다.
-        // - .mine/.hover-own 클래스를 제거해 파란 배경/강조 테두리 제거
+        // - .mine/.hover-own/.auto-cell 클래스를 제거해 강조 배경/테두리 제거
         // - <input> 편집창을 실제 값 텍스트만 있는 읽기전용 표시(.cell-value)로 교체
         //   (html2canvas의 inset box-shadow 과다 렌더링 이슈도 이 방식으로 자연히 해결됨)
         clone.querySelectorAll('td.mine, td.cell.mine').forEach((td) => {
-          td.classList.remove('mine', 'hover-own');
+          td.classList.remove('mine', 'hover-own', 'auto-cell');
           const editor = td.querySelector('.cell-editor');
           const input = editor ? editor.querySelector('.cell-input') : null;
           if (editor && input) {
