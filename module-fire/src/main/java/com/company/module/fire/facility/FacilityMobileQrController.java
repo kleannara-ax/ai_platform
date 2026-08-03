@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +38,7 @@ public class FacilityMobileQrController {
     private final FacilityEquipmentService facilityEquipmentService;
     private final FacilityAirconFaultReportRepository airconFaultReportRepository;
     private final FacilityWaterDisinfectionRepository waterDisinfectionRepository;
+    private final FacilityWaterConsumptionRepository waterConsumptionRepository;
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(IllegalArgumentException ex) {
@@ -74,10 +76,14 @@ public class FacilityMobileQrController {
         }
         Map<String, Object> result = equipmentDetail(equipment);
         result.put("registered", true);
-        result.put("recentDisinfections", waterDisinfectionRepository
-                .findTop5ByEquipment_EquipmentIdOrderByDisinfectionDateDescDisinfectionIdDesc(equipment.getEquipmentId())
+        YearMonth month = YearMonth.now();
+        result.put("consumptionYearMonth", month.toString());
+        result.put("currentMonthConsumption", waterConsumptionRepository.sumBottleCountByEquipmentAndDateBetween(
+                equipment.getEquipmentId(), month.atDay(1), month.atEndOfMonth()));
+        result.put("recentConsumptions", waterConsumptionRepository
+                .findTop10ByEquipment_EquipmentIdOrderByConsumptionDateDescConsumptionIdDesc(equipment.getEquipmentId())
                 .stream()
-                .map(this::disinfectionRow)
+                .map(this::consumptionRow)
                 .toList());
         return ResponseEntity.ok(ApiResponse.success(result));
     }
@@ -178,6 +184,26 @@ public class FacilityMobileQrController {
         return ResponseEntity.ok(ApiResponse.success(faultReportRow(report)));
     }
 
+    @PostMapping(value = "/water-purifiers/{qrKey}/consumptions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> submitWaterConsumption(
+            @PathVariable String qrKey,
+            @RequestParam int bottleCount) {
+        if (bottleCount < 1 || bottleCount > 9) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("물통 수량은 한 번에 1통 이상 9통 이하로 등록할 수 있습니다."));
+        }
+        FacilityEquipment equipment = findByQrKey(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, qrKey);
+        LocalDate date = LocalDate.now();
+        FacilityWaterConsumption consumption = waterConsumptionRepository.save(FacilityWaterConsumption.builder()
+                .equipment(equipment).consumptionDate(date).bottleCount(bottleCount).build());
+        Map<String, Object> result = consumptionRow(consumption);
+        YearMonth month = YearMonth.from(date);
+        result.put("currentMonthConsumption", waterConsumptionRepository.sumBottleCountByEquipmentAndDateBetween(
+                equipment.getEquipmentId(), month.atDay(1), month.atEndOfMonth()));
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // Kept for historical clients. New QR pages use the consumption endpoint above.
     @PostMapping(value = "/water-purifiers/{qrKey}/disinfections", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> submitWaterDisinfection(
@@ -298,6 +324,15 @@ public class FacilityMobileQrController {
         row.put("status", report.getStatus());
         row.put("createdAt", report.getCreatedAt());
         row.put("completedAt", report.getCompletedAt());
+        return row;
+    }
+
+    private Map<String, Object> consumptionRow(FacilityWaterConsumption consumption) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("consumptionId", consumption.getConsumptionId());
+        row.put("consumptionDate", consumption.getConsumptionDate());
+        row.put("bottleCount", consumption.getBottleCount());
+        row.put("createdAt", consumption.getCreatedAt());
         return row;
     }
 

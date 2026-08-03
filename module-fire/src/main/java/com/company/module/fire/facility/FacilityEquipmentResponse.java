@@ -40,6 +40,9 @@ public class FacilityEquipmentResponse {
     private String lastFaultReason;
     private boolean inspectionRequested;
     private List<InspectionRow> inspections;
+    private String consumptionYearMonth;
+    private Integer monthlyConsumption;
+    private List<WaterConsumptionRow> waterConsumptions;
 
     public static FacilityEquipmentResponse from(FacilityEquipment e) {
         return FacilityEquipmentResponse.builder()
@@ -84,6 +87,27 @@ public class FacilityEquipmentResponse {
         this.inspections = list.stream()
                 .map(i -> new InspectionRow(i.getInspectionId(), i.getInspectionDate(), i.getInspectedByName(), i.isFaulty(), i.getFaultReason()))
                 .collect(Collectors.toList());
+    }
+
+    public void setWaterConsumption(String yearMonth, Integer monthlyConsumption, List<FacilityWaterConsumption> rows) {
+        this.consumptionYearMonth = yearMonth;
+        this.monthlyConsumption = monthlyConsumption == null ? 0 : monthlyConsumption;
+        this.waterConsumptions = rows == null ? List.of() : rows.stream()
+                .map(row -> new WaterConsumptionRow(row.getConsumptionId(), row.getConsumptionDate(), row.getBottleCount()))
+                .collect(Collectors.toList());
+    }
+
+    @Getter
+    public static class WaterConsumptionRow {
+        private final Long consumptionId;
+        private final LocalDate consumptionDate;
+        private final int bottleCount;
+
+        public WaterConsumptionRow(Long consumptionId, LocalDate consumptionDate, int bottleCount) {
+            this.consumptionId = consumptionId;
+            this.consumptionDate = consumptionDate;
+            this.bottleCount = bottleCount;
+        }
     }
 
     @Getter

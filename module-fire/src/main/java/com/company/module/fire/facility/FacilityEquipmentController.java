@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.Principal;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,11 +56,12 @@ public class FacilityEquipmentController {
             @RequestParam(required = false) List<Long> buildingIds,
             @RequestParam(required = false) Long floorId,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String yearMonth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         List<Long> selectedBuildingIds = selectedBuildingIds(buildingId, buildingIds);
         return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.getEquipmentList(
-                FacilityEquipmentService.CATEGORY_WATER_PURIFIER, selectedBuildingIds, floorId, q, page, size)));
+                FacilityEquipmentService.CATEGORY_WATER_PURIFIER, selectedBuildingIds, floorId, q, page, size, yearMonth)));
     }
 
     @GetMapping("/qr/list")
@@ -94,8 +96,36 @@ public class FacilityEquipmentController {
     }
 
     @GetMapping("/water-purifiers/{id}")
-    public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> getWaterPurifier(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.getDetail(FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id)));
+    public ResponseEntity<ApiResponse<FacilityEquipmentResponse>> getWaterPurifier(
+            @PathVariable Long id, @RequestParam(required = false) String yearMonth) {
+        return ResponseEntity.ok(ApiResponse.success(facilityEquipmentService.getDetail(
+                FacilityEquipmentService.CATEGORY_WATER_PURIFIER, id, yearMonth)));
+    }
+
+    @PostMapping("/water-purifiers/{id}/consumptions")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Void>> addWaterConsumption(
+            @PathVariable Long id, @RequestBody FacilityWaterConsumptionRequest request) {
+        facilityEquipmentService.addWaterConsumption(id,
+                request.getConsumptionDate() == null ? LocalDate.now() : request.getConsumptionDate(),
+                request.getBottleCount() == null ? 0 : request.getBottleCount());
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @PatchMapping("/water-purifiers/{id}/consumptions/{consumptionId}")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Void>> updateWaterConsumption(
+            @PathVariable Long id, @PathVariable Long consumptionId, @RequestBody FacilityWaterConsumptionRequest request) {
+        facilityEquipmentService.updateWaterConsumption(id, consumptionId, request.getConsumptionDate(),
+                request.getBottleCount() == null ? 0 : request.getBottleCount());
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @DeleteMapping("/water-purifiers/{id}/consumptions/{consumptionId}")
+    @PreAuthorize("@facilityPermissionService.hasOtherFacilityAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Void>> deleteWaterConsumption(@PathVariable Long id, @PathVariable Long consumptionId) {
+        facilityEquipmentService.deleteWaterConsumption(id, consumptionId);
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PostMapping("/air-conditioners")
