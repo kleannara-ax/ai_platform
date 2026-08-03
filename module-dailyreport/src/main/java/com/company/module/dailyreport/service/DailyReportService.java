@@ -122,6 +122,15 @@ public class DailyReportService {
                             }
                         }
                     }
+                    // ★★ 2026-08 추가: 이 기능 배포 이전에 만들어진 일보 등, 5개 사업부
+                    // 특이사항 행이 누락된 경우 보충한다 (기존에 이미 입력된 행은 건드리지 않음)
+                    boolean remarksMissing = SPECIAL_NOTE_CATEGORIES.keySet().stream()
+                            .anyMatch(cat -> report.getRemarks().stream()
+                                    .noneMatch(r -> cat.equals(r.getCategory())));
+                    if (remarksMissing) {
+                        Map<String, String> previousRemarkValues = findPreviousRemarkValues(reportDate);
+                        ensureDefaultRemarks(report, previousRemarkValues);
+                    }
                     return DailyReportResponse.fromWithDetails(report);
                 })
                 .orElseGet(() -> {
@@ -135,6 +144,10 @@ public class DailyReportService {
                     // ★ 값 이어받기: 직전 일보의 DATA 셀 값을 새 표의 초기값으로 반영
                     Map<String, String> previousValues = findPreviousCellValues(reportDate);
                     createDefaultTables(report, previousValues);
+                    // ★★ 2026-08 추가: 특이사항도 셀과 동일하게 직전 일보의 사업부별
+                    // 내용을 이어받아 5개 행을 미리 만들어둔다
+                    Map<String, String> previousRemarkValues = findPreviousRemarkValues(reportDate);
+                    ensureDefaultRemarks(report, previousRemarkValues);
                     reportRepository.save(report);
                     return DailyReportResponse.fromWithDetails(report);
                 });
@@ -165,6 +178,11 @@ public class DailyReportService {
         // 4개 기본 표 구조 생성 (★ 값 이어받기: 직전 일보의 DATA 셀 값을 초기값으로 반영)
         Map<String, String> previousValues = findPreviousCellValues(request.getReportDate());
         createDefaultTables(report, previousValues);
+
+        // ★★ 2026-08 추가: 특이사항도 셀과 동일하게 직전 일보의 사업부별 내용을
+        // 이어받아 5개 행을 미리 만들어둔다
+        Map<String, String> previousRemarkValues = findPreviousRemarkValues(request.getReportDate());
+        ensureDefaultRemarks(report, previousRemarkValues);
 
         reportRepository.save(report);
         return DailyReportResponse.fromWithDetails(report);
@@ -397,6 +415,10 @@ public class DailyReportService {
      * 특이사항 추가 (사업부 1행 신규 작성)
      * - CellAuth 기반 권한 검증: 이 사용자가 이 사업부(category)에 배정된 담당자여야 한다
      *   (셀과 동일 원칙 — 담당자 미배정 행은 아무도 편집 불가).
+     * - ★★ 2026-08: 이 기능 배포 이후에는 일보 생성 시 5개 사업부 행이 항상
+     *   미리 만들어져 있으므로(ensureDefaultRemarks), 이 메서드는 그 이전에
+     *   만들어진 레거시 일보에 행이 누락된 경우에만 실제로 호출된다. 정상적으로
+     *   새 값이 저장되었으므로 값 전파도 함께 수행한다.
      */
     @Transactional
     public RemarkResponse addRemark(Long reportId, RemarkRequest request, Long userId) {
@@ -423,12 +445,27 @@ public class DailyReportService {
 
         report.addRemark(remark);
         remarkRepository.save(remark);
+
+        // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
+        // 특이사항 값도 최신화
+        propagateRemarkForward(report.getReportDate(), request.getCategory(), request.getContent());
+
         return RemarkResponse.from(remark);
     }
 
     /**
      * 특이사항 수정
      * - updatedBy를 기록하여 "누가 마지막으로 저장했는지" 추적한다.
+     * - createdBy가 null(이어받기 상태, 아직 아무도 직접 입력한 적 없음)이면
+     *   이번이 최초로 사람이 손대는 시점이므로 작성자로도 기록한다
+     *   ({@link DailyReportRemark#updateContent}).
+     *
+     * ★★ 값 전파 안전장치(2026-08): 프론트가 "저장" 클릭 시 편집 가능한 특이사항
+     * 행을 전부 다시 전송하므로(변경 여부와 무관), 실제로 내용/카테고리가 바뀌지
+     * 않았다면 여기서 그대로 종료한다 — 그렇지 않으면 사용자가 건드리지 않은
+     * (이어받기 상태인) 행까지 매 저장마다 "touched"로 바뀌어 값 전파가
+     * 무력화된다(셀은 dirtyCoords로 변경된 셀만 전송하므로 이 문제가 없지만,
+     * 특이사항은 매번 전체를 재전송하는 구조라 서버에서 별도로 방어해야 한다).
      */
     @Transactional
     public RemarkResponse updateRemark(Long remarkId, RemarkRequest request, Long userId) {
@@ -438,9 +475,21 @@ public class DailyReportService {
         validateReportEditable(remark.getDailyReport());
         validateRemarkEditableDate(remark.getDailyReport());
         validateRemarkOwnership(remark.getCategory(), userId);
+
+        boolean unchanged = Objects.equals(remark.getContent(), request.getContent())
+                && Objects.equals(remark.getCategory(), request.getCategory());
+        if (unchanged) {
+            return RemarkResponse.from(remark);
+        }
+
         validateSpecialNoteLimits(remark.getDailyReport().getReportId(), remark.getRemarkId(),
                 remark.getCategory(), request.getContent());
         remark.updateContent(request.getContent(), request.getCategory(), userId);
+
+        // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
+        // 특이사항 값도 최신화
+        propagateRemarkForward(remark.getDailyReport().getReportDate(), remark.getCategory(), request.getContent());
+
         return RemarkResponse.from(remark);
     }
 
@@ -812,6 +861,135 @@ public class DailyReportService {
 
     private String carryOverKey(String tableCode, String excelCoord) {
         return tableCode + ":" + excelCoord;
+    }
+
+    // ─────────────────────────────────────────────
+    // 특이사항 값 이어받기 / 값 전파 (2026-08 추가, 셀과 동일한 2단계 원리)
+    // ─────────────────────────────────────────────
+
+    /**
+     * ★ 값 이어받기(carry-over) — 주어진 날짜 이전(과거)의 가장 최근 일보에서
+     *   사업부(category)별 특이사항 내용을 모아 반환한다. {@link #findPreviousCellValues}와
+     *   동일한 원리이며, 셀과 마찬가지로 "누가 입력했는지(사람/이어받기)"와 무관하게
+     *   비어있지 않은 내용은 모두 이어받기 후보가 된다.
+     *
+     * @return key = 사업부 코드(PAPER/TISSUE/PAD/SAFETY/ETC), value = 직전 일보에 입력된 내용
+     */
+    private Map<String, String> findPreviousRemarkValues(LocalDate reportDate) {
+        Optional<DailyReport> previous = reportRepository
+                .findTopByReportDateLessThanOrderByReportDateDesc(reportDate);
+        if (previous.isEmpty()) {
+            return Map.of();
+        }
+        return remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(previous.get().getReportId())
+                .stream()
+                .filter(r -> r.getContent() != null && !r.getContent().isBlank())
+                .collect(Collectors.toMap(DailyReportRemark::getCategory, DailyReportRemark::getContent,
+                        (existing, replacement) -> replacement));
+    }
+
+    /**
+     * ★ 값 이어받기 — 셀의 {@link #createDefaultTables}/{@link #applyCarriedOverValues}와
+     *   동일한 원리를 특이사항 5개 사업부 행에 적용한다. 이미 존재하는 카테고리 행은
+     *   건드리지 않고(기존 입력 보존), 아직 없는 카테고리 행만 새로 만들어 직전 일보의
+     *   내용을 초기값으로 반영한다. CREATED_BY는 null로 두어 "이어받기 상태, 아직 사람이
+     *   직접 입력한 적 없음"을 표시한다(셀의 LAST_EDITOR_ID null과 동일한 의미).
+     *
+     * - 신규 일보 생성 시(모든 카테고리 누락) 5개 행이 전부 새로 만들어진다.
+     * - 이 기능 배포 이전에 만들어진 기존 일보를 다시 열었을 때는 누락된 카테고리만
+     *   보충한다(이미 사람이 입력해 둔 다른 카테고리 행은 그대로 유지).
+     */
+    private void ensureDefaultRemarks(DailyReport report, Map<String, String> previousValues) {
+        Set<String> existingCategories = report.getRemarks().stream()
+                .map(DailyReportRemark::getCategory)
+                .collect(Collectors.toSet());
+        int sortOrder = report.getRemarks().size();
+        for (String category : SPECIAL_NOTE_CATEGORIES.keySet()) {
+            if (existingCategories.contains(category)) {
+                continue;
+            }
+            sortOrder++;
+            DailyReportRemark remark = DailyReportRemark.builder()
+                    .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                    .category(category)
+                    .content(previousValues.getOrDefault(category, ""))
+                    .sortOrder(sortOrder)
+                    .createdBy(null) // ★ 이어받기 상태 — 아직 사람이 직접 입력한 적 없음
+                    .build();
+            report.addRemark(remark);
+        }
+    }
+
+    /** SPECIAL_NOTE_CATEGORIES 정의 순서 기준 사업부 코드의 고정 정렬 순서(1부터 시작) */
+    private int sortOrderOfCategory(String category) {
+        int i = 1;
+        for (String c : SPECIAL_NOTE_CATEGORIES.keySet()) {
+            if (c.equals(category)) {
+                return i;
+            }
+            i++;
+        }
+        return SPECIAL_NOTE_CATEGORIES.size() + 1; // 이론상 도달 불가 (category는 항상 유효한 값)
+    }
+
+    /**
+     * ★★ 값 전파(forward propagation, 2026-08 추가) — {@link CellService#propagateValueForward}와
+     * 완전히 동일한 원리를 특이사항에 적용한다. 특이사항을 저장할 때마다 그 날짜
+     * "다음"에 이미 존재하는 일보들을 날짜 순서대로 순회하며, 동일 사업부(category)
+     * 행이 아직 사람이 직접 입력한 적 없는(CREATED_BY가 null인, 즉 이어받기 상태
+     * 그대로인) 상태라면 방금 저장한 내용으로 갱신하고 계속 다음 날짜로 전파한다.
+     *
+     * 어느 미래 일보에서든 그 행에 사람이 이미 직접 내용을 입력해 둔 경우
+     * (CREATED_BY != null)라면 — 예: 특정 날짜에 특이사항을 미리 입력해 둔 경우 —
+     * 그 값은 의도적인 사전 입력/오버라이드이므로 그 시점에서 전파를 멈추고 절대
+     * 덮어쓰지 않는다.
+     *
+     * ※ 이 기능 배포 이전에 만들어진 미래 일보는 해당 사업부 행 자체가 없을 수
+     *   있으므로, 없으면 이어받기 상태의 새 행을 만들어 전파를 계속한다.
+     * ※ {@link DailyReportRemark#carryOverContent}를 사용하므로 CREATED_BY/UPDATED_BY는
+     *   변경되지 않는다 — 여전히 "이어받은 값일 뿐 아직 아무도 직접 입력하지 않았다"는
+     *   상태가 그대로 유지된다.
+     * ※ 무한 루프/과도한 조회 방지를 위해 최대 366일(약 1년)까지만 전파한다.
+     */
+    private void propagateRemarkForward(LocalDate fromDate, String category, String newContent) {
+        LocalDate cursor = fromDate;
+        for (int hop = 0; hop < 366; hop++) {
+            DailyReport nextReport = reportRepository
+                    .findTopByReportDateGreaterThanOrderByReportDateAsc(cursor)
+                    .orElse(null);
+            if (nextReport == null) {
+                break; // 더 이상 미래에 생성된 일보가 없음
+            }
+            cursor = nextReport.getReportDate();
+
+            DailyReportRemark nextRemark = remarkRepository
+                    .findByDailyReport_ReportIdAndCategory(nextReport.getReportId(), category)
+                    .orElse(null);
+
+            if (nextRemark == null) {
+                // 이 기능 배포 이전에 만들어진 미래 일보 등, 해당 사업부 행이 아직 없는
+                // 경우 — 이어받기 상태의 새 행을 만들어 전파를 계속한다.
+                DailyReportRemark created = DailyReportRemark.builder()
+                        .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                        .category(category)
+                        .content(newContent)
+                        .sortOrder(sortOrderOfCategory(category))
+                        .createdBy(null)
+                        .build();
+                nextReport.addRemark(created);
+                remarkRepository.save(created);
+                continue; // 이 행도 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
+            }
+
+            if (nextRemark.getCreatedBy() != null) {
+                break; // 이미 사람이 직접 입력해 둔 값 — 의도적 오버라이드이므로 전파 중단
+            }
+
+            if (!Objects.equals(nextRemark.getContent(), newContent)) {
+                nextRemark.carryOverContent(newContent);
+            }
+            // 이 행은 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
+        }
     }
 
     /**

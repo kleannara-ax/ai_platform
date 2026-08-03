@@ -18,6 +18,12 @@ import java.time.LocalDateTime;
  * 셀 시스템과 동일하게 daily_report_cell_auth(TABLE_CODE='TBL_SPECIAL_NOTE',
  * CELL_COORDS=[사업부코드])로 담당자를 배정하며, "누가 언제 저장했는지"를
  * 화면에 표시하기 위해 UPDATED_BY(최종 수정자)를 추가한다.
+ *
+ * ★★ 2026-08 개편: 일보 생성 시 5개 사업부 행을 셀과 동일하게 미리 만들어두고,
+ * 직전 일보의 값을 이어받는다({@code DailyReportService#ensureDefaultRemarks}).
+ * 저장 시에는 이미 만들어져 있는 미래 일보 중 아직 사람이 손대지 않은 동일
+ * 사업부 행에도 값을 전파한다({@code DailyReportService#propagateRemarkForward}).
+ * CREATED_BY가 null이면 "이어받기 상태, 아직 사람이 직접 입력한 적 없음"을 뜻한다.
  */
 @Entity
 @Table(name = "daily_report_remark")
@@ -51,8 +57,16 @@ public class DailyReportRemark {
     @Column(name = "SORT_ORDER", nullable = false)
     private Integer sortOrder;
 
-    /** 최초 작성자 ID (core_user 참조) */
-    @Column(name = "CREATED_BY", nullable = false)
+    /**
+     * 최초 작성자 ID (core_user 참조)
+     *
+     * ★★ 2026-08 값 전파(forward propagation) 도입: null이면 "아직 아무도 직접
+     * 입력하지 않은, 전일 값을 이어받기만 한 상태"를 의미한다 (셀의 LAST_EDITOR_ID
+     * null과 동일한 개념). 사람이 실제로 저장하는 순간(최초 1회) 이 값이 채워지며,
+     * 그 이후로는 이 행이 값 전파의 대상에서 제외되어(=의도적 입력으로 보존) 절대
+     * 자동으로 덮어써지지 않는다. (과거 데이터는 항상 값이 채워져 있어 그대로 보존됨)
+     */
+    @Column(name = "CREATED_BY")
     private Long createdBy;
 
     /** 최종 수정자 ID (core_user 참조) — "누가 언제 저장했는지" 추적용 */
@@ -90,10 +104,31 @@ public class DailyReportRemark {
         this.dailyReport = dailyReport;
     }
 
-    /** 내용 수정 (★ updatedBy를 함께 기록하여 "누가 언제 저장했는지" 추적) */
+    /**
+     * 내용 수정 (사람이 직접 저장) — updatedBy를 함께 기록하여 "누가 언제
+     * 저장했는지" 추적한다.
+     *
+     * ★★ 2026-08: 이 행이 지금까지 "이어받기 상태"(createdBy == null)였다면,
+     * 이번이 최초로 사람이 직접 저장하는 시점이므로 작성자로도 기록한다 —
+     * 이후로는 값 전파(propagateRemarkForward) 대상에서 제외되어 보존된다.
+     */
     public void updateContent(String content, String category, Long updatedBy) {
+        if (this.createdBy == null) {
+            this.createdBy = updatedBy;
+        }
         this.content = content;
         this.category = category;
         this.updatedBy = updatedBy;
+    }
+
+    /**
+     * ★★ 값 이어받기/전파(carry-over, 2026-08 추가) 전용 — 시스템이 자동으로
+     * 이어받기 값을 채우거나 최신화할 때 사용한다. CREATED_BY/UPDATED_BY(사람이
+     * 직접 손댄 기록)는 절대 건드리지 않는다 — 여전히 "이어받은 값일 뿐 아직
+     * 아무도 직접 입력하지 않았다"는 상태가 그대로 유지되어, 계속 값 전파의
+     * 대상이 될 수 있다.
+     */
+    public void carryOverContent(String content) {
+        this.content = content;
     }
 }
