@@ -2123,6 +2123,56 @@
       offscreen.style.padding = '24px';
       offscreen.style.boxSizing = 'border-box';
 
+      // ★ 캡처 전용 글자 확대 스타일 — 화면(라이브 페이지)에는 전혀 영향을 주지
+      //   않고, 이 오프스크린 캡처 사본에만 적용된다. 셀 안에 거의 꽉 찰 정도로
+      //   숫자/텍스트를 크게 키워서 캡처 이미지의 가독성을 높인다.
+      const captureStyle = document.createElement('style');
+      captureStyle.textContent = `
+        #pptCaptureOffscreen .table-cell,
+        #pptCaptureOffscreen .cell-value,
+        #pptCaptureOffscreen .cell-input,
+        #pptCaptureOffscreen .special-note-input,
+        #pptCaptureOffscreen .special-side-label,
+        #pptCaptureOffscreen .special-division-label,
+        #pptCaptureOffscreen .special-head-left,
+        #pptCaptureOffscreen .special-head-mid,
+        #pptCaptureOffscreen .special-head-right {
+          font-size: 22px !important;
+          line-height: 1.3 !important;
+        }
+        /* 표3(에너지 원단위)/표4(보일러) 처럼 컬럼폭이 좁아 nowrap으로 고정된 셀은
+           26px까지 키우면 텍스트가 컬럼폭을 넘어 잘리므로, 폭이 좁은 nowrap 셀은
+           살짝 작은 크기를 유지해 잘림 없이 안전하게 표시한다. */
+        #pptCaptureOffscreen .nowrap-cell {
+          font-size: 19px !important;
+        }
+        #pptCaptureOffscreen .section-title {
+          font-size: 24px !important;
+          padding: 16px 18px !important;
+        }
+      `;
+      offscreen.appendChild(captureStyle);
+      offscreen.id = 'pptCaptureOffscreen';
+
+      // ★ 캡처 상단 날짜 표시줄 — 우측 상단에 "오늘 날짜"를 표시 (캡처 이미지에만 포함)
+      const dateHeader = document.createElement('div');
+      dateHeader.style.display = 'flex';
+      dateHeader.style.justifyContent = 'flex-end';
+      dateHeader.style.marginBottom = '10px';
+      const dateBadge = document.createElement('div');
+      const todayObj = new Date();
+      const todayLabel = `${todayObj.getFullYear()}년 ${todayObj.getMonth() + 1}월 ${todayObj.getDate()}일`;
+      dateBadge.textContent = todayLabel;
+      dateBadge.style.fontSize = '32px';
+      dateBadge.style.fontWeight = '800';
+      dateBadge.style.color = '#0f172a';
+      dateBadge.style.background = '#ffffff';
+      dateBadge.style.border = '1px solid #cbd5e1';
+      dateBadge.style.borderRadius = '12px';
+      dateBadge.style.padding = '10px 22px';
+      dateHeader.appendChild(dateBadge);
+      offscreen.appendChild(dateHeader);
+
       const inner = document.createElement('div');
       inner.style.display = 'flex';
       inner.style.flexDirection = 'column';
