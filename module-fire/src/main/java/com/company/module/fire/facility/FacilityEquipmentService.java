@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +40,7 @@ public class FacilityEquipmentService {
     private final FacilityEquipmentRepository equipmentRepository;
     private final FacilityEquipmentInspectionRepository inspectionRepository;
     private final FacilityAirconFaultReportRepository airconFaultReportRepository;
+    private final FacilityWaterConsumptionRepository waterConsumptionRepository;
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
 
@@ -49,6 +51,11 @@ public class FacilityEquipmentService {
 
     public Page<FacilityEquipmentResponse> getEquipmentList(String category, List<Long> buildingIds, Long floorId,
                                                             String keyword, int page, int size) {
+        return getEquipmentList(category, buildingIds, floorId, keyword, page, size, null);
+    }
+
+    public Page<FacilityEquipmentResponse> getEquipmentList(String category, List<Long> buildingIds, Long floorId,
+                                                            String keyword, int page, int size, String yearMonth) {
         String normalizedCategory = normalizeCategory(category);
         Pageable pageable = PageRequest.of(page, size, Sort.by("equipmentId").ascending());
         List<Long> bIds = buildingIds == null ? null : buildingIds.stream()
@@ -66,12 +73,18 @@ public class FacilityEquipmentService {
             if (CATEGORY_AIRCON.equals(normalizedCategory)) {
                 dto.setInspectionRequested(airconFaultReportRepository
                         .existsByEquipment_EquipmentIdAndStatus(e.getEquipmentId(), "REQUESTED"));
+            } else if (CATEGORY_WATER_PURIFIER.equals(normalizedCategory)) {
+                applyWaterConsumption(dto, e.getEquipmentId(), yearMonth, false);
             }
             return dto;
         });
     }
 
     public FacilityEquipmentResponse getDetail(String category, Long equipmentId) {
+        return getDetail(category, equipmentId, null);
+    }
+
+    public FacilityEquipmentResponse getDetail(String category, Long equipmentId, String yearMonth) {
         FacilityEquipment e = findOwned(category, equipmentId);
         FacilityEquipmentResponse dto = FacilityEquipmentResponse.from(e);
         Pageable top12 = PageRequest.of(0, MAX_INSPECTION_HISTORY,
@@ -85,6 +98,8 @@ public class FacilityEquipmentService {
         if (CATEGORY_AIRCON.equals(normalizeCategory(category))) {
             dto.setInspectionRequested(airconFaultReportRepository
                     .existsByEquipment_EquipmentIdAndStatus(equipmentId, "REQUESTED"));
+        } else if (CATEGORY_WATER_PURIFIER.equals(normalizeCategory(category))) {
+            applyWaterConsumption(dto, equipmentId, yearMonth, true);
         }
         return dto;
     }
@@ -318,6 +333,57 @@ public class FacilityEquipmentService {
             throw new BusinessException("설비와 점검 이력이 일치하지 않습니다.");
         }
         inspectionRepository.delete(inspection);
+    }
+
+    @Transactional
+    public FacilityWaterConsumption addWaterConsumption(Long equipmentId, LocalDate consumptionDate, int bottleCount) {
+        FacilityEquipment equipment = findOwned(CATEGORY_WATER_PURIFIER, equipmentId);
+        validateBottleCount(bottleCount);
+        if (consumptionDate == null) throw new BusinessException("등록일은 필수입니다.");
+        return waterConsumptionRepository.save(FacilityWaterConsumption.builder()
+                .equipment(equipment).consumptionDate(consumptionDate).bottleCount(bottleCount).build());
+    }
+
+    @Transactional
+    public void updateWaterConsumption(Long equipmentId, Long consumptionId, LocalDate consumptionDate, int bottleCount) {
+        findOwned(CATEGORY_WATER_PURIFIER, equipmentId);
+        validateBottleCount(bottleCount);
+        if (consumptionDate == null) throw new BusinessException("등록일은 필수입니다.");
+        FacilityWaterConsumption consumption = waterConsumptionRepository.findById(consumptionId)
+                .orElseThrow(() -> new EntityNotFoundException("물통 소모 이력", consumptionId));
+        if (!equipmentId.equals(consumption.getEquipment().getEquipmentId())) throw new BusinessException("정수기와 소모 이력이 일치하지 않습니다.");
+        consumption.update(consumptionDate, bottleCount);
+    }
+
+    @Transactional
+    public void deleteWaterConsumption(Long equipmentId, Long consumptionId) {
+        findOwned(CATEGORY_WATER_PURIFIER, equipmentId);
+        FacilityWaterConsumption consumption = waterConsumptionRepository.findById(consumptionId)
+                .orElseThrow(() -> new EntityNotFoundException("물통 소모 이력", consumptionId));
+        if (!equipmentId.equals(consumption.getEquipment().getEquipmentId())) throw new BusinessException("정수기와 소모 이력이 일치하지 않습니다.");
+        waterConsumptionRepository.delete(consumption);
+    }
+
+    private void applyWaterConsumption(FacilityEquipmentResponse dto, Long equipmentId, String requestedYearMonth, boolean includeRows) {
+        YearMonth month = parseYearMonth(requestedYearMonth);
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.atEndOfMonth();
+        List<FacilityWaterConsumption> rows = includeRows
+                ? waterConsumptionRepository.findByEquipment_EquipmentIdAndConsumptionDateBetweenOrderByConsumptionDateDescConsumptionIdDesc(equipmentId, from, to)
+                : List.of();
+        dto.setWaterConsumption(month.toString(), waterConsumptionRepository.sumBottleCountByEquipmentAndDateBetween(equipmentId, from, to), rows);
+    }
+
+    private YearMonth parseYearMonth(String value) {
+        try {
+            return value == null || value.isBlank() ? YearMonth.now() : YearMonth.parse(value);
+        } catch (Exception ex) {
+            throw new BusinessException("연/월 형식이 올바르지 않습니다. (YYYY-MM)");
+        }
+    }
+
+    private void validateBottleCount(int bottleCount) {
+        if (bottleCount < 1 || bottleCount > 9) throw new BusinessException("물통 수량은 한 번에 1통 이상 9통 이하로 등록할 수 있습니다.");
     }
 
     @Transactional

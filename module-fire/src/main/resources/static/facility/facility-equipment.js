@@ -14,7 +14,7 @@
   };
   const state = {
     items: [], buildings: [], floors: [], buildingFloorMap: {},
-    q: '', buildingIds: [], floorId: '', status: null,
+    q: '', buildingIds: [], floorId: '', status: null, consumptionYearMonth: new Date().toISOString().slice(0, 7),
     sort: { key: 'serialNumber', direction: 'asc' },
     editingId: 0, inspectId: 0, selectedCoord: null,
     planImagePath: '', existingMarkers: [], planView: { scale: 1 }
@@ -168,11 +168,9 @@
               ${CFG.subtitle ? `<div class="text-white-50 fw-semibold">${esc(CFG.subtitle)}</div>` : ''}
               <div class="text-white-50 fw-semibold mt-1">총 <span id="totalCount">0</span> 건</div>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <div class="btn-group" role="group">
-                <button type="button" class="btn btn-info text-white fw-bold" id="btnStatusInspect">${esc(inspectStatusLabel())} <span id="countInspect">(0)</span></button>
-              </div>
-              ${canEdit() ? `<button type="button" class="btn btn-light fw-bold" id="btnAdd">+ ${esc(label)} 추가</button>` : ''}
+            <div class="d-flex align-items-center gap-2 flex-wrap facility-header-actions">
+              ${isWaterPurifierPage() ? `<div class="d-flex align-items-center gap-2"><input type="month" class="form-control facility-header-month" id="consumptionYearMonth" value="${esc(state.consumptionYearMonth)}"><button type="button" class="btn facility-header-btn facility-header-query" id="btnConsumptionSearch">조회</button></div>` : `<div class="btn-group status-chip-group" role="group"><button type="button" class="btn facility-header-btn facility-header-inspect" id="btnStatusInspect">${esc(inspectStatusLabel())} <span id="countInspect">(0)</span></button></div>`}
+              ${canEdit() ? `<button type="button" class="btn facility-header-btn facility-header-add" id="btnAdd">+ ${esc(label)} 추가</button>` : ''}
             </div>
           </div>
         </section>
@@ -222,12 +220,18 @@
     return `<div class="modal fade" id="inspectModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 점검</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 결과</strong></div><div class="row g-3"><div class="col-md-4"><label class="form-label fw-bold">점검일</label><input type="date" class="form-control" id="inspectDate"></div><div class="col-md-8 d-flex align-items-end"><div class="alert alert-info mb-0 w-100 py-2">${esc(inspectStatusLabel())} 처리 후 상태는 정상으로 저장됩니다.</div><input type="radio" class="btn-check" name="inspectFaulty" id="inspectOk" value="false" checked><input type="radio" class="btn-check" name="inspectFaulty" id="inspectBad" value="true"><textarea class="d-none" id="inspectFaultReason"></textarea></div><div class="col-12"><label class="form-label fw-bold">점검 사진(선택)</label><input type="file" class="form-control" id="inspectPhoto" accept="image/*"><div class="form-text">업로드 시 사용자가 업로드한 이미지가 교체됩니다.</div></div></div></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button class="btn btn-success" id="btnConfirmInspect">점검 완료</button></div></div></div></div>`;
   }
 
+  function renderWaterConsumptionRegisterModal() {
+    if (!isWaterPurifierPage()) return '';
+    return `<div class="modal fade" id="waterConsumptionRegisterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">물통 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><label class="form-label fw-bold">정수기</label><div class="form-control bg-light" id="waterConsumptionEquipmentName">-</div></div><div class="col-md-6"><label class="form-label fw-bold">등록일</label><input type="date" class="form-control" id="waterConsumptionDate" value="${today()}" readonly><div class="form-text">오늘 날짜로 등록됩니다.</div></div><div class="col-md-6"><label class="form-label fw-bold">물통 수 <span class="text-danger">*</span></label><input type="number" class="form-control" id="waterConsumptionBottleCount" min="1" max="9" value="1" required><div class="form-text">한 번에 1~9통만 등록할 수 있습니다.</div></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button><button type="button" class="btn btn-success" id="btnConfirmWaterConsumptionRegister">물통 등록</button></div></div></div></div>`;
+  }
+
   function renderModals() {
     return `
       <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${esc(label)} 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="detailsModalBody"></div></div></div></div>
       <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered" style="max-width:min(96vw,1400px)"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img id="zoomImage" alt="확대 이미지" style="max-width:100%;max-height:84vh;object-fit:contain"></div></div></div></div>
       ${renderInspectModal()}
-      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-12"><div class="fw-edit-section-title mb-2"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><div id="planContent" style="position:absolute;transform-origin:center center"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span><span>마우스 휠로 도면을 확대/축소할 수 있습니다.</span></div></div></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>점검 이력</strong><span>최근 12건 수정 / 추가 / 삭제</span></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th style="width:34%">점검일</th><th>점검자</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">점검 이력이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
+      ${renderWaterConsumptionRegisterModal()}
+      <div class="modal fade" id="upsertModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="upsertTitle">${esc(label)} 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="upsertForm"><input type="hidden" id="equipmentId"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="row g-3"><div class="col-md-6"><label class="form-label fw-bold">건물</label><select class="form-select" id="buildingSel" required></select></div><div class="col-md-6"><label class="form-label fw-bold">층</label><select class="form-select" id="floorSel" required></select></div><div class="col-12"><div class="fw-edit-section-title mb-2"><strong>도면 위치 선택</strong><span>도면 클릭으로 좌표를 지정합니다.</span></div><div class="border rounded p-2 bg-light"><div id="planCanvas" class="position-relative" style="height:480px;overflow:hidden;background:#fff;border:1px solid #ddd;border-radius:8px"><div id="planContent" style="position:absolute;transform-origin:center center"><img id="planImg" alt="도면" style="position:absolute;display:none"><div id="markerLayer" style="position:absolute;inset:0;z-index:3"></div></div></div><div class="small text-muted mt-2 d-flex flex-wrap gap-3"><span>선택 좌표: X <span id="coordXText">-</span> / Y <span id="coordYText">-</span></span><span>마우스 휠로 도면을 확대/축소할 수 있습니다.</span></div></div></div><div class="col-md-4"><label class="form-label fw-bold">${esc(installDateLabel())}</label><input type="${installDateInputType()}" class="form-control" id="manufactureMonth" required></div>${renderCycleField()}${renderTypeField()}${renderAirconFields()}<div class="col-md-3"><label class="form-label fw-bold">X 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordX"></div><div class="col-md-3"><label class="form-label fw-bold">Y 좌표(%)</label><input type="number" step="0.01" class="form-control" id="coordY"></div>${renderNoteAndPhotoFields()}</div></div><div class="fw-edit-section" id="historySection"><div class="fw-edit-section-title"><strong>월간 소모량 관리</strong><span>등록일과 물통 수량을 수정할 수 있습니다.</span></div><div class="d-flex gap-2 mb-3"><input type="month" class="form-control" id="editConsumptionMonth" style="max-width:180px"><button type="button" class="btn btn-outline-primary" id="btnEditConsumptionSearch">조회</button></div><div class="table-responsive fw-history-wrap"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>등록일</th><th>물통 수</th><th style="width:160px">관리</th></tr></thead><tbody id="historyBody"><tr><td colspan="3" class="text-center text-muted">등록 내역이 없습니다.</td></tr></tbody></table></div></div></form></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary" id="btnSave">저장</button></div></div></div></div>`;
   }
 
   function renderNav() {
@@ -274,6 +278,7 @@
     if (state.q) params.set('q', state.q);
     state.buildingIds.forEach(id => params.append('buildingIds', id));
     if (state.floorId) params.set('floorId', state.floorId);
+    if (isWaterPurifierPage() && state.consumptionYearMonth) params.set('yearMonth', state.consumptionYearMonth);
     const res = await API.req(`${apiBase}?${params}`); if (!res) return;
     const json = await res.json().catch(() => null);
     if (res.ok && json?.success !== false) state.items = unwrap(json)?.content || [];
@@ -283,10 +288,8 @@
 
   function bucket(item) {
     if (isAirconPage()) return { inspect: Boolean(item.inspectionRequested) };
-    const now = new Date(); now.setHours(0,0,0,0);
-    const last = item.lastInspectionDate ? new Date(item.lastInspectionDate) : null;
-    const inspect = !last || new Date(last.getTime() + 30*24*3600*1000) <= now;
-    return { inspect };
+    if (isWaterPurifierPage()) return { inspect: false };
+    return { inspect: false };
   }
 
   function filteredItems() {
@@ -296,7 +299,7 @@
 
   function updateCounts() {
     $('totalCount').textContent = String(state.items.length);
-    $('countInspect').textContent = `(${state.items.filter(i => bucket(i).inspect).length})`;
+    if ($('countInspect')) $('countInspect').textContent = `(${state.items.filter(i => bucket(i).inspect).length})`;
   }
 
   function sortValue(item, key) {
@@ -308,6 +311,7 @@
       case 'manufactureDate': return item.manufactureDate || '';
       case 'lastInspectionDate': return item.lastInspectionDate || '';
       case 'lastInspectorName': return item.lastInspectorName || '';
+      case 'monthlyConsumption': return Number(item.monthlyConsumption || 0);
       case 'note': return item.note || '';
       default: return '';
     }
@@ -334,25 +338,19 @@
   function renderTable(items) {
     const wrap = $('mainTableWrap'); if (!wrap) return;
     if (!items.length) { wrap.innerHTML = '<div class="text-center text-muted py-5">조회 결과가 없습니다.</div>'; return; }
+    const water = isWaterPurifierPage();
     const rows = sorted(items).map((it, idx) => {
-      const typeCell = isSimpleWaterPurifier() ? '' : `<td><div class="fw-semibold text-truncate" title="${esc(it.equipmentType || '')}">${esc(it.equipmentType || '-')}</div>${isAirconPage() ? `<div class="small text-muted mt-1">${esc([it.manufacturer, it.locationDescription, it.outdoorUnitCount ? '실외기 ' + outdoorUnitCount(it.outdoorUnitCount) + '대' : ''].filter(Boolean).join(' · ') || '-')}</div>` : ''}</td>`;
-      const noteCell = isSimpleWaterPurifier() ? '' : `<td class="text-truncate" title="${esc(it.note || '')}">${esc(it.note || '-')}</td>`;
-      const inspectionCells = isAirconPage() ? '' : `<td>${fmtDate(it.lastInspectionDate)}</td><td class="text-truncate" title="${esc(it.lastInspectorName || '')}">${esc(it.lastInspectorName || '-')}</td>`;
-      const requestButton = isAirconPage()
-        ? `<button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검 요청</button>`
-        : `<button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검</button>`;
-      return `<tr class="clickable-row js-detail" data-id="${it.equipmentId}">
-        <td class="text-center">${idx + 1}</td><td class="text-center fw-bold">${esc(it.serialNumber || '-')}</td>
-        <td class="text-truncate" title="${esc(it.buildingName || '')}">${esc(it.buildingName || '-')}</td>
-        <td class="text-truncate" title="${esc(it.floorName || '')}">${esc(it.floorName || '-')}</td>
-        ${typeCell}<td>${displayInstallDate(it.manufactureDate)}</td>${inspectionCells}
-        <td>${bucket(it).inspect ? `<span class="fw-status fw-warn">${esc(inspectStatusLabel())}</span>` : '<span class="fw-status fw-ok">정상</span>'}</td>
-        ${noteCell}<td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button>${requestButton}<button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td>
-      </tr>`;
+      const typeCell = isSimpleWaterPurifier() ? '' : `<td><div class="fw-semibold text-truncate">${esc(it.equipmentType || '-')}</div></td>`;
+      const noteCell = isSimpleWaterPurifier() ? '' : `<td class="text-truncate">${esc(it.note || '-')}</td>`;
+      const monthlyCell = water ? `<td class="fw-bold text-success text-center">${Number(it.monthlyConsumption || 0)}통</td>` : '';
+      const requestButton = isAirconPage() ? `<button class="btn btn-sm btn-fw-inspect js-inspect" data-id="${it.equipmentId}">점검 요청</button>` : '';
+      const waterRegisterButton = water ? `<button class="btn btn-sm btn-success js-water-consumption-register" data-id="${it.equipmentId}" data-name="${esc(`${it.serialNumber || '정수기'} · ${it.buildingName || '-'} ${it.floorName || ''}`.trim())}">물통 등록</button>` : '';
+      return `<tr class="clickable-row js-detail" data-id="${it.equipmentId}"><td class="text-center">${idx + 1}</td><td class="text-center fw-bold">${esc(it.serialNumber || '-')}</td><td>${esc(it.buildingName || '-')}</td><td>${esc(it.floorName || '-')}</td>${typeCell}<td>${displayInstallDate(it.manufactureDate)}</td>${monthlyCell}${noteCell}<td class="text-center"><div class="facility-actions">${canEdit() ? `<button class="btn btn-sm btn-fw-edit js-edit" data-id="${it.equipmentId}">수정</button>${requestButton}${waterRegisterButton}<button class="btn btn-sm btn-fw-delete js-delete" data-id="${it.equipmentId}" data-serial="${esc(it.serialNumber || '')}">삭제</button>` : ''}</div></td></tr>`;
     }).join('');
     const typeHead = isSimpleWaterPurifier() ? '' : th('종류', 'equipmentType', 'width:170px');
     const noteHead = isSimpleWaterPurifier() ? '' : th('비고', 'note', 'width:160px');
-    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive fw-list-scroll"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${typeHead}${th(installDateLabel(), 'manufactureDate', 'width:110px')}${isAirconPage() ? '' : `${th('최종 점검일', 'lastInspectionDate', 'width:110px')}${th('점검자', 'lastInspectorName', 'width:100px')}`}${th('상태', 'lastInspectionDate', 'width:100px')}${noteHead}<th style="width:160px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const waterHead = water ? th('월간 소모량', 'monthlyConsumption', 'width:120px;text-align:center') : '';
+    wrap.innerHTML = `<div class="fw-table-wrap"><div class="table-responsive fw-list-scroll"><table class="table table-hover mb-0 facility-list-table"><thead class="table-dark"><tr>${th('No.', 'rowNo', 'width:50px;text-align:center')}${th(CFG.serialLabel || '설비 ID', 'serialNumber', 'width:92px;text-align:center')}${th('건물', 'buildingName', 'width:110px')}${th('층', 'floorName', 'width:80px')}${typeHead}${th(installDateLabel(), 'manufactureDate', 'width:110px')}${waterHead}${noteHead}<th style="width:130px;text-align:center">관리</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function markerImage(type) {
@@ -376,8 +374,9 @@
       detailItem('실외기 대수', `${outdoorUnitCount(d.outdoorUnitCount)}대`);
   }
 
-  async function getDetail(id) {
-    const res = await API.req(`${apiBase}/${encodeURIComponent(id)}`); if (!res) return null;
+  async function getDetail(id, yearMonth = state.consumptionYearMonth) {
+    const suffix = isWaterPurifierPage() && yearMonth ? `?yearMonth=${encodeURIComponent(yearMonth)}` : '';
+    const res = await API.req(`${apiBase}/${encodeURIComponent(id)}${suffix}`); if (!res) return null;
     const json = await res.json().catch(() => null);
     if (!res.ok || json?.success === false || !json?.data) { alert(json?.message || '상세 정보를 불러오지 못했습니다.'); return null; }
     return json.data;
@@ -411,10 +410,10 @@
   async function openDetails(id) {
     const d = await getDetail(id); if (!d) return;
     const plan = await fetchPlanImage(d.buildingId, d.floorId, d.buildingName, d.floorName);
-    const inspRows = (d.inspections || []).length ? d.inspections.map(r => `<tr><td>${fmtDate(r.inspectionDate)}</td><td>${esc(r.inspectorName || '-')}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">점검 이력이 없습니다.</td></tr>';
+    const consumptionRows = (d.waterConsumptions || []).length ? d.waterConsumptions.map(r => `<tr><td>${fmtDate(r.consumptionDate)}</td><td class="fw-bold text-success">${Number(r.bottleCount)}통</td></tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted">등록 내역이 없습니다.</td></tr>';
     const typeDetail = isSimpleWaterPurifier() ? '' : detailItem(CFG.typeLabel || '종류', d.equipmentType);
     const noteBox = (!isSimpleWaterPurifier() && d.note) ? `<div class="fw-media-box mt-3"><strong>비고</strong><div class="mt-2">${esc(d.note)}</div></div>` : '';
-    const secondarySection = isAirconPage() ? noteBox : `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>점검 정보</strong><span>최근 12건</span></div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>점검일</th><th>점검자</th></tr></thead><tbody>${inspRows}</tbody></table></div>${noteBox}</div>`;
+    const secondarySection = isAirconPage() ? noteBox : `<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>월간 소모량</strong><span>${esc(d.consumptionYearMonth || state.consumptionYearMonth)}</span></div><div class="d-flex gap-2 mb-3"><input type="month" class="form-control" id="detailConsumptionMonth" value="${esc(d.consumptionYearMonth || state.consumptionYearMonth)}"><button class="btn btn-outline-primary" id="btnDetailConsumptionSearch" data-id="${d.equipmentId}">조회</button></div><div class="fs-5 fw-bold text-success mb-3">합계 ${Number(d.monthlyConsumption || 0)}통</div><div class="fw-history-wrap table-responsive"><table class="table table-sm fw-history-table mb-0"><thead><tr><th>등록일</th><th>물통 수</th></tr></thead><tbody>${consumptionRows}</tbody></table></div></div>`;
     const photoSection = renderDetailPhotoSection(d);
     const qrSection = renderDetailQrSection(d);
     $('detailsModalBody').innerHTML = `<div class="row g-4"><div class="col-lg-6 d-flex flex-column gap-3"><div class="fw-edit-section"><div class="fw-edit-section-title"><strong>기본 정보</strong></div><div class="fw-detail-grid">${detailItem(CFG.serialLabel || '설비 ID', d.serialNumber)}${detailItem('건물', d.buildingName)}${detailItem('층', d.floorName)}${typeDetail}${detailItem(installDateLabel(), displayInstallDate(d.manufactureDate))}${detailItem('좌표', d.x != null && d.y != null ? `X ${Number(d.x).toFixed(2)} / Y ${Number(d.y).toFixed(2)}` : '-')}${airconExtraDetail(d)}</div></div>${secondarySection}</div><div class="col-lg-6 d-flex flex-column gap-3">${photoSection}${qrSection}<div class="fw-edit-section"><div class="fw-edit-section-title"><strong>도면 위치</strong><span>클릭하면 확대됩니다.</span></div>${plan ? `<div class="fw-media-box position-relative js-zoomable" id="detailPlanWrap" data-zoom-src="${esc(plan)}" data-zoom-kind="plan" style="height:320px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center"><img id="detailPlanImg" src="${esc(plan)}" alt="도면" style="max-width:100%;max-height:100%;object-fit:contain;display:block"><div id="detailMarkerLayer" style="position:absolute;inset:0;z-index:3;pointer-events:none"></div></div>` : '<div class="fw-empty-box">도면 정보가 없습니다.</div>'}</div></div></div>`;
@@ -457,7 +456,7 @@
     state.editingId = Number(id || 0); state.selectedCoord = null;
     $('upsertTitle').textContent = state.editingId ? `${label} 수정` : `${label} 등록`;
     $('equipmentId').value = state.editingId || '';
-    $('historySection').style.display = state.editingId && !isAirconPage() ? '' : 'none';
+    $('historySection').style.display = state.editingId && isWaterPurifierPage() ? '' : 'none';
     if ($('photo')) $('photo').value = ''; fillTypeOptions(); resetFormDefaults();
     if (state.editingId) {
       const d = await getDetail(state.editingId); if (!d) return;
@@ -471,7 +470,7 @@
         if ($('outdoorUnitCount')) $('outdoorUnitCount').value = String(outdoorUnitCount(d.outdoorUnitCount));
         if ($('inspectionRequested')) $('inspectionRequested').value = String(Boolean(d.inspectionRequested));
       }
-      setCoord(d.x, d.y); renderHistory(d.inspections || []);
+      setCoord(d.x, d.y); if (isWaterPurifierPage()) { $('editConsumptionMonth').value = d.consumptionYearMonth || state.consumptionYearMonth; renderConsumptionHistory(d.waterConsumptions || []); } else renderHistory(d.inspections || []);
     } else {
       renderHistory([]);
       if (preset.buildingId) { $('buildingSel').value = preset.buildingId; updateModalFloorOptions(); }
@@ -531,6 +530,27 @@
     const list = rows.slice(0, 12);
     const blank = `<tr class="js-new-history"><td><input type="date" class="form-control form-control-sm js-h-date" value="${today()}"><input type="hidden" class="js-h-faulty" value="false"><input type="hidden" class="js-h-reason" value=""></td><td class="text-muted">신규</td><td><button type="button" class="btn btn-sm btn-primary js-h-add">추가</button></td></tr>`;
     body.innerHTML = list.map(r => `<tr data-id="${r.inspectionId}"><td><input type="date" class="form-control form-control-sm js-h-date" value="${fmtDate(r.inspectionDate)}"><input type="hidden" class="js-h-faulty" value="false"><input type="hidden" class="js-h-reason" value=""></td><td class="fw-history-name">${esc(r.inspectorName || '-')}</td><td><div class="fw-history-actions"><button type="button" class="btn btn-sm btn-outline-primary js-h-save">저장</button><button type="button" class="btn btn-sm btn-outline-danger js-h-del">삭제</button></div></td></tr>`).join('') + blank;
+  }
+
+  function renderConsumptionHistory(rows) {
+    const body = $('historyBody'); if (!body) return;
+    const blank = `<tr><td><input type="date" class="form-control form-control-sm js-c-date" value="${today()}"></td><td><input type="number" min="1" max="9" class="form-control form-control-sm js-c-count" value="1"></td><td><button type="button" class="btn btn-sm btn-primary js-c-add">추가</button></td></tr>`;
+    body.innerHTML = (rows || []).map(r => `<tr data-id="${r.consumptionId}"><td><input type="date" class="form-control form-control-sm js-c-date" value="${fmtDate(r.consumptionDate)}"></td><td><input type="number" min="1" max="9" class="form-control form-control-sm js-c-count" value="${Number(r.bottleCount)}"></td><td><button type="button" class="btn btn-sm btn-outline-primary js-c-save">저장</button> <button type="button" class="btn btn-sm btn-outline-danger js-c-del">삭제</button></td></tr>`).join('') + blank;
+  }
+  async function saveConsumptionRow(tr, mode) {
+    const consumptionDate = tr.querySelector('.js-c-date')?.value;
+    const bottleCount = Number(tr.querySelector('.js-c-count')?.value || 0);
+    if (!consumptionDate || !Number.isInteger(bottleCount) || bottleCount < 1 || bottleCount > 9) return alert('등록일과 1~9통 수량을 입력하세요.');
+    const url = mode === 'add' ? `${apiBase}/${state.editingId}/consumptions` : `${apiBase}/${state.editingId}/consumptions/${tr.dataset.id}`;
+    const res = await API.req(url, { method: mode === 'add' ? 'POST' : 'PATCH', body: { consumptionDate, bottleCount } });
+    const json = res && await res.json().catch(() => null); if (!res || !res.ok || json?.success === false) return alert(json?.message || '소모량 저장 실패');
+    const d = await getDetail(state.editingId, $('editConsumptionMonth').value); if (d) renderConsumptionHistory(d.waterConsumptions || []); await loadList(); showToast('월간 소모량을 저장했습니다.');
+  }
+  async function deleteConsumptionRow(tr) {
+    if (!confirm('소모 내역을 삭제할까요?')) return;
+    const res = await API.req(`${apiBase}/${state.editingId}/consumptions/${tr.dataset.id}`, { method: 'DELETE' });
+    const json = res && await res.json().catch(() => null); if (!res || !res.ok || json?.success === false) return alert(json?.message || '소모량 삭제 실패');
+    const d = await getDetail(state.editingId, $('editConsumptionMonth').value); if (d) renderConsumptionHistory(d.waterConsumptions || []); await loadList(); showToast('월간 소모량을 삭제했습니다.');
   }
 
   async function saveEquipment() {
@@ -639,6 +659,33 @@
     showToast('삭제되었습니다.'); await loadList();
   }
 
+  function openWaterConsumptionRegistration(equipmentId, equipmentName) {
+    if (!requireEditPermission()) return;
+    state.waterConsumptionEquipmentId = Number(equipmentId) || 0;
+    if (!state.waterConsumptionEquipmentId) return alert('정수기 정보를 찾을 수 없습니다.');
+    $('waterConsumptionEquipmentName').textContent = equipmentName || '-';
+    $('waterConsumptionDate').value = today();
+    $('waterConsumptionBottleCount').value = '1';
+    bootstrapModal('waterConsumptionRegisterModal')?.show();
+  }
+
+  async function registerTodayWaterConsumption() {
+    if (!requireEditPermission()) return;
+    const equipmentId = Number(state.waterConsumptionEquipmentId || 0);
+    const bottleCount = Number($('waterConsumptionBottleCount')?.value || 0);
+    if (!Number.isInteger(equipmentId) || equipmentId < 1) return alert('정수기를 선택하세요.');
+    if (!Number.isInteger(bottleCount) || bottleCount < 1 || bottleCount > 9) return alert('물통 수량은 1통 이상 9통 이하로 입력하세요.');
+    const res = await API.req(`${apiBase}/${equipmentId}/consumptions`, {
+      method: 'POST',
+      body: { consumptionDate: today(), bottleCount }
+    });
+    const json = res && await res.json().catch(() => null);
+    if (!res || !res.ok || json?.success === false) return alert(json?.message || '물통 등록에 실패했습니다.');
+    bootstrapModal('waterConsumptionRegisterModal')?.hide();
+    showToast(`${bottleCount}통을 오늘 날짜로 등록했습니다.`);
+    await loadList();
+  }
+
   function openZoomImage(sourceEl) {
     const img = $('zoomImage');
     if (!img || !sourceEl) return;
@@ -662,9 +709,14 @@
       const sort = e.target.closest('.js-sort'); if (sort) { const key = sort.dataset.key; if (state.sort.key === key) state.sort.direction = state.sort.direction === 'asc' ? 'desc' : 'asc'; else state.sort = { key, direction: 'asc' }; renderTable(filteredItems()); return; }
       const detail = e.target.closest('.js-detail'); if (detail && !e.target.closest('button')) return openDetails(detail.dataset.id);
       const edit = e.target.closest('.js-edit'); if (edit) { e.stopPropagation(); if (!requireEditPermission()) return; return openUpsert(edit.dataset.id); }
+      const waterRegister = e.target.closest('.js-water-consumption-register'); if (waterRegister) { e.stopPropagation(); return openWaterConsumptionRegistration(waterRegister.dataset.id, waterRegister.dataset.name); }
       const insp = e.target.closest('.js-inspect'); if (insp) { e.stopPropagation(); if (!requireEditPermission()) return; state.inspectId = Number(insp.dataset.id); if (isAirconPage()) { if ($('faultReporterName')) $('faultReporterName').value = ''; if ($('faultReporterDepartment')) $('faultReporterDepartment').value = ''; if ($('faultDescription')) $('faultDescription').value = ''; return bootstrapModal('inspectModal')?.show(); } $('inspectDate').value = today(); $('inspectOk').checked = true; $('inspectFaultReason').value = ''; $('inspectPhoto').value = ''; return bootstrapModal('inspectModal')?.show(); }
       const del = e.target.closest('.js-delete'); if (del) { e.stopPropagation(); if (!requireEditPermission()) return; return deleteEquipment(del.dataset.id, del.dataset.serial); }
       const zoom = e.target.closest('.js-zoomable'); if (zoom) return openZoomImage(zoom);
+      const detailMonth = e.target.closest('#btnDetailConsumptionSearch'); if (detailMonth) { state.consumptionYearMonth = $('detailConsumptionMonth')?.value || state.consumptionYearMonth; return openDetails(detailMonth.dataset.id); }
+      const addC = e.target.closest('.js-c-add'); if (addC) return saveConsumptionRow(addC.closest('tr'), 'add');
+      const saveC = e.target.closest('.js-c-save'); if (saveC) return saveConsumptionRow(saveC.closest('tr'), 'save');
+      const delC = e.target.closest('.js-c-del'); if (delC) return deleteConsumptionRow(delC.closest('tr'));
       const addH = e.target.closest('.js-h-add'); if (addH) return saveHistoryRow(addH.closest('tr'), 'add');
       const saveH = e.target.closest('.js-h-save'); if (saveH) return saveHistoryRow(saveH.closest('tr'), 'save');
       const delH = e.target.closest('.js-h-del'); if (delH) return deleteHistoryRow(delH.closest('tr'));
@@ -673,6 +725,9 @@
     $('btnSearch')?.addEventListener('click', () => { state.q = $('filterQ').value.trim(); state.buildingIds = window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || []; state.floorId = $('filterFloorId').value; loadList(); });
     $('btnReset')?.addEventListener('click', () => { state.q = state.floorId = ''; state.buildingIds = []; $('filterQ').value = ''; window.FireWebBuildingMultiFilter?.clear('filterBuildingIds'); $('filterFloorId').value = ''; loadList(); });
     $('btnStatusInspect')?.addEventListener('click', () => { state.status = state.status === 'inspect' ? null : 'inspect'; renderTable(filteredItems()); });
+    $('btnConsumptionSearch')?.addEventListener('click', () => { state.consumptionYearMonth = $('consumptionYearMonth').value || new Date().toISOString().slice(0, 7); loadList(); });
+    $('btnConfirmWaterConsumptionRegister')?.addEventListener('click', registerTodayWaterConsumption);
+    $('btnEditConsumptionSearch')?.addEventListener('click', async () => { if (!state.editingId) return; const d = await getDetail(state.editingId, $('editConsumptionMonth').value); if (d) renderConsumptionHistory(d.waterConsumptions || []); });
     $('btnSave')?.addEventListener('click', saveEquipment);
     $('btnConfirmInspect')?.addEventListener('click', inspectEquipment);
     $('buildingSel')?.addEventListener('change', () => { updateModalFloorOptions(); loadPlanForModal(); });
