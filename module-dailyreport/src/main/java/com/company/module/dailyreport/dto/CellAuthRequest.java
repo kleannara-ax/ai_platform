@@ -25,7 +25,7 @@ public class CellAuthRequest {
     @NotNull(message = "셀 좌표 목록은 필수입니다.")
     private List<String> cellCoords;
 
-    /** 입력 주기: daily / monthly / yearly / event */
+    /** 입력 주기: daily / event (2026-08: monthly/yearly 폐기, 두 값만 유효) */
     @NotBlank(message = "입력 주기는 필수입니다.")
     private String freqCode;
 

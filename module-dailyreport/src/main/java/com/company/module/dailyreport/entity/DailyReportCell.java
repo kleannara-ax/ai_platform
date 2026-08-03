@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * - 셀 유형: HEADER(헤더), DATA(입력값), FORMULA(계산값), READONLY(읽기전용)
  * - 엑셀 좌표(EXCEL_COORD): 원본 엑셀 기준 좌표 (예: "B5", "O10")
  * - 셀 소유자(OWNER_IDS): 공백 구분 사용자 로그인ID (예: "kim", "jang lee")
- * - 입력 주기(FREQ_CODE): daily/monthly/yearly/event
+ * - 입력 주기(FREQ_CODE): daily/event (2026-08: monthly/yearly 폐기)
  */
 @Entity
 @Table(name = "daily_report_cell", uniqueConstraints = {
@@ -71,11 +71,11 @@ public class DailyReportCell {
     @Column(name = "INPUT_CYCLE", nullable = false, length = 20)
     private String inputCycle;
 
-    /** 입력 주기(HTML 기준): daily / monthly / yearly / event / none */
+    /** 입력 주기(HTML 기준): daily / event / none (2026-08: monthly/yearly 폐기) */
     @Column(name = "FREQ_CODE", length = 20)
     private String freqCode;
 
-    /** 주기 한글 라벨: 매일 / 매월 / 매년 / 발생 시 */
+    /** 주기 한글 라벨: 매일 / 발생 시 */
     @Column(name = "FREQ_LABEL", length = 50)
     private String freqLabel;
 

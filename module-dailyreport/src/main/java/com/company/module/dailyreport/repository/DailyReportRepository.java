@@ -24,6 +24,15 @@ public interface DailyReportRepository extends JpaRepository<DailyReport, Long> 
      */
     Optional<DailyReport> findTopByReportDateLessThanOrderByReportDateDesc(LocalDate reportDate);
 
+    /**
+     * ★ 값 전파(forward propagation, 2026-08 추가) 전용 — 주어진 날짜 이후(미래)의
+     * 가장 가까운 일보 1건 조회
+     * - 과거 일보에 값을 입력했을 때, 이미 만들어져 있는 미래 일보 중 아직 아무도
+     *   직접 수정하지 않은(=이어받기 상태인) 동일 셀 값을 최신값으로 갱신하기 위해
+     *   날짜 순서대로 순회하는 용도로 사용한다.
+     */
+    Optional<DailyReport> findTopByReportDateGreaterThanOrderByReportDateAsc(LocalDate reportDate);
+
     /** 기간별 일보 목록 페이징 조회 */
     @Query("SELECT r FROM DailyReport r " +
            "WHERE (:startDate IS NULL OR r.reportDate >= :startDate) " +

@@ -351,7 +351,7 @@ public final class DefaultCellTemplate {
         Map<YearMonth, String> fb13 = anchorFallbackMap("94", "99", "104", "96", "84", "82", "84");
         ro(t, 8, 0, "B13", "슬러지원단위", 2, 2);
         ro(t, 8, 2, "D13", "제   지", 1, 1);
-        d(t,  8, 3, "E13", "yearly", "매년");
+        d(t,  8, 3, "E13", "daily", "매일");
         ro(t, 8, 4, "F13", yearlyAverage(lookup, tableCode, 8, liveCol, prevYear2, fb13, "89"));
         ro(t, 8, 5, "G13", yearlyAverage(lookup, tableCode, 8, liveCol, prevYear1, fb13, "91"));
         addHistoricalRollingRow(t, 8, 6, coordsForRow(histCols, 13), rolling, tableCode, liveCol, lookup, fb13);
@@ -361,7 +361,7 @@ public final class DefaultCellTemplate {
         // ── Row 9: 슬러지원단위 - 화장지 ──
         Map<YearMonth, String> fb14 = anchorFallbackMap("81", "58", "68", "50", "46", "53", "62");
         ro(t, 9, 2, "D14", "화장지", 1, 1);
-        d(t,  9, 3, "E14", "yearly", "매년");
+        d(t,  9, 3, "E14", "daily", "매일");
         ro(t, 9, 4, "F14", yearlyAverage(lookup, tableCode, 9, liveCol, prevYear2, fb14, "76"));
         ro(t, 9, 5, "G14", yearlyAverage(lookup, tableCode, 9, liveCol, prevYear1, fb14, "64"));
         addHistoricalRollingRow(t, 9, 6, coordsForRow(histCols, 14), rolling, tableCode, liveCol, lookup, fb14);
@@ -480,7 +480,7 @@ public final class DefaultCellTemplate {
         ro(t, 6, 3, "E25", "0");
         addHistoricalRollingRow(t, 6, 4, coordsForRow(histCols, 25), rolling, tableCode, liveCol, lookup,
                 anchorFallbackMap("4354", "4372", "4005", "4236", "3761", "3404", "3120"));
-        d(t,  6,11, "M25", "monthly", "매월");
+        d(t,  6,11, "M25", "daily", "매일");
         d(t,  6,12, "N25", "daily", "매일");
 
         // ── Row 7: 장기재고 6개월 초과 ──
@@ -489,7 +489,7 @@ public final class DefaultCellTemplate {
         ro(t, 7, 3, "E26", "0");
         addHistoricalRollingRow(t, 7, 4, coordsForRow(histCols, 26), rolling, tableCode, liveCol, lookup,
                 anchorFallbackMap("917", "980", "786", "915", "957", "1543", "1130"));
-        d(t,  7,11, "M26", "monthly", "매월");
+        d(t,  7,11, "M26", "daily", "매일");
         d(t,  7,12, "N26", "daily", "매일");
 
         // ── Row 8: 야적현황 - 제지 ──
@@ -533,45 +533,45 @@ public final class DefaultCellTemplate {
         // ── Row 2: 전력 - 제지 ──
         ro(t, 2, 0, "B36", "전력",    3, 1);
         ro(t, 2, 1, "C36", "제   지", 1, 1);
-        d(t,  2, 2, "D36", "yearly", "매년");
+        d(t,  2, 2, "D36", "daily", "매일");
         d(t,  2, 3, "E36", null, null);
-        d(t,  2, 4, "F36", "monthly", "매월");
+        d(t,  2, 4, "F36", "daily", "매일");
         d(t,  2, 5, "G36", null, null);
 
         // ── Row 3: 전력 - 화장지 ──
         ro(t, 3, 1, "C37", "화장지", 1, 1);
-        d(t,  3, 2, "D37", "yearly", "매년");
+        d(t,  3, 2, "D37", "daily", "매일");
         d(t,  3, 3, "E37", null, null);
-        d(t,  3, 4, "F37", "monthly", "매월");
+        d(t,  3, 4, "F37", "daily", "매일");
         d(t,  3, 5, "G37", null, null);
 
         // ── Row 4: 전력 - 화)초지5 ──
         ro(t, 4, 1, "C38", "화)초지5", 1, 1);
-        d(t,  4, 2, "D38", "yearly", "매년");
+        d(t,  4, 2, "D38", "daily", "매일");
         d(t,  4, 3, "E38", null, null);
-        d(t,  4, 4, "F38", "monthly", "매월");
+        d(t,  4, 4, "F38", "daily", "매일");
         d(t,  4, 5, "G38", null, null);
 
         // ── Row 5: 연료 - 제지 ──
         ro(t, 5, 0, "B39", "연료",    3, 1);
         ro(t, 5, 1, "C39", "제   지", 1, 1);
-        d(t,  5, 2, "D39", "yearly", "매년");
+        d(t,  5, 2, "D39", "daily", "매일");
         d(t,  5, 3, "E39", null, null);
-        d(t,  5, 4, "F39", "monthly", "매월");
+        d(t,  5, 4, "F39", "daily", "매일");
         d(t,  5, 5, "G39", null, null);
 
         // ── Row 6: 연료 - 화장지 ──
         ro(t, 6, 1, "C40", "화장지", 1, 1);
-        d(t,  6, 2, "D40", "yearly", "매년");
+        d(t,  6, 2, "D40", "daily", "매일");
         d(t,  6, 3, "E40", null, null);
-        d(t,  6, 4, "F40", "monthly", "매월");
+        d(t,  6, 4, "F40", "daily", "매일");
         d(t,  6, 5, "G40", null, null);
 
         // ── Row 7: 연료 - 화)초지5 ──
         ro(t, 7, 1, "C41", "화)초지5", 1, 1);
-        d(t,  7, 2, "D41", "yearly", "매년");
+        d(t,  7, 2, "D41", "daily", "매일");
         d(t,  7, 3, "E41", null, null);
-        d(t,  7, 4, "F41", "monthly", "매월");
+        d(t,  7, 4, "F41", "daily", "매일");
         d(t,  7, 5, "G41", null, null);
     }
 
@@ -603,52 +603,52 @@ public final class DefaultCellTemplate {
         // ── Row 2: LNG보일러 ──
         Map<YearMonth, String> fbLng = boilerAnchorFallback("2.4", "0.4");
         ro(t, 2, 0, "J36", "LNG보일러", 1, 1);
-        d(t,  2, 1, "K36", "yearly",  "매년");
-        d(t,  2, 2, "L36", "yearly",  "매년");
+        d(t,  2, 1, "K36", "daily", "매일");
+        d(t,  2, 2, "L36", "daily", "매일");
         ro(t, 2, 3, "M36", rollingValue(lookup, tableCode, 2, liveCol, mMinus2, fbLng));
         ro(t, 2, 4, "N36", rollingValue(lookup, tableCode, 2, liveCol, mMinus1, fbLng));
-        d(t,  2, 5, "O36", "monthly", "매월");
+        d(t,  2, 5, "O36", "daily", "매일");
         d(t,  2, 6, "P36", "daily",   "매일");
         d(t,  2, 7, "Q36", "daily", "매일", 5, 1);
 
         // ── Row 3: 유동상소각로 ──
         Map<YearMonth, String> fbFluid = boilerAnchorFallback("15.3", "14.7");
         ro(t, 3, 0, "J37", "유동상소각로", 1, 1);
-        d(t,  3, 1, "K37", "yearly",  "매년");
-        d(t,  3, 2, "L37", "yearly",  "매년");
+        d(t,  3, 1, "K37", "daily", "매일");
+        d(t,  3, 2, "L37", "daily", "매일");
         ro(t, 3, 3, "M37", rollingValue(lookup, tableCode, 3, liveCol, mMinus2, fbFluid));
         ro(t, 3, 4, "N37", rollingValue(lookup, tableCode, 3, liveCol, mMinus1, fbFluid));
-        d(t,  3, 5, "O37", "monthly", "매월");
+        d(t,  3, 5, "O37", "daily", "매일");
         d(t,  3, 6, "P37", "daily",   "매일");
 
         // ── Row 4: 복합보일러 ──
         Map<YearMonth, String> fbComplex = boilerAnchorFallback("56.8", "52.5");
         ro(t, 4, 0, "J38", "복합보일러", 1, 1);
-        d(t,  4, 1, "K38", "yearly",  "매년");
-        d(t,  4, 2, "L38", "yearly",  "매년");
+        d(t,  4, 1, "K38", "daily", "매일");
+        d(t,  4, 2, "L38", "daily", "매일");
         ro(t, 4, 3, "M38", rollingValue(lookup, tableCode, 4, liveCol, mMinus2, fbComplex));
         ro(t, 4, 4, "N38", rollingValue(lookup, tableCode, 4, liveCol, mMinus1, fbComplex));
-        d(t,  4, 5, "O38", "monthly", "매월");
+        d(t,  4, 5, "O38", "daily", "매일");
         d(t,  4, 6, "P38", "daily",   "매일");
 
         // ── Row 5: 폐합성소각로 ──
         Map<YearMonth, String> fbWaste = boilerAnchorFallback("10.2", "11.6");
         ro(t, 5, 0, "J39", "폐합성소각로", 1, 1);
-        d(t,  5, 1, "K39", "yearly",  "매년");
-        d(t,  5, 2, "L39", "yearly",  "매년");
+        d(t,  5, 1, "K39", "daily", "매일");
+        d(t,  5, 2, "L39", "daily", "매일");
         ro(t, 5, 3, "M39", rollingValue(lookup, tableCode, 5, liveCol, mMinus2, fbWaste));
         ro(t, 5, 4, "N39", rollingValue(lookup, tableCode, 5, liveCol, mMinus1, fbWaste));
-        d(t,  5, 5, "O39", "monthly", "매월");
+        d(t,  5, 5, "O39", "daily", "매일");
         d(t,  5, 6, "P39", "daily",   "매일");
 
         // ── Row 6: 합계 ──
         Map<YearMonth, String> fbTotal = boilerAnchorFallback("84.7", "79.2");
         ro(t, 6, 0, "J40", "합  계", 1, 1);
-        d(t,  6, 1, "K40", "yearly",  "매년");
-        d(t,  6, 2, "L40", "yearly",  "매년");
+        d(t,  6, 1, "K40", "daily", "매일");
+        d(t,  6, 2, "L40", "daily", "매일");
         ro(t, 6, 3, "M40", rollingValue(lookup, tableCode, 6, liveCol, mMinus2, fbTotal));
         ro(t, 6, 4, "N40", rollingValue(lookup, tableCode, 6, liveCol, mMinus1, fbTotal));
-        d(t,  6, 5, "O40", "monthly", "매월");
+        d(t,  6, 5, "O40", "daily", "매일");
         d(t,  6, 6, "P40", "daily",   "매일");
     }
 

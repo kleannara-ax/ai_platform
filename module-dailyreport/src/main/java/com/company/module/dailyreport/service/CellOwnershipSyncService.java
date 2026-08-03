@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * - 이제 담당자 지정은 오직 관리자가 '세부공장일보 컬럼관리' 화면에서
  *   daily_report_cell_auth 테이블에 등록하는 방식으로만 이루어진다.
  * - 하지만 CellService.isCellEditableForUser()는 셀 단위로 정확한 입력 주기
- *   (FREQ_CODE: daily/monthly/yearly/event)를 확인해야 하는데, CellAuth 한
+ *   (FREQ_CODE: daily/event, 2026-08: monthly/yearly 폐기)를 확인해야 하는데, CellAuth 한
  *   레코드는 (USER_ID, TABLE_CODE)당 FREQ_CODE 값을 하나만 가진다. 같은
  *   사용자가 같은 표 안에서 서로 다른 주기의 셀들을 담당하는 경우가 실제로
  *   존재하므로(예: yearly 셀과 monthly 셀을 동시에 담당), CellAuth의

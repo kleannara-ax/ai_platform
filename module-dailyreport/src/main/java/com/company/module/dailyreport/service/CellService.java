@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 셀 데이터 입력 및 권한 기반 편집 관리 서비스
@@ -28,7 +29,7 @@ import java.util.List;
  * ★ Phase 4 변경사항:
  * - 레거시 CellPermission(행/열 범위) → CellAuth(엑셀 좌표 JSON) 기반으로 전환
  * - 소유권(OWNER_IDS) 1차 확인 → CellAuth 2차 확인 (두 경로 모두 지원)
- * - 입력 주기(FREQ_CODE): daily/monthly/yearly/event에 따라 활성화
+ * - 입력 주기(FREQ_CODE): daily/event (2026-08: monthly/yearly 폐기, 둘 다 항상 활성화)
  */
 @Service
 @RequiredArgsConstructor
@@ -130,6 +131,10 @@ public class CellService {
 
             cell.updateValue(item.getCellValue(), userId);
             savedCells.add(CellResponse.from(cell));
+
+            // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기 값도 최신화
+            propagateValueForward(report.getReportDate(), table.getTableCode(),
+                    cell.getExcelCoord(), item.getCellValue());
         }
 
         return savedCells;
@@ -141,6 +146,79 @@ public class CellService {
     @Transactional
     public int toggleCellLockByCycle(Long tableId, String inputCycle, boolean locked) {
         return cellRepository.updateLockByCycle(tableId, inputCycle, locked);
+    }
+
+    /**
+     * ★★ 값 전파(forward propagation, 2026-08 추가) — 이미 만들어져 있는 미래 일보 중
+     * "아직 아무도 직접 수정하지 않은"(=이어받기 상태 그대로인) 동일 좌표 셀 값을
+     * 방금 입력한 값으로 갱신한다.
+     *
+     * 배경: 값 이어받기(carry-over, {@link DailyReportService#createDefaultTables})는
+     * 일보가 "처음 생성되는 시점"에 그 시점 기준 가장 최근 일보의 값을 1회 복사하는
+     * 방식이다. 그런데 미래 일보를 자유롭게 미리 열람/편집할 수 있게 되면서 다음과
+     * 같은 문제가 생긴다:
+     *   예) 오늘이 8/31인데 9/5 일보를 미리 열어보면(=자동 생성) 9/5는 아직 존재하지
+     *   않는 9/1~9/4가 아니라 그 시점 가장 최근 일보(8/31)의 값을 이어받는다.
+     *   이후 9/4가 되어 9/4 일보에 실제 값을 입력해도, 9/5는 이미 만들어져 있으므로
+     *   carry-over가 다시 실행되지 않아 예전(8/31 기준) 값에 멈춰 있게 된다.
+     *
+     * 해결: 셀 값을 저장할 때마다 그 날짜 "다음"에 이미 존재하는 일보들을 날짜
+     * 순서대로 순회하며, 동일 표(tableCode)/좌표(excelCoord)의 셀이 아직 사람이
+     * 직접 입력한 적 없는(LAST_EDITOR_ID가 null인, 즉 이어받기 값 그대로인) 상태라면
+     * 방금 입력한 값으로 갱신하고 계속 다음 날짜로 전파한다.
+     *
+     * 반대로 어느 미래 일보에서든 그 셀에 사람이 이미 직접 값을 입력해 둔 경우
+     * (LAST_EDITOR_ID != null)라면 — 예: 9/5에 장기재고 값을 미리 입력해 둔 경우 —
+     * 그 값은 의도적인 사전 입력/오버라이드이므로 그 시점에서 전파를 멈추고 절대
+     * 덮어쓰지 않으며, 그보다 더 뒤(9/6 이후)로도 전파하지 않는다(그 뒤 일보들은
+     * 이미 그 의도적인 값을 기준으로 이어받았을 것이기 때문).
+     *
+     * ※ {@link DailyReportCell#carryOverValue}를 사용하므로 LAST_EDITOR_ID/
+     *   LAST_EDITED_AT은 변경되지 않는다 — 여전히 "이어받은 값일 뿐 아직 아무도
+     *   직접 입력하지 않았다"는 상태가 그대로 유지되어, 이후 또 다른 과거 날짜
+     *   수정이 있어도 계속 전파 대상이 될 수 있다.
+     * ※ 무한 루프/과도한 조회 방지를 위해 최대 366일(약 1년)까지만 전파한다.
+     */
+    private void propagateValueForward(LocalDate fromDate, String tableCode,
+                                        String excelCoord, String newValue) {
+        if (excelCoord == null) {
+            return;
+        }
+        LocalDate cursor = fromDate;
+        for (int hop = 0; hop < 366; hop++) {
+            DailyReport nextReport = reportRepository
+                    .findTopByReportDateGreaterThanOrderByReportDateAsc(cursor)
+                    .orElse(null);
+            if (nextReport == null) {
+                break; // 더 이상 미래에 생성된 일보가 없음
+            }
+            cursor = nextReport.getReportDate();
+
+            DailyReportTable nextTable = nextReport.getTables().stream()
+                    .filter(t -> tableCode.equals(t.getTableCode()))
+                    .findFirst()
+                    .orElse(null);
+            if (nextTable == null) {
+                continue; // 이 표가 없는 일보(구조 변경 등) — 건너뛰고 다음 날짜로 계속
+            }
+
+            DailyReportCell nextCell = nextTable.getCells().stream()
+                    .filter(c -> excelCoord.equals(c.getExcelCoord()))
+                    .findFirst()
+                    .orElse(null);
+            if (nextCell == null || !"DATA".equals(nextCell.getCellType())) {
+                continue; // 좌표 불일치/DATA 아님 — 건너뛰고 다음 날짜로 계속
+            }
+
+            if (nextCell.getLastEditorId() != null) {
+                break; // 이미 사람이 직접 입력해 둔 값 — 의도적 오버라이드이므로 전파 중단
+            }
+
+            if (!Objects.equals(nextCell.getCellValue(), newValue)) {
+                nextCell.carryOverValue(newValue);
+            }
+            // 이 셀은 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -172,18 +250,20 @@ public class CellService {
      * (좌표 그룹은 등록 시 서로 겹치지 않도록 CellAuthService에서 검증하므로,
      * 정상적으로는 최대 1건만 매칭된다.)
      *
-     * ★★★★★ 편집 가능 일보를 "오늘 또는 어제"로 한정 (2026-07 → 2026-07 확장):
-     * 이 셀이 속한 일보의 REPORT_DATE가 실제 오늘(LocalDate.now()) 또는
-     * 어제(today.minusDays(1))가 아니면 — 그 외 과거든 미래든 상관없이 —
-     * freqCode(daily/event/monthly/yearly)와 무관하게 항상 편집 불가(조회 전용)
-     * 처리한다. 오늘/어제 일보에 한해서만 아래 주기별 규칙이 적용된다:
+     * ★★★★★ 편집 가능 일보를 "어제 이후(어제/오늘/미래 전체)"로 한정
+     * (2026-07 → 오늘·어제로 최초 도입 → 2026-08 미래 전체로 확장):
+     * 이 셀이 속한 일보의 REPORT_DATE가 어제(today.minusDays(1))보다 이전(더
+     * 오래된 과거)이면 — freqCode(daily/event/monthly/yearly)와 무관하게 —
+     * 항상 편집 불가(조회 전용) 처리한다. 어제/오늘/미래 일보는 모두 아래
+     * 주기별 규칙이 적용된다(미래 일보를 미리 열어 값을 채워 넣을 수 있어야
+     * 하므로 과거만 차단하고 미래는 막지 않는다):
      *   - daily/event: 무조건 활성화
      *   - monthly: 해당 일보의 REPORT_DATE가 매월 1일인 경우에만 활성화
      *   - yearly: 해당 일보의 REPORT_DATE가 매년 1월 1일인 경우에만 활성화
      * ※ 주기 판정은 "실제 오늘"이 아니라 "편집하려는 리포트의 REPORT_DATE"
      *   기준으로 한다. 예) 오늘이 4/2이고 어제(4/1)치 리포트를 늦게 입력하는
      *   경우, 어제(4/1)가 매월 1일이므로 월간 셀도 정상적으로 편집 가능해야
-     *   한다.
+     *   한다. 같은 원리로 미래 리포트도 그 리포트 자신의 날짜로 주기를 판정한다.
      */
     private boolean isCellEditableForUser(DailyReportCell cell,
                                            String loginId,
@@ -194,10 +274,11 @@ public class CellService {
             return false;
         }
 
-        // 오늘/어제 날짜의 일보가 아니면(그 외 과거·미래 모두) 주기 불문 항상 편집 불가(조회만 가능)
+        // 어제보다 이전(과거)의 일보면 주기 불문 항상 편집 불가(조회만 가능).
+        // 어제/오늘/미래(그 이후 모든 날짜)는 차단하지 않고 아래 주기 규칙으로 판정한다.
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
-        if (reportDate == null || (!reportDate.isEqual(today) && !reportDate.isEqual(yesterday))) {
+        if (reportDate == null || reportDate.isBefore(yesterday)) {
             return false;
         }
 
@@ -218,25 +299,18 @@ public class CellService {
     }
 
     /**
-     * 주기(freqCode)에 따라, 편집 대상 리포트 날짜(targetDate) 기준으로
-     * 입력 가능한지 판단.
-     * (호출측에서 이미 "이 일보가 오늘 또는 어제 날짜인지"를 확인했으므로,
-     * 여기서는 targetDate가 오늘 또는 어제인 상태로 호출된다. 주기 판정
-     * 기준일은 실제 "오늘"이 아니라 targetDate(=편집하려는 리포트의
-     * REPORT_DATE) 그 자체이다 — 어제치를 늦게 입력하는 경우에도 어제
-     * 날짜가 매월/매년 1일인지로 판단해야 하기 때문이다.)
-     * - daily: 무조건 활성화
-     * - event: 발생 시 입력 = 무조건 활성화
-     * - monthly: targetDate가 매월 1일인 경우만 활성화
-     * - yearly: targetDate가 매년 1월 1일인 경우만 활성화
+     * ★★★ 입력 주기 단순화 (2026-08): daily(매일) / event(발생 시) 두 가지만
+     * 유효한 주기이며, 이 둘은 원래부터 "항상 활성화"로 동일하게 동작했다.
+     * 매월 1일/매년 1월 1일에만 활성화되던 monthly/yearly 개념은 완전히
+     * 폐기한다 — 컬럼관리 대시보드(cell-auth-admin.html)에서도 이제 주기
+     * 선택 옵션은 daily/event 두 개뿐이다.
+     *
+     * ★ 이미 DB에 남아있을 수 있는 레거시 monthly/yearly 값(마이그레이션 SQL로
+     *   daily로 일괄 정리하는 것이 원칙이지만, 혹시 정리되지 않은 값이 있더라도)도
+     *   방어적으로 "항상 활성화"로 동일하게 취급한다 — freqCode가 null이 아니면
+     *   그 값이 무엇이든 더 이상 날짜(일/월)로 제약하지 않는다.
      */
     private boolean canEditByFrequency(String freqCode, LocalDate targetDate) {
-        if (freqCode == null || targetDate == null) return false;
-        return switch (freqCode.toLowerCase()) {
-            case "daily", "event" -> true;
-            case "monthly" -> targetDate.getDayOfMonth() == 1;
-            case "yearly" -> targetDate.getMonthValue() == 1 && targetDate.getDayOfMonth() == 1;
-            default -> false;
-        };
+        return freqCode != null && targetDate != null;
     }
 }

@@ -235,7 +235,7 @@
 
     <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small></div>
     <div class="legend">
-      <div class="legend-item"><span class="swatch mine"></span> 오늘 입력 가능한 본인 담당 셀</div>
+      <div class="legend-item"><span class="swatch mine"></span> 입력 가능한 본인 담당 셀 (어제/오늘/미래)</div>
       <div class="legend-item"><span class="swatch locked"></span> 잠금 또는 비담당 셀</div>
     </div>
 
@@ -352,13 +352,17 @@
     }
 
     /**
-     * ★★ 이미지 첨부 업로드/삭제 가능 여부: 오늘 또는 어제 날짜의 일보에서만 true.
-     * (백엔드 DailyReportService.validateImageEditableDate와 동일한 기준 —
-     *  프론트는 UX용 버튼 표시/숨김 판단, 실제 강제는 서버가 담당)
+     * ★★ 이미지 첨부 업로드/삭제(및 특이사항 등록/수정) 가능 여부: 어제 이후
+     * (어제/오늘/미래 전체) 날짜의 일보에서만 true. 어제보다 이전인 과거만 제한한다.
+     * (백엔드 DailyReportService.validateImageEditableDate/isEditableReportDate와
+     *  동일한 기준 — 2026-08 미래 전체 편집 허용으로 확장. 프론트는 UX용 버튼
+     *  표시/숨김 판단, 실제 강제는 서버가 담당)
+     * ※ 날짜 문자열이 YYYY-MM-DD 형식이므로 문자열 비교로도 날짜 순서가 그대로
+     *   보장된다(사전식 비교 = 날짜 비교).
      */
     function isImageEditableDate(reportDate) {
       if (!reportDate) return false;
-      return reportDate === getTodayStr() || reportDate === getYesterdayStr();
+      return reportDate >= getYesterdayStr();
     }
 
     function getTodayParts() {
@@ -366,19 +370,19 @@
       return { year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate() };
     }
 
+    // ★★★ 입력 주기 단순화 (2026-08): daily(매일)/event(발생 시) 둘만 유효하고
+    // 둘 다 "항상 활성화"다. 매월 1일/매년 1월 1일에만 활성화되는 monthly/yearly
+    // 개념은 볱기한다(백엔드 CellService.canEditByFrequency와 동일 기준). 마이그러이션이 늘지
+    // 앞있는 달은 데이타에 있을 수 있는 레거시 monthly/yearly 값도 방어적으로
+    // 항상 활성화로 취급한다.
     function canEditByFrequency(freqCode) {
-      const t = getTodayParts();
-      if (freqCode === 'daily' || freqCode === 'event') return true;
-      if (freqCode === 'monthly') return t.day === 1;
-      if (freqCode === 'yearly') return t.month === 1 && t.day === 1;
-      return false;
+      return !!freqCode;
     }
 
     function getFrequencyHelp(freqCode) {
       if (freqCode === 'daily') return '매일 입력 가능';
       if (freqCode === 'event') return '발생 시 / 매일 입력 가능';
-      if (freqCode === 'monthly') return '매월 1일만 입력 가능';
-      if (freqCode === 'yearly') return '매년 1월 1일만 입력 가능';
+      if (freqCode) return '매일 입력 가능'; // 레거시 monthly/yearly 도 항상 가능으로 표시
       return '입력 불가';
     }
 
@@ -1465,7 +1469,7 @@
       });
 
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
-      // ★★ 셀/이미지와 동일하게 오늘/어제 일보에서만 특이사항 등록/수정 가능
+      // ★★ 셀/이미지와 동일하게 어제 이후(어제/오늘/미래) 일보에서만 특이사항 등록/수정 가능
       const isEditableDate = isImageEditableDate(currentReportDate);
 
       const rowsHtml = SPECIAL_NOTE_CATEGORIES.map(({ code, label }, idx) => {
@@ -1473,7 +1477,7 @@
         const content = r.content || '';
         // ★★ 셀과 동일 원칙: 담당자(CellAuth)가 배정되지 않은 사업부 행은
         //    editable이 서버에서 false로 내려오며, 이 경우 아무도 편집 불가(잠금).
-        //    담당자가 배정되어 있어도 canWrite/오늘·어제 날짜가 아니면 편집 불가.
+        //    담당자가 배정되어 있어도 canWrite/어제 이후(어제·오늘·미래) 날짜가 아니면 편집 불가.
         const serverEditable = r.editable === true;
         const canEditRow = canWrite && isEditableDate && serverEditable;
         const isLockedRow = !serverEditable; // 담당자 미배정 = 잠금 (셀과 동일)
@@ -1488,7 +1492,7 @@
         if (isLockedRow) {
           helpMsg = '이 항목은 담당자가 배정되지 않아 편집할 수 없습니다.';
         } else if (!isEditableDate) {
-          helpMsg = '특이사항은 오늘·어제 일보에서만 등록/수정할 수 있습니다.';
+          helpMsg = '특이사항은 어제 이후(어제·오늘·미래) 일보에서만 등록/수정할 수 있습니다.';
         } else if (!canWrite) {
           helpMsg = '쓰기 권한이 없습니다.';
         }
@@ -1574,7 +1578,7 @@
       section.dataset.section = 'upload';
 
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
-      // ★★ 오늘/어제 일보에서만 업로드·삭제 가능 (그 외 과거/미래는 조회+다운로드 전용)
+      // ★★ 어제 이후(어제/오늘/미래) 일보에서만 업로드·삭제 가능 (그 이전 과거는 조회+다운로드 전용)
       const isEditableDate = isImageEditableDate(currentReportDate);
       const canUpload = canWrite && isEditableDate;
       const disabledClass = canUpload ? '' : 'disabled';
@@ -1596,13 +1600,13 @@
           <label class="upload-btn" for="imageUploadInput">이미지 선택</label>
           <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple />
           <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()">이미지 비우기</button>
-          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (오늘/어제 일보에서만 등록·삭제 가능)</div>
+          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (어제/오늘/미래 일보에서만 등록·삭제 가능)</div>
         `
         : `
           <label class="upload-btn disabled" for="imageUploadInput">이미지 선택</label>
           <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple disabled />
           <button class="toolbar-btn" type="button" id="clearImagesBtn" disabled>이미지 비우기</button>
-          <div class="upload-help">이미지는 오늘·어제 일보에서만 등록/삭제할 수 있습니다. 이 날짜의 이미지는 조회 및 다운로드만 가능합니다.</div>
+          <div class="upload-help">이미지는 어제 이후(어제·오늘·미래) 일보에서만 등록/삭제할 수 있습니다. 그 이전 과거 날짜의 이미지는 조회 및 다운로드만 가능합니다.</div>
         `;
 
       section.innerHTML = `
@@ -1678,7 +1682,7 @@
       }
 
       // ★★ 다운로드는 날짜와 무관하게 항상 가능.
-      //    삭제는 오늘/어제 일보(=수정 가능 기간)일 때만 추가로 노출.
+      //    삭제는 어제 이후(어제/오늘/미래, =수정 가능 기간) 일보일 때만 추가로 노출.
       const isEditableDate = isImageEditableDate(currentReportDate);
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
       const canDelete = canWrite && isEditableDate;
@@ -1701,7 +1705,7 @@
     }
 
     /**
-     * 조회 전용 기간(오늘/어제가 아닌 일보)의 이미지 다운로드
+     * 조회 전용 기간(어제보다 이전인 과거 일보)의 이미지 다운로드
      * - 이미 blob으로 로드된 dataUrl(Object URL)을 이용해 <a download>로 저장
      */
     function downloadUploadedImage(idx) {
@@ -1858,7 +1862,7 @@
         }
 
         // 3. 특이사항 저장 (사업부별 5행 — 담당자로 배정된 행만 활성화되어 있으므로
-        //    disabled 여부로 저장 대상을 판별한다. 잠긴 행/오늘·어제가 아닌 날짜의
+        //    disabled 여부로 저장 대상을 판별한다. 잠긴 행/어제 이후가 아닌(=과거) 날짜의
         //    행은 애초에 textarea가 비활성화되어 저장 시도 자체를 건너뛴다.)
         // ★★ 사업부(category)별로 기존 레코드(currentRemarkIds[code])가 있으면
         //    PUT으로 "수정", 없으면 POST로 "신규 생성"

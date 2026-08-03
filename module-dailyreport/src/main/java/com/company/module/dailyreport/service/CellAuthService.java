@@ -137,6 +137,8 @@ public class CellAuthService {
      */
     @Transactional
     public CellAuthResponse createAuth(CellAuthRequest request, Long grantedBy) {
+        validateFreqCode(request.getFreqCode());
+
         List<CellAuth> existingActiveAuths =
                 cellAuthRepository.findAllByUserIdAndTableCodeAndIsActiveTrue(
                         request.getUserId(), request.getTableCode());
@@ -188,6 +190,8 @@ public class CellAuthService {
      */
     @Transactional
     public CellAuthResponse updateAuth(Long authId, CellAuthRequest request, Long grantedBy) {
+        validateFreqCode(request.getFreqCode());
+
         CellAuth auth = cellAuthRepository.findById(authId)
                 .orElseThrow(() -> new EntityNotFoundException("셀 권한을 찾을 수 없습니다. ID: " + authId));
 
@@ -287,5 +291,20 @@ public class CellAuthService {
                 .filter(auth -> auth.coversCoord(excelCoord))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * ★★★ 입력 주기 단순화 (2026-08): 컬럼관리 대시보드에서 등록/수정 가능한 주기를
+     * daily(매일)/event(발생 시) 두 가지로만 제한한다. 프론트(cell-auth-admin.html)의
+     * 선택 목록에서 이미 monthly/yearly 옵션을 제거했지만, API를 직접 호출하는 경우까지
+     * 방어하기 위해 서버에서도 반드시 재검증한다.
+     */
+    private static final Set<String> ALLOWED_FREQ_CODES = Set.of("daily", "event");
+
+    private void validateFreqCode(String freqCode) {
+        if (freqCode == null || !ALLOWED_FREQ_CODES.contains(freqCode)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "입력 주기는 daily(매일) 또는 event(발생 시)만 등록할 수 있습니다. 입력값: " + freqCode);
+        }
     }
 }

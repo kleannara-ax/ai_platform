@@ -48,11 +48,11 @@ public class CellAuth {
     @Column(name = "CELL_COORDS", nullable = false, columnDefinition = "TEXT")
     private String cellCoords;
 
-    /** 입력 주기: daily / monthly / yearly / event */
+    /** 입력 주기: daily / event (2026-08: monthly/yearly 폐기, 두 값만 유효) */
     @Column(name = "FREQ_CODE", nullable = false, length = 20)
     private String freqCode;
 
-    /** 주기 한글 라벨: 매일 / 매월 / 매년 / 발생 시 */
+    /** 주기 한글 라벨: 매일 / 발생 시 */
     @Column(name = "FREQ_LABEL", length = 50)
     private String freqLabel;
 

@@ -842,35 +842,38 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 이미지 첨부(업로드/삭제/설명수정)는 "오늘 또는 어제" 날짜의 일보에서만
-     * 허용한다 — 셀 편집 가능 기간(CellService.isCellEditableForUser)과 동일한
-     * 기준. 그 외 과거/미래 일보의 이미지는 화면에는 계속 표시되지만(조회+다운로드는
-     * 항상 가능) 추가/삭제/설명수정은 서버에서 거부한다.
+     * ★★ 이미지 첨부(업로드/삭제/설명수정)는 "어제 이후(어제/오늘/미래 전체)" 날짜의
+     * 일보에서만 허용한다 — 셀 편집 가능 기간(CellService.isCellEditableForUser)과
+     * 동일한 기준(2026-08: 미래 전역 편집 허용으로 확장). 그 이전(어제보다 이전)의
+     * 과거 일보의 이미지는 화면에는 계속 표시되지만(조회+다운로드는 항상 가능)
+     * 추가/삭제/설명수정은 서버에서 거부한다.
      */
     private void validateImageEditableDate(DailyReport report) {
-        if (!isTodayOrYesterday(report.getReportDate())) {
+        if (!isEditableReportDate(report.getReportDate())) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
-                    "이미지는 오늘 또는 어제 날짜의 일보에서만 등록/삭제할 수 있습니다. 그 외 날짜는 다운로드만 가능합니다.");
+                    "이미지는 어제 이후(어제/오늘/미래) 날짜의 일보에서만 등록/삭제할 수 있습니다. 그 이전 과거 날짜는 다운로드만 가능합니다.");
         }
     }
 
     /**
-     * ★★ 특이사항(등록/수정/삭제)도 셀·이미지와 동일하게 "오늘 또는 어제" 날짜의
-     * 일보에서만 허용한다. 그 외 과거/미래 일보의 특이사항은 조회는 항상 가능하지만
-     * 등록/수정/삭제는 서버에서 거부한다.
+     * ★★ 특이사항(등록/수정/삭제)도 셀·이미지와 동일하게 "어제 이후(어제/오늘/미래
+     * 전체)" 날짜의 일보에서만 허용한다. 그 이전 과거 일보의 특이사항은 조회는
+     * 항상 가능하지만 등록/수정/삭제는 서버에서 거부한다.
      */
     private void validateRemarkEditableDate(DailyReport report) {
-        if (!isTodayOrYesterday(report.getReportDate())) {
+        if (!isEditableReportDate(report.getReportDate())) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
-                    "특이사항은 오늘 또는 어제 날짜의 일보에서만 등록/수정할 수 있습니다.");
+                    "특이사항은 어제 이후(어제/오늘/미래) 날짜의 일보에서만 등록/수정할 수 있습니다.");
         }
     }
 
-    /** 오늘 또는 어제 날짜인지 판정 (CellService.isCellEditableForUser와 동일 기준) */
-    private boolean isTodayOrYesterday(LocalDate date) {
+    /**
+     * 어제 이후(어제/오늘/미래 전체) 날짜인지 판정 (CellService.isCellEditableForUser와
+     * 동일한 기준 — 어제보다 이전의 과거만 차단하고 미래는 제한하지 않는다)
+     */
+    private boolean isEditableReportDate(LocalDate date) {
         if (date == null) return false;
-        LocalDate today = LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
-        return date.isEqual(today) || date.isEqual(yesterday);
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        return !date.isBefore(yesterday);
     }
 }
