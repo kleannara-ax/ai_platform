@@ -60,13 +60,16 @@ public class DailyReportService {
         SPECIAL_NOTE_CATEGORIES.put("ETC", "기타");
     }
 
-    /** ★★ 특이사항 분량 제한 (2026-07 추가)
+    /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정)
      *  - 줄바꿈/전체 글자수는 5개 사업부 행 전체를 합산한 "공유 총량"이다
      *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
      *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
+     *  - 줄바꿈 총량은 원래 특이사항이 분리되기 전 하나의 자유서술 칸 기준 21회였으나,
+     *    5개 사업부(제지/화장지/패드/사고안전사고/기타) 행으로 나뉘며 행 사이 구분선이
+     *    4곳(5개 항목 사이 간격) 생겨 그만큼 공간을 차지하므로 21에서 4를 뺀 17을 사용한다.
      *  프론트(index.html)에서도 동일한 상수로 실시간 검증을 하지만, 프론트 검증은
      *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
-    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 21;
+    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
     private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 84;
 
@@ -467,7 +470,7 @@ public class DailyReportService {
 
     /**
      * ★★ 특이사항 분량 제한 검증 (신규 작성)
-     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(21회/789자)를
+     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(17회/789자)를
      *   넘지 않는지 확인한다. 다른 사업부 행에 이미 저장된 내용까지 합산 대상이다.
      * - 자신이 입력하는 내용 자체의 한 줄(개행 기준) 길이가 84자를 넘지 않는지 확인한다.
      */
