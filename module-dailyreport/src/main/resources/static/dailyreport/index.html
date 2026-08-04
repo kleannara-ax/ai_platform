@@ -409,6 +409,15 @@
       return '입력 불가';
     }
 
+    // ── 3.에너지 원단위 "연료" 행(제지/화장지/화)초지5) 좌표 목록 ──
+    // 이 좌표들(목표/전월실적/계획/실적 4열 × 3행)만 예외적으로 소수점 3자리로 표시한다.
+    // (전력 행 D36~G38은 기존과 동일하게 소수점 1자리 규칙 유지)
+    const FUEL_ROW_COORDS = new Set([
+      'D39', 'E39', 'F39', 'G39', // 연료 - 제지
+      'D40', 'E40', 'F40', 'G40', // 연료 - 화장지
+      'D41', 'E41', 'F41', 'G41', // 연료 - 화)초지5
+    ]);
+
     /**
      * 숫자 셀 서식 — 천 단위 콤마 적용, 정수부 자릿수에 따라 소수점 표시 여부 결정
      * - 숫자로 해석 불가능한 값(텍스트, "-", 빈 문자열 등)은 원본 그대로 반환
@@ -416,8 +425,10 @@
      * - 정수부(부호 제외) 3자리 이하: 소수점 1자리까지 표시 (예: 640 -> 640.0, -999.9 -> -999.9)
      * - 정수부 4자리 이상: 소수점 없이 정수로 반올림 표시 (예: 1234.5 -> 1,235, 3826.0 -> 3,826)
      * - 값이 정확히 0인 경우는 예외적으로 소수점 없이 "0"만 표시
+     * - coord가 FUEL_ROW_COORDS(에너지 원단위 표의 "연료" 행)에 해당하면, 위 규칙과
+     *   무관하게 항상 소수점 3자리까지 표시 (정수부 자릿수/0 예외 규칙 모두 미적용)
      */
-    function formatNumber(v) {
+    function formatNumber(v, coord) {
       if (v === null || v === undefined) return v;
       const raw = String(v);
       const trimmed = raw.trim();
@@ -426,6 +437,11 @@
       if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return raw; // 숫자 형식이 아니면 그대로
       const num = Number(cleaned);
       if (isNaN(num)) return raw;
+
+      // 에너지 원단위 "연료" 행 예외: 항상 소수점 3자리
+      if (coord && FUEL_ROW_COORDS.has(coord)) {
+        return num.toLocaleString('ko-KR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+      }
 
       // 0은 예외적으로 그냥 "0"만 표시
       if (num === 0) return '0';
@@ -1171,9 +1187,9 @@
         ))
         || (isDual && isEnergyTable && !isDataLike && cell.colIndex === 1);
 
-      // 값 결정 (숫자 셀은 천 단위 콤마 + 소수점 1자리 서식 적용)
+      // 값 결정 (숫자 셀은 천 단위 콤마 + 소수점 1자리 서식 적용, 연료 행은 3자리)
       let displayValue = cell.cellValue || '';
-      const formattedDisplayValue = formatNumber(displayValue);
+      const formattedDisplayValue = formatNumber(displayValue, cell.excelCoord);
       let cellClasses = 'cell table-cell ' + (forceNoWrap ? 'nowrap-cell' : 'wrap-cell');
 
       // assignable 클래스 추가
@@ -1247,7 +1263,7 @@
           const rawText = escapeHtml(savedVal);
           innerHtml = `<div class="cell-editor"><textarea class="cell-input cell-input-remark" data-coord="${escapeHtml(cell.excelCoord || '')}" data-row="${cell.rowIndex}" data-col="${cell.colIndex}" data-table-code="${escapeHtml(cell.tableCode || '')}" placeholder="값 입력" ${disabledAttr} oninput="onCellInput(this)">${rawText}</textarea></div>`;
         } else {
-          const displayVal = formatNumber(savedVal);
+          const displayVal = formatNumber(savedVal, cell.excelCoord);
           innerHtml = `<div class="cell-editor"><input class="cell-input" data-coord="${escapeHtml(cell.excelCoord || '')}" data-row="${cell.rowIndex}" data-col="${cell.colIndex}" data-table-code="${escapeHtml(cell.tableCode || '')}" value="${escapeHtml(displayVal)}" placeholder="값 입력" ${disabledAttr} oninput="onCellInput(this)" onfocus="onCellFocus(this)" onblur="onCellBlur(this)" /></div>`;
         }
       } else {
@@ -1328,7 +1344,7 @@
      * (실제 저장/전송 시에는 saveInputs()에서 콤마를 제거한 원본 숫자를 서버로 보낸다)
      */
     function onCellBlur(inputEl) {
-      inputEl.value = formatNumber(inputEl.value);
+      inputEl.value = formatNumber(inputEl.value, inputEl.dataset.coord);
     }
 
     // ── 특이사항 분량 제한 헬퍼 ──
@@ -2227,7 +2243,7 @@
           const input = editor ? editor.querySelector('.cell-input') : null;
           if (editor && input) {
             const rawValue = input.value || '';
-            const formatted = formatNumber(rawValue);
+            const formatted = formatNumber(rawValue, input.dataset.coord);
             const hasValue = formatted && String(formatted).trim() !== '';
             const displayText = hasValue ? escapeHtml(formatted).replace(/\n/g, '<br>') : '&nbsp;';
             const textAlign = (td.style.textAlign || 'center').trim();
