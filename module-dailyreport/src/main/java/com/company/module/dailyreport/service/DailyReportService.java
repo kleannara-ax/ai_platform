@@ -1046,12 +1046,24 @@ public class DailyReportService {
     }
 
     /**
-     * 어제 이후(어제/오늘/미래 전체) 날짜인지 판정 (CellService.isCellEditableForUser와
-     * 동일한 기준 — 어제보다 이전의 과거만 차단하고 미래는 제한하지 않는다)
+     * 어제 이후(어제/오늘/미래 전체) + 매월 말일 날짜인지 판정
+     * (CellService.isCellEditableForUser와 동일한 기준 — 어제보다 이전의
+     * 과거는 그 달의 말일이 아닌 한 차단하고, 미래는 제한하지 않는다)
      */
     private boolean isEditableReportDate(LocalDate date) {
         if (date == null) return false;
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        return !date.isBefore(yesterday);
+        if (!date.isBefore(yesterday)) {
+            return true;
+        }
+        return isLastDayOfMonth(date);
+    }
+
+    /**
+     * ★ 매월 말일 판정 (2026-08 추가) — CellService.isLastDayOfMonth와 동일한
+     * 기준으로 독립 계산한다.
+     */
+    private boolean isLastDayOfMonth(LocalDate date) {
+        return date != null && date.getDayOfMonth() == date.lengthOfMonth();
     }
 }

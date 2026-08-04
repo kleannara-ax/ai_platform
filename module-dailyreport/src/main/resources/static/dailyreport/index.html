@@ -240,8 +240,8 @@
 
     <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small></div>
     <div class="legend">
-      <div class="legend-item"><span class="swatch mine"></span> 파란색: 사람이 수기로 입력하는 셀 (본인 담당, 어제/오늘/미래)</div>
-      <div class="legend-item"><span class="swatch auto"></span> 노란색: 자동화 시스템이 값을 기입하는 셀 (본인 담당, 어제/오늘/미래)</div>
+      <div class="legend-item"><span class="swatch mine"></span> 파란색: 사람이 수기로 입력하는 셀 (본인 담당, 어제/오늘/미래 또는 매월 말일)</div>
+      <div class="legend-item"><span class="swatch auto"></span> 노란색: 자동화 시스템이 값을 기입하는 셀 (본인 담당, 어제/오늘/미래 또는 매월 말일)</div>
       <div class="legend-item"><span class="swatch locked"></span> 잠금 또는 비담당 셀</div>
     </div>
 
@@ -358,17 +358,34 @@
     }
 
     /**
+     * ★ 매월 말일 판정 (2026-08 추가) — reportDate(YYYY-MM-DD 문자열)가 그 달의
+     * 마지막 날(28~31일, 2월은 평년 28일/윤년 29일)인지 확인한다.
+     * (백엔드 CellService.isLastDayOfMonth / DailyReportService.isLastDayOfMonth와
+     *  동일한 기준)
+     */
+    function isLastDayOfMonthStr(reportDate) {
+      if (!reportDate) return false;
+      const parts = reportDate.split('-').map(Number);
+      const year = parts[0], month = parts[1], day = parts[2];
+      if (!year || !month || !day) return false;
+      // 해당 월의 말일 = 다음 달 1일에서 하루를 뺀 날짜의 day 값
+      const lastDay = new Date(year, month, 0).getDate();
+      return day === lastDay;
+    }
+
+    /**
      * ★★ 이미지 첨부 업로드/삭제(및 특이사항 등록/수정) 가능 여부: 어제 이후
-     * (어제/오늘/미래 전체) 날짜의 일보에서만 true. 어제보다 이전인 과거만 제한한다.
-     * (백엔드 DailyReportService.validateImageEditableDate/isEditableReportDate와
-     *  동일한 기준 — 2026-08 미래 전체 편집 허용으로 확장. 프론트는 UX용 버튼
-     *  표시/숨김 판단, 실제 강제는 서버가 담당)
+     * (어제/오늘/미래 전체) 날짜의 일보, 또는 과거라도 그 달의 말일인 일보에서만
+     * true. (백엔드 DailyReportService.validateImageEditableDate/isEditableReportDate와
+     *  동일한 기준 — 2026-08 미래 전체 편집 허용 + 매월 말일 예외로 확장. 프론트는
+     *  UX용 버튼 표시/숨김 판단, 실제 강제는 서버가 담당)
      * ※ 날짜 문자열이 YYYY-MM-DD 형식이므로 문자열 비교로도 날짜 순서가 그대로
      *   보장된다(사전식 비교 = 날짜 비교).
      */
     function isImageEditableDate(reportDate) {
       if (!reportDate) return false;
-      return reportDate >= getYesterdayStr();
+      if (reportDate >= getYesterdayStr()) return true;
+      return isLastDayOfMonthStr(reportDate);
     }
 
     function getTodayParts() {
@@ -1517,7 +1534,7 @@
         if (isLockedRow) {
           helpMsg = '이 항목은 담당자가 배정되지 않아 편집할 수 없습니다.';
         } else if (!isEditableDate) {
-          helpMsg = '특이사항은 어제 이후(어제·오늘·미래) 일보에서만 등록/수정할 수 있습니다.';
+          helpMsg = '특이사항은 어제 이후(어제·오늘·미래) 또는 매월 말일 일보에서만 등록/수정할 수 있습니다.';
         } else if (!canWrite) {
           helpMsg = '쓰기 권한이 없습니다.';
         }
@@ -1625,13 +1642,13 @@
           <label class="upload-btn" for="imageUploadInput">이미지 선택</label>
           <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple />
           <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()">이미지 비우기</button>
-          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (어제/오늘/미래 일보에서만 등록·삭제 가능)</div>
+          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (어제/오늘/미래 또는 매월 말일 일보에서만 등록·삭제 가능)</div>
         `
         : `
           <label class="upload-btn disabled" for="imageUploadInput">이미지 선택</label>
           <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple disabled />
           <button class="toolbar-btn" type="button" id="clearImagesBtn" disabled>이미지 비우기</button>
-          <div class="upload-help">이미지는 어제 이후(어제·오늘·미래) 일보에서만 등록/삭제할 수 있습니다. 그 이전 과거 날짜의 이미지는 조회 및 다운로드만 가능합니다.</div>
+          <div class="upload-help">이미지는 어제 이후(어제·오늘·미래) 또는 매월 말일 일보에서만 등록/삭제할 수 있습니다. 그 이전 과거 날짜(말일 제외)의 이미지는 조회 및 다운로드만 가능합니다.</div>
         `;
 
       section.innerHTML = `

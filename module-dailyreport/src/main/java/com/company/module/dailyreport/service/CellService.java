@@ -250,13 +250,17 @@ public class CellService {
      * (좌표 그룹은 등록 시 서로 겹치지 않도록 CellAuthService에서 검증하므로,
      * 정상적으로는 최대 1건만 매칭된다.)
      *
-     * ★★★★★ 편집 가능 일보를 "어제 이후(어제/오늘/미래 전체)"로 한정
-     * (2026-07 → 오늘·어제로 최초 도입 → 2026-08 미래 전체로 확장):
+     * ★★★★★ 편집 가능 일보를 "어제 이후(어제/오늘/미래 전체) + 매월 말일"로 한정
+     * (2026-07 → 오늘·어제로 최초 도입 → 2026-08 미래 전체로 확장 → 2026-08
+     * 매월 말일 예외 추가):
      * 이 셀이 속한 일보의 REPORT_DATE가 어제(today.minusDays(1))보다 이전(더
-     * 오래된 과거)이면 — freqCode(daily/event/monthly/yearly)와 무관하게 —
-     * 항상 편집 불가(조회 전용) 처리한다. 어제/오늘/미래 일보는 모두 아래
+     * 오래된 과거)이면서 그 REPORT_DATE가 해당 월의 "말일"도 아니라면 —
+     * freqCode(daily/event/monthly/yearly)와 무관하게 — 항상 편집 불가(조회
+     * 전용) 처리한다. 어제/오늘/미래 일보, 그리고 과거라도 그 달의 말일(28~31일,
+     * 월별 실제 마지막 날. 2월은 28일 또는 윤년 29일)인 일보는 모두 아래
      * 주기별 규칙이 적용된다(미래 일보를 미리 열어 값을 채워 넣을 수 있어야
-     * 하므로 과거만 차단하고 미래는 막지 않는다):
+     * 하므로 과거만 차단하고 미래는 막지 않는다. 말일은 월 마감 결산 특성상
+     * 예외적으로 계속 열어둔다):
      *   - daily/event: 무조건 활성화
      *   - monthly: 해당 일보의 REPORT_DATE가 매월 1일인 경우에만 활성화
      *   - yearly: 해당 일보의 REPORT_DATE가 매년 1월 1일인 경우에만 활성화
@@ -274,11 +278,16 @@ public class CellService {
             return false;
         }
 
-        // 어제보다 이전(과거)의 일보면 주기 불문 항상 편집 불가(조회만 가능).
-        // 어제/오늘/미래(그 이후 모든 날짜)는 차단하지 않고 아래 주기 규칙으로 판정한다.
+        // 어제보다 이전(과거)의 일보면 — 그 달의 말일이 아닌 한 — 주기 불문
+        // 항상 편집 불가(조회만 가능). 어제/오늘/미래(그 이후 모든 날짜),
+        // 그리고 과거라도 매월 말일인 일보는 차단하지 않고 아래 주기 규칙으로
+        // 판정한다.
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
-        if (reportDate == null || reportDate.isBefore(yesterday)) {
+        if (reportDate == null) {
+            return false;
+        }
+        if (reportDate.isBefore(yesterday) && !isLastDayOfMonth(reportDate)) {
             return false;
         }
 
@@ -312,5 +321,18 @@ public class CellService {
      */
     private boolean canEditByFrequency(String freqCode, LocalDate targetDate) {
         return freqCode != null && targetDate != null;
+    }
+
+    /**
+     * ★ 매월 말일 판정 (2026-08 추가) — 과거 일보라도 그 REPORT_DATE가 해당 월의
+     * 마지막 날(28~31일, 월별로 다름. 2월은 평년 28일/윤년 29일)이면 월 마감
+     * 결산 목적상 예외적으로 편집을 계속 허용한다.
+     * ※ {@link DailyReportService#isLastDayOfMonth}와 동일한 기준이며,
+     *   두 클래스가 서로 참조하지 않도록 각자 독립적으로 계산한다(로직은
+     *   {@code date.equals(date.with(TemporalAdjusters.lastDayOfMonth()))}와
+     *   동치).
+     */
+    private boolean isLastDayOfMonth(LocalDate date) {
+        return date != null && date.getDayOfMonth() == date.lengthOfMonth();
     }
 }
