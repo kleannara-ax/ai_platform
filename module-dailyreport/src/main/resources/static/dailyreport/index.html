@@ -2265,25 +2265,20 @@
           useCORS: true,
         });
 
-        let copied = false;
-        if (navigator.clipboard && window.ClipboardItem) {
-          try {
-            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-            if (blob) {
-              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-              copied = true;
-            }
-          } catch (clipErr) {
-            console.warn('클립보드 복사 실패, 다운로드로 대체합니다:', clipErr);
-          }
+        // ★★ 버튼 한 번 클릭으로 "캡처 + 다운로드 + 클립보드 복사"가 무조건 전부
+        //   함께 이루어진다 — 조건 분기 없이 둘 다 항상 시도한다. (클립보드 복사가
+        //   브라우저 정책상 실패하더라도 다운로드는 이미 별개로 실행되었으므로
+        //   영향받지 않는다)
+        downloadCanvasAsPng(canvas, `ppt_capture_table1-4_${getTodayStr()}.png`);
+
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        } catch (clipErr) {
+          console.warn('클립보드 복사 실패(다운로드는 정상 진행됨):', clipErr);
         }
 
-        if (copied) {
-          showPptToast('표1~4 화면 캡처가 완료되었습니다. Ctrl + V로 붙여넣기 할 수 있습니다.');
-        } else {
-          downloadCanvasAsPng(canvas, `ppt_capture_table1-4_${getTodayStr()}.png`);
-          showPptToast('클립보드 복사가 지원되지 않아 이미지로 다운로드했습니다', true);
-        }
+        showPptToast('표1~4 화면 캡처가 완료되었습니다. 클립보드 복사(Ctrl+V) + 파일 다운로드가 모두 처리되었습니다.');
       } catch (err) {
         console.error('PPT 캡처 실패:', err);
         showPptToast('캡처 중 오류가 발생했습니다: ' + (err?.message || err), true);
