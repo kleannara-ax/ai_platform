@@ -129,12 +129,33 @@ public class CellService {
                                 cell.getExcelCoord() != null ? cell.getExcelCoord() : ""));
             }
 
-            cell.updateValue(item.getCellValue(), userId);
-            savedCells.add(CellResponse.from(cell));
+            // ★★ 값 전파 안전장치(2026-08): 프론트가 "저장" 클릭 시 화면에 보이는
+            // 편집 가능한 셀을 전부 다시 전송하므로(변경 여부와 무관), 실제로 값이
+            // 바뀌지 않았다면 편집자 도장(LAST_EDITOR_ID)을 찍지 않고 그대로 둔다.
+            // 그렇지 않으면 한 사용자가 여러 셀을 담당할 때, 그중 하나만 고쳐도
+            // 나머지 안 건드린(이어받기 상태인) 담당 셀까지 매 저장마다 "사람이
+            // 직접 입력한 값"으로 바뀌어 버려, 그 셀은 이후 더 이전 날짜에서
+            // 실제로 값을 고쳐도 propagateValueForward가 여기서 멈춰버리는
+            // 문제가 있었다 (특이사항/remark 쪽의 updateRemark()에 있던 동일한
+            // unchanged 가드를 셀에도 동일하게 적용).
+            String newValue = item.getCellValue();
+            String previousValue = cell.getCellValue();
+            boolean valueChanged = !Objects.equals(
+                    previousValue == null ? "" : previousValue,
+                    newValue == null ? "" : newValue);
 
-            // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기 값도 최신화
-            propagateValueForward(report.getReportDate(), table.getTableCode(),
-                    cell.getExcelCoord(), item.getCellValue());
+            if (valueChanged) {
+                cell.updateValue(newValue, userId);
+
+                // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기 값도 최신화
+                propagateValueForward(report.getReportDate(), table.getTableCode(),
+                        cell.getExcelCoord(), newValue);
+            }
+            // 값이 바뀌지 않았다면 위 두 동작(도장 찍기/전파) 모두 건너뛴다 —
+            // 이 셀은 여전히 "이어받기 상태"로 남아, 향후 더 이전 날짜에서의
+            // 실제 수정이 이 셀까지 정상적으로 전파될 수 있다.
+
+            savedCells.add(CellResponse.from(cell));
         }
 
         return savedCells;
