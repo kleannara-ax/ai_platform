@@ -257,42 +257,64 @@ public class DailyReportService {
 
         for (DailyReport report : targets) {
             for (DailyReportTable table : report.getTables()) {
-                // 최신 로직으로 헤더/읽기전용 셀을 다시 계산할 "메모리 전용" 임시 표
-                // (영속화하지 않음 — DB에는 절대 저장되지 않고 값 비교용으로만 사용)
-                DailyReportTable freshTable = DailyReportTable.builder()
-                        .tableCode(table.getTableCode())
-                        .tableName(table.getTableName())
-                        .sortOrder(table.getSortOrder())
-                        .rowCount(table.getRowCount())
-                        .colCount(table.getColCount())
-                        .build();
-                DefaultCellTemplate.populateDefaultCells(freshTable, report.getReportDate(), historicalValueLookup());
+                updatedCount += refreshTableRollingHeaders(table, report.getReportDate());
+            }
+        }
+        return updatedCount;
+    }
 
-                // 좌표(EXCEL_COORD) → 새로 계산된 값, HEADER/READONLY만 대상
-                Map<String, String> freshValuesByCoord = new LinkedHashMap<>();
-                for (DailyReportCell freshCell : freshTable.getCells()) {
-                    if ("HEADER".equals(freshCell.getCellType()) || "READONLY".equals(freshCell.getCellType())) {
-                        if (freshCell.getExcelCoord() != null) {
-                            freshValuesByCoord.put(freshCell.getExcelCoord(), freshCell.getCellValue());
-                        }
-                    }
-                }
+    /**
+     * ★★ 롤링 헤더 재계산 — 표 1개 단위 (2026-08 추가, {@link #refreshRollingHeaders}의
+     * 내부 로직을 추출하여 재사용 가능하게 분리).
+     *
+     * {@link #refreshRollingHeaders}(전체 배치, 관리자 수동 실행용)뿐 아니라
+     * {@link CellService#saveCells}의 "저장 시 자동 재계산"에서도 호출된다 —
+     * 실측(라이브 입력) 컬럼이 저장될 때마다, 이미 만들어져 있는 미래 일보 중
+     * 이 저장으로 실제 영향받는 표들만 개별적으로 즉시 재계산하는 데 사용되어,
+     * 전체 배치처럼 모든 일보×모든 표를 매번 훑지 않고도 항상 최신 상태를
+     * 유지할 수 있게 한다.
+     *
+     * @param table 재계산 대상 표 엔티티 (영속 상태 — 변경 시 트랜잭션 커밋 시 자동 반영)
+     * @param reportDate 이 표가 속한 일보의 날짜 (롤링 월 계산 기준)
+     * @return 실제로 값이 변경된 셀 개수
+     */
+    @Transactional
+    public int refreshTableRollingHeaders(DailyReportTable table, LocalDate reportDate) {
+        // 최신 로직으로 헤더/읽기전용 셀을 다시 계산할 "메모리 전용" 임시 표
+        // (영속화하지 않음 — DB에는 절대 저장되지 않고 값 비교용으로만 사용)
+        DailyReportTable freshTable = DailyReportTable.builder()
+                .tableCode(table.getTableCode())
+                .tableName(table.getTableName())
+                .sortOrder(table.getSortOrder())
+                .rowCount(table.getRowCount())
+                .colCount(table.getColCount())
+                .build();
+        DefaultCellTemplate.populateDefaultCells(freshTable, reportDate, historicalValueLookup());
 
-                for (DailyReportCell dbCell : table.getCells()) {
-                    // ★ DATA 셀은 절대 건드리지 않는다 (사용자 실입력값 보호)
-                    if (!"HEADER".equals(dbCell.getCellType()) && !"READONLY".equals(dbCell.getCellType())) {
-                        continue;
-                    }
-                    String coord = dbCell.getExcelCoord();
-                    if (coord == null || !freshValuesByCoord.containsKey(coord)) {
-                        continue; // 좌표 불일치(표 구조 변경 등) — 안전하게 건너뜀
-                    }
-                    String newValue = freshValuesByCoord.get(coord);
-                    if (!Objects.equals(dbCell.getCellValue(), newValue)) {
-                        dbCell.carryOverValue(newValue); // 값만 교체, 편집자/시각 기록 안 건드림
-                        updatedCount++;
-                    }
+        // 좌표(EXCEL_COORD) → 새로 계산된 값, HEADER/READONLY만 대상
+        Map<String, String> freshValuesByCoord = new LinkedHashMap<>();
+        for (DailyReportCell freshCell : freshTable.getCells()) {
+            if ("HEADER".equals(freshCell.getCellType()) || "READONLY".equals(freshCell.getCellType())) {
+                if (freshCell.getExcelCoord() != null) {
+                    freshValuesByCoord.put(freshCell.getExcelCoord(), freshCell.getCellValue());
                 }
+            }
+        }
+
+        int updatedCount = 0;
+        for (DailyReportCell dbCell : table.getCells()) {
+            // ★ DATA 셀은 절대 건드리지 않는다 (사용자 실입력값 보호)
+            if (!"HEADER".equals(dbCell.getCellType()) && !"READONLY".equals(dbCell.getCellType())) {
+                continue;
+            }
+            String coord = dbCell.getExcelCoord();
+            if (coord == null || !freshValuesByCoord.containsKey(coord)) {
+                continue; // 좌표 불일치(표 구조 변경 등) — 안전하게 건너뜀
+            }
+            String newValue = freshValuesByCoord.get(coord);
+            if (!Objects.equals(dbCell.getCellValue(), newValue)) {
+                dbCell.carryOverValue(newValue); // 값만 교체, 편집자/시각 기록 안 건드림
+                updatedCount++;
             }
         }
         return updatedCount;

@@ -19,8 +19,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -40,6 +44,19 @@ public class CellService {
     private final DailyReportTableRepository tableRepository;
     private final DailyReportCellRepository cellRepository;
     private final CellAuthRepository cellAuthRepository;
+    private final DailyReportService dailyReportService;
+
+    /**
+     * ★★ 롤링 헤더가 참조하는 "실측(라이브 입력)" 컬럼의 colIndex — 표코드별로 1개씩.
+     * {@link DefaultCellTemplate}의 liveCol 상수와 반드시 동일하게 유지해야 한다
+     * (표1=O열=13, 표2=M열=11, 표4=P열=6). 표3(에너지)은 롤링 헤더 자체가 없으므로
+     * 이 맵에 없다 — 이 맵에 없는 표코드는 롤링 재계산 대상에서 자동 제외된다.
+     */
+    private static final Map<String, Integer> ROLLING_LIVE_COL_BY_TABLE = Map.of(
+            "TBL_PRODUCTION_INDEX", 13,
+            "TBL_INVENTORY", 11,
+            "TBL_BOILER", 6
+    );
 
     /**
      * 사용자 기준 표 데이터 조회 (편집 가능 여부 포함)
@@ -150,6 +167,14 @@ public class CellService {
                 // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기 값도 최신화
                 propagateValueForward(report.getReportDate(), table.getTableCode(),
                         cell.getExcelCoord(), newValue);
+
+                // ★★ 롤링 헤더 즉시 재계산(2026-08 추가): 이 셀이 표1/표2/표4의 "실측
+                // (라이브 입력)" 컬럼이면, 이미 만들어져 있는 미래 일보들의 과거월/연평균
+                // 헤더값(H~N, F/G, M/N 등)도 그 자리에서 바로 다시 계산해 반영한다.
+                // (관리자용 "월 롤링 헤더 재계산" 전체 배치와 달리, 이 저장으로 실제
+                // 영향받을 수 있는 좁은 범위만 훑으므로 데이터가 아무리 많아져도 느려지지 않는다.)
+                propagateRollingHeadersForward(report.getReportDate(), table.getTableCode(),
+                        cell.getColIndex());
             }
             // 값이 바뀌지 않았다면 위 두 동작(도장 찍기/전파) 모두 건너뛴다 —
             // 이 셀은 여전히 "이어받기 상태"로 남아, 향후 더 이전 날짜에서의
@@ -239,6 +264,73 @@ public class CellService {
                 nextCell.carryOverValue(newValue);
             }
             // 이 셀은 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
+        }
+    }
+
+    /**
+     * ★★ 롤링 헤더 즉시 전파(2026-08 추가) — 표1(생산지표)/표2(재공품)/표4(보일러)의
+     * "실측(라이브 입력)" 컬럼(O/M/P열)이 저장될 때마다, 이미 만들어져 있는 미래
+     * 일보들 중 이 값을 과거월 헤더/연평균으로 참조할 수 있는 표만 그 자리에서
+     * 즉시 다시 계산해 반영한다.
+     *
+     * 배경: 관리자용 "월 롤링 헤더 재계산"({@link DailyReportService#refreshRollingHeaders})은
+     * 전체 일보×전체 표를 매번 통째로 훑기 때문에, 운영 데이터가 쌓일수록
+     * (일보 수 × 표 수 × 표당 실측 조회 횟수) 점점 느려져 API 타임아웃 위험이
+     * 커진다. 반면 이 메서드는 "지금 저장한 값이 실제로 영향을 줄 수 있는
+     * 이미 존재하는 미래 일보"만 좁게 훑으므로, 과거 데이터가 아무리 많이
+     * 누적되어도(=이 저장과 무관) 항상 빠르게 끝난다.
+     *
+     * ※ 어느 지점까지 영향을 줄 수 있는지(maxHorizonMonths)는 표별 롤링 계산
+     *   범위에 따라 다르다:
+     *   - 표1(TBL_PRODUCTION_INDEX): 과거 7개월 롤링 창(최대 +7개월) + '24/'25년
+     *     스타일의 연평균(F/G열, 최대 +2년) → 넉넉하게 +36개월까지 확인
+     *   - 표2(TBL_INVENTORY): 과거 7개월 롤링 창만 있음 → +8개월까지 확인
+     *   - 표4(TBL_BOILER): 전전월/전월 실적 2칸뿐 → +3개월까지 확인
+     * ※ 무한 루프/과도한 조회 방지를 위해 hop 수 자체도 최대 1200회(약 3년치
+     *   일보)로 상한을 둔다 — maxHorizonMonths 조건이 먼저 걸려 실제로는
+     *   훨씬 일찍 끝난다.
+     */
+    private void propagateRollingHeadersForward(LocalDate fromDate, String tableCode, Integer colIndex) {
+        Integer liveCol = ROLLING_LIVE_COL_BY_TABLE.get(tableCode);
+        if (liveCol == null || colIndex == null || !liveCol.equals(colIndex)) {
+            return; // 이 표에 롤링 헤더가 없거나, 저장된 셀이 실측(라이브) 컬럼이 아님
+        }
+
+        int maxHorizonMonths = switch (tableCode) {
+            case "TBL_PRODUCTION_INDEX" -> 36;
+            case "TBL_INVENTORY" -> 8;
+            case "TBL_BOILER" -> 3;
+            default -> 0;
+        };
+        if (maxHorizonMonths <= 0) {
+            return;
+        }
+
+        YearMonth changedMonth = YearMonth.from(fromDate);
+        LocalDate cursor = fromDate;
+        for (int hop = 0; hop < 1200; hop++) {
+            DailyReport nextReport = reportRepository
+                    .findTopByReportDateGreaterThanOrderByReportDateAsc(cursor)
+                    .orElse(null);
+            if (nextReport == null) {
+                break; // 더 이상 미래에 생성된 일보가 없음
+            }
+            cursor = nextReport.getReportDate();
+
+            YearMonth nextMonth = YearMonth.from(cursor);
+            if (ChronoUnit.MONTHS.between(changedMonth, nextMonth) > maxHorizonMonths) {
+                break; // 이 표의 롤링 계산이 더 이상 changedMonth를 참조할 수 없는 시점 이후
+            }
+
+            DailyReportTable nextTable = nextReport.getTables().stream()
+                    .filter(t -> tableCode.equals(t.getTableCode()))
+                    .findFirst()
+                    .orElse(null);
+            if (nextTable == null) {
+                continue; // 이 표가 없는 일보(구조 변경 등) — 건너뛰고 다음 날짜로 계속
+            }
+
+            dailyReportService.refreshTableRollingHeaders(nextTable, cursor);
         }
     }
 
