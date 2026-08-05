@@ -62,6 +62,8 @@
     .data-table .col-desc { max-width:180px; }
     .data-table td.col-desc { line-height:1.4; font-size:12px; color:#475569; cursor:default; }
     .data-table td.col-desc .desc-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; }
+    /* 담당 셀(coord) 컬럼: 항목이 많아도 가로 스크롤 없이 줄바꿈되도록 폭을 제한 */
+    .data-table .col-coords { max-width:260px; }
 
     /* ── 테이블 코드 뱃지 ── */
     .badge { display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; white-space:nowrap; }
@@ -70,9 +72,14 @@
     .badge-inactive { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
     .badge-active { background:#f0fdf4; color:#166534; border:1px solid #86efac; }
 
-    /* ── 셀 라벨 표시 ── */
+    /* ── 셀 라벨 표시 ──
+       담당 셀이 많아지면 한 그룹(section)의 라벨 목록이 매우 길어질 수 있는데,
+       기존에는 .coord-label이 white-space:nowrap이라 한 줄로 강제되어 표 전체가
+       가로로 늘어나며 스크롤바가 생기고 우측 관리(수정/삭제) 버튼이 화면 밖으로
+       밀려나는 문제가 있었다. white-space:normal + word-break로 바꿔 컬럼 폭
+       안에서 자연스럽게 줄바꿈되도록 수정(가로 스크롤 대신 행 높이가 늘어남). */
     .coord-tags { display:flex; flex-direction:column; gap:2px; }
-    .coord-label { display:inline; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:500; line-height:1.6; background:#f8fafc; border:1px solid #e2e8f0; color:#334155; white-space:nowrap; }
+    .coord-label { display:block; max-width:100%; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:500; line-height:1.6; background:#f8fafc; border:1px solid #e2e8f0; color:#334155; white-space:normal; word-break:break-word; overflow-wrap:anywhere; }
     .coord-label .section { color:#6366f1; font-weight:700; }
     .coord-label .separator { color:#94a3b8; margin:0 1px; }
     .coord-label .detail { color:#475569; }
@@ -1167,7 +1174,7 @@
             <td class="col-id">${auth.authId}</td>
             <td class="col-user">${userLabel}</td>
             <td class="col-table"><span class="badge badge-table">${escapeHtml(tableName)}</span></td>
-            <td>${coordHtml}</td>
+            <td class="col-coords">${coordHtml}</td>
             <td class="col-freq"><span class="badge badge-freq">${escapeHtml(auth.freqLabel || FREQ_LABELS[auth.freqCode] || auth.freqCode || '-')}</span></td>
             <td class="col-status">${statusBadge}</td>
             <td class="col-desc" title="${escapeHtml(auth.description || '')}"><span class="desc-text">${escapeHtml(auth.description || '-')}</span></td>

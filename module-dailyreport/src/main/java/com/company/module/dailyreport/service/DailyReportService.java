@@ -71,7 +71,7 @@ public class DailyReportService {
      *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
     private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
-    private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 84;
+    private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
 
     // ─────────────────────────────────────────────
     // 일보 CRUD
