@@ -440,6 +440,12 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- 다른 모듈(소방/설비 점검 등)과 동일한 세션 만료 처리를 위한 공용 유틸
+       - refreshJwtToken(): sessionStorage/localStorage의 refresh token으로 액세스 토큰 재발급 시도
+       - isInIframe() / goLogin(): iframe 안이면 부모 SPA에 FIRE_AUTH_EXPIRED 메시지를 보내
+         부모가 "세션이 만료되었습니다..." 빨간 토스트 + 로그인 화면 전환을 처리하도록 함 -->
+  <script src="/js/csrf.js"></script>
+
   <!-- ═══════════════════════════════════════════════════
        JavaScript — 컬럼 권한 관리 (CRUD)
   ═══════════════════════════════════════════════════ -->
@@ -449,7 +455,33 @@
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
     const _urlParams = new URLSearchParams(window.location.search);
     const _previewLoginId = _urlParams.get('_loginId') || '';
-    const _jwtToken = _urlParams.get('_t') || '';
+    // refresh 성공 시 새 액세스 토큰으로 교체될 수 있으므로 let으로 선언
+    let _jwtToken = _urlParams.get('_t') || '';
+
+    /**
+     * 401(인증 만료) 공통 처리 — index.html(입력 페이지)과 동일한 흐름.
+     * 1) refresh token으로 액세스 토큰 재발급을 조용히 시도 → 성공하면 화면 전환 없이 계속 사용
+     * 2) 실패하면 iframe이면 부모 SPA에 FIRE_AUTH_EXPIRED 메시지(로그인 화면+빨간 토스트),
+     *    독립 탭이면 실제 로그인 화면(/index.html)으로 이동
+     */
+    async function handleAuthExpired() {
+      if (window.FireWebCsrf?.refreshJwtToken) {
+        const refreshed = await window.FireWebCsrf.refreshJwtToken();
+        if (refreshed) {
+          const newToken = window.FireWebCsrf.getJwtToken();
+          if (newToken) {
+            _jwtToken = newToken;
+            return true;
+          }
+        }
+      }
+      if (window.FireWebCsrf?.isInIframe?.()) {
+        window.FireWebCsrf.goLogin();
+      } else {
+        window.location.href = '/index.html?returnUrl=' + encodeURIComponent(window.location.pathname + window.location.search);
+      }
+      return false;
+    }
 
     // ── 상태 ──
     let currentUser = null;
@@ -670,16 +702,21 @@
         const sep = url.includes('?') ? '&' : '?';
         url += sep + '_loginId=' + encodeURIComponent(_previewLoginId);
       }
-      const hdrs = { 'Content-Type': 'application/json', ...options.headers };
-      if (_jwtToken) hdrs['Authorization'] = 'Bearer ' + _jwtToken;
-      const res = await fetch(url, {
-        headers: hdrs,
-        credentials: 'same-origin',
-        ...options
-      });
+      const doFetch = () => {
+        const hdrs = { 'Content-Type': 'application/json', ...options.headers };
+        if (_jwtToken) hdrs['Authorization'] = 'Bearer ' + _jwtToken;
+        return fetch(url, { headers: hdrs, credentials: 'same-origin', ...options });
+      };
+      let res = await doFetch();
       if (res.status === 401) {
-        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-        throw new Error('인증이 만료되었습니다.');
+        // refresh token으로 재발급 시도 → 성공하면 새 토큰으로 한 번 더 요청
+        const refreshed = await handleAuthExpired();
+        if (refreshed) {
+          res = await doFetch();
+        }
+        if (!refreshed || res.status === 401) {
+          throw new Error('인증이 만료되었습니다.');
+        }
       }
       if (res.status === 403) {
         throw new Error('접근 권한이 없습니다.');
