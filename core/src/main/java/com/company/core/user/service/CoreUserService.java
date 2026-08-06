@@ -96,6 +96,7 @@ public class CoreUserService {
     public UserResponse updateUser(Long userId, UserUpdateRequest request) {
         CoreUser user = findUserById(userId);
         user.updateProfile(request.getUserName(), request.getEmail(), request.getPhone());
+        applyPasswordChangeIfPresent(user, request.getPassword());
         UserProfileSnapshot profile = userProfileSyncPort
                 .flatMap(port -> port.saveProfile(userId, request))
                 .or(() -> userProfileSyncPort.flatMap(port -> port.findProfile(userId)))
@@ -108,8 +109,21 @@ public class CoreUserService {
     public CoreUser updateCoreUser(Long userId, UserUpdateRequest request) {
         CoreUser user = findUserById(userId);
         user.updateProfile(request.getUserName(), request.getEmail(), request.getPhone());
+        applyPasswordChangeIfPresent(user, request.getPassword());
         log.info("사용자 정보 수정 완료: userId={}", userId);
         return user;
+    }
+
+    /**
+     * 비밀번호 변경 요청이 있는 경우에만 인코딩하여 반영한다.
+     * request.getPassword()가 null이면(입력하지 않은 경우) 기존 비밀번호를 그대로 유지한다.
+     */
+    private void applyPasswordChangeIfPresent(CoreUser user, String rawPassword) {
+        if (rawPassword == null) {
+            return;
+        }
+        user.changePassword(passwordEncoder.encode(rawPassword));
+        log.info("사용자 비밀번호 변경 완료: userId={}", user.getUserId());
     }
 
     @Transactional
