@@ -146,8 +146,9 @@ table tr:last-child td{border-bottom:none;}
 .modal-header .close:hover{background:var(--bg);color:var(--text);}
 .modal-body{padding:24px;}
 .modal-body .form-group{margin-bottom:16px;}
-.modal-body .form-group input,.modal-body .form-group select{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);}
+.modal-body .form-group input:not([type="checkbox"]):not([type="radio"]),.modal-body .form-group select{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);}
 .modal-body .form-group select{background:#fff;}
+.modal-body .form-group input[type="checkbox"],.modal-body .form-group input[type="radio"]{width:auto;padding:0;border:0;border-radius:0;margin:0;flex-shrink:0;}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
 
 .form-section{font-size:13px;font-weight:700;color:var(--primary);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border);}
