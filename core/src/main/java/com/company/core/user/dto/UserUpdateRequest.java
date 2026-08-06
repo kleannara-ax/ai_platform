@@ -23,6 +23,13 @@ public class UserUpdateRequest {
     @Size(max = 100, message = "사용자명은 100자 이하여야 합니다.")
     private String userName;
 
+    /**
+     * 비밀번호 변경 (선택 입력)
+     * 값이 없으면(null) 기존 비밀번호를 유지하고, 값이 있으면 변경한다.
+     */
+    @Size(min = 8, max = 100, message = "비밀번호는 8~100자여야 합니다.")
+    private String password;
+
     @Email(message = "이메일 형식이 올바르지 않습니다.")
     @Size(max = 200, message = "이메일은 200자 이하여야 합니다.")
     private String email;
@@ -43,6 +50,14 @@ public class UserUpdateRequest {
      */
     public void setUserName(String userName) {
         this.userName = (userName != null) ? userName.trim() : null;
+    }
+
+    /**
+     * 빈 문자열 비밀번호를 null로 변환(변경하지 않음), 앞뒤 공백 제거
+     */
+    public void setPassword(String password) {
+        if (password != null) password = password.trim();
+        this.password = (password != null && password.isBlank()) ? null : password;
     }
 
     /**
