@@ -779,10 +779,10 @@
         // 권한 확인 성공 → UI 업데이트
         updateUserUI();
 
-        // 오늘 날짜로 일보 로드
-        const today = getTodayStr();
-        document.getElementById('reportDateInput').value = today;
-        await loadReport(today);
+        // 전일(어제) 날짜를 디폴트로 일보 로드
+        const defaultDate = getYesterdayStr();
+        document.getElementById('reportDateInput').value = defaultDate;
+        await loadReport(defaultDate);
 
         // 자동 새로고침 시작
         startAutoRefresh();
