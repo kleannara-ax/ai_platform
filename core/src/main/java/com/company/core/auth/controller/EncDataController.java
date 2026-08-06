@@ -129,7 +129,7 @@ public class EncDataController {
                       }
                     } catch(e) {}
                     if (!currentUser) {
-                      currentUser = { loginId: SPRO_ID, userName: SPRO_ID, role: 'ROLE_USER' };
+                      currentUser = { loginId: SPRO_ID, userName: SPRO_ID, role: 'ROLE_USER', roles: ['ROLE_USER'] };
                     }
                     sessionStorage.setItem('auth', JSON.stringify({
                       token: TOKEN,
@@ -137,12 +137,15 @@ public class EncDataController {
                       currentUser: currentUser,
                       currentPage: 'dashboard'
                     }));
+                    // 다중 역할 지원: currentUser.roles(배열) 우선, 없으면 currentUser.role(단일값)로 대체 (하위호환)
+                    var userRoles = (Array.isArray(currentUser.roles) && currentUser.roles.length > 0) ? currentUser.roles : (currentUser.role ? [currentUser.role] : ['ROLE_USER']);
                     var fireRole = (currentUser.role||'').replace('ROLE_','');
-                    var fireCanManage = currentUser.role==='ROLE_ADMIN'||currentUser.role==='ROLE_FIRE_MANAGER';
+                    var fireCanManage = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].some(function(r){ return userRoles.indexOf(r) >= 0; });
                     localStorage.setItem('fireweb_user', JSON.stringify({
                       loginId: currentUser.loginId,
                       userName: currentUser.userName,
                       role: fireRole,
+                      roles: userRoles,
                       token: TOKEN,
                       canManage: fireCanManage
                     }));

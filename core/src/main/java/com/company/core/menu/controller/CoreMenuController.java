@@ -49,15 +49,25 @@ public class CoreMenuController {
         return ResponseEntity.ok(ApiResponse.success(menuService.getAllMenusIncludeInactive()));
     }
 
-    /** 역할별 메뉴 트리 (접속자 IP 기반 필터링 포함) */
+    /**
+     * 역할별 메뉴 트리 (접속자 IP 기반 필터링 포함)
+     * 다중 역할 지원: {role} 경로 변수에 쉼표(,)로 구분된 역할 목록을 전달하면
+     * 각 역할이 허용하는 메뉴를 UNION하여 반환한다 (예: /role/ROLE_ADMIN,ROLE_FIRE_MANAGER).
+     * 단일 역할만 전달해도 기존과 동일하게 동작한다.
+     */
     @GetMapping("/role/{role}")
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getMenusByRole(
             @PathVariable String role, HttpServletRequest request) {
         // IP 헤더 전체 덤프 (디버깅용)
         LogUtil.logAllIpHeaders(request, "메뉴조회");
         String clientIp = LogUtil.getClientIp(request);
-        log.info("[메뉴조회] role={}, clientIp={}", role, clientIp);
-        List<MenuResponse> menus = menuService.getMenuTreeByRole(role, clientIp);
+        List<String> roles = java.util.Arrays.stream(role.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        log.info("[메뉴조회] roles={}, clientIp={}", roles, clientIp);
+        List<MenuResponse> menus = menuService.getMenuTreeByRoles(roles, clientIp);
         log.info("[메뉴조회] 반환 메뉴 수={}, 메뉴목록={}", menus.size(),
                 menus.stream().map(m -> m.getMenuCode() + "(allowedIps=" + m.getAllowedIps() + ")").collect(java.util.stream.Collectors.joining(", ")));
         return ResponseEntity.ok(ApiResponse.success(menus));

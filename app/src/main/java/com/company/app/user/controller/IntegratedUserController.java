@@ -2,6 +2,8 @@ package com.company.app.user.controller;
 
 import com.company.app.user.dto.IntegratedUserResponse;
 import com.company.app.user.service.IntegratedUserService;
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
 import com.company.core.user.dto.UserCreateRequest;
@@ -15,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 통합 사용자 관리 API
@@ -77,11 +81,19 @@ public class IntegratedUserController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    /** 역할 변경 */
+    /**
+     * 역할 변경 (다중 역할 지원)
+     * 쿼리 파라미터 role을 여러 번 전달하면 다중 역할로 저장된다.
+     * 예: PATCH /api/integrated/users/1/role?role=ROLE_ADMIN&role=ROLE_FIRE_MANAGER
+     * 단일 role 파라미터만 전달해도 기존과 동일하게 동작한다(하위호환).
+     */
     @PatchMapping("/{userId}/role")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<IntegratedUserResponse>> changeRole(
-            @PathVariable Long userId, @RequestParam String role) {
-        return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRole(userId, role)));
+            @PathVariable Long userId, @RequestParam(name = "role") List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "최소 1개 이상의 역할을 선택해야 합니다.");
+        }
+        return ResponseEntity.ok(ApiResponse.success(integratedUserService.changeRoles(userId, roles)));
     }
 }

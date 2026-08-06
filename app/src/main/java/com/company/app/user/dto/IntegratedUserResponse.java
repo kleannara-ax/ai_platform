@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 사용자 + 프로필 통합 응답 DTO
@@ -20,7 +21,10 @@ public class IntegratedUserResponse {
     private String userName;
     private String email;
     private String phone;
+    /** 대표 역할 (하위호환용, roles의 첫번째 값) */
     private String role;
+    /** 사용자가 보유한 전체 역할 목록 (다중 역할 지원) */
+    private List<String> roles;
     private Boolean enabled;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,13 +40,23 @@ public class IntegratedUserResponse {
     private String internalExt;
 
     public static IntegratedUserResponse from(CoreUser user, UserProfile profile, String deptName) {
+        return from(user, profile, deptName, null);
+    }
+
+    public static IntegratedUserResponse from(CoreUser user, UserProfile profile, String deptName, List<String> roles) {
+        List<String> effectiveRoles = (roles == null || roles.isEmpty())
+                ? (user.getRole() != null ? List.of(user.getRole()) : List.of())
+                : roles;
+        String primaryRole = effectiveRoles.isEmpty() ? user.getRole() : effectiveRoles.get(0);
+
         var b = IntegratedUserResponse.builder()
                 .userId(user.getUserId())
                 .loginId(user.getLoginId())
                 .userName(user.getUserName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
-                .role(user.getRole())
+                .role(primaryRole)
+                .roles(effectiveRoles)
                 .enabled(user.getEnabled())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt());

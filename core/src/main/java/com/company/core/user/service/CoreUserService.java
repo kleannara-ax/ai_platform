@@ -7,9 +7,11 @@ import com.company.core.user.dto.UserCreateRequest;
 import com.company.core.user.dto.UserResponse;
 import com.company.core.user.dto.UserUpdateRequest;
 import com.company.core.user.entity.CoreUser;
+import com.company.core.user.entity.CoreUserRole;
 import com.company.core.user.profile.UserProfileSnapshot;
 import com.company.core.user.profile.UserProfileSyncPort;
 import com.company.core.user.repository.CoreUserRepository;
+import com.company.core.user.repository.CoreUserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,8 +20,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 사용자 관리 서비스 (Core)
@@ -31,6 +37,7 @@ import java.util.Optional;
 public class CoreUserService {
 
     private final CoreUserRepository coreUserRepository;
+    private final CoreUserRoleRepository coreUserRoleRepository;
     private final PasswordEncoder passwordEncoder;
     private final Optional<UserProfileSyncPort> userProfileSyncPort;
 
@@ -52,6 +59,7 @@ public class CoreUserService {
                 .enabled(true)
                 .build();
         CoreUser saved = coreUserRepository.save(user);
+        coreUserRoleRepository.save(CoreUserRole.builder().userId(saved.getUserId()).role(role).build());
         log.info("사용자 생성 완료: loginId={}, role={}", saved.getLoginId(), role);
         return saved;
     }
@@ -73,15 +81,56 @@ public class CoreUserService {
         UserProfileSnapshot profile = userProfileSyncPort
                 .flatMap(port -> port.findProfile(userId))
                 .orElse(null);
-        return UserResponse.from(user, profile);
+        List<String> roles = getRolesByUserId(userId);
+        return UserResponse.from(user, profile, roles);
     }
 
     public Page<UserResponse> getUsers(Pageable pageable) {
         Page<CoreUser> users = coreUserRepository.findAll(pageable);
+        List<Long> userIds = users.getContent().stream().map(CoreUser::getUserId).toList();
         Map<Long, UserProfileSnapshot> profileMap = userProfileSyncPort
-                .map(port -> port.findProfiles(users.getContent().stream().map(CoreUser::getUserId).toList()))
+                .map(port -> port.findProfiles(userIds))
                 .orElse(Map.of());
-        return users.map(user -> UserResponse.from(user, profileMap.get(user.getUserId())));
+        Map<Long, List<String>> roleMap = coreUserRoleRepository.findRoleCodesByUserIds(userIds);
+        return users.map(user -> UserResponse.from(
+                user, profileMap.get(user.getUserId()), roleMap.get(user.getUserId())));
+    }
+
+    /**
+     * 사용자의 전체 역할 목록 조회 (다중 역할)
+     * core_user_role에 데이터가 없으면(레거시) core_user.role 단일값으로 대체한다.
+     */
+    public List<String> getRolesByUserId(Long userId) {
+        List<String> roles = coreUserRoleRepository.findByUserId(userId).stream()
+                .map(CoreUserRole::getRole)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!roles.isEmpty()) {
+            return roles;
+        }
+        CoreUser user = coreUserRepository.findById(userId).orElse(null);
+        return (user != null && user.getRole() != null) ? List.of(user.getRole()) : List.of();
+    }
+
+    /**
+     * 여러 사용자의 역할 목록을 일괄 조회 (userId → List<role>)
+     * core_user_role에 매핑이 없는(레거시) 사용자는 core_user.role 단일값으로 대체한다.
+     */
+    public Map<Long, List<String>> getRolesByUserIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Map.of();
+        Map<Long, List<String>> roleMap = new java.util.HashMap<>(
+                coreUserRoleRepository.findRoleCodesByUserIds(userIds));
+        List<Long> missing = userIds.stream()
+                .filter(id -> !roleMap.containsKey(id) || roleMap.get(id).isEmpty())
+                .toList();
+        if (!missing.isEmpty()) {
+            coreUserRepository.findAllById(missing).forEach(u -> {
+                if (u.getRole() != null) {
+                    roleMap.put(u.getUserId(), List.of(u.getRole()));
+                }
+            });
+        }
+        return roleMap;
     }
 
     public Page<CoreUser> getUserEntities(Pageable pageable) {
@@ -152,12 +201,42 @@ public class CoreUserService {
         log.info("사용자 활성화: loginId={}", loginId);
     }
 
+    /**
+     * 사용자 역할 변경 (단일 역할 - 하위호환용)
+     * 내부적으로 changeRoles(userId, List.of(role))를 호출한다.
+     */
     @Transactional
     public UserResponse changeRole(Long userId, String role) {
+        return changeRoles(userId, role == null ? List.of() : List.of(role));
+    }
+
+    /**
+     * 사용자 역할 변경 (다중 역할)
+     * core_user_role 매핑 테이블을 전체 교체하고,
+     * 하위호환을 위해 core_user.role에는 대표 역할(첫번째 역할)을 동기화한다.
+     */
+    @Transactional
+    public UserResponse changeRoles(Long userId, List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "최소 1개 이상의 역할을 선택해야 합니다.");
+        }
         CoreUser user = findUserById(userId);
-        user.changeRole(role);
-        log.info("사용자 역할 변경: userId={}, role={}", userId, role);
-        return UserResponse.from(user);
+
+        // 중복 제거, 순서 유지
+        Set<String> uniqueRoles = new LinkedHashSet<>(roles);
+
+        coreUserRoleRepository.deleteByUserId(userId);
+        coreUserRoleRepository.flush();
+        for (String role : uniqueRoles) {
+            coreUserRoleRepository.save(CoreUserRole.builder().userId(userId).role(role).build());
+        }
+
+        // 레거시 core_user.role 컬럼은 대표 역할(첫번째)로 동기화
+        String primaryRole = uniqueRoles.iterator().next();
+        user.changeRole(primaryRole);
+
+        log.info("사용자 역할 변경: userId={}, roles={}", userId, uniqueRoles);
+        return UserResponse.from(user, null, List.copyOf(uniqueRoles));
     }
 
     private CoreUser findUserById(Long userId) {

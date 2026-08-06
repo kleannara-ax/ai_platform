@@ -90,9 +90,28 @@ public class CoreMenuService {
 
     /** 역할별 접근 가능 메뉴 트리 (IP 필터링 포함) */
     public List<MenuResponse> getMenuTreeByRole(String role, String clientIp) {
-        List<Long> menuIds = roleMenuRepository.findByRole(role).stream()
-                .map(rm -> rm.getMenuId()).collect(Collectors.toList());
-        if (menuIds.isEmpty()) return Collections.emptyList();
+        return getMenuTreeByRoles(role == null ? Collections.emptyList() : List.of(role), clientIp);
+    }
+
+    /** 다중 역할 목록 → 접근 가능 메뉴 트리 (UNION, IP 필터링 포함) */
+    public List<MenuResponse> getMenuTreeByRoles(Collection<String> roles) {
+        return getMenuTreeByRoles(roles, null);
+    }
+
+    /**
+     * 다중 역할 목록 → 접근 가능 메뉴 트리
+     * 역할별로 core_role_menu에서 조회한 menuId를 UNION(중복제거)한 뒤 트리를 구성한다.
+     * 즉, 사용자가 보유한 여러 역할 중 하나라도 허용된 메뉴는 모두 노출된다.
+     */
+    public List<MenuResponse> getMenuTreeByRoles(Collection<String> roles, String clientIp) {
+        if (roles == null || roles.isEmpty()) return Collections.emptyList();
+        Set<Long> menuIdSet = new LinkedHashSet<>();
+        for (String role : roles) {
+            if (role == null || role.isBlank()) continue;
+            roleMenuRepository.findByRole(role).forEach(rm -> menuIdSet.add(rm.getMenuId()));
+        }
+        if (menuIdSet.isEmpty()) return Collections.emptyList();
+        List<Long> menuIds = new ArrayList<>(menuIdSet);
         List<CoreMenu> menus = menuRepository.findByMenuIdInAndIsActiveTrueOrderBySortOrder(menuIds);
         // IP 필터링: allowedIps가 설정된 메뉴는 clientIp가 허용 목록에 포함되어야 함
         if (clientIp != null && !clientIp.isBlank()) {

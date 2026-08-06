@@ -43,8 +43,16 @@ const TEST_UI_DIR = path.join(__dirname, 'test-ui');
 const mockUser = {
   userId: 1, loginId: 'admin', userName: '관리자',
   email: 'admin@company.com', phone: '010-1234-5678',
-  role: 'ROLE_ADMIN', enabled: true
+  role: 'ROLE_ADMIN', roles: ['ROLE_ADMIN'], enabled: true
 };
+
+// 다중 역할 지원(Mock): 사용자 객체에 roles 배열이 없으면 role(단일값)으로부터 생성해 붙여준다.
+// 실제 백엔드는 core_user_role 매핑 테이블에서 roles 배열을 채워 반환하므로, mock도 동일한 응답 shape를 맞춘다.
+function withRoles(u) {
+  if (!u) return u;
+  if (Array.isArray(u.roles) && u.roles.length > 0) return u;
+  return Object.assign({}, u, { roles: u.role ? [u.role] : [] });
+}
 
 const mockMenus = [
   // ── 코어 메뉴 ──
@@ -396,10 +404,12 @@ const server = http.createServer((req, res) => {
     document.getElementById('s').textContent='사용자 정보를 조회하는 중...';
     var u=null;
     try{var r=await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+T}});var d=await r.json();if(d.success&&d.data)u=d.data;}catch(e){}
-    if(!u)u={loginId:S,userName:S,role:'ROLE_USER'};
+    if(!u)u={loginId:S,userName:S,role:'ROLE_USER',roles:['ROLE_USER']};
     sessionStorage.setItem('auth',JSON.stringify({token:T,refreshTk:R,currentUser:u,currentPage:'dashboard'}));
+    var ur=(Array.isArray(u.roles)&&u.roles.length>0)?u.roles:(u.role?[u.role]:['ROLE_USER']);
     var fr=(u.role||'').replace('ROLE_','');
-    localStorage.setItem('fireweb_user',JSON.stringify({loginId:u.loginId,userName:u.userName,role:fr,token:T,canManage:u.role==='ROLE_ADMIN'||u.role==='ROLE_FIRE_MANAGER'}));
+    var cm=['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].some(function(r){return ur.indexOf(r)>=0;});
+    localStorage.setItem('fireweb_user',JSON.stringify({loginId:u.loginId,userName:u.userName,role:fr,roles:ur,token:T,canManage:cm}));
     document.getElementById('s').textContent='로그인 완료! 메인 페이지로 이동합니다...';
     window.location.replace('/index.html');
   }catch(e){document.getElementById('s').textContent='오류: '+e.message;}
@@ -451,7 +461,7 @@ const server = http.createServer((req, res) => {
       const bearerToken = authHeader.replace('Bearer ', '');
       const loggedInUser = tokenToUser[bearerToken] || null;
       if (loggedInUser) {
-        return apiOk(res, loggedInUser);
+        return apiOk(res, withRoles(loggedInUser));
       }
       // 토큰에서 loginId 추출 시도 (mock-jwt-{loginId}-{timestamp} 형식)
       const tokenMatch = bearerToken.match(/^mock-jwt-(.+?)-\d+$/);
@@ -459,11 +469,11 @@ const server = http.createServer((req, res) => {
         const foundUser = mockUsers.find(u => u.loginId === tokenMatch[1]);
         if (foundUser) {
           tokenToUser[bearerToken] = foundUser; // 캐시
-          return apiOk(res, foundUser);
+          return apiOk(res, withRoles(foundUser));
         }
       }
       // fallback: admin
-      return apiOk(res, mockUser);
+      return apiOk(res, withRoles(mockUser));
     }
 
     // My IP
@@ -471,12 +481,16 @@ const server = http.createServer((req, res) => {
       return apiOk(res, { ip: '127.0.0.1' });
     }
 
-    // Menus - role
+    // Menus - role (다중 역할 지원: 쉼표로 구분된 역할 목록을 UNION하여 메뉴 반환)
     if (pathname.startsWith('/api/core/menus/role/')) {
       // 역할별 메뉴 필터링: mockPermissions의 menuIds 기준으로 트리 필터
-      var reqRole = decodeURIComponent(pathname.split('/').pop());
-      var rolePerm = mockPermissions.find(function(p){ return p.role === reqRole; });
-      var allowedIds = rolePerm ? rolePerm.menuIds : [1]; // 기본: 대시보드만
+      var reqRoles = decodeURIComponent(pathname.split('/').pop()).split(',').map(function(r){return r.trim();}).filter(Boolean);
+      var allowedIdSet = new Set();
+      reqRoles.forEach(function(reqRole){
+        var rolePerm = mockPermissions.find(function(p){ return p.role === reqRole; });
+        (rolePerm ? rolePerm.menuIds : [1]).forEach(function(id){ allowedIdSet.add(id); }); // 기본: 대시보드만
+      });
+      var allowedIds = Array.from(allowedIdSet);
 
       function filterMenuTree(nodes, ids) {
         var result = [];
@@ -565,7 +579,7 @@ const server = http.createServer((req, res) => {
 
     // Users - integrated
     if (pathname === '/api/integrated/users' && method === 'GET') {
-      return apiOk(res, { content: mockUsers, totalElements: mockUsers.length });
+      return apiOk(res, { content: mockUsers.map(withRoles), totalElements: mockUsers.length });
     }
     if (pathname === '/api/integrated/users' && method === 'POST') {
       // 신규 사용자는 항상 ROLE_USER(사용자) 역할로 생성
@@ -577,6 +591,7 @@ const server = http.createServer((req, res) => {
         email: jsonBody.email || null,
         phone: jsonBody.phone || null,
         role: 'ROLE_USER',
+        roles: ['ROLE_USER'],
         enabled: true,
         deptCode: jsonBody.deptCode || null,
         deptName: jsonBody.deptCode ? (mockDepts.find(d => d.code === jsonBody.deptCode) || {}).codeName || jsonBody.deptCode : null,
@@ -594,7 +609,15 @@ const server = http.createServer((req, res) => {
       return apiOk(res, jsonBody);
     }
     if (pathname.match(/^\/api\/integrated\/users\/\d+\/role/) && method === 'PATCH') {
-      return apiOk(res, null);
+      // 다중 역할 지원(Mock): ?role=A&role=B 반복 파라미터를 배열로 받아 대상 사용자의 role/roles를 갱신한다.
+      const uid = parseInt(pathname.split('/')[3]);
+      const newRoles = (parsedUrl.query.role ? (Array.isArray(parsedUrl.query.role) ? parsedUrl.query.role : [parsedUrl.query.role]) : []);
+      const target = mockUsers.find(u => u.userId === uid);
+      if (target && newRoles.length > 0) {
+        target.roles = newRoles;
+        target.role = newRoles[0]; // 대표 역할 캐시로 동기화
+      }
+      return apiOk(res, target ? withRoles(target) : null);
     }
     if (pathname.match(/^\/api\/integrated\/users\/\d+\/(enable|disable)$/) && method === 'PATCH') {
       return apiOk(res, null);
@@ -602,12 +625,12 @@ const server = http.createServer((req, res) => {
 
     // Core Users
     if (pathname === '/api/core/users' && method === 'GET') {
-      return apiOk(res, { content: mockUsers, totalElements: mockUsers.length });
+      return apiOk(res, { content: mockUsers.map(withRoles), totalElements: mockUsers.length });
     }
     if (pathname.match(/^\/api\/core\/users\/\d+$/) && method === 'GET') {
       const uid = parseInt(pathname.split('/').pop());
       const u = mockUsers.find(x => x.userId === uid);
-      return u ? apiOk(res, u) : apiErr(res, 'User not found', 404);
+      return u ? apiOk(res, withRoles(u)) : apiErr(res, 'User not found', 404);
     }
 
     // Fire API - Dashboard Stats
