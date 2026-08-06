@@ -22,7 +22,7 @@ import java.time.LocalDate;
 public class UserCreateRequest {
 
     @NotBlank(message = "로그인 ID는 필수입니다.")
-    @Size(min = 4, max = 50, message = "로그인 ID는 4~50자여야 합니다.")
+    @Size(min = 2, max = 50, message = "로그인 ID는 2~50자여야 합니다.")
     private String loginId;
 
     @NotBlank(message = "비밀번호는 필수입니다.")
