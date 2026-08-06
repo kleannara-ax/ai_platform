@@ -51,10 +51,12 @@ public class IntegratedUserService {
                 .findByGroup_GroupCodeAndIsActiveTrueOrderBySortOrderAsc("DEPT").stream()
                 .collect(Collectors.toMap(CodeDetail::getCode, CodeDetail::getCodeName, (a, b) -> a));
 
+        Map<Long, List<String>> roleMap = coreUserService.getRolesByUserIds(userIds);
+
         return users.map(user -> {
             UserProfile profile = profileMap.get(user.getUserId());
             String deptName = resolveDeptName(profile, deptNameMap);
-            return IntegratedUserResponse.from(user, profile, deptName);
+            return IntegratedUserResponse.from(user, profile, deptName, roleMap.get(user.getUserId()));
         });
     }
 
@@ -65,7 +67,8 @@ public class IntegratedUserService {
         CoreUser user = coreUserService.getUserEntity(userId);
         UserProfile profile = profileRepo.findByUserId(userId).orElse(null);
         String deptName = resolveDeptName(profile);
-        return IntegratedUserResponse.from(user, profile, deptName);
+        List<String> roles = coreUserService.getRolesByUserId(userId);
+        return IntegratedUserResponse.from(user, profile, deptName, roles);
     }
 
     /**
@@ -127,11 +130,20 @@ public class IntegratedUserService {
     }
 
     /**
-     * 역할 변경
+     * 역할 변경 (단일 역할 - 하위호환용)
      */
     @Transactional
     public IntegratedUserResponse changeRole(Long userId, String role) {
         coreUserService.changeRole(userId, role);
+        return getUser(userId);
+    }
+
+    /**
+     * 역할 변경 (다중 역할)
+     */
+    @Transactional
+    public IntegratedUserResponse changeRoles(Long userId, List<String> roles) {
+        coreUserService.changeRoles(userId, roles);
         return getUser(userId);
     }
 

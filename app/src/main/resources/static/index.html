@@ -146,8 +146,9 @@ table tr:last-child td{border-bottom:none;}
 .modal-header .close:hover{background:var(--bg);color:var(--text);}
 .modal-body{padding:24px;}
 .modal-body .form-group{margin-bottom:16px;}
-.modal-body .form-group input,.modal-body .form-group select{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);}
+.modal-body .form-group input:not([type="checkbox"]):not([type="radio"]),.modal-body .form-group select{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);}
 .modal-body .form-group select{background:#fff;}
+.modal-body .form-group input[type="checkbox"],.modal-body .form-group input[type="radio"]{width:auto;padding:0;border:0;border-radius:0;margin:0;flex-shrink:0;}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
 
 .form-section{font-size:13px;font-weight:700;color:var(--primary);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border);}
@@ -395,7 +396,7 @@ async function doLogin() {
       if (meRes.success && meRes.data) {
         currentUser = meRes.data;
       } else {
-        currentUser = {loginId:id,userName:id,role:'ROLE_USER'};
+        currentUser = {loginId:id,userName:id,role:'ROLE_USER',roles:['ROLE_USER']};
       }
       saveSession();
       enterApp();
@@ -417,11 +418,13 @@ async function enterApp() {
     // fireweb_user 저장 후 returnUrl로 이동
     if (token && currentUser) {
       var fireRole = (currentUser.role||'').replace('ROLE_','');
-      var fireCanManage = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
+      // 다중 역할 지원: 부여된 역할 중 하나라도 관리 권한 역할이면 canManage=true
+      var fireCanManage = hasAnyRole(['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER']);
       localStorage.setItem('fireweb_user', JSON.stringify({
         loginId: currentUser.loginId,
         userName: currentUser.userName,
         role: fireRole,
+        roles: currentUserRoles(),
         token: token,
         canManage: fireCanManage
       }));
@@ -436,7 +439,7 @@ async function enterApp() {
   restoreMenuGroupState();
   document.getElementById('userAvatar').textContent=(currentUser.userName||'U')[0].toUpperCase();
   document.getElementById('userName').textContent=currentUser.userName||currentUser.loginId;
-  document.getElementById('userRole').textContent=currentUser.role||'';
+  document.getElementById('userRole').textContent=currentUserRoles().join(', ')||'';
   // 공통코드에서 역할 목록 로드
   try{ const rr=await api('GET','/common-api/codes/lookup/ROLE'); allRoles=rr.success?(rr.data||[]):[]; Object.keys(_roleColorCache).forEach(k=>delete _roleColorCache[k]); }catch(e){ allRoles=[]; }
   // 현재 접속자 IP 조회
@@ -444,11 +447,13 @@ async function enterApp() {
   // 소방 모듈 연동: fireweb_user에 JWT 토큰 저장 (iframe 내 소방 페이지에서 사용)
   if (token && currentUser) {
     const fireRole = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
+    // 다중 역할 지원: 부여된 역할 중 하나라도 관리 권한 역할이면 canManage=true
+    const fireCanManage = hasAnyRole(['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER']);
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: fireRole,
+      roles: currentUserRoles(),
       token: token,
       canManage: fireCanManage
     }));
@@ -602,11 +607,24 @@ function filterMenusByIp(menus){
   });
 }
 
+// 현재 사용자의 전체 역할 목록 (다중 역할 지원). currentUser.roles(배열) 우선,
+// 없으면 currentUser.role(단일값)로 대체 — 구버전 캐시된 세션과의 하위호환.
+function currentUserRoles() {
+  if (Array.isArray(currentUser?.roles) && currentUser.roles.length > 0) return currentUser.roles;
+  return currentUser?.role ? [currentUser.role] : ['ROLE_USER'];
+}
+// 여러 역할 중 하나라도 만족하면 true (관리자류 권한 등 다중 역할 OR 체크용)
+function hasAnyRole(roleList) {
+  const mine = currentUserRoles();
+  return roleList.some(r => mine.includes(r));
+}
+
 async function loadUserMenus() {
   const nav = document.getElementById('sidebarMenu');
   try {
-    const role = currentUser.role || 'ROLE_USER';
-    const res = await api('GET', '/api/core/menus/role/' + encodeURIComponent(role));
+    const roles = currentUserRoles();
+    // 다중 역할: 쉼표로 구분해 전달하면 서버가 역할별 메뉴를 UNION하여 반환한다
+    const res = await api('GET', '/api/core/menus/role/' + encodeURIComponent(roles.join(',')));
     let menus = res.success ? (res.data || []) : [];
     userMenus = filterMenusByIp(menus);
 
@@ -614,7 +632,7 @@ async function loadUserMenus() {
     // admin이 아닌 사용자: cell_auth 보유 여부로 dailyreport 메뉴 표시 결정
     // core_role_menu에는 ROLE_USER에 세부공장일보 열려있으나,
     // 실제 담당자(cell_auth 보유자)만 사이드바에 표시
-    if (currentUser.role !== 'ROLE_ADMIN') {
+    if (!hasAnyRole(['ROLE_ADMIN'])) {
       try {
         var loginId = currentUser.loginId || '';
         var drRes = await fetch('/dailyreport-api/view/my-permissions?_loginId=' + encodeURIComponent(loginId), {
@@ -772,9 +790,12 @@ async function renderDashboard() {
     const users = usersRes.success?(usersRes.data.content||usersRes.data||[]):[];
     const menuTree2 = menuTreeRes.success?(menuTreeRes.data||[]):[];
 
-    // ── 접근권한별 사용자 수 ──
+    // ── 접근권한별 사용자 수 (다중 역할 지원: 사용자가 여러 역할을 가지면 각 역할별로 집계) ──
     const roleCounts = {};
-    users.forEach(u => { const r = u.role || 'UNKNOWN'; roleCounts[r] = (roleCounts[r]||0) + 1; });
+    users.forEach(u => {
+      const userRoleList = (Array.isArray(u.roles)&&u.roles.length>0) ? u.roles : [u.role || 'UNKNOWN'];
+      userRoleList.forEach(r => { roleCounts[r] = (roleCounts[r]||0) + 1; });
+    });
     // allRoles 순서대로 + 미등록 역할도 포함
     const roleKeys = allRoles.map(r=>r.code);
     Object.keys(roleCounts).forEach(r => { if (!roleKeys.includes(r)) roleKeys.push(r); });
@@ -910,7 +931,7 @@ function userRow(u,canManage){
     <td>${esc(u.deptName||'-')}</td>
     <td>${esc(posJob||'-')}</td>
     <td><code>${esc(u.employeeNo||'-')}</code></td>
-    <td>${roleBadge(u.role)}</td>
+    <td>${roleBadges(u)}</td>
     <td>${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</td>
     ${canManage?`<td class="text-center" onclick="event.stopPropagation()">
       <button class="btn-icon" title="수정" onclick="openEditUser(${u.userId})">&#9998;</button>
@@ -928,7 +949,10 @@ function filterUsers(){
   const status=document.getElementById('statusFilter')?.value||'';
   let filtered=allUsers.filter(u=>{
     if(q&&!u.userName.toLowerCase().includes(q)&&!u.loginId.toLowerCase().includes(q)&&!(u.deptName||'').toLowerCase().includes(q)&&!(u.employeeNo||'').toLowerCase().includes(q))return false;
-    if(role&&u.role!==role)return false;
+    if(role){
+      const userRoleList=(Array.isArray(u.roles)&&u.roles.length>0)?u.roles:(u.role?[u.role]:[]);
+      if(!userRoleList.includes(role))return false;
+    }
     if(status==='active'&&!u.enabled)return false;
     if(status==='inactive'&&u.enabled)return false;
     return true;
@@ -948,7 +972,7 @@ function showUserDetail(userId){
         <div class="detail-row"><div class="lbl">이름</div><div class="val"><b>${esc(u.userName)}</b></div></div>
         <div class="detail-row"><div class="lbl">이메일</div><div class="val">${esc(u.email||'-')}</div></div>
         <div class="detail-row"><div class="lbl">전화번호</div><div class="val">${esc(u.phone||'-')}</div></div>
-        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadge(u.role)}</div></div>
+        <div class="detail-row"><div class="lbl">역할</div><div class="val">${roleBadges(u)}</div></div>
         <div class="detail-row"><div class="lbl">상태</div><div class="val">${u.enabled?'<span class="badge badge-active">활성</span>':'<span class="badge badge-inactive">비활성</span>'}</div></div>
       </div>
       <div class="detail-section">
@@ -1095,20 +1119,30 @@ async function submitEditUser(id){
 
 function openRoleChange(id){
   const u=allUsers.find(x=>x.userId===id);if(!u)return;
-  const curLabel=(allRoles.find(ar=>ar.code===u.role)||{}).codeName||u.role;
+  // 다중 역할 지원: u.roles(배열) 우선 사용, 없으면 u.role(단일값)로 대체 (하위호환)
+  const curRoles=(Array.isArray(u.roles)&&u.roles.length>0)?u.roles:(u.role?[u.role]:[]);
+  const curLabel=curRoles.map(rc=>(allRoles.find(ar=>ar.code===rc)||{}).codeName||rc).join(', ')||'-';
   openModal('역할 변경 - '+(u?u.loginId:id),`
     <div class="form-group"><label>현재 역할</label><input value="${esc(curLabel)}" disabled></div>
-    <div class="form-group"><label>변경할 역할</label>
-      <select id="m_newRole">${allRoles.map(r=>`<option value="${esc(r.code)}" ${u.role===r.code?'selected':''}>${esc(r.codeName)}</option>`).join('')}</select>
+    <div class="form-group"><label>변경할 역할 (1개 이상 선택)</label>
+      <div id="m_newRoles" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;">
+        ${allRoles.map(r=>`
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;cursor:pointer;">
+            <input type="checkbox" value="${esc(r.code)}" ${curRoles.includes(r.code)?'checked':''}>
+            <span>${esc(r.codeName)}</span>
+          </label>`).join('')}
+      </div>
     </div>
   `,`<button class="btn btn-sm btn-outline" onclick="closeModal()">취소</button><button class="btn btn-sm btn-primary" onclick="submitRoleChange(${id})">역할 변경</button>`);
 }
 
 async function submitRoleChange(id){
   try{
-    const role=document.getElementById('m_newRole').value;
-    if(!role){toast('역할을 선택해주세요.','error');return;}
-    const res=await api('PATCH',`/api/integrated/users/${id}/role?role=${encodeURIComponent(role)}`);
+    const checked=[...document.querySelectorAll('#m_newRoles input[type="checkbox"]:checked')].map(cb=>cb.value);
+    if(checked.length===0){toast('최소 1개 이상의 역할을 선택해주세요.','error');return;}
+    // 다중 역할: role 파라미터를 반복 전송 (?role=A&role=B) → 서버는 List<String>으로 바인딩
+    const qs=checked.map(r=>'role='+encodeURIComponent(r)).join('&');
+    const res=await api('PATCH',`/api/integrated/users/${id}/role?${qs}`);
     if(res.success){toast('역할이 변경되었습니다.','success');closeModal();renderUsers();}
     else toast(res.message||'변경 실패','error');
   }catch(e){toast(e.message,'error');}
@@ -1772,11 +1806,13 @@ function navigateToFirePage(path) {
   // 소방 모듈 페이지를 SPA 내부 iframe으로 로드 (JWT 토큰을 localStorage에 저장하여 전달)
   if (token && currentUser) {
     const fireRole2 = (currentUser.role||'').replace('ROLE_','');
-    const fireCanManage2 = ['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER'].includes(currentUser.role);
+    // 다중 역할 지원: 부여된 역할 중 하나라도 관리 권한 역할이면 canManage=true
+    const fireCanManage2 = hasAnyRole(['ROLE_ADMIN','ROLE_FACILITY_MANAGER','ROLE_FIRE_MANAGER','ROLE_EQUIPMENT_MANAGER']);
     localStorage.setItem('fireweb_user', JSON.stringify({
       loginId: currentUser.loginId,
       userName: currentUser.userName,
       role: fireRole2,
+      roles: currentUserRoles(),
       token: token,
       canManage: fireCanManage2,
       menuCodes: collectMenuCodes(userMenus)
@@ -1879,6 +1915,12 @@ function roleBadge(role){
   const label=r?r.codeName:role.replace('ROLE_','');
   const c=roleColor(role);
   return `<span class="badge" style="background:${c.bg};color:${c.fg};">${esc(label)}</span>`;
+}
+// 다중 역할 뱃지 렌더링: u.roles(배열) 우선, 없으면 u.role(단일값)로 대체 (하위호환)
+function roleBadges(u){
+  const roleList=(Array.isArray(u.roles)&&u.roles.length>0)?u.roles:(u.role?[u.role]:[]);
+  if(roleList.length===0)return'-';
+  return roleList.map(r=>roleBadge(r)).join(' ');
 }
 
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}

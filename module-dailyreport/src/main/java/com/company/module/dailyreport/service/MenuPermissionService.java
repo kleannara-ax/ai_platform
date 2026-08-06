@@ -11,7 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 메뉴(페이지) 접근 권한 검증 서비스 (★ Phase 4 — cell_auth 단일 기준)
  *
  * 권한 판단 기준:
- *   - admin 여부: core_user.ROLE = 'ROLE_ADMIN' (EntityManager native query)
+ *   - admin 여부: core_user_role에 ROLE_ADMIN 매핑 존재 여부 (EntityManager native query)
+ *     ★ 2026-08 변경: 다중 역할(Multi-Role) 지원 도입으로 core_user.ROLE(단일 컬럼)은
+ *       더 이상 "이 사용자의 유일한 역할"을 의미하지 않는다. core_user.ROLE은 대표 역할
+ *       캐시로만 유지되므로, admin 여부 판별은 반드시 core_user_role 매핑 테이블을
+ *       조회해야 한다 (사용자가 ROLE_ADMIN을 보조 역할로 보유한 경우도 인식해야 함).
  *   - 일반 사용자: daily_report_cell_auth 활성 레코드 존재 여부
  *
  * ※ core_menu_permission 테이블 의존 제거
@@ -77,7 +81,7 @@ public class MenuPermissionService {
     }
 
     /**
-     * ★ 프론트엔드 UI 라벨 분기용 — 실제 core_user.ROLE = 'ROLE_ADMIN' 여부를 그대로 노출.
+     * ★ 프론트엔드 UI 라벨 분기용 — 사용자가 ROLE_ADMIN 역할을 보유하는지 그대로 노출.
      * (canAdminAuthPage는 "컬럼관리 CRUD 가능 여부"이고, isRealAdmin은 "진짜 관리자 계정인지"
      *  구분이 필요한 경우에만 사용 — 예: 화면에 "관리자" 대신 "담당자"로 표시)
      */
@@ -90,15 +94,17 @@ public class MenuPermissionService {
     // ─────────────────────────────────────────────
 
     /**
-     * core_user 테이블에서 role = 'ROLE_ADMIN' 여부 확인
+     * core_user_role 매핑 테이블에서 ROLE_ADMIN 보유 여부 확인 (다중 역할 지원)
      * ※ core 모듈 Entity 직접 import 없이 native query 사용 (아키텍처 규칙 준수)
-     * ※ V2.0.0 운영 스키마 기준: 소문자 컬럼명 (user_id, role)
+     * ※ V3.0.0 다중 역할 스키마 기준: core_user_role(user_id, role) 매핑 테이블 조회
+     *   (core_user.role 단일 컬럼은 대표 역할 캐시일 뿐이므로 admin 판별에 사용하지 않음 —
+     *    사용자가 ROLE_ADMIN을 보조 역할로 보유한 경우도 놓치지 않기 위함)
      */
     private boolean isAdmin(Long userId) {
         if (userId == null) return false;
         Number count = (Number) entityManager
                 .createNativeQuery(
-                        "SELECT COUNT(*) FROM core_user WHERE user_id = ?1 AND role = 'ROLE_ADMIN'")
+                        "SELECT COUNT(*) FROM core_user_role WHERE user_id = ?1 AND role = 'ROLE_ADMIN'")
                 .setParameter(1, userId)
                 .getSingleResult();
         return count.longValue() > 0;
