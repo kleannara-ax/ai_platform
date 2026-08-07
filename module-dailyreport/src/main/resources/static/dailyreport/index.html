@@ -2363,13 +2363,14 @@
             const displayText = hasValue ? escapeHtml(formatted).replace(/\n/g, '<br>') : '&nbsp;';
             const textAlign = (td.style.textAlign || 'center').trim();
             const justify = textAlign === 'right' ? 'flex-end' : textAlign === 'left' ? 'flex-start' : 'center';
-            // ★★ 버그 수정(2026-08): 화면에서는 값이 입력된 셀이
-            // .cell-input:not(:placeholder-shown) 규칙으로 굵게 강조되지만,
-            // 캡처본에서는 담당 셀 여부와 무관하게 다른 읽기전용 셀과 동일한
-            // 기본 굵기로 통일해서 보여준다(요청: 캡처 시 본인 담당 셀만 유독
-            // 볼드로 보이는 것을 없애 달라).
             editor.outerHTML = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};">${displayText}</div>`;
           }
+        });
+
+        // ★★ 요청(2026-08): 담당/비담당, 값 유무와 무관하게 캡처본의 모든 셀을
+        // 볼드체로 통일해서 보여준다. (화면 표시에는 영향 없음 — 캡처 사본에만 적용)
+        clone.querySelectorAll('td.cell, td.table-cell').forEach((td) => {
+          td.style.fontWeight = '800';
         });
 
         if (dualSectionIds.has(sec.dataset.section)) {
