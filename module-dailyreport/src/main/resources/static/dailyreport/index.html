@@ -2369,8 +2369,16 @@
 
         // ★★ 요청(2026-08): 담당/비담당, 값 유무와 무관하게 캡처본의 모든 셀을
         // 볼드체로 통일해서 보여준다. (화면 표시에는 영향 없음 — 캡처 사본에만 적용)
-        clone.querySelectorAll('td.cell, td.table-cell').forEach((td) => {
-          td.style.fontWeight = '800';
+        // <td> 자체뿐 아니라 그 안의 모든 자식 요소(.cell-value, .cell-input,
+        // wrapper div 등)에도 명시적으로 font-weight를 지정한다 — html2canvas가
+        // 부모 → 자식 상속을 완벽히 반영하지 못해 일부 셀(예: 표1의 "당월" 열처럼
+        // 별도 wrapper로 렌더링되는 값)만 상속이 끊겨 얇게 보이는 문제가 있었기
+        // 때문에, 모든 하위 요소까지 강제로 덮어써서 예외 없이 통일한다.
+        clone.querySelectorAll('td').forEach((td) => {
+          td.style.setProperty('font-weight', '800', 'important');
+          td.querySelectorAll('*').forEach((el) => {
+            el.style.setProperty('font-weight', '800', 'important');
+          });
         });
 
         if (dualSectionIds.has(sec.dataset.section)) {
