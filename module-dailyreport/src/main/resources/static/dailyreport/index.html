@@ -2363,10 +2363,12 @@
             const displayText = hasValue ? escapeHtml(formatted).replace(/\n/g, '<br>') : '&nbsp;';
             const textAlign = (td.style.textAlign || 'center').trim();
             const justify = textAlign === 'right' ? 'flex-end' : textAlign === 'left' ? 'flex-start' : 'center';
-            // 화면에서 값이 입력된 셀은 .cell-input:not(:placeholder-shown) 규칙으로
-            // 굵게만 강조되고 크기는 동일하므로, 캡처본에서도 동일하게 굵기만 적용
-            const valueStyle = hasValue ? 'font-weight:800;' : '';
-            editor.outerHTML = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};${valueStyle}">${displayText}</div>`;
+            // ★★ 버그 수정(2026-08): 화면에서는 값이 입력된 셀이
+            // .cell-input:not(:placeholder-shown) 규칙으로 굵게 강조되지만,
+            // 캡처본에서는 담당 셀 여부와 무관하게 다른 읽기전용 셀과 동일한
+            // 기본 굵기로 통일해서 보여준다(요청: 캡처 시 본인 담당 셀만 유독
+            // 볼드로 보이는 것을 없애 달라).
+            editor.outerHTML = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};">${displayText}</div>`;
           }
         });
 
