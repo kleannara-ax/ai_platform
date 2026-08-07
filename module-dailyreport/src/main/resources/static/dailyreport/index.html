@@ -253,7 +253,7 @@
         <button class="toolbar-btn ppt-capture" type="button" id="pptCaptureBtn" onclick="capturePptSlide()" title="표 1~4를 PPT 16:9 슬라이드 폭(1920px)에 맞춰 캡처하고 클립보드에 복사합니다">&#128247; 화면 캡처</button>
         <div class="auto-refresh-indicator" id="autoRefreshIndicator" style="display:none">
           <span class="dot"></span>
-          <span id="autoRefreshLabel">자동 갱신 60초</span>
+          <span id="autoRefreshLabel">자동 갱신 3분</span>
         </div>
       </div>
     </div>
@@ -329,7 +329,7 @@
     // ── 설정 ──
     const API_BASE = '/dailyreport-api';
     const MAX_UPLOAD_IMAGES = 8;
-    const AUTO_REFRESH_INTERVAL_MS = 60000; // 60초마다 자동 새로고침
+    const AUTO_REFRESH_INTERVAL_MS = 180000; // 3분마다 자동 새로고침
 
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
     const _urlParams = new URLSearchParams(window.location.search);
@@ -912,7 +912,7 @@
     }
 
     /**
-     * 자동 새로고침 시작 (60초 간격)
+     * 자동 새로고침 시작 (3분 간격)
      */
     function startAutoRefresh() {
       stopAutoRefresh();
@@ -931,7 +931,7 @@
 
         try {
           await loadReport(currentReportDate, true);
-          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 60초';
+          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 3분';
         } catch (err) {
           console.warn('자동 갱신 실패:', err);
           document.getElementById('autoRefreshLabel').textContent = '갱신 실패';
@@ -1699,11 +1699,18 @@
           const textarea = document.getElementById(`specialNoteInput_${code}`);
           if (textarea) {
             specialNoteLastValue[code] = textarea.value;
-            // 한글 등 IME 조합 중에는 검증을 건너뛰기 위한 플래그
-            // (compositionend 이후 브라우저가 최종 input 이벤트를 다시 발생시키므로
-            //  그 시점에 dataset.composing이 '0'이 되어 정상적으로 검증이 수행된다.)
+            // 한글 등 IME 조합 중에는 검증을 건너뛰기 위한 플래그.
+            // ★★ 버그 수정(2026-08): 원래는 compositionend 이후 브라우저가 발생시키는
+            // 후속 input 이벤트에 기대어 그 시점에 검증했으나, 브라우저/IME 조합에 따라
+            // 그 후속 input 이벤트가 누락/지연되는 경우가 실제로 있어 67자 제한이 먹지
+            // 않는 사례가 보고되었다. 이제 compositionend에서 곧바로 검증을 실행해
+            // 후속 input 이벤트 발생 여부와 무관하게 항상 그 자리에서 막는다.
             textarea.addEventListener('compositionstart', () => { textarea.dataset.composing = '1'; });
-            textarea.addEventListener('compositionend', () => { textarea.dataset.composing = '0'; });
+            textarea.addEventListener('compositionend', () => {
+              textarea.dataset.composing = '0';
+              onSpecialNoteInput(code, textarea);
+              setSaveState('저장 필요', 'dirty');
+            });
             textarea.addEventListener('input', () => {
               onSpecialNoteInput(code, textarea);
               setSaveState('저장 필요', 'dirty');
@@ -2084,7 +2091,7 @@
         const indicator = document.getElementById('autoRefreshIndicator');
         if (indicator) {
           indicator.classList.remove('paused');
-          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 60초';
+          document.getElementById('autoRefreshLabel').textContent = '자동 갱신 3분';
         }
 
         // ★★ 특이사항은 서버에서 remarkId/savedByName/savedAt이 갱신되므로
@@ -2429,3 +2436,4 @@
   </script>
 </body>
 </html>
+
