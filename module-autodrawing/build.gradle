@@ -1,0 +1,27 @@
+// module-autodrawing: AI 기반 자동 도면 생성 모듈
+//
+// [의존 구조]
+//   compileOnly project(':core')  → 컴파일 시에만 참조 (ApiResponse, BusinessException, CustomUserDetails 등)
+//   런타임에는 app 모듈이 모든 클래스를 포함하므로 runtimeOnly 불필요
+
+dependencies {
+    // core 공통 클래스 참조 (컴파일 전용: 순환 의존 방지)
+    compileOnly project(':core')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // OpenAI Vision API client
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // JSON processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+}
+
+// spring-boot 플러그인 미적용 서브모듈: plain jar만 생성
+jar {
+    enabled = true
+}
