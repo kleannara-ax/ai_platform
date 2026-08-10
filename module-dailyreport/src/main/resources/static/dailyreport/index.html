@@ -1369,28 +1369,15 @@
         innerHtml = `<div class="cell-value" style="justify-content:${justify};text-align:${textAlign};${wordBreakStyle}">${valueText}</div>`;
       }
 
-      // ★ hover "최종 저장자/시각" 표시 (2026-08 추가) — 이월(carry-over)된 셀도
-      // 같은 좌표의 과거 실입력 값 기준으로 서버가 채워주는 displayEditorName/
+      // ★ hover "최종 저장자/시각" 표시 (2026-08 추가, 이후 값/주기 정보 제거 요청에
+      // 따라 이름/시각만 단독 표시하도록 단순화) — 이월(carry-over)된 셀도 같은
+      // 좌표의 과거 실입력 값 기준으로 서버가 채워주는 displayEditorName/
       // displayEditedAt을 사용한다(원본 lastEditorId가 null이어도 표시됨).
-      // 저장 기록이 전혀 없는 좌표는 서버가 null로 내려주므로 자동으로 생략된다.
-      let savedInfoText = '';
+      // 저장 기록이 전혀 없는 좌표는 서버가 null로 내려주므로 title 자체가 생략된다.
+      let titleAttr = '';
       if (cell.displayEditorName) {
         const savedAtText = cell.displayEditedAt ? ` ${formatSavedAt(cell.displayEditedAt)} 저장` : '';
-        savedInfoText = `${cell.displayEditorName}${savedAtText}`;
-      }
-
-      // title 속성
-      let titleAttr = '';
-      if (isAssignable) {
-        const fl = cell.freqLabel || '';
-        const fc = cell.freqCode || '';
-        const savedSuffix = savedInfoText ? ` / ${savedInfoText}` : '';
-        titleAttr = ` title="${escapeHtml(formattedDisplayValue)} / ${escapeHtml(fl)} / ${getFrequencyHelp(fc)}${escapeHtml(savedSuffix)}"`;
-      } else if (cell.ownerNames) {
-        const savedSuffix = savedInfoText ? ` / ${savedInfoText}` : '';
-        titleAttr = ` title="${escapeHtml(cell.ownerNames)}${escapeHtml(savedSuffix)}"`;
-      } else if (savedInfoText) {
-        titleAttr = ` title="${escapeHtml(savedInfoText)}"`;
+        titleAttr = ` title="${escapeHtml(cell.displayEditorName)}${escapeHtml(savedAtText)}"`;
       }
 
       return `<td class="${cellClasses}" style="${style}"${dataAttrs}${spanAttrs}${titleAttr}>${innerHtml}</td>`;
