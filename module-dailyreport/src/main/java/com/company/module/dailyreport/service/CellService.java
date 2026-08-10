@@ -19,13 +19,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 셀 데이터 입력 및 권한 기반 편집 관리 서비스
@@ -79,13 +82,19 @@ public class CellService {
 
         LocalDate reportDate = table.getDailyReport().getReportDate();
 
-        // 각 셀에 편집 가능 여부 설정
+        // ★ hover "최종 저장자" 표시용 fallback 조회 (2026-08, 표당 1회 배치 조회)
+        Map<String, Object[]> fallbackByCoord = loadFallbackEditorInfo(table.getTableCode(), reportDate);
+
+        // 각 셀에 편집 가능 여부 설정 + hover 표시용 최종 저장자 정보 계산
         List<CellResponse> cellResponses = table.getCells().stream()
                 .map(cell -> {
                     boolean editable = isCellEditableForUser(cell, loginId, cellAuths, reportDate);
-                    return CellResponse.fromWithEditability(cell, editable);
+                    CellResponse response = CellResponse.fromWithEditability(cell, editable);
+                    return response;
                 })
                 .toList();
+
+        applyDisplayEditorInfo(cellResponses, fallbackByCoord);
 
         return ReportTableResponse.builder()
                 .tableId(table.getTableId())
@@ -96,6 +105,85 @@ public class CellService {
                 .colCount(table.getColCount())
                 .cells(cellResponses)
                 .build();
+    }
+
+    /**
+     * ★ 셀 hover "최종 저장자/시각" 표시 fallback (2026-08 추가).
+     * - lastEditorId가 이미 있는 셀은 그 값을 그대로 표시용으로 쓴다.
+     * - lastEditorId가 null인(이월/carry-over 상태) 셀은, 같은 좌표에서 조회
+     *   기준일(reportDate) 이전 날짜 중 실제로 사람이 입력한 가장 최근 값을
+     *   {@link DailyReportCellRepository#findLastRealEditorByCoordUpToDate}로
+     *   표(tableCode) 단위 1회 배치 조회하여 대신 채운다.
+     * - 저장 기록이 전혀 없는 좌표는 표시할 정보가 없으므로 null로 남는다.
+     */
+    private Map<String, Object[]> loadFallbackEditorInfo(String tableCode, LocalDate reportDate) {
+        List<Object[]> rows = cellRepository.findLastRealEditorByCoordUpToDate(tableCode, reportDate);
+        Map<String, Object[]> byCoord = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            // row = [rowIndex, colIndex, lastEditorId, lastEditedAt]
+            String key = row[0] + "," + row[1];
+            byCoord.put(key, row);
+        }
+        return byCoord;
+    }
+
+    /**
+     * cellResponses에 표시용 displayEditorName/displayEditedAt을 채운다.
+     * - 원본 lastEditorId가 있으면 그 값을 우선 사용, 없으면 fallback 맵에서 채움.
+     * - 필요한 userId만 모아 DailyReportService.resolveUserNames()로 이름 일괄 조회
+     *   (셀당 개별 조회 없이 한 번에 처리 — N+1 방지).
+     */
+    private void applyDisplayEditorInfo(List<CellResponse> cellResponses,
+                                         Map<String, Object[]> fallbackByCoord) {
+        // 각 셀이 표시에 사용할 (editorId, editedAt) 결정
+        Map<CellResponse, Long> resolvedEditorIdByCell = new LinkedHashMap<>();
+        Map<CellResponse, LocalDateTime> resolvedEditedAtByCell = new LinkedHashMap<>();
+        Set<Long> userIdsToResolve = new HashSet<>();
+
+        for (CellResponse cell : cellResponses) {
+            Long editorId = cell.getLastEditorId();
+            LocalDateTime editedAt = cell.getLastEditedAt();
+
+            if (editorId == null) {
+                String key = cell.getRowIndex() + "," + cell.getColIndex();
+                Object[] fallback = fallbackByCoord.get(key);
+                if (fallback != null) {
+                    editorId = ((Number) fallback[2]).longValue();
+                    editedAt = toLocalDateTime(fallback[3]);
+                }
+            }
+
+            if (editorId != null) {
+                resolvedEditorIdByCell.put(cell, editorId);
+                resolvedEditedAtByCell.put(cell, editedAt);
+                userIdsToResolve.add(editorId);
+            }
+        }
+
+        Map<Long, String> userNames = dailyReportService.resolveUserNames(userIdsToResolve);
+
+        for (CellResponse cell : cellResponses) {
+            Long editorId = resolvedEditorIdByCell.get(cell);
+            if (editorId == null) {
+                continue;
+            }
+            cell.setDisplayEditorName(userNames.get(editorId));
+            cell.setDisplayEditedAt(resolvedEditedAtByCell.get(cell));
+        }
+    }
+
+    /** JDBC 네이티브 쿼리 결과(java.sql.Timestamp 등)를 LocalDateTime으로 안전 변환 */
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime ldt) {
+            return ldt;
+        }
+        if (value instanceof java.sql.Timestamp ts) {
+            return ts.toLocalDateTime();
+        }
+        return null;
     }
 
     /**
