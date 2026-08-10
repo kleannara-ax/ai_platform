@@ -89,4 +89,35 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
             @Param("colIndex") int colIndex,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    /**
+     * ★ 셀 hover 시 "최종 저장자/시각" 표시용 fallback 조회 (2026-08).
+     * - 이월(carryOverValue)된 셀은 LAST_EDITOR_ID/LAST_EDITED_AT이 항상 NULL이므로
+     *   (전파 제어 플래그와 겸용되기 때문에 의도적으로 세팅하지 않음), 화면 표시만을
+     *   위해 "같은 좌표(rowIndex/colIndex)에서 조회 기준일 이전 날짜 중 실제로
+     *   사람이 입력한(LAST_EDITOR_ID IS NOT NULL) 가장 최근 셀"을 좌표별로 1건씩
+     *   윈도우 함수로 일괄 조회한다.
+     * - 표(tableCode) 단위로 1회만 호출 — 셀 개수(최대 ~320개)만큼 N+1 조회하지
+     *   않도록 배치 처리한다.
+     * - 스키마 변경 없음 (기존 컬럼만 SELECT) — DB 마이그레이션 불필요.
+     */
+    @Query(value =
+            "SELECT row_index, col_index, last_editor_id, last_edited_at " +
+            "FROM ( " +
+            "  SELECT c.ROW_INDEX AS row_index, c.COL_INDEX AS col_index, " +
+            "         c.LAST_EDITOR_ID AS last_editor_id, c.LAST_EDITED_AT AS last_edited_at, " +
+            "         ROW_NUMBER() OVER (PARTITION BY c.ROW_INDEX, c.COL_INDEX " +
+            "                            ORDER BY r.REPORT_DATE DESC) AS rn " +
+            "  FROM daily_report_cell c " +
+            "  JOIN daily_report_table t ON c.TABLE_ID = t.TABLE_ID " +
+            "  JOIN daily_report r ON t.REPORT_ID = r.REPORT_ID " +
+            "  WHERE t.TABLE_CODE = :tableCode " +
+            "    AND r.REPORT_DATE <= :reportDate " +
+            "    AND c.LAST_EDITOR_ID IS NOT NULL " +
+            ") x " +
+            "WHERE rn = 1",
+            nativeQuery = true)
+    List<Object[]> findLastRealEditorByCoordUpToDate(
+            @Param("tableCode") String tableCode,
+            @Param("reportDate") LocalDate reportDate);
 }

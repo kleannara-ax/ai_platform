@@ -622,9 +622,12 @@ public class DailyReportService {
     /**
      * userId 목록에 해당하는 core_user.USER_NAME(없으면 LOGIN_ID)을 일괄 조회
      * - Architecture Rule #4: core 모듈 Entity를 직접 import하지 않고 native query 사용
+     * - ★ package-private(2026-08): 같은 패키지의 CellService가 셀 hover
+     *   "최종 저장자" 표시 기능에서 재사용하기 위해 접근 범위를 열어둠
+     *   (private → default). 외부 모듈에는 노출되지 않는다.
      */
     @SuppressWarnings("unchecked")
-    private Map<Long, String> resolveUserNames(Set<Long> userIds) {
+    Map<Long, String> resolveUserNames(Set<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return Map.of();
         }
