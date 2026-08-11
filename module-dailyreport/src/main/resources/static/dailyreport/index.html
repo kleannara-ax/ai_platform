@@ -485,6 +485,18 @@
     ]);
 
     /**
+     * 좌표(excelCoord)가 "2.제지 재공품 및 야적현황"(표2, 엑셀행 19~28) 범위에
+     * 속하는지 판별한다 (2026-08 요청: 표2는 소수점 없이 항상 정수로만 표시).
+     */
+    function isInventoryTableCoord(coord) {
+      if (!coord) return false;
+      const m = /^[A-Z]+(\d+)$/.exec(coord);
+      if (!m) return false;
+      const row = Number(m[1]);
+      return row >= 19 && row <= 28;
+    }
+
+    /**
      * 숫자 셀 서식 — 천 단위 콤마 적용, 정수부 자릿수에 따라 소수점 표시 여부 결정
      * - 숫자로 해석 불가능한 값(텍스트, "-", 빈 문자열 등)은 원본 그대로 반환
      * - 이미 콤마가 포함된 값(재편집 시)도 다시 파싱 가능하도록 콤마 제거 후 판별
@@ -493,6 +505,8 @@
      * - 값이 정확히 0인 경우는 예외적으로 소수점 없이 "0"만 표시
      * - coord가 FUEL_ROW_COORDS(에너지 원단위 표의 "연료" 행)에 해당하면, 위 규칙과
      *   무관하게 항상 소수점 3자리까지 표시 (정수부 자릿수/0 예외 규칙 모두 미적용)
+     * - coord가 표2(제지 재공품 및 야적현황, 엑셀행 19~28)에 해당하면, 위 규칙과
+     *   무관하게 항상 소수점 없이 정수로만 표시 (2026-08 요청)
      */
     function formatNumber(v, coord) {
       if (v === null || v === undefined) return v;
@@ -503,6 +517,11 @@
       if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return raw; // 숫자 형식이 아니면 그대로
       const num = Number(cleaned);
       if (isNaN(num)) return raw;
+
+      // 표2(제지 재공품 및 야적현황) 예외: 항상 정수로만 표시 (소수점 없음)
+      if (isInventoryTableCoord(coord)) {
+        return Math.round(num).toLocaleString('ko-KR');
+      }
 
       // 에너지 원단위 "연료" 행 예외: 항상 소수점 3자리
       if (coord && FUEL_ROW_COORDS.has(coord)) {
