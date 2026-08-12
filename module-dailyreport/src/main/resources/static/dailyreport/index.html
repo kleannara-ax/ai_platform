@@ -309,7 +309,7 @@
     </div>
   </div>
 
-  <!-- 특이사항 분량 제한(줄바꿈 17회 / 글자수 789자 / 한 줄 84자) 초과 시 표시되는 알림 전용 팝업 -->
+  <!-- 특이사항 분량 제한(줄바꿈 17회 / 글자수 1206자 / 한 줄 84자) 초과 시 표시되는 알림 전용 팝업 -->
   <div class="confirm-modal-overlay" id="limitAlertOverlay">
     <div class="confirm-modal-box">
       <div class="confirm-modal-message" id="limitAlertMessage"></div>
@@ -399,7 +399,7 @@
     // - 한 줄(개행 기준) 글자수: 각 행 자신만의 독립된 제한
     // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정
     const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
-    const SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
+    const SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
     const SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
     let reportData = null;         // /view/render 응답 전체
     let uploadedImages = [];
@@ -1493,7 +1493,7 @@
       return { totalNewlines, totalChars };
     }
 
-    /** 특이사항 섹션 타이틀 바의 "(줄바꿈: n/17회) (글자 수: nnn/789자)" 카운터를 갱신한다. */
+    /** 특이사항 섹션 타이틀 바의 "(줄바꿈: n/17회) (글자 수: nnn/1206자)" 카운터를 갱신한다. */
     function updateSpecialNoteCounter() {
       const el = document.getElementById('specialNoteCounter');
       if (!el) return;
@@ -1507,7 +1507,7 @@
 
     /**
      * 특이사항 textarea 입력값을 분량 제한에 맞게 다듬는다.
-     * - 공유 총량(줄바꿈 17회 / 글자수 789자)을 넘는 "신규 입력분"은 넘치는 부분만 잘라낸다
+     * - 공유 총량(줄바꿈 17회 / 글자수 1206자)을 넘는 "신규 입력분"은 넘치는 부분만 잘라낸다
      *   (붙여넣기로 한 번에 대량 입력된 경우에도 가능한 곳까지만 반영).
      * - 한 줄(개행 기준) 84자 제한은 하드 블록 대상 — 이 함수에서는 자르지 않고
      *   호출부(onSpecialNoteInput)에서 별도로 감지해 팝업 + 되돌리기를 수행한다.
@@ -1570,7 +1570,7 @@
     }
 
     /**
-     * 특이사항 textarea input 이벤트 핸들러 — 공유 총량(17회/789자) 초과분은 잘라내고,
+     * 특이사항 textarea input 이벤트 핸들러 — 공유 총량(17회/1206자) 초과분은 잘라내고,
      * 한 줄 84자 초과는 하드 블록 + 팝업으로 되돌린다.
      * (한글 등 IME 조합 중에는 검증을 건너뛰어 조합 자체가 깨지지 않도록 한다.)
      */
@@ -1603,7 +1603,7 @@
         return;
       }
 
-      // 2) 공유 총량(줄바꿈 17회 / 글자수 789자) 초과 — 넘치는 부분만 잘라서 반영
+      // 2) 공유 총량(줄바꿈 17회 / 글자수 1206자) 초과 — 넘치는 부분만 잘라서 반영
       const { text, newlineBlocked, charBlocked } = trimToSpecialNoteBudget(code, raw);
       if (text !== raw) {
         textarea.value = text;
@@ -1721,7 +1721,7 @@
         </div>
       `;
 
-      // 변경 감지 (행별 textarea 각각에 바인딩) + 분량 제한(줄바꿈 17회/글자수 789자
+      // 변경 감지 (행별 textarea 각각에 바인딩) + 분량 제한(줄바꿈 17회/글자수 1206자
       // 공유 총량, 한 줄 84자 개별 제한) 실시간 검증
       setTimeout(() => {
         specialNoteLastValue = {};
