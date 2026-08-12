@@ -70,7 +70,7 @@ public class DailyReportService {
      *  프론트(index.html)에서도 동일한 상수로 실시간 검증을 하지만, 프론트 검증은
      *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
-    private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 789;
+    private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
 
     // ─────────────────────────────────────────────
@@ -541,7 +541,7 @@ public class DailyReportService {
 
     /**
      * ★★ 특이사항 분량 제한 검증 (신규 작성)
-     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(17회/789자)를
+     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(17회/1206자)를
      *   넘지 않는지 확인한다. 다른 사업부 행에 이미 저장된 내용까지 합산 대상이다.
      * - 자신이 입력하는 내용 자체의 한 줄(개행 기준) 길이가 84자를 넘지 않는지 확인한다.
      */
