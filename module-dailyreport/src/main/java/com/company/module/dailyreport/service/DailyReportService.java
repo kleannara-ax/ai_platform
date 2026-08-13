@@ -1119,11 +1119,10 @@ public class DailyReportService {
         DailyReport report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new EntityNotFoundException("일보를 찾을 수 없습니다. ID: " + reportId));
 
-        String batchDate = report.getReportDate()
-                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE); // YYYYMMDD
-
+        // ★ 2026-08: BATCH_DATE는 daily_report.REPORT_DATE와 동일한 DATE 타입으로
+        //   통일되어 있으므로, 문자열 변환 없이 report.getReportDate()(LocalDate)를 그대로 사용한다.
         DailyBatchJob job = DailyBatchJob.builder()
-                .batchDate(batchDate)
+                .batchDate(report.getReportDate())
                 .batchType(batchType)
                 .createdBy(userId)
                 .build();

@@ -58,7 +58,7 @@ SELECT '=== 1. CREATE TABLE 실행: daily_batchjob ===' AS section;
 
 CREATE TABLE IF NOT EXISTS daily_batchjob (
     SEQ_NO       BIGINT        NOT NULL AUTO_INCREMENT                COMMENT '순번',
-    BATCH_DATE   VARCHAR(8)    NOT NULL                                COMMENT '일자 (YYYYMMDD)',
+    BATCH_DATE   DATE          NOT NULL                                COMMENT '일자 (일보 대상 날짜, daily_report.REPORT_DATE와 동일 규칙)',
     BATCH_TYPE   VARCHAR(1)    NOT NULL                                COMMENT '구분 (1:공장일보, 2:세부공장일보, 3:모두)',
     CREATE_YN    VARCHAR(1)    NOT NULL DEFAULT 'N'                    COMMENT '생성여부 (배치가 처리 완료 시 Y로 갱신)',
     CREATED_AT   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP      COMMENT '요청일시',

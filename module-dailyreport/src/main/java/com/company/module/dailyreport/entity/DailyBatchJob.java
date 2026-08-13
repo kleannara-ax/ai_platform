@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -41,9 +42,9 @@ public class DailyBatchJob {
     @Column(name = "SEQ_NO")
     private Long seqNo;
 
-    /** 일자 (YYYYMMDD 문자열 — 배치 시스템 규격에 맞춰 varchar(8) 그대로 사용) */
-    @Column(name = "BATCH_DATE", nullable = false, length = 8)
-    private String batchDate;
+    /** 일자 (일보 대상 날짜 — daily_report.REPORT_DATE와 동일한 DATE 타입/네이밍 규칙으로 통일, 2026-08) */
+    @Column(name = "BATCH_DATE", nullable = false)
+    private LocalDate batchDate;
 
     /** 구분: 1=공장일보, 2=세부공장일보, 3=모두 */
     @Column(name = "BATCH_TYPE", nullable = false, length = 1)
@@ -91,7 +92,7 @@ public class DailyBatchJob {
     }
 
     @Builder
-    public DailyBatchJob(String batchDate, String batchType, Long createdBy, String remarks1) {
+    public DailyBatchJob(LocalDate batchDate, String batchType, Long createdBy, String remarks1) {
         this.batchDate = batchDate;
         this.batchType = batchType;
         this.createYn = "N";
