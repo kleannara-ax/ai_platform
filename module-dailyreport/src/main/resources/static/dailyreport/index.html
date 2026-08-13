@@ -497,6 +497,18 @@
     }
 
     /**
+     * 좌표(excelCoord)가 표1(주요 생산 지표 현황) "제지3 평균선속" 행(엑셀행 7)에
+     * 속하는지 판별한다 (2026-08 요청: 이 행만 소수점 없이 항상 정수로만 표시).
+     * (엑셀행 7은 표1에서만 사용되므로 행 번호만으로 충분히 식별 가능)
+     */
+    function isLineSpeedRowCoord(coord) {
+      if (!coord) return false;
+      const m = /^[A-Z]+(\d+)$/.exec(coord);
+      if (!m) return false;
+      return Number(m[1]) === 7;
+    }
+
+    /**
      * 숫자 셀 서식 — 천 단위 콤마 적용, 정수부 자릿수에 따라 소수점 표시 여부 결정
      * - 숫자로 해석 불가능한 값(텍스트, "-", 빈 문자열 등)은 원본 그대로 반환
      * - 이미 콤마가 포함된 값(재편집 시)도 다시 파싱 가능하도록 콤마 제거 후 판별
@@ -507,6 +519,8 @@
      *   무관하게 항상 소수점 3자리까지 표시 (정수부 자릿수/0 예외 규칙 모두 미적용)
      * - coord가 표2(제지 재공품 및 야적현황, 엑셀행 19~28)에 해당하면, 위 규칙과
      *   무관하게 항상 소수점 없이 정수로만 표시 (2026-08 요청)
+     * - coord가 표1 "제지3 평균선속" 행(엑셀행 7)에 해당하면, 위 규칙과 무관하게
+     *   항상 소수점 없이 정수로만 표시 (2026-08 요청)
      */
     function formatNumber(v, coord) {
       if (v === null || v === undefined) return v;
@@ -520,6 +534,11 @@
 
       // 표2(제지 재공품 및 야적현황) 예외: 항상 정수로만 표시 (소수점 없음)
       if (isInventoryTableCoord(coord)) {
+        return Math.round(num).toLocaleString('ko-KR');
+      }
+
+      // 표1 "제지3 평균선속" 행 예외: 항상 정수로만 표시 (소수점 없음)
+      if (isLineSpeedRowCoord(coord)) {
         return Math.round(num).toLocaleString('ko-KR');
       }
 
