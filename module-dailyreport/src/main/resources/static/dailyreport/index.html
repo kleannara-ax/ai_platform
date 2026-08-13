@@ -63,8 +63,8 @@
     .confirm-modal-btn:hover { background:#f1f5f9; }
     .confirm-modal-btn.confirm { background:var(--blue); color:#fff; border-color:var(--blue); }
     .confirm-modal-btn.confirm:hover { background:#1d4ed8; }
-    /* ★★ 게시판 재업로드 요청 라디오 그룹 (2026-08 신규) — 08:05 이후 "수정" 확인 모달에서만 표시.
-       기본 선택 없음(사용자가 반드시 3개 중 하나를 명시적으로 골라야 함). */
+    /* ★★ 게시판 재업로드 요청 라디오 그룹 (2026-08 신규) — 저장 구간(05:00~08:04:59) 밖의
+       "수정" 확인 모달에서만 표시. 기본 선택 없음(사용자가 반드시 3개 중 하나를 명시적으로 골라야 함). */
     .confirm-modal-radio-group { margin-top:16px; text-align:left; display:flex; flex-direction:column; gap:10px; }
     .confirm-modal-radio-item { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:background .15s, border-color .15s; }
     .confirm-modal-radio-item:hover { background:#f8fafc; }
@@ -309,8 +309,8 @@
   <div class="toast" id="toast"></div>
 
   <!-- 커스텀 확인 모달 (브라우저 기본 confirm() 대체 — 주소/origin 표시 없이 순수 문구만 표시)
-       ★★ 08:05 이후 "수정" 흐름에서는 confirmModalRadioGroup에 게시판 재업로드 대상을
-       고르는 라디오 3개(기본 선택 없음)가 동적으로 추가되어 표시된다 (2026-08 신규). -->
+       ★★ 저장 구간(05:00~08:04:59) 밖의 "수정" 흐름에서는 confirmModalRadioGroup에 게시판
+       재업로드 대상을 고르는 라디오 3개(기본 선택 없음)가 동적으로 추가되어 표시된다 (2026-08 신규). -->
   <div class="confirm-modal-overlay" id="confirmModalOverlay">
     <div class="confirm-modal-box">
       <div class="confirm-modal-message" id="confirmModalMessage"></div>
@@ -355,34 +355,46 @@
     const MAX_UPLOAD_IMAGES = 8;
     const AUTO_REFRESH_INTERVAL_MS = 180000; // 3분마다 자동 새로고침
 
-    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규)
-    // - 오전 08:05를 기준으로 "저장"(그 이전)/"수정"(그 이후) 버튼 라벨과 확인 모달
-    //   흐름이 달라진다. 서버(DailyReportService.BATCH_JOB_CUTOFF_TIME)와 반드시
-    //   동일한 시각(8시 5분)을 사용해야 한다.
-    // - 08:05 이후 "수정" 확인 시에는 아래 3개 라디오 중 정확히 1개를 사용자가
-    //   직접 선택해야 하며(기본 선택 없음), 선택값(batchType)을 저장 성공 후
+    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규, 시간대 방식으로 변경)
+    // - "저장" 버튼 활성 구간: 05:00:00 ~ 08:04:59 (이 구간에서는 daily_batchjob을
+    //   전혀 참조하지 않는 기존 저장 흐름 그대로 유지)
+    // - 그 외 나머지 모든 시간(08:05:00 ~ 다음날 04:59:59, 자정을 넘나드는 새벽 포함):
+    //   "수정" 버튼 + daily_batchjob 재업로드 요청 흐름 활성화
+    //   서버(DailyReportService.SAVE_WINDOW_START_TIME/SAVE_WINDOW_END_TIME)와 반드시
+    //   동일한 구간(05:00:00~08:04:59)을 사용해야 한다.
+    // - "수정" 확인 시에는 아래 3개 라디오 중 정확히 1개를 사용자가 직접 선택해야
+    //   하며(기본 선택 없음), 선택값(batchType)을 저장 성공 후
     //   POST /reports/{id}/batch-jobs 로 전송해 재업로드 요청 큐에 적재한다.
-    const BATCH_JOB_CUTOFF_HOUR = 8;
-    const BATCH_JOB_CUTOFF_MINUTE = 5;
+    const SAVE_WINDOW_START_HOUR = 5;
+    const SAVE_WINDOW_START_MINUTE = 0;
+    const SAVE_WINDOW_END_HOUR = 8;
+    const SAVE_WINDOW_END_MINUTE = 5; // 종료는 배타적(exclusive) — 08:04:59는 저장, 08:05:00부터 수정
     const BATCH_JOB_RADIO_OPTIONS = [
       { value: '1', label: '공장일보 재업로드(특이사항/제지 재공품 항목 수정)' },
       { value: '2', label: '세부공장일보 재업로드(표 1, 2, 3, 4 값 수정)' },
       { value: '3', label: '모두 재업로드' },
     ];
 
-    /** 현재 시각이 08:05(재업로드 요청 기준 시각)를 지났는지 판정 */
-    function isAfterBatchJobCutoff() {
+    /** 현재 시각이 "저장" 구간(05:00:00~08:04:59) 안에 있는지 판정 */
+    function isWithinSaveWindow() {
       const now = new Date();
-      const cutoff = new Date(now);
-      cutoff.setHours(BATCH_JOB_CUTOFF_HOUR, BATCH_JOB_CUTOFF_MINUTE, 0, 0);
-      return now.getTime() >= cutoff.getTime();
+      const start = new Date(now);
+      start.setHours(SAVE_WINDOW_START_HOUR, SAVE_WINDOW_START_MINUTE, 0, 0);
+      const end = new Date(now);
+      end.setHours(SAVE_WINDOW_END_HOUR, SAVE_WINDOW_END_MINUTE, 0, 0);
+      return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
     }
 
-    /** 08:05 기준으로 저장 버튼 라벨을 "저장"/"수정"으로 전환하고, 매분 재확인한다 */
+    /** 저장 구간(05:00:00~08:04:59) 밖이면 "수정" 흐름(재업로드 요청 대상) */
+    function isAfterBatchJobCutoff() {
+      return !isWithinSaveWindow();
+    }
+
+    /** 저장 구간 여부에 따라 저장 버튼 라벨을 "저장"/"수정"으로 전환하고, 매분 재확인한다 */
     function updateSaveButtonLabel() {
       const btn = document.getElementById('saveBtn');
       if (!btn) return;
-      btn.textContent = isAfterBatchJobCutoff() ? '수정' : '저장';
+      btn.textContent = isWithinSaveWindow() ? '저장' : '수정';
     }
 
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
@@ -2125,9 +2137,9 @@
       if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
 
       // 저장 전 확인 팝업
-      // - 08:05 이전: "YYYY.MM.DD 일자로 저장하시겠습니까?" (기존 문구/흐름 그대로 유지)
-      // - 08:05 이후: "YYYY.MM.DD 일보를 수정하시겠습니까?" + 재업로드 대상 게시판을
-      //   고르는 라디오 3개(기본 선택 없음)를 함께 표시한다 (★ 2026-08 신규).
+      // - 저장 구간(05:00:00~08:04:59): "YYYY.MM.DD 일자로 저장하시겠습니까?" (기존 문구/흐름 그대로 유지)
+      // - 그 외 나머지 모든 시간(수정 구간): "YYYY.MM.DD 일보를 수정하시겠습니까?" + 재업로드
+      //   대상 게시판을 고르는 라디오 3개(기본 선택 없음)를 함께 표시한다 (★ 2026-08 신규).
       const dateLabel = formatDateDots(currentReportDate);
       const isBatchJobFlow = isAfterBatchJobCutoff();
       let selectedBatchType = null;
@@ -2243,8 +2255,8 @@
           setSaveState(`저장됨 ${timeStr}`, 'saved');
           showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 ${noteSaveCount}건 반영`);
 
-          // ★★ 게시판 재업로드 요청 (2026-08 신규) — 08:05 이후 "수정" 흐름이고
-          // 셀/특이사항 저장이 모두 성공했을 때만, 사용자가 고른 게시판(batchType)을
+          // ★★ 게시판 재업로드 요청 (2026-08 신규) — 저장 구간(05:00:00~08:04:59) 밖의
+          // "수정" 흐름이고 셀/특이사항 저장이 모두 성공했을 때만, 사용자가 고른 게시판(batchType)을
           // 재업로드 요청 큐(daily_batchjob)에 적재한다. 이 요청은 별도 PC의 배치
           // 시스템이 5초 주기로 폴링하여 처리하므로, 여기서는 등록만 하고 끝낸다.
           // (저장 자체는 이미 완료되었으므로, 이 요청이 실패해도 저장 실패로
@@ -2614,8 +2626,8 @@
       // 날짜 입력 기본값
       document.getElementById('reportDateInput').value = getTodayStr();
 
-      // ★ 08:05 기준 저장/수정 버튼 라벨 초기 반영 + 매분 재확인
-      //   (사용자가 08:05 경계를 걸쳐 페이지를 오래 열어둔 채로 있어도 라벨이
+      // ★ 저장 구간(05:00:00~08:04:59) 기준 저장/수정 버튼 라벨 초기 반영 + 매분 재확인
+      //   (사용자가 구간 경계를 걸쳐 페이지를 오래 열어둔 채로 있어도 라벨이
       //    실시간으로 전환되도록 60초 주기로 다시 판정한다)
       updateSaveButtonLabel();
       setInterval(updateSaveButtonLabel, 60000);

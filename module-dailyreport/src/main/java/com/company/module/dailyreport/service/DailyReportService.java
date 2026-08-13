@@ -47,9 +47,14 @@ public class DailyReportService {
     private final DailyBatchJobRepository batchJobRepository;
     private final EntityManager entityManager;
 
-    /** ★★ 게시판 재업로드 판단 기준 시각 (2026-08 신규) — 이 시각 이후 저장/수정
-     *  시에는 "수정" 버튼 + 게시판 재업로드 요청(daily_batchjob) 흐름이 활성화된다. */
-    private static final java.time.LocalTime BATCH_JOB_CUTOFF_TIME = java.time.LocalTime.of(8, 5);
+    /** ★★ "저장" 버튼이 활성화되는 구간(2026-08, 시간대 방식으로 변경) — 이 구간
+     *  [SAVE_WINDOW_START, SAVE_WINDOW_END) 안에서만 "저장" 버튼 + daily_batchjob을
+     *  전혀 참조하지 않는 기존 흐름이 유지된다. 이 구간을 벗어난 나머지 모든
+     *  시간(자정을 넘나드는 새벽 포함)은 "수정" 버튼 + daily_batchjob 재업로드
+     *  요청 흐름이 활성화된다. */
+    private static final java.time.LocalTime SAVE_WINDOW_START_TIME = java.time.LocalTime.of(5, 0, 0);
+    /** ★★ 저장 구간 종료 시각(배타적, exclusive) — 08:04:59는 "저장", 08:05:00부터는 "수정" */
+    private static final java.time.LocalTime SAVE_WINDOW_END_TIME = java.time.LocalTime.of(8, 5, 0);
 
     /** ★★ 특이사항(사업부별 5행) 전용 가상 표 코드 — daily_report_cell_auth의
      *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
@@ -1102,8 +1107,15 @@ public class DailyReportService {
     // ─────────────────────────────────────────────
 
     /**
-     * 오전 8:05 이후 값을 저장/수정했을 때, 사용자가 선택한 게시판 구분에 따라
-     * daily_batchjob에 재업로드 요청 행을 1건 INSERT한다.
+     * "수정" 흐름(저장 구간 05:00:00~08:04:59 이외의 모든 시간)에서 값을 저장했을 때,
+     * 사용자가 선택한 게시판 구분에 따라 daily_batchjob에 재업로드 요청 행을 1건
+     * INSERT한다.
+     *
+     * ★★ 서버 측 시간 재검증(2026-08): 프론트엔드가 저장 구간 여부를 자체 판단해
+     * "저장" 버튼일 때는 이 API를 호출조차 하지 않지만, 클라이언트 시계 조작/오차로
+     * 인해 저장 구간(05:00:00~08:04:59) 중에 이 API가 호출되는 것을 서버에서도
+     * 한 번 더 차단한다 — 저장 구간에는 daily_batchjob을 절대 참조/적재하지 않아야
+     * 하기 때문이다.
      *
      * ※ 이 메서드는 요청 등록만 담당하며, 실제 게시판 갱신은 별도 PC에서
      *   동작하는 배치 시스템이 이 테이블을 5초 주기로 폴링하여 처리한다.
@@ -1116,6 +1128,11 @@ public class DailyReportService {
      */
     @Transactional
     public void requestBatchJob(Long reportId, String batchType, Long userId) {
+        if (isWithinSaveWindow()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "저장 시간대(05:00~08:04:59)에는 게시판 재업로드 요청을 등록할 수 없습니다.");
+        }
+
         DailyReport report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new EntityNotFoundException("일보를 찾을 수 없습니다. ID: " + reportId));
 
@@ -1130,15 +1147,25 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 현재 서버 시각(Asia/Seoul)이 게시판 재업로드 판단 기준 시각(오전 8:05)을
-     * 지났는지 여부. 프론트엔드가 별도로 자체 시각을 판단해 버튼 라벨을 전환하지만,
-     * 실제 배치잡 등록 API 호출 시에도 서버가 동일 기준으로 한 번 더 판단해
-     * 클라이언트 시계 조작/오차로 인한 오남용을 방지한다(단, 이 메서드는 참고용
-     * 노출이며 requestBatchJob 자체는 별도로 이 시각을 강제하지 않는다 — 사용자가
-     * 직접 "수정" 버튼을 눌러 명시적으로 선택한 요청이므로 등록 자체를 막을 필요는
-     * 없다).
+     * ★★ 현재 서버 시각(Asia/Seoul)이 "저장" 구간(05:00:00~08:04:59, 시작 포함/종료
+     * 배타) 안에 있는지 여부. true면 "저장" 버튼 + 기존 흐름(daily_batchjob 미참조),
+     * false면 "수정" 버튼 + daily_batchjob 재업로드 요청 흐름이 활성화된다.
+     *
+     * 자정을 넘나드는 새벽 시간(00:00:00~04:59:59)도 저장 구간 밖이므로 "수정"으로
+     * 판정된다 — 하루를 "저장 구간"과 "그 외 나머지 전체 시간(수정 구간)" 두 구간으로
+     * 나누는 것이며, "그 외 나머지"가 자정을 사이에 두고 이어져 있을 뿐이다.
+     */
+    private boolean isWithinSaveWindow() {
+        java.time.LocalTime now = java.time.LocalTime.now();
+        return !now.isBefore(SAVE_WINDOW_START_TIME) && now.isBefore(SAVE_WINDOW_END_TIME);
+    }
+
+    /**
+     * ★★ 현재 서버 시각이 "수정" 흐름(=저장 구간 밖)인지 여부. 프론트엔드가 별도로
+     * 자체 시각을 판단해 버튼 라벨을 전환하지만, 참고/검증용으로 서버에도 동일 기준을
+     * 노출한다.
      */
     public boolean isAfterBatchJobCutoff() {
-        return java.time.LocalTime.now().isAfter(BATCH_JOB_CUTOFF_TIME);
+        return !isWithinSaveWindow();
     }
 }
