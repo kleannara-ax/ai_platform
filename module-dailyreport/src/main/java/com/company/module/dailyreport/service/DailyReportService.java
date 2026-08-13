@@ -44,7 +44,12 @@ public class DailyReportService {
     private final DailyReportImageRepository imageRepository;
     private final CellOwnershipSyncService cellOwnershipSyncService;
     private final CellAuthRepository cellAuthRepository;
+    private final DailyBatchJobRepository batchJobRepository;
     private final EntityManager entityManager;
+
+    /** ★★ 게시판 재업로드 판단 기준 시각 (2026-08 신규) — 이 시각 이후 저장/수정
+     *  시에는 "수정" 버튼 + 게시판 재업로드 요청(daily_batchjob) 흐름이 활성화된다. */
+    private static final java.time.LocalTime BATCH_JOB_CUTOFF_TIME = java.time.LocalTime.of(8, 5);
 
     /** ★★ 특이사항(사업부별 5행) 전용 가상 표 코드 — daily_report_cell_auth의
      *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
@@ -1090,5 +1095,51 @@ public class DailyReportService {
      */
     private boolean isLastDayOfMonth(LocalDate date) {
         return date != null && date.getDayOfMonth() == date.lengthOfMonth();
+    }
+
+    // ─────────────────────────────────────────────
+    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규)
+    // ─────────────────────────────────────────────
+
+    /**
+     * 오전 8:05 이후 값을 저장/수정했을 때, 사용자가 선택한 게시판 구분에 따라
+     * daily_batchjob에 재업로드 요청 행을 1건 INSERT한다.
+     *
+     * ※ 이 메서드는 요청 등록만 담당하며, 실제 게시판 갱신은 별도 PC에서
+     *   동작하는 배치 시스템이 이 테이블을 5초 주기로 폴링하여 처리한다.
+     *   CREATE_YN/RESULT_VALUE 등 처리 결과 필드는 그 배치 시스템만 갱신하므로
+     *   이 메서드는 항상 CREATE_YN='N'(대기 상태)으로만 INSERT한다.
+     *
+     * @param reportId  대상 일보 ID (BATCH_DATE 산출용)
+     * @param batchType "1"(공장일보) / "2"(세부공장일보) / "3"(모두)
+     * @param userId    요청자 (core_user FK)
+     */
+    @Transactional
+    public void requestBatchJob(Long reportId, String batchType, Long userId) {
+        DailyReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new EntityNotFoundException("일보를 찾을 수 없습니다. ID: " + reportId));
+
+        String batchDate = report.getReportDate()
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE); // YYYYMMDD
+
+        DailyBatchJob job = DailyBatchJob.builder()
+                .batchDate(batchDate)
+                .batchType(batchType)
+                .createdBy(userId)
+                .build();
+        batchJobRepository.save(job);
+    }
+
+    /**
+     * ★★ 현재 서버 시각(Asia/Seoul)이 게시판 재업로드 판단 기준 시각(오전 8:05)을
+     * 지났는지 여부. 프론트엔드가 별도로 자체 시각을 판단해 버튼 라벨을 전환하지만,
+     * 실제 배치잡 등록 API 호출 시에도 서버가 동일 기준으로 한 번 더 판단해
+     * 클라이언트 시계 조작/오차로 인한 오남용을 방지한다(단, 이 메서드는 참고용
+     * 노출이며 requestBatchJob 자체는 별도로 이 시각을 강제하지 않는다 — 사용자가
+     * 직접 "수정" 버튼을 눌러 명시적으로 선택한 요청이므로 등록 자체를 막을 필요는
+     * 없다).
+     */
+    public boolean isAfterBatchJobCutoff() {
+        return java.time.LocalTime.now().isAfter(BATCH_JOB_CUTOFF_TIME);
     }
 }

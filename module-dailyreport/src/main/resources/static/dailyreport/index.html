@@ -63,6 +63,16 @@
     .confirm-modal-btn:hover { background:#f1f5f9; }
     .confirm-modal-btn.confirm { background:var(--blue); color:#fff; border-color:var(--blue); }
     .confirm-modal-btn.confirm:hover { background:#1d4ed8; }
+    /* ★★ 게시판 재업로드 요청 라디오 그룹 (2026-08 신규) — 08:05 이후 "수정" 확인 모달에서만 표시.
+       기본 선택 없음(사용자가 반드시 3개 중 하나를 명시적으로 골라야 함). */
+    .confirm-modal-radio-group { margin-top:16px; text-align:left; display:flex; flex-direction:column; gap:10px; }
+    .confirm-modal-radio-item { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:background .15s, border-color .15s; }
+    .confirm-modal-radio-item:hover { background:#f8fafc; }
+    .confirm-modal-radio-item.checked { border-color:var(--blue); background:var(--blue-soft); }
+    .confirm-modal-radio-item input[type="radio"] { margin-top:2px; accent-color:var(--blue); cursor:pointer; flex-shrink:0; width:16px; height:16px; }
+    .confirm-modal-radio-item label { font-size:13px; font-weight:700; color:#334155; line-height:1.45; cursor:pointer; }
+    .confirm-modal-radio-warning { display:none; margin-top:10px; font-size:12px; font-weight:800; color:#dc2626; text-align:left; }
+    .confirm-modal-radio-warning.show { display:block; }
 
     /* ── 알림/범례 ── */
     .notice { width:min(1551px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
@@ -253,7 +263,7 @@
         <div class="user-chip" id="userChip">인증 확인중...</div>
         <div class="date-chip save-chip idle" id="saveChip">저장 전</div>
         <button class="toolbar-btn refresh" type="button" onclick="refreshData()" title="다른 사용자가 입력한 값을 최신으로 갱신합니다">&#8635; 새로고침</button>
-        <button class="toolbar-btn primary" type="button" onclick="saveInputs()">저장</button>
+        <button class="toolbar-btn primary" type="button" id="saveBtn" onclick="saveInputs()">저장</button>
         <button class="toolbar-btn ppt-capture" type="button" id="pptCaptureBtn" onclick="capturePptSlide()" title="표 1~4를 PPT 16:9 슬라이드 폭(1920px)에 맞춰 캡처하고 클립보드에 복사합니다">&#128247; 화면 캡처</button>
         <div class="auto-refresh-indicator" id="autoRefreshIndicator" style="display:none">
           <span class="dot"></span>
@@ -298,10 +308,14 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- 커스텀 확인 모달 (브라우저 기본 confirm() 대체 — 주소/origin 표시 없이 순수 문구만 표시) -->
+  <!-- 커스텀 확인 모달 (브라우저 기본 confirm() 대체 — 주소/origin 표시 없이 순수 문구만 표시)
+       ★★ 08:05 이후 "수정" 흐름에서는 confirmModalRadioGroup에 게시판 재업로드 대상을
+       고르는 라디오 3개(기본 선택 없음)가 동적으로 추가되어 표시된다 (2026-08 신규). -->
   <div class="confirm-modal-overlay" id="confirmModalOverlay">
     <div class="confirm-modal-box">
       <div class="confirm-modal-message" id="confirmModalMessage"></div>
+      <div class="confirm-modal-radio-group" id="confirmModalRadioGroup" style="display:none;"></div>
+      <div class="confirm-modal-radio-warning" id="confirmModalRadioWarning">재업로드할 게시판을 선택해 주세요.</div>
       <div class="confirm-modal-actions">
         <button class="confirm-modal-btn cancel" type="button" id="confirmModalCancelBtn">취소</button>
         <button class="confirm-modal-btn confirm" type="button" id="confirmModalOkBtn">확인</button>
@@ -340,6 +354,36 @@
     const API_BASE = '/dailyreport-api';
     const MAX_UPLOAD_IMAGES = 8;
     const AUTO_REFRESH_INTERVAL_MS = 180000; // 3분마다 자동 새로고침
+
+    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규)
+    // - 오전 08:05를 기준으로 "저장"(그 이전)/"수정"(그 이후) 버튼 라벨과 확인 모달
+    //   흐름이 달라진다. 서버(DailyReportService.BATCH_JOB_CUTOFF_TIME)와 반드시
+    //   동일한 시각(8시 5분)을 사용해야 한다.
+    // - 08:05 이후 "수정" 확인 시에는 아래 3개 라디오 중 정확히 1개를 사용자가
+    //   직접 선택해야 하며(기본 선택 없음), 선택값(batchType)을 저장 성공 후
+    //   POST /reports/{id}/batch-jobs 로 전송해 재업로드 요청 큐에 적재한다.
+    const BATCH_JOB_CUTOFF_HOUR = 8;
+    const BATCH_JOB_CUTOFF_MINUTE = 5;
+    const BATCH_JOB_RADIO_OPTIONS = [
+      { value: '1', label: '공장일보 재업로드(특이사항/제지 재공품 항목 수정)' },
+      { value: '2', label: '세부공장일보 재업로드(표 1, 2, 3, 4 값 수정)' },
+      { value: '3', label: '모두 재업로드' },
+    ];
+
+    /** 현재 시각이 08:05(재업로드 요청 기준 시각)를 지났는지 판정 */
+    function isAfterBatchJobCutoff() {
+      const now = new Date();
+      const cutoff = new Date(now);
+      cutoff.setHours(BATCH_JOB_CUTOFF_HOUR, BATCH_JOB_CUTOFF_MINUTE, 0, 0);
+      return now.getTime() >= cutoff.getTime();
+    }
+
+    /** 08:05 기준으로 저장 버튼 라벨을 "저장"/"수정"으로 전환하고, 매분 재확인한다 */
+    function updateSaveButtonLabel() {
+      const btn = document.getElementById('saveBtn');
+      if (!btn) return;
+      btn.textContent = isAfterBatchJobCutoff() ? '수정' : '저장';
+    }
 
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
     const _urlParams = new URLSearchParams(window.location.search);
@@ -591,17 +635,58 @@
      * 커스텀 확인 모달 — 브라우저 기본 confirm() 대체
      * - 브라우저 기본 confirm()은 보안상 사이트 주소(origin)가 강제로 함께 표시되어
      *   순수 문구만 보여줄 수 없음 → 화면 내 커스텀 모달로 대체
-     * - Promise<boolean> 반환: 확인 클릭 시 true, 취소/오버레이 클릭/ESC 시 false
+     * - radioOptions 미지정(기존 호출 방식): Promise<boolean> 반환
+     *   (확인 클릭 시 true, 취소/오버레이 클릭/ESC 시 false — 기존 동작 100% 동일)
+     * - radioOptions 지정(★ 2026-08 신규, 게시판 재업로드 요청용): 3개 라디오
+     *   ({value,label})를 모달 안에 렌더링하고, 기본 선택 없음 상태로 표시한다.
+     *   사용자가 라디오 하나를 선택하지 않은 채 "확인"을 누르면 경고 문구만 보여주고
+     *   모달을 닫지 않는다(취소/오버레이/ESC는 선택 여부와 무관하게 항상 취소 가능).
+     *   Promise<{confirmed:boolean, batchType:string|null}> 반환.
      */
-    function showConfirmModal(message) {
+    function showConfirmModal(message, radioOptions) {
       return new Promise((resolve) => {
         const overlay = document.getElementById('confirmModalOverlay');
         const msgEl = document.getElementById('confirmModalMessage');
         const okBtn = document.getElementById('confirmModalOkBtn');
         const cancelBtn = document.getElementById('confirmModalCancelBtn');
+        const radioGroup = document.getElementById('confirmModalRadioGroup');
+        const radioWarning = document.getElementById('confirmModalRadioWarning');
+        const hasRadio = Array.isArray(radioOptions) && radioOptions.length > 0;
 
         msgEl.textContent = message;
+
+        // ── 라디오 옵션 렌더링 (기본 선택 없음) ──
+        radioGroup.innerHTML = '';
+        radioWarning.classList.remove('show');
+        if (hasRadio) {
+          radioOptions.forEach((opt, idx) => {
+            const item = document.createElement('div');
+            item.className = 'confirm-modal-radio-item';
+            const inputId = `confirmModalRadio_${idx}`;
+            item.innerHTML = `
+              <input type="radio" name="confirmModalRadio" id="${inputId}" value="${escapeHtml(opt.value)}">
+              <label for="${inputId}">${escapeHtml(opt.label)}</label>
+            `;
+            item.addEventListener('click', () => {
+              const input = item.querySelector('input[type="radio"]');
+              input.checked = true;
+              radioGroup.querySelectorAll('.confirm-modal-radio-item').forEach(el => el.classList.remove('checked'));
+              item.classList.add('checked');
+              radioWarning.classList.remove('show');
+            });
+            radioGroup.appendChild(item);
+          });
+          radioGroup.style.display = 'flex';
+        } else {
+          radioGroup.style.display = 'none';
+        }
+
         overlay.classList.add('show');
+
+        function getSelectedBatchType() {
+          const checked = radioGroup.querySelector('input[type="radio"]:checked');
+          return checked ? checked.value : null;
+        }
 
         function cleanup(result) {
           overlay.classList.remove('show');
@@ -611,12 +696,24 @@
           document.removeEventListener('keydown', onKeydown);
           resolve(result);
         }
-        function onOk() { cleanup(true); }
-        function onCancel() { cleanup(false); }
-        function onOverlayClick(e) { if (e.target === overlay) cleanup(false); }
+        function onOk() {
+          if (hasRadio) {
+            const batchType = getSelectedBatchType();
+            if (!batchType) {
+              // ★ 3개 중 하나를 반드시 선택해야 함 — 미선택 시 모달을 닫지 않고 경고만 표시
+              radioWarning.classList.add('show');
+              return;
+            }
+            cleanup({ confirmed: true, batchType });
+          } else {
+            cleanup(true);
+          }
+        }
+        function onCancel() { cleanup(hasRadio ? { confirmed: false, batchType: null } : false); }
+        function onOverlayClick(e) { if (e.target === overlay) onCancel(); }
         function onKeydown(e) {
-          if (e.key === 'Escape') cleanup(false);
-          if (e.key === 'Enter') cleanup(true);
+          if (e.key === 'Escape') onCancel();
+          if (e.key === 'Enter') onOk();
         }
 
         okBtn.addEventListener('click', onOk);
@@ -2027,10 +2124,21 @@
       if (!currentUser.permissions.canWriteInput) { showToast('쓰기 권한이 없습니다.'); return; }
       if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
 
-      // 저장 전 확인 팝업: "YYYY.MM.DD 일자로 저장하시겠습니까?" (커스텀 모달, 주소 표시 없음)
+      // 저장 전 확인 팝업
+      // - 08:05 이전: "YYYY.MM.DD 일자로 저장하시겠습니까?" (기존 문구/흐름 그대로 유지)
+      // - 08:05 이후: "YYYY.MM.DD 일보를 수정하시겠습니까?" + 재업로드 대상 게시판을
+      //   고르는 라디오 3개(기본 선택 없음)를 함께 표시한다 (★ 2026-08 신규).
       const dateLabel = formatDateDots(currentReportDate);
-      const confirmed = await showConfirmModal(`${dateLabel} 일자로 저장하시겠습니까?`);
-      if (!confirmed) return;
+      const isBatchJobFlow = isAfterBatchJobCutoff();
+      let selectedBatchType = null;
+      if (isBatchJobFlow) {
+        const result = await showConfirmModal(`${dateLabel} 일보를 수정하시겠습니까?`, BATCH_JOB_RADIO_OPTIONS);
+        if (!result.confirmed) return;
+        selectedBatchType = result.batchType;
+      } else {
+        const confirmed = await showConfirmModal(`${dateLabel} 일자로 저장하시겠습니까?`);
+        if (!confirmed) return;
+      }
 
       try {
         // 1. 셀 데이터 수집 (표별로 그룹핑)
@@ -2134,6 +2242,24 @@
         } else {
           setSaveState(`저장됨 ${timeStr}`, 'saved');
           showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 ${noteSaveCount}건 반영`);
+
+          // ★★ 게시판 재업로드 요청 (2026-08 신규) — 08:05 이후 "수정" 흐름이고
+          // 셀/특이사항 저장이 모두 성공했을 때만, 사용자가 고른 게시판(batchType)을
+          // 재업로드 요청 큐(daily_batchjob)에 적재한다. 이 요청은 별도 PC의 배치
+          // 시스템이 5초 주기로 폴링하여 처리하므로, 여기서는 등록만 하고 끝낸다.
+          // (저장 자체는 이미 완료되었으므로, 이 요청이 실패해도 저장 실패로
+          //  간주하지 않고 토스트로만 별도 안내한다.)
+          if (isBatchJobFlow && selectedBatchType) {
+            try {
+              await apiFetch(`/reports/${currentReportId}/batch-jobs`, {
+                method: 'POST',
+                body: JSON.stringify({ batchType: selectedBatchType })
+              });
+            } catch (err) {
+              console.warn('게시판 재업로드 요청 등록 실패:', err);
+              showToast(`⚠️ 저장은 완료되었으나 재업로드 요청 등록에 실패했습니다: ${err.message}`);
+            }
+          }
         }
 
         // 자동 새로고침 표시 복원
@@ -2487,6 +2613,12 @@
     async function init() {
       // 날짜 입력 기본값
       document.getElementById('reportDateInput').value = getTodayStr();
+
+      // ★ 08:05 기준 저장/수정 버튼 라벨 초기 반영 + 매분 재확인
+      //   (사용자가 08:05 경계를 걸쳐 페이지를 오래 열어둔 채로 있어도 라벨이
+      //    실시간으로 전환되도록 60초 주기로 다시 판정한다)
+      updateSaveButtonLabel();
+      setInterval(updateSaveButtonLabel, 60000);
 
       // AI 플랫폼 인증 확인 + 1계층 권한 검증 + 일보 로드
       await checkPermissionsAndInit();
