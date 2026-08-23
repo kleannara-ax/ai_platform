@@ -53,8 +53,9 @@ public class DailyReportService {
      *  시간(자정을 넘나드는 새벽 포함)은 "수정" 버튼 + daily_batchjob 재업로드
      *  요청 흐름이 활성화된다. */
     private static final java.time.LocalTime SAVE_WINDOW_START_TIME = java.time.LocalTime.of(5, 0, 0);
-    /** ★★ 저장 구간 종료 시각(배타적, exclusive) — 08:04:59는 "저장", 08:05:00부터는 "수정" */
-    private static final java.time.LocalTime SAVE_WINDOW_END_TIME = java.time.LocalTime.of(8, 5, 0);
+    /** ★★ 저장 구간 종료 시각(배타적, exclusive) — 08:09:59는 "저장", 08:10:00부터는 "수정"
+     *  (2026-08 8:05→8:10으로 조정) */
+    private static final java.time.LocalTime SAVE_WINDOW_END_TIME = java.time.LocalTime.of(8, 10, 0);
 
     /** ★★ 특이사항(사업부별 5행) 전용 가상 표 코드 — daily_report_cell_auth의
      *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
@@ -1108,13 +1109,13 @@ public class DailyReportService {
     // ─────────────────────────────────────────────
 
     /**
-     * "수정" 흐름(저장 구간 05:00:00~08:04:59 이외의 모든 시간)에서 값을 저장했을 때,
+     * "수정" 흐름(저장 구간 05:00:00~08:09:59 이외의 모든 시간)에서 값을 저장했을 때,
      * 사용자가 선택한 게시판 구분에 따라 daily_batchjob에 재업로드 요청 행을 1건
      * INSERT한다.
      *
      * ★★ 서버 측 시간 재검증(2026-08): 프론트엔드가 저장 구간 여부를 자체 판단해
      * "저장" 버튼일 때는 이 API를 호출조차 하지 않지만, 클라이언트 시계 조작/오차로
-     * 인해 저장 구간(05:00:00~08:04:59) 중에 이 API가 호출되는 것을 서버에서도
+     * 인해 저장 구간(05:00:00~08:09:59) 중에 이 API가 호출되는 것을 서버에서도
      * 한 번 더 차단한다 — 저장 구간에는 daily_batchjob을 절대 참조/적재하지 않아야
      * 하기 때문이다.
      *
@@ -1131,7 +1132,7 @@ public class DailyReportService {
     public void requestBatchJob(Long reportId, String batchType, Long userId) {
         if (isWithinSaveWindow()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT,
-                    "저장 시간대(05:00~08:04:59)에는 게시판 재업로드 요청을 등록할 수 없습니다.");
+                    "저장 시간대(05:00~08:09:59)에는 게시판 재업로드 요청을 등록할 수 없습니다.");
         }
 
         DailyReport report = reportRepository.findById(reportId)
@@ -1148,7 +1149,7 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 현재 서버 시각(Asia/Seoul)이 "저장" 구간(05:00:00~08:04:59, 시작 포함/종료
+     * ★★ 현재 서버 시각(Asia/Seoul)이 "저장" 구간(05:00:00~08:09:59, 시작 포함/종료
      * 배타) 안에 있는지 여부. true면 "저장" 버튼 + 기존 흐름(daily_batchjob 미참조),
      * false면 "수정" 버튼 + daily_batchjob 재업로드 요청 흐름이 활성화된다.
      *
