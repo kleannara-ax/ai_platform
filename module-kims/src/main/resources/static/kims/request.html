@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS - 업무 요청 관리</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div id="nav"></div>
+  <div class="container-fluid px-4">
+    <h4 class="mb-2">업무 요청 관리</h4>
+    <div id="msg" class="alert d-none" role="alert"></div>
+
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item"><button class="nav-link active" id="rtab-home" onclick="showRTab('home')">홈</button></li>
+      <li class="nav-item"><button class="nav-link" id="rtab-list" onclick="showRTab('list')">업무요청 목록</button></li>
+      <li class="nav-item"><button class="nav-link" id="rtab-monthly" onclick="showRTab('monthly')">당월 업무 요청 목록</button></li>
+    </ul>
+
+    <!-- ===== 홈: 유형별 카드 ===== -->
+    <div id="rpane-home">
+      <p class="text-muted small mb-3">유형 카드의 좌측 상단 숫자 = 신규(접수) 건수. 카드를 클릭하면 월별 요청 내역과 등록 화면이 열립니다.</p>
+      <div class="row g-3" id="typeCards"></div>
+    </div>
+
+    <!-- ===== 업무요청 목록 ===== -->
+    <div id="rpane-list" style="display:none">
+      <div class="d-flex justify-content-end gap-1 mb-2">
+        <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
+        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ 업무 등록</button>
+      </div>
+      <!-- 검색/필터 -->
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2"><label class="form-label small mb-0">기간(부터)</label><input id="f-from" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">기간(까지)</label><input id="f-to" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">요청유형</label><select id="f-type" class="form-select form-select-sm"><option value="">전체</option></select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">처리상태</label><select id="f-status" class="form-select form-select-sm"><option value="">전체</option></select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">요청자</label><input id="f-requester" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">부서</label><input id="f-dept" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">담당자</label><input id="f-assignee" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">위치</label><input id="f-loc" class="form-control form-control-sm"></div>
+          <div class="col-md-3 mt-2"><button class="btn btn-secondary btn-sm" onclick="page=0;load()">검색</button>
+            <button class="btn btn-light btn-sm" onclick="resetFilter()">초기화</button></div>
+        </div>
+      </div></div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+          <thead class="table-light"><tr>
+            <th>요청번호</th><th>요청일</th><th>요청자</th><th>부서</th><th>위치</th><th>유형</th>
+            <th>요청내용</th><th>상태</th><th>담당자</th><th>완료일</th><th style="width:70px">상세</th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="11" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="pager" class="d-flex justify-content-center gap-2"></div>
+    </div>
+
+    <!-- ===== 월별 업무요청 목록 ===== -->
+    <div id="rpane-monthly" style="display:none">
+      <div class="d-flex gap-2 align-items-end mb-2">
+        <div><label class="form-label small mb-0">조회 월</label>
+          <select id="rmonthSel" class="form-select form-select-sm" onchange="loadReqMonth()"></select></div>
+      </div>
+      <div id="monthlyResult"></div>
+    </div>
+  </div>
+
+  <!-- 등록 모달 -->
+  <div class="modal fade" id="createModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">업무 요청 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col"><label class="form-label small mb-0">요청자명 *</label><input id="c-requester" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">부서</label><input id="c-dept" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">연락처</label><input id="c-contact" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">위치</label><input id="c-loc" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0 align-items-end">
+        <div class="col"><label class="form-label small mb-0">요청유형 *</label><select id="c-type" class="form-select form-select-sm" onchange="onCreateTypeChange()"></select></div>
+        <div class="col"><label class="form-label small mb-0">접수채널</label><select id="c-channel" class="form-select form-select-sm"></select></div>
+        <div class="col-auto"><div class="form-check mt-3"><input class="form-check-input" type="checkbox" id="c-urgent"><label class="form-check-label" for="c-urgent">긴급</label></div></div>
+      </div>
+      <!-- 전산소모품 지급: 품목 선택 + 수량 (요청유형=SUPPLY 일 때만 표시) -->
+      <div id="c-supply-block" class="row g-2 mt-0" style="display:none">
+        <div class="col"><label class="form-label small mb-0">지급 품목 *</label>
+          <select id="c-item" class="form-select form-select-sm"><option value="">품목 불러오는 중...</option></select></div>
+        <div class="col-4"><label class="form-label small mb-0">수량 *</label>
+          <input id="c-qty" type="number" min="1" value="1" class="form-control form-control-sm"></div>
+      </div>
+      <!-- PC관련 불편사항 조치: 불편유형 선택 (요청유형=PROGRAM 일 때만 표시) -->
+      <div id="c-issue-block" class="row g-2 mt-0" style="display:none">
+        <div class="col"><label class="form-label small mb-0">불편유형 *</label>
+          <select id="c-issue" class="form-select form-select-sm"></select></div>
+      </div>
+      <!-- IP 변경/생성: 요청목록 + 변경자/생성자 (요청유형=IP 일 때만 표시) -->
+      <div id="c-ipkind-block" class="row g-2 mt-0" style="display:none">
+        <div class="col"><label class="form-label small mb-0">요청목록 *</label>
+          <select id="c-ipkind" class="form-select form-select-sm" onchange="onIpKindChange()">
+            <option value="IP_CHANGE">IP변경</option>
+            <option value="IP_NEW">IP신규생성</option>
+            <option value="PC_CHANGE">PC변경</option>
+            <option value="ETC">기타 변경</option>
+          </select></div>
+        <div class="col" id="c-changer-col"><label class="form-label small mb-0" id="c-changer-label">변경자 *</label>
+          <input id="c-changer" class="form-control form-control-sm" placeholder="변경 대상 사용자명"></div>
+      </div>
+      <div class="mb-2 mt-1"><label class="form-label small mb-0" id="c-content-label">상세 요청내용 *</label><textarea id="c-content" class="form-control form-control-sm" rows="3"></textarea></div>
+      <div class="mb-2"><label class="form-label small mb-0">첨부파일 등록</label>
+        <input id="c-files" type="file" class="form-control form-control-sm" multiple>
+        <div class="form-text">여러 파일 선택 가능. 등록 시 함께 업로드됩니다. (파일당 최대 20MB)</div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="create()">등록</button></div>
+  </div></div></div>
+
+  <!-- 상세 모달 -->
+  <div class="modal fade" id="detailModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="detailTitle">요청 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="detailBody"></div>
+  </div></div></div>
+
+  <!-- 유형 카드 모달 (월별 요청 내역 + 등록) -->
+  <div class="modal fade" id="typeModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="tm-title">요청 내역</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="d-flex justify-content-between align-items-end mb-2">
+        <div><label class="form-label small mb-0">조회 월</label>
+          <select id="tm-month" class="form-select form-select-sm" style="width:auto" onchange="loadTypeMonth()"></select></div>
+        <button class="btn btn-primary btn-sm" onclick="createFromType()">+ 업무 등록</button>
+      </div>
+      <div id="tm-result"></div>
+    </div>
+  </div></div></div>
+
+  <!-- 보류/반려 사유 입력 모달 -->
+  <div class="modal fade" id="reasonModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="rs-title">사유 입력</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label small mb-1">상세 사유 *</label>
+      <textarea id="rs-reason" class="form-control form-control-sm" rows="3"
+        placeholder="보류/반려 사유를 입력하세요. 입력한 내용은 처리내용 메모로 기록되어 상세 모달에서 확인됩니다."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="submitReason()">입력완료</button>
+    </div>
+  </div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/kims.js"></script>
+  <script>
+    if (!KIMS.requireAuth()) { } else { KIMS.renderNav('request.html'); }
+    let page = 0; const size = 20;
+    const E = KIMS.escapeHtml;
+    let createModal, detailModal, typeModal, reasonModal, currentId = null, currentReq = null, curType = null;
+    let pendingQuick = null; // 보류/반려 사유 입력 대기 컨텍스트 {id,status,btn,label}
+    let homeLoaded = false, listLoaded = false, monthsLoaded = false;
+    const TYPES = { SUPPLY:'전산소모품 지급', IP:'IP 변경/생성', PROGRAM:'PC관련 불편사항 조치', INTERNET:'인터넷 공사' };
+    const TYPE_ICON = { SUPPLY:'🖱️', IP:'🌐', PROGRAM:'💻', INTERNET:'📡' };
+    // PC관련 불편사항 조치(PROGRAM)의 세부 불편유형 (백엔드 IssueType enum 과 코드 일치)
+    const ISSUE_TYPES = {
+      PC_USE:'PC 사용불편문의 (안켜짐, 느림 등)',
+      MONITOR:'모니터 관련 문의 (안켜짐, 어두워짐 등)',
+      NETWORK:'인터넷 관련 문의 (네트워크 안됨, 느림)',
+      PROGRAM_INSTALL:'프로그램 설치 문의',
+      PC_NEW:'PC 신규 설치 문의',
+      PRINTER:'프린터 관련 문의 (스캔, 인쇄안됨, 신규설치 등)',
+      LABEL_PRINTER:'라벨프린터 관련 문의',
+      KIOSK:'키오스크 관련 문의',
+      PDA:'PDA 관련 문의',
+      ETC:'기타 문의'
+    };
+    const CHANNELS = { PHONE:'전화', MANUAL:'직접/수기', QR:'QR' };
+    const STATUSES = { RECEIVED:'접수', IN_PROGRESS:'처리중', ON_HOLD:'보류', COMPLETED:'완료', REJECTED:'반려', CANCELED:'취소' }; // 라벨 표시용(레거시 포함)
+    const STATUS_CHOICES = { RECEIVED:'접수', COMPLETED:'완료', ON_HOLD:'보류', REJECTED:'반려', CANCELED:'취소' }; // 선택 가능 상태
+    const SB = { RECEIVED:'bg-secondary', IN_PROGRESS:'bg-info', ON_HOLD:'bg-warning text-dark', COMPLETED:'bg-success', REJECTED:'bg-danger', CANCELED:'bg-dark' };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      createModal = new bootstrap.Modal('#createModal');
+      detailModal = new bootstrap.Modal('#detailModal');
+      typeModal = new bootstrap.Modal('#typeModal');
+      reasonModal = new bootstrap.Modal('#reasonModal');
+      fillOpt('f-type', TYPES, true); fillOpt('f-status', STATUS_CHOICES, true); fillOpt('c-type', TYPES, false); fillOpt('c-channel', CHANNELS, false);
+      // 기본 탭 = 홈
+      homeLoaded = true; loadTypeCards();
+      // 딥링크: ?open=<requestId> 이면 해당 요청 상세를 바로 연다 (대시보드 "오늘 접수"에서 이동)
+      const openId = new URLSearchParams(location.search).get('open');
+      if (openId) detail(Number(openId));
+    });
+
+    // ---- 하위 탭 전환 ----
+    function showRTab(t) {
+      ['home','list','monthly'].forEach(x => {
+        document.getElementById('rpane-' + x).style.display = (x === t) ? '' : 'none';
+        document.getElementById('rtab-' + x).classList.toggle('active', x === t);
+      });
+      if (t === 'home' && !homeLoaded) { homeLoaded = true; loadTypeCards(); }
+      if (t === 'list' && !listLoaded) { listLoaded = true; load(); }
+      if (t === 'monthly' && !monthsLoaded) { monthsLoaded = true; initReqMonths(); }
+    }
+
+    // 현재 월 yyyy-MM-dd 범위 쿼리스트링
+    function curMonthRange() {
+      const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1;
+      const last = new Date(y, m, 0).getDate();
+      const mm = String(m).padStart(2,'0');
+      return 'from=' + y + '-' + mm + '-01T00:00:00&to=' + y + '-' + mm + '-' + String(last).padStart(2,'0') + 'T23:59:59';
+    }
+
+    // 행별 빠른 처리 버튼 — 상태에 따라 달라짐
+    //  · 완료(COMPLETED)      : [취소] 만 (지급분이 있으면 취소 시 재고·지급수량 원복)
+    //  · 취소/반려(종료 상태) : 버튼 없음 (되돌리면 재고관리가 어려워짐)
+    //  · 그 외(접수/처리중/보류): [보류][반려][완료]
+    function quickBtns(r) {
+      if (r.status === 'CANCELED' || r.status === 'REJECTED') return '<span class="text-muted">-</span>';
+      const defs = (r.status === 'COMPLETED')
+        ? [['CANCELED','취소','secondary']]
+        : [['ON_HOLD','보류','warning'],['REJECTED','반려','danger'],['COMPLETED','완료','success']];
+      return defs.map(([s,lbl,c]) =>
+        `<button class="btn btn-outline-${c} btn-sm py-0 px-1${r.status===s?' active disabled':''}"
+          ${r.status===s?'disabled':''} onclick="quickStatus(${r.requestId},'${s}',this)">${lbl}</button>`).join(' ');
+    }
+
+    // 요청 목록 표 HTML
+    function reqTableHtml(list) {
+      if (!list || !list.length) return '<p class="text-muted">해당 내역이 없습니다.</p>';
+      return `<div class="table-responsive"><table class="table table-sm table-hover table-bordered bg-white align-middle">
+        <thead class="table-light"><tr><th>요청번호</th><th>요청일</th><th>요청자</th><th>부서</th><th>유형</th><th>요청내용</th><th>상태</th><th>담당자</th><th class="text-nowrap">빠른 처리</th><th style="width:60px">상세</th></tr></thead><tbody>
+        ${list.map(r => `<tr>
+          <td><b>${E(r.requestNo)}</b> ${r.urgent?'<span class="badge bg-danger">긴급</span>':''}</td>
+          <td>${(r.createdAt||'').substring(0,10)}</td><td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
+          <td>${E(r.requestTypeLabel)}</td><td class="text-truncate" style="max-width:200px">${E(r.contentSummary||'')}</td>
+          <td>${badge(r.status, r.statusLabel)}</td><td>${E(r.assignee)}</td>
+          <td class="text-nowrap">${quickBtns(r)}</td>
+          <td><button class="btn btn-outline-secondary btn-sm py-0" onclick="detail(${r.requestId})">상세</button></td></tr>`).join('')}
+        </tbody></table></div>`;
+    }
+
+    // 빠른 처리: 상태 변경 + 담당자=로그인 사용자 자동 기록
+    // 빠른 처리: 보류/반려는 사유 입력 모달을 거치고, 완료는 즉시 처리
+    function quickStatus(id, status, btn) {
+      if (status === 'ON_HOLD' || status === 'REJECTED' || status === 'CANCELED') {
+        pendingQuick = { id, status, btn, label: STATUS_CHOICES[status] };
+        document.getElementById('rs-title').textContent = STATUS_CHOICES[status] + ' 사유 입력';
+        document.getElementById('rs-reason').value = '';
+        reasonModal.show();
+        setTimeout(() => { const ta = document.getElementById('rs-reason'); if (ta) ta.focus(); }, 350);
+        return;
+      }
+      applyQuick(id, status, btn, '', '');
+    }
+
+    // 사유 입력 모달의 '입력완료'
+    async function submitReason() {
+      if (!pendingQuick) return;
+      const reason = document.getElementById('rs-reason').value.trim();
+      if (!reason) { KIMS.toast('사유를 입력하세요.', false); return; }
+      const { id, status, btn, label } = pendingQuick;
+      await applyQuick(id, status, btn, reason, label);
+    }
+
+    // 실제 상태변경(+사유를 처리내용 메모로 등록) 적용
+    async function applyQuick(id, status, btn, reason, label) {
+      const me = KIMS.getUser() || 'admin';
+      try {
+        await KIMS.api('/kims-api/requests/' + id + '/status',
+          { method:'PATCH', body:{ status, changedBy: me, assignee: me } });
+        // 사유는 '처리내용 메모'(PROCESS_NOTE)로 등록 → 상세 모달 우측에서 확인 가능
+        if (reason) {
+          await KIMS.api('/kims-api/requests/' + id + '/logs',
+            { method:'POST', body:{ changedBy: me, content: (label ? label + ' 사유: ' : '') + reason } });
+        }
+        // 즉시 반영: 클릭한 행의 담당자/상태 갱신
+        const tr = btn && btn.closest('tr');
+        if (tr && tr.children.length >= 8) {
+          tr.children[7].textContent = me;                                        // 담당자
+          tr.children[6].innerHTML = badge(status, STATUS_CHOICES[status]||status); // 상태
+        }
+        if (reasonModal) reasonModal.hide();
+        pendingQuick = null;
+        KIMS.toast((STATUS_CHOICES[status]||status) + ' 처리 · 담당자 ' + me + (reason ? ' · 사유 메모 등록' : ''));
+        refreshReqViews();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    // 현재 보이는 요청 화면들 새로고침
+    function refreshReqViews() {
+      loadTypeCards();
+      if (document.getElementById('typeModal').classList.contains('show')) loadTypeMonth();
+      if (monthsLoaded && document.getElementById('rpane-monthly').style.display !== 'none') loadReqMonth();
+      if (listLoaded && document.getElementById('rpane-list').style.display !== 'none') load();
+    }
+
+    // ---- 홈: 유형별 카드 ----
+    async function loadTypeCards() {
+      try {
+        const data = await KIMS.api('/kims-api/requests/type-summary');
+        const box = document.getElementById('typeCards');
+        box.innerHTML = data.map(t => `
+          <div class="col-6 col-md-4 col-lg-2">
+            <div class="card h-100 position-relative" role="button" onclick="showTypeMonth('${t.type}','${E(t.label)}')">
+              ${t.newCount > 0 ? `<span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-danger" style="z-index:2">${t.newCount}<span class="visually-hidden">신규</span></span>` : ''}
+              <div class="card-body text-center py-3">
+                <div style="font-size:1.8rem">${TYPE_ICON[t.type]||'📋'}</div>
+                <div class="fw-bold small mt-1">${E(t.label)}</div>
+                <div class="text-muted small">신규 <span class="${t.newCount>0?'text-danger fw-bold':''}">${t.newCount}</span> / 전체 ${t.totalCount}</div>
+              </div></div></div>`).join('');
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    // 카드 클릭 → 모달(월별 요청 내역 + 등록)
+    async function showTypeMonth(type, label) {
+      curType = type;
+      document.getElementById('tm-title').textContent = label + ' — 월별 요청 내역';
+      try {
+        const months = await KIMS.api('/kims-api/requests/months');
+        document.getElementById('tm-month').innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+      } catch (e) { /* 무시 */ }
+      typeModal.show();
+      loadTypeMonth();
+    }
+    // 모달: 선택 월 + 현재 유형의 요청 내역
+    async function loadTypeMonth() {
+      const v = document.getElementById('tm-month').value; if (!v || !curType) return;
+      const [y, m] = v.split('-'); const last = new Date(Number(y), Number(m), 0).getDate();
+      const qs = 'requestType=' + curType + '&from=' + v + '-01T00:00:00&to=' + v + '-' + String(last).padStart(2,'0') + 'T23:59:59&size=500';
+      try {
+        const data = await KIMS.api('/kims-api/requests?' + qs);
+        document.getElementById('tm-result').innerHTML = `<p class="small text-muted">${v} ${TYPES[curType]||''} 요청 ${data.totalElements}건</p>` + reqTableHtml(data.content);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    // 모달의 '업무 등록' → 등록 모달 (해당 유형 선택된 상태)
+    function createFromType() {
+      const t = curType;
+      const el = document.getElementById('typeModal');
+      el.addEventListener('hidden.bs.modal', function once() {
+        el.removeEventListener('hidden.bs.modal', once);
+        openCreate();
+        if (t) { document.getElementById('c-type').value = t; onCreateTypeChange(); }
+      }, { once: true });
+      typeModal.hide();
+    }
+
+    // ---- 월별 업무요청 목록 ----
+    async function initReqMonths() {
+      try {
+        const months = await KIMS.api('/kims-api/requests/months');
+        document.getElementById('rmonthSel').innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+        loadReqMonth();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function loadReqMonth() {
+      const v = document.getElementById('rmonthSel').value; if (!v) return;
+      const [y, m] = v.split('-'); const last = new Date(Number(y), Number(m), 0).getDate();
+      const qs = 'from=' + v + '-01T00:00:00&to=' + v + '-' + String(last).padStart(2,'0') + 'T23:59:59';
+      try {
+        const data = await KIMS.api('/kims-api/requests?' + qs + '&size=500');
+        document.getElementById('monthlyResult').innerHTML = `<p class="small text-muted">${v} 신청 ${data.totalElements}건</p>` + reqTableHtml(data.content);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    function fillOpt(id, map, withAll) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = (withAll ? '<option value="">전체</option>' : '') + Object.entries(map).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+    }
+    function badge(s, label) { return `<span class="badge ${SB[s]||'bg-secondary'}">${E(label||STATUSES[s]||s)}</span>`; }
+
+    function filters() {
+      const p = new URLSearchParams();
+      const g = id => document.getElementById(id).value.trim();
+      if (g('f-from')) p.set('from', g('f-from') + 'T00:00:00');
+      if (g('f-to')) p.set('to', g('f-to') + 'T23:59:59');
+      if (document.getElementById('f-type').value) p.set('requestType', document.getElementById('f-type').value);
+      if (document.getElementById('f-status').value) p.set('status', document.getElementById('f-status').value);
+      if (g('f-requester')) p.set('requester', g('f-requester'));
+      if (g('f-dept')) p.set('department', g('f-dept'));
+      if (g('f-assignee')) p.set('assignee', g('f-assignee'));
+      if (g('f-loc')) p.set('location', g('f-loc'));
+      return p;
+    }
+    function resetFilter() {
+      ['f-from','f-to','f-requester','f-dept','f-assignee','f-loc'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('f-type').value = ''; document.getElementById('f-status').value = '';
+      page = 0; load();
+    }
+
+    async function load() {
+      try {
+        const p = filters(); p.set('page', page); p.set('size', size);
+        const data = await KIMS.api('/kims-api/requests?' + p.toString());
+        renderRows(data.content); renderPager(data);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    function renderRows(list) {
+      const tb = document.getElementById('rows');
+      if (!list || !list.length) { tb.innerHTML = '<tr><td colspan="11" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
+      tb.innerHTML = list.map(r => `
+        <tr>
+          <td><b>${E(r.requestNo)}</b> ${r.urgent ? '<span class="badge bg-danger">긴급</span>' : ''}</td>
+          <td>${(r.createdAt||'').substring(0,10)}</td>
+          <td>${E(r.requesterName)}</td><td>${E(r.department)}</td><td>${E(r.location)}</td>
+          <td>${E(r.requestTypeLabel)}</td>
+          <td class="text-truncate" style="max-width:160px">${E(r.contentSummary||'')}</td>
+          <td>${badge(r.status, r.statusLabel)}</td><td>${E(r.assignee)}</td><td>${E(r.completedAt)}</td>
+          <td><button class="btn btn-outline-secondary btn-sm py-0" onclick="detail(${r.requestId})">상세</button></td>
+        </tr>`).join('');
+    }
+    function renderPager(d) {
+      const pg = document.getElementById('pager'); const cur = d.page, total = d.totalPages;
+      pg.innerHTML = `<button class="btn btn-sm btn-outline-secondary" ${cur<=0?'disabled':''} onclick="page=${cur-1};load()">이전</button>
+        <span class="align-self-center small">${total===0?0:cur+1} / ${total} (총 ${d.totalElements}건)</span>
+        <button class="btn btn-sm btn-outline-secondary" ${cur>=total-1?'disabled':''} onclick="page=${cur+1};load()">다음</button>`;
+    }
+
+    // ---- 등록 ----
+    function openCreate() {
+      ['c-requester','c-dept','c-contact','c-loc','c-content'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('c-files').value = '';
+      document.getElementById('c-type').value = 'SUPPLY';
+      document.getElementById('c-channel').value = 'PHONE';
+      document.getElementById('c-urgent').checked = false;
+      document.getElementById('c-qty').value = 1;
+      const issueSel = document.getElementById('c-issue'); if (issueSel) issueSel.value = '';
+      document.getElementById('c-ipkind').value = 'IP_CHANGE';
+      document.getElementById('c-changer').value = '';
+      onCreateTypeChange();      // 유형에 맞춰 폼 구성(기본 SUPPLY → 품목/수량)
+      createModal.show();
+    }
+    // 요청유형에 따라 등록 폼 전환: SUPPLY = 품목/수량, PROGRAM = 불편유형, 그 외 = 상세 요청내용
+    function onCreateTypeChange() {
+      const t = document.getElementById('c-type').value;
+      const isSupply = t === 'SUPPLY';
+      const isIssue = t === 'PROGRAM';
+      const isIp = t === 'IP';
+      document.getElementById('c-supply-block').style.display = isSupply ? '' : 'none';
+      document.getElementById('c-issue-block').style.display = isIssue ? '' : 'none';
+      document.getElementById('c-ipkind-block').style.display = isIp ? '' : 'none';
+      document.getElementById('c-content-label').textContent = isSupply ? '추가 요청사항 (선택)' : '상세 요청내용 *';
+      document.getElementById('c-content').placeholder = isSupply ? '필요 시 추가 설명을 적어주세요 (선택)' : '';
+      if (isSupply) loadCreateItems();
+      if (isIp) onIpKindChange();
+      if (isIssue) {
+        const sel = document.getElementById('c-issue');
+        if (!sel.dataset.loaded) {   // 최초 1회만 구성
+          sel.innerHTML = '<option value="">불편유형 선택</option>'
+            + Object.entries(ISSUE_TYPES).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+          sel.dataset.loaded = '1';
+        }
+      }
+    }
+    // 요청목록에 따라 변경자/생성자 입력칸 라벨 전환 (기타 변경은 숨김)
+    function onIpKindChange() {
+      const k = document.getElementById('c-ipkind').value;
+      const col = document.getElementById('c-changer-col');
+      if (k === 'ETC') { col.style.display = 'none'; return; }
+      col.style.display = '';
+      document.getElementById('c-changer-label').textContent = (k === 'IP_NEW') ? '생성자 *' : '변경자 *';
+      document.getElementById('c-changer').placeholder = (k === 'IP_NEW') ? '신규 IP 부여 대상 사용자명' : '변경 대상 사용자명';
+    }
+    async function loadCreateItems() {
+      const sel = document.getElementById('c-item');
+      if (sel.dataset.loaded) return;   // 최초 1회만 로드
+      try {
+        const data = await KIMS.api('/kims-api/inventory-items?size=200');
+        sel.innerHTML = '<option value="">품목 선택</option>' +
+          (data.content||[]).map(i => `<option value="${i.itemId}" data-unit="${E(i.unit||'개')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+        sel.dataset.loaded = '1';
+      } catch (e) { /* 무시 */ }
+    }
+    async function create() {
+      const requesterName = document.getElementById('c-requester').value.trim();
+      const type = document.getElementById('c-type').value;
+      let content = document.getElementById('c-content').value.trim();
+      let issueType = null, ipKind = null, changerName = null;
+      if (!requesterName) { KIMS.toast('요청자명은 필수입니다.', false); return; }
+
+      // 전산소모품 지급: 품목/수량을 필수로 받아 요청내용을 자동 구성
+      if (type === 'SUPPLY') {
+        const sel = document.getElementById('c-item');
+        const itemId = sel.value;
+        const qty = Number(document.getElementById('c-qty').value);
+        if (!itemId) { KIMS.toast('지급 받을 품목을 선택하세요.', false); return; }
+        if (!qty || qty < 1) { KIMS.toast('수량을 1 이상 입력하세요.', false); return; }
+        const opt = sel.options[sel.selectedIndex];
+        const base = `[전산소모품 지급 요청] ${opt.dataset.name || ''} ${qty}${opt.dataset.unit || '개'}`;
+        content = content ? (base + ' / ' + content) : base;
+      } else if (type === 'PROGRAM') {
+        // PC관련 불편사항 조치: 불편유형 필수 선택
+        issueType = document.getElementById('c-issue').value;
+        if (!issueType) { KIMS.toast('불편유형을 선택하세요.', false); return; }
+        if (!content) { KIMS.toast('상세 요청내용은 필수입니다.', false); return; }
+      } else if (type === 'IP') {
+        // IP 변경/생성: 요청목록 + 변경자/생성자
+        ipKind = document.getElementById('c-ipkind').value;
+        if (ipKind !== 'ETC') {
+          changerName = document.getElementById('c-changer').value.trim();
+          if (!changerName) { KIMS.toast((ipKind === 'IP_NEW' ? '생성자' : '변경자') + '를 입력하세요.', false); return; }
+        }
+        if (!content) { KIMS.toast('상세 요청내용은 필수입니다.', false); return; }
+      } else if (!content) {
+        KIMS.toast('상세 요청내용은 필수입니다.', false); return;
+      }
+
+      const payload = {
+        requesterName, content,
+        department: document.getElementById('c-dept').value.trim(),
+        contact: document.getElementById('c-contact').value.trim(),
+        location: document.getElementById('c-loc').value.trim(),
+        requestType: type,
+        issueType, ipKind, changerName,
+        receivedChannel: document.getElementById('c-channel').value,
+        urgent: document.getElementById('c-urgent').checked,
+      };
+      try {
+        const created = await KIMS.api('/kims-api/requests', { method:'POST', body:payload });
+        // 선택된 첨부파일 업로드
+        const files = document.getElementById('c-files').files;
+        let uploaded = 0;
+        for (const f of files) { await KIMS.uploadFile('/kims-api/requests/' + created.requestId + '/attachments', f); uploaded++; }
+        KIMS.toast('등록되었습니다.' + (uploaded ? ' (첨부 ' + uploaded + '건)' : ''));
+        createModal.hide(); load(); loadTypeCards();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 상세 ----
+    async function detail(id) {
+      currentId = id;
+      try {
+        const d = await KIMS.api('/kims-api/requests/' + id);
+        currentReq = d;
+        document.getElementById('detailTitle').textContent = '요청 상세 - ' + d.requestNo;
+        const choices = Object.assign({}, STATUS_CHOICES);
+        if (!choices[d.status]) choices[d.status] = STATUSES[d.status] || d.status; // 레거시 상태(처리중/취소)도 표시
+        const statusSel = Object.entries(choices).map(([k,v]) => `<option value="${k}" ${k===d.status?'selected':''}>${v}</option>`).join('');
+        const t = d.requestType;
+        // 처리내용 메모(PROCESS_NOTE) 목록 — 보류/반려 사유 포함, 상세 모달 우측에 표시
+        const memoList = (d.logs||[]).filter(l => l.logType === 'PROCESS_NOTE').map(l =>
+          `<div class="border-bottom py-1">${E(l.content||'')} <span class="text-muted small">— ${E(l.changedBy)}, ${(l.createdAt||'').substring(0,16).replace('T',' ')}</span></div>`
+        ).join('') || '<span class="text-muted">등록된 메모 없음</span>';
+        // 유형별 액션: 소모품 지급 처리는 소모품(SUPPLY) 요청에서만 노출
+        const supplyAction = t === 'SUPPLY' ? `
+                <hr class="my-2">
+                <h6>소모품 지급 처리 <small class="text-muted">(재고 차감)</small></h6>
+                <div class="row g-1">
+                  <div class="col"><select id="d-item" class="form-select form-select-sm"><option value="">품목 불러오는 중...</option></select></div>
+                  <div class="col-4"><input id="d-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
+                </div>
+                <input id="d-receiver" class="form-control form-control-sm mt-1" placeholder="지급 대상자">
+                <button class="btn btn-success btn-sm mt-1 w-100" onclick="issueSupply()">이 요청으로 소모품 지급</button>` : '';
+        // IP 자동처리 액션: IP 변경/생성 요청(기타 변경 제외)에서만 노출
+        const ipAction = (t === 'IP' && d.ipKind && d.ipKind !== 'ETC') ? `
+                <hr class="my-2">
+                <h6>IP 처리 <small class="text-muted">(${E(d.ipKindLabel)})</small></h6>
+                <div id="d-ip-action" class="small text-muted">불러오는 중...</div>
+                <div class="form-text">완료로 상태 변경 시 자동 반영·이력 기록됩니다.</div>` : '';
+        const info = `
+          <div class="row">
+            <div class="col-md-7">
+              <table class="table table-sm">
+                <tr><th width="110">요청번호</th><td>${E(d.requestNo)}</td><th width="90">상태</th><td>${badge(d.status,d.statusLabel)}</td></tr>
+                <tr><th>요청자</th><td>${E(d.requesterName)}</td><th>부서</th><td>${E(d.department)}</td></tr>
+                <tr><th>연락처</th><td>${E(d.contact)}</td><th>위치</th><td>${E(d.location)}</td></tr>
+                <tr><th>유형</th><td>${E(d.requestTypeLabel)}</td><th>긴급</th><td>${d.urgent?'<span class="text-danger">긴급</span>':'일반'}</td></tr>
+                ${d.issueTypeLabel ? `<tr><th>불편유형</th><td colspan="3">${E(d.issueTypeLabel)}</td></tr>` : ''}
+                ${d.ipKindLabel ? `<tr><th>요청목록</th><td>${E(d.ipKindLabel)}</td><th>${d.ipKind==='IP_NEW'?'생성자':'변경자'}</th><td>${E(d.changerName)}</td></tr>` : ''}
+                <tr><th>접수채널</th><td>${E(d.receivedChannelLabel)}</td><th>담당자</th><td>${E(d.assignee)}</td></tr>
+                <tr><th>완료일</th><td colspan="3">${E(d.completedAt)}</td></tr>
+                <tr><th>요청내용</th><td colspan="3" style="white-space:pre-wrap">${E(d.content)}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-5">
+              <div class="card bg-light"><div class="card-body py-2">
+                <h6>처리상태 변경</h6>
+                <div class="row g-1">
+                  <div class="col"><select id="d-status" class="form-select form-select-sm">${statusSel}</select></div>
+                  <div class="col"><input id="d-assignee" class="form-control form-control-sm" placeholder="담당자" value="${E(d.assignee||'')}"></div>
+                </div>
+                <input id="d-reason" class="form-control form-control-sm mt-1" placeholder="변경 사유">
+                <button class="btn btn-primary btn-sm mt-1 w-100" onclick="changeStatus()">상태 변경</button>
+                <hr class="my-2">
+                <h6>처리내용 메모</h6>
+                <div class="border rounded bg-white p-1 mb-1 small" style="max-height:140px;overflow:auto">${memoList}</div>
+                <input id="d-note" class="form-control form-control-sm" placeholder="처리내용 메모 입력">
+                <button class="btn btn-outline-primary btn-sm mt-1 w-100" onclick="addNote()">메모 추가</button>
+                ${supplyAction}${ipAction}
+              </div></div>
+            </div>
+          </div>`;
+        const logRows = (d.logs||[]).map(l => `<tr><td>${(l.createdAt||'').substring(0,19).replace('T',' ')}</td><td>${E(l.logTypeLabel)}</td>
+          <td>${l.beforeStatus?E(STATUSES[l.beforeStatus]):''}${l.afterStatus?' → '+E(STATUSES[l.afterStatus]):''}</td>
+          <td>${E(l.content||l.reason||'')}</td><td>${E(l.changedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const supplyRows = (d.supplyIssues||[]).map(s => `<tr><td>${E(s.issuedAt)}</td><td>${E(s.itemName)}</td><td>${s.quantity}</td><td>${E(s.receiverName)}</td><td>${E(s.issuedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const ipRows = (d.ipChanges||[]).map(h => `<tr><td>${(h.createdAt||'').substring(0,10)}</td><td>${E(h.ipAddress)}</td><td>${E(h.changeTypeLabel)}</td><td>${h.approved?'Y':'N'}</td><td>${E(h.changedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const piRows = (d.programInstalls||[]).map(p => `<tr><td>${E(p.installedAt)}</td><td>${E(p.programName)}</td><td>${E(p.targetPc)}</td><td>${E(p.installedBy)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">없음</td></tr>';
+        const iwRows = (d.internetWorks||[]).map(w => `<tr><td>${E(w.workTypeLabel)}</td><td>${E(w.statusLabel)}</td><td>${E(w.location)}</td><td>${E(w.assignee)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">없음</td></tr>';
+
+        // 첨부파일
+        const attRows = (d.attachments||[]).map(a => `<tr>
+          <td><a href="#" onclick="dlAttach(${a.attachmentId},'${E(a.originalName)}');return false;">${E(a.originalName)}</a></td>
+          <td>${formatSize(a.fileSize)}</td><td>${E(a.uploadedBy)}</td><td>${(a.createdAt||'').substring(0,16).replace('T',' ')}</td>
+          <td><button class="btn btn-outline-danger btn-sm py-0" onclick="delAttach(${a.attachmentId})">삭제</button></td>
+        </tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const attUpload = `<div class="input-group input-group-sm mt-1" style="max-width:480px">
+          <input type="file" id="d-attfile" class="form-control"><button class="btn btn-outline-primary" onclick="uploadAttach()">첨부 추가</button></div>`;
+
+        const sec = (title, head, rows) => `<h6 class="mt-3">${title}</h6><table class="table table-sm table-bordered"><thead class="table-light"><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+        // 유형별 관련 내역: 해당 유형 섹션만 노출
+        let typeSection = '';
+        if (t === 'SUPPLY')        typeSection = sec('관련 소모품 지급', '<th>지급일</th><th>품목</th><th>수량</th><th>대상자</th><th>담당자</th>', supplyRows);
+        else if (t === 'IP')       typeSection = sec('관련 IP 변경', '<th>일시</th><th>IP</th><th>유형</th><th>품의</th><th>변경자</th>', ipRows);
+        else if (t === 'PROGRAM')  typeSection = sec('관련 프로그램 설치', '<th>설치일</th><th>프로그램</th><th>대상PC</th><th>담당자</th>', piRows);
+        else if (t === 'INTERNET') typeSection = sec('관련 인터넷 공사', '<th>유형</th><th>상태</th><th>위치</th><th>담당자</th>', iwRows);
+        document.getElementById('detailBody').innerHTML = info
+          + sec('처리 이력 로그', '<th>일시</th><th>유형</th><th>상태변화</th><th>내용</th><th>처리자</th>', logRows)
+          + '<h6 class="mt-3">첨부파일</h6>'
+          + `<table class="table table-sm table-bordered"><thead class="table-light"><tr><th>파일명</th><th>크기</th><th>등록자</th><th>등록일시</th><th>관리</th></tr></thead><tbody>${attRows}</tbody></table>` + attUpload
+          + typeSection;
+        // 카드 모달(typeModal)에서 열렸으면 겹치지 않도록 먼저 닫고 상세만 표시
+        const tm = document.getElementById('typeModal');
+        if (tm.classList.contains('show')) {
+          tm.addEventListener('hidden.bs.modal', function once() {
+            tm.removeEventListener('hidden.bs.modal', once);
+            detailModal.show();
+          }, { once: true });
+          typeModal.hide();
+        } else {
+          detailModal.show();
+        }
+        if (t === 'SUPPLY') {
+          const recv = document.getElementById('d-receiver'); if (recv) recv.value = d.requesterName || '';
+          populateDetailItems();
+        }
+        if (t === 'IP' && d.ipKind && d.ipKind !== 'ETC') setupIpAction(d);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // PC변경 시 관리자가 고를 수 있는 항목 (필드코드 → 라벨)
+    const PC_CHANGE_FIELDS = {
+      department:'부서', device:'장치구분', rentalCompany:'렌탈사', serialNo:'제조번호', purchaseDate:'구입일',
+      osVersion:'OS버전', osSerial:'OS시리얼', officeVersion:'OFFICE버전', officeSerial:'OFFICE시리얼',
+      hangulVersion:'한글버전', hangulSerial:'한글시리얼'
+    };
+    // 상세 모달: IP 요청목록별 처리 UI 구성
+    async function setupIpAction(d) {
+      const box = document.getElementById('d-ip-action');
+      if (!box) return;
+      const kind = d.ipKind, changer = d.changerName || '';
+      if (kind === 'IP_NEW') {
+        box.innerHTML = `<label class="form-label small mb-0">부여할 신규 IP *</label>
+          <input id="d-newip" class="form-control form-control-sm" placeholder="예: 192.1.20.166">
+          <div class="form-text">생성자 <b>${E(changer)}</b> 에게 부여됩니다.</div>`;
+        return;
+      }
+      // IP_CHANGE / PC_CHANGE: 변경자의 현재 PC 조회
+      let pcs = [];
+      try {
+        const data = await KIMS.api('/kims-api/ips?searchField=user&keyword=' + encodeURIComponent(changer) + '&size=50');
+        pcs = (data.content || []).filter(p => p.ipAddress);   // IP 있는 PC만
+      } catch (e) {}
+      if (!pcs.length) {
+        box.innerHTML = `<div class="text-danger">'${E(changer)}' 사용자의 IP 배정 PC를 찾을 수 없습니다. 사용자명을 확인하세요.</div>`;
+        return;
+      }
+      const opts = pcs.map(p => `<option value="${p.ipId}" data-ip="${E(p.ipAddress)}">${E(p.ipAddress)}${p.serialNo?(' / '+E(p.serialNo)):''}${p.department?(' / '+E(p.department)):''}</option>`).join('');
+      let inner = `<label class="form-label small mb-0">대상 PC (현재 IP) *</label>
+        <select id="d-targetip" class="form-select form-select-sm">${opts}</select>`;
+      if (kind === 'IP_CHANGE') {
+        inner += `<label class="form-label small mb-0 mt-1">변경할 새 IP *</label>
+          <input id="d-newip" class="form-control form-control-sm" placeholder="예: 192.1.20.166">`;
+      } else if (kind === 'PC_CHANGE') {
+        inner += `<div class="mt-1"><label class="form-label small mb-0">변경 항목 (체크 후 새 값 입력)</label>
+          <div class="border rounded p-1" style="max-height:180px;overflow:auto">`
+          + Object.entries(PC_CHANGE_FIELDS).map(([k,v]) => `<div class="d-flex align-items-center gap-1 mb-1">
+              <input type="checkbox" id="pcf-${k}" class="form-check-input mt-0">
+              <label for="pcf-${k}" class="small" style="width:80px">${v}</label>
+              <input id="pcv-${k}" class="form-control form-control-sm py-0" placeholder="새 값">
+            </div>`).join('')
+          + `</div></div>`;
+      }
+      box.innerHTML = inner;
+    }
+
+    // IP 존재/사용 여부 조회 (정확 일치)
+    async function lookupIp(ip) {
+      try {
+        const data = await KIMS.api('/kims-api/ips?keyword=' + encodeURIComponent(ip) + '&size=20');
+        return (data.content || []).find(p => p.ipAddress === ip) || null;
+      } catch (e) { return null; }
+    }
+
+    // 상세 화면의 소모품 select 채우기
+    async function populateDetailItems() {
+      try {
+        const data = await KIMS.api('/kims-api/inventory-items?size=200');
+        const sel = document.getElementById('d-item');
+        if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
+          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.currentStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+      } catch (e) { /* 무시 */ }
+    }
+
+    // 이 요청으로 소모품 지급 (재고 차감 + 지급내역 + 처리로그)
+    async function issueSupply() {
+      const sel = document.getElementById('d-item');
+      const itemId = sel.value;
+      const qty = Number(document.getElementById('d-qty').value);
+      const receiver = document.getElementById('d-receiver').value.trim();
+      if (!itemId) { KIMS.toast('지급할 품목을 선택하세요.', false); return; }
+      if (!qty || qty < 1) { KIMS.toast('수량을 1 이상 입력하세요.', false); return; }
+      if (!receiver) { KIMS.toast('지급 대상자를 입력하세요.', false); return; }
+      // 재고 사전 검사 — 부족하면 지급하지 않고 부족 수량 모달 표시
+      const opt = sel.options[sel.selectedIndex];
+      const stock = Number(opt.dataset.stock || 0);
+      if (qty > stock) {
+        const unit = opt.dataset.unit || '';
+        KIMS.alertModal('⚠ 재고 부족',
+          `<b>${E(opt.dataset.name||'')}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
+          `<table class="table table-sm mb-0"><tbody>` +
+          `<tr><td>현재 재고</td><td class="text-end fw-bold">${stock} ${E(unit)}</td></tr>` +
+          `<tr><td>요청 수량</td><td class="text-end fw-bold">${qty} ${E(unit)}</td></tr>` +
+          `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${qty - stock} ${E(unit)}</td></tr>` +
+          `</tbody></table>`);
+        return;
+      }
+      const payload = { requestId: currentId, itemId: Number(itemId), quantity: qty,
+        receiverName: receiver, department: (currentReq && currentReq.department) || '',
+        issuedBy: KIMS.getUser() || 'admin' };
+      try {
+        await KIMS.api('/kims-api/supply-issues', { method:'POST', body:payload });
+        KIMS.toast('소모품이 지급되었습니다. (재고 차감 + 지급내역 기록)');
+        detail(currentId);  // 상세 새로고침 → "관련 소모품 지급"에 반영
+        load();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 재고 부족', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
+    }
+
+    function formatSize(b) { if (b == null) return ''; if (b < 1024) return b + 'B'; if (b < 1048576) return (b/1024).toFixed(1) + 'KB'; return (b/1048576).toFixed(1) + 'MB'; }
+    async function dlAttach(id, name) { try { await KIMS.download('/kims-api/attachments/' + id + '/download', name); } catch (e) { KIMS.toast(e.message, false); } }
+    async function uploadAttach() {
+      const inp = document.getElementById('d-attfile');
+      if (!inp.files.length) { KIMS.toast('파일을 선택하세요.', false); return; }
+      try { for (const f of inp.files) { await KIMS.uploadFile('/kims-api/requests/' + currentId + '/attachments', f); } KIMS.toast('첨부되었습니다.'); detail(currentId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function delAttach(id) {
+      if (!confirm('이 첨부파일을 삭제할까요?')) return;
+      try { await KIMS.api('/kims-api/attachments/' + id, { method:'DELETE' }); KIMS.toast('삭제되었습니다.'); detail(currentId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function changeStatus() {
+      const status = document.getElementById('d-status').value;
+      const payload = { status, changedBy: KIMS.getUser()||'admin',
+        assignee: document.getElementById('d-assignee').value.trim(), reason: document.getElementById('d-reason').value.trim() };
+
+      // IP 변경/생성 요청을 '완료'로 처리 시: 자동 반영 payload 구성 + 확인
+      const d = currentReq;
+      if (status === 'COMPLETED' && d && d.requestType === 'IP' && d.ipKind && d.ipKind !== 'ETC') {
+        const ok = await buildIpChangePayload(d, payload);
+        if (!ok) return;   // 취소/유효성 실패
+      }
+      try { await KIMS.api('/kims-api/requests/' + currentId + '/status', { method:'PATCH', body:payload }); KIMS.toast('상태가 변경되었습니다.'); detail(currentId); load(); loadTypeCards(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // IP 완료 처리 payload 구성 + 확인 모달. 성공 시 payload 채우고 true, 취소/오류 시 false
+    async function buildIpChangePayload(d, payload) {
+      if (d.ipKind === 'IP_NEW') {
+        const newIp = (document.getElementById('d-newip')||{}).value?.trim();
+        if (!newIp) { KIMS.toast('부여할 신규 IP를 입력하세요.', false); return false; }
+        const occ = await lookupIp(newIp);
+        if (occ && occ.userName) {
+          if (!confirm(`해당 IP(${newIp})에 '${occ.userName}' 사용자가 있습니다.\n해당 사용자를 제거하고 신규 생성자 '${d.changerName}'에게 부여하시겠습니까?`)) return false;
+        }
+        payload.newIp = newIp;
+        return true;
+      }
+      // IP_CHANGE / PC_CHANGE 공통: 대상 PC
+      const sel = document.getElementById('d-targetip');
+      if (!sel || !sel.value) { KIMS.toast('대상 PC를 확인하세요.', false); return false; }
+      const targetIpId = Number(sel.value);
+      const curIp = sel.options[sel.selectedIndex].dataset.ip || '';
+
+      if (d.ipKind === 'IP_CHANGE') {
+        const newIp = (document.getElementById('d-newip')||{}).value?.trim();
+        if (!newIp) { KIMS.toast('변경할 새 IP를 입력하세요.', false); return false; }
+        if (newIp === curIp) { KIMS.toast('현재 IP와 동일합니다.', false); return false; }
+        const occ = await lookupIp(newIp);
+        if (occ && occ.userName && occ.ipId !== targetIpId) {
+          if (!confirm(`해당 IP(${newIp})에 사용자 '${occ.userName}' 사용중 이력이 있습니다.\n그래도 변경하시겠습니까?`)) return false;
+        }
+        if (!confirm(`${d.changerName}의 기존 ${curIp} 에서 ${newIp} 으로 변경하시겠습니까?\n기존 ${curIp} 는 자동 회수 처리됩니다.`)) return false;
+        payload.targetIpId = targetIpId; payload.newIp = newIp;
+        return true;
+      }
+      if (d.ipKind === 'PC_CHANGE') {
+        const fields = {};
+        for (const k of Object.keys(PC_CHANGE_FIELDS)) {
+          const cb = document.getElementById('pcf-' + k);
+          if (cb && cb.checked) fields[k] = (document.getElementById('pcv-' + k).value || '').trim();
+        }
+        if (!Object.keys(fields).length) { KIMS.toast('변경할 항목을 하나 이상 선택하세요.', false); return false; }
+        const names = Object.keys(fields).map(k => PC_CHANGE_FIELDS[k]).join(', ');
+        if (!confirm(`${curIp} (${d.changerName}) 의 다음 항목을 변경합니다:\n${names}\n진행하시겠습니까?`)) return false;
+        payload.targetIpId = targetIpId; payload.pcFields = fields;
+        return true;
+      }
+      return true;
+    }
+    async function addNote() {
+      const content = document.getElementById('d-note').value.trim();
+      if (!content) { KIMS.toast('처리내용을 입력하세요.', false); return; }
+      try { await KIMS.api('/kims-api/requests/' + currentId + '/logs', { method:'POST', body:{ changedBy: KIMS.getUser()||'admin', content } }); KIMS.toast('추가되었습니다.'); detail(currentId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function downloadExcel() {
+      try { await KIMS.download('/kims-api/requests/excel?' + filters().toString(), 'service_requests.xlsx'); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS - PC 관리</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* 목록/변경내역: 셀 줄바꿈 금지 → 가로로 길게, 컨테이너 좌우 스크롤 */
+    /* (별도관리 탭은 pane-list 를 재사용하므로 함께 적용됨) */
+    #pane-list .table-responsive,
+    #pane-current .table-responsive,
+    #pane-monthly .table-responsive,
+    #pane-histmgmt .table-responsive { overflow-x: auto; }
+    #pane-list table th, #pane-list table td,
+    #pane-current table th, #pane-current table td,
+    #pane-monthly table th, #pane-monthly table td,
+    #pane-histmgmt table th, #pane-histmgmt table td { white-space: nowrap; }
+    /* 비고는 너무 길어질 수 있어 폭 제한 + 말줄임 유지 */
+    #pane-list table td.remark-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+    /* 사용 흐름 플로우차트 */
+    .flow-node { border: 1px solid #0d6efd; border-radius: 8px; padding: 4px 10px; background: #f0f6ff;
+                 text-align: center; white-space: nowrap; min-width: 90px; }
+    .flow-arrow { color: #0d6efd; font-weight: bold; font-size: 1.2rem; padding: 0 6px; }
+  </style>
+</head>
+<body class="bg-light">
+  <div id="nav"></div>
+  <div class="container-fluid px-4">
+    <h4 class="mb-2">PC 관리</h4>
+    <div id="msg" class="alert d-none" role="alert"></div>
+
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item"><button class="nav-link active" id="tab-dash" onclick="showTab('dash')">홈</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-list" onclick="showTab('list')">PC 목록</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-sep" onclick="showTab('sep')">별도관리</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-current" onclick="showTab('current')">당월 변경 내역</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-monthly" onclick="showTab('monthly')">월별 변경 내역</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-histmgmt" onclick="showTab('histmgmt')">이력관리</button></li>
+    </ul>
+
+    <!-- ===== IP 목록 ===== -->
+    <div id="pane-list" style="display:none">
+      <div id="sep-hint" class="alert alert-info py-2 mb-2" style="display:none">
+        <b>별도관리</b> — IP 대역이 없거나(사외 시설·협력업체 설치 등) 미배정 상태로 별도 관리하는 장비 목록입니다.
+      </div>
+      <div class="d-flex justify-content-end gap-1 mb-2">
+        <button class="btn btn-outline-warning btn-sm" onclick="showUnapproved()">미품의 변경 내역</button>
+        <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
+        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ 신규 PC 등록</button>
+      </div>
+      <!-- 검색/필터 -->
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2"><label class="form-label small mb-0">검색 기준</label>
+            <select id="f-field" class="form-select form-select-sm" onchange="onFieldChange()">
+              <option value="">전체(IP/사용자/장치/비고)</option>
+              <option value="serial">제조번호</option>
+              <option value="user">사용자</option>
+              <option value="dept">부서</option>
+            </select></div>
+          <div class="col-md-3"><label class="form-label small mb-0">검색어</label>
+            <input id="f-keyword" class="form-control form-control-sm" placeholder="검색어 입력 후 Enter"
+                   onkeydown="if(event.key==='Enter'){page=0;load();}"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">상태</label>
+            <select id="f-status" class="form-select form-select-sm">
+              <option value="">전체</option><option value="IN_USE">사용중</option>
+              <option value="AVAILABLE">가용</option><option value="RECLAIMED">회수</option>
+            </select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">IP그룹 분류</label>
+            <select id="f-group" class="form-select form-select-sm" onchange="page=0;load()">
+              <option value="">전체 대역</option>
+            </select></div>
+          <div class="col-md-2"><button class="btn btn-secondary btn-sm" onclick="page=0;load()">검색</button>
+            <button class="btn btn-light btn-sm" onclick="resetFilter()">초기화</button></div>
+        </div>
+      </div></div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+          <thead class="table-light"><tr>
+            <th>IP그룹</th><th>IP주소</th><th>상태</th><th>상주/임시</th><th>부서</th><th>장치구분</th><th>사용자</th><th>렌탈사</th><th>PC자산번호</th><th>모니터자산번호</th>
+            <th>모델</th><th>제조번호</th><th>구입업체</th><th>구입일</th>
+            <th>OS버전</th><th>OS시리얼</th><th>OFFICE버전</th><th>OFFICE시리얼</th><th>한글버전</th><th>한글시리얼</th>
+            <th>비고</th><th style="width:210px">관리</th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="22" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="pager" class="d-flex justify-content-center gap-2"></div>
+    </div>
+
+    <!-- ===== 홈 (대시보드 + 신규 요청) ===== -->
+    <div id="pane-dash">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="m-0">대역 사용 현황</h6>
+        <div class="btn-group btn-group-sm" role="group" aria-label="대역 선택">
+          <input type="radio" class="btn-check" name="scope" id="scope-user" autocomplete="off" checked onchange="setScope('USER')">
+          <label class="btn btn-outline-primary" for="scope-user">사용자 대역</label>
+          <input type="radio" class="btn-check" name="scope" id="scope-fac" autocomplete="off" onchange="setScope('FACILITY')">
+          <label class="btn btn-outline-primary" for="scope-fac">설비 대역</label>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="card text-bg-dark"><div class="card-body py-2"><div class="small" id="t-scope-label">사용자 대역 총 IP</div><div class="fs-4 fw-bold" id="t-total">-</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card text-bg-primary"><div class="card-body py-2"><div class="small">총 사용중</div><div class="fs-4 fw-bold" id="t-used">-</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card text-bg-secondary"><div class="card-body py-2"><div class="small">총 미사용</div><div class="fs-4 fw-bold" id="t-free">-</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card text-bg-info"><div class="card-body py-2"><div class="small">전체 사용률</div><div class="fs-4 fw-bold" id="t-rate">-</div></div></div></div>
+      </div>
+      <div class="row g-3" id="charts"></div>
+
+      <!-- 신규 생성/변경 요청 (IP 변경/생성 요청 · 접수) -->
+      <div class="card mt-3"><div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="m-0">신규 생성/변경 요청 <span class="badge bg-warning text-dark" id="ir-cnt">0</span></h6>
+          <span class="small text-muted">IP 변경/생성 요청 중 '접수' 상태</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered bg-white align-middle mb-0">
+            <thead class="table-light"><tr>
+              <th>요청번호</th><th>요청자</th><th>부서</th><th>요청내용</th><th>요청일</th><th style="width:90px">처리</th>
+            </tr></thead>
+            <tbody id="ipReqRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ===== 당월 변경 내역 ===== -->
+    <div id="pane-current" style="display:none">
+      <h6>당월 변경 내역 <span class="badge bg-primary" id="cm-label"></span> <span class="badge bg-secondary" id="cm-cnt">0</span></h6>
+      <div id="curMonth"></div>
+    </div>
+
+    <!-- ===== 월별 변경 내역 ===== -->
+    <div id="pane-monthly" style="display:none">
+      <div class="d-flex gap-2 align-items-end mb-2">
+        <div><label class="form-label small mb-0">조회 월</label>
+          <select id="monthSel" class="form-select form-select-sm" onchange="loadHist()"></select></div>
+      </div>
+      <div id="histBox"></div>
+    </div>
+
+    <!-- ===== 이력관리 (사용자별/제조번호별/IP별) ===== -->
+    <div id="pane-histmgmt" style="display:none">
+      <div class="card mb-2"><div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2"><label class="form-label small mb-0">조회 기준</label>
+            <select id="hm-field" class="form-select form-select-sm" onchange="onHmFieldChange()">
+              <option value="user">사용자별</option>
+              <option value="serial">제조번호별</option>
+              <option value="ip">IP별</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small mb-0">검색어</label>
+            <input id="hm-keyword" class="form-control form-control-sm" placeholder="사용자명으로 검색 후 Enter"
+                   onkeydown="if(event.key==='Enter')hmSearch()"></div>
+          <div class="col-md-2"><button class="btn btn-secondary btn-sm" onclick="hmSearch()">조회</button>
+            <button class="btn btn-light btn-sm" onclick="document.getElementById('hm-keyword').value='';document.getElementById('hm-result').innerHTML='';">초기화</button></div>
+          <div class="col"><span id="hm-cnt" class="badge bg-secondary"></span></div>
+        </div>
+        <div class="form-text mt-1">사용자별은 <b>그 사용자가 사용한 IP·PC의 변경 시점</b>(IP/제조번호 변경·신규생성)과 전후 사용자를, 제조번호·IP별은 해당 장비/주소의 전체 변경 이력을 보여줍니다.</div>
+      </div></div>
+      <div id="hm-result"><p class="text-muted small">조회 기준을 고르고 검색어를 입력하세요.</p></div>
+    </div>
+  </div>
+
+  <!-- 등록/변경 모달 -->
+  <div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="editTitle">신규 PC 등록</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="e-ipId">
+      <div class="mb-2"><label class="form-label small mb-0">IP 주소 *</label>
+        <input id="e-ip" class="form-control form-control-sm"></div>
+      <ul class="nav nav-tabs mb-2" id="editTabs" style="display:none">
+        <li class="nav-item"><button type="button" class="nav-link active" id="etab-pc" onclick="showEditTab('pc')">PC 변경</button></li>
+        <li class="nav-item"><button type="button" class="nav-link" id="etab-ip" onclick="showEditTab('ip')">IP 변경</button></li>
+      </ul>
+      <div id="epane-pc">
+      <div class="row g-2">
+        <div class="col"><label class="form-label small mb-0">사용자</label><input id="e-user" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">부서</label><input id="e-dept" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">장치구분</label>
+          <input id="e-device" class="form-control form-control-sm" list="deviceTypes" placeholder="노트북/서버/데스크탑/프린터/키오스크">
+          <datalist id="deviceTypes"><option>노트북</option><option>서버</option><option>데스크탑</option><option>프린터</option><option>복합기</option><option>키오스크</option><option>임시</option></datalist></div>
+        <div class="col"><label class="form-label small mb-0">위치</label><input id="e-loc" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0 align-items-end">
+        <div class="col-auto"><div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="e-approved"><label class="form-check-label" for="e-approved">품의 완료</label></div></div>
+        <div class="col"><label class="form-label small mb-0">품의번호</label><input id="e-appno" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">비고 / 변경사유</label><input id="e-remark" class="form-control form-control-sm"></div>
+        <div class="col-4"><label class="form-label small mb-0">연결 요청 ID</label><input id="e-reqid" type="number" class="form-control form-control-sm" placeholder="선택"></div>
+      </div>
+
+      <hr class="my-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="small text-muted">PC / 장비 상세 스펙</div>
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label small mb-0" for="e-rental">렌탈사/구입처</label>
+          <input id="e-rental" class="form-control form-control-sm" list="rentalList" style="width:180px"
+                 placeholder="비우면 자산">
+          <datalist id="rentalList">
+            <option value="롯데렌탈"><option value="AJ렌탈"><option value="기재요망">
+            <option value="AJ네트웍스"><option value="에이텍"><option value="ADT캡스">
+          </datalist></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">PC 자산번호</label><input id="e-pcasset" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">모니터 자산번호</label><input id="e-monasset" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">모델</label><input id="e-model" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">제조번호</label><input id="e-serial" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">구입업체</label><input id="e-vendor" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">OS 버전</label><input id="e-osver" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">OS 시리얼</label><input id="e-osserial" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">OFFICE 버전</label><input id="e-offver" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">OFFICE 시리얼</label><input id="e-offserial" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">한글 버전</label><input id="e-hanver" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">한글 시리얼</label><input id="e-hanserial" class="form-control form-control-sm"></div>
+      </div>
+      </div><!-- /epane-pc -->
+
+      <div id="epane-ip" style="display:none">
+        <p class="small text-muted">같은 PC를 다른 IP로 이동합니다. (사용자·스펙·자산정보는 그대로 옮겨집니다)</p>
+        <div class="mb-2"><label class="form-label small mb-0">현재 IP</label>
+          <input id="e-curip" class="form-control form-control-sm" disabled></div>
+        <div class="mb-2"><label class="form-label small mb-0">새 IP 주소 *</label>
+          <input id="e-newip" class="form-control form-control-sm" placeholder="예: 192.1.0.120 (관리대장의 '가용' IP)"></div>
+        <div class="mb-2"><label class="form-label small mb-0">변경 사유</label>
+          <input id="e-movereason" class="form-control form-control-sm"></div>
+        <div class="mb-2"><label class="form-label small mb-0">연결 요청 ID</label>
+          <input id="e-movereqid" type="number" class="form-control form-control-sm" placeholder="선택"></div>
+        <p class="small text-muted mb-0">※ 대상 IP는 관리대장에 등록된 <b>가용</b> 상태여야 합니다.</p>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+      <button class="btn btn-primary btn-sm" id="e-save-btn" onclick="onEditSave()">저장</button></div>
+  </div></div></div>
+
+  <!-- 상세/이력 모달 -->
+  <div class="modal fade" id="detailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="detailTitle">IP 상세</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="detailBody"></div>
+  </div></div></div>
+
+  <!-- 회수 모달 -->
+  <div class="modal fade" id="reclaimModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="reclaimTitle">IP 회수</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="rc-ipId">
+      <p class="small text-muted mb-2" id="rc-info"></p>
+      <div class="mb-2"><label class="form-label small mb-0" id="rc-reason-label">비고 / 회수 사유</label>
+        <input id="rc-reason" class="form-control form-control-sm" placeholder="예: 퇴사자 PC 회수 / 장비 폐기 등"></div>
+      <div class="mb-2"><label class="form-label small mb-0">연결 업무요청 ID (선택)</label>
+        <input id="rc-reqid" type="number" class="form-control form-control-sm" placeholder="관련 요청과 연결"></div>
+      <p class="small text-muted mb-0" id="rc-note">※ 회수 시 상태가 '회수'로 바뀌고, 입력한 비고가 <b>변경내역</b>에 기록됩니다.</p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+      <button class="btn btn-dark btn-sm" id="rc-submit" onclick="submitReclaim()">회수 처리</button></div>
+  </div></div></div>
+
+  <!-- 변경 상세: 이전/이후 사용자 (+ IP 이동) -->
+  <div class="modal fade" id="changeModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">변경 상세</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="d-flex align-items-center justify-content-center text-center my-2">
+        <div class="px-3"><div class="small text-muted">이전 사용자</div>
+          <div class="fs-5 fw-bold text-danger" id="cg-buser">-</div></div>
+        <div class="px-2 fs-3 text-secondary">&rarr;</div>
+        <div class="px-3"><div class="small text-muted">이후 사용자</div>
+          <div class="fs-5 fw-bold text-success" id="cg-auser">-</div></div>
+      </div>
+      <div id="cg-iprow" class="d-flex align-items-center justify-content-center text-center my-2" style="display:none">
+        <div class="px-3"><div class="small text-muted">변경 전 IP</div>
+          <div class="fw-bold text-danger" id="cg-before">-</div></div>
+        <div class="px-2 fs-5 text-secondary">&rarr;</div>
+        <div class="px-3"><div class="small text-muted">변경 후 IP</div>
+          <div class="fw-bold text-success" id="cg-after">-</div></div>
+      </div>
+      <hr>
+      <p class="mb-1"><b>장치구분</b> : <span id="cg-device"></span></p>
+      <p class="mb-0"><b>변경 사유</b> : <span id="cg-content"></span></p>
+    </div>
+  </div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="js/kims.js"></script>
+  <script>
+    if (!KIMS.requireAuth()) { /* redirect */ } else { KIMS.renderNav('ip.html'); }
+    let page = 0; const size = 256;
+    const E = KIMS.escapeHtml;
+    let editModal, detailModal, reclaimModal, changeModal;
+    let listLoaded = false, utilLoaded = false, curLoaded = false, monthsLoaded = false, charts = [];
+    let currentScope = 'USER';   // 대시보드 대역 구분: USER(사용자) / FACILITY(설비)
+    let utilCache = null;        // 대역 사용현황 캐시
+    const TYPE_BADGE = { CREATED:'bg-secondary', MODIFIED:'bg-info', USER_CHANGED:'bg-primary', RECLAIMED:'bg-dark',
+                         RETURNED:'bg-danger',
+                         TEMP_CREATED:'bg-warning text-dark', TEMP_MODIFIED:'bg-warning-subtle text-warning-emphasis border border-warning',
+                         DELETED:'bg-danger' };
+    document.addEventListener('DOMContentLoaded', () => {
+      editModal = new bootstrap.Modal('#editModal');
+      detailModal = new bootstrap.Modal('#detailModal');
+      reclaimModal = new bootstrap.Modal('#reclaimModal');
+      changeModal = new bootstrap.Modal('#changeModal');
+      // 기본 탭 = 홈(대시보드 + 신규요청)
+      utilLoaded = true; loadUtil(); loadIpRequests();
+      loadGroups();
+    });
+
+    // IP그룹 분류 드롭다운 채우기 (별도관리는 전용 탭이 있으므로 제외)
+    async function loadGroups() {
+      try {
+        const groups = await KIMS.api('/kims-api/ips/groups');
+        const sel = document.getElementById('f-group');
+        sel.innerHTML = '<option value="">전체 대역</option>'
+          + (groups || []).filter(g => g !== '별도관리')
+              .map(g => `<option value="${E(g)}">${E(g)}</option>`).join('');
+      } catch (e) { /* 무시 */ }
+    }
+
+    // ---- 하위 탭 전환 ----
+    function showTab(t) {
+      const paneOf = { list:'list', sep:'list', dash:'dash', current:'current', monthly:'monthly', histmgmt:'histmgmt' };
+      ['list','dash','current','monthly','histmgmt'].forEach(x => {
+        document.getElementById('pane-' + x).style.display = (paneOf[t] === x) ? '' : 'none';
+      });
+      ['list','sep','dash','current','monthly','histmgmt'].forEach(x =>
+        document.getElementById('tab-' + x).classList.toggle('active', x === t));
+      if (t === 'list' || t === 'sep') {
+        sepMode = (t === 'sep');
+        document.getElementById('sep-hint').style.display = sepMode ? '' : 'none';
+        page = 0; load();
+      }
+      if (t === 'dash') { loadUtil(); loadIpRequests(); }
+      if (t === 'current' && !curLoaded) { curLoaded = true; loadCurMonth(); }
+      if (t === 'monthly' && !monthsLoaded) { monthsLoaded = true; initMonths(); }
+    }
+    let sepMode = false;   // 별도관리 탭 여부
+
+    // ---- 대역 구분 토글 (사용자/설비) ----
+    function setScope(s) { currentScope = s; if (utilCache) renderUtil(); else loadUtil(); }
+
+    // ---- 변경내역 표 (컬럼 클릭 정렬 지원) ----
+    const ipKey = (s) => String(s||'').split('.').reduce((a,p) => a*256 + (parseInt(p,10)||0), 0);
+    const HIST_COLS = [
+      { label:'일시',     get:h => (h.createdAt||'').substring(0,10) },
+      { label:'IP',       get:h => h.ipAddress, cmp:(a,b) => ipKey(a)-ipKey(b) },
+      { label:'부서',     get:h => h.department },
+      { label:'장치구분', get:h => h.device },
+      { label:'사용자',   get:h => h.userName },
+      { label:'OS버전',      get:h => h.osVersion },
+      { label:'OS시리얼',    get:h => h.osSerial },
+      { label:'OFFICE버전',  get:h => h.officeVersion },
+      { label:'OFFICE시리얼',get:h => h.officeSerial },
+      { label:'한글버전',    get:h => h.hangulVersion },
+      { label:'한글시리얼',  get:h => h.hangulSerial },
+      { label:'유형',     get:h => h.changeTypeLabel },
+      { label:'내용',     get:h => h.content },
+      { label:'품의',     get:h => (h.approved?1:0), cmp:(a,b) => a-b },
+      { label:'변경자',   get:h => h.changedBy },
+    ];
+    const histState = {}; // tkey -> { list, sortCol, sortDir }
+
+    function histTable(list, tkey) {
+      histState[tkey] = { list: list || [], sortCol: null, sortDir: 1 };
+      return renderHist(tkey);
+    }
+
+    function sortHist(tkey, col) {
+      const st = histState[tkey]; if (!st) return;
+      if (st.sortCol === col) st.sortDir *= -1; else { st.sortCol = col; st.sortDir = 1; }
+      const el = document.getElementById('hist-' + tkey);
+      if (el) el.outerHTML = renderHist(tkey);
+    }
+
+    function renderHist(tkey) {
+      const st = histState[tkey];
+      if (!st.list || !st.list.length) return `<div id="hist-${tkey}"><p class="text-muted">변경 내역이 없습니다.</p></div>`;
+      let rows = st.list;
+      if (st.sortCol !== null) {
+        const c = HIST_COLS[st.sortCol], dir = st.sortDir;
+        rows = st.list.slice().sort((x, y) => {
+          const a = c.get(x), b = c.get(y);
+          const r = c.cmp ? c.cmp(a, b) : String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), 'ko');
+          return r * dir;
+        });
+      }
+      const ths = HIST_COLS.map((c, i) => {
+        const caret = st.sortCol === i ? (st.sortDir > 0 ? ' ▲' : ' ▼') : '';
+        return `<th role="button" style="cursor:pointer;user-select:none" onclick="sortHist('${tkey}',${i})">${c.label}<span class="text-primary">${caret}</span></th>`;
+      }).join('');
+      return `<div id="hist-${tkey}"><div class="table-responsive"><table class="table table-sm table-bordered bg-white align-middle">
+        <thead class="table-light"><tr>${ths}<th></th></tr></thead><tbody>
+        ${rows.map(h => `<tr>
+          <td>${(h.createdAt||'').substring(0,10)}</td><td><b>${E(h.ipAddress)}</b></td>
+          <td>${E(h.department)}</td><td>${E(h.device)}</td><td>${E(h.userName)}</td>
+          <td>${E(h.osVersion)}</td><td>${E(h.osSerial)}</td><td>${E(h.officeVersion)}</td><td>${E(h.officeSerial)}</td><td>${E(h.hangulVersion)}</td><td>${E(h.hangulSerial)}</td>
+          <td><span class="badge ${TYPE_BADGE[h.changeType]||'bg-secondary'}">${E(h.changeTypeLabel)}</span></td>
+          <td>${E(h.content)}</td>
+          <td>${h.approved?'<span class="text-success">Y</span>':'<span class="text-danger">N</span>'}</td>
+          <td>${E(h.changedBy)}</td>
+          <td>${hasDetail(h) ? `<button class="btn btn-outline-info btn-sm py-0"
+            data-before="${E(h.beforeIp||'')}" data-after="${E(h.beforeIp ? (h.afterIp||h.ipAddress) : '')}"
+            data-buser="${E(h.beforeUser||'')}" data-auser="${E(h.afterUser||'')}"
+            data-device="${E(h.device)}" data-content="${E(h.content)}" onclick="showChange(this)">상세</button>` : ''}</td></tr>`).join('')}
+        </tbody></table></div></div>`;
+    }
+
+    // ---- 사용자 흐름 표시 (이전 → 이후) ----
+    const NONE = '<span class="text-muted">(없음)</span>';
+    function userFlow(h, fallbackUser) {
+      const b = (h.beforeUser || '').trim();
+      const a = (h.afterUser || '').trim();
+      if (!b && !a) return fallbackUser ? E(fallbackUser) : '<span class="text-muted">-</span>';
+      if (!b) return E(a);                                  // 신규 부여 등: 이후 사용자만
+      const aj = a ? E(a) : NONE;                           // 회수/삭제: 이후 없음
+      return E(b) + ' <span class="text-secondary">→</span> ' + aj;
+    }
+    // 변경 전/후 정보를 보여줄 만한 행인지 (상세 버튼 노출 조건)
+    const CHANGE_TYPES = ['MODIFIED','USER_CHANGED','TEMP_MODIFIED','DELETED','RECLAIMED'];
+    function hasDetail(h) {
+      return CHANGE_TYPES.includes(h.changeType) && (h.beforeIp || h.beforeUser || h.afterUser);
+    }
+
+    // ---- 정보변경: 변경 전/후 상세 모달 ----
+    function showChange(btn) {
+      const d = btn.dataset;
+      document.getElementById('cg-buser').textContent = d.buser || '(없음)';
+      document.getElementById('cg-auser').textContent = d.auser || '(없음)';
+      const ipRow = document.getElementById('cg-iprow');
+      if (d.before) {
+        ipRow.style.display = '';
+        document.getElementById('cg-before').textContent = d.before;
+        document.getElementById('cg-after').textContent = d.after || '-';
+      } else {
+        ipRow.style.display = 'none';
+      }
+      document.getElementById('cg-device').textContent = d.device || '-';
+      document.getElementById('cg-content').textContent = d.content || '-';
+      changeModal.show();
+    }
+
+    // ---- 홈: 대역 사용현황 (사용자/설비 대역 토글) ----
+    async function loadUtil() {
+      try {
+        utilCache = await KIMS.api('/kims-api/ips/utilization');
+        renderUtil();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    function renderUtil() {
+      const data = (utilCache || []).filter(g => g.type === currentScope);
+      let totUsed = 0, totFree = 0, totAll = 0;
+      const box = document.getElementById('charts');
+      box.innerHTML = ''; charts.forEach(c => c.destroy()); charts = [];
+      data.forEach((g, idx) => {
+        totUsed += g.used; totFree += g.available; totAll += g.total;
+        const rate = g.total ? Math.round(g.used / g.total * 100) : 0;
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-3';
+        col.innerHTML = `<div class="card h-100"><div class="card-body text-center">
+          <h6 class="card-title">${g.group} 대역</h6>
+          <canvas id="ch${idx}" height="150"></canvas>
+          <div class="small mt-2">사용중 <b class="text-primary">${g.used}</b> / 미사용 <b>${g.available}</b> <span class="text-muted">(총 ${g.total})</span></div>
+          <div class="small text-muted">사용률 ${rate}%</div></div></div>`;
+        box.appendChild(col);
+        charts.push(new Chart(document.getElementById('ch'+idx), {
+          type: 'doughnut',
+          data: { labels: ['사용중','미사용'], datasets: [{ data: [g.used, g.available], backgroundColor: ['#0d6efd','#dee2e6'] }] },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        }));
+      });
+      document.getElementById('t-scope-label').textContent = (currentScope === 'FACILITY' ? '설비 대역 총 IP' : '사용자 대역 총 IP');
+      document.getElementById('t-total').textContent = totAll;
+      document.getElementById('t-used').textContent = totUsed;
+      document.getElementById('t-free').textContent = totFree;
+      document.getElementById('t-rate').textContent = (totAll ? Math.round(totUsed/totAll*100) : 0) + '%';
+    }
+
+    // ---- 홈: 신규 생성/변경 요청 (IP 변경/생성 요청 · 접수) ----
+    async function loadIpRequests() {
+      const tb = document.getElementById('ipReqRows');
+      try {
+        const data = await KIMS.api('/kims-api/requests?requestType=IP&status=RECEIVED&size=100');
+        const list = data.content || [];
+        document.getElementById('ir-cnt').textContent = list.length;
+        tb.innerHTML = list.length ? list.map(r => `
+          <tr>
+            <td><b>${E(r.requestNo)}</b> ${r.urgent?'<span class="badge bg-danger">긴급</span>':''}</td>
+            <td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
+            <td class="text-truncate" style="max-width:380px">${E(r.contentSummary)}</td>
+            <td>${(r.createdAt||'').substring(0,10)}</td>
+            <td><a class="btn btn-outline-primary btn-sm py-0" href="request.html?open=${r.requestId}">처리</a></td>
+          </tr>`).join('')
+          : '<tr><td colspan="6" class="text-center text-muted">신규 IP 생성/변경 요청이 없습니다. 👍</td></tr>';
+      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // ---- 당월 변경 내역 ----
+    async function loadCurMonth() {
+      const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1;
+      document.getElementById('cm-label').textContent = y + '-' + String(m).padStart(2,'0');
+      try {
+        const list = await KIMS.api('/kims-api/ips/history?year=' + y + '&month=' + m);
+        document.getElementById('cm-cnt').textContent = list.length;
+        document.getElementById('curMonth').innerHTML = histTable(list, 'current');
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 월별 변경 내역 ----
+    async function initMonths() {
+      try {
+        const months = await KIMS.api('/kims-api/ips/history/months');
+        document.getElementById('monthSel').innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+        loadHist();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function loadHist() {
+      const v = document.getElementById('monthSel').value; if (!v) return;
+      const [y, m] = v.split('-');
+      try {
+        const list = await KIMS.api('/kims-api/ips/history?year=' + Number(y) + '&month=' + Number(m));
+        document.getElementById('histBox').innerHTML = `<p class="small text-muted">${v} 변경 ${list.length}건</p>` + histTable(list, 'monthly');
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    function filters() {
+      const p = new URLSearchParams();
+      const kw = document.getElementById('f-keyword').value.trim();
+      const fld = document.getElementById('f-field').value;
+      const st = document.getElementById('f-status').value;
+      if (kw) { p.set('keyword', kw); if (fld) p.set('searchField', fld); }
+      if (st) p.set('status', st);
+      return p;
+    }
+    // 검색 기준 변경 시 안내 문구
+    function onFieldChange() {
+      const map = { '':'검색어 입력 후 Enter', serial:'제조번호로 검색', user:'사용자명으로 검색', dept:'부서명으로 검색' };
+      document.getElementById('f-keyword').placeholder = map[document.getElementById('f-field').value] || '';
+    }
+    function resetFilter() {
+      document.getElementById('f-keyword').value = '';
+      document.getElementById('f-field').value = '';
+      document.getElementById('f-status').value = '';
+      document.getElementById('f-group').value = '';
+      onFieldChange();
+      page = 0; load();
+    }
+
+    async function load() {
+      try {
+        const p = filters(); p.set('page', page); p.set('size', size);
+        if (sepMode) {
+          p.set('ipGroup', '별도관리');
+        } else {
+          const g = document.getElementById('f-group').value;
+          if (g) p.set('ipGroup', g); else p.set('excludeGroup', '별도관리');
+        }
+        const data = await KIMS.api('/kims-api/ips?' + p.toString());
+        renderRows(data.content);
+        renderPager(data);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    function statusBadge(s) {
+      const m = { IN_USE: 'bg-success', AVAILABLE: 'bg-secondary', RECLAIMED: 'bg-dark' };
+      const lbl = { IN_USE: '사용중', AVAILABLE: '가용', RECLAIMED: '회수' };
+      return `<span class="badge ${m[s] || 'bg-secondary'}">${lbl[s] || s}</span>`;
+    }
+    // 렌탈사명 (없으면 자산)
+    function rentalBadge(v) {
+      return v ? `<span class="badge bg-warning text-dark">${E(v)}</span>`
+               : '<span class="badge bg-secondary">자산</span>';
+    }
+    // 전체 IP 에서 끝자리(KKK)만 추출 — 대역(XXX.Y.ZZ)은 IP그룹 컬럼에서 표시
+    function octet(ip) {
+      if (!ip) return '';
+      const i = ip.lastIndexOf('.');
+      return i >= 0 ? ip.substring(i + 1) : ip;
+    }
+
+    function renderRows(list) {
+      const tb = document.getElementById('rows');
+      if (!list || !list.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
+      tb.innerHTML = list.map(r => `
+        <tr>
+          <td>${E(r.ipGroup)}</td>
+          <td><b>${E(octet(r.ipAddress))}</b></td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${E(r.usageType)}</td>
+          <td>${E(r.department)}</td><td>${E(r.device)}</td><td>${E(r.userName)}</td>
+          <td>${rentalBadge(r.rentalCompany)}</td>
+          <td>${E(r.pcAssetNo)}</td><td>${E(r.monitorAssetNo)}</td>
+          <td>${E(r.model)}</td><td>${E(r.serialNo)}</td><td>${E(r.vendor)}</td><td>${E(r.purchaseDate)}</td>
+          <td>${E(r.osVersion)}</td><td>${E(r.osSerial)}</td><td>${E(r.officeVersion)}</td><td>${E(r.officeSerial)}</td><td>${E(r.hangulVersion)}</td><td>${E(r.hangulSerial)}</td>
+          <td class="remark-cell" title="${E(r.remark)}">${E(r.remark)}</td>
+          <td class="text-nowrap">
+            <button class="btn btn-outline-secondary btn-sm py-0" onclick="detail(${r.ipId})">상세</button>
+            <button class="btn btn-outline-primary btn-sm py-0" onclick="openEdit(${r.ipId})">변경</button>
+            <button class="btn btn-outline-dark btn-sm py-0" onclick="reclaim(${r.ipId},'${E(r.ipAddress)}')">회수</button>
+            <button class="btn btn-outline-danger btn-sm py-0" onclick="returnPc(${r.ipId},'${E(r.ipAddress)}')">반납</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function renderPager(d) {
+      const pg = document.getElementById('pager');
+      const cur = d.page, total = d.totalPages;
+      pg.innerHTML = `
+        <button class="btn btn-sm btn-outline-secondary" ${cur<=0?'disabled':''} onclick="page=${cur-1};load()">이전</button>
+        <span class="align-self-center small">${total===0?0:cur+1} / ${total} (총 ${d.totalElements}건)</span>
+        <button class="btn btn-sm btn-outline-secondary" ${cur>=total-1?'disabled':''} onclick="page=${cur+1};load()">다음</button>`;
+    }
+
+    // PC 스펙 입력칸 id ↔ 응답 필드 매핑
+    const SPEC_FIELDS = [['e-pcasset','pcAssetNo'],['e-monasset','monitorAssetNo'],
+      ['e-model','model'],['e-serial','serialNo'],['e-vendor','vendor'],
+      ['e-osver','osVersion'],['e-osserial','osSerial'],['e-offver','officeVersion'],['e-offserial','officeSerial'],
+      ['e-hanver','hangulVersion'],['e-hanserial','hangulSerial']];
+
+    // 변경 모달 탭 전환 (PC 변경 / IP 변경)
+    function showEditTab(t) {
+      document.getElementById('epane-pc').style.display = (t === 'pc') ? '' : 'none';
+      document.getElementById('epane-ip').style.display = (t === 'ip') ? '' : 'none';
+      document.getElementById('etab-pc').classList.toggle('active', t === 'pc');
+      document.getElementById('etab-ip').classList.toggle('active', t === 'ip');
+      document.getElementById('e-save-btn').textContent = (t === 'ip') ? 'IP 이동' : '저장';
+    }
+    function isIpTabActive() { return document.getElementById('etab-ip').classList.contains('active'); }
+    function onEditSave() { if (isIpTabActive()) saveMove(); else save(); }
+
+    // ---- 등록 ----
+    function openCreate() {
+      document.getElementById('editTitle').textContent = '신규 PC 등록';
+      ['e-ipId','e-ip','e-user','e-dept','e-loc','e-device','e-appno','e-remark','e-reqid','e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
+      SPEC_FIELDS.forEach(([id]) => document.getElementById(id).value = '');
+      document.getElementById('e-approved').checked = false;
+      document.getElementById('e-rental').value = '';
+      document.getElementById('e-ip').disabled = false;
+      document.getElementById('editTabs').style.display = 'none';   // 등록은 PC 입력만
+      showEditTab('pc');
+      document.getElementById('e-save-btn').textContent = '등록';
+      editModal.show();
+    }
+    // ---- 변경 ----
+    async function openEdit(ipId) {
+      try {
+        const d = await KIMS.api('/kims-api/ips/' + ipId);
+        document.getElementById('editTitle').textContent = 'PC/IP 변경 - ' + d.ipAddress;
+        document.getElementById('e-ipId').value = d.ipId;
+        document.getElementById('e-ip').value = d.ipAddress;
+        document.getElementById('e-ip').disabled = true;
+        document.getElementById('e-user').value = d.userName || '';
+        document.getElementById('e-dept').value = d.department || '';
+        document.getElementById('e-loc').value = d.location || '';
+        document.getElementById('e-device').value = d.device || '';
+        document.getElementById('e-approved').checked = !!d.approved;
+        document.getElementById('e-appno').value = d.approvalNo || '';
+        document.getElementById('e-remark').value = '';
+        document.getElementById('e-reqid').value = '';
+        SPEC_FIELDS.forEach(([id, key]) => document.getElementById(id).value = d[key] || '');
+        document.getElementById('e-rental').value = d.rentalCompany || '';
+        // IP 변경 탭 초기화
+        document.getElementById('e-curip').value = d.ipAddress;
+        ['e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('editTabs').style.display = '';      // 변경은 PC/IP 탭 노출
+        showEditTab('pc');
+        editModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // IP 변경(이동) 저장
+    async function saveMove() {
+      const ipId = document.getElementById('e-ipId').value;
+      const newIp = document.getElementById('e-newip').value.trim();
+      if (!newIp) { KIMS.toast('새 IP 주소를 입력하세요.', false); return; }
+      const body = { newIpAddress: newIp, changedBy: KIMS.getUser() || 'admin',
+        reason: document.getElementById('e-movereason').value.trim() };
+      const reqid = document.getElementById('e-movereqid').value;
+      if (reqid) body.requestId = Number(reqid);
+      try {
+        await KIMS.api('/kims-api/ips/' + ipId + '/move', { method: 'POST', body });
+        KIMS.toast('IP가 변경(이동)되었습니다.');
+        editModal.hide(); load();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function save() {
+      const ipId = document.getElementById('e-ipId').value;
+      const payload = {
+        userName: document.getElementById('e-user').value.trim(),
+        department: document.getElementById('e-dept').value.trim(),
+        location: document.getElementById('e-loc').value.trim(),
+        device: document.getElementById('e-device').value.trim(),
+        approved: document.getElementById('e-approved').checked,
+        approvalNo: document.getElementById('e-appno').value.trim(),
+        remark: document.getElementById('e-remark').value.trim(),
+        changedBy: KIMS.getUser() || 'tester',
+      };
+      SPEC_FIELDS.forEach(([id, key]) => { payload[key] = document.getElementById(id).value.trim(); });
+      payload.rentalCompany = document.getElementById('e-rental').value;
+      const reqid = document.getElementById('e-reqid').value;
+      if (reqid) payload.requestId = Number(reqid);
+      try {
+        if (ipId) {
+          payload.reason = document.getElementById('e-remark').value.trim();
+          await KIMS.api('/kims-api/ips/' + ipId, { method: 'PATCH', body: payload });
+          KIMS.toast('변경되었습니다.');
+        } else {
+          payload.ipAddress = document.getElementById('e-ip').value.trim();
+          if (!payload.ipAddress) { KIMS.toast('IP 주소를 입력하세요.', false); return; }
+          await KIMS.api('/kims-api/ips', { method: 'POST', body: payload });
+          KIMS.toast('등록되었습니다.');
+        }
+        editModal.hide(); load();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 회수 / 반납 ----
+    let reclaimMode = 'reclaim';   // 'reclaim' = IP만 회수, 'return' = PC+IP 반납
+
+    // 회수 버튼 → IP만 회수
+    function reclaim(ipId, ip) {
+      reclaimMode = 'reclaim';
+      document.getElementById('reclaimTitle').textContent = 'IP 회수 - ' + ip;
+      document.getElementById('rc-info').textContent = ip + ' 을(를) 회수합니다. (IP만 미사용, PC 정보는 유지)';
+      document.getElementById('rc-note').style.display = 'none';
+      document.getElementById('rc-submit').textContent = '회수';
+      openReclaimModal(ipId);
+    }
+    // 반납 버튼 → PC+IP 반납 (PC 정보까지 비움)
+    function returnPc(ipId, ip) {
+      reclaimMode = 'return';
+      document.getElementById('reclaimTitle').textContent = 'PC + IP 반납 - ' + ip;
+      document.getElementById('rc-info').textContent = ip + ' 및 연결된 PC/장비를 반납합니다.';
+      document.getElementById('rc-note').style.display = '';
+      document.getElementById('rc-note').textContent = '⚠ 사용자·장치·PC 스펙·자산번호가 모두 비워집니다.';
+      document.getElementById('rc-submit').textContent = '반납';
+      openReclaimModal(ipId);
+    }
+    function openReclaimModal(ipId) {
+      document.getElementById('rc-ipId').value = ipId;
+      document.getElementById('rc-reason').value = '';
+      document.getElementById('rc-reqid').value = '';
+      reclaimModal.show();
+    }
+    async function submitReclaim() {
+      const ipId = document.getElementById('rc-ipId').value;
+      const body = { changedBy: KIMS.getUser() || 'admin', reason: document.getElementById('rc-reason').value.trim() };
+      const reqid = document.getElementById('rc-reqid').value;
+      if (reqid) body.requestId = Number(reqid);
+      const endpoint = (reclaimMode === 'return') ? '/return' : '/reclaim';
+      const okMsg = (reclaimMode === 'return') ? '반납되었습니다. (변경내역에 기록됨)' : '회수되었습니다. (변경내역에 기록됨)';
+      try {
+        await KIMS.api('/kims-api/ips/' + ipId + endpoint, { method: 'POST', body });
+        KIMS.toast(okMsg);
+        reclaimModal.hide();
+        load();
+        utilLoaded = false; if (document.getElementById('pane-dash').style.display !== 'none') { utilLoaded = true; loadUtil(); }
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 상세 + 이력 ----
+    async function detail(ipId) {
+      try {
+        const d = await KIMS.api('/kims-api/ips/' + ipId);
+        document.getElementById('detailTitle').textContent = 'PC 상세 - ' + d.ipAddress;
+        const info = `
+          <table class="table table-sm">
+            <tr><th width="120">IP</th><td>${E(d.ipAddress)}</td><th width="120">IP그룹</th><td>${E(d.ipGroup)}</td></tr>
+            <tr><th>상태</th><td>${statusBadge(d.status)}</td><th>상주/임시</th><td>${E(d.usageType)}</td></tr>
+            <tr><th>사용자</th><td>${E(d.userName)}</td><th>사용자ID</th><td>${E(d.userId)}</td></tr>
+            <tr><th>부서</th><td>${E(d.department)}</td><th>위치</th><td>${E(d.location)}</td></tr>
+            <tr><th>장치구분</th><td>${E(d.device)}</td><th>구입일</th><td>${E(d.purchaseDate)}</td></tr>
+            <tr><th>모델</th><td>${E(d.model)}</td><th>제조번호</th><td>${E(d.serialNo)}</td></tr>
+            <tr><th>구입업체</th><td>${E(d.vendor)}</td><th>렌탈사/구입처</th><td>${rentalBadge(d.rentalCompany)}</td></tr>
+            <tr><th>PC 자산번호</th><td>${E(d.pcAssetNo)}</td><th>모니터 자산번호</th><td>${E(d.monitorAssetNo)}</td></tr>
+            <tr><th>OS 버전</th><td>${E(d.osVersion)}</td><th>OS 시리얼</th><td>${E(d.osSerial)}</td></tr>
+            <tr><th>OFFICE 버전</th><td>${E(d.officeVersion)}</td><th>OFFICE 시리얼</th><td>${E(d.officeSerial)}</td></tr>
+            <tr><th>한글 버전</th><td>${E(d.hangulVersion)}</td><th>한글 시리얼</th><td>${E(d.hangulSerial)}</td></tr>
+            <tr><th>품의여부</th><td>${d.approved?'Y':'N'}</td><th>품의번호</th><td>${E(d.approvalNo)}</td></tr>
+            <tr><th>회수일</th><td>${E(d.reclaimedAt)}</td><th>비고</th><td>${E(d.remark)}</td></tr>
+          </table>
+          <h6 class="mt-3">변경 이력</h6>`;
+        const hist = (d.histories && d.histories.length) ? `
+          <table class="table table-sm table-bordered"><thead class="table-light"><tr>
+            <th>일시</th><th>유형</th><th>내용</th><th>사용자</th><th>변경자</th></tr></thead><tbody>
+          ${d.histories.map(h => `<tr>
+            <td>${(h.createdAt||'').substring(0,19).replace('T',' ')}</td>
+            <td><span class="badge ${TYPE_BADGE[h.changeType]||'bg-secondary'}">${E(h.changeTypeLabel)}</span></td><td>${E(h.content)}</td>
+            <td>${userFlow(h, d.userName)}</td><td>${E(h.changedBy)}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="text-muted">이력이 없습니다.</p>';
+        document.getElementById('detailBody').innerHTML = info + hist;
+        detailModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 미품의 변경 내역 ----
+    async function showUnapproved() {
+      try {
+        const list = await KIMS.api('/kims-api/ips/unapproved-changes');
+        document.getElementById('detailTitle').textContent = '미품의 IP 변경 내역';
+        document.getElementById('detailBody').innerHTML = (list && list.length) ? `
+          <table class="table table-sm table-bordered"><thead class="table-light"><tr>
+            <th>일시</th><th>IP</th><th>유형</th><th>내용</th><th>변경자</th></tr></thead><tbody>
+          ${list.map(h => `<tr>
+            <td>${(h.createdAt||'').substring(0,19).replace('T',' ')}</td>
+            <td>${E(h.ipAddress)}</td><td>${E(h.changeTypeLabel)}</td><td>${E(h.content)}</td><td>${E(h.changedBy)}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="text-success">미품의 변경 내역이 없습니다. 👍</p>';
+        detailModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- 이력관리 (사용자별/제조번호별/IP별) ----
+    function onHmFieldChange() {
+      const map = { user:'사용자명으로 검색 후 Enter', serial:'제조번호로 검색 후 Enter', ip:'IP 주소로 검색 후 Enter' };
+      document.getElementById('hm-keyword').placeholder = map[document.getElementById('hm-field').value] || '';
+    }
+    async function hmSearch() {
+      const field = document.getElementById('hm-field').value;
+      const kw = document.getElementById('hm-keyword').value.trim();
+      const box = document.getElementById('hm-result');
+      if (!kw) { KIMS.toast('검색어를 입력하세요.', false); return; }
+      try {
+        if (field === 'user') { await hmSearchUser(kw, box); return; }
+        // 제조번호별 / IP별: 사용자 인수인계 흐름 (사용자 바뀐 시점만) + 하단 플로우차트
+        const list = await KIMS.api('/kims-api/ips/history/search?field=' + field + '&keyword=' + encodeURIComponent(kw));
+        document.getElementById('hm-cnt').textContent = (list || []).length + '건';
+        if (!list || !list.length) { box.innerHTML = '<p class="text-muted small">검색 결과가 없습니다.</p>'; return; }
+        const flow = h => `${E(h.beforeUser||'(없음)')} → ${E(h.afterUser||'(없음)')}`;
+        const table = `<div class="table-responsive"><table class="table table-sm table-bordered table-hover bg-white align-middle mb-0">
+          <thead class="table-light"><tr>
+            <th>일시</th><th>당시 IP</th><th>제조번호</th><th>설비 종류</th><th>부서</th><th>유형</th><th>변경 내용</th><th>이전 → 이후 사용자</th>
+          </tr></thead><tbody>
+          ${list.map(h => `<tr>
+            <td>${(h.createdAt||'').substring(0,19).replace('T',' ')}</td>
+            <td>${E(h.snapshotIp || h.ipAddress)}</td><td>${E(h.serialNo)}</td><td>${E(h.device)}</td><td>${E(h.department)}</td>
+            <td><span class="badge ${TYPE_BADGE[h.changeType]||'bg-secondary'}">${E(h.changeTypeLabel)}</span></td>
+            <td class="small">${E((h.content||'').replace(/^\[관리대장\]\s*/, ''))}</td>
+            <td>${flow(h)}</td></tr>`).join('')}
+          </tbody></table></div>`;
+        box.innerHTML = table + renderUsageFlow(list, field);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 사용 흐름 플로우차트 (시간순). ip별=그 IP를 누가/어느 장비로 썼는지, 제조번호별=그 장비를 누가 썼는지
+    function renderUsageFlow(list, field) {
+      const byIp = (field === 'ip');
+      const groups = {};
+      list.slice().reverse().forEach(h => {   // 시간 오름차순
+        const key = byIp ? (h.snapshotIp || h.ipAddress || '(미상)') : (h.serialNo || h.ipAddress || '(미상)');
+        (groups[key] = groups[key] || []).push(h);
+      });
+      const blocks = Object.entries(groups).map(([key, hs]) => {
+        const nodes = hs.map(h => {
+          const sub = byIp ? (E(h.serialNo || '(제조번호없음)') + (h.device ? (' · ' + E(h.device)) : ''))
+                           : E(h.snapshotIp || h.ipAddress || '');
+          return `<div class="flow-node">
+            <div class="fw-bold">${E(h.afterUser || '(회수/미배정)')}</div>
+            <div class="text-muted small">${(h.createdAt||'').substring(0,10)}</div>
+            <div class="text-muted small">${sub}</div>
+          </div>`;
+        }).join('<div class="flow-arrow">→</div>');
+        const label = byIp ? (E(key) + ' (IP)') : (E(key) + (hs[0].device ? (' · ' + E(hs[0].device)) : ''));
+        return `<div class="mb-2"><div class="small text-muted mb-1">${label}</div>
+          <div class="d-flex flex-wrap align-items-center">${nodes}</div></div>`;
+      }).join('');
+      const title = byIp ? '이 IP를 누가 썼는지' : '이 설비를 누가 썼는지';
+      return `<div class="mt-3"><h6 class="mb-2">사용 흐름 <small class="text-muted">(${title})</small></h6>${blocks}</div>`;
+    }
+
+    // 사용자별: 해당 사용자가 쓰던 장비들의 사용자 변천 (일시/IP/제조번호/부서/사용자)
+    async function hmSearchUser(kw, box) {
+      const list = await KIMS.api('/kims-api/ips/history/by-user?keyword=' + encodeURIComponent(kw));
+      document.getElementById('hm-cnt').textContent = (list || []).length + '건';
+      if (!list || !list.length) { box.innerHTML = '<p class="text-muted small">검색 결과가 없습니다.</p>'; return; }
+      const flow = h => `${E(h.beforeUser||'(없음)')} → ${E(h.afterUser||'(없음)')}`;
+      const rows = list.map(h => `<tr>
+          <td>${(h.createdAt||'').substring(0,19).replace('T',' ')}</td>
+          <td>${E(h.snapshotIp || h.ipAddress)}</td><td>${E(h.serialNo)}</td><td>${E(h.device)}</td><td>${E(h.department)}</td>
+          <td><span class="badge ${TYPE_BADGE[h.changeType]||'bg-secondary'}">${E(h.changeTypeLabel)}</span></td>
+          <td>${flow(h)}</td></tr>`).join('');
+      box.innerHTML = `<p class="small text-muted mb-1"><b>${E(kw)}</b> 님이 사용한 IP·PC의 변경 시점(IP/제조번호 변경·신규생성)과 전후 사용자입니다.</p>
+        <div class="table-responsive"><table class="table table-sm table-bordered table-hover bg-white align-middle mb-0">
+        <thead class="table-light"><tr><th>일시</th><th>당시 IP</th><th>제조번호</th><th>설비 종류</th><th>부서</th><th>유형</th><th>이전 → 이후 사용자</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
+    }
+
+    // ---- Excel ----
+    async function downloadExcel() {
+      try {
+        const p = filters();
+        if (sepMode) p.set('ipGroup', '별도관리');
+        else { const g = document.getElementById('f-group').value; if (g) p.set('ipGroup', g); }
+        await KIMS.download('/kims-api/ips/excel?' + p.toString(), 'ip_addresses.xlsx');
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+  </script>
+</body>
+</html>

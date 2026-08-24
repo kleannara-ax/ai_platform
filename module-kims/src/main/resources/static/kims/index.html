@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>KIMS</title>
+</head>
+<body>
+  <script src="js/kims.js"></script>
+  <script>
+    // 홈은 대시보드로 통합. 로그인은 플랫폼(AiPlatform) 로그인으로 통일되어
+    // 토큰이 없으면 플랫폼 첫 화면으로 보낸다.
+    location.replace(KIMS.getToken() ? 'dashboard.html' : '/');
+  </script>
+</body>
+</html>

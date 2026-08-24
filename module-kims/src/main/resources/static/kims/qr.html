@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS - QR 구역 관리</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div id="nav"></div>
+  <div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="m-0">QR 구역 관리 <small class="text-muted fs-6">사무실 위치·부서별 QR 코드 생성</small></h4>
+      <button class="btn btn-primary btn-sm" onclick="openCreate()">+ QR 구역 생성</button>
+    </div>
+    <div id="msg" class="alert d-none" role="alert"></div>
+
+    <div class="card mb-3"><div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4"><label class="form-label small mb-0">검색(구역명/위치/부서)</label><input id="f-keyword" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><button class="btn btn-secondary btn-sm" onclick="page=0;load()">검색</button></div>
+      </div>
+    </div></div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover table-bordered bg-white align-middle">
+        <thead class="table-light"><tr>
+          <th>구역명</th><th>위치</th><th>부서</th><th>사용</th><th>생성일</th><th style="width:230px">관리</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="pager" class="d-flex justify-content-center gap-2"></div>
+  </div>
+
+  <!-- 생성/수정 모달 -->
+  <div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="editTitle">QR 구역 생성</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="e-id">
+      <div class="mb-2"><label class="form-label small mb-0">구역명 (표시용)</label><input id="e-name" class="form-control form-control-sm" placeholder="예: 제지생산팀 사무실"></div>
+      <div class="mb-2"><label class="form-label small mb-0">위치 *</label><input id="e-loc" class="form-control form-control-sm" placeholder="예: 본관 3층 301호"></div>
+      <div class="mb-2"><label class="form-label small mb-0">부서</label><input id="e-dept" class="form-control form-control-sm"></div>
+      <div class="mb-2"><label class="form-label small mb-0">비고</label><input id="e-remark" class="form-control form-control-sm"></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="e-active" checked><label class="form-check-label" for="e-active">사용 (체크 해제 시 스캔 무효)</label></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="save()">저장</button></div>
+  </div></div></div>
+
+  <!-- QR 보기 모달 -->
+  <div class="modal fade" id="qrModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="qrTitle">QR 코드</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body text-center">
+      <div id="qrMeta" class="mb-2 small text-muted"></div>
+      <img id="qrImg" alt="QR" class="border rounded" style="width:280px;height:280px;object-fit:contain">
+      <div class="input-group input-group-sm mt-3">
+        <span class="input-group-text">URL</span>
+        <input id="qrUrl" class="form-control" readonly>
+        <button class="btn btn-outline-secondary" onclick="copyUrl()">복사</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-success btn-sm" onclick="downloadQr()">PNG 다운로드</button>
+      <button class="btn btn-outline-primary btn-sm" onclick="printQr()">인쇄</button>
+      <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button>
+    </div>
+  </div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/kims.js"></script>
+  <script>
+    if (!KIMS.requireAuth()) { } else { KIMS.renderNav('qr.html'); }
+    let page = 0; const size = 20; const E = KIMS.escapeHtml;
+    let editModal, qrModal, curQr = null, curImgUrl = null;
+    document.addEventListener('DOMContentLoaded', () => {
+      editModal = new bootstrap.Modal('#editModal');
+      qrModal = new bootstrap.Modal('#qrModal');
+      load();
+    });
+
+    async function load() {
+      try {
+        const p = new URLSearchParams();
+        const kw = document.getElementById('f-keyword').value.trim();
+        if (kw) p.set('keyword', kw);
+        p.set('page', page); p.set('size', size);
+        const data = await KIMS.api('/kims-api/qr-locations?' + p.toString());
+        renderRows(data.content); renderPager(data);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    function renderRows(list) {
+      const tb = document.getElementById('rows');
+      if (!list || !list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
+      tb.innerHTML = list.map(r => `
+        <tr>
+          <td>${E(r.name)}</td><td><b>${E(r.location)}</b></td><td>${E(r.department)}</td>
+          <td>${r.active?'<span class="text-success">사용</span>':'<span class="text-muted">중지</span>'}</td>
+          <td>${(r.createdAt||'').substring(0,10)}</td>
+          <td><div class="d-flex gap-1">
+            <button class="btn btn-outline-dark btn-sm py-0" onclick='showQr(${JSON.stringify(r)})'>QR 보기</button>
+            <button class="btn btn-outline-primary btn-sm py-0" onclick='openEdit(${JSON.stringify(r)})'>수정</button>
+            <button class="btn btn-outline-danger btn-sm py-0" onclick="del(${r.qrId})">삭제</button>
+          </div></td>
+        </tr>`).join('');
+    }
+    function renderPager(d) {
+      const pg = document.getElementById('pager'); const cur = d.page, total = d.totalPages;
+      pg.innerHTML = `<button class="btn btn-sm btn-outline-secondary" ${cur<=0?'disabled':''} onclick="page=${cur-1};load()">이전</button>
+        <span class="align-self-center small">${total===0?0:cur+1} / ${total} (총 ${d.totalElements}건)</span>
+        <button class="btn btn-sm btn-outline-secondary" ${cur>=total-1?'disabled':''} onclick="page=${cur+1};load()">다음</button>`;
+    }
+
+    function openCreate() {
+      document.getElementById('editTitle').textContent = 'QR 구역 생성';
+      ['e-id','e-name','e-loc','e-dept','e-remark'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('e-active').checked = true;
+      editModal.show();
+    }
+    function openEdit(r) {
+      document.getElementById('editTitle').textContent = 'QR 구역 수정';
+      document.getElementById('e-id').value = r.qrId;
+      document.getElementById('e-name').value = r.name || '';
+      document.getElementById('e-loc').value = r.location || '';
+      document.getElementById('e-dept').value = r.department || '';
+      document.getElementById('e-remark').value = r.remark || '';
+      document.getElementById('e-active').checked = !!r.active;
+      editModal.show();
+    }
+    async function save() {
+      const id = document.getElementById('e-id').value;
+      const payload = {
+        name: document.getElementById('e-name').value.trim(),
+        location: document.getElementById('e-loc').value.trim(),
+        department: document.getElementById('e-dept').value.trim(),
+        remark: document.getElementById('e-remark').value.trim(),
+        active: document.getElementById('e-active').checked,
+      };
+      if (!payload.location) { KIMS.toast('위치는 필수입니다.', false); return; }
+      try {
+        if (id) { await KIMS.api('/kims-api/qr-locations/' + id, { method:'PATCH', body:payload }); KIMS.toast('수정되었습니다.'); }
+        else { await KIMS.api('/kims-api/qr-locations', { method:'POST', body:payload }); KIMS.toast('QR 구역이 생성되었습니다.'); }
+        editModal.hide(); load();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function del(id) {
+      if (!confirm('이 QR 구역을 삭제할까요? (기존 QR 코드는 무효가 됩니다)')) return;
+      try { await KIMS.api('/kims-api/qr-locations/' + id, { method:'DELETE' }); KIMS.toast('삭제되었습니다.'); load(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ---- QR 보기 ----
+    async function showQr(r) {
+      curQr = r;
+      try {
+        const detail = await KIMS.api('/kims-api/qr-locations/' + r.qrId);
+        document.getElementById('qrTitle').textContent = 'QR - ' + (r.name || r.location);
+        document.getElementById('qrMeta').textContent = '위치: ' + (r.location||'') + '  /  부서: ' + (r.department||'-');
+        document.getElementById('qrUrl').value = detail.url;
+        // 이미지(인증 헤더 필요) → blob
+        if (curImgUrl) { URL.revokeObjectURL(curImgUrl); curImgUrl = null; }
+        const res = await fetch('/kims-api/qr-locations/' + r.qrId + '/image', { headers: { 'Authorization': 'Bearer ' + KIMS.getToken() } });
+        if (!res.ok) throw new Error('QR 이미지 로드 실패');
+        const blob = await res.blob();
+        curImgUrl = URL.createObjectURL(blob);
+        document.getElementById('qrImg').src = curImgUrl;
+        qrModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    function copyUrl() {
+      const u = document.getElementById('qrUrl'); u.select(); document.execCommand('copy'); KIMS.toast('URL 복사됨');
+    }
+    async function downloadQr() {
+      try { await KIMS.download('/kims-api/qr-locations/' + curQr.qrId + '/image', 'qr_' + (curQr.location||curQr.qrId) + '.png'); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    function printQr() {
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>QR 인쇄</title></head><body style="text-align:center;font-family:sans-serif">'
+        + '<h3>' + (curQr.name || curQr.location || '') + '</h3>'
+        + '<p>위치: ' + (curQr.location||'') + ' / 부서: ' + (curQr.department||'-') + '</p>'
+        + '<img src="' + curImgUrl + '" style="width:320px;height:320px"><br><small>QR을 스캔해 업무를 요청하세요</small>'
+        + '</body></html>');
+      w.document.close(); w.focus(); setTimeout(() => { w.print(); }, 300);
+    }
+  </script>
+</body>
+</html>
