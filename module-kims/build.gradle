@@ -15,7 +15,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     // 공통코드(KIMS_PERM) 조회용 JdbcTemplate
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // Excel 다운로드(.xlsx)

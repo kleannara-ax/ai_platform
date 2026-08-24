@@ -58,10 +58,6 @@ public class InventoryTransaction extends BaseTimeEntity {
     @Column(name = "NOTE", length = 255)
     private String note;
 
-    /** 처리자 */
-    @Column(name = "CREATED_BY", length = 50)
-    private String createdBy;
-
     @Builder
     private InventoryTransaction(InventoryItem inventoryItem, TransactionType transactionType,
                                  int quantity, int beforeStock, int afterStock,
@@ -72,7 +68,7 @@ public class InventoryTransaction extends BaseTimeEntity {
         this.beforeStock = beforeStock;
         this.afterStock = afterStock;
         this.note = note;
-        this.createdBy = createdBy;
+        markCreatedBy(createdBy);
     }
 
     /** 입고 이력 생성 */
