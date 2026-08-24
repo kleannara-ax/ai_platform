@@ -12,19 +12,21 @@ import java.util.List;
 
 public interface ProgramInstallRepository extends JpaRepository<ProgramInstall, Long> {
 
-    /** 특정 요청에 연결된 설치 내역 (요청 상세에서 "관련 프로그램 설치 내역" 표시용) */
-    List<ProgramInstall> findByServiceRequest_RequestIdOrderByCreatedAtAsc(Long requestId);
+    /** 특정 요청에 연결된 설치 내역 (요청 상세에서 "관련 프로그램 설치 내역" 표시용, 삭제되지 않은 것만) */
+    List<ProgramInstall> findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(Long requestId, String deletedYn);
 
-    /** 기간 내 설치 내역 (월말 결산용, 설치일 기준) */
-    List<ProgramInstall> findByInstalledAtBetweenOrderByInstalledAtDesc(LocalDate from, LocalDate to);
+    /** 기간 내 설치 내역 (월말 결산용, 설치일 기준, 삭제되지 않은 것만) */
+    List<ProgramInstall> findByInstalledAtBetweenAndDeletedYnOrderByInstalledAtDesc(
+            LocalDate from, LocalDate to, String deletedYn);
 
     /**
      * 설치 내역 검색 (프로그램/요청자/대상PC 부분일치, 부서, 담당자, 설치일 기간 — 모두 선택적).
-     * <p>{@code Pageable.unpaged()} 로 전체(엑셀용) 조회 가능.
+     * <p>{@code Pageable.unpaged()} 로 전체(엑셀용) 조회 가능. 소프트 삭제된 건은 제외한다.
      */
     @Query("""
             SELECT p FROM ProgramInstall p
-            WHERE (:keyword IS NULL OR p.programName LIKE CONCAT('%', :keyword, '%')
+            WHERE p.deletedYn = 'N'
+              AND (:keyword IS NULL OR p.programName LIKE CONCAT('%', :keyword, '%')
                                     OR p.requesterName LIKE CONCAT('%', :keyword, '%')
                                     OR p.targetPc LIKE CONCAT('%', :keyword, '%'))
               AND (:department IS NULL OR p.department = :department)

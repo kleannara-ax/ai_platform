@@ -14,19 +14,21 @@ import java.util.List;
 
 public interface InternetWorkRepository extends JpaRepository<InternetWork, Long> {
 
-    /** 특정 요청에 연결된 공사 내역 (요청 상세용) */
-    List<InternetWork> findByServiceRequest_RequestIdOrderByCreatedAtAsc(Long requestId);
+    /** 특정 요청에 연결된 공사 내역 (요청 상세용, 삭제되지 않은 것만) */
+    List<InternetWork> findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(Long requestId, String deletedYn);
 
-    /** 기간 내 공사 내역 (월말 결산용, 접수일 기준) */
-    List<InternetWork> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime from, LocalDateTime to);
+    /** 기간 내 공사 내역 (월말 결산용, 접수일 기준, 삭제되지 않은 것만) */
+    List<InternetWork> findByCreatedAtBetweenAndDeletedYnOrderByCreatedAtDesc(
+            LocalDateTime from, LocalDateTime to, String deletedYn);
 
     /**
      * 공사 내역 검색 (요청자/위치/내용 부분일치, 공사유형, 상태, 부서, 접수기간 — 모두 선택적).
-     * <p>{@code Pageable.unpaged()} 로 전체(엑셀용) 조회 가능.
+     * <p>{@code Pageable.unpaged()} 로 전체(엑셀용) 조회 가능. 소프트 삭제된 건은 제외한다.
      */
     @Query("""
             SELECT w FROM InternetWork w
-            WHERE (:keyword IS NULL OR w.requesterName LIKE CONCAT('%', :keyword, '%')
+            WHERE w.deletedYn = 'N'
+              AND (:keyword IS NULL OR w.requesterName LIKE CONCAT('%', :keyword, '%')
                                     OR w.location LIKE CONCAT('%', :keyword, '%')
                                     OR w.content LIKE CONCAT('%', :keyword, '%'))
               AND (:workType IS NULL OR w.workType = :workType)

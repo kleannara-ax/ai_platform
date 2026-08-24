@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,7 +40,7 @@ public class AttachmentService {
     @Transactional
     public AttachmentResponse upload(Long requestId, MultipartFile file, String uploadedBy) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("업로드할 파일이 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 파일이 없습니다.");
         }
         ServiceRequest request = serviceRequestRepository.findById(requestId)
                 .orElseThrow(() -> new EntityNotFoundException("업무 요청을 찾을 수 없습니다. id=" + requestId));
@@ -54,7 +53,7 @@ public class AttachmentService {
             Files.createDirectories(dir);
             file.transferTo(dir.resolve(stored).toAbsolutePath());
         } catch (IOException e) {
-            throw new UncheckedIOException("파일 저장 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다.");
         }
 
         RequestAttachment entity = RequestAttachment.builder()
@@ -69,14 +68,13 @@ public class AttachmentService {
     }
 
     public List<AttachmentResponse> getList(Long requestId) {
-        return attachmentRepository.findByServiceRequest_RequestIdOrderByCreatedAtAsc(requestId)
+        return attachmentRepository.findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(requestId, "N")
                 .stream().map(AttachmentResponse::from).toList();
     }
 
     /** 다운로드용 파일 로드 (바이트 + 원본명 + 타입) */
     public DownloadFile loadForDownload(Long attachmentId) {
-        RequestAttachment a = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new EntityNotFoundException("첨부파일을 찾을 수 없습니다. id=" + attachmentId));
+        RequestAttachment a = findActive(attachmentId);
         try {
             byte[] data = Files.readAllBytes(Paths.get(uploadDir).resolve(a.getStoredName()));
             return new DownloadFile(data, a.getOriginalName(), a.getContentType());
@@ -86,15 +84,23 @@ public class AttachmentService {
     }
 
     @Transactional
-    public void delete(Long attachmentId) {
-        RequestAttachment a = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new EntityNotFoundException("첨부파일을 찾을 수 없습니다. id=" + attachmentId));
+    public void delete(Long attachmentId, String deletedBy) {
+        RequestAttachment a = findActive(attachmentId);
         try {
             Files.deleteIfExists(Paths.get(uploadDir).resolve(a.getStoredName()));
         } catch (IOException ignored) {
             // 파일이 이미 없어도 메타데이터는 삭제 진행
         }
-        attachmentRepository.delete(a);
+        a.delete(deletedBy);
+    }
+
+    private RequestAttachment findActive(Long attachmentId) {
+        RequestAttachment a = attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new EntityNotFoundException("첨부파일을 찾을 수 없습니다. id=" + attachmentId));
+        if (a.isDeleted()) {
+            throw new EntityNotFoundException("첨부파일을 찾을 수 없습니다. id=" + attachmentId);
+        }
+        return a;
     }
 
     private String extension(String filename) {

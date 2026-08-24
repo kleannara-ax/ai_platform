@@ -185,15 +185,15 @@ public class ServiceRequestService {
                 .stream().map(IpHistoryResponse::from).toList();
 
         List<ProgramInstallResponse> programInstalls = programInstallRepository
-                .findByServiceRequest_RequestIdOrderByCreatedAtAsc(requestId)
+                .findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(requestId, "N")
                 .stream().map(ProgramInstallResponse::from).toList();
 
         List<InternetWorkResponse> internetWorks = internetWorkRepository
-                .findByServiceRequest_RequestIdOrderByCreatedAtAsc(requestId)
+                .findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(requestId, "N")
                 .stream().map(InternetWorkResponse::from).toList();
 
         List<AttachmentResponse> attachments = requestAttachmentRepository
-                .findByServiceRequest_RequestIdOrderByCreatedAtAsc(requestId)
+                .findByServiceRequest_RequestIdAndDeletedYnOrderByCreatedAtAsc(requestId, "N")
                 .stream().map(AttachmentResponse::from).toList();
 
         return ServiceRequestDetailResponse.of(request, logs, supplyIssues,

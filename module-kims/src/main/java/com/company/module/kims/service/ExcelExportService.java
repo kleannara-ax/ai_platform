@@ -1,5 +1,7 @@
 package com.company.module.kims.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.module.kims.dto.response.InternetWorkResponse;
 import com.company.module.kims.dto.response.IpHistoryResponse;
 import com.company.module.kims.dto.response.ProgramInstallResponse;
@@ -23,7 +25,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -72,7 +73,7 @@ public class ExcelExportService {
             autoSize(sheet, headers.length);
             return toByteArray(workbook);
         } catch (IOException e) {
-            throw new UncheckedIOException("업무요청 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "업무요청 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 
@@ -106,7 +107,7 @@ public class ExcelExportService {
             autoSize(sheet, headers.length);
             return toByteArray(workbook);
         } catch (IOException e) {
-            throw new UncheckedIOException("소모품지급 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "소모품지급 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 
@@ -144,7 +145,7 @@ public class ExcelExportService {
             autoSize(sheet, headers.length);
             return toByteArray(workbook);
         } catch (IOException e) {
-            throw new UncheckedIOException("IP목록 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "IP목록 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 
@@ -178,7 +179,7 @@ public class ExcelExportService {
             autoSize(sheet, headers.length);
             return toByteArray(workbook);
         } catch (IOException e) {
-            throw new UncheckedIOException("프로그램설치 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "프로그램설치 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 
@@ -220,7 +221,7 @@ public class ExcelExportService {
             autoSize(sheet, headers.length);
             return toByteArray(workbook);
         } catch (IOException e) {
-            throw new UncheckedIOException("인터넷공사 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "인터넷공사 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 
@@ -309,7 +310,7 @@ public class ExcelExportService {
 
             return toByteArray(wb);
         } catch (IOException e) {
-            throw new UncheckedIOException("월말결산 Excel 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "월말결산 Excel 생성 중 오류가 발생했습니다.");
         }
     }
 

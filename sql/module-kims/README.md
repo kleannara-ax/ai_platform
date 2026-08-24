@@ -7,7 +7,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | KIMS 테이블 12개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
+| 1 | `01_schema.sql` | KIMS 테이블 11개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
 | 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (KIMS_MGMT 그룹 + 페이지 6개) + 역할별 노출 권한 |
 | 3 | `03_perm_code.sql` | 공통코드 `KIMS_PERM` (KIMS 관리자 명단) |
 
@@ -28,11 +28,14 @@ mysql -u root --default-character-set=utf8mb4 {db} < 03_perm_code.sql
 1. `DROP DATABASE` / `CREATE DATABASE` 두 줄 삭제
 2. `USE \`kims\`;` → 플랫폼 DB 이름으로 변경
 
-## 테이블 (12개, 플랫폼 DB 공용)
+> KIMS 는 자체 사용자/로그인 테이블(`kims_user`)을 두지 않는다. 로그인·인증은 항상
+> 플랫폼 `core_user` 계정을 사용하며, 요청자/담당자 이름 등은 각 업무 테이블의
+> 문자열 컬럼(REQUESTER_NAME, ASSIGNEE 등)에 자유 입력으로 저장한다.
+
+## 테이블 (11개, 플랫폼 DB 공용)
 
 | 테이블 | 설명 |
 |--------|------|
-| `kims_user` | KIMS 사용자·부서 정보 (로그인은 플랫폼 계정으로 통일, 이 표는 담당자/요청자 데이터로 사용) |
 | `service_request` / `request_log` / `request_attachment` | 업무 요청과 처리 이력·첨부 |
 | `ip_address` / `ip_history` | PC(IP) 관리와 변경 이력 |
 | `inventory_item` / `inventory_transaction` | 소모품 재고와 입출고 |
@@ -41,26 +44,83 @@ mysql -u root --default-character-set=utf8mb4 {db} < 03_perm_code.sql
 | `supply_issue` | 소모품 지급 |
 | `qr_location` | QR 구역 |
 
+모든 테이블은 공통 감사(Audit) 컬럼을 갖는다: `CREATED_AT`/`CREATED_BY`/`UPDATED_AT`/`UPDATED_BY`/
+`DELETED_YN`/`DELETED_AT`/`DELETED_BY`. `CREATED_BY`/`UPDATED_BY`/`DELETED_BY` 는 core_user FK 가
+아니라 플랫폼 로그인 ID를 담는 문자열(varchar(50))이다.
+
+### 삭제 정책 (소프트 삭제)
+
+물리 `DELETE` 는 사용하지 않는다. 아래 4개 엔티티는 `delete()` 비즈니스 메서드로
+`DELETED_YN='Y'` 처리만 하며, 목록/검색 조회는 모두 `DELETED_YN='N'` 조건으로 걸러진다.
+
+- `RequestAttachment` (첨부파일 메타데이터, 실제 파일은 업로드 디렉토리에서 즉시 제거)
+- `InternetWork` (인터넷 공사)
+- `ProgramInstall` (프로그램 설치 내역)
+- `QrLocation` (QR 구역)
+
+그 외(`ServiceRequest`, `InventoryItem`, `IpAddress`, `SupplyIssue` 등)는 원래부터
+상태 전환(`changeStatus` 등)만으로 관리되고 별도 삭제 기능이 없어 대상이 아니다.
+`SupplyIssueService.reverseByRequest()` 의 `deleteAll` 은 "요청 취소/반려 시 지급을 원복"하는
+정정성 로직으로, 재고를 함께 되돌리는 보정 처리이며 향후 감사 요구가 생기면 소프트 삭제로
+전환을 검토할 수 있으나 현재는 표준 적용 범위에서 제외했다.
+
 ## 권한
 
 KIMS 관리자 명단은 **공통코드 그룹 `KIMS_PERM`** 에서 관리한다 (공통코드 관리 화면 → KIMS 관리자 → 코드 추가,
 `CODE` = 플랫폼 로그인 ID). 소방 `FIRE_PERM`, PS점검 `PS_INSP_AUTH` 과 같은 방식이다.
 
 판정은 [`KimsPermission`](../../module-kims/src/main/java/com/company/module/kims/support/KimsPermission.java) 이 하고,
-컨트롤러는 `@PreAuthorize` 로 이를 호출한다.
+컨트롤러는 `@PreAuthorize` 로 이를 호출한다. `code_group`/`code_detail` 을 JdbcTemplate 으로 직접 조회하는데,
+이는 `module-ps-insp` 가 읽기전용 JPA 엔티티로 같은 테이블에 접근하는 것과 동일한 기존 플랫폼 관례를 따른 것이다.
 
 | 대상 | 표현식 | 통과 조건 |
 |------|--------|-----------|
-| 관리자 전용 (13곳) | `@kimsPerm.isAdmin(authentication)` | KIMS_PERM 등록자 **또는** 플랫폼 `ROLE_ADMIN` |
-| 요청 처리·입력 (15곳) | `@kimsPerm.canWork(authentication)` | 위 관리자 **또는** 플랫폼 `ROLE_MANAGER` |
+| 관리자 전용 | `@kimsPerm.isAdmin(authentication)` | KIMS_PERM 등록자 **또는** 플랫폼 `ROLE_ADMIN` |
+| 요청 처리·입력 | `@kimsPerm.canWork(authentication)` | 위 관리자 **또는** 플랫폼 `ROLE_MANAGER` |
 
 플랫폼 `ROLE_ADMIN` 을 항상 통과시키는 이유는 공통코드에서 실수로 전원을 지웠을 때 잠기지 않게 하기 위해서다.
 목록은 30초간 캐시되므로 공통코드를 고친 뒤 최대 30초 후 반영된다.
 
-`kims_user.ROLE` 은 더 이상 권한 판정에 쓰이지 않는다(화면의 담당자 구분 표시용으로만 남아 있음).
-
 > 메뉴 노출은 여전히 역할 기반(`core_role_menu`: ROLE_ADMIN / ROLE_MANAGER)이다.
 > KIMS_PERM 에만 넣고 플랫폼 역할이 ROLE_USER 인 사람은 API 는 되지만 좌측 메뉴가 보이지 않는다.
+
+## core 에 추가가 필요한 부분 (향후 검토)
+
+신규 "업무 모듈 생성 표준"은 로그인 사용자 정보를
+`com.company.core.security.CurrentUserProvider` 로 조회하는 것을 가정하지만,
+**core 에는 현재 이 컴포넌트가 존재하지 않는다.** module-fire/module-ps-insp/module-dailyreport
+모두 각자 다른 방식(`SecurityContextHolder`, `Authentication` 파라미터,
+`@AuthenticationPrincipal`)으로 로그인 사용자를 얻고 있으며, KIMS 도 이번 리팩터링에서
+컨트롤러가 `Authentication` 을 직접 받아 `authentication.getName()` 을 로그인 ID로 사용하는
+기존 관례를 그대로 따랐다(예: 첨부파일 삭제자, 공사/설치/QR 삭제자 기록).
+
+추후 core 에 `CurrentUserProvider` (또는 동등한 공통 유틸)가 추가되면, 각 모듈의
+컨트롤러가 이를 통해 로그인 ID/사용자ID를 일관되게 조회하도록 맞추는 것을 권장한다.
+이번 리팩터링에서는 "현재 KIMS 프로젝트만 변경"이라는 범위 제약에 따라 core 는 수정하지 않았다.
+
+또한 `KimsSecurityConfig` (`@Order(-2)` SecurityFilterChain, `/kims/**` + `/qr-api/**` permitAll)는
+신규 표준상 "업무 모듈은 SecurityConfig 를 만들지 않는다" 규칙과 상충하지만, 이를 core 의
+`SecurityConfig` 로 옮기려면 core 수정이 필요하므로 이번 범위에서는 유지했다. 향후 다른 업무
+모듈에도 정적 페이지(직접 URL 접속)가 필요해지면, core 에 공통 패턴으로 흡수하는 방안을 검토한다.
+
+## 자체 검수 결과 (신규 표준 대비)
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| SpringBootApplication/application.yml 미생성 | ✅ 준수 | |
+| security 는 compileOnly 만 사용 | ✅ 준수 | core 가 `api` 로 런타임 제공 |
+| Entity Builder+정적팩토리+비즈니스 메서드 | ✅ 준수 | `@Setter`/`@Data` 미사용 |
+| 공통 감사컬럼(7종) | ✅ 준수 | 전 테이블에 적용 |
+| 소프트 삭제(물리 DELETE 금지) | ✅ 준수 | 삭제 기능이 있는 4개 엔티티 전환 완료 |
+| Controller `/kims-api/**` + `ApiResponse` 응답 | ✅ 준수 | 기존부터 준수 |
+| BusinessException/EntityNotFoundException 사용 | ✅ 준수 | IllegalArgumentException/UncheckedIOException 모두 전환 |
+| core_user 등 core 테이블 FK 금지 | ✅ 준수 | createdBy 등은 문자열 로그인ID |
+| 자체 사용자 테이블(kims_user) 생성 금지 | ✅ 준수 | 이번 리팩터링에서 제거 |
+| CREATE TABLE IF NOT EXISTS / INSERT IGNORE 등 | ✅ 준수 | |
+| 메뉴/권한 core 테이블 임의 INSERT 금지 | △ 부분 | `KIMS_PERM` 공통코드 그룹만 등록(권한 관리용, 메뉴 아님). 메뉴는 `02_menu.sql` 이 기존부터 등록해왔음(리팩터링 범위 밖) |
+| SecurityConfig 미생성 | △ 예외 유지 | `KimsSecurityConfig` — 위 "core 에 추가가 필요한 부분" 참고 |
+| CurrentUserProvider 사용 | △ 미사용 | core 에 해당 컴포넌트 없음. `Authentication` 파라미터로 대체(기존 플랫폼 관례) |
+| code_group/code_detail 직접 조회 지양 | △ 유지 | `module-ps-insp` 선례와 동일한 기존 플랫폼 관례로 판단, 유지 |
 
 ## 마이그레이션 이력
 

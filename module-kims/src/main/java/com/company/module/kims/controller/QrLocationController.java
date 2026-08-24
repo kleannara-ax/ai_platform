@@ -13,6 +13,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -84,8 +85,9 @@ public class QrLocationController {
     /** QR 구역 삭제 */
     @DeleteMapping("/{qrId}")
     @PreAuthorize("@kimsPerm.isAdmin(authentication)")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long qrId) {
-        qrLocationService.delete(qrId);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long qrId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        qrLocationService.delete(qrId, deletedBy);
         return ResponseEntity.ok(ApiResponse.success());
     }
 

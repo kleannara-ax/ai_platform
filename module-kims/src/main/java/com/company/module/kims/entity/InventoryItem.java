@@ -1,5 +1,7 @@
 package com.company.module.kims.entity;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -69,7 +71,8 @@ public class InventoryItem extends BaseTimeEntity {
      */
     public void increaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("입고 수량은 1 이상이어야 합니다. 입력값=" + quantity);
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "입고 수량은 1 이상이어야 합니다. 입력값=" + quantity);
         }
         this.currentStock += quantity;
     }
@@ -79,14 +82,15 @@ public class InventoryItem extends BaseTimeEntity {
      * <p>현재 재고보다 많은 수량을 차감하려 하면 예외가 발생한다.
      *
      * @param quantity 차감할 수량 (양수)
-     * @throws IllegalArgumentException 수량이 0 이하이거나 재고가 부족한 경우
+     * @throws BusinessException 수량이 0 이하이거나 재고가 부족한 경우
      */
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("지급 수량은 1 이상이어야 합니다. 입력값=" + quantity);
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "지급 수량은 1 이상이어야 합니다. 입력값=" + quantity);
         }
         if (quantity > this.currentStock) {
-            throw new IllegalArgumentException(
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "재고가 부족합니다. 품목=" + this.itemName
                             + ", 현재고=" + this.currentStock + ", 요청수량=" + quantity);
         }

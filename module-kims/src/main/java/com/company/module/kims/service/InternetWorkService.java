@@ -88,8 +88,8 @@ public class InternetWorkService {
     }
 
     @Transactional
-    public void delete(Long workId) {
-        internetWorkRepository.delete(findWork(workId));
+    public void delete(Long workId, String deletedBy) {
+        findWork(workId).delete(deletedBy);
     }
 
     public byte[] exportExcel(String keyword, InternetWorkType workType, InternetWorkStatus status,
@@ -102,8 +102,12 @@ public class InternetWorkService {
 
     // ----------------------------------------------------------------
     private InternetWork findWork(Long workId) {
-        return internetWorkRepository.findById(workId)
+        InternetWork entity = internetWorkRepository.findById(workId)
                 .orElseThrow(() -> new EntityNotFoundException("인터넷 공사 내역을 찾을 수 없습니다. id=" + workId));
+        if (entity.isDeleted()) {
+            throw new EntityNotFoundException("인터넷 공사 내역을 찾을 수 없습니다. id=" + workId);
+        }
+        return entity;
     }
 
     private ServiceRequest findRequestOrNull(Long requestId) {

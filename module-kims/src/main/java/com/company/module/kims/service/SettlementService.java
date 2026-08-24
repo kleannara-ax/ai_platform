@@ -71,9 +71,9 @@ public class SettlementService {
                         .stream().map(IpHistoryResponse::from).toList())
                 .unapprovedIpChanges(ipHistoryRepository.findByApprovedFalseAndCreatedAtBetweenOrderByCreatedAtDesc(fromDt, toDt)
                         .stream().map(IpHistoryResponse::from).toList())
-                .programInstalls(programInstallRepository.findByInstalledAtBetweenOrderByInstalledAtDesc(f, t)
+                .programInstalls(programInstallRepository.findByInstalledAtBetweenAndDeletedYnOrderByInstalledAtDesc(f, t, "N")
                         .stream().map(ProgramInstallResponse::from).toList())
-                .internetWorks(internetWorkRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(fromDt, toDt)
+                .internetWorks(internetWorkRepository.findByCreatedAtBetweenAndDeletedYnOrderByCreatedAtDesc(fromDt, toDt, "N")
                         .stream().map(InternetWorkResponse::from).toList())
                 .build();
     }

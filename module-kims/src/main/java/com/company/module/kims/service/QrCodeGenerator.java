@@ -1,5 +1,7 @@
 package com.company.module.kims.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
@@ -9,7 +11,6 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
-import java.io.UncheckedIOException;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -32,9 +33,9 @@ public class QrCodeGenerator {
                 return out.toByteArray();
             }
         } catch (java.io.IOException e) {
-            throw new UncheckedIOException("QR 이미지 생성 중 오류가 발생했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "QR 이미지 생성 중 오류가 발생했습니다.");
         } catch (Exception e) {
-            throw new IllegalStateException("QR 코드 생성에 실패했습니다.", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "QR 코드 생성에 실패했습니다.");
         }
     }
 }

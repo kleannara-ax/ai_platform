@@ -16,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -90,8 +91,9 @@ public class InternetWorkController {
     /** 공사 삭제 (관리자 전용) */
     @DeleteMapping("/{workId}")
     @PreAuthorize("@kimsPerm.isAdmin(authentication)")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long workId) {
-        internetWorkService.delete(workId);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long workId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        internetWorkService.delete(workId, deletedBy);
         return ResponseEntity.ok(ApiResponse.success());
     }
 

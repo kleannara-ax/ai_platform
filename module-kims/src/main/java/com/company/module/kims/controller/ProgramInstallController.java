@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -78,8 +79,9 @@ public class ProgramInstallController {
     /** 설치 내역 삭제 (관리자 전용) */
     @DeleteMapping("/{installId}")
     @PreAuthorize("@kimsPerm.isAdmin(authentication)")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long installId) {
-        programInstallService.delete(installId);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long installId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        programInstallService.delete(installId, deletedBy);
         return ResponseEntity.ok(ApiResponse.success());
     }
 

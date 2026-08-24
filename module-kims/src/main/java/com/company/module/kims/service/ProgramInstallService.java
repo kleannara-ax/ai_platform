@@ -88,9 +88,8 @@ public class ProgramInstallService {
     // 삭제
     // ================================================================
     @Transactional
-    public void delete(Long installId) {
-        ProgramInstall entity = findInstall(installId);
-        programInstallRepository.delete(entity);
+    public void delete(Long installId, String deletedBy) {
+        findInstall(installId).delete(deletedBy);
     }
 
     // ================================================================
@@ -110,8 +109,12 @@ public class ProgramInstallService {
     // ----------------------------------------------------------------
 
     private ProgramInstall findInstall(Long installId) {
-        return programInstallRepository.findById(installId)
+        ProgramInstall entity = programInstallRepository.findById(installId)
                 .orElseThrow(() -> new EntityNotFoundException("설치 내역을 찾을 수 없습니다. id=" + installId));
+        if (entity.isDeleted()) {
+            throw new EntityNotFoundException("설치 내역을 찾을 수 없습니다. id=" + installId);
+        }
+        return entity;
     }
 
     private ServiceRequest findRequestOrNull(Long requestId) {

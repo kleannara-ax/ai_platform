@@ -70,4 +70,9 @@ public class QrLocation extends BaseTimeEntity {
         this.active = active;
         this.remark = remark;
     }
+
+    /** 소프트 삭제. 물리 DELETE 대신 DELETED_YN='Y' 로만 처리한다. */
+    public void delete(String deletedBy) {
+        markDeleted(deletedBy);
+    }
 }

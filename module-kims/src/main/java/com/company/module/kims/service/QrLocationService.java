@@ -61,7 +61,7 @@ public class QrLocationService {
 
     /** 토큰으로 구역 정보 조회 (공개 페이지용, 비활성 구역은 예외) */
     public QrLocationResponse getByToken(String token) {
-        QrLocation qr = qrLocationRepository.findByToken(token)
+        QrLocation qr = qrLocationRepository.findByTokenAndDeletedYn(token, "N")
                 .orElseThrow(() -> new EntityNotFoundException("유효하지 않은 QR 입니다."));
         if (!qr.isActive()) {
             throw new EntityNotFoundException("비활성화된 QR 입니다.");
@@ -77,8 +77,8 @@ public class QrLocationService {
     }
 
     @Transactional
-    public void delete(Long qrId) {
-        qrLocationRepository.delete(findQr(qrId));
+    public void delete(Long qrId, String deletedBy) {
+        findQr(qrId).delete(deletedBy);
     }
 
     /**
@@ -98,8 +98,12 @@ public class QrLocationService {
     }
 
     private QrLocation findQr(Long qrId) {
-        return qrLocationRepository.findById(qrId)
+        QrLocation qr = qrLocationRepository.findById(qrId)
                 .orElseThrow(() -> new EntityNotFoundException("QR 구역을 찾을 수 없습니다. id=" + qrId));
+        if (qr.isDeleted()) {
+            throw new EntityNotFoundException("QR 구역을 찾을 수 없습니다. id=" + qrId);
+        }
+        return qr;
     }
 
     private String emptyToNull(String v) {

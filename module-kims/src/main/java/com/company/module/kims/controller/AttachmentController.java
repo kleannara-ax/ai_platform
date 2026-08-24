@@ -68,8 +68,9 @@ public class AttachmentController {
     /** 첨부파일 삭제 (관리자/담당자) */
     @DeleteMapping("/kims-api/attachments/{attachmentId}")
     @PreAuthorize("@kimsPerm.canWork(authentication)")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long attachmentId) {
-        attachmentService.delete(attachmentId);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long attachmentId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        attachmentService.delete(attachmentId, deletedBy);
         return ResponseEntity.ok(ApiResponse.success());
     }
 }
