@@ -18,6 +18,9 @@
     #pane-histmgmt table th, #pane-histmgmt table td { white-space: nowrap; }
     /* 비고는 너무 길어질 수 있어 폭 제한 + 말줄임 유지 */
     #pane-list table td.remark-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+    /* 표 상단 보조 스크롤바 (표가 넓어 하단 스크롤바까지 내려가야 하는 불편함 해소) */
+    .table-top-scroll { overflow-x: auto; overflow-y: hidden; height: 14px; }
+    .table-top-scroll > div { height: 1px; }
     /* 사용 흐름 플로우차트 */
     .flow-node { border: 1px solid #0d6efd; border-radius: 8px; padding: 4px 10px; background: #f0f6ff;
                  text-align: center; white-space: nowrap; min-width: 90px; }
@@ -75,7 +78,8 @@
             <button class="btn btn-light btn-sm" onclick="resetFilter()">초기화</button></div>
         </div>
       </div></div>
-      <div class="table-responsive">
+      <div class="table-top-scroll" id="list-top-scroll"><div id="list-top-scroll-inner">&nbsp;</div></div>
+      <div class="table-responsive" id="list-table-scroll">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
             <th>IP그룹</th><th>IP주소</th><th>상태</th><th>상주/임시</th><th>부서</th><th>장치구분</th><th>사용자</th><th>렌탈사</th><th>PC자산번호</th><th>모니터자산번호</th>
@@ -320,7 +324,33 @@
       // 기본 탭 = 홈(대시보드 + 신규요청)
       utilLoaded = true; loadUtil(); loadIpRequests();
       loadGroups();
+      setupTopScroll();
     });
+
+    // ---- PC 목록 표 상단 보조 스크롤바 (하단 스크롤바와 상호 동기화) ----
+    function setupTopScroll() {
+      const top = document.getElementById('list-top-scroll');
+      const topInner = document.getElementById('list-top-scroll-inner');
+      const bottom = document.getElementById('list-table-scroll');
+      if (!top || !bottom) return;
+      let syncing = false;
+      const syncWidth = () => {
+        const table = bottom.querySelector('table');
+        if (table) topInner.style.width = table.scrollWidth + 'px';
+      };
+      top.addEventListener('scroll', () => {
+        if (syncing) return; syncing = true;
+        bottom.scrollLeft = top.scrollLeft; syncing = false;
+      });
+      bottom.addEventListener('scroll', () => {
+        if (syncing) return; syncing = true;
+        top.scrollLeft = bottom.scrollLeft; syncing = false;
+      });
+      syncWidth();
+      window.addEventListener('resize', syncWidth);
+      // 표 내용(행)이 갱신될 때마다 폭 재계산
+      new MutationObserver(syncWidth).observe(document.getElementById('rows'), { childList: true });
+    }
 
     // IP그룹 분류 드롭다운 채우기 (별도관리는 전용 탭이 있으므로 제외)
     async function loadGroups() {
