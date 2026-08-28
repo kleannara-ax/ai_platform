@@ -50,4 +50,7 @@ public class IpCreateRequest {
 
     @NotBlank(message = "등록자는 필수입니다.")
     private String changedBy;
+
+    /** 사업장 구분 (CHEONGJU/SEOUL). 미지정 시 청주공장(CHEONGJU)으로 등록된다(기존 기능 유지). */
+    private String site;
 }
