@@ -176,13 +176,20 @@
     <div class="modal-body" id="histBody"></div>
   </div></div></div>
 
+  <!-- 업무요청 상세 모달 (신규 지급 요청 "처리" 버튼에서 바로 열림 — request.html 이동 없이 처리) -->
+  <div class="modal fade" id="reqDetailModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="reqDetailTitle">요청 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="reqDetailBody"></div>
+  </div></div></div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="js/kims.js"></script>
   <script>
     if (!KIMS.requireAuth()) { } else { KIMS.renderNav('inventory.html'); }
     const E = KIMS.escapeHtml;
-    let itemModal, inboundModal, issueModal, histModal;
+    let itemModal, inboundModal, issueModal, histModal, reqDetailModal;
+    let reqDetailId = null, reqDetailCur = null;
     let catCharts = [];
     // 분류 순서 / 색상
     const CAT_ORDER = ['PC소모품', 'PC', '케이블', '기타 소모품', '태블릿'];
@@ -206,6 +213,7 @@
       inboundModal = new bootstrap.Modal('#inboundModal');
       issueModal = new bootstrap.Modal('#issueModal');
       histModal = new bootstrap.Modal('#histModal');
+      reqDetailModal = new bootstrap.Modal('#reqDetailModal');
       showTab('dash');
     });
 
@@ -320,7 +328,7 @@
             <td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
             <td class="text-truncate" style="max-width:380px">${E(r.contentSummary)}</td>
             <td>${dateOnly((r.createdAt || '').replace('T', ' '))}</td>
-            <td><a class="btn btn-outline-primary btn-sm py-0" href="request.html?open=${r.requestId}">처리</a></td>
+            <td><button class="btn btn-outline-primary btn-sm py-0" onclick="openReqDetail(${r.requestId})">처리</button></td>
           </tr>`).join('')
           : '<tr><td colspan="6" class="text-center text-muted">신규 지급 요청이 없습니다. 👍</td></tr>';
       } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
@@ -555,7 +563,7 @@
             <td><span class="badge ${RH_SB[r.status]||'bg-secondary'}">${E(r.statusLabel)}</span></td>
             <td>${E(r.assignee)}</td>
             <td>${itemsTxt}</td>
-            <td><a class="btn btn-outline-secondary btn-sm py-0" href="request.html?open=${r.requestId}">상세</a></td>
+            <td><button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${r.requestId})">상세</button></td>
           </tr>`;
         }).join('') : '<tr><td colspan="8" class="text-center text-muted">해당 조건의 소모품 요청이 없습니다.</td></tr>';
         renderReqHistPager(reqData);
@@ -567,6 +575,177 @@
       pg.innerHTML = `<button class="btn btn-sm btn-outline-secondary" ${cur<=0?'disabled':''} onclick="rhPage=${cur-1};loadReqHist()">이전</button>
         <span class="align-self-center small">${total===0?0:cur+1} / ${total} (총 ${d.totalElements}건)</span>
         <button class="btn btn-sm btn-outline-secondary" ${cur>=total-1?'disabled':''} onclick="rhPage=${cur+1};loadReqHist()">다음</button>`;
+    }
+
+    // ================= 업무요청 상세 모달 (request.html 이동 없이 인벤토리 페이지 내에서 처리) =================
+    const REQ_STATUS_CHOICES = { RECEIVED:'접수', COMPLETED:'완료', ON_HOLD:'보류', REJECTED:'반려', CANCELED:'취소' };
+
+    function reqBadge(s, label) {
+      return `<span class="badge ${RH_SB[s]||'bg-secondary'}">${E(label||RH_STATUS[s]||s)}</span>`;
+    }
+    function reqSec(title, head, rows) {
+      return `<h6 class="mt-3">${title}</h6><table class="table table-sm table-bordered"><thead class="table-light"><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    function reqFormatSize(b) {
+      if (b == null) return '';
+      if (b < 1024) return b + 'B';
+      if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+      return (b/1048576).toFixed(1) + 'MB';
+    }
+    async function reqDlAttach(id, name) {
+      try { await KIMS.download('/kims-api/attachments/' + id + '/download', name); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function reqUploadAttach() {
+      const inp = document.getElementById('rd-attfile');
+      if (!inp.files.length) { KIMS.toast('파일을 선택하세요.', false); return; }
+      try { for (const f of inp.files) { await KIMS.uploadFile('/kims-api/requests/' + reqDetailId + '/attachments', f); } KIMS.toast('첨부되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function reqDelAttach(id) {
+      if (!confirm('이 첨부파일을 삭제할까요?')) return;
+      try { await KIMS.api('/kims-api/attachments/' + id, { method:'DELETE' }); KIMS.toast('삭제되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function populateReqDetailItems() {
+      try {
+        const data = await KIMS.api('/kims-api/inventory-items?size=200');
+        const sel = document.getElementById('rd-item');
+        if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
+          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.currentStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+      } catch (e) { /* 무시 */ }
+    }
+
+    async function issueSupplyFromDetail() {
+      const sel = document.getElementById('rd-item');
+      const itemId = sel.value;
+      const qty = Number(document.getElementById('rd-qty').value);
+      const receiver = document.getElementById('rd-receiver').value.trim();
+      if (!itemId) { KIMS.toast('지급할 품목을 선택하세요.', false); return; }
+      if (!qty || qty < 1) { KIMS.toast('수량을 1 이상 입력하세요.', false); return; }
+      if (!receiver) { KIMS.toast('지급 대상자를 입력하세요.', false); return; }
+      const opt = sel.options[sel.selectedIndex];
+      const stock = Number(opt.dataset.stock || 0);
+      if (qty > stock) {
+        const unit = opt.dataset.unit || '';
+        KIMS.alertModal('⚠ 재고 부족',
+          `<b>${E(opt.dataset.name||'')}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
+          `<table class="table table-sm mb-0"><tbody>` +
+          `<tr><td>현재 재고</td><td class="text-end fw-bold">${stock} ${E(unit)}</td></tr>` +
+          `<tr><td>요청 수량</td><td class="text-end fw-bold">${qty} ${E(unit)}</td></tr>` +
+          `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${qty - stock} ${E(unit)}</td></tr>` +
+          `</tbody></table>`);
+        return;
+      }
+      const payload = { requestId: reqDetailId, itemId: Number(itemId), quantity: qty,
+        receiverName: receiver, department: (reqDetailCur && reqDetailCur.department) || '',
+        issuedBy: KIMS.getUser() || 'admin' };
+      try {
+        await KIMS.api('/kims-api/supply-issues', { method:'POST', body:payload });
+        KIMS.toast('소모품이 지급되었습니다. (재고 차감 + 지급내역 기록)');
+        openReqDetail(reqDetailId);
+        refreshReqLists();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 재고 부족', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
+    }
+
+    async function changeReqDetailStatus() {
+      const status = document.getElementById('rd-status').value;
+      const payload = { status, changedBy: KIMS.getUser()||'admin',
+        assignee: document.getElementById('rd-assignee').value.trim(), reason: document.getElementById('rd-reason').value.trim() };
+      try { await KIMS.api('/kims-api/requests/' + reqDetailId + '/status', { method:'PATCH', body:payload }); KIMS.toast('상태가 변경되었습니다.'); openReqDetail(reqDetailId); refreshReqLists(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function addReqDetailNote() {
+      const content = document.getElementById('rd-note').value.trim();
+      if (!content) { KIMS.toast('처리내용을 입력하세요.', false); return; }
+      try { await KIMS.api('/kims-api/requests/' + reqDetailId + '/logs', { method:'POST', body:{ changedBy: KIMS.getUser()||'admin', content } }); KIMS.toast('추가되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 현재 화면(대시보드 신규 지급 요청 / 이력 탭 / 재고 차트)을 최신 상태로 새로고침
+    function refreshReqLists() {
+      loadSupplyRequests();
+      loadStockChart();
+      const reqhistPane = document.getElementById('pane-reqhist');
+      if (reqhistPane && reqhistPane.style.display !== 'none') loadReqHist();
+    }
+
+    async function openReqDetail(id) {
+      reqDetailId = id;
+      try {
+        const d = await KIMS.api('/kims-api/requests/' + id);
+        reqDetailCur = d;
+        document.getElementById('reqDetailTitle').textContent = '요청 상세 - ' + d.requestNo;
+        const choices = Object.assign({}, REQ_STATUS_CHOICES);
+        if (!choices[d.status]) choices[d.status] = RH_STATUS[d.status] || d.status;
+        const statusSel = Object.entries(choices).map(([k,v]) => `<option value="${k}" ${k===d.status?'selected':''}>${v}</option>`).join('');
+        const memoList = (d.logs||[]).filter(l => l.logType === 'PROCESS_NOTE').map(l =>
+          `<div class="border-bottom py-1">${E(l.content||'')} <span class="text-muted small">— ${E(l.changedBy)}, ${(l.createdAt||'').substring(0,16).replace('T',' ')}</span></div>`
+        ).join('') || '<span class="text-muted">등록된 메모 없음</span>';
+        const info = `
+          <div class="row">
+            <div class="col-md-7">
+              <table class="table table-sm">
+                <tr><th width="110">요청번호</th><td>${E(d.requestNo)}</td><th width="90">상태</th><td>${reqBadge(d.status,d.statusLabel)}</td></tr>
+                <tr><th>요청자</th><td>${E(d.requesterName)}</td><th>부서</th><td>${E(d.department)}</td></tr>
+                <tr><th>연락처</th><td>${E(d.contact)}</td><th>위치</th><td>${E(d.location)}</td></tr>
+                <tr><th>유형</th><td>${E(d.requestTypeLabel)}</td><th>긴급</th><td>${d.urgent?'<span class="text-danger">긴급</span>':'일반'}</td></tr>
+                <tr><th>접수채널</th><td>${E(d.receivedChannelLabel)}</td><th>담당자</th><td>${E(d.assignee)}</td></tr>
+                <tr><th>완료일</th><td colspan="3">${E(d.completedAt)}</td></tr>
+                <tr><th>요청내용</th><td colspan="3" style="white-space:pre-wrap">${E(d.content)}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-5">
+              <div class="card bg-light"><div class="card-body py-2">
+                <h6>처리상태 변경</h6>
+                <div class="row g-1">
+                  <div class="col"><select id="rd-status" class="form-select form-select-sm">${statusSel}</select></div>
+                  <div class="col"><input id="rd-assignee" class="form-control form-control-sm" placeholder="담당자" value="${E(d.assignee||'')}"></div>
+                </div>
+                <input id="rd-reason" class="form-control form-control-sm mt-1" placeholder="변경 사유">
+                <button class="btn btn-primary btn-sm mt-1 w-100" onclick="changeReqDetailStatus()">상태 변경</button>
+                <hr class="my-2">
+                <h6>처리내용 메모</h6>
+                <div class="border rounded bg-white p-1 mb-1 small" style="max-height:140px;overflow:auto">${memoList}</div>
+                <input id="rd-note" class="form-control form-control-sm" placeholder="처리내용 메모 입력">
+                <button class="btn btn-outline-primary btn-sm mt-1 w-100" onclick="addReqDetailNote()">메모 추가</button>
+                <hr class="my-2">
+                <h6>소모품 지급 처리 <small class="text-muted">(재고 차감)</small></h6>
+                <div class="row g-1">
+                  <div class="col"><select id="rd-item" class="form-select form-select-sm"><option value="">품목 불러오는 중...</option></select></div>
+                  <div class="col-4"><input id="rd-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
+                </div>
+                <input id="rd-receiver" class="form-control form-control-sm mt-1" placeholder="지급 대상자" value="${E(d.requesterName||'')}">
+                <button class="btn btn-success btn-sm mt-1 w-100" onclick="issueSupplyFromDetail()">이 요청으로 소모품 지급</button>
+              </div></div>
+            </div>
+          </div>`;
+        const logRows = (d.logs||[]).map(l => `<tr><td>${(l.createdAt||'').substring(0,19).replace('T',' ')}</td><td>${E(l.logTypeLabel)}</td>
+          <td>${l.beforeStatus?E(RH_STATUS[l.beforeStatus]):''}${l.afterStatus?' → '+E(RH_STATUS[l.afterStatus]):''}</td>
+          <td>${E(l.content||l.reason||'')}</td><td>${E(l.changedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const supplyRows = (d.supplyIssues||[]).map(s => `<tr><td>${E(s.issuedAt)}</td><td>${E(s.itemName)}</td><td>${s.quantity}</td><td>${E(s.receiverName)}</td><td>${E(s.issuedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const attRows = (d.attachments||[]).map(a => `<tr>
+          <td><a href="#" onclick="reqDlAttach(${a.attachmentId},'${E(a.originalName)}');return false;">${E(a.originalName)}</a></td>
+          <td>${reqFormatSize(a.fileSize)}</td><td>${E(a.uploadedBy)}</td><td>${(a.createdAt||'').substring(0,16).replace('T',' ')}</td>
+          <td><button class="btn btn-outline-danger btn-sm py-0" onclick="reqDelAttach(${a.attachmentId})">삭제</button></td>
+        </tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const attUpload = `<div class="input-group input-group-sm mt-1" style="max-width:480px">
+          <input type="file" id="rd-attfile" class="form-control"><button class="btn btn-outline-primary" onclick="reqUploadAttach()">첨부 추가</button></div>`;
+
+        document.getElementById('reqDetailBody').innerHTML = info
+          + reqSec('처리 이력 로그', '<th>일시</th><th>유형</th><th>상태변화</th><th>내용</th><th>처리자</th>', logRows)
+          + reqSec('관련 소모품 지급', '<th>지급일</th><th>품목</th><th>수량</th><th>대상자</th><th>담당자</th>', supplyRows)
+          + '<h6 class="mt-3">첨부파일</h6>'
+          + `<table class="table table-sm table-bordered"><thead class="table-light"><tr><th>파일명</th><th>크기</th><th>등록자</th><th>등록일시</th><th>관리</th></tr></thead><tbody>${attRows}</tbody></table>` + attUpload;
+
+        reqDetailModal.show();
+        populateReqDetailItems();
+      } catch (e) { KIMS.toast(e.message, false); }
     }
   </script>
 </body>
