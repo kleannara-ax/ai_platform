@@ -119,12 +119,26 @@
 12. 수신기/소방펌프 점검 내역의 `엑셀 다운로드`를 누르면 조회 기간 내 이력이 XLSX로 저장됩니다. 전원/스위치 등 점검 결과는 항목별 컬럼으로 분리되고, 비고에는 실제 점검 비고만 표시되며 등록된 점검사진은 사진 컬럼에 첨부됩니다.
 13. 등록/수정 화면에서 도면을 클릭해 X/Y 좌표를 선택할 수 있습니다. 에어컨도 실내기 위치만 지정하며, 실외기는 좌표 연결 없이 대수만 입력합니다.
 
+## module-safety: 안전 작업방식 매뉴얼
+- **목적**: 안전 작업방식 매뉴얼(원본 엑셀: 시트 1개 = 매뉴얼 1개)을 분류 트리로 정리해 조회/등록/엑셀 일괄업로드하는 신규 업무 모듈입니다.
+- **화면**: `설비관리시스템` 사이드바 하단에 `안전작업방식 매뉴얼` 그룹 메뉴로 노출됩니다(플랫폼 SPA가 `/safety/`로 시작하는 메뉴 URL을 iframe으로 로드).
+  - `/safety/index.html` — 분류 트리 + 매뉴얼 목록/상세(원본 엑셀 레이아웃과 동일한 공정순서/위험요인/안전보호구/비고 테이블 + 단계별 사진)
+  - `/safety/upload.html` — 엑셀 일괄업로드 전용 화면(관리자 전용)
+- **API**: `/safety-api/**` (분류/매뉴얼/단계/사진 CRUD + 엑셀 업로드). 상세 endpoint 목록은 `sql/module-safety/README.md` 참고.
+- **엑셀 일괄업로드는 2단계**:
+  1. 형식 확인(미리보기, DB 미반영) → 시트별 인식 여부/제목/단계 수/사진 수를 보여줌. `공정단계` 헤더를 가진 개요/범례 시트(예: 초지)는 자동으로 업로드 대상에서 제외됩니다.
+  2. 확정 업로드 → 분류를 지정하고 원하는 시트만 선택해 실제 매뉴얼로 저장(단계+사진 포함).
+- **권한**: 조회는 로그인 사용자 누구나, 등록/수정/삭제/업로드는 관리자만 가능합니다. 관리자 판정은 플랫폼 `ROLE_ADMIN` 또는 공통코드 `SAFETY_PERM` 등록자입니다.
+- **데이터**: `safety_manual_category`(분류, 자기참조 트리) / `safety_manual`(매뉴얼) / `safety_manual_step`(단계) / `safety_manual_step_photo`(사진, 메타데이터만 DB에 저장하고 실제 파일은 `safety.upload-dir` 디스크 경로에 저장).
+- **SQL**: `sql/module-safety/01_schema.sql` → `02_menu.sql` → `03_perm_code.sql` → `04_data.sql` 순서로 실행. **반드시 `mysql --default-character-set=utf8mb4` 옵션을 붙여 실행할 것**(누락 시 한글 mojibake 발생 — 자세한 내용은 `sql/module-safety/README.md` 참고).
+
 ## Deployment / Runtime
 - **Runtime**: Spring Boot 3.2.5 + Java 21
 - **Build**: `./gradlew :app:bootJar`
 - **Process Manager**: PM2 (`platform`)
 - **Start script**: `/home/user/webapp/start-app.sh`
-- **Last Updated**: 2026-07-14
+- **DB 접속 시 반드시 `--default-character-set=utf8mb4` 사용**: `mysql` 클라이언트 기본 캐릭터셋이 `latin1`이라 이 옵션 없이 SQL을 실행하면 한글이 깨진 채(mojibake) 저장됩니다.
+- **Last Updated**: 2026-09-01 (module-safety 추가)
 
 ## Current Status
 - 기타설비 도메인/API/화면 기본 구현 완료
