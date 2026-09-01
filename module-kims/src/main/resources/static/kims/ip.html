@@ -30,8 +30,15 @@
 <body class="bg-light">
   <div id="nav"></div>
   <div class="container-fluid px-4">
-    <h4 class="mb-2">PC 관리 <span id="site-badge" class="badge align-middle" style="font-size:.6em;vertical-align:middle"></span></h4>
+    <h4 class="mb-2 d-flex align-items-center gap-2">
+      PC 관리 <span id="site-badge" class="badge align-middle" style="font-size:.6em;vertical-align:middle"></span>
+      <span class="btn-group btn-group-sm ms-2" role="group" aria-label="사업장 선택">
+        <a id="site-tab-청주" href="ip.html?site=청주" class="btn btn-outline-secondary">청주공장</a>
+        <a id="site-tab-서울" href="ip.html?site=서울" class="btn btn-outline-secondary">서울</a>
+      </span>
+    </h4>
     <div id="msg" class="alert d-none" role="alert"></div>
+
 
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><button class="nav-link active" id="tab-dash" onclick="showTab('dash')">홈</button></li>
@@ -328,6 +335,13 @@
       changeModal = new bootstrap.Modal('#changeModal');
       const sb = document.getElementById('site-badge');
       if (sb) { sb.textContent = SITE; sb.classList.add(SITE === '서울' ? 'bg-danger' : 'bg-success'); }
+      // 사업장 전환 탭(청주공장/서울) 활성 표시 — 플랫폼 iframe 안에서도 항상 노출되는 페이지 내부 탭
+      ['청주', '서울'].forEach(s => {
+        const el = document.getElementById('site-tab-' + s);
+        if (!el) return;
+        if (s === SITE) { el.classList.add('active', 'btn-primary'); el.classList.remove('btn-outline-secondary'); }
+        else { el.classList.remove('active', 'btn-primary'); el.classList.add('btn-outline-secondary'); }
+      });
       // 서울 등 비-청주 사업장은 설비 대역이 없으므로 토글 숨김 (사용자 대역만)
       if (SITE !== '청주') {
         document.getElementById('scope-fac')?.classList.add('d-none');
