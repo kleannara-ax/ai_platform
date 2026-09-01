@@ -33,7 +33,7 @@
     <h4 class="mb-2 d-flex align-items-center gap-2">
       PC 관리 <span id="site-badge" class="badge align-middle" style="font-size:.6em;vertical-align:middle"></span>
       <span class="btn-group btn-group-sm ms-2" role="group" aria-label="사업장 선택">
-        <a id="site-tab-청주" href="ip.html?site=청주" class="btn btn-outline-secondary">청주공장</a>
+        <a id="site-tab-청주" href="ip.html?site=청주" class="btn btn-outline-secondary">청주</a>
         <a id="site-tab-서울" href="ip.html?site=서울" class="btn btn-outline-secondary">서울</a>
       </span>
     </h4>
@@ -347,7 +347,7 @@
 
       const sb = document.getElementById('site-badge');
       if (sb) { sb.textContent = SITE; sb.classList.add(SITE === '서울' ? 'bg-danger' : 'bg-success'); }
-      // 사업장 전환 탭(청주공장/서울) 활성 표시 — 플랫폼 iframe 안에서도 항상 노출되는 페이지 내부 탭
+      // 사업장 전환 탭(청주/서울) 활성 표시 — 플랫폼 iframe 안에서도 항상 노출되는 페이지 내부 탭
       ['청주', '서울'].forEach(s => {
         const el = document.getElementById('site-tab-' + s);
         if (!el) return;
