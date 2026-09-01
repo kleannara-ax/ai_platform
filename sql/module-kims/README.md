@@ -5,19 +5,30 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 
 ## 실행 순서
 
+번호는 실행 순서 그대로다(건너뛰는 번호 없음). 모든 파일이 재실행해도 안전한 idempotent
+패턴(표는 `IF NOT EXISTS`, 컬럼/인덱스는 `INFORMATION_SCHEMA` 존재 체크 후 추가, 메뉴는 삭제 후
+재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 07번까지
+순서대로 전부 실행**하면 된다.
+
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | KIMS 테이블 11개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
+| 1 | `01_schema.sql` | KIMS 테이블 11개 (구조만, `SITE` 컬럼 포함). ddl-auto=none 이라 반드시 먼저 실행 |
 | 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (KIMS_MGMT 그룹 + 페이지 6개) + 역할별 노출 권한 |
 | 3 | `03_perm_code.sql` | 공통코드 `KIMS_PERM` (KIMS 관리자 명단) |
+| 4 | `04_data.sql` | 기존 운영 데이터 이관(대용량, 신규 설치 시에는 생략 가능) |
+| 5 | `05_pc_site_column.sql` | `ip_address.SITE` 컬럼/인덱스 보강 — 01_schema.sql 에 이미 반영된 신규 설치 DB에서는 실행해도 아무 변화 없음(idempotent). 01_schema.sql 을 갱신하기 전에 만들어진 기존 배포 DB에만 실질적인 효과가 있음 |
+| 6 | `06_seoul_perm_code.sql` | 공통코드 `KIMS_PERM_SEOUL` ("KIMS 서울", PC 관리 서울 전용 접근 그룹) 생성 |
+| 7 | `07_seoul_ip_band_backfill.sql` | 서울 IP 대역(192.1.17/104/107/117.x) 기존 데이터 `SITE` 보정 |
 
 ```bash
 mysql -u root --default-character-set=utf8mb4 {db} < 01_schema.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 02_menu.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 03_perm_code.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 04_data.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 05_pc_site_column.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 06_seoul_perm_code.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 07_seoul_ip_band_backfill.sql
 ```
-
-세 파일 모두 재실행해도 안전하다(표는 IF NOT EXISTS, 메뉴는 삭제 후 재삽입, 명단은 없을 때만 추가).
 
 ### 기존 KIMS 데이터를 함께 옮길 때
 
@@ -106,7 +117,7 @@ KIMS 관리자(KIMS_PERM)·플랫폼 `ROLE_MANAGER` 는 이 제한과 무관하�
 대시보드 "대역 사용 현황"(`getUtilization`)도 site=서울 조회 시 이 4개 고정 대역을 표시한다(청주의
 `USER_GROUPS`/`FACILITY_GROUPS` 와 동일한 고정 리스트 방식).
 
-과거에 이 대역으로 등록된 기존 데이터를 서울로 보정해야 한다면 `32_seoul_ip_band_backfill.sql`
+과거에 이 대역으로 등록된 기존 데이터를 서울로 보정해야 한다면 `07_seoul_ip_band_backfill.sql`
 (idempotent, `SITE <> '서울'` AND IP LIKE 해당 대역인 행만 UPDATE)을 실행한다.
 
 ## core 에 추가가 필요한 부분 (향후 검토)
@@ -149,21 +160,22 @@ KIMS 관리자(KIMS_PERM)·플랫폼 `ROLE_MANAGER` 는 이 제한과 무관하�
 
 ## 마이그레이션 이력
 
-KIMS 단독 프로젝트 시절의 마이그레이션 SQL(01~29)은 이 폴더에서 뺐다.
+KIMS 단독 프로젝트 시절의 마이그레이션 SQL(구 01~29번)은 이 폴더에서 뺐다.
 현재 스키마가 `01_schema.sql` 에 이미 반영돼 있어 실행할 필요가 없고,
 일부는 `DROP` 이나 데이터 재구축이라 운영 DB 에서 잘못 실행하면 위험하기 때문이다.
 이력이 필요하면 `Kims/KIMS Ver 0.3.zip` 안의 `KIMS/sql/module-kims/` 를 참고한다.
 
-### 30번 이후 (신규 설치 이후 스키마 변경분)
+### 05번 이후 (신규 설치 기준 스키마 확정 이후 변경분)
 
-`01_schema.sql` 은 신규 설치 기준 스키마이므로 이후 변경분은 `module-fire`
-(`V8`,`V9`,`V32`~`V39`)와 같은 방식으로 버전드 마이그레이션 파일을 이 폴더에 남긴다.
-이미 배포되어 데이터가 쌓인 DB 는 `01_schema.sql` 을 재실행할 수 없으므로, 아래
-파일을 순서대로 실행해 스키마를 맞춘다(모두 `INFORMATION_SCHEMA` 존재 체크 후에만
-`ALTER`/`CREATE INDEX` 를 실행하는 idempotent 패턴이라 재실행해도 안전하다).
+`01_schema.sql` 은 신규 설치 기준 스키마이므로, 이 파일이 특정 시점 기준으로 확정된 뒤에
+생긴 변경분은 `module-fire`(`V8`,`V9`,`V32`~`V39`)와 같은 방식으로 버전드 마이그레이션
+파일을 이 폴더에 순서대로 남긴다(번호는 건너뛰지 않고 이어서 붙인다). 이미 배포되어
+데이터가 쌓인 DB 는 `01_schema.sql` 을 재실행할 수 없으므로, 아래 파일을 번호 순서대로
+실행해 스키마를 맞춘다(모두 `INFORMATION_SCHEMA` 존재 체크 후에만 `ALTER`/`CREATE INDEX`
+를 실행하는 idempotent 패턴이라, 이미 반영된 DB에서 재실행해도 안전하다).
 
 | 파일 | 설명 |
 |------|------|
-| `30_pc_site_column.sql` | PC 관리 사업장(SITE) 구분 도입 — 서울/청주 PC를 별도 관리하기 위해 `ip_address` 에 `SITE varchar(20) NOT NULL DEFAULT '청주'` 컬럼과 `IDX_IP_ADDRESS_SITE` 인덱스를 추가한다. 기존 전체 데이터는 모두 `'청주'`로 채워진다(현행 유지). 조회는 `site` 파라미터가 있으면 해당 사업장만, 없으면 전체(기존 동작 보존)로 동작한다. `01_schema.sql` 은 신규 설치 기준으로 이 컬럼/인덱스를 이미 포함하므로, 신규 설치 시에는 이 파일을 실행할 필요가 없다 — 기존에 배포된 DB 에만 적용한다. |
-| `31_seoul_perm_code.sql` | PC 관리 "KIMS 서울" 권한 그룹 도입 — 공통코드 그룹 `KIMS_PERM_SEOUL`("KIMS 서울") 을 생성한다. 이 그룹에 등록된 로그인 ID는 PC 관리에서 서울 데이터만 조회·수정 가능하고 청주는 차단된다(다른 KIMS 기능은 영향 없음). `KIMS_PERM`(관리자)과 달리 초기 멤버를 자동 부트스트랩하지 않으며, 관리자가 공통코드 관리 화면에서 직접 등록한다. 신규 설치·기존 배포 DB 모두 이 파일을 실행해야 한다(스키마 변경이 아니라 코드 그룹 데이터이므로 `01_schema.sql` 에는 포함되지 않음). |
-| `32_seoul_ip_band_backfill.sql` | PC 관리 "서울" 사업장 IP 대역 확정 — 서울 사업장 IP 대역을 `192.1.17`/`192.1.104`/`192.1.107`/`192.1.117`(각 `.1~.254`)로 정의하고, 이 대역에 해당하는 기존 등록 IP(기본값 '청주')의 `SITE` 를 '서울'로 백필한다. 애플리케이션 코드(`IpAddressService.isSeoulBandIp`)도 신규 등록/엑셀 업로드 시 이 대역이면 자동으로 `SITE='서울'` 을 지정하므로, 이 SQL 은 과거 데이터 보정용이다(idempotent, `SITE <> '서울'` 조건이라 재실행해도 안전). |
+| `05_pc_site_column.sql` | PC 관리 사업장(SITE) 구분 도입 — 서울/청주 PC를 별도 관리하기 위해 `ip_address` 에 `SITE varchar(20) NOT NULL DEFAULT '청주'` 컬럼과 `IDX_IP_ADDRESS_SITE` 인덱스를 추가한다. 기존 전체 데이터는 모두 `'청주'`로 채워진다(현행 유지). 조회는 `site` 파라미터가 있으면 해당 사업장만, 없으면 전체(기존 동작 보존)로 동작한다. `01_schema.sql` 은 이 컬럼/인덱스가 이미 반영된 최신 버전이므로, 그 버전으로 신규 설치하는 경우에는 이 파일을 실행해도 아무 변화가 없다(idempotent) — 그보다 이전 버전으로 이미 배포된 DB 에만 실질적인 효과가 있다. |
+| `06_seoul_perm_code.sql` | PC 관리 "KIMS 서울" 권한 그룹 도입 — 공통코드 그룹 `KIMS_PERM_SEOUL`("KIMS 서울") 을 생성한다. 이 그룹에 등록된 로그인 ID는 PC 관리에서 서울 데이터만 조회·수정 가능하고 청주는 차단된다(다른 KIMS 기능은 영향 없음). `KIMS_PERM`(관리자)과 달리 초기 멤버를 자동 부트스트랩하지 않으며, 관리자가 공통코드 관리 화면에서 직접 등록한다. 신규 설치·기존 배포 DB 모두 이 파일을 실행해야 한다(스키마 변경이 아니라 코드 그룹 데이터이므로 `01_schema.sql` 에는 포함되지 않음). |
+| `07_seoul_ip_band_backfill.sql` | PC 관리 "서울" 사업장 IP 대역 확정 — 서울 사업장 IP 대역을 `192.1.17`/`192.1.104`/`192.1.107`/`192.1.117`(각 `.1~.254`)로 정의하고, 이 대역에 해당하는 기존 등록 IP(기본값 '청주')의 `SITE` 를 '서울'로 백필한다. 애플리케이션 코드(`IpAddressService.isSeoulBandIp`)도 신규 등록/엑셀 업로드 시 이 대역이면 자동으로 `SITE='서울'` 을 지정하므로, 이 SQL 은 과거 데이터 보정용이다(idempotent, `SITE <> '서울'` 조건이라 재실행해도 안전). |
