@@ -1,7 +1,6 @@
 package com.company.module.kims.dto.response;
 
 import com.company.module.kims.entity.IpAddress;
-import com.company.module.kims.entity.enums.IpSite;
 import com.company.module.kims.entity.enums.IpStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,8 +18,6 @@ public class IpAddressResponse {
     private final Long ipId;
     private final String ipAddress;
     private final String ipGroup;          // IP그룹 (예: 192.1.0, 별도관리)
-    private final IpSite site;             // 사업장 구분 (청주공장/서울)
-    private final String siteLabel;
     private final IpStatus status;
     private final String statusLabel;
     private final String usageType;        // 상주/임시/반납/예비
@@ -57,8 +54,6 @@ public class IpAddressResponse {
                 .ipId(e.getIpId())
                 .ipAddress(e.getIpAddress())
                 .ipGroup(e.getIpGroup() != null ? e.getIpGroup() : groupOf(e.getIpAddress()))
-                .site(e.getSite())
-                .siteLabel(e.getSite() != null ? e.getSite().getLabel() : null)
                 .status(e.getStatus())
                 .statusLabel(e.getStatus().getLabel())
                 .usageType(e.getUsageType())

@@ -10,13 +10,11 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 | 1 | `01_schema.sql` | KIMS 테이블 11개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
 | 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (KIMS_MGMT 그룹 + 페이지 6개) + 역할별 노출 권한 |
 | 3 | `03_perm_code.sql` | 공통코드 `KIMS_PERM` (KIMS 관리자 명단) |
-| 4 | `V1__add_ip_address_site.sql` | (신규설치는 불필요, 01_schema.sql에 이미 반영됨) 기존 운영 DB에 `ip_address.SITE` 컬럼을 추가하는 마이그레이션. PC관리 서울/청주 사업장 분리용 |
 
 ```bash
 mysql -u root --default-character-set=utf8mb4 {db} < 01_schema.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 02_menu.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 03_perm_code.sql
-mysql -u root --default-character-set=utf8mb4 {db} < V1__add_ip_address_site.sql   # 기존 운영 DB(01_schema.sql을 이미 실행한 환경)에만 필요
 ```
 
 세 파일 모두 재실행해도 안전하다(표는 IF NOT EXISTS, 메뉴는 삭제 후 재삽입, 명단은 없을 때만 추가).

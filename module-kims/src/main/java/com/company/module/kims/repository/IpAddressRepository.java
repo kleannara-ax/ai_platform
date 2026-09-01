@@ -1,7 +1,6 @@
 package com.company.module.kims.repository;
 
 import com.company.module.kims.entity.IpAddress;
-import com.company.module.kims.entity.enums.IpSite;
 import com.company.module.kims.entity.enums.IpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,9 +15,8 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
     java.util.Optional<com.company.module.kims.entity.IpAddress> findByIpAddress(String ipAddress);
 
     /**
-     * IP 목록 검색 (IP/사용자 부분일치, 상태, 부서, 사업장 — 모두 선택적).
+     * IP 목록 검색 (IP/사용자 부분일치, 상태, 부서 — 모두 선택적).
      * <p>{@code Pageable.unpaged()} 로 전체(엑셀용) 조회 가능.
-     * <p>{@code site} 가 지정되면 해당 사업장 데이터만 조회한다(서울/청주 완전 분리).
      */
     @Query("""
             SELECT i FROM IpAddress i
@@ -37,7 +35,6 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
               AND (:department IS NULL OR i.department = :department)
               AND (:ipGroup IS NULL OR i.ipGroup = :ipGroup)
               AND (:excludeGroup IS NULL OR i.ipGroup IS NULL OR i.ipGroup <> :excludeGroup)
-              AND (:site IS NULL OR i.site = :site)
             ORDER BY i.ipGroup, FUNCTION('INET_ATON', i.ipAddress), i.ipId
             """)
     Page<IpAddress> search(@Param("keyword") String keyword,
@@ -46,12 +43,11 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
                            @Param("department") String department,
                            @Param("ipGroup") String ipGroup,
                            @Param("excludeGroup") String excludeGroup,
-                           @Param("site") IpSite site,
                            Pageable pageable);
 
-    /** 등록된 IP 그룹 목록 (중복 제거, 정렬, 사업장별) */
-    @Query("SELECT DISTINCT i.ipGroup FROM IpAddress i WHERE i.ipGroup IS NOT NULL AND i.ipGroup <> '' AND i.site = :site ORDER BY i.ipGroup")
-    java.util.List<String> findDistinctGroupsBySite(@Param("site") IpSite site);
+    /** 등록된 IP 그룹 목록 (중복 제거, 정렬) */
+    @Query("SELECT DISTINCT i.ipGroup FROM IpAddress i WHERE i.ipGroup IS NOT NULL AND i.ipGroup <> '' ORDER BY i.ipGroup")
+    java.util.List<String> findDistinctGroups();
 
     // ================================================================
     // 대역(그룹) 사용 현황 집계

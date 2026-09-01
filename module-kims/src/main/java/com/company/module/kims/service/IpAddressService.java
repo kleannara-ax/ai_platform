@@ -15,7 +15,6 @@ import com.company.module.kims.entity.IpAddress;
 import com.company.module.kims.entity.IpHistory;
 import com.company.module.kims.entity.ServiceRequest;
 import com.company.module.kims.entity.enums.IpChangeType;
-import com.company.module.kims.entity.enums.IpSite;
 import com.company.module.kims.entity.enums.IpStatus;
 import com.company.module.kims.repository.IpAddressRepository;
 import com.company.module.kims.repository.IpHistoryRepository;
@@ -70,7 +69,6 @@ public class IpAddressService {
                 .approvalNo(req.getApprovalNo())
                 .remark(req.getRemark())
                 .noteDate(req.getNoteDate())
-                .site(parseSite(req.getSite()))
                 .build();
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
@@ -353,18 +351,18 @@ public class IpAddressService {
     // ================================================================
     // 목록 / 상세 / 이력 / 미품의 변경
     // ================================================================
-    /** 등록된 IP 그룹 목록 (사업장별. 미지정 시 청주공장 — 기존 기능 유지) */
-    public java.util.List<String> getGroups(String site) {
-        return ipAddressRepository.findDistinctGroupsBySite(parseSite(site));
+    /** 등록된 IP 그룹 목록 */
+    public java.util.List<String> getGroups() {
+        return ipAddressRepository.findDistinctGroups();
     }
 
     public PageResponse<IpAddressResponse> getList(String keyword, String searchField, IpStatus status,
                                                   String department, String ipGroup, String excludeGroup,
-                                                  String site, int page, int size) {
+                                                  int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<IpAddressResponse> result = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), emptyToNull(excludeGroup), parseSite(site), pageable)
+                        emptyToNull(ipGroup), emptyToNull(excludeGroup), pageable)
                 .map(IpAddressResponse::from);
         return PageResponse.of(result);
     }
@@ -383,9 +381,9 @@ public class IpAddressService {
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
-    /** 미품의 IP 변경 내역 (사업장별. PC 관리 화면의 '미품의 변경 내역' 버튼용) */
-    public List<IpHistoryResponse> getUnapprovedChanges(String site) {
-        return ipHistoryRepository.findByApprovedFalseAndIpAddress_SiteOrderByCreatedAtDesc(parseSite(site))
+    /** 미품의 IP 변경 내역 */
+    public List<IpHistoryResponse> getUnapprovedChanges() {
+        return ipHistoryRepository.findByApprovedFalseOrderByCreatedAtDesc()
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
@@ -393,14 +391,14 @@ public class IpAddressService {
      * 이력 검색 (제조번호별/IP별) — 해당 장비/주소의 <b>사용자 인수인계 흐름</b>만 남긴다.
      * <p>사용자(afterUser)가 바뀐 시점과 신규생성만 남기고, 같은 사용자의 필드 변경(부서/IP 등)은 접는다.
      */
-    public List<IpHistoryResponse> searchHistory(String field, String keyword, String site) {
+    public List<IpHistoryResponse> searchHistory(String field, String keyword) {
         String f = emptyToNull(field);
         String kw = emptyToNull(keyword);
         if (f == null || kw == null) {
             return java.util.List.of();
         }
         List<IpHistory> raw = ipHistoryRepository
-                .searchHistory(f, kw, parseSite(site), org.springframework.data.domain.PageRequest.of(0, 2000));
+                .searchHistory(f, kw, org.springframework.data.domain.PageRequest.of(0, 2000));
         // 장비(IP_ID)별로 묶어 시간순으로 훑고, 사용자가 바뀌는 시점만 남긴다
         // IP별: 당시 IP(SNAPSHOT_IP)가 검색 IP인 이력만 남긴다 ('그 IP'의 사용 이력)
         if ("ip".equals(f)) {
@@ -447,12 +445,12 @@ public class IpAddressService {
      * 신규생성만 남기고, 각 시점의 (변경 전 → 후) 사용자를 함께 보여준다.
      * 당시 IP(SNAPSHOT_IP)로 표시해 관리대장 원본과 매칭된다.
      */
-    public List<IpHistoryResponse> searchUserUsage(String keyword, String site) {
+    public List<IpHistoryResponse> searchUserUsage(String keyword) {
         String kw = emptyToNull(keyword);
         if (kw == null) {
             return java.util.List.of();
         }
-        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw, parseSite(site));
+        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw);
         List<IpHistory> collected = new ArrayList<>();
         for (Long ipId : deviceIds) {
             List<IpHistory> hist = ipHistoryRepository.findByIpAddress_IpIdOrderByCreatedAtAsc(ipId);
@@ -489,16 +487,8 @@ public class IpAddressService {
     private static final List<String> FACILITY_GROUPS = List.of("100.1.1", "192.1.100", "210.107.102");
     private static final int IPS_PER_GROUP = 254;
 
-    /**
-     * 대역별 사용중/미사용 현황 (사용자 대역 + 설비 대역, 각 type 표기).
-     * <p>현재 등록된 대역(USER_GROUPS/FACILITY_GROUPS)은 청주공장 전용으로 확인되어,
-     * 청주공장(CHEONGJU) 조회 시에만 기존과 동일하게 집계한다. 서울은 아직 대역 정보가
-     * 정의되지 않았으므로 빈 목록을 반환한다(향후 서울 대역이 확정되면 이 메서드를 확장한다).
-     */
-    public List<IpGroupUtilResponse> getUtilization(String site) {
-        if (parseSite(site) != IpSite.CHEONGJU) {
-            return List.of();
-        }
+    /** 대역별 사용중/미사용 현황 (사용자 대역 + 설비 대역, 각 type 표기) */
+    public List<IpGroupUtilResponse> getUtilization() {
         List<IpGroupUtilResponse> result = new ArrayList<>();
         addUtil(result, USER_GROUPS, "USER");
         addUtil(result, FACILITY_GROUPS, "FACILITY");
@@ -517,19 +507,19 @@ public class IpAddressService {
         }
     }
 
-    /** 특정 연·월의 IP 변경 내역 (당월/월별 조회용, 사업장별) */
-    public List<IpHistoryResponse> getMonthlyHistory(int year, int month, String site) {
+    /** 특정 연·월의 IP 변경 내역 (당월/월별 조회용) */
+    public List<IpHistoryResponse> getMonthlyHistory(int year, int month) {
         LocalDate first = LocalDate.of(year, month, 1);
         LocalDateTime from = first.atStartOfDay();
         LocalDateTime to = first.withDayOfMonth(first.lengthOfMonth()).atTime(23, 59, 59);
-        return ipHistoryRepository.findByCreatedAtBetweenAndIpAddress_SiteOrderByCreatedAtDesc(from, to, parseSite(site))
+        return ipHistoryRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(from, to)
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
-    /** 변경 이력이 있는 월 목록 ("yyyy-MM", 최신순, 사업장별). 당월이 없으면 맨 앞에 추가. */
-    public List<String> getHistoryMonths(String site) {
+    /** 변경 이력이 있는 월 목록 ("yyyy-MM", 최신순). 당월이 없으면 맨 앞에 추가. */
+    public List<String> getHistoryMonths() {
         List<String> months = new ArrayList<>();
-        for (Object[] row : ipHistoryRepository.findDistinctYearMonthsBySite(parseSite(site))) {
+        for (Object[] row : ipHistoryRepository.findDistinctYearMonths()) {
             months.add(String.format("%04d-%02d", ((Number) row[0]).intValue(), ((Number) row[1]).intValue()));
         }
         String cur = String.format("%04d-%02d", LocalDate.now().getYear(), LocalDate.now().getMonthValue());
@@ -542,11 +532,10 @@ public class IpAddressService {
     // ================================================================
     // Excel 다운로드 (IP 목록)
     // ================================================================
-    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department,
-                               String ipGroup, String site) {
+    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup) {
         List<IpAddress> list = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), null, parseSite(site), Pageable.unpaged())
+                        emptyToNull(ipGroup), null, Pageable.unpaged())
                 .getContent();
         return excelExportService.buildIpListExcel(list);
     }
@@ -574,21 +563,5 @@ public class IpAddressService {
 
     private String emptyToNull(String v) {
         return (v == null || v.isBlank()) ? null : v;
-    }
-
-    /**
-     * 사업장 문자열 파싱. 값이 없거나 알 수 없는 값이면 청주공장(CHEONGJU)으로 취급한다.
-     * <p>기존(리팩터링 이전) 데이터/호출부는 사업장 개념이 없었으므로, 이 기본값 처리로
-     * 청주 PC 관리 기능이 신규 서울 탭 도입 이전과 완전히 동일하게 동작하도록 보장한다.
-     */
-    private IpSite parseSite(String site) {
-        if (site == null || site.isBlank()) {
-            return IpSite.CHEONGJU;
-        }
-        try {
-            return IpSite.valueOf(site.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return IpSite.CHEONGJU;
-        }
     }
 }

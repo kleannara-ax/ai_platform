@@ -1,6 +1,5 @@
 package com.company.module.kims.entity;
 
-import com.company.module.kims.entity.enums.IpSite;
 import com.company.module.kims.entity.enums.IpStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -40,14 +39,6 @@ public class IpAddress extends BaseTimeEntity {
     /** IP 그룹/대역 (예: 192.1.0, 또는 '별도관리') */
     @Column(name = "IP_GROUP", length = 30)
     private String ipGroup;
-
-    /**
-     * 사업장 구분 (청주공장/서울). 기존 데이터는 모두 청주공장 데이터이므로 기본값은 {@link IpSite#CHEONGJU}.
-     * 서울은 신규 도입된 사업장으로, 청주 관리대장과 완전히 분리된 PC(IP) 목록을 가진다.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "SITE", nullable = false, length = 20)
-    private IpSite site = IpSite.CHEONGJU;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false, length = 20)
@@ -140,7 +131,7 @@ public class IpAddress extends BaseTimeEntity {
     @Builder
     private IpAddress(String ipAddress, IpStatus status, String userName, String department,
                       String location, String device, boolean approved, String approvalNo,
-                      String remark, LocalDate noteDate, IpSite site) {
+                      String remark, LocalDate noteDate) {
         this.ipAddress = ipAddress;
         this.status = status;
         this.userName = userName;
@@ -151,7 +142,6 @@ public class IpAddress extends BaseTimeEntity {
         this.approvalNo = approvalNo;
         this.remark = remark;
         this.noteDate = noteDate;
-        this.site = (site != null) ? site : IpSite.CHEONGJU;
     }
 
     // ----------------------------------------------------------------
@@ -247,11 +237,6 @@ public class IpAddress extends BaseTimeEntity {
     /** IP 그룹(대역) 지정 — 신규 행 생성 시 대역 세팅용 */
     public void assignGroup(String ipGroup) {
         this.ipGroup = ipGroup;
-    }
-
-    /** 사업장 지정 — 신규 행 생성 시에만 사용(이후 사업장은 변경하지 않는다) */
-    public void assignSite(IpSite site) {
-        this.site = (site != null) ? site : IpSite.CHEONGJU;
     }
 
     /** 신규 부여/사용자 교체: 사용자 지정 후 사용중으로 전환 */
