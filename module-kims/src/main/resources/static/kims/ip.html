@@ -18,8 +18,12 @@
     #pane-histmgmt table th, #pane-histmgmt table td { white-space: nowrap; }
     /* 비고는 너무 길어질 수 있어 폭 제한 + 말줄임 유지 */
     #pane-list table td.remark-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-    /* 표 상단 보조 스크롤바 (표가 넓어 하단 스크롤바까지 내려가야 하는 불편함 해소) */
-    .table-top-scroll { overflow-x: auto; overflow-y: hidden; height: 14px; }
+    /* 표 상단 보조 스크롤바 (표가 넓어 하단 스크롤바까지 내려가야 하는 불편함 해소)
+       엑셀 틀고정처럼 화면(뷰포트) 상단에 항상 고정되도록 sticky 처리 →
+       표를 세로로 얼마나 내리더라도 좌우 스크롤을 즉시 사용할 수 있음. */
+    .table-top-scroll { overflow-x: auto; overflow-y: hidden; height: 14px;
+      position: sticky; top: 0; z-index: 15; background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6; }
     .table-top-scroll > div { height: 1px; }
     /* 사용 흐름 플로우차트 */
     .flow-node { border: 1px solid #0d6efd; border-radius: 8px; padding: 4px 10px; background: #f0f6ff;
