@@ -241,6 +241,7 @@ let token = '', refreshTk = '', currentUser = null, currentPage = 'dashboard';
 let allDepts = [], allRoles = [], userMenus = [], clientIp = '';
 let isRefreshing = false;
 let kimsMenuNames = {};  // /kims/{page}.html -> 메뉴명 (KIMS 하위 메뉴 제목/브레드크럼용)
+let safetyMenuNames = {};  // /safety/{page}.html -> 메뉴명 (안전 작업방식 매뉴얼 하위 메뉴 제목/브레드크럼용)
 
 // ══ 소방 모듈 iframe 메시지 수신 ══
 window.addEventListener('message', function(e) {
@@ -465,7 +466,7 @@ async function enterApp() {
   var requestedPage = normalizePage(new URLSearchParams(window.location.search || '').get('page'));
   var validPages = Object.values(menuCodeToPage).concat(['dashboard']);
   // KIMS 페이지(kims::/kims/xxx.html)는 동적 URL이라 menuCodeToPage에 없으므로 접두사로 허용
-  var isValidPage = function(p){ return validPages.includes(p) || (typeof p === 'string' && p.indexOf('kims::') === 0); };
+  var isValidPage = function(p){ return validPages.includes(p) || (typeof p === 'string' && (p.indexOf('kims::') === 0 || p.indexOf('safety::') === 0)); };
   var fallbackPage = isValidPage(normalizePage(currentPage)) ? normalizePage(currentPage) : 'dashboard';
   navigate(requestedPage && isValidPage(requestedPage) ? requestedPage : fallbackPage);
   saveSession();
@@ -635,6 +636,10 @@ async function loadUserMenus() {
     kimsMenuNames = {};
     (function walkKims(nodes){ (nodes||[]).forEach(function(m){ if(m.menuUrl && String(m.menuUrl).indexOf('/kims/')===0){ kimsMenuNames[m.menuUrl]=m.menuName; } if(m.children&&m.children.length) walkKims(m.children); }); })(userMenus);
 
+    // 안전(module-safety) 하위 메뉴: url -> 이름 맵 구축 (페이지 제목/브레드크럼용)
+    safetyMenuNames = {};
+    (function walkSafety(nodes){ (nodes||[]).forEach(function(m){ if(m.menuUrl && String(m.menuUrl).indexOf('/safety/')===0){ safetyMenuNames[m.menuUrl]=m.menuName; } if(m.children&&m.children.length) walkSafety(m.children); }); })(userMenus);
+
     // ── cell_auth 기반 세부공장일보 사이드바 필터링 ──
     // admin이 아닌 사용자: cell_auth 보유 여부로 dailyreport 메뉴 표시 결정
     // core_role_menu에는 ROLE_USER에 세부공장일보 열려있으나,
@@ -678,7 +683,9 @@ function renderSidebarMenus() {
     const normalizedCode = normalizeMenuCode(menu.menuCode);
     // KIMS(IT 운영 관리) 모듈: /kims/ 로 시작하는 메뉴 URL은 SPA 안에서 iframe으로 연다
     const isKimsPage = menu.menuUrl && String(menu.menuUrl).indexOf('/kims/') === 0;
-    const page = isKimsPage ? ('kims::' + menu.menuUrl) : pageForMenuCode(menu.menuCode);
+    // 안전(module-safety) 모듈: /safety/ 로 시작하는 메뉴 URL은 SPA 안에서 iframe으로 연다
+    const isSafetyPage = menu.menuUrl && String(menu.menuUrl).indexOf('/safety/') === 0;
+    const page = isKimsPage ? ('kims::' + menu.menuUrl) : (isSafetyPage ? ('safety::' + menu.menuUrl) : pageForMenuCode(menu.menuCode));
     const icon = menuIcons[normalizedCode] || menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
     const displayName = displayMenuName(menu);
     const children = Array.isArray(menu.children) ? menu.children.slice() : [];
@@ -761,6 +768,15 @@ function navigate(page, el) {
     document.getElementById('breadcrumb').textContent = '모듈 > IT 운영 관리 > ' + kimsName;
     document.getElementById('topbarActions').innerHTML = '';
     navigateToKimsPage(kimsUrl);
+    return;
+  }
+  if (typeof page === 'string' && page.indexOf('safety::') === 0) {
+    var safetyUrl = page.slice(8);
+    var safetyName = (safetyMenuNames && safetyMenuNames[safetyUrl]) || '안전 작업방식 매뉴얼';
+    document.getElementById('pageTitle').textContent = safetyName;
+    document.getElementById('breadcrumb').textContent = '모듈 > 안전 작업방식 매뉴얼 > ' + safetyName;
+    document.getElementById('topbarActions').innerHTML = '';
+    navigateToSafetyPage(safetyUrl);
     return;
   }
   const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',other_qr:'QR코드',ps_insp:'PS 지분 검사',dailyreport:'세부공장일보',dailyreport_input:'세부공장일보 입력',dailyreport_auth:'세부공장일보 컬럼관리'};
@@ -1991,6 +2007,23 @@ function navigateToKimsPage(path) {
   var iframe = document.createElement('iframe');
   iframe.className = 'fire-iframe';
   iframe.id = 'kimsIframe';
+  iframe.onload = function() { iframe.classList.add('loaded'); };
+  iframe.src = path;
+  el.innerHTML = '';
+  el.appendChild(iframe);
+}
+
+// ══ 안전(module-safety) 모듈 ══
+function navigateToSafetyPage(path) {
+  // 안전 작업방식 매뉴얼 모듈 페이지를 SPA 내부 iframe으로 로드.
+  // 인증은 fireweb_user(localStorage)를 통해 전달된다 — enterApp()에서
+  // 이미 token/loginId/roles를 저장해두므로 안전 모듈 쪽 js(safety.js)가 그대로 읽어 쓴다.
+  var el = document.getElementById('pageContent');
+  el.className = 'page fire-iframe-mode';
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3)"><span>불러오는 중...</span></div>';
+  var iframe = document.createElement('iframe');
+  iframe.className = 'fire-iframe';
+  iframe.id = 'safetyIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
   iframe.src = path;
   el.innerHTML = '';

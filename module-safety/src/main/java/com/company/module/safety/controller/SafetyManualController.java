@@ -1,0 +1,113 @@
+package com.company.module.safety.controller;
+
+import com.company.core.common.response.ApiResponse;
+import com.company.core.common.response.PageResponse;
+import com.company.module.safety.dto.request.ManualCreateRequest;
+import com.company.module.safety.dto.request.ManualUpdateRequest;
+import com.company.module.safety.dto.request.StepCreateRequest;
+import com.company.module.safety.dto.request.StepUpdateRequest;
+import com.company.module.safety.dto.response.ManualDetailResponse;
+import com.company.module.safety.dto.response.ManualSummaryResponse;
+import com.company.module.safety.dto.response.StepResponse;
+import com.company.module.safety.service.SafetyManualService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 안전작업방식 매뉴얼(본문) REST API.
+ * <p>조회는 인증된 사용자 누구나, 등록/수정/삭제는 SAFETY 관리자만 가능하다.
+ */
+@RestController
+@RequiredArgsConstructor
+public class SafetyManualController {
+
+    private final SafetyManualService manualService;
+
+    /** 매뉴얼 목록/검색 (페이지) */
+    @GetMapping("/safety-api/manuals")
+    public ResponseEntity<ApiResponse<PageResponse<ManualSummaryResponse>>> getList(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success(manualService.getList(keyword, categoryId, page, size)));
+    }
+
+    /** 특정 분류에 속한 매뉴얼 목록 (분류 클릭 시 목록 화면) */
+    @GetMapping("/safety-api/categories/{categoryId}/manuals")
+    public ResponseEntity<ApiResponse<List<ManualSummaryResponse>>> getListByCategory(@PathVariable Long categoryId) {
+        return ResponseEntity.ok(ApiResponse.success(manualService.getListByCategory(categoryId)));
+    }
+
+    /** 매뉴얼 상세 (원본 엑셀과 같은 레이아웃: 단계 + 단계별 사진) */
+    @GetMapping("/safety-api/manuals/{manualId}")
+    public ResponseEntity<ApiResponse<ManualDetailResponse>> getDetail(@PathVariable Long manualId) {
+        return ResponseEntity.ok(ApiResponse.success(manualService.getDetail(manualId)));
+    }
+
+    @PostMapping("/safety-api/manuals")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<ManualDetailResponse>> create(
+            @Valid @RequestBody ManualCreateRequest request, Authentication authentication) {
+        String createdBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.created(manualService.create(request, createdBy)));
+    }
+
+    @PutMapping("/safety-api/manuals/{manualId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<ManualDetailResponse>> update(
+            @PathVariable Long manualId, @Valid @RequestBody ManualUpdateRequest request,
+            Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(manualService.update(manualId, request, updatedBy)));
+    }
+
+    @DeleteMapping("/safety-api/manuals/{manualId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long manualId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        manualService.delete(manualId, deletedBy);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    // ================================================================
+    // 단계(순서) 관리 — 매뉴얼 상세 화면에서 개별 추가/수정/삭제
+    // ================================================================
+
+    @PostMapping("/safety-api/manuals/{manualId}/steps")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<StepResponse>> addStep(
+            @PathVariable Long manualId, @RequestBody StepCreateRequest request, Authentication authentication) {
+        String createdBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.created(manualService.addStep(manualId, request, createdBy)));
+    }
+
+    @PutMapping("/safety-api/steps/{stepId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<StepResponse>> updateStep(
+            @PathVariable Long stepId, @RequestBody StepUpdateRequest request, Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(manualService.updateStep(stepId, request, updatedBy)));
+    }
+
+    @DeleteMapping("/safety-api/steps/{stepId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<Void>> deleteStep(@PathVariable Long stepId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        manualService.deleteStep(stepId, deletedBy);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+}
