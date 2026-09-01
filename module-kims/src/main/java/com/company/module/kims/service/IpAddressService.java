@@ -11,6 +11,7 @@ import com.company.module.kims.dto.response.IpAddressDetailResponse;
 import com.company.module.kims.dto.response.IpAddressResponse;
 import com.company.module.kims.dto.response.IpGroupUtilResponse;
 import com.company.module.kims.dto.response.IpHistoryResponse;
+import com.company.module.kims.dto.response.IpExcelUploadResult;
 import com.company.module.kims.entity.IpAddress;
 import com.company.module.kims.entity.IpHistory;
 import com.company.module.kims.entity.ServiceRequest;
@@ -25,7 +26,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,6 +78,7 @@ public class IpAddressService {
                 .approvalNo(req.getApprovalNo())
                 .remark(req.getRemark())
                 .noteDate(req.getNoteDate())
+                .site(req.getSite())
                 .build();
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
@@ -352,17 +362,17 @@ public class IpAddressService {
     // 목록 / 상세 / 이력 / 미품의 변경
     // ================================================================
     /** 등록된 IP 그룹 목록 */
-    public java.util.List<String> getGroups() {
-        return ipAddressRepository.findDistinctGroups();
+    public java.util.List<String> getGroups(String site) {
+        return ipAddressRepository.findDistinctGroups(emptyToNull(site));
     }
 
     public PageResponse<IpAddressResponse> getList(String keyword, String searchField, IpStatus status,
                                                   String department, String ipGroup, String excludeGroup,
-                                                  int page, int size) {
+                                                  String site, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<IpAddressResponse> result = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), emptyToNull(excludeGroup), pageable)
+                        emptyToNull(ipGroup), emptyToNull(excludeGroup), emptyToNull(site), pageable)
                 .map(IpAddressResponse::from);
         return PageResponse.of(result);
     }
@@ -381,9 +391,9 @@ public class IpAddressService {
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
-    /** 미품의 IP 변경 내역 */
-    public List<IpHistoryResponse> getUnapprovedChanges() {
-        return ipHistoryRepository.findByApprovedFalseOrderByCreatedAtDesc()
+    /** 미품의 IP 변경 내역 (site 미지정 시 전체) */
+    public List<IpHistoryResponse> getUnapprovedChanges(String site) {
+        return ipHistoryRepository.findUnapprovedBySite(emptyToNull(site))
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
@@ -391,14 +401,14 @@ public class IpAddressService {
      * 이력 검색 (제조번호별/IP별) — 해당 장비/주소의 <b>사용자 인수인계 흐름</b>만 남긴다.
      * <p>사용자(afterUser)가 바뀐 시점과 신규생성만 남기고, 같은 사용자의 필드 변경(부서/IP 등)은 접는다.
      */
-    public List<IpHistoryResponse> searchHistory(String field, String keyword) {
+    public List<IpHistoryResponse> searchHistory(String field, String keyword, String site) {
         String f = emptyToNull(field);
         String kw = emptyToNull(keyword);
         if (f == null || kw == null) {
             return java.util.List.of();
         }
         List<IpHistory> raw = ipHistoryRepository
-                .searchHistory(f, kw, org.springframework.data.domain.PageRequest.of(0, 2000));
+                .searchHistory(f, kw, emptyToNull(site), org.springframework.data.domain.PageRequest.of(0, 2000));
         // 장비(IP_ID)별로 묶어 시간순으로 훑고, 사용자가 바뀌는 시점만 남긴다
         // IP별: 당시 IP(SNAPSHOT_IP)가 검색 IP인 이력만 남긴다 ('그 IP'의 사용 이력)
         if ("ip".equals(f)) {
@@ -445,12 +455,12 @@ public class IpAddressService {
      * 신규생성만 남기고, 각 시점의 (변경 전 → 후) 사용자를 함께 보여준다.
      * 당시 IP(SNAPSHOT_IP)로 표시해 관리대장 원본과 매칭된다.
      */
-    public List<IpHistoryResponse> searchUserUsage(String keyword) {
+    public List<IpHistoryResponse> searchUserUsage(String keyword, String site) {
         String kw = emptyToNull(keyword);
         if (kw == null) {
             return java.util.List.of();
         }
-        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw);
+        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw, emptyToNull(site));
         List<IpHistory> collected = new ArrayList<>();
         for (Long ipId : deviceIds) {
             List<IpHistory> hist = ipHistoryRepository.findByIpAddress_IpIdOrderByCreatedAtAsc(ipId);
@@ -488,18 +498,26 @@ public class IpAddressService {
     private static final int IPS_PER_GROUP = 254;
 
     /** 대역별 사용중/미사용 현황 (사용자 대역 + 설비 대역, 각 type 표기) */
-    public List<IpGroupUtilResponse> getUtilization() {
+    public List<IpGroupUtilResponse> getUtilization(String site) {
+        String s = emptyToNull(site);
         List<IpGroupUtilResponse> result = new ArrayList<>();
-        addUtil(result, USER_GROUPS, "USER");
-        addUtil(result, FACILITY_GROUPS, "FACILITY");
+        if (s == null || "청주".equals(s)) {
+            // 청주(및 전체): 고정 대역(사용자/설비) 기준 — 기존 동작 유지
+            addUtil(result, USER_GROUPS, "USER", s);
+            addUtil(result, FACILITY_GROUPS, "FACILITY", s);
+        } else {
+            // 다른 사업장(서울 등): 실제 등록된 대역만, 설비 구분 없이 전부 사용자 대역.
+            // 데이터가 없으면 빈 목록 → 총 IP 0.
+            addUtil(result, ipAddressRepository.findDistinctGroups(s), "USER", s);
+        }
         return result;
     }
 
-    private void addUtil(List<IpGroupUtilResponse> result, List<String> groups, String type) {
+    private void addUtil(List<IpGroupUtilResponse> result, List<String> groups, String type, String site) {
         for (String g : groups) {
             String prefix = g + ".";
-            int used = (int) ipAddressRepository.countByStatusAndIpAddressStartingWith(IpStatus.IN_USE, prefix);
-            int registered = (int) ipAddressRepository.countByIpAddressStartingWith(prefix);
+            int used = (int) ipAddressRepository.countByStatusAndPrefixAndSite(IpStatus.IN_USE, prefix, site);
+            int registered = (int) ipAddressRepository.countByPrefixAndSite(prefix, site);
             int available = Math.max(0, IPS_PER_GROUP - used);
             result.add(IpGroupUtilResponse.builder()
                     .group(g).type(type).total(IPS_PER_GROUP).used(used).available(available).registered(registered)
@@ -508,18 +526,18 @@ public class IpAddressService {
     }
 
     /** 특정 연·월의 IP 변경 내역 (당월/월별 조회용) */
-    public List<IpHistoryResponse> getMonthlyHistory(int year, int month) {
+    public List<IpHistoryResponse> getMonthlyHistory(int year, int month, String site) {
         LocalDate first = LocalDate.of(year, month, 1);
         LocalDateTime from = first.atStartOfDay();
         LocalDateTime to = first.withDayOfMonth(first.lengthOfMonth()).atTime(23, 59, 59);
-        return ipHistoryRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(from, to)
+        return ipHistoryRepository.findByPeriodAndSite(from, to, emptyToNull(site))
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
-    /** 변경 이력이 있는 월 목록 ("yyyy-MM", 최신순). 당월이 없으면 맨 앞에 추가. */
-    public List<String> getHistoryMonths() {
+    /** 변경 이력이 있는 월 목록 ("yyyy-MM", 최신순). 당월이 없으면 맨 앞에 추가. site 미지정 시 전체. */
+    public List<String> getHistoryMonths(String site) {
         List<String> months = new ArrayList<>();
-        for (Object[] row : ipHistoryRepository.findDistinctYearMonths()) {
+        for (Object[] row : ipHistoryRepository.findDistinctYearMonths(emptyToNull(site))) {
             months.add(String.format("%04d-%02d", ((Number) row[0]).intValue(), ((Number) row[1]).intValue()));
         }
         String cur = String.format("%04d-%02d", LocalDate.now().getYear(), LocalDate.now().getMonthValue());
@@ -532,12 +550,105 @@ public class IpAddressService {
     // ================================================================
     // Excel 다운로드 (IP 목록)
     // ================================================================
-    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup) {
+    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup, String site) {
         List<IpAddress> list = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), null, Pageable.unpaged())
+                        emptyToNull(ipGroup), null, emptyToNull(site), Pageable.unpaged())
                 .getContent();
         return excelExportService.buildIpListExcel(list);
+    }
+
+    // ================================================================
+    // Excel 업로드 (PC 목록 대량 등록) — 헤더가 양식과 일치할 때만 적재
+    // ================================================================
+    @Transactional
+    public IpExcelUploadResult importExcel(MultipartFile file, String site, String changedBy) {
+        String s = (site == null || site.isBlank()) ? "청주" : site;
+        List<String> expected = List.of(ExcelExportService.IP_LIST_HEADERS);
+        DataFormatter fmt = new DataFormatter();
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            Row header = (sheet != null) ? sheet.getRow(sheet.getFirstRowNum()) : null;
+            List<String> actual = new ArrayList<>();
+            if (header != null) {
+                for (int c = 0; c < expected.size(); c++) {
+                    actual.add(cellStr(header.getCell(c), fmt));
+                }
+            }
+            // 헤더가 양식과 모두 동일하지 않으면 업로드하지 않고 경고 대상으로 반환
+            if (!expected.equals(actual)) {
+                return IpExcelUploadResult.headerMismatch(expected, actual);
+            }
+
+            int imported = 0, skipped = 0;
+            int last = sheet.getLastRowNum();
+            for (int r = header.getRowNum() + 1; r <= last; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) { continue; }
+                String ip = trimToNull(cellStr(row.getCell(1), fmt));
+                if (ip == null) { continue; }                       // IP 없는 빈 행은 건너뜀
+                if (ipAddressRepository.existsByIpAddress(ip)) { skipped++; continue; }  // 이미 존재하는 IP
+
+                String userName = trimToNull(cellStr(row.getCell(6), fmt));
+                String rental = trimToNull(cellStr(row.getCell(7), fmt));
+                IpAddress e = IpAddress.builder()
+                        .ipAddress(ip)
+                        .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)))
+                        .status(statusFromLabel(cellStr(row.getCell(2), fmt), userName))
+                        .usageType(trimToNull(cellStr(row.getCell(3), fmt)))
+                        .department(trimToNull(cellStr(row.getCell(4), fmt)))
+                        .device(trimToNull(cellStr(row.getCell(5), fmt)))
+                        .userName(userName)
+                        .remark(trimToNull(cellStr(row.getCell(20), fmt)))
+                        .purchaseDate(trimToNull(cellStr(row.getCell(13), fmt)))
+                        .approved(false)
+                        .site(s)
+                        .build();
+                e.updateSpec(
+                        trimToNull(cellStr(row.getCell(10), fmt)),   // 모델
+                        trimToNull(cellStr(row.getCell(11), fmt)),   // 제조번호
+                        trimToNull(cellStr(row.getCell(12), fmt)),   // 구입업체
+                        trimToNull(cellStr(row.getCell(14), fmt)),   // OS버전
+                        trimToNull(cellStr(row.getCell(15), fmt)),   // OS시리얼
+                        trimToNull(cellStr(row.getCell(16), fmt)),   // OFFICE버전
+                        trimToNull(cellStr(row.getCell(17), fmt)),   // OFFICE시리얼
+                        trimToNull(cellStr(row.getCell(18), fmt)),   // 한글버전
+                        trimToNull(cellStr(row.getCell(19), fmt)),   // 한글시리얼
+                        "자산".equals(rental) ? null : rental,        // 렌탈사('자산'=자산소유→null)
+                        trimToNull(cellStr(row.getCell(8), fmt)),    // PC자산번호
+                        trimToNull(cellStr(row.getCell(9), fmt)));   // 모니터자산번호
+                IpAddress saved = ipAddressRepository.save(e);
+                ipHistoryRepository.save(IpHistory.of(saved, null, IpChangeType.CREATED,
+                        "[엑셀 업로드] 신규 등록", false, null, changedBy));
+                imported++;
+            }
+            return IpExcelUploadResult.success(imported, skipped);
+        } catch (IOException ex) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다: " + ex.getMessage());
+        }
+    }
+
+    /** 셀 값을 화면 표시 형태의 문자열로 (숫자/날짜/문자 모두 처리). null 안전. */
+    private static String cellStr(Cell cell, DataFormatter fmt) {
+        if (cell == null) { return ""; }
+        return fmt.formatCellValue(cell).trim();
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) { return null; }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /** 상태 라벨(사용중/가용/회수) → enum. 없으면 사용자 유무로 추정. */
+    private static IpStatus statusFromLabel(String label, String userName) {
+        if (label != null) {
+            String l = label.trim();
+            for (IpStatus st : IpStatus.values()) {
+                if (st.getLabel().equals(l)) { return st; }
+            }
+        }
+        return (userName != null && !userName.isBlank()) ? IpStatus.IN_USE : IpStatus.AVAILABLE;
     }
 
     // ----------------------------------------------------------------

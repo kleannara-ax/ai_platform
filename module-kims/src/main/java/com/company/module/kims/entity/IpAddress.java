@@ -135,7 +135,8 @@ public class IpAddress extends BaseTimeEntity {
     @Builder
     private IpAddress(String ipAddress, IpStatus status, String userName, String department,
                       String location, String device, boolean approved, String approvalNo,
-                      String remark, LocalDate noteDate, String site) {
+                      String remark, LocalDate noteDate, String site,
+                      String ipGroup, String usageType, String purchaseDate) {
         this.ipAddress = ipAddress;
         this.status = status;
         this.userName = userName;
@@ -147,6 +148,9 @@ public class IpAddress extends BaseTimeEntity {
         this.remark = remark;
         this.noteDate = noteDate;
         this.site = (site == null || site.isBlank()) ? "청주" : site;
+        this.ipGroup = ipGroup;
+        this.usageType = usageType;
+        this.purchaseDate = purchaseDate;
     }
 
     // ----------------------------------------------------------------

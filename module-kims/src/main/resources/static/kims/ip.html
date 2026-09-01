@@ -30,7 +30,7 @@
 <body class="bg-light">
   <div id="nav"></div>
   <div class="container-fluid px-4">
-    <h4 class="mb-2">PC 관리</h4>
+    <h4 class="mb-2">PC 관리 <span id="site-badge" class="badge align-middle" style="font-size:.6em;vertical-align:middle"></span></h4>
     <div id="msg" class="alert d-none" role="alert"></div>
 
     <ul class="nav nav-tabs mb-3">
@@ -50,6 +50,8 @@
       <div class="d-flex justify-content-end gap-1 mb-2">
         <button class="btn btn-outline-warning btn-sm" onclick="showUnapproved()">미품의 변경 내역</button>
         <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
+        <input type="file" id="excelUploadInput" accept=".xlsx,.xls" class="d-none" onchange="uploadExcel(this)">
+        <button id="btn-excel-upload" class="btn btn-outline-primary btn-sm d-none" onclick="document.getElementById('excelUploadInput').click()">Excel 업로드</button>
         <button class="btn btn-primary btn-sm" onclick="openCreate()">+ 신규 PC 등록</button>
       </div>
       <!-- 검색/필터 -->
@@ -101,7 +103,7 @@
           <input type="radio" class="btn-check" name="scope" id="scope-user" autocomplete="off" checked onchange="setScope('USER')">
           <label class="btn btn-outline-primary" for="scope-user">사용자 대역</label>
           <input type="radio" class="btn-check" name="scope" id="scope-fac" autocomplete="off" onchange="setScope('FACILITY')">
-          <label class="btn btn-outline-primary" for="scope-fac">설비 대역</label>
+          <label class="btn btn-outline-primary" for="scope-fac" id="scope-fac-label">설비 대역</label>
         </div>
       </div>
       <div class="row g-3 mb-3">
@@ -306,6 +308,9 @@
   <script src="js/kims.js"></script>
   <script>
     if (!KIMS.requireAuth()) { /* redirect */ } else { KIMS.renderNav('ip.html'); }
+    // 사업장(청주/서울) — URL ?site= 로 결정, 기본 청주. 모든 조회에 붙인다.
+    const SITE = new URLSearchParams(location.search).get('site') || '청주';
+    const withSite = (url) => url + (url.includes('?') ? '&' : '?') + 'site=' + encodeURIComponent(SITE);
     let page = 0; const size = 256;
     const E = KIMS.escapeHtml;
     let editModal, detailModal, reclaimModal, changeModal;
@@ -321,6 +326,15 @@
       detailModal = new bootstrap.Modal('#detailModal');
       reclaimModal = new bootstrap.Modal('#reclaimModal');
       changeModal = new bootstrap.Modal('#changeModal');
+      const sb = document.getElementById('site-badge');
+      if (sb) { sb.textContent = SITE; sb.classList.add(SITE === '서울' ? 'bg-danger' : 'bg-success'); }
+      // 서울 등 비-청주 사업장은 설비 대역이 없으므로 토글 숨김 (사용자 대역만)
+      if (SITE !== '청주') {
+        document.getElementById('scope-fac')?.classList.add('d-none');
+        document.getElementById('scope-fac-label')?.classList.add('d-none');
+        // 엑셀 업로드 버튼 노출 (서울 대량 등록용)
+        document.getElementById('btn-excel-upload')?.classList.remove('d-none');
+      }
       // 기본 탭 = 홈(대시보드 + 신규요청)
       utilLoaded = true; loadUtil(); loadIpRequests();
       loadGroups();
@@ -355,7 +369,7 @@
     // IP그룹 분류 드롭다운 채우기 (별도관리는 전용 탭이 있으므로 제외)
     async function loadGroups() {
       try {
-        const groups = await KIMS.api('/kims-api/ips/groups');
+        const groups = await KIMS.api(withSite('/kims-api/ips/groups'));
         const sel = document.getElementById('f-group');
         sel.innerHTML = '<option value="">전체 대역</option>'
           + (groups || []).filter(g => g !== '별도관리')
@@ -488,7 +502,7 @@
     // ---- 홈: 대역 사용현황 (사용자/설비 대역 토글) ----
     async function loadUtil() {
       try {
-        utilCache = await KIMS.api('/kims-api/ips/utilization');
+        utilCache = await KIMS.api(withSite('/kims-api/ips/utilization'));
         renderUtil();
       } catch (e) { KIMS.toast(e.message, false); }
     }
@@ -545,7 +559,7 @@
       const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1;
       document.getElementById('cm-label').textContent = y + '-' + String(m).padStart(2,'0');
       try {
-        const list = await KIMS.api('/kims-api/ips/history?year=' + y + '&month=' + m);
+        const list = await KIMS.api(withSite('/kims-api/ips/history?year=' + y + '&month=' + m));
         document.getElementById('cm-cnt').textContent = list.length;
         document.getElementById('curMonth').innerHTML = histTable(list, 'current');
       } catch (e) { KIMS.toast(e.message, false); }
@@ -554,7 +568,7 @@
     // ---- 월별 변경 내역 ----
     async function initMonths() {
       try {
-        const months = await KIMS.api('/kims-api/ips/history/months');
+        const months = await KIMS.api(withSite('/kims-api/ips/history/months'));
         document.getElementById('monthSel').innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
         loadHist();
       } catch (e) { KIMS.toast(e.message, false); }
@@ -563,7 +577,7 @@
       const v = document.getElementById('monthSel').value; if (!v) return;
       const [y, m] = v.split('-');
       try {
-        const list = await KIMS.api('/kims-api/ips/history?year=' + Number(y) + '&month=' + Number(m));
+        const list = await KIMS.api(withSite('/kims-api/ips/history?year=' + Number(y) + '&month=' + Number(m)));
         document.getElementById('histBox').innerHTML = `<p class="small text-muted">${v} 변경 ${list.length}건</p>` + histTable(list, 'monthly');
       } catch (e) { KIMS.toast(e.message, false); }
     }
@@ -593,7 +607,7 @@
 
     async function load() {
       try {
-        const p = filters(); p.set('page', page); p.set('size', size);
+        const p = filters(); p.set('page', page); p.set('size', size); p.set('site', SITE);
         if (sepMode) {
           p.set('ipGroup', '별도관리');
         } else {
@@ -753,6 +767,7 @@
         } else {
           payload.ipAddress = document.getElementById('e-ip').value.trim();
           if (!payload.ipAddress) { KIMS.toast('IP 주소를 입력하세요.', false); return; }
+          payload.site = SITE;   // 신규 등록은 현재 사업장(청주/서울)으로
           await KIMS.api('/kims-api/ips', { method: 'POST', body: payload });
           KIMS.toast('등록되었습니다.');
         }
@@ -842,7 +857,7 @@
     // ---- 미품의 변경 내역 ----
     async function showUnapproved() {
       try {
-        const list = await KIMS.api('/kims-api/ips/unapproved-changes');
+        const list = await KIMS.api(withSite('/kims-api/ips/unapproved-changes'));
         document.getElementById('detailTitle').textContent = '미품의 IP 변경 내역';
         document.getElementById('detailBody').innerHTML = (list && list.length) ? `
           <table class="table table-sm table-bordered"><thead class="table-light"><tr>
@@ -868,7 +883,7 @@
       try {
         if (field === 'user') { await hmSearchUser(kw, box); return; }
         // 제조번호별 / IP별: 사용자 인수인계 흐름 (사용자 바뀐 시점만) + 하단 플로우차트
-        const list = await KIMS.api('/kims-api/ips/history/search?field=' + field + '&keyword=' + encodeURIComponent(kw));
+        const list = await KIMS.api(withSite('/kims-api/ips/history/search?field=' + field + '&keyword=' + encodeURIComponent(kw)));
         document.getElementById('hm-cnt').textContent = (list || []).length + '건';
         if (!list || !list.length) { box.innerHTML = '<p class="text-muted small">검색 결과가 없습니다.</p>'; return; }
         const flow = h => `${E(h.beforeUser||'(없음)')} → ${E(h.afterUser||'(없음)')}`;
@@ -915,7 +930,7 @@
 
     // 사용자별: 해당 사용자가 쓰던 장비들의 사용자 변천 (일시/IP/제조번호/부서/사용자)
     async function hmSearchUser(kw, box) {
-      const list = await KIMS.api('/kims-api/ips/history/by-user?keyword=' + encodeURIComponent(kw));
+      const list = await KIMS.api(withSite('/kims-api/ips/history/by-user?keyword=' + encodeURIComponent(kw)));
       document.getElementById('hm-cnt').textContent = (list || []).length + '건';
       if (!list || !list.length) { box.innerHTML = '<p class="text-muted small">검색 결과가 없습니다.</p>'; return; }
       const flow = h => `${E(h.beforeUser||'(없음)')} → ${E(h.afterUser||'(없음)')}`;
@@ -933,10 +948,40 @@
     // ---- Excel ----
     async function downloadExcel() {
       try {
-        const p = filters();
+        const p = filters(); p.set('site', SITE);
         if (sepMode) p.set('ipGroup', '별도관리');
         else { const g = document.getElementById('f-group').value; if (g) p.set('ipGroup', g); }
         await KIMS.download('/kims-api/ips/excel?' + p.toString(), 'ip_addresses.xlsx');
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 엑셀 업로드 (서울 대량 등록) — 헤더가 양식과 같을 때만 적재, 다르면 경고 모달
+    async function uploadExcel(input) {
+      const file = input.files && input.files[0];
+      input.value = '';                       // 같은 파일 재선택 허용
+      if (!file) return;
+      try {
+        const r = await KIMS.uploadFile('/kims-api/ips/excel/upload?site=' + encodeURIComponent(SITE), file);
+        if (r && r.ok) {
+          KIMS.toast(r.message || '업로드되었습니다.');
+          loadUtil(); page = 0; load();       // 대시보드·목록 갱신
+        } else {
+          const exp = (r && r.expectedHeaders) || [];
+          const act = (r && r.actualHeaders) || [];
+          const rows = exp.map((h, i) => {
+            const a = act[i] || '(없음)';
+            const ok = (a === h);
+            return `<tr><td class="text-muted">${i + 1}</td><td>${E(h)}</td>
+              <td class="${ok ? 'text-success' : 'text-danger fw-bold'}">${E(a)}</td></tr>`;
+          }).join('');
+          const extra = act.length > exp.length
+            ? `<div class="text-danger small mt-1">※ 양식보다 열이 ${act.length - exp.length}개 더 많습니다.</div>` : '';
+          KIMS.alertModal('업로드 실패 — 헤더가 양식과 다릅니다',
+            `<div class="mb-2">${E((r && r.message) || '엑셀 헤더가 양식과 일치하지 않습니다.')}</div>
+             <div style="max-height:300px;overflow:auto"><table class="table table-sm table-bordered mb-0">
+               <thead class="table-light"><tr><th>#</th><th>양식(기대)</th><th>업로드한 파일</th></tr></thead>
+               <tbody>${rows}</tbody></table></div>${extra}`, 'danger');
+        }
       } catch (e) { KIMS.toast(e.message, false); }
     }
   </script>

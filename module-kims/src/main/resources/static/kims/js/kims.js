@@ -138,10 +138,28 @@ const KIMS = (() => {
       { href: 'settlement.html', label: '월말 결산', icon: '📅' },
       { href: 'qr.html', label: 'QR 관리', icon: '🔳' },
     ];
-    const items = links.map(l =>
-      `<a class="kims-navlink ${l.href === active ? 'active' : ''}" href="${l.href}">
-         <span class="kims-navicon">${l.icon}</span><span>${l.label}</span></a>`
-    ).join('');
+    const curSite = new URLSearchParams(location.search).get('site') || '청주';
+    const items = links.map(l => {
+      // PC 관리: 청주공장 / 서울 하위 메뉴로 펼침
+      if (l.href === 'ip.html') {
+        const onPc = active === 'ip.html';
+        const subs = [
+          { site: '청주', label: '청주공장' },
+          { site: '서울', label: '서울' },
+        ].map(s => {
+          const on = onPc && curSite === s.site;
+          return `<a class="kims-navlink kims-subnav ${on ? 'active' : ''}" href="ip.html?site=${encodeURIComponent(s.site)}">
+             <span class="kims-navicon">·</span><span>${s.label}</span></a>`;
+        }).join('');
+        return `<div class="kims-navgroup ${onPc ? 'open' : ''}">
+           <div class="kims-navlink kims-navparent" onclick="this.parentElement.classList.toggle('open')">
+             <span class="kims-navicon">${l.icon}</span><span>${l.label}</span>
+             <span class="kims-caret">▾</span></div>
+           ${subs}</div>`;
+      }
+      return `<a class="kims-navlink ${l.href === active ? 'active' : ''}" href="${l.href}">
+         <span class="kims-navicon">${l.icon}</span><span>${l.label}</span></a>`;
+    }).join('');
     const css = `<style id="kims-nav-style">
       body { padding-left: 220px; }
       .kims-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
@@ -162,6 +180,12 @@ const KIMS = (() => {
       .kims-navlink:hover { background: rgba(255,255,255,.06); color: #fff; }
       .kims-navlink.active { background: rgba(37,99,235,.18); color: #fff; border-left-color: #3b82f6; font-weight: 600; }
       .kims-navicon { width: 18px; text-align: center; }
+      .kims-navparent { cursor: pointer; user-select: none; }
+      .kims-caret { margin-left: auto; font-size: 11px; transition: transform .15s; color: #64748b; }
+      .kims-navgroup:not(.open) .kims-caret { transform: rotate(-90deg); }
+      .kims-navgroup .kims-subnav { display: none; padding-left: 34px; font-size: 13px; }
+      .kims-navgroup.open .kims-subnav { display: flex; }
+      .kims-subnav .kims-navicon { color: #475569; }
       .kims-logout { margin: 12px 16px 16px; }
     </style>`;
     const html = css + `
