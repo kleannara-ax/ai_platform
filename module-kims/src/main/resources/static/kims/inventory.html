@@ -320,7 +320,7 @@
             <td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
             <td class="text-truncate" style="max-width:380px">${E(r.contentSummary)}</td>
             <td>${dateOnly((r.createdAt || '').replace('T', ' '))}</td>
-            <td><a class="btn btn-outline-primary btn-sm py-0" href="request.html">처리</a></td>
+            <td><a class="btn btn-outline-primary btn-sm py-0" href="request.html?open=${r.requestId}">처리</a></td>
           </tr>`).join('')
           : '<tr><td colspan="6" class="text-center text-muted">신규 지급 요청이 없습니다. 👍</td></tr>';
       } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
