@@ -92,6 +92,23 @@ KIMS 관리자(KIMS_PERM)·플랫폼 `ROLE_MANAGER` 는 이 제한과 무관하�
 > (서울 전용 계정을 실제 운용하려면 해당 플랫폼 계정에 ROLE_MANAGER 이상 역할도 함께 부여하거나,
 > 플랫폼 메뉴 화면에서 별도로 노출 방법을 검토해야 한다 — 이번 범위에서는 공통코드 권한 판정만 구현했다.)
 
+### 서울 사업장 IP 대역
+
+서울 사업장의 IP 대역은 **`192.1.17` / `192.1.104` / `192.1.107` / `192.1.117`**(각 `.1~.254`)로 고정되어 있다.
+[`IpAddressService`](../../module-kims/src/main/java/com/company/module/kims/service/IpAddressService.java) 의
+`SEOUL_GROUPS` 상수 + `isSeoulBandIp()` 로 판정하며, 다음 경로에서 이 대역의 IP는 사업장(SITE)을
+**자동으로 "서울"** 로 지정한다(화면에서 탭을 청주로 두고 등록해도 실제 IP 대역 기준으로 보정됨):
+
+- 신규 PC 등록(`create`)
+- 엑셀 업로드(`importExcel`, 행 단위로 판정)
+- 업무요청 자동반영으로 신규 IP 행이 만들어질 때(`createEmptyIp`)
+
+대시보드 "대역 사용 현황"(`getUtilization`)도 site=서울 조회 시 이 4개 고정 대역을 표시한다(청주의
+`USER_GROUPS`/`FACILITY_GROUPS` 와 동일한 고정 리스트 방식).
+
+과거에 이 대역으로 등록된 기존 데이터를 서울로 보정해야 한다면 `32_seoul_ip_band_backfill.sql`
+(idempotent, `SITE <> '서울'` AND IP LIKE 해당 대역인 행만 UPDATE)을 실행한다.
+
 ## core 에 추가가 필요한 부분 (향후 검토)
 
 신규 "업무 모듈 생성 표준"은 로그인 사용자 정보를
@@ -149,3 +166,4 @@ KIMS 단독 프로젝트 시절의 마이그레이션 SQL(01~29)은 이 폴더�
 |------|------|
 | `30_pc_site_column.sql` | PC 관리 사업장(SITE) 구분 도입 — 서울/청주 PC를 별도 관리하기 위해 `ip_address` 에 `SITE varchar(20) NOT NULL DEFAULT '청주'` 컬럼과 `IDX_IP_ADDRESS_SITE` 인덱스를 추가한다. 기존 전체 데이터는 모두 `'청주'`로 채워진다(현행 유지). 조회는 `site` 파라미터가 있으면 해당 사업장만, 없으면 전체(기존 동작 보존)로 동작한다. `01_schema.sql` 은 신규 설치 기준으로 이 컬럼/인덱스를 이미 포함하므로, 신규 설치 시에는 이 파일을 실행할 필요가 없다 — 기존에 배포된 DB 에만 적용한다. |
 | `31_seoul_perm_code.sql` | PC 관리 "KIMS 서울" 권한 그룹 도입 — 공통코드 그룹 `KIMS_PERM_SEOUL`("KIMS 서울") 을 생성한다. 이 그룹에 등록된 로그인 ID는 PC 관리에서 서울 데이터만 조회·수정 가능하고 청주는 차단된다(다른 KIMS 기능은 영향 없음). `KIMS_PERM`(관리자)과 달리 초기 멤버를 자동 부트스트랩하지 않으며, 관리자가 공통코드 관리 화면에서 직접 등록한다. 신규 설치·기존 배포 DB 모두 이 파일을 실행해야 한다(스키마 변경이 아니라 코드 그룹 데이터이므로 `01_schema.sql` 에는 포함되지 않음). |
+| `32_seoul_ip_band_backfill.sql` | PC 관리 "서울" 사업장 IP 대역 확정 — 서울 사업장 IP 대역을 `192.1.17`/`192.1.104`/`192.1.107`/`192.1.117`(각 `.1~.254`)로 정의하고, 이 대역에 해당하는 기존 등록 IP(기본값 '청주')의 `SITE` 를 '서울'로 백필한다. 애플리케이션 코드(`IpAddressService.isSeoulBandIp`)도 신규 등록/엑셀 업로드 시 이 대역이면 자동으로 `SITE='서울'` 을 지정하므로, 이 SQL 은 과거 데이터 보정용이다(idempotent, `SITE <> '서울'` 조건이라 재실행해도 안전). |

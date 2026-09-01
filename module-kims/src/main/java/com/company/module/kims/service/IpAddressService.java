@@ -71,6 +71,11 @@ public class IpAddressService {
 
         // 서울 전용 사용자는 사업장을 항상 '서울'로 강제한다(요청값 무시).
         String site = resolveSite(authentication, req.getSite());
+        // IP 대역이 서울 대역(192.1.17/104/107/117.x)이면 사업장을 서울로 자동 보정한다
+        // (탭 선택을 깜빡해도 실제 IP 주소 기준으로 정확한 사업장이 지정되도록).
+        if (isSeoulBandIp(req.getIpAddress())) {
+            site = "서울";
+        }
 
         boolean assigned = req.getUserName() != null && !req.getUserName().isBlank();
         IpAddress ip = IpAddress.builder()
@@ -238,10 +243,11 @@ public class IpAddressService {
         return (d > 0) ? ip.substring(0, d) : ip;
     }
 
-    /** 신규 IP 행 생성(가용 상태) */
+    /** 신규 IP 행 생성(가용 상태). IP 대역이 서울 대역이면 사업장을 서울로 지정한다. */
     private IpAddress createEmptyIp(String ip) {
+        String site = isSeoulBandIp(ip) ? "서울" : "청주";
         IpAddress row = IpAddress.builder()
-                .ipAddress(ip).status(IpStatus.AVAILABLE).approved(false).build();
+                .ipAddress(ip).status(IpStatus.AVAILABLE).approved(false).site(site).build();
         row.assignGroup(groupOf(ip));
         return ipAddressRepository.save(row);
     }
@@ -508,7 +514,17 @@ public class IpAddressService {
     private static final List<String> USER_GROUPS = List.of("192.1.0", "192.1.1", "192.1.20", "192.1.21");
     /** 설비 대역 (CCTV / PDA·무선AP 등 장비 / 서버) */
     private static final List<String> FACILITY_GROUPS = List.of("100.1.1", "192.1.100", "210.107.102");
+    /** 서울 사업장 대역 (사용자 대역만 존재, 설비 대역 구분 없음) */
+    private static final List<String> SEOUL_GROUPS = List.of("192.1.17", "192.1.104", "192.1.107", "192.1.117");
     private static final int IPS_PER_GROUP = 254;
+
+    /** 해당 IP가 서울 사업장 대역(192.1.17/104/107/117.x)에 속하는지 여부 */
+    private static boolean isSeoulBandIp(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return false;
+        }
+        return SEOUL_GROUPS.contains(groupOf(ip));
+    }
 
     /** 대역별 사용중/미사용 현황 (사용자 대역 + 설비 대역, 각 type 표기) */
     public List<IpGroupUtilResponse> getUtilization(String site, Authentication authentication) {
@@ -518,8 +534,11 @@ public class IpAddressService {
             // 청주(및 전체): 고정 대역(사용자/설비) 기준 — 기존 동작 유지
             addUtil(result, USER_GROUPS, "USER", s);
             addUtil(result, FACILITY_GROUPS, "FACILITY", s);
+        } else if ("서울".equals(s)) {
+            // 서울: 고정 대역(192.1.17/104/107/117.x) 기준, 설비 구분 없이 전부 사용자 대역.
+            addUtil(result, SEOUL_GROUPS, "USER", s);
         } else {
-            // 다른 사업장(서울 등): 실제 등록된 대역만, 설비 구분 없이 전부 사용자 대역.
+            // 그 외 사업장: 실제 등록된 대역만, 설비 구분 없이 전부 사용자 대역.
             // 데이터가 없으면 빈 목록 → 총 IP 0.
             addUtil(result, ipAddressRepository.findDistinctGroups(s), "USER", s);
         }
@@ -605,6 +624,8 @@ public class IpAddressService {
 
                 String userName = trimToNull(cellStr(row.getCell(6), fmt));
                 String rental = trimToNull(cellStr(row.getCell(7), fmt));
+                // 행의 IP 주소가 서울 대역(192.1.17/104/107/117.x)이면 그 행만 서울로 자동 보정
+                String rowSite = isSeoulBandIp(ip) ? "서울" : s;
                 IpAddress e = IpAddress.builder()
                         .ipAddress(ip)
                         .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)))
@@ -616,7 +637,7 @@ public class IpAddressService {
                         .remark(trimToNull(cellStr(row.getCell(20), fmt)))
                         .purchaseDate(trimToNull(cellStr(row.getCell(13), fmt)))
                         .approved(false)
-                        .site(s)
+                        .site(rowSite)
                         .build();
                 e.updateSpec(
                         trimToNull(cellStr(row.getCell(10), fmt)),   // 모델
