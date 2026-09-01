@@ -316,7 +316,9 @@
   <script>
     if (!KIMS.requireAuth()) { /* redirect */ } else { KIMS.renderNav('ip.html'); }
     // 사업장(청주/서울) — URL ?site= 로 결정, 기본 청주. 모든 조회에 붙인다.
-    const SITE = new URLSearchParams(location.search).get('site') || '청주';
+    // (KIMS 서울 전용 사용자는 아래 DOMContentLoaded 에서 항상 '서울'로 강제된다 — 서버도 동일하게 강제하므로
+    //  화면 표시만 맞춰주는 용도. 실제 데이터 차단은 서버(KimsPermission)가 최종 보장한다.)
+    let SITE = new URLSearchParams(location.search).get('site') || '청주';
     const withSite = (url) => url + (url.includes('?') ? '&' : '?') + 'site=' + encodeURIComponent(SITE);
     let page = 0; const size = 256;
     const E = KIMS.escapeHtml;
@@ -328,11 +330,21 @@
                          RETURNED:'bg-danger',
                          TEMP_CREATED:'bg-warning text-dark', TEMP_MODIFIED:'bg-warning-subtle text-warning-emphasis border border-warning',
                          DELETED:'bg-danger' };
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       editModal = new bootstrap.Modal('#editModal');
       detailModal = new bootstrap.Modal('#detailModal');
       reclaimModal = new bootstrap.Modal('#reclaimModal');
       changeModal = new bootstrap.Modal('#changeModal');
+
+      // KIMS 서울 전용 사용자(공통코드 KIMS_PERM_SEOUL)는 항상 서울로 강제하고,
+      // 청주 전환 탭을 숨겨 "다른건 안보여도 돼" 요구를 화면에서도 지킨다.
+      // (실제 데이터 차단은 서버(KimsPermission)가 site 파라미터와 무관하게 최종 보장한다.)
+      const seoulOnly = await KIMS.isSeoulOnly();
+      if (seoulOnly) {
+        SITE = '서울';
+        document.getElementById('site-tab-청주')?.classList.add('d-none');
+      }
+
       const sb = document.getElementById('site-badge');
       if (sb) { sb.textContent = SITE; sb.classList.add(SITE === '서울' ? 'bg-danger' : 'bg-success'); }
       // 사업장 전환 탭(청주공장/서울) 활성 표시 — 플랫폼 iframe 안에서도 항상 노출되는 페이지 내부 탭

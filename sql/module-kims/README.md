@@ -69,20 +69,28 @@ mysql -u root --default-character-set=utf8mb4 {db} < 03_perm_code.sql
 KIMS 관리자 명단은 **공통코드 그룹 `KIMS_PERM`** 에서 관리한다 (공통코드 관리 화면 → KIMS 관리자 → 코드 추가,
 `CODE` = 플랫폼 로그인 ID). 소방 `FIRE_PERM`, PS점검 `PS_INSP_AUTH` 과 같은 방식이다.
 
+PC 관리(IP 관리)의 **서울 전용 접근**은 같은 방식으로 **공통코드 그룹 `KIMS_PERM_SEOUL`(표시명: "KIMS 서울")**
+에서 관리한다 (공통코드 관리 화면 → KIMS 서울 → 코드 추가, `CODE` = 플랫폼 로그인 ID).
+KIMS_PERM_SEOUL 에 등록된 계정은 PC 관리에서 **서울 데이터만** 조회/수정할 수 있고, **청주 데이터는 완전히 차단**된다.
+KIMS 관리자(KIMS_PERM)·플랫폼 `ROLE_MANAGER` 는 이 제한과 무관하게 항상 전체(청주+서울)를 조회/수정한다.
+
 판정은 [`KimsPermission`](../../module-kims/src/main/java/com/company/module/kims/support/KimsPermission.java) 이 하고,
-컨트롤러는 `@PreAuthorize` 로 이를 호출한다. `code_group`/`code_detail` 을 JdbcTemplate 으로 직접 조회하는데,
+컨트롤러/서비스는 이를 호출한다. `code_group`/`code_detail` 을 JdbcTemplate 으로 직접 조회하는데,
 이는 `module-ps-insp` 가 읽기전용 JPA 엔티티로 같은 테이블에 접근하는 것과 동일한 기존 플랫폼 관례를 따른 것이다.
 
 | 대상 | 표현식 | 통과 조건 |
 |------|--------|-----------|
 | 관리자 전용 | `@kimsPerm.isAdmin(authentication)` | KIMS_PERM 등록자 **또는** 플랫폼 `ROLE_ADMIN` |
-| 요청 처리·입력 | `@kimsPerm.canWork(authentication)` | 위 관리자 **또는** 플랫폼 `ROLE_MANAGER` |
+| 요청 처리·입력 | `@kimsPerm.canWork(authentication)` | 위 관리자 **또는** 플랫폼 `ROLE_MANAGER` **또는** KIMS_PERM_SEOUL 등록자(서울 전용) |
+| 대상 사업장 제한 | `IpAddressService` 내부 `resolveSite`/`assertSiteAccess` (`kimsPerm.allowedSite`/`canWorkOnSite` 사용) | 서울 전용 사용자는 site 파라미터를 무시하고 서버가 "서울"로 강제, 청주 레코드 대상 작업은 ACCESS_DENIED(A004)로 차단 |
 
 플랫폼 `ROLE_ADMIN` 을 항상 통과시키는 이유는 공통코드에서 실수로 전원을 지웠을 때 잠기지 않게 하기 위해서다.
 목록은 30초간 캐시되므로 공통코드를 고친 뒤 최대 30초 후 반영된다.
 
 > 메뉴 노출은 여전히 역할 기반(`core_role_menu`: ROLE_ADMIN / ROLE_MANAGER)이다.
-> KIMS_PERM 에만 넣고 플랫폼 역할이 ROLE_USER 인 사람은 API 는 되지만 좌측 메뉴가 보이지 않는다.
+> KIMS_PERM/KIMS_PERM_SEOUL 에만 넣고 플랫폼 역할이 ROLE_USER 인 사람은 API 는 되지만 좌측 메뉴가 보이지 않는다.
+> (서울 전용 계정을 실제 운용하려면 해당 플랫폼 계정에 ROLE_MANAGER 이상 역할도 함께 부여하거나,
+> 플랫폼 메뉴 화면에서 별도로 노출 방법을 검토해야 한다 — 이번 범위에서는 공통코드 권한 판정만 구현했다.)
 
 ## core 에 추가가 필요한 부분 (향후 검토)
 
@@ -117,7 +125,7 @@ KIMS 관리자 명단은 **공통코드 그룹 `KIMS_PERM`** 에서 관리한다
 | core_user 등 core 테이블 FK 금지 | ✅ 준수 | createdBy 등은 문자열 로그인ID |
 | 자체 사용자 테이블(kims_user) 생성 금지 | ✅ 준수 | 이번 리팩터링에서 제거 |
 | CREATE TABLE IF NOT EXISTS / INSERT IGNORE 등 | ✅ 준수 | |
-| 메뉴/권한 core 테이블 임의 INSERT 금지 | △ 부분 | `KIMS_PERM` 공통코드 그룹만 등록(권한 관리용, 메뉴 아님). 메뉴는 `02_menu.sql` 이 기존부터 등록해왔음(리팩터링 범위 밖) |
+| 메뉴/권한 core 테이블 임의 INSERT 금지 | △ 부분 | `KIMS_PERM`/`KIMS_PERM_SEOUL` 공통코드 그룹만 등록(권한 관리용, 메뉴 아님). 메뉴는 `02_menu.sql` 이 기존부터 등록해왔음(리팩터링 범위 밖) |
 | SecurityConfig 미생성 | △ 예외 유지 | `KimsSecurityConfig` — 위 "core 에 추가가 필요한 부분" 참고 |
 | CurrentUserProvider 사용 | △ 미사용 | core 에 해당 컴포넌트 없음. `Authentication` 파라미터로 대체(기존 플랫폼 관례) |
 | code_group/code_detail 직접 조회 지양 | △ 유지 | `module-ps-insp` 선례와 동일한 기존 플랫폼 관례로 판단, 유지 |
@@ -140,3 +148,4 @@ KIMS 단독 프로젝트 시절의 마이그레이션 SQL(01~29)은 이 폴더�
 | 파일 | 설명 |
 |------|------|
 | `30_pc_site_column.sql` | PC 관리 사업장(SITE) 구분 도입 — 서울/청주 PC를 별도 관리하기 위해 `ip_address` 에 `SITE varchar(20) NOT NULL DEFAULT '청주'` 컬럼과 `IDX_IP_ADDRESS_SITE` 인덱스를 추가한다. 기존 전체 데이터는 모두 `'청주'`로 채워진다(현행 유지). 조회는 `site` 파라미터가 있으면 해당 사업장만, 없으면 전체(기존 동작 보존)로 동작한다. `01_schema.sql` 은 신규 설치 기준으로 이 컬럼/인덱스를 이미 포함하므로, 신규 설치 시에는 이 파일을 실행할 필요가 없다 — 기존에 배포된 DB 에만 적용한다. |
+| `31_seoul_perm_code.sql` | PC 관리 "KIMS 서울" 권한 그룹 도입 — 공통코드 그룹 `KIMS_PERM_SEOUL`("KIMS 서울") 을 생성한다. 이 그룹에 등록된 로그인 ID는 PC 관리에서 서울 데이터만 조회·수정 가능하고 청주는 차단된다(다른 KIMS 기능은 영향 없음). `KIMS_PERM`(관리자)과 달리 초기 멤버를 자동 부트스트랩하지 않으며, 관리자가 공통코드 관리 화면에서 직접 등록한다. 신규 설치·기존 배포 DB 모두 이 파일을 실행해야 한다(스키마 변경이 아니라 코드 그룹 데이터이므로 `01_schema.sql` 에는 포함되지 않음). |

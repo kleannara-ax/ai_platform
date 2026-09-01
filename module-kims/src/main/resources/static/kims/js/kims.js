@@ -123,6 +123,32 @@ const KIMS = (() => {
     return _adminCache;
   }
 
+  // ---- KIMS 서울 전용(PC 관리) 판정 ----
+  // 공통코드 그룹 'KIMS_PERM_SEOUL' 에 등록된 로그인 ID는 PC 관리에서 서울만 다룬다.
+  // 서버 판정(KimsPermission.allowedSite)과 같은 기준: KIMS_PERM 관리자·플랫폼 ROLE_MANAGER 는
+  // 이 그룹에 있어도 항상 전체(청주+서울)를 본다 — 서울 전용 제한이 적용되지 않는다.
+  let _seoulOnlyCache = null;
+  async function isSeoulOnly() {
+    if (_seoulOnlyCache !== null) return _seoulOnlyCache;
+    if (await isAdmin()) return (_seoulOnlyCache = false);
+    if (getRoles().includes('MANAGER')) return (_seoulOnlyCache = false);
+    const session = platformSession();
+    const loginId = String(session.loginId || localStorage.getItem(USER_KEY) || '').trim().toLowerCase();
+    if (!loginId) return (_seoulOnlyCache = false);
+    try {
+      const res = await fetch('/common-api/codes/lookup/KIMS_PERM_SEOUL', {
+        headers: { 'Authorization': 'Bearer ' + getToken() },
+      });
+      const json = await res.json();
+      const list = (json && json.success && Array.isArray(json.data)) ? json.data : [];
+      _seoulOnlyCache = list.some(d => String(d.code || '').trim().toLowerCase() === loginId);
+    } catch (e) {
+      console.warn('KIMS_PERM_SEOUL 조회 실패', e);
+      _seoulOnlyCache = false;
+    }
+    return _seoulOnlyCache;
+  }
+
   // ---- 공통 네비게이션 (좌측 세로 사이드바) ----
   function renderNav(active) {
     // 플랫폼 SPA iframe 안에서는 플랫폼 사이드바가 이미 있으므로 KIMS 자체 사이드바는 그리지 않는다.
@@ -240,5 +266,5 @@ const KIMS = (() => {
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
   };
 
-  return { getToken, getUser, getRoles, isAdmin, setSession, clear, requireAuth, api, uploadFile, download, renderNav, logout, escapeHtml, toast, alertModal };
+  return { getToken, getUser, getRoles, isAdmin, isSeoulOnly, setSession, clear, requireAuth, api, uploadFile, download, renderNav, logout, escapeHtml, toast, alertModal };
 })();

@@ -20,10 +20,12 @@ import com.company.module.kims.entity.enums.IpStatus;
 import com.company.module.kims.repository.IpAddressRepository;
 import com.company.module.kims.repository.IpHistoryRepository;
 import com.company.module.kims.repository.ServiceRequestRepository;
+import com.company.module.kims.support.KimsPermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,16 +57,20 @@ public class IpAddressService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final ExcelExportService excelExportService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final KimsPermission kimsPerm;
 
     // ================================================================
     // 신규 IP 등록 (이력: 신규생성)
     // ================================================================
     @Transactional
-    public IpAddressResponse create(IpCreateRequest req) {
+    public IpAddressResponse create(IpCreateRequest req, Authentication authentication) {
         if (ipAddressRepository.existsByIpAddress(req.getIpAddress())) {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE,
                     "이미 등록된 IP 주소입니다. ip=" + req.getIpAddress());
         }
+
+        // 서울 전용 사용자는 사업장을 항상 '서울'로 강제한다(요청값 무시).
+        String site = resolveSite(authentication, req.getSite());
 
         boolean assigned = req.getUserName() != null && !req.getUserName().isBlank();
         IpAddress ip = IpAddress.builder()
@@ -78,7 +84,7 @@ public class IpAddressService {
                 .approvalNo(req.getApprovalNo())
                 .remark(req.getRemark())
                 .noteDate(req.getNoteDate())
-                .site(req.getSite())
+                .site(site)
                 .build();
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
@@ -95,8 +101,9 @@ public class IpAddressService {
     // 정보/사용자 변경 (이력: 정보변경 또는 사용자변경)
     // ================================================================
     @Transactional
-    public IpAddressResponse modify(Long ipId, IpModifyRequest req) {
+    public IpAddressResponse modify(Long ipId, IpModifyRequest req, Authentication authentication) {
         IpAddress ip = findIp(ipId);
+        assertSiteAccess(authentication, ip.getSite());
 
         // 사용자/부서가 바뀌면 USER_CHANGED, 그 외는 MODIFIED 로 분류
         boolean userChanged = !equalsNullable(ip.getUserName(), req.getUserName())
@@ -133,8 +140,9 @@ public class IpAddressService {
     // 회수 처리 (이력: 회수)
     // ================================================================
     @Transactional
-    public IpAddressResponse reclaim(Long ipId, IpReclaimRequest req) {
+    public IpAddressResponse reclaim(Long ipId, IpReclaimRequest req, Authentication authentication) {
         IpAddress ip = findIp(ipId);
+        assertSiteAccess(authentication, ip.getSite());
         ip.reclaim(req.getReason());
 
         String content = (req.getReason() != null && !req.getReason().isBlank())
@@ -150,8 +158,9 @@ public class IpAddressService {
     // 반납 처리 (PC+IP 반납, 이력: 반납) — PC 정보까지 비운다
     // ================================================================
     @Transactional
-    public IpAddressResponse returnPc(Long ipId, IpReclaimRequest req) {
+    public IpAddressResponse returnPc(Long ipId, IpReclaimRequest req, Authentication authentication) {
         IpAddress ip = findIp(ipId);
+        assertSiteAccess(authentication, ip.getSite());
         String beforeUser = ip.getUserName();
         ip.returnPc(req.getReason());
 
@@ -174,14 +183,16 @@ public class IpAddressService {
     // IP 변경(이동) — 같은 PC 를 다른 IP 로 옮긴다 (정보변경/IP 이동 이력)
     // ================================================================
     @Transactional
-    public IpAddressResponse moveIp(Long ipId, com.company.module.kims.dto.request.IpMoveRequest req) {
+    public IpAddressResponse moveIp(Long ipId, com.company.module.kims.dto.request.IpMoveRequest req, Authentication authentication) {
         IpAddress src = findIp(ipId);
+        assertSiteAccess(authentication, src.getSite());
         String newIp = req.getNewIpAddress().trim();
         if (src.getIpAddress().equals(newIp)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "현재 IP와 동일합니다. ip=" + newIp);
         }
         IpAddress dst = ipAddressRepository.findByIpAddress(newIp)
                 .orElseThrow(() -> new EntityNotFoundException("대상 IP가 관리대장에 없습니다. ip=" + newIp));
+        assertSiteAccess(authentication, dst.getSite());
         if (dst.getStatus() == IpStatus.IN_USE) {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "대상 IP가 이미 사용중입니다. ip=" + newIp);
         }
@@ -362,38 +373,40 @@ public class IpAddressService {
     // 목록 / 상세 / 이력 / 미품의 변경
     // ================================================================
     /** 등록된 IP 그룹 목록 */
-    public java.util.List<String> getGroups(String site) {
-        return ipAddressRepository.findDistinctGroups(emptyToNull(site));
+    public java.util.List<String> getGroups(String site, Authentication authentication) {
+        return ipAddressRepository.findDistinctGroups(resolveSite(authentication, site));
     }
 
     public PageResponse<IpAddressResponse> getList(String keyword, String searchField, IpStatus status,
                                                   String department, String ipGroup, String excludeGroup,
-                                                  String site, int page, int size) {
+                                                  String site, int page, int size, Authentication authentication) {
         Pageable pageable = PageRequest.of(page, size);
         Page<IpAddressResponse> result = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), emptyToNull(excludeGroup), emptyToNull(site), pageable)
+                        emptyToNull(ipGroup), emptyToNull(excludeGroup), resolveSite(authentication, site), pageable)
                 .map(IpAddressResponse::from);
         return PageResponse.of(result);
     }
 
-    public IpAddressDetailResponse getDetail(Long ipId) {
+    public IpAddressDetailResponse getDetail(Long ipId, Authentication authentication) {
         IpAddress ip = findIp(ipId);
+        assertSiteAccess(authentication, ip.getSite());
         List<IpHistoryResponse> histories = ipHistoryRepository
                 .findByIpAddress_IpIdOrderByCreatedAtDesc(ipId)
                 .stream().map(IpHistoryResponse::from).toList();
         return IpAddressDetailResponse.of(ip, histories);
     }
 
-    public List<IpHistoryResponse> getHistory(Long ipId) {
-        findIp(ipId);
+    public List<IpHistoryResponse> getHistory(Long ipId, Authentication authentication) {
+        IpAddress ip = findIp(ipId);
+        assertSiteAccess(authentication, ip.getSite());
         return ipHistoryRepository.findByIpAddress_IpIdOrderByCreatedAtDesc(ipId)
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
     /** 미품의 IP 변경 내역 (site 미지정 시 전체) */
-    public List<IpHistoryResponse> getUnapprovedChanges(String site) {
-        return ipHistoryRepository.findUnapprovedBySite(emptyToNull(site))
+    public List<IpHistoryResponse> getUnapprovedChanges(String site, Authentication authentication) {
+        return ipHistoryRepository.findUnapprovedBySite(resolveSite(authentication, site))
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
@@ -401,14 +414,14 @@ public class IpAddressService {
      * 이력 검색 (제조번호별/IP별) — 해당 장비/주소의 <b>사용자 인수인계 흐름</b>만 남긴다.
      * <p>사용자(afterUser)가 바뀐 시점과 신규생성만 남기고, 같은 사용자의 필드 변경(부서/IP 등)은 접는다.
      */
-    public List<IpHistoryResponse> searchHistory(String field, String keyword, String site) {
+    public List<IpHistoryResponse> searchHistory(String field, String keyword, String site, Authentication authentication) {
         String f = emptyToNull(field);
         String kw = emptyToNull(keyword);
         if (f == null || kw == null) {
             return java.util.List.of();
         }
         List<IpHistory> raw = ipHistoryRepository
-                .searchHistory(f, kw, emptyToNull(site), org.springframework.data.domain.PageRequest.of(0, 2000));
+                .searchHistory(f, kw, resolveSite(authentication, site), org.springframework.data.domain.PageRequest.of(0, 2000));
         // 장비(IP_ID)별로 묶어 시간순으로 훑고, 사용자가 바뀌는 시점만 남긴다
         // IP별: 당시 IP(SNAPSHOT_IP)가 검색 IP인 이력만 남긴다 ('그 IP'의 사용 이력)
         if ("ip".equals(f)) {
@@ -455,12 +468,12 @@ public class IpAddressService {
      * 신규생성만 남기고, 각 시점의 (변경 전 → 후) 사용자를 함께 보여준다.
      * 당시 IP(SNAPSHOT_IP)로 표시해 관리대장 원본과 매칭된다.
      */
-    public List<IpHistoryResponse> searchUserUsage(String keyword, String site) {
+    public List<IpHistoryResponse> searchUserUsage(String keyword, String site, Authentication authentication) {
         String kw = emptyToNull(keyword);
         if (kw == null) {
             return java.util.List.of();
         }
-        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw, emptyToNull(site));
+        List<Long> deviceIds = ipHistoryRepository.findDistinctDeviceIdsByUser(kw, resolveSite(authentication, site));
         List<IpHistory> collected = new ArrayList<>();
         for (Long ipId : deviceIds) {
             List<IpHistory> hist = ipHistoryRepository.findByIpAddress_IpIdOrderByCreatedAtAsc(ipId);
@@ -498,8 +511,8 @@ public class IpAddressService {
     private static final int IPS_PER_GROUP = 254;
 
     /** 대역별 사용중/미사용 현황 (사용자 대역 + 설비 대역, 각 type 표기) */
-    public List<IpGroupUtilResponse> getUtilization(String site) {
-        String s = emptyToNull(site);
+    public List<IpGroupUtilResponse> getUtilization(String site, Authentication authentication) {
+        String s = resolveSite(authentication, site);
         List<IpGroupUtilResponse> result = new ArrayList<>();
         if (s == null || "청주".equals(s)) {
             // 청주(및 전체): 고정 대역(사용자/설비) 기준 — 기존 동작 유지
@@ -526,18 +539,18 @@ public class IpAddressService {
     }
 
     /** 특정 연·월의 IP 변경 내역 (당월/월별 조회용) */
-    public List<IpHistoryResponse> getMonthlyHistory(int year, int month, String site) {
+    public List<IpHistoryResponse> getMonthlyHistory(int year, int month, String site, Authentication authentication) {
         LocalDate first = LocalDate.of(year, month, 1);
         LocalDateTime from = first.atStartOfDay();
         LocalDateTime to = first.withDayOfMonth(first.lengthOfMonth()).atTime(23, 59, 59);
-        return ipHistoryRepository.findByPeriodAndSite(from, to, emptyToNull(site))
+        return ipHistoryRepository.findByPeriodAndSite(from, to, resolveSite(authentication, site))
                 .stream().map(IpHistoryResponse::from).toList();
     }
 
     /** 변경 이력이 있는 월 목록 ("yyyy-MM", 최신순). 당월이 없으면 맨 앞에 추가. site 미지정 시 전체. */
-    public List<String> getHistoryMonths(String site) {
+    public List<String> getHistoryMonths(String site, Authentication authentication) {
         List<String> months = new ArrayList<>();
-        for (Object[] row : ipHistoryRepository.findDistinctYearMonths(emptyToNull(site))) {
+        for (Object[] row : ipHistoryRepository.findDistinctYearMonths(resolveSite(authentication, site))) {
             months.add(String.format("%04d-%02d", ((Number) row[0]).intValue(), ((Number) row[1]).intValue()));
         }
         String cur = String.format("%04d-%02d", LocalDate.now().getYear(), LocalDate.now().getMonthValue());
@@ -550,10 +563,10 @@ public class IpAddressService {
     // ================================================================
     // Excel 다운로드 (IP 목록)
     // ================================================================
-    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup, String site) {
+    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup, String site, Authentication authentication) {
         List<IpAddress> list = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
-                        emptyToNull(ipGroup), null, emptyToNull(site), Pageable.unpaged())
+                        emptyToNull(ipGroup), null, resolveSite(authentication, site), Pageable.unpaged())
                 .getContent();
         return excelExportService.buildIpListExcel(list);
     }
@@ -562,8 +575,9 @@ public class IpAddressService {
     // Excel 업로드 (PC 목록 대량 등록) — 헤더가 양식과 일치할 때만 적재
     // ================================================================
     @Transactional
-    public IpExcelUploadResult importExcel(MultipartFile file, String site, String changedBy) {
-        String s = (site == null || site.isBlank()) ? "청주" : site;
+    public IpExcelUploadResult importExcel(MultipartFile file, String site, String changedBy, Authentication authentication) {
+        String resolved = resolveSite(authentication, site);
+        String s = (resolved == null || resolved.isBlank()) ? "청주" : resolved;
         List<String> expected = List.of(ExcelExportService.IP_LIST_HEADERS);
         DataFormatter fmt = new DataFormatter();
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
@@ -674,5 +688,22 @@ public class IpAddressService {
 
     private String emptyToNull(String v) {
         return (v == null || v.isBlank()) ? null : v;
+    }
+
+    /**
+     * 사업장 강제/검증. 서울 전용 사용자(KIMS_PERM_SEOUL)는 요청값과 무관하게 항상 '서울'로 강제한다
+     * (다른 사업장 데이터가 노출되지 않도록 서버에서 최종 결정한다).
+     * 그 외(관리자/매니저/일반 사용자)는 요청값을 그대로 쓴다(null/빈값이면 전체).
+     */
+    private String resolveSite(Authentication authentication, String requestedSite) {
+        String allowed = kimsPerm.allowedSite(authentication);
+        return (allowed != null) ? allowed : emptyToNull(requestedSite);
+    }
+
+    /** 대상 레코드의 사업장이 이 사용자의 허용 범위 밖이면 접근을 차단한다(청주 데이터 완전 차단용). */
+    private void assertSiteAccess(Authentication authentication, String targetSite) {
+        if (!kimsPerm.canWorkOnSite(authentication, targetSite)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED, "해당 사업장의 데이터에 접근할 권한이 없습니다.");
+        }
     }
 }
