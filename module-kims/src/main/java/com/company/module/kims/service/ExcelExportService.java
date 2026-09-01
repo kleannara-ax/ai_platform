@@ -111,6 +111,15 @@ public class ExcelExportService {
         }
     }
 
+    /** PC 목록(=IP 목록) 엑셀의 컬럼 헤더. 내보내기 생성과 업로드 검증이 공유한다. */
+    public static final String[] IP_LIST_HEADERS = {
+            "IP그룹", "IP주소", "상태", "상주/임시", "부서", "장치구분", "사용자",
+            "렌탈사", "PC자산번호", "모니터자산번호",
+            "모델", "제조번호", "구입업체", "구입일",
+            "OS버전", "OS시리얼", "OFFICE버전", "OFFICE시리얼", "한글버전", "한글시리얼",
+            "비고"
+    };
+
     /**
      * IP 목록 Excel 생성.
      */
@@ -119,27 +128,36 @@ public class ExcelExportService {
             Sheet sheet = workbook.createSheet("IP목록");
             CellStyle headerStyle = createHeaderStyle(workbook);
 
-            // 청주공장 IP 대역 관리대장 양식
-            String[] headers = {
-                    "IP그룹", "IP", "부서", "장치구분", "사용자", "상태",
-                    "품의여부", "품의번호", "비고", "비고작성일"
-            };
+            // PC 목록 화면과 동일한 컬럼 구성 (업로드 검증도 이 상수를 공유)
+            String[] headers = IP_LIST_HEADERS;
             writeHeader(sheet, headers, headerStyle);
 
             int rowIdx = 1;
             for (IpAddress ip : ips) {
                 Row row = sheet.createRow(rowIdx++);
                 int c = 0;
-                setCell(row, c++, ipGroupOf(ip.getIpAddress()));
+                setCell(row, c++, ip.getIpGroup());
                 setCell(row, c++, ip.getIpAddress());
+                setCell(row, c++, ip.getStatus().getLabel());
+                setCell(row, c++, ip.getUsageType());
                 setCell(row, c++, ip.getDepartment());
                 setCell(row, c++, ip.getDevice());
                 setCell(row, c++, ip.getUserName());
-                setCell(row, c++, ip.getStatus().getLabel());
-                setCell(row, c++, ip.isApproved() ? "Y" : "N");
-                setCell(row, c++, ip.getApprovalNo());
-                setCell(row, c++, ip.getRemark());
-                setCell(row, c, ip.getNoteDate() != null ? ip.getNoteDate().format(DATE) : "");
+                String rental = ip.getRentalCompany();
+                setCell(row, c++, (rental == null || rental.isBlank()) ? "자산" : rental);
+                setCell(row, c++, ip.getPcAssetNo());
+                setCell(row, c++, ip.getMonitorAssetNo());
+                setCell(row, c++, ip.getModel());
+                setCell(row, c++, ip.getSerialNo());
+                setCell(row, c++, ip.getVendor());
+                setCell(row, c++, ip.getPurchaseDate());
+                setCell(row, c++, ip.getOsVersion());
+                setCell(row, c++, ip.getOsSerial());
+                setCell(row, c++, ip.getOfficeVersion());
+                setCell(row, c++, ip.getOfficeSerial());
+                setCell(row, c++, ip.getHangulVersion());
+                setCell(row, c++, ip.getHangulSerial());
+                setCell(row, c, ip.getRemark());
             }
 
             autoSize(sheet, headers.length);

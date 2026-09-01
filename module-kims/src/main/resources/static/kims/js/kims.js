@@ -123,6 +123,32 @@ const KIMS = (() => {
     return _adminCache;
   }
 
+  // ---- KIMS 서울 전용(PC 관리) 판정 ----
+  // 공통코드 그룹 'KIMS_PERM_SEOUL' 에 등록된 로그인 ID는 PC 관리에서 서울만 다룬다.
+  // 서버 판정(KimsPermission.allowedSite)과 같은 기준: KIMS_PERM 관리자·플랫폼 ROLE_MANAGER 는
+  // 이 그룹에 있어도 항상 전체(청주+서울)를 본다 — 서울 전용 제한이 적용되지 않는다.
+  let _seoulOnlyCache = null;
+  async function isSeoulOnly() {
+    if (_seoulOnlyCache !== null) return _seoulOnlyCache;
+    if (await isAdmin()) return (_seoulOnlyCache = false);
+    if (getRoles().includes('MANAGER')) return (_seoulOnlyCache = false);
+    const session = platformSession();
+    const loginId = String(session.loginId || localStorage.getItem(USER_KEY) || '').trim().toLowerCase();
+    if (!loginId) return (_seoulOnlyCache = false);
+    try {
+      const res = await fetch('/common-api/codes/lookup/KIMS_PERM_SEOUL', {
+        headers: { 'Authorization': 'Bearer ' + getToken() },
+      });
+      const json = await res.json();
+      const list = (json && json.success && Array.isArray(json.data)) ? json.data : [];
+      _seoulOnlyCache = list.some(d => String(d.code || '').trim().toLowerCase() === loginId);
+    } catch (e) {
+      console.warn('KIMS_PERM_SEOUL 조회 실패', e);
+      _seoulOnlyCache = false;
+    }
+    return _seoulOnlyCache;
+  }
+
   // ---- 공통 네비게이션 (좌측 세로 사이드바) ----
   function renderNav(active) {
     // 플랫폼 SPA iframe 안에서는 플랫폼 사이드바가 이미 있으므로 KIMS 자체 사이드바는 그리지 않는다.
@@ -138,10 +164,28 @@ const KIMS = (() => {
       { href: 'settlement.html', label: '월말 결산', icon: '📅' },
       { href: 'qr.html', label: 'QR 관리', icon: '🔳' },
     ];
-    const items = links.map(l =>
-      `<a class="kims-navlink ${l.href === active ? 'active' : ''}" href="${l.href}">
-         <span class="kims-navicon">${l.icon}</span><span>${l.label}</span></a>`
-    ).join('');
+    const curSite = new URLSearchParams(location.search).get('site') || '청주';
+    const items = links.map(l => {
+      // PC 관리: 청주공장 / 서울 하위 메뉴로 펼침
+      if (l.href === 'ip.html') {
+        const onPc = active === 'ip.html';
+        const subs = [
+          { site: '청주', label: '청주공장' },
+          { site: '서울', label: '서울' },
+        ].map(s => {
+          const on = onPc && curSite === s.site;
+          return `<a class="kims-navlink kims-subnav ${on ? 'active' : ''}" href="ip.html?site=${encodeURIComponent(s.site)}">
+             <span class="kims-navicon">·</span><span>${s.label}</span></a>`;
+        }).join('');
+        return `<div class="kims-navgroup ${onPc ? 'open' : ''}">
+           <div class="kims-navlink kims-navparent" onclick="this.parentElement.classList.toggle('open')">
+             <span class="kims-navicon">${l.icon}</span><span>${l.label}</span>
+             <span class="kims-caret">▾</span></div>
+           ${subs}</div>`;
+      }
+      return `<a class="kims-navlink ${l.href === active ? 'active' : ''}" href="${l.href}">
+         <span class="kims-navicon">${l.icon}</span><span>${l.label}</span></a>`;
+    }).join('');
     const css = `<style id="kims-nav-style">
       body { padding-left: 220px; }
       .kims-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
@@ -162,6 +206,12 @@ const KIMS = (() => {
       .kims-navlink:hover { background: rgba(255,255,255,.06); color: #fff; }
       .kims-navlink.active { background: rgba(37,99,235,.18); color: #fff; border-left-color: #3b82f6; font-weight: 600; }
       .kims-navicon { width: 18px; text-align: center; }
+      .kims-navparent { cursor: pointer; user-select: none; }
+      .kims-caret { margin-left: auto; font-size: 11px; transition: transform .15s; color: #64748b; }
+      .kims-navgroup:not(.open) .kims-caret { transform: rotate(-90deg); }
+      .kims-navgroup .kims-subnav { display: none; padding-left: 34px; font-size: 13px; }
+      .kims-navgroup.open .kims-subnav { display: flex; }
+      .kims-subnav .kims-navicon { color: #475569; }
       .kims-logout { margin: 12px 16px 16px; }
     </style>`;
     const html = css + `
@@ -216,5 +266,5 @@ const KIMS = (() => {
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
   };
 
-  return { getToken, getUser, getRoles, isAdmin, setSession, clear, requireAuth, api, uploadFile, download, renderNav, logout, escapeHtml, toast, alertModal };
+  return { getToken, getUser, getRoles, isAdmin, isSeoulOnly, setSession, clear, requireAuth, api, uploadFile, download, renderNav, logout, escapeHtml, toast, alertModal };
 })();

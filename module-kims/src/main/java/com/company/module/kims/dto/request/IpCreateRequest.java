@@ -48,6 +48,9 @@ public class IpCreateRequest {
     /** 연결할 업무 요청 ID (선택) */
     private Long requestId;
 
+    /** 사업장 구분 (청주/서울) — 미지정 시 청주 */
+    private String site;
+
     @NotBlank(message = "등록자는 필수입니다.")
     private String changedBy;
 }

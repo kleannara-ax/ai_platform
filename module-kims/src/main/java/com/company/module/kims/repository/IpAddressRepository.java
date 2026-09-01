@@ -35,6 +35,7 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
               AND (:department IS NULL OR i.department = :department)
               AND (:ipGroup IS NULL OR i.ipGroup = :ipGroup)
               AND (:excludeGroup IS NULL OR i.ipGroup IS NULL OR i.ipGroup <> :excludeGroup)
+              AND (:site IS NULL OR i.site = :site)
             ORDER BY i.ipGroup, FUNCTION('INET_ATON', i.ipAddress), i.ipId
             """)
     Page<IpAddress> search(@Param("keyword") String keyword,
@@ -43,11 +44,13 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
                            @Param("department") String department,
                            @Param("ipGroup") String ipGroup,
                            @Param("excludeGroup") String excludeGroup,
+                           @Param("site") String site,
                            Pageable pageable);
 
-    /** 등록된 IP 그룹 목록 (중복 제거, 정렬) */
-    @Query("SELECT DISTINCT i.ipGroup FROM IpAddress i WHERE i.ipGroup IS NOT NULL AND i.ipGroup <> '' ORDER BY i.ipGroup")
-    java.util.List<String> findDistinctGroups();
+    /** 등록된 IP 그룹 목록 (중복 제거, 정렬). site 미지정 시 전체. */
+    @Query("SELECT DISTINCT i.ipGroup FROM IpAddress i WHERE i.ipGroup IS NOT NULL AND i.ipGroup <> '' "
+            + "AND (:site IS NULL OR i.site = :site) ORDER BY i.ipGroup")
+    java.util.List<String> findDistinctGroups(@Param("site") String site);
 
     // ================================================================
     // 대역(그룹) 사용 현황 집계
@@ -58,4 +61,15 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
 
     /** 특정 대역 접두어 + 상태별 IP 수 (사용중 집계용) */
     long countByStatusAndIpAddressStartingWith(IpStatus status, String prefix);
+
+    /** 대역 접두어 전체 등록 IP 수 (site 미지정 시 전체) */
+    @Query("SELECT COUNT(i) FROM IpAddress i WHERE i.ipAddress LIKE CONCAT(:prefix, '%') "
+            + "AND (:site IS NULL OR i.site = :site)")
+    long countByPrefixAndSite(@Param("prefix") String prefix, @Param("site") String site);
+
+    /** 대역 접두어 + 상태별 IP 수 (site 미지정 시 전체) */
+    @Query("SELECT COUNT(i) FROM IpAddress i WHERE i.status = :status AND i.ipAddress LIKE CONCAT(:prefix, '%') "
+            + "AND (:site IS NULL OR i.site = :site)")
+    long countByStatusAndPrefixAndSite(@Param("status") IpStatus status,
+                                       @Param("prefix") String prefix, @Param("site") String site);
 }

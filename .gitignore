@@ -33,3 +33,5 @@ test_*.js
 package*.json
 app.log
 uploads/
+.runtime/
+tmp/
