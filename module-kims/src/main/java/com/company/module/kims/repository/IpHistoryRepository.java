@@ -13,17 +13,25 @@ public interface IpHistoryRepository extends JpaRepository<IpHistory, Long> {
     /** 특정 IP 의 변경 이력 (오래된순 — 사용자 변천 추적용) */
     List<IpHistory> findByIpAddress_IpIdOrderByCreatedAtAsc(Long ipId);
 
-    /** 특정 사용자가 변경 전/후에 관여한 장비(IP_ID) 목록 */
+    /** 특정 사용자가 변경 전/후에 관여한 장비(IP_ID) 목록. site 미지정 시 전체. */
     @org.springframework.data.jpa.repository.Query(
             "SELECT DISTINCT h.ipAddress.ipId FROM IpHistory h "
-            + "WHERE h.beforeUser LIKE CONCAT('%', :kw, '%') OR h.afterUser LIKE CONCAT('%', :kw, '%')")
-    List<Long> findDistinctDeviceIdsByUser(@org.springframework.data.repository.query.Param("kw") String kw);
+            + "WHERE (h.beforeUser LIKE CONCAT('%', :kw, '%') OR h.afterUser LIKE CONCAT('%', :kw, '%')) "
+            + "AND (:site IS NULL OR h.ipAddress.site = :site)")
+    List<Long> findDistinctDeviceIdsByUser(@org.springframework.data.repository.query.Param("kw") String kw,
+                                           @org.springframework.data.repository.query.Param("site") String site);
 
     /** 특정 업무요청에 연결된 IP 변경 이력 (요청 상세용) */
     List<IpHistory> findByServiceRequest_RequestIdOrderByCreatedAtDesc(Long requestId);
 
     /** 미품의(approved=false) 변경 이력 (최신순) — "미품의 IP 변경 내역" */
     List<IpHistory> findByApprovedFalseOrderByCreatedAtDesc();
+
+    /** 미품의 변경 이력 (site 미지정 시 전체) */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT h FROM IpHistory h WHERE h.approved = false "
+            + "AND (:site IS NULL OR h.ipAddress.site = :site) ORDER BY h.createdAt DESC")
+    List<IpHistory> findUnapprovedBySite(@org.springframework.data.repository.query.Param("site") String site);
 
     /** 미품의 변경 건수 (대시보드 알림용) */
     long countByApprovedFalse();
@@ -32,14 +40,23 @@ public interface IpHistoryRepository extends JpaRepository<IpHistory, Long> {
     /** 기간 내 IP 변경 이력 */
     List<IpHistory> findByCreatedAtBetweenOrderByCreatedAtDesc(java.time.LocalDateTime from, java.time.LocalDateTime to);
 
+    /** 기간 내 IP 변경 이력 (site 미지정 시 전체) */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT h FROM IpHistory h WHERE h.createdAt BETWEEN :from AND :to "
+            + "AND (:site IS NULL OR h.ipAddress.site = :site) ORDER BY h.createdAt DESC")
+    List<IpHistory> findByPeriodAndSite(@org.springframework.data.repository.query.Param("from") java.time.LocalDateTime from,
+                                        @org.springframework.data.repository.query.Param("to") java.time.LocalDateTime to,
+                                        @org.springframework.data.repository.query.Param("site") String site);
+
     /** 기간 내 미품의 IP 변경 이력 */
     List<IpHistory> findByApprovedFalseAndCreatedAtBetweenOrderByCreatedAtDesc(java.time.LocalDateTime from, java.time.LocalDateTime to);
 
-    /** 변경 이력이 존재하는 (연,월) 목록: [Year, Month] 내림차순 */
+    /** 변경 이력이 존재하는 (연,월) 목록: [Year, Month] 내림차순. site 미지정 시 전체. */
     @org.springframework.data.jpa.repository.Query(
             "SELECT DISTINCT YEAR(h.createdAt), MONTH(h.createdAt) FROM IpHistory h "
+            + "WHERE (:site IS NULL OR h.ipAddress.site = :site) "
             + "ORDER BY YEAR(h.createdAt) DESC, MONTH(h.createdAt) DESC")
-    List<Object[]> findDistinctYearMonths();
+    List<Object[]> findDistinctYearMonths(@org.springframework.data.repository.query.Param("site") String site);
 
     /**
      * 이력 검색 — 기준(field) 별 부분일치.
@@ -51,14 +68,16 @@ public interface IpHistoryRepository extends JpaRepository<IpHistory, Long> {
      */
     @org.springframework.data.jpa.repository.Query("""
             SELECT h FROM IpHistory h
-            WHERE (:field = 'user' AND (h.beforeUser LIKE CONCAT('%', :keyword, '%')
-                                     OR h.afterUser LIKE CONCAT('%', :keyword, '%')))
+            WHERE ((:field = 'user' AND (h.beforeUser LIKE CONCAT('%', :keyword, '%')
+                                      OR h.afterUser LIKE CONCAT('%', :keyword, '%')))
                OR (:field = 'serial' AND h.ipAddress.serialNo LIKE CONCAT('%', :keyword, '%'))
                OR (:field = 'ip' AND (h.snapshotIp LIKE CONCAT('%', :keyword, '%')
-                                   OR h.ipAddress.ipAddress LIKE CONCAT('%', :keyword, '%')))
+                                   OR h.ipAddress.ipAddress LIKE CONCAT('%', :keyword, '%'))))
+              AND (:site IS NULL OR h.ipAddress.site = :site)
             ORDER BY h.createdAt DESC
             """)
     List<IpHistory> searchHistory(@org.springframework.data.repository.query.Param("field") String field,
                                   @org.springframework.data.repository.query.Param("keyword") String keyword,
+                                  @org.springframework.data.repository.query.Param("site") String site,
                                   org.springframework.data.domain.Pageable pageable);
 }

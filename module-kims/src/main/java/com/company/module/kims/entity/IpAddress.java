@@ -40,6 +40,10 @@ public class IpAddress extends BaseTimeEntity {
     @Column(name = "IP_GROUP", length = 30)
     private String ipGroup;
 
+    /** 사업장 구분 (청주/서울) — PC 관리 분리용. 기본 '청주' */
+    @Column(name = "SITE", nullable = false, length = 20)
+    private String site;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false, length = 20)
     private IpStatus status;
@@ -131,7 +135,7 @@ public class IpAddress extends BaseTimeEntity {
     @Builder
     private IpAddress(String ipAddress, IpStatus status, String userName, String department,
                       String location, String device, boolean approved, String approvalNo,
-                      String remark, LocalDate noteDate) {
+                      String remark, LocalDate noteDate, String site) {
         this.ipAddress = ipAddress;
         this.status = status;
         this.userName = userName;
@@ -142,6 +146,7 @@ public class IpAddress extends BaseTimeEntity {
         this.approvalNo = approvalNo;
         this.remark = remark;
         this.noteDate = noteDate;
+        this.site = (site == null || site.isBlank()) ? "청주" : site;
     }
 
     // ----------------------------------------------------------------
