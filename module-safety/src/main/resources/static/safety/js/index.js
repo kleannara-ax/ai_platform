@@ -305,6 +305,11 @@ function formatDate(value) {
   return value ? String(value).replace('T', ' ').substring(0, 16) : '';
 }
 
+/** 날짜만 (공지 목록은 시간까지 보여줄 만큼 폭이 넓지 않다) */
+function formatDateOnly(value) {
+  return value ? String(value).substring(0, 10) : '';
+}
+
 // ================================================================
 // 관리(수정) 모드 — 기본 꺼짐. 켜야 관리 버튼과 관리 칸이 나타난다.
 // ================================================================
@@ -560,8 +565,11 @@ function renderPhotos(photos) {
 // 공지사항 (좌측 패널)
 // ================================================================
 let notices = [];
-/** 본문을 펼쳐 둔 공지 id */
-let expandedNotices = new Set();
+let noticeViewModal = null;
+/** 전체 보기 모달 상태 — 한 페이지 5건, 펼쳐 둔 공지는 하나만 */
+const NOTICE_PAGE_SIZE = 5;
+let noticeViewPage = 0;
+let noticeOpenId = null;
 
 async function loadNotices() {
   try {
@@ -580,29 +588,85 @@ function renderNotices() {
     return;
   }
   const manage = isAdminUser && editMode;
-  holder.innerHTML = notices.map(n => {
-    const open = expandedNotices.has(Number(n.noticeId));
-    return `<div class="notice-row ${n.pinned ? 'pinned' : ''}">
+  holder.innerHTML = notices.map(n => `
+    <div class="notice-row ${n.pinned ? 'pinned' : ''}" onclick="openNoticeView(${n.noticeId})"
+         title="눌러서 전체 내용 보기">
       <div class="notice-top">
         ${n.pinned ? '<span class="notice-pin" title="상단 고정"><i class="fas fa-thumbtack"></i></span>' : ''}
-        <div class="notice-title" onclick="toggleNotice(${n.noticeId})"
-             title="${SAFETY.escapeHtml(n.title)}">${SAFETY.escapeHtml(n.title)}</div>
-        ${manage ? `<span class="notice-tools">
+        <div class="notice-title">${SAFETY.escapeHtml(n.title)}</div>
+        <span class="notice-date">${formatDateOnly(n.createdAt)}</span>
+        ${manage ? `<span class="notice-tools" onclick="event.stopPropagation()">
           <button onclick="openNoticeModal(${n.noticeId})" title="공지 수정"><i class="fas fa-pen"></i></button>
           <button class="danger" onclick="deleteNotice(${n.noticeId})" title="공지 삭제"><i class="fas fa-trash"></i></button>
         </span>` : ''}
       </div>
-      <div class="notice-date">${formatDate(n.createdAt)}${n.createdBy ? ' · ' + SAFETY.escapeHtml(n.createdBy) : ''}</div>
-      ${open && n.content ? `<div class="notice-body">${SAFETY.escapeHtml(n.content)}</div>` : ''}
-    </div>`;
-  }).join('');
+      ${n.content ? `<div class="notice-preview">${SAFETY.escapeHtml(n.content)}</div>` : ''}
+    </div>`).join('');
 }
 
-/** 제목을 누르면 본문을 펼치고 접는다 */
-function toggleNotice(noticeId) {
-  const key = Number(noticeId);
-  if (expandedNotices.has(key)) expandedNotices.delete(key); else expandedNotices.add(key);
-  renderNotices();
+/**
+ * 공지 전체 보기 모달. 한 페이지에 5건씩 보여주고, 누른 공지만 펼쳐 둔다.
+ * (누른 공지가 몇 번째든 그 공지가 있는 페이지를 열어 준다)
+ */
+function openNoticeView(noticeId) {
+  if (!notices.length) { SAFETY.toast('등록된 공지사항이 없습니다.', false); return; }
+
+  const index = notices.findIndex(n => Number(n.noticeId) === Number(noticeId));
+  noticeViewPage = index >= 0 ? Math.floor(index / NOTICE_PAGE_SIZE) : 0;
+  noticeOpenId = index >= 0 ? Number(notices[index].noticeId) : null;
+
+  renderNoticeView();
+  if (!noticeViewModal) noticeViewModal = new bootstrap.Modal(document.getElementById('noticeViewModal'));
+  noticeViewModal.show();
+}
+
+function renderNoticeView() {
+  const totalPages = Math.max(1, Math.ceil(notices.length / NOTICE_PAGE_SIZE));
+  noticeViewPage = Math.min(Math.max(0, noticeViewPage), totalPages - 1);
+  const from = noticeViewPage * NOTICE_PAGE_SIZE;
+  const page = notices.slice(from, from + NOTICE_PAGE_SIZE);
+
+  document.getElementById('noticeViewMeta').textContent = `전체 ${notices.length}건`;
+  document.getElementById('noticeViewList').innerHTML = page.map(n => {
+    const open = Number(n.noticeId) === noticeOpenId;
+    return `<article class="nf-item ${open ? 'open' : ''}" data-notice="${n.noticeId}">
+      <div class="nf-head" onclick="toggleNoticeView(${n.noticeId})">
+        <h6 class="nf-title">
+          ${n.pinned ? '<span class="notice-pin" title="상단 고정"><i class="fas fa-thumbtack"></i></span>' : ''}
+          <span>${SAFETY.escapeHtml(n.title)}</span>
+        </h6>
+        <span class="nf-date">${formatDateOnly(n.createdAt)}</span>
+        <span class="nf-caret"><i class="fas fa-chevron-down"></i></span>
+      </div>
+      ${open ? `<div class="nf-body${n.content ? '' : ' empty'}">${
+        SAFETY.escapeHtml(n.content || '내용이 없습니다.')}</div>` : ''}
+    </article>`;
+  }).join('');
+
+  const to = from + page.length;
+  document.getElementById('noticeViewPager').innerHTML = `
+    <span class="nf-range">${from + 1}–${to} / ${notices.length}건</span>
+    <span class="nf-pages">
+      <button class="nf-page" ${noticeViewPage === 0 ? 'disabled' : ''}
+              onclick="goNoticePage(${noticeViewPage - 1})"><i class="fas fa-chevron-left"></i></button>
+      ${Array.from({ length: totalPages }, (_, i) =>
+        `<button class="nf-page ${i === noticeViewPage ? 'active' : ''}" onclick="goNoticePage(${i})">${i + 1}</button>`).join('')}
+      <button class="nf-page" ${noticeViewPage === totalPages - 1 ? 'disabled' : ''}
+              onclick="goNoticePage(${noticeViewPage + 1})"><i class="fas fa-chevron-right"></i></button>
+    </span>`;
+  document.getElementById('noticeViewScroll').scrollTop = 0;
+}
+
+/** 머리글을 누르면 그 공지만 펼친다 (이미 펼쳐져 있으면 접는다) */
+function toggleNoticeView(noticeId) {
+  noticeOpenId = (Number(noticeId) === noticeOpenId) ? null : Number(noticeId);
+  renderNoticeView();
+}
+
+function goNoticePage(page) {
+  noticeViewPage = page;
+  noticeOpenId = null;   // 페이지를 넘기면 모두 접힌 상태로 시작한다
+  renderNoticeView();
 }
 
 function openNoticeModal(noticeId) {
@@ -640,7 +704,6 @@ async function deleteNotice(noticeId) {
   try {
     await SAFETY.api('/safety-api/notices/' + noticeId, { method: 'DELETE' });
     SAFETY.toast('삭제되었습니다.');
-    expandedNotices.delete(Number(noticeId));
     await loadNotices();
   } catch (e) {
     SAFETY.toast(e.message, false);

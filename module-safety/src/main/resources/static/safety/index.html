@@ -85,25 +85,65 @@ body{
 
 /* 공지사항 */
 .notice-card #noticeList{max-height:300px; overflow-y:auto}
-.notice-row{padding:11px 16px; border-bottom:1px solid var(--line)}
+.notice-row{padding:11px 16px; border-bottom:1px solid var(--line); cursor:pointer; transition:.12s}
 .notice-row:last-child{border-bottom:none}
+.notice-row:hover{background:#f8f9fd}
 .notice-row.pinned{background:#fffbeb}
-.notice-top{display:flex; align-items:flex-start; gap:6px}
+.notice-row.pinned:hover{background:#fef7dd}
+.notice-top{display:flex; align-items:center; gap:6px}
 .notice-title{
-  flex:1 1 auto; min-width:0; font-size:.85rem; font-weight:700; cursor:pointer;
+  flex:1 1 auto; min-width:0; font-size:.85rem; font-weight:700;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.notice-title:hover{color:var(--brand)}
-.notice-pin{color:#f59e0b; font-size:.72rem; flex:0 0 auto; margin-top:2px}
+.notice-pin{color:#f59e0b; font-size:.72rem; flex:0 0 auto}
+/* 날짜는 제목 줄 오른쪽 끝에 — 날짜만 표시하고 시간·작성자는 넣지 않는다 */
+.notice-date{flex:0 0 auto; font-size:.72rem; color:var(--muted); white-space:nowrap}
 .notice-tools{flex:0 0 auto; display:flex; gap:2px}
 .notice-tools button{
   width:22px; height:22px; border-radius:6px; border:none; background:transparent; color:#9aa0b4; font-size:.66rem;
 }
 .notice-tools button:hover{background:#e9ebf5; color:var(--text)}
 .notice-tools button.danger:hover{background:#fee2e2; color:#dc2626}
-.notice-date{font-size:.7rem; color:var(--muted); margin-top:2px}
-.notice-body{font-size:.8rem; color:#4b5563; margin-top:6px; white-space:pre-wrap; line-height:1.5}
+/* 목록에서는 두 줄까지만 — 전체 내용은 눌러서 모달로 본다 */
+.notice-preview{
+  font-size:.78rem; color:#6b7280; margin-top:5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
 .notice-empty{padding:22px 14px; text-align:center; color:var(--muted); font-size:.8rem}
+/* 전체 보기 모달 */
+.notice-view-meta{font-size:.78rem; color:var(--muted); margin-top:3px}
+.nf-item{border-bottom:1px solid var(--line)}
+.nf-item:last-child{border-bottom:none}
+/* 머리글은 항상 보이고, 본문은 펼친 항목만 보인다 */
+.nf-head{
+  display:flex; align-items:center; gap:12px; padding:14px 12px; cursor:pointer;
+  border-radius:10px; transition:.12s;
+}
+.nf-head:hover{background:#f8f9fd}
+.nf-title{font-size:1rem; font-weight:700; margin:0; display:flex; align-items:center; gap:7px; min-width:0; flex:1 1 auto}
+.nf-title > span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.nf-title .notice-pin{font-size:.8rem}
+.nf-date{flex:0 0 auto; font-size:.8rem; color:var(--muted); white-space:nowrap}
+.nf-caret{flex:0 0 auto; color:#9aa0b4; font-size:.75rem; transition:transform .15s}
+.nf-item.open .nf-caret{transform:rotate(180deg)}
+.nf-item.open .nf-title{color:var(--brand)}
+.nf-body{
+  font-size:.94rem; color:var(--text); line-height:1.75; white-space:pre-wrap; word-break:break-word;
+  padding:2px 12px 16px;
+}
+.nf-body.empty{color:var(--muted); font-style:italic}
+
+/* 페이지네이션 */
+#noticeViewPager{justify-content:space-between; align-items:center; gap:10px}
+.nf-range{font-size:.8rem; color:var(--muted)}
+.nf-pages{display:flex; gap:4px; align-items:center}
+.nf-page{
+  min-width:30px; height:30px; padding:0 8px; border-radius:8px; border:1px solid var(--line);
+  background:#fff; color:var(--text); font-size:.82rem; font-weight:600;
+}
+.nf-page:hover:not(:disabled){background:var(--brand-soft); border-color:var(--brand-soft); color:var(--brand)}
+.nf-page.active{background:var(--brand); border-color:var(--brand); color:#fff}
+.nf-page:disabled{color:#c7cad6; background:#fff}
 
 /* ---- 좌측: 스택형 분류 트리 ---- */
 .tree-panel{
@@ -482,6 +522,19 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
   <div class="lb-stage" id="lbStage"><img id="lbImg" class="fit" src="" alt=""></div>
   <div class="lb-hint">이미지를 클릭하면 확대/축소, 마우스 휠로 배율 조절, Esc로 닫기</div>
 </div>
+
+<!-- 공지사항 전체 보기 모달 — 목록에서 무엇을 누르든 전체 공지를 볼 수 있다 -->
+<div class="modal fade" id="noticeViewModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header">
+    <div style="min-width:0">
+      <h5 class="modal-title"><i class="fas fa-bullhorn me-2"></i>공지사항</h5>
+      <div class="notice-view-meta" id="noticeViewMeta"></div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="modal-body" id="noticeViewScroll"><div id="noticeViewList"></div></div>
+  <div class="modal-footer" id="noticeViewPager"></div>
+</div></div></div>
 
 <!-- 공지사항 등록/수정 모달 -->
 <div class="modal fade" id="noticeModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
