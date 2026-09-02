@@ -20,7 +20,7 @@ public class ExcelSheetAssignRequest {
     @NotBlank(message = "시트명은 필수입니다.")
     private String sheetName;
 
-    /** 이 시트를 등록할 소분류(3단계) ID */
+    /** 이 시트를 등록할 중분류(2단계) ID */
     @NotNull(message = "시트별 등록 분류는 필수입니다.")
     private Long categoryId;
 }

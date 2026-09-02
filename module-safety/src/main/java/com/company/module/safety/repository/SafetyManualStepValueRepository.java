@@ -36,7 +36,7 @@ public interface SafetyManualStepValueRepository extends JpaRepository<SafetyMan
 
     /**
      * 내용 검색 — 텍스트 열의 값에서 키워드를 찾는다.
-     * <p>분류 하위(대/중/소 무관) 범위로 좁힐 수 있고, {@code categoryId} 가 null 이면 전체가 대상이다.
+     * <p>분류 하위(대/중 무관) 범위로 좁힐 수 있고, {@code categoryId} 가 null 이면 전체가 대상이다.
      */
     @Query("""
             SELECT v FROM SafetyManualStepValue v
@@ -44,12 +44,10 @@ public interface SafetyManualStepValueRepository extends JpaRepository<SafetyMan
             JOIN s.manual m
             JOIN m.category c
             LEFT JOIN c.parent p
-            LEFT JOIN p.parent gp
             WHERE v.deletedYn = 'N' AND s.deletedYn = 'N' AND m.deletedYn = 'N' AND c.deletedYn = 'N'
               AND (:categoryId IS NULL
                    OR c.categoryId = :categoryId
-                   OR p.categoryId = :categoryId
-                   OR gp.categoryId = :categoryId)
+                   OR p.categoryId = :categoryId)
               AND LOWER(v.textValue) LIKE LOWER(CONCAT('%', :keyword, '%'))
             ORDER BY m.manualId ASC, s.sortOrder ASC
             """)

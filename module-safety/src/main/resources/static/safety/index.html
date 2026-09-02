@@ -296,6 +296,40 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
 }
 .step-manage{display:flex; gap:5px; justify-content:center}
 
+/* 체크 열 — 표 안에서 눌러 켜고 끈다 */
+.step-table th.col-check{text-align:center}
+.check-btn{
+  border:none; background:transparent; font-size:1.15rem; line-height:1; padding:2px 6px;
+  border-radius:8px; color:#c7cad6; transition:.12s;
+}
+.check-btn.on{color:var(--brand)}
+.check-btn:not(:disabled){cursor:pointer}
+.check-btn:not(:disabled):hover{background:var(--brand-soft)}
+.check-btn:disabled{opacity:1}
+
+/* 열 관리 (수정 모드) */
+.col-admin{border-top:1px solid var(--line); margin-top:14px; padding-top:12px}
+.col-admin-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px}
+.col-admin-head h6{margin:0; font-size:.86rem; font-weight:800; display:flex; align-items:center; gap:7px}
+.col-admin-head h6 i{color:var(--brand)}
+.col-chip-row{display:flex; flex-wrap:wrap; gap:6px}
+.col-chip{
+  display:flex; align-items:center; gap:6px; background:#f4f5fa; border:1px solid var(--line);
+  border-radius:10px; padding:5px 8px; font-size:.8rem;
+}
+.col-chip .cc-type{font-size:.68rem; font-weight:700; color:var(--brand); background:#fff; border-radius:6px; padding:1px 6px}
+.col-chip button{border:none; background:transparent; color:#9aa0b4; font-size:.7rem; padding:2px 3px; border-radius:6px}
+.col-chip button:hover{background:#e9ebf5; color:var(--text)}
+.col-chip button.danger:hover{background:#fee2e2; color:#dc2626}
+/* 머리말 (위험성 평가서의 부서명/작업인원 등) */
+.detail-meta-grid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:6px 14px;
+  background:#f8f9fd; border-radius:12px; padding:12px 14px; margin-bottom:14px;
+}
+.dm-item{font-size:.85rem; display:flex; gap:8px; min-width:0}
+.dm-label{flex:0 0 auto; font-weight:700; color:var(--muted)}
+.dm-value{min-width:0; white-space:pre-wrap}
+
 /* 좁은 화면(표 영역 760px 미만): 표를 포기하고 단계별 카드로 쌓는다.
    가로 스크롤로 내용이 잘려 나가는 것보다 항목명을 붙여 세로로 쌓는 편이 읽기 쉽다. */
 .step-table.stacked{width:100% !important; display:block}
@@ -314,12 +348,16 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
   color:var(--muted); margin-bottom:3px;
 }
 .step-table.stacked td.text-center{text-align:left !important}
-/* 카드형에서는 사진이 화면을 통째로 먹지 않도록 높이를 제한한다 (누르면 확대 뷰어로 크게 볼 수 있다) */
-.step-table.stacked .step-photo{max-height:320px}
-/* 클릭하면 확대되는 단계 사진 */
+/* 카드형에서는 사진 칸을 조금 더 크게 잡는다 (누르면 확대 뷰어로 원본을 볼 수 있다) */
+.step-table.stacked .step-photo{height:240px}
+/*
+ * 목록의 단계 사진 — 세로/가로 사진이 섞여 있어도 칸 크기를 똑같이 맞춘다.
+ * object-fit:fill 이라 세로 사진은 가로로 늘어난다(잘리지 않는다).
+ * 원본 비율은 눌러서 여는 확대 뷰어에서 그대로 볼 수 있다.
+ */
 .step-photo{
-  max-width:100%; max-height:130px; display:block; margin-bottom:5px; cursor:zoom-in;
-  border:1px solid var(--line); border-radius:8px; transition:.15s;
+  width:100%; height:130px; object-fit:fill; display:block; margin-bottom:5px; cursor:zoom-in;
+  border:1px solid var(--line); border-radius:8px; transition:.15s; background:#fff;
 }
 .step-photo:hover{border-color:var(--brand); box-shadow:var(--shadow-md)}
 
@@ -343,7 +381,8 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
 .lb-actions button:hover{background:rgba(255,255,255,.24)}
 .lb-zoom{min-width:52px; text-align:center; font-weight:700; color:#cbd5e1}
 .lb-stage{flex:1 1 auto; overflow:auto; display:flex; align-items:center; justify-content:center; padding:0 18px 18px}
-.lb-stage img{display:block; margin:auto; background:#fff; border-radius:8px; cursor:zoom-in}
+/* 확대 뷰어는 원본 그대로 — 목록 썸네일과 달리 늘리거나 자르지 않는다 */
+.lb-stage img{display:block; margin:auto; background:#fff; border-radius:8px; cursor:zoom-in; object-fit:contain}
 .lb-stage img.fit{max-width:100%; max-height:100%}
 .lb-stage img.zoomed{cursor:zoom-out; max-width:none; max-height:none}
 .lb-hint{text-align:center; color:#94a3b8; font-size:.72rem; padding-bottom:12px; flex:0 0 auto}
@@ -496,6 +535,7 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
     </div>
   </div>
   <div class="modal-body">
+    <div id="detailMetaBox"></div>
     <div class="table-responsive">
       <table class="step-table">
         <colgroup id="stepCols"></colgroup>
@@ -503,7 +543,28 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
         <tbody id="stepRows"></tbody>
       </table>
     </div>
+    <div id="columnAdmin"></div>
   </div>
+</div></div></div>
+
+<!-- 표 열 추가/수정 모달 -->
+<div class="modal fade" id="columnModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="columnModalTitle">열 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="col-id">
+    <div class="mb-3"><label class="form-label-modern">열 이름 *</label><input id="col-label" class="form-control" maxlength="100" placeholder="예: 위험요인, 확인"></div>
+    <div class="mb-3">
+      <label class="form-label-modern">열 유형</label>
+      <select id="col-type" class="form-select">
+        <option value="TEXT">글 입력</option>
+        <option value="CHECK">체크버튼</option>
+        <option value="PHOTO">사진</option>
+      </select>
+      <div class="eu-note">체크버튼을 고르면 표에서 눌러 켜고 끄는 칸이 됩니다.</div>
+    </div>
+    <div class="mb-1"><label class="form-label-modern">기본 폭 비중</label><input id="col-width" type="number" class="form-control" value="200"></div>
+  </div>
+  <div class="modal-footer"><button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">취소</button><button class="btn-modern btn-primary-modern" onclick="saveColumn()">저장</button></div>
 </div></div></div>
 
 <!-- 이미지 확대 뷰어 -->
@@ -572,7 +633,7 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
   <div class="modal-body">
     <input type="hidden" id="man-id">
     <div class="mb-3">
-      <label class="form-label-modern">등록할 분류(소분류) *</label>
+      <label class="form-label-modern">등록할 분류(중분류) *</label>
       <select id="man-category" class="form-select"></select>
     </div>
     <div class="mb-3"><label class="form-label-modern">매뉴얼 제목(공정명) *</label><input id="man-title" class="form-control" placeholder="예: 독타 블레이드 교체"></div>
@@ -591,10 +652,8 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
       <div class="col-3"><label class="form-label-modern">No. *</label><input id="step-no" type="number" class="form-control"></div>
       <div class="col-9"><label class="form-label-modern">표시 순서</label><input id="step-sort" type="number" class="form-control" value="0"></div>
     </div>
-    <div class="mb-2 mt-2"><label class="form-label-modern">공정 순서(설명)</label><textarea id="step-desc" class="form-control" rows="2"></textarea></div>
-    <div class="mb-2"><label class="form-label-modern">위험요인</label><textarea id="step-hazard" class="form-control" rows="2"></textarea></div>
-    <div class="mb-2"><label class="form-label-modern">안전 보호구</label><textarea id="step-equip" class="form-control" rows="2"></textarea></div>
-    <div class="mb-2"><label class="form-label-modern">비고</label><textarea id="step-remark" class="form-control" rows="2"></textarea></div>
+    <!-- 입력 칸은 매뉴얼의 열 정의대로 만들어진다 (renderStepModalFields) -->
+    <div id="step-fields" class="mt-2"></div>
     <div class="mb-1" id="step-photo-upload-wrap" style="display:none">
       <label class="form-label-modern">사진 첨부</label>
       <input type="file" id="step-photo-file" class="form-control" accept="image/*">
@@ -619,10 +678,10 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
 
     <div id="euStep2" style="display:none">
       <hr class="my-3">
-      <div class="eu-step active" id="eu-step2-label"><span class="num">2</span>등록할 분류 선택 (아래에서 시트마다 따로 바꿀 수 있어요)</div>
+      <div class="eu-step active" id="eu-step2-label"><span class="num">2</span>등록할 분류 선택 (중분류까지 고르면 됩니다 · 시트마다 따로 바꿀 수 있어요)</div>
 
       <div class="row g-3 mb-2">
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label-modern">대분류</label>
           <div class="eu-catrow">
             <div class="flex-fill"><select id="eu-major" class="form-select" onchange="euOnMajorChange()"><option value="">선택</option></select></div>
@@ -633,7 +692,7 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
             <button class="btn btn-sm btn-primary" onclick="euCreateCategory('major')">추가</button>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label-modern">중분류</label>
           <div class="eu-catrow">
             <div class="flex-fill"><select id="eu-middle" class="form-select" onchange="euOnMiddleChange()" disabled><option value="">대분류를 먼저 선택</option></select></div>
@@ -642,17 +701,6 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
           <div class="eu-add-inline d-none" id="eu-add-middle-form">
             <input class="form-control form-control-sm" id="eu-add-middle-name" placeholder="새 중분류명">
             <button class="btn btn-sm btn-primary" onclick="euCreateCategory('middle')">추가</button>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label-modern">소분류</label>
-          <div class="eu-catrow">
-            <div class="flex-fill"><select id="eu-minor" class="form-select" onchange="euOnMinorChange()" disabled><option value="">중분류를 먼저 선택</option></select></div>
-            <button class="eu-add-btn" onclick="euToggleAdd('minor')" title="소분류 추가"><i class="fas fa-plus"></i></button>
-          </div>
-          <div class="eu-add-inline d-none" id="eu-add-minor-form">
-            <input class="form-control form-control-sm" id="eu-add-minor-name" placeholder="새 소분류명">
-            <button class="btn btn-sm btn-primary" onclick="euCreateCategory('minor')">추가</button>
           </div>
         </div>
       </div>

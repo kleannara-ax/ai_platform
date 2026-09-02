@@ -20,8 +20,8 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
     List<SafetyManual> findByCategoryId(@Param("categoryId") Long categoryId);
 
     /**
-     * 분류 하위(자기 자신 + 중분류 + 소분류)에 속한 매뉴얼 전체.
-     * <p>분류 트리는 대/중/소 3단계로 고정이므로 부모를 2단계까지만 거슬러 비교하면 충분하다.
+     * 분류 하위(자기 자신 + 중분류)에 속한 매뉴얼 전체.
+     * <p>분류 트리는 대/중 2단계로 고정이므로 부모를 한 단계만 거슬러 비교하면 충분하다.
      * {@code categoryId} 가 null 이면 전체 매뉴얼을 반환한다.
      * 목록 화면에서 분류 경로(대 &gt; 중 &gt; 소)를 함께 보여주므로 상위 분류까지 fetch join 한다.
      */
@@ -29,12 +29,10 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
             SELECT m FROM SafetyManual m
             JOIN FETCH m.category c
             LEFT JOIN FETCH c.parent p
-            LEFT JOIN FETCH p.parent gp
             WHERE m.deletedYn = 'N' AND c.deletedYn = 'N'
               AND (:categoryId IS NULL
                    OR c.categoryId = :categoryId
-                   OR p.categoryId = :categoryId
-                   OR gp.categoryId = :categoryId)
+                   OR p.categoryId = :categoryId)
             ORDER BY c.sortOrder ASC, c.categoryId ASC, m.sortOrder ASC, m.manualId ASC
             """)
     List<SafetyManual> findInCategorySubtree(@Param("categoryId") Long categoryId);
@@ -47,12 +45,10 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
             SELECT DISTINCT m FROM SafetyManual m
             JOIN FETCH m.category c
             LEFT JOIN FETCH c.parent p
-            LEFT JOIN FETCH p.parent gp
             WHERE m.deletedYn = 'N' AND c.deletedYn = 'N'
               AND (:categoryId IS NULL
                    OR c.categoryId = :categoryId
-                   OR p.categoryId = :categoryId
-                   OR gp.categoryId = :categoryId)
+                   OR p.categoryId = :categoryId)
               AND EXISTS (
                   SELECT 1 FROM SafetyManualStep s
                   WHERE s.manual = m AND s.deletedYn = 'N'
@@ -66,7 +62,7 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
     List<SafetyManual> searchByStepContent(@Param("categoryId") Long categoryId,
                                             @Param("keyword") String keyword);
 
-    /** 소분류별 매뉴얼 건수 (좌측 분류 트리의 건수 배지 계산용) */
+    /** 분류별 매뉴얼 건수 (좌측 분류 트리의 건수 배지 계산용) */
     @Query("""
             SELECT m.category.categoryId AS categoryId, COUNT(m) AS manualCount
             FROM SafetyManual m

@@ -13,7 +13,7 @@ public class CategoryResponse {
     private final Long categoryId;
     private final String name;
     private final Long parentId;
-    /** 1=대분류, 2=중분류, 3=소분류 */
+    /** 1=대분류, 2=중분류 */
     private final int levelNo;
     private final int sortOrder;
     /** 이 분류와 하위 분류에 속한 매뉴얼 총 건수 (트리 화면의 건수 배지) */

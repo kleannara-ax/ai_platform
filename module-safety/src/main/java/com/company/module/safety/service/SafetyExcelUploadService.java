@@ -126,7 +126,7 @@ public class SafetyExcelUploadService {
 
             SafetyManualCategory category = categoryCache.get(categoryId);
             if (category == null) {
-                category = categoryService.findActiveMinor(categoryId);
+                category = categoryService.findActiveLeaf(categoryId);
                 categoryCache.put(categoryId, category);
             }
 

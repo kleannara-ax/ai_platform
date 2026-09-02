@@ -15,20 +15,20 @@ let editMode = false;
 let detailModal = null;
 
 // ── 단계 표 컬럼 폭 ──
-// 폭은 px 가 아니라 "비중"으로 들고 다닌다. 모달 폭이 얼마든 비중대로 나눠 담기 때문에
-// 항상 가로로 꽉 차고 좁은 화면에서도 잘리지 않는다. 경계를 끌면 이 비중이 바뀐다.
-const STEP_COL_LABELS = {
-  no: 'No.', photo: '공정 순서(사진)', desc: '공정 순서(설명)',
-  hazard: '위험요인', equip: '안전 보호구', remark: '비고', manage: '관리',
-};
-// 위험요인이 가장 중요한 항목이라 기본 비중을 가장 크게 잡는다.
-const STEP_COL_DEFAULT_WEIGHTS = { no: 46, photo: 150, desc: 270, hazard: 400, equip: 150, remark: 120, manage: 80 };
+// 열 구성은 매뉴얼마다 다르므로(서식/사용자 정의) 서버에서 받은 열 정의를 그대로 쓴다.
+// 폭은 px 가 아니라 "비중"이라 모달 폭이 얼마든 가로로 꽉 찬다.
+/** No. 열은 항상 맨 앞에 붙는 고정 열이다 (열 정의에는 들어 있지 않다) */
+const STEP_NO_WIDTH = 46;
+/** 관리 열도 고정 (수정 모드에서만) */
+const STEP_MANAGE_WIDTH = 80;
 const STEP_COL_MIN = 44;
 /** 이 폭보다 좁으면 표 대신 항목별 카드로 쌓아 보여준다 */
 const STEP_STACK_BREAKPOINT = 760;
 const STEP_COL_STORAGE_KEY = 'safety.stepColWeights';
+/** 매뉴얼별로 사용자가 조절한 폭 비중 { manualId: { columnKey: weight } } */
 let stepColWeights = loadStepColWeights();
-let stepColWidths = {};
+/** 지금 그려진 표의 열 목록 (No./관리 포함, 화면 기준) */
+let stepColLayout = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!SAFETY.requireAuth()) return;
@@ -82,7 +82,7 @@ function findNode(id) {
   return (id == null) ? null : (nodeIndex.get(Number(id)) || null);
 }
 
-/** 루트에서 해당 분류까지의 이름 배열 (대분류 > 중분류 > 소분류) */
+/** 루트에서 해당 분류까지의 이름 배열 (대분류 > 중분류) */
 function pathOf(id) {
   const names = [];
   for (let n = findNode(id); n; n = n.__parent) names.unshift(n.name);
@@ -119,7 +119,7 @@ function treeRootRow() {
 }
 
 function renderNodes(nodes) {
-  const icons = { 1: 'fa-industry', 2: 'fa-cogs', 3: 'fa-tags' };
+  const icons = { 1: 'fa-industry', 2: 'fa-cogs' };
   return sortNodes(nodes).map(n => {
     const id = Number(n.categoryId);
     const children = n.children || [];
@@ -129,9 +129,9 @@ function renderNodes(nodes) {
     const caret = hasChildren
       ? `<button class="tr-caret ${isOpen ? 'open' : ''}" onclick="event.stopPropagation(); toggleExpand(${id})" title="${isOpen ? '접기' : '펼치기'}"><i class="fas fa-chevron-right"></i></button>`
       : `<span class="tr-caret leaf"></span>`;
-    // 분류 추가는 이 트리 안에서만 한다 — 소분류 아래에는 더 만들 수 없으므로 버튼도 내지 않는다.
+    // 분류 추가는 이 트리 안에서만 한다 — 중분류 아래에는 더 만들 수 없으므로 버튼도 내지 않는다.
     // 추가 버튼은 항상 보이고, 수정/삭제는 수정 모드에서만 보인다.
-    const childLabel = { 1: '중분류 추가', 2: '소분류 추가' }[n.levelNo];
+    const childLabel = { 1: '중분류 추가' }[n.levelNo];
     const addButton = (isAdminUser && childLabel)
       ? `<button onclick="openCategoryCreateModal(${id})" title="${childLabel}"><i class="fas fa-plus"></i></button>` : '';
     const editButtons = (isAdminUser && editMode)
@@ -372,10 +372,108 @@ function renderDetail() {
   if (!d) return;
   document.getElementById('detailTitle').textContent = d.title || '';
   const summary = manuals.find(m => Number(m.manualId) === Number(currentManualId));
+  const path = (summary && summary.categoryPath) ? summary.categoryPath : (d.categoryName || '');
   document.getElementById('detailPath').textContent =
-    (summary && summary.categoryPath) ? summary.categoryPath : (d.categoryName || '');
+    d.formTypeName ? `${path} · ${d.formTypeName}` : path;
   renderDetailTools();
+  renderDetailMeta(d.meta || []);
   renderSteps(d.steps || []);
+  renderColumnAdmin();
+}
+
+/** 위험성 평가서의 부서명/작업인원/목적 같은 머리말 항목 */
+function renderDetailMeta(meta) {
+  const box = document.getElementById('detailMetaBox');
+  if (!meta.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="detail-meta-grid">${meta.map(m => `
+    <div class="dm-item">
+      <span class="dm-label">${SAFETY.escapeHtml(m.label)}</span>
+      <span class="dm-value">${SAFETY.escapeHtml(m.value || '')}</span>
+    </div>`).join('')}</div>`;
+}
+
+/** 표의 열 관리 — 수정 모드에서만 보인다 */
+function renderColumnAdmin() {
+  const box = document.getElementById('columnAdmin');
+  if (!isAdminUser || !editMode || !currentDetail) { box.innerHTML = ''; return; }
+  const columns = currentDetail.columns || [];
+  const typeName = { TEXT: '글', CHECK: '체크', PHOTO: '사진' };
+  box.innerHTML = `<div class="col-admin">
+    <div class="col-admin-head">
+      <h6><i class="fas fa-table-columns"></i>표의 열</h6>
+      <button class="btn-modern btn-outline-modern" onclick="openColumnModal()"><i class="fas fa-plus"></i>열 추가</button>
+    </div>
+    <div class="col-chip-row">${columns.map((c, i) => `
+      <span class="col-chip">
+        <span class="cc-type">${typeName[c.columnType] || c.columnType}</span>
+        <span>${SAFETY.escapeHtml(c.label)}</span>
+        <button onclick="moveColumn(${c.columnId}, -1)" title="왼쪽으로" ${i === 0 ? 'disabled' : ''}><i class="fas fa-arrow-left"></i></button>
+        <button onclick="moveColumn(${c.columnId}, 1)" title="오른쪽으로" ${i === columns.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-right"></i></button>
+        <button onclick="openColumnModal(${c.columnId})" title="이름/유형 수정"><i class="fas fa-pen"></i></button>
+        <button class="danger" onclick="deleteColumn(${c.columnId})" title="열 삭제"><i class="fas fa-trash"></i></button>
+      </span>`).join('')}</div>
+    <div class="eu-note">열을 추가하거나 이름·순서를 바꿀 수 있습니다. 체크버튼도 열 유형 중 하나입니다.</div>
+  </div>`;
+}
+
+// ================================================================
+// 표의 열 추가/수정/삭제/순서 변경
+// ================================================================
+function openColumnModal(columnId) {
+  const column = columnId ? (currentDetail.columns || []).find(c => Number(c.columnId) === Number(columnId)) : null;
+  document.getElementById('col-id').value = column ? column.columnId : '';
+  document.getElementById('col-label').value = column ? column.label : '';
+  document.getElementById('col-type').value = column ? column.columnType : 'TEXT';
+  document.getElementById('col-width').value = column ? column.widthWeight : 200;
+  document.getElementById('columnModalTitle').textContent = column ? '열 수정' : '열 추가';
+  new bootstrap.Modal(document.getElementById('columnModal')).show();
+}
+
+async function saveColumn() {
+  const id = document.getElementById('col-id').value;
+  const label = document.getElementById('col-label').value.trim();
+  if (!label) { SAFETY.toast('열 이름을 입력하세요.', false); return; }
+  const body = {
+    label,
+    columnType: document.getElementById('col-type').value,
+    widthWeight: Number(document.getElementById('col-width').value) || 200,
+    sortOrder: 0,
+  };
+  try {
+    if (id) await SAFETY.api('/safety-api/columns/' + id, { method: 'PUT', body });
+    else await SAFETY.api(`/safety-api/manuals/${currentManualId}/columns`, { method: 'POST', body });
+    bootstrap.Modal.getInstance(document.getElementById('columnModal')).hide();
+    SAFETY.toast('저장되었습니다.');
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+async function deleteColumn(columnId) {
+  if (!confirm('이 열을 삭제하시겠습니까? 열에 들어 있던 내용도 함께 사라집니다.')) return;
+  try {
+    await SAFETY.api('/safety-api/columns/' + columnId, { method: 'DELETE' });
+    SAFETY.toast('삭제되었습니다.');
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 열을 한 칸 왼쪽/오른쪽으로 옮긴다 */
+async function moveColumn(columnId, direction) {
+  const ids = (currentDetail.columns || []).map(c => Number(c.columnId));
+  const at = ids.indexOf(Number(columnId));
+  const to = at + direction;
+  if (at < 0 || to < 0 || to >= ids.length) return;
+  ids.splice(to, 0, ids.splice(at, 1)[0]);
+  try {
+    await SAFETY.api(`/safety-api/manuals/${currentManualId}/columns/order`, { method: 'PUT', body: ids });
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
 }
 
 function renderDetailTools() {
@@ -387,42 +485,76 @@ function renderDetailTools() {
     <button class="btn-modern btn-edit-toggle ${editMode ? 'on' : ''}" onclick="toggleEditMode()">
       <i class="fas fa-pen"></i>${editMode ? '수정 종료' : '수정'}</button>
     ${editMode ? `
-      <button class="btn-modern btn-outline-modern" onclick="openStepModal()"><i class="fas fa-plus"></i>단계 추가</button>
+      <button class="btn-modern btn-outline-modern" onclick="openStepModal()"><i class="fas fa-plus"></i>행 추가</button>
       <button class="btn-modern btn-danger-soft" onclick="deleteManual()"><i class="fas fa-trash"></i>매뉴얼 삭제</button>` : ''}`;
 }
 
-/** 관리 칸은 수정 모드에서만 만들고, 평상시에는 열 자체를 없애 본문을 넓게 쓴다. */
+/**
+ * 상세 표를 그린다.
+ * 열 구성은 매뉴얼마다 다르므로 서버가 준 열 정의(currentDetail.columns)대로 만들고,
+ * 각 칸은 열 ID 로 값을 찾아 채운다. 체크 열은 체크버튼으로 그린다.
+ * 사진이 하나도 없는 매뉴얼이면 사진 열 자체를 만들지 않는다(buildStepColLayout).
+ */
 function renderSteps(steps) {
-  const manage = isAdminUser && editMode;
-  const keys = stepColKeys();
-  document.getElementById('stepHead').innerHTML = '<tr>' + keys.map((k, i) =>
-    `<th class="${k === 'hazard' ? 'col-hazard' : ''}" data-col="${k}" title="${STEP_COL_LABELS[k]}"
-       >${STEP_COL_LABELS[k]}${i < keys.length - 1
-         ? `<span class="col-resizer" data-col="${k}" title="경계를 끌어 폭 조절"></span>` : ''}</th>`).join('') + '</tr>';
+  stepColLayout = buildStepColLayout();
+
+  document.getElementById('stepHead').innerHTML = '<tr>' + stepColLayout.map((col, i) =>
+    `<th class="${col.type === 'CHECK' ? 'col-check' : ''}" data-col="${col.key}" title="${SAFETY.escapeHtml(col.label)}"
+       >${SAFETY.escapeHtml(col.label)}${i < stepColLayout.length - 1
+         ? `<span class="col-resizer" data-col="${col.key}" title="경계를 끌어 폭 조절"></span>` : ''}</th>`).join('') + '</tr>';
 
   const tbody = document.getElementById('stepRows');
-  const colCount = keys.length;
   if (!steps.length) {
-    tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted py-4">등록된 단계가 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${stepColLayout.length}" class="text-center text-muted py-4">등록된 행이 없습니다.</td></tr>`;
     applyStepColWidths();
     return;
   }
-  tbody.innerHTML = steps.map(s => `
-    <tr>
-      <td class="text-center" data-label="${STEP_COL_LABELS.no}"><span class="step-no-badge">${s.stepNo}</span></td>
-      <td data-label="${STEP_COL_LABELS.photo}">${renderPhotos(s.photos)}</td>
-      <td data-label="${STEP_COL_LABELS.desc}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.description || '')}</td>
-      <td class="col-hazard" data-label="${STEP_COL_LABELS.hazard}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.hazard || '')}</td>
-      <td data-label="${STEP_COL_LABELS.equip}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.safetyEquipment || '')}</td>
-      <td data-label="${STEP_COL_LABELS.remark}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.remark || '')}</td>
-      ${manage ? `<td data-label="${STEP_COL_LABELS.manage}">
-        <div class="step-manage">
-          <button class="btn btn-sm btn-outline-secondary" onclick="openStepModal(${s.stepId})" title="단계 수정"><i class="fas fa-pen"></i></button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteStep(${s.stepId})" title="단계 삭제"><i class="fas fa-trash"></i></button>
-        </div>
-      </td>` : ''}
-    </tr>`).join('');
+
+  tbody.innerHTML = steps.map(step => {
+    const byColumn = {};
+    (step.values || []).forEach(v => { byColumn[v.columnId] = v; });
+    return '<tr>' + stepColLayout.map(col => renderStepCell(col, step, byColumn[col.columnId])).join('') + '</tr>';
+  }).join('');
   applyStepColWidths();
+}
+
+function renderStepCell(col, step, value) {
+  const label = ` data-label="${SAFETY.escapeHtml(col.label)}"`;
+  if (col.type === 'NO') {
+    return `<td class="text-center"${label}><span class="step-no-badge">${step.stepNo}</span></td>`;
+  }
+  if (col.type === 'MANAGE') {
+    return `<td${label}><div class="step-manage">
+      <button class="btn btn-sm btn-outline-secondary" onclick="openStepModal(${step.stepId})" title="행 수정"><i class="fas fa-pen"></i></button>
+      <button class="btn btn-sm btn-outline-danger" onclick="deleteStep(${step.stepId})" title="행 삭제"><i class="fas fa-trash"></i></button>
+    </div></td>`;
+  }
+  if (col.type === 'PHOTO') {
+    return `<td${label}>${renderPhotos(step.photos)}</td>`;
+  }
+  if (col.type === 'CHECK') {
+    const checked = value && value.checked;
+    const clickable = isAdminUser && editMode;
+    return `<td class="text-center"${label}>
+      <button class="check-btn ${checked ? 'on' : ''}" ${clickable ? '' : 'disabled'}
+              title="${clickable ? '눌러서 체크' : (checked ? '체크됨' : '미체크')}"
+              onclick="toggleStepCheck(${step.stepId}, ${col.columnId}, ${!checked})">
+        <i class="fas ${checked ? 'fa-square-check' : 'fa-square'}"></i>
+      </button></td>`;
+  }
+  const text = (value && value.text) ? value.text : '';
+  return `<td style="white-space:pre-wrap"${label}>${SAFETY.escapeHtml(text)}</td>`;
+}
+
+/** 체크버튼 토글 — 관리자만, 수정 모드에서만 */
+async function toggleStepCheck(stepId, columnId, checked) {
+  if (!isAdminUser || !editMode) return;
+  try {
+    await SAFETY.api(`/safety-api/steps/${stepId}/checks/${columnId}?checked=${checked}`, { method: 'PUT' });
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
 }
 
 // ================================================================
@@ -435,17 +567,47 @@ function stepColKeys() {
 }
 
 function loadStepColWeights() {
-  const weights = Object.assign({}, STEP_COL_DEFAULT_WEIGHTS);
   try {
-    const saved = JSON.parse(localStorage.getItem(STEP_COL_STORAGE_KEY) || '{}');
-    Object.keys(weights).forEach(k => { if (Number(saved[k]) > 0) weights[k] = Number(saved[k]); });
-  } catch (e) { /* 저장값이 없거나 못 읽는 환경이면 기본 비중 그대로 */ }
-  return weights;
+    return JSON.parse(localStorage.getItem(STEP_COL_STORAGE_KEY) || '{}') || {};
+  } catch (e) {
+    return {}; // 저장값을 못 읽는 환경이면 서버의 기본 비중을 쓴다
+  }
 }
 
 function saveStepColWeights() {
   try { localStorage.setItem(STEP_COL_STORAGE_KEY, JSON.stringify(stepColWeights)); }
   catch (e) { /* 저장 못해도 이번 세션 동안은 그대로 쓴다 */ }
+}
+
+/**
+ * 지금 매뉴얼에 맞는 화면 열 목록을 만든다.
+ * 서버 열 정의 앞에 No., (수정 모드면) 뒤에 관리 열을 붙인다.
+ * 사진 열은 실제 사진이 하나도 없으면 빼서 그만큼 다른 열을 넓게 쓴다.
+ */
+function buildStepColLayout() {
+  const detail = currentDetail || {};
+  const columns = detail.columns || [];
+  const hasAnyPhoto = (detail.steps || []).some(step => (step.photos || []).length > 0);
+  const manualId = detail.manualId;
+  const saved = (manualId != null && stepColWeights[manualId]) ? stepColWeights[manualId] : {};
+
+  const layout = [{ key: 'no', label: 'No.', type: 'NO', weight: STEP_NO_WIDTH, fixed: true }];
+  columns.forEach(column => {
+    if (column.columnType === 'PHOTO' && !hasAnyPhoto) return;   // 사진이 없으면 사진 열은 아예 만들지 않는다
+    const key = 'c' + column.columnId;
+    layout.push({
+      key,
+      columnId: column.columnId,
+      label: column.label,
+      type: column.columnType,
+      weight: Number(saved[key]) > 0 ? Number(saved[key]) : (column.widthWeight || 200),
+      fixed: false,
+    });
+  });
+  if (isAdminUser && editMode) {
+    layout.push({ key: 'manage', label: '관리', type: 'MANAGE', weight: STEP_MANAGE_WIDTH, fixed: true });
+  }
+  return layout;
 }
 
 /** 표가 들어갈 실제 가용 폭. 모달이 보이기 전에는 0 이 나올 수 있다. */
@@ -454,35 +616,42 @@ function stepColAvailableWidth() {
   return holder ? Math.floor(holder.clientWidth) : 0;
 }
 
-/** 가용 폭을 비중대로 나눈다. 마지막 칸이 반올림 오차를 흡수해 합계가 정확히 맞는다. */
-function fitStepColWidths(keys, available) {
-  const totalWeight = keys.reduce((sum, k) => sum + stepColWeights[k], 0);
+/** 고정 폭을 뺀 나머지를 비중대로 나눈다. 마지막 칸이 반올림 오차를 흡수한다. */
+function fitStepColWidths(layout, available) {
   const widths = {};
+  let remaining = available;
+  layout.forEach(col => { if (col.fixed) { widths[col.key] = col.weight; remaining -= col.weight; } });
+
+  const flex = layout.filter(col => !col.fixed);
+  const totalWeight = flex.reduce((sum, col) => sum + col.weight, 0) || 1;
   let used = 0;
-  keys.forEach((k, i) => {
-    if (i === keys.length - 1) {
-      widths[k] = Math.max(STEP_COL_MIN, available - used);
+  flex.forEach((col, i) => {
+    if (i === flex.length - 1) {
+      widths[col.key] = Math.max(STEP_COL_MIN, remaining - used);
     } else {
-      widths[k] = Math.max(STEP_COL_MIN, Math.round(available * stepColWeights[k] / totalWeight));
-      used += widths[k];
+      widths[col.key] = Math.max(STEP_COL_MIN, Math.round(remaining * col.weight / totalWeight));
+      used += widths[col.key];
     }
   });
   return widths;
 }
 
-/** colgroup 만 현재 폭으로 다시 씌운다 (드래그 중 매 프레임 호출) */
-function paintStepCols(keys) {
+function paintStepCols(widths) {
   document.getElementById('stepCols').innerHTML =
-    keys.map(k => `<col style="width:${stepColWidths[k]}px">`).join('');
+    stepColLayout.map(col => `<col style="width:${widths[col.key]}px">`).join('');
+  const table = document.querySelector('#detailModal .step-table');
+  if (table) {
+    table.style.width = stepColLayout.reduce((sum, col) => sum + widths[col.key], 0) + 'px';
+  }
 }
 
 /**
- * 현재 모달 폭에 맞춰 컬럼 폭을 다시 계산해 적용한다 (행 내용은 건드리지 않는다).
+ * 현재 모달 폭에 맞춰 열 폭을 다시 계산해 적용한다 (행 내용은 건드리지 않는다).
  * 표로 읽을 수 없을 만큼 좁으면 항목별 카드 형태로 전환한다.
  */
 function applyStepColWidths() {
   const table = document.querySelector('#detailModal .step-table');
-  if (!table) return;
+  if (!table || !stepColLayout.length) return;
   const available = stepColAvailableWidth();
 
   if (available > 0 && available < STEP_STACK_BREAKPOINT) {
@@ -492,11 +661,7 @@ function applyStepColWidths() {
     return;
   }
   table.classList.remove('stacked');
-
-  const keys = stepColKeys();
-  stepColWidths = fitStepColWidths(keys, (available > 0 ? available : 1100) - 1);
-  paintStepCols(keys);
-  table.style.width = keys.reduce((sum, k) => sum + stepColWidths[k], 0) + 'px';
+  paintStepCols(fitStepColWidths(stepColLayout, (available > 0 ? available : 1100) - 1));
 }
 
 function bindStepColResize() {
@@ -504,7 +669,6 @@ function bindStepColResize() {
   document.getElementById('detailModal').addEventListener('shown.bs.modal', () => applyStepColWidths());
 
   // 표 영역 폭이 바뀔 때마다 다시 맞춘다 — 세로 스크롤바 등장, 사이드바 접기, 창 크기 변경까지 포함.
-  // 표 자체 폭을 바꾸는 것은 감시 대상(컨테이너) 폭에 영향을 주지 않으므로 순환하지 않는다.
   const holder = document.querySelector('#detailModal .table-responsive');
   if (holder && window.ResizeObserver) {
     let lastWidth = 0;
@@ -522,33 +686,37 @@ function bindStepColResize() {
   document.getElementById('stepHead').addEventListener('mousedown', (e) => {
     const handle = e.target.closest('.col-resizer');
     if (!handle) return;
-    const keys = stepColKeys();
-    const index = keys.indexOf(handle.dataset.col);
-    const nextKey = keys[index + 1];
-    if (index < 0 || !nextKey) return;          // 마지막 칸 오른쪽 경계는 옮길 대상이 없다
+    const index = stepColLayout.findIndex(col => col.key === handle.dataset.col);
+    if (index < 0 || index + 1 >= stepColLayout.length) return;
     e.preventDefault();
 
-    const key = keys[index];
+    const widths = fitStepColWidths(stepColLayout, stepColAvailableWidth() - 1);
+    const key = stepColLayout[index].key;
+    const nextKey = stepColLayout[index + 1].key;
     const startX = e.clientX;
-    const startWidth = stepColWidths[key];
-    const startNext = stepColWidths[nextKey];
-    if (!startWidth || !startNext) return;
+    const startWidth = widths[key];
+    const startNext = widths[nextKey];
     document.body.classList.add('col-resizing');
 
     const onMove = (ev) => {
       const delta = Math.max(STEP_COL_MIN - startWidth,
                     Math.min(startNext - STEP_COL_MIN, ev.clientX - startX));
-      stepColWidths[key] = startWidth + delta;
-      stepColWidths[nextKey] = startNext - delta;
+      widths[key] = startWidth + delta;
+      widths[nextKey] = startNext - delta;
       // 현재 px 값을 그대로 비중으로 삼는다 — 다른 폭의 화면에서도 같은 비율로 재현된다.
-      keys.forEach(k => { stepColWeights[k] = stepColWidths[k]; });
-      paintStepCols(keys);
+      stepColLayout.forEach(col => { if (!col.fixed) col.weight = widths[col.key]; });
+      paintStepCols(widths);
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       document.body.classList.remove('col-resizing');
-      saveStepColWeights();
+      const manualId = currentDetail && currentDetail.manualId;
+      if (manualId != null) {
+        stepColWeights[manualId] = {};
+        stepColLayout.forEach(col => { if (!col.fixed) stepColWeights[manualId][col.key] = col.weight; });
+        saveStepColWeights();
+      }
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -556,8 +724,10 @@ function bindStepColResize() {
 }
 
 function resetStepColWidths() {
-  stepColWeights = Object.assign({}, STEP_COL_DEFAULT_WEIGHTS);
+  const manualId = currentDetail && currentDetail.manualId;
+  if (manualId != null) delete stepColWeights[manualId];
   saveStepColWeights();
+  stepColLayout = buildStepColLayout();
   applyStepColWidths();
   SAFETY.toast('열 너비를 기본 비율로 되돌렸습니다.');
 }
@@ -805,12 +975,12 @@ function lbOpenRaw() {
 let categoryParentId = null;
 function openCategoryCreateModal(parentId) {
   const parent = findNode(parentId);
-  if (parent && parent.levelNo === 3) { SAFETY.toast('소분류 아래에는 분류를 추가할 수 없습니다.', false); return; }
+  if (parent && parent.levelNo === 2) { SAFETY.toast('중분류 아래에는 분류를 추가할 수 없습니다.', false); return; }
   categoryParentId = parent ? Number(parent.categoryId) : null;
   document.getElementById('cat-id').value = '';
   document.getElementById('cat-name').value = '';
   document.getElementById('cat-sort').value = 0;
-  const labels = { 1: '아래 중분류', 2: '아래 소분류' };
+  const labels = { 1: '아래 중분류' };
   document.getElementById('cat-context-text').textContent =
     parent ? (pathOf(parent.categoryId).join(' > ') + ' ' + labels[parent.levelNo]) : '최상위(대분류)';
   document.getElementById('categoryModalTitle').textContent = parent ? '하위 분류 추가' : '대분류 추가';
@@ -873,11 +1043,11 @@ async function refreshAll() {
 // ================================================================
 // 매뉴얼 등록/삭제
 // ================================================================
-/** 트리 전체의 소분류를 "대 > 중 > 소" 경로로 모아 준다 (매뉴얼/엑셀 업로드의 분류 선택지) */
+/** 트리 전체의 중분류를 "대 > 중" 경로로 모아 준다 (매뉴얼/엑셀 업로드의 분류 선택지) */
 function minorCategoryOptions() {
   const options = [];
   nodeIndex.forEach(node => {
-    if (node.levelNo === 3) options.push({ id: Number(node.categoryId), path: pathOf(node.categoryId).join(' > ') });
+    if (node.levelNo === 2) options.push({ id: Number(node.categoryId), path: pathOf(node.categoryId).join(' > ') });
   });
   return options.sort((a, b) => a.path.localeCompare(b.path));
 }
@@ -885,14 +1055,14 @@ function minorCategoryOptions() {
 function openManualCreateModal() {
   const options = minorCategoryOptions();
   if (!options.length) {
-    SAFETY.toast('먼저 좌측 분류에서 소분류까지 만들어 주세요. 매뉴얼은 소분류에만 등록할 수 있습니다.', false);
+    SAFETY.toast('먼저 좌측 분류에서 중분류까지 만들어 주세요. 매뉴얼은 중분류에만 등록할 수 있습니다.', false);
     return;
   }
   const select = document.getElementById('man-category');
   select.innerHTML = options.map(o => `<option value="${o.id}">${SAFETY.escapeHtml(o.path)}</option>`).join('');
-  // 지금 보고 있는 분류가 소분류면 그걸 기본값으로
+  // 지금 보고 있는 분류가 중분류면 그걸 기본값으로
   const current = findNode(selectedId);
-  select.value = (current && current.levelNo === 3) ? String(current.categoryId) : String(options[0].id);
+  select.value = (current && current.levelNo === 2) ? String(current.categoryId) : String(options[0].id);
 
   document.getElementById('man-id').value = '';
   document.getElementById('man-title').value = '';
@@ -943,29 +1113,62 @@ async function deleteManual() {
 // 단계 등록/수정/삭제
 // ================================================================
 function openStepModal(stepId) {
-  document.getElementById('stepModalTitle').textContent = stepId ? '단계 수정' : '단계 추가';
-  document.getElementById('step-id').value = stepId || '';
-  document.getElementById('step-photo-upload-wrap').style.display = '';   // 새 단계도 사진을 바로 첨부할 수 있다
-  document.getElementById('step-photo-file').value = '';
   const step = stepId ? (currentDetail && (currentDetail.steps || []).find(x => Number(x.stepId) === Number(stepId))) : null;
-  document.getElementById('step-no').value = step ? step.stepNo : '';
-  document.getElementById('step-sort').value = step ? step.sortOrder : 0;
-  document.getElementById('step-desc').value = step ? (step.description || '') : '';
-  document.getElementById('step-hazard').value = step ? (step.hazard || '') : '';
-  document.getElementById('step-equip').value = step ? (step.safetyEquipment || '') : '';
-  document.getElementById('step-remark').value = step ? (step.remark || '') : '';
+  document.getElementById('stepModalTitle').textContent = step ? '행 수정' : '행 추가';
+  document.getElementById('step-id').value = step ? step.stepId : '';
+  document.getElementById('step-photo-file').value = '';
+  document.getElementById('step-no').value = step ? step.stepNo : nextStepNo();
+  document.getElementById('step-sort').value = step ? step.sortOrder : nextStepNo();
+  renderStepModalFields(step);
   new bootstrap.Modal(document.getElementById('stepModal')).show();
+}
+
+function nextStepNo() {
+  const steps = (currentDetail && currentDetail.steps) || [];
+  return steps.length ? Math.max(...steps.map(s => s.stepNo || 0)) + 1 : 1;
+}
+
+/** 입력 칸을 매뉴얼의 열 정의대로 만든다 (사진 열은 아래 파일 첨부로 대신한다) */
+function renderStepModalFields(step) {
+  const columns = (currentDetail && currentDetail.columns) || [];
+  const byColumn = {};
+  ((step && step.values) || []).forEach(v => { byColumn[v.columnId] = v; });
+
+  const holder = document.getElementById('step-fields');
+  holder.innerHTML = columns.filter(c => c.columnType !== 'PHOTO').map(c => {
+    const value = byColumn[c.columnId];
+    if (c.columnType === 'CHECK') {
+      return `<div class="form-check mb-2">
+        <input class="form-check-input step-field" type="checkbox" id="stepcol-${c.columnId}"
+               data-column="${c.columnId}" data-type="CHECK" ${value && value.checked ? 'checked' : ''}>
+        <label class="form-check-label" for="stepcol-${c.columnId}" style="font-size:.85rem">
+          ${SAFETY.escapeHtml(c.label)}</label>
+      </div>`;
+    }
+    return `<div class="mb-2">
+      <label class="form-label-modern">${SAFETY.escapeHtml(c.label)}</label>
+      <textarea class="form-control step-field" id="stepcol-${c.columnId}"
+                data-column="${c.columnId}" data-type="TEXT" rows="2">${
+        SAFETY.escapeHtml((value && value.text) || '')}</textarea>
+    </div>`;
+  }).join('');
+
+  // 사진 열이 있는 매뉴얼에서만 사진 첨부를 보여준다
+  const hasPhotoColumn = columns.some(c => c.columnType === 'PHOTO');
+  document.getElementById('step-photo-upload-wrap').style.display = hasPhotoColumn ? '' : 'none';
 }
 
 async function saveStep() {
   const stepId = document.getElementById('step-id').value;
+  const values = [...document.querySelectorAll('.step-field')].map(el => ({
+    columnId: Number(el.dataset.column),
+    text: el.dataset.type === 'TEXT' ? el.value : null,
+    checked: el.dataset.type === 'CHECK' ? el.checked : false,
+  }));
   const payload = {
     stepNo: Number(document.getElementById('step-no').value) || 0,
-    description: document.getElementById('step-desc').value,
-    hazard: document.getElementById('step-hazard').value,
-    safetyEquipment: document.getElementById('step-equip').value,
-    remark: document.getElementById('step-remark').value,
     sortOrder: Number(document.getElementById('step-sort').value) || 0,
+    values,
   };
   try {
     let savedStepId = stepId;
@@ -1002,8 +1205,8 @@ async function deleteStep(stepId) {
 // 엑셀 일괄 업로드 모달
 // ================================================================
 let euPreviewData = [];
-let euSelected = { major: null, middle: null, minor: null };
-/** 시트 index -> 사용자가 그 행에서 직접 고른 소분류 id. 여기 없으면 상단 기본 분류를 따른다. */
+let euSelected = { major: null, middle: null };
+/** 시트 index -> 사용자가 그 행에서 직접 고른 중분류 id. 여기 없으면 상단 기본 분류를 따른다. */
 let euRowCategory = {};
 
 function openExcelModal() {
@@ -1013,17 +1216,16 @@ function openExcelModal() {
   document.getElementById('euStep3').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
   euPreviewData = [];
-  euSelected = { major: null, middle: null, minor: null };
+  euSelected = { major: null, middle: null };
   euRowCategory = {};
   document.getElementById('eu-add-major-form').classList.add('d-none');
   document.getElementById('eu-add-middle-form').classList.add('d-none');
-  document.getElementById('eu-add-minor-form').classList.add('d-none');
   euFillMajorSelect();
   euPreselectFromTree();
   new bootstrap.Modal(document.getElementById('excelModal')).show();
 }
 
-/** 좌측 트리에서 이미 고른 분류가 있으면 업로드 모달의 대/중/소 선택을 미리 채워 준다 */
+/** 좌측 트리에서 이미 고른 분류가 있으면 업로드 모달의 대/중 선택을 미리 채워 준다 */
 function euPreselectFromTree() {
   const node = findNode(selectedId);
   if (!node) return;
@@ -1037,10 +1239,6 @@ function euPreselectFromTree() {
     document.getElementById('eu-middle').value = chain[1].categoryId;
     euOnMiddleChange();
   }
-  if (chain[2]) {
-    document.getElementById('eu-minor').value = chain[2].categoryId;
-    euOnMinorChange();
-  }
 }
 
 function euFillMajorSelect() {
@@ -1050,17 +1248,13 @@ function euFillMajorSelect() {
   sel.value = '';
   document.getElementById('eu-middle').innerHTML = '<option value="">대분류를 먼저 선택</option>';
   document.getElementById('eu-middle').disabled = true;
-  document.getElementById('eu-minor').innerHTML = '<option value="">중분류를 먼저 선택</option>';
-  document.getElementById('eu-minor').disabled = true;
 }
 
 function euOnMajorChange() {
   const majorId = document.getElementById('eu-major').value;
   euSelected.major = majorId || null;
-  euSelected.middle = null; euSelected.minor = null;
+  euSelected.middle = null;
   const midSel = document.getElementById('eu-middle');
-  const minSel = document.getElementById('eu-minor');
-  minSel.innerHTML = '<option value="">중분류를 먼저 선택</option>'; minSel.disabled = true;
   if (!majorId) { midSel.innerHTML = '<option value="">대분류를 먼저 선택</option>'; midSel.disabled = true; euUpdateSummary(); return; }
   const children = sortNodes((findNode(majorId) || {}).children);
   midSel.innerHTML = '<option value="">선택</option>' + children.map(c => `<option value="${c.categoryId}">${SAFETY.escapeHtml(c.name)}</option>`).join('');
@@ -1069,19 +1263,7 @@ function euOnMajorChange() {
 }
 
 function euOnMiddleChange() {
-  const middleId = document.getElementById('eu-middle').value;
-  euSelected.middle = middleId || null;
-  euSelected.minor = null;
-  const minSel = document.getElementById('eu-minor');
-  if (!middleId) { minSel.innerHTML = '<option value="">중분류를 먼저 선택</option>'; minSel.disabled = true; euUpdateSummary(); return; }
-  const children = sortNodes((findNode(middleId) || {}).children);
-  minSel.innerHTML = '<option value="">선택</option>' + children.map(c => `<option value="${c.categoryId}">${SAFETY.escapeHtml(c.name)}</option>`).join('');
-  minSel.disabled = false;
-  euUpdateSummary();
-}
-
-function euOnMinorChange() {
-  euSelected.minor = document.getElementById('eu-minor').value || null;
+  euSelected.middle = document.getElementById('eu-middle').value || null;
   euUpdateSummary();
 }
 
@@ -1093,9 +1275,7 @@ async function euCreateCategory(level) {
   const nameInput = document.getElementById('eu-add-' + level + '-name');
   const name = nameInput.value.trim();
   if (!name) { SAFETY.toast('분류명을 입력하세요.', false); return; }
-  let parentId = null;
-  if (level === 'middle') parentId = euSelected.major;
-  if (level === 'minor') parentId = euSelected.middle;
+  const parentId = (level === 'middle') ? euSelected.major : null;
   if (level !== 'major' && !parentId) { SAFETY.toast('상위 분류를 먼저 선택하세요.', false); return; }
   try {
     const created = await SAFETY.api('/safety-api/categories', { method: 'POST', body: { name, parentId, sortOrder: 0 } });
@@ -1109,14 +1289,10 @@ async function euCreateCategory(level) {
       euFillMajorSelect();
       document.getElementById('eu-major').value = created.categoryId;
       euOnMajorChange();
-    } else if (level === 'middle') {
+    } else {
       euOnMajorChange();
       document.getElementById('eu-middle').value = created.categoryId;
       euOnMiddleChange();
-    } else {
-      euOnMiddleChange();
-      document.getElementById('eu-minor').value = created.categoryId;
-      euOnMinorChange();
     }
   } catch (e) {
     SAFETY.toast(e.message, false);
@@ -1131,7 +1307,7 @@ function euMinorOptions() {
 /** 그 행에 실제로 적용될 분류 id (직접 고른 값 우선, 없으면 상단 기본 분류) */
 function euCategoryOf(idx) {
   if (euRowCategory[idx] != null) return Number(euRowCategory[idx]);
-  return euSelected.minor ? Number(euSelected.minor) : null;
+  return euSelected.middle ? Number(euSelected.middle) : null;
 }
 
 function euOnRowCategoryChange(idx, value) {
@@ -1175,8 +1351,8 @@ function euUpdateSummary() {
   const btn = document.getElementById('eu-confirm-btn');
   euRefreshRowCategories();
 
-  const base = euSelected.minor
-    ? `<i class="fas fa-folder-tree me-1"></i>기본 등록 위치: <b>${SAFETY.escapeHtml(pathOf(euSelected.minor).join(' > '))}</b>`
+  const base = euSelected.middle
+    ? `<i class="fas fa-folder-tree me-1"></i>기본 등록 위치: <b>${SAFETY.escapeHtml(pathOf(euSelected.middle).join(' > '))}</b>`
     : '<i class="fas fa-folder-tree me-1"></i>기본 등록 위치를 고르거나, 시트마다 등록 분류를 직접 선택하세요.';
   const changedCount = Object.keys(euRowCategory).length;
   box.innerHTML = base + (changedCount ? ` · 개별 지정 <b>${changedCount}</b>건` : '');
