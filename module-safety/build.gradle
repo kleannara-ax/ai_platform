@@ -1,0 +1,35 @@
+// ============================================================
+// module-safety: 안전작업방식 매뉴얼(안전_작업방식 메뉴얼) 모듈
+// 패키지: com.company.module.safety
+// URL Prefix: /safety-api/** (업무 API)
+// 화면: /safety/**  (플랫폼 SPA 안에서 iframe 으로 로드)
+// DB Table: safety_manual_category, safety_manual, safety_manual_step, safety_manual_step_photo
+// ============================================================
+
+dependencies {
+    // core 공통 클래스 참조 (컴파일 전용: 순환 의존 방지)
+    compileOnly project(':core')
+
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 관리자 권한(SAFETY_PERM) 조회용 JdbcTemplate
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Excel 업로드 파싱(.xlsx) - 시트/행/이미지(드로잉 앵커) 추출
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// spring-boot 플러그인 미적용 서브모듈: plain jar만 생성
+jar {
+    enabled = true
+}
