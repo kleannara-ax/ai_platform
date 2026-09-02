@@ -1,5 +1,7 @@
 package com.company.module.safety.support;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -56,7 +58,9 @@ public class SafetyExcelParser {
             }
             return result;
         } catch (IOException e) {
-            throw new IllegalArgumentException("엑셀 파일을 읽을 수 없습니다: " + e.getMessage(), e);
+            // 표준상 RuntimeException/IllegalArgumentException 을 직접 던지지 않고 core 예외를 쓴다.
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "엑셀 파일을 읽을 수 없습니다: " + e.getMessage());
         }
     }
 

@@ -8,9 +8,8 @@
 | 순서 | 파일 | 설명 |
 |------|------|------|
 | 1 | `01_schema.sql` | SAFETY 테이블 4개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
-| 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (SAFETY_MGMT 그룹 + 페이지 1개 — 엑셀 업로드는 별도 페이지가 아니라 모달로 통합됨) + 역할별 노출 권한 |
+| 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (SAFETY_MGMT 그룹 + 페이지 1개 — 엑셀 업로드는 별도 페이지가 아니라 모달로 통합됨) + 역할별 노출 권한. `MENU_CODE` UNIQUE 기준 upsert 라 `MENU_ID` 가 바뀌지 않는다 |
 | 3 | `03_perm_code.sql` | 공통코드 `SAFETY_PERM` (SAFETY 관리자 명단, 기존 ROLE_ADMIN 계정으로 자동 시딩) |
-| 4 | `04_data.sql` | (선택) 최상위 분류 데모 데이터 1건 |
 | 5 | `05_category_level.sql` | 분류 3단계(대/중/소) 고정 구조 도입: `LEVEL_NO` 컬럼 추가 + 기존 데이터 레벨 백필 + 소분류가 아닌 곳에 매뉴얼이 붙어 있으면 자동으로 "미분류" 하위 분류를 만들어 이동시키는 1회성 마이그레이션 |
 | 6 | `06_org_categories.sql` | 조직(팀) 기준 **대분류 12건** 일괄 등록. 같은 이름의 활성 대분류가 있으면 건너뛴다 |
 
@@ -18,7 +17,6 @@
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 02_menu.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 03_perm_code.sql
-mysql -u platform_user --default-character-set=utf8mb4 platform_db < 04_data.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 05_category_level.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_categories.sql
 ```
@@ -29,9 +27,17 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_cate
 > latin1로 잘못 해석되어 DB에 깨진 상태(mojibake)로 저장된다. 컬럼 자체는 `utf8mb4`라
 > 오류 없이 들어가 버리므로 반드시 옵션을 챙겨야 한다.
 
-모든 파일은 재실행해도 안전하다(표는 `CREATE TABLE IF NOT EXISTS`, 메뉴는 삭제 후 재삽입,
-권한 명단/분류는 없을 때만 추가, `05_category_level.sql`은 `ADD COLUMN IF NOT EXISTS` + 마이그레이션
-프로시저를 실행 후 즉시 DROP하는 방식이라 반복 실행해도 안전하다).
+> 번호 `04` 는 과거 데모 분류 1건을 넣던 파일이었고, 조직 기준 대분류를 넣는 `06_org_categories.sql`
+> 로 대체되어 삭제했다. 이미 실행한 환경에 남아 있는 데모 분류는 화면에서 지우면 된다.
+
+모든 파일은 재실행해도 안전하다(표는 `CREATE TABLE IF NOT EXISTS`, 메뉴는 `MENU_CODE` UNIQUE 기준
+`ON DUPLICATE KEY UPDATE` + 역할 매핑 `INSERT IGNORE`, 권한 명단/분류는 없을 때만 추가,
+`05_category_level.sql`은 `ADD COLUMN IF NOT EXISTS` + 마이그레이션 프로시저를 실행 후 즉시 DROP하는
+방식이라 반복 실행해도 안전하다).
+
+`02_menu.sql` 은 core 메뉴 행을 **지우지 않는다**. 지웠다 다시 넣으면 `MENU_ID` 가 바뀌어 운영자가
+손봐 둔 역할 매핑·정렬 순서가 함께 날아가기 때문이다. 더 이상 쓰지 않는 `SAFETY_UPLOAD` 메뉴도
+삭제하지 않고 `IS_VISIBLE=0, IS_ACTIVE=0` 으로만 내린다.
 `06_org_categories.sql` 도 `NOT EXISTS` 조건으로만 INSERT 하므로 몇 번을 실행해도 대분류가 중복되지 않는다.
 
 ### 기존 분류/매뉴얼을 비우고 싶을 때
@@ -65,7 +71,7 @@ UPDATE safety_manual_category   SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELET
   `SafetyCategoryService.findActiveMinor()` 가드가 400 에러로 거부한다.
 - 소분류 아래에는 4단계 하위 분류를 만들 수 없다(`SafetyCategoryService.create()` 가드).
 
-## 테이블 (4개, 플랫폼 DB 공용)
+## 테이블 (5개, 플랫폼 DB 공용)
 
 | 테이블 | 설명 |
 |--------|------|
@@ -73,6 +79,7 @@ UPDATE safety_manual_category   SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELET
 | `safety_manual` | 매뉴얼 (원본 엑셀의 시트 1개 = 매뉴얼 1개) |
 | `safety_manual_step` | 매뉴얼 단계(원본 엑셀의 행 1개 = 1건) — 공정순서/위험요인/안전보호구/비고 |
 | `safety_manual_step_photo` | 단계별 사진 (메타데이터만, 실제 파일은 디스크 `safety.upload-dir`) |
+| `safety_notice` | 공지사항 (분류/매뉴얼과 연결되지 않는 독립 게시물, FK 없음) |
 
 모든 테이블은 공통 감사(Audit) 컬럼 7개를 갖는다: `CREATED_AT`/`CREATED_BY`/`UPDATED_AT`/`UPDATED_BY`/
 `DELETED_YN`/`DELETED_AT`/`DELETED_BY`. `CREATED_BY`/`UPDATED_BY`/`DELETED_BY` 는 core_user FK 가
@@ -190,6 +197,88 @@ node preview-server.js 8081     # http://localhost:8081  (admin / 아무 비밀�
 ```
 
 (사진 업로드·엑셀 업로드는 목 서버에서 지원하지 않으므로 실제 서버에서 확인한다.)
+
+## 권한 코드 / 메뉴 등록 정보
+
+| 항목 | 값 |
+|------|-----|
+| 메뉴명 | 안전작업방식 매뉴얼 > 분류/매뉴얼 목록 |
+| 메뉴 코드 | `SAFETY_MGMT` (그룹), `SAFETY_CATEGORY` (페이지) |
+| 메뉴 URL | `/safety/index.html` |
+| API Prefix | `/safety-api` |
+
+이 모듈은 별도 권한 코드(`SAFETY_READ` 등)를 만들지 않고, **공통코드 그룹 `SAFETY_PERM`** 에 등록된
+로그인 ID 를 관리자로 본다(소방 `FIRE_PERM`, KIMS `KIMS_PERM` 과 같은 플랫폼 방식).
+플랫폼 `ROLE_ADMIN` 도 항상 관리자로 인정한다.
+
+| 대상 | 조회 | 등록/수정/삭제 |
+|------|------|----------------|
+| 플랫폼 `ROLE_ADMIN` | O | O |
+| `SAFETY_PERM` 등록 사용자 | O | O |
+| 그 외 로그인 사용자 | O | X |
+
+메뉴 노출 권한은 `02_menu.sql` 에서 `ROLE_ADMIN` / `ROLE_MANAGER` / `ROLE_USER` 에 부여한다.
+실제 쓰기 권한은 위 표대로 `@PreAuthorize("@safetyPerm.isAdmin(authentication)")` 로 판정한다.
+
+## core 에 추가 필요 / 표준과 다르게 간 부분
+
+표준(Spring Boot 업무 모듈 생성 표준)과 어긋나거나, core 지원이 없어 모듈에서 감당한 부분을 남긴다.
+
+| 항목 | 현재 상태 | 사유 / 필요한 조치 |
+|------|-----------|--------------------|
+| `CurrentUserProvider` | **core 에 없음** | 표준은 `com.company.core.security.CurrentUserProvider` 사용을 전제하지만 core 에 해당 클래스가 없다. 모듈은 `SecurityContextHolder` 를 직접 다루지 않고, 컨트롤러가 받은 `Authentication#getName()` 을 서비스로 넘겨 감사 컬럼에 채운다. **core 에 `CurrentUserProvider` 추가 필요** — 제공되면 컨트롤러의 `Authentication` 파라미터를 걷어낼 수 있다. |
+| 사용자 조회 | 하지 않음 | 감사 컬럼에 로그인 ID 문자열만 저장한다. 사용자 이름·부서 등이 필요해지면 **core 사용자 조회 Provider 또는 API 필요**. |
+| `CREATED_BY` 등 타입 | `varchar(50)` (로그인 ID) | 표준 예시는 `BIGINT`(사용자 ID)다. 이 모듈은 플랫폼의 다른 모듈과 맞춰 로그인 ID 문자열을 쓴다. core_user 에 FK 는 걸지 않는다. |
+| `SafetySecurityConfig` | **모듈 안에 존재** | 표준은 SecurityConfig 생성을 금지한다. 다만 `/safety/**` 정적 화면과 `<img>` 태그가 부르는 사진 조회(`/safety-api/photos/*/view`)는 Authorization 헤더를 실을 수 없어 공개 경로가 필요하다. core 를 수정하지 않기 위해 모듈이 `@Order(-2)` 체인을 따로 기여한다(module-kims 의 `/kims/**` 와 같은 방식). **core 가 모듈별 공개 경로 등록 지점을 제공하면 이 파일을 없앨 수 있다.** |
+| 사진 조회 응답 | `ResponseEntity<byte[]>` | 표준은 모든 응답을 `ApiResponse<T>` 로 감싸라고 하지만, 이 엔드포인트는 `<img src>` 가 직접 부르는 이미지 바이너리라 JSON 래핑이 불가능하다. 이 하나를 제외한 모든 API 는 `ApiResponse<T>` 를 쓴다. |
+| `SafetyPermission` | 모듈 안에 존재 | Permission 엔티티/API 가 아니라 `@PreAuthorize` 에서 쓰는 판정 빈이다. 공통코드(`code_group`/`code_detail`)를 **읽기만** 하며 core 테이블을 수정하지 않는다. |
+
+## 플랫폼 app 설정에 추가 필요
+
+모듈은 `application.yml` 을 만들지 않는다. 아래 설정은 플랫폼 app 쪽에 있어야 한다.
+
+| 설정 키 | 기본값 | 용도 |
+|---------|--------|------|
+| `safety.upload-dir` | `${user.home}/safety-uploads` | 단계 사진 저장 경로 |
+| `safety.excel.max-sheets-per-upload` | `100` | 엑셀 1회 업로드 시트 수 상한 |
+
+운영자가 수동으로 해야 하는 작업(모듈이 건드리지 않는다):
+
+- `settings.gradle` 에 `include 'module-safety'` 추가
+- `app/build.gradle` 에 `implementation project(':module-safety')` 추가
+- 위 SQL 실행 순서대로 적용
+
+## 자체 검수 체크리스트
+
+| 번호 | 검수 항목 | 결과 | 비고 |
+|---|---|---|---|
+| 1 | User/Auth/Role/Menu 관련 클래스 미생성 | 통과 | 해당 엔티티/리포지토리/컨트롤러 없음 |
+| 2 | SecurityConfig/JwtProvider/AuthController 미생성 | **부분** | `SafetySecurityConfig` 존재 — 사유는 위 표 참고. JWT/Auth 관련은 없음 |
+| 3 | `application.yml`/`properties` 미생성 | 통과 | |
+| 4 | Dockerfile/docker-compose/Nginx 설정 미생성 | 통과 | |
+| 5 | `SpringBootApplication` main class 미생성 | 통과 | `jar { enabled = true }`, bootJar 미설정 |
+| 6 | API URL `/safety-api/**` 규칙 준수 | 통과 | 전 엔드포인트 확인 |
+| 7 | 금지 URL(`/api/**` 등) 미사용 | 통과 | |
+| 8 | Entity `@Setter` 없음 | 통과 | |
+| 9 | Entity `@Data` 없음 | 통과 | |
+| 10 | Service 에서 `entity.setXxx(...)` 미사용 | 통과 | 상태 변경은 `update()`/`delete()`/`restore()` 로만 |
+| 11 | Entity 컬럼 `@Column(name="UPPER_SNAKE_CASE")` | 통과 | |
+| 12 | 업무 테이블 공통 컬럼 포함 | 통과 | 5개 테이블 전부 감사 컬럼 7종 |
+| 13 | `DELETED_YN` 소프트 삭제 | 통과 | 물리 DELETE 없음 |
+| 14 | 모든 테이블/컬럼 COMMENT | 통과 | |
+| 15 | SQL `DROP TABLE` 없음 | 통과 | |
+| 16 | SQL `TRUNCATE` 없음 | 통과 | |
+| 17 | SQL 무조건 `DELETE` 없음 | 통과 | `02_menu.sql` 의 DELETE 를 upsert 로 교체함 |
+| 18 | SQL `ALTER TABLE DROP COLUMN` 없음 | 통과 | |
+| 19 | core 테이블에 FK 미생성 | 통과 | FK 는 safety 테이블 사이에만 |
+| 20 | Controller 응답 `ApiResponse<T>` | **부분** | 사진 바이너리 조회 1건 제외(위 표 참고) |
+| 21 | Controller 에서 Entity 직접 반환 안 함 | 통과 | 전부 Response DTO |
+| 22 | `RuntimeException`/`IllegalArgumentException` 직접 throw 안 함 | 통과 | `SafetyExcelParser` 의 `IllegalArgumentException` 을 `BusinessException` 으로 교체함 |
+| 23 | `ddl-auto` 의존 없이 SQL DDL 제공 | 통과 | |
+| 24 | core 모듈 미수정 | 통과 | |
+| 25 | app 모듈 미수정 | 통과 | `app/src/main/resources/static/index.html` 은 `/safety/` iframe 처리를 이미 갖고 있어 건드리지 않음 |
+| 26 | 메뉴/권한 등록 정보 README 작성 | 통과 | 위 "권한 코드 / 메뉴 등록 정보" |
+| 27 | 부족한 core 기능 README 명시 | 통과 | 위 "core 에 추가 필요" |
 
 ## 참고: 문자 인코딩(mojibake) 관련 주의사항
 
