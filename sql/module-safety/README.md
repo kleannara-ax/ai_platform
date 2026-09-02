@@ -9,9 +9,12 @@
 |------|------|------|
 | 1 | `01_schema.sql` | SAFETY 테이블 4개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
 | 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (SAFETY_MGMT 그룹 + 페이지 1개 — 엑셀 업로드는 별도 페이지가 아니라 모달로 통합됨) + 역할별 노출 권한. `MENU_CODE` UNIQUE 기준 upsert 라 `MENU_ID` 가 바뀌지 않는다 |
-| 3 | `03_perm_code.sql` | 공통코드 `SAFETY_PERM` (SAFETY 관리자 명단, 기존 ROLE_ADMIN 계정으로 자동 시딩) |
-| 5 | `05_category_level.sql` | 분류 3단계(대/중/소) 고정 구조 도입: `LEVEL_NO` 컬럼 추가 + 기존 데이터 레벨 백필 + 소분류가 아닌 곳에 매뉴얼이 붙어 있으면 자동으로 "미분류" 하위 분류를 만들어 이동시키는 1회성 마이그레이션 |
+| 3 | `03_perm_code.sql` | 공통코드 그룹 `SAFETY_PERM` 생성만. 관리자 명단은 자동으로 채우지 않고 공통코드 관리 화면에서 직접 추가한다 |
+| 5 | `05_category_level.sql` | 분류 2단계(대/중) 고정 구조 도입: `LEVEL_NO` 컬럼 추가 + 기존 데이터 레벨 백필 + 중분류가 아닌 곳에 매뉴얼이 붙어 있으면 자동으로 "미분류" 중분류를 만들어 이동시키는 1회성 마이그레이션 |
 | 6 | `06_org_categories.sql` | 조직(팀) 기준 **대분류 12건** 일괄 등록. 같은 이름의 활성 대분류가 있으면 건너뛴다 |
+| 7 | `07_notice.sql` | 공지사항 테이블 |
+| 8 | `08_flexible_columns.sql` | 서식 구분(`FORM_TYPE`) + 상세 표의 열을 데이터로 빼는 구조(머리말/열 정의/행x열 값) + 기존 고정 컬럼 값 백필 |
+| 9 | `09_two_level_categories.sql` | 예전 3단계 DB 정리: 소분류에 붙어 있던 매뉴얼을 부모 중분류로 옮기고 소분류를 소프트 삭제. **신규 DB에서는 대상이 없어 아무 것도 하지 않는다** |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
@@ -19,7 +22,13 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 02_menu.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 03_perm_code.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 05_category_level.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_categories.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 07_notice.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 08_flexible_columns.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 09_two_level_categories.sql
 ```
+
+> 신규 DB에 이 순서대로 올리면 **대분류 12건만 있는 2단계 구조**가 만들어진다.
+> (검증: 빈 DB에 01~09 를 두 번 실행해 분류 1단계 12건 / 소분류 0건, 테이블 8개 생성 확인)
 
 > ⚠️ **반드시 `--default-character-set=utf8mb4` 옵션을 붙여서 실행할 것.**
 > mysql 클라이언트의 기본 접속 캐릭터셋은 `latin1` 이라, 이 옵션 없이 실행하면
@@ -54,22 +63,22 @@ UPDATE safety_manual_category   SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELET
 
 `DELETED_YN='N'` 으로 되돌리면 복구된다. 업로드된 사진 파일 자체는 디스크에 그대로 남는다.
 
-## 분류 체계 (대분류/중분류/소분류 3단계 고정)
+## 분류 체계 (대분류/중분류 2단계 고정)
 
-분류는 자기참조 트리(`PARENT_ID`)이지만, **딱 3단계까지만** 만들 수 있도록 서비스 계층에서 강제한다
-(`LEVEL_NO`: 1=대분류, 2=중분류, 3=소분류). 예시:
+분류는 자기참조 트리(`PARENT_ID`)이지만, **딱 2단계까지만** 만들 수 있도록 서비스 계층에서 강제한다
+(`LEVEL_NO`: 1=대분류, 2=중분류). 예시:
 
 ```
-대분류: 제지 / 화장지 / 패드 ...
-  중분류: 3호기 / 4호기 / 5호기 ...
-    소분류: 설비 / 안전 / 작업 / 원료 ...
+대분류: 화장지생산팀 / 공무팀 / 제지생산팀 ...
+  중분류: 초지 5호기 / 기계정비반 / 물류공정 ...   (매뉴얼은 여기에 붙는다)
 ```
 
 - 모든 레벨은 관리자가 화면에서 자유롭게 추가/수정할 수 있다 (엑셀 업로드 모달 안에서도 각 레벨마다
   인라인 "+" 추가 버튼 제공).
-- **매뉴얼은 반드시 소분류(3단계)에만 등록**할 수 있다. 대분류/중분류에 매뉴얼을 붙이려 하면
-  `SafetyCategoryService.findActiveMinor()` 가드가 400 에러로 거부한다.
-- 소분류 아래에는 4단계 하위 분류를 만들 수 없다(`SafetyCategoryService.create()` 가드).
+- **매뉴얼은 반드시 중분류(2단계)에만 등록**할 수 있다. 대분류에 매뉴얼을 붙이려 하면
+  `SafetyCategoryService.findActiveLeaf()` 가드가 400 에러로 거부한다.
+- 중분류 아래에는 하위 분류를 만들 수 없다(`SafetyCategoryService.create()` 가드).
+- 예전에는 소분류(3단계)까지 뒀으나 쓰지 않기로 해서 2단계로 줄였다.
 
 ## 테이블 (5개, 플랫폼 DB 공용)
 
@@ -152,18 +161,18 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
      사유 표시) — 초지 시트는 매뉴얼이 아닌 개요/범례이므로 업로드 대상에서 항상 제외한다.
    - 프론트엔드는 인식된 시트(`recognized=true`)의 체크박스를 **기본적으로 체크된 상태**로 보여주고,
      사용자는 확인/해제만 하면 된다(요구사항: "시트를 확인하고 기본적으로 적용, 사용자는 확인·수정만").
-   - 모달 상단의 대분류/중분류/소분류 3단계 select 는 **기본 등록 위치**를 정한다.
+   - 모달 상단의 대분류/중분류 2단계 select 는 **기본 등록 위치**를 정한다.
      각 select 옆의 "+" 버튼으로 그 자리에서 바로 새 분류를 추가할 수 있다.
-   - **시트 목록의 "등록 분류" 칸에서 시트마다 다른 소분류를 직접 고를 수 있다.**
+   - **시트 목록의 "등록 분류" 칸에서 시트마다 다른 중분류를 직접 고를 수 있다.**
      비워 두면 상단의 기본 등록 위치를 따르고, 직접 고른 행은 강조 표시되며 되돌리기 버튼이 나타난다.
-     선택지는 트리 전체의 소분류를 `대 > 중 > 소` 경로로 보여주므로 상단 선택과 무관하게 아무 분류나 고를 수 있다.
+     선택지는 트리 전체의 중분류를 `대 > 중` 경로로 보여주므로 상단 선택과 무관하게 아무 분류나 고를 수 있다.
 2. **확정 업로드** (`POST /excel-upload/confirm`): multipart 로 `file` 과 `assignments` 를 보낸다.
    `assignments` 는 `[{"sheetName":"...","categoryId":1}, ...]` 형태의 JSON 문자열이며,
    **시트 하나하나가 들어갈 분류를 담는다**(목록에 없는 시트는 가져오지 않는다 = 선택 해제와 같음).
    시트명에 쉼표가 들어갈 수 있어 CSV 대신 JSON 을 쓴다.
    같은 파일을 다시 업로드받아 재파싱한 뒤, 지정되고 인식된 시트만 매뉴얼+단계+사진으로 실제 저장한다.
    (서버는 상태를 저장하지 않으므로 phase 1/2 모두 같은 파일을 다시 업로드해야 한다)
-   각 `categoryId` 는 반드시 소분류(3단계)여야 하며, 아니면 400 에러로 거부된다.
+   각 `categoryId` 는 반드시 중분류(2단계)여야 하며, 아니면 400 에러로 거부된다.
    매뉴얼 제목 중복 검사와 정렬순서(`SORT_ORDER`)는 **그 시트가 들어갈 분류 기준**으로 따로 매겨진다.
 
 ## 프론트엔드 화면 (index.html, 단일 페이지)
@@ -171,10 +180,10 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 플랫폼 SPA 안에서 iframe 모듈로 열린다(메뉴 URL `/safety/index.html`). 좌측 트리 + 우측 목록의
 2단 레이아웃이며, 단계를 눌러야 다음 단계가 보이던 드릴다운 방식은 쓰지 않는다.
 
-- **좌측 — 스택형 분류 트리**: 대분류/중분류/소분류를 한 화면에 계층으로 펼쳐 둔다. 화살표로 접고 펴며,
+- **좌측 — 스택형 분류 트리**: 대분류/중분류를 한 화면에 계층으로 펼쳐 둔다. 화살표로 접고 펴며,
   각 분류 옆 배지는 **하위 분류까지 합산한 매뉴얼 건수**(`CategoryResponse.manualCount`)다.
 - **우측 — 매뉴얼 목록**: 좌측에서 어느 단계를 고르든 그 분류 **하위 전체** 매뉴얼을 보여준다
-  (`/safety-api/manuals/by-category`). 각 행에 `대분류 > 중분류 > 소분류` 경로를 함께 표시하고,
+  (`/safety-api/manuals/by-category`). 각 행에 `대분류 > 중분류` 경로를 함께 표시하고,
   제목/경로로 거르는 검색창을 제공한다. 최상단 "전체"를 고르면 모든 매뉴얼을 한 번에 본다.
 - **매뉴얼 상세는 모달**: 목록에서 행을 누르면 별도 모달이 열려 수칙(단계) 표를 보여준다.
 - **관리 UI는 기본으로 숨긴다**: 상단(및 상세 모달)의 "수정" 버튼을 눌러야 관리 모드가 켜지고,
