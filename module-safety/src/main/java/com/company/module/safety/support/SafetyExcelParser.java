@@ -53,13 +53,17 @@ public class SafetyExcelParser {
     /** 개요/범례 시트(예: "초지" 시트)의 특징적 헤더 문구 — 이게 있으면 매뉴얼이 아니라 제외한다. */
     private static final String HEADER_MARK_OVERVIEW = "공정단계";
 
+    /** 행 번호 칸 (열 정의에는 넣지 않고 stepNo 로 쓴다) */
+    private static final String HEADER_NO = "No.";
+    /** 매뉴얼 제목이 병합되어 들어 있는 칸 (열 정의에는 넣지 않는다) */
+    private static final String HEADER_TITLE = "공정명";
+    /** 사진이 들어가는 칸 */
+    private static final String HEADER_PHOTO = "사진";
+
     private static final int COL_NO = 0;
     private static final int COL_TITLE = 1;
     private static final int COL_PHOTO = 2;
     private static final int COL_DESC = 3;
-    private static final int COL_HAZARD = 4;
-    private static final int COL_EQUIPMENT = 5;
-    private static final int COL_REMARK = 6;
 
     // ── 작업 위험성 평가서 서식 ──
     /** 표 머리글 첫 칸 문구 */
@@ -123,12 +127,27 @@ public class SafetyExcelParser {
             return ParsedSheet.rejected(sheetName, "지원하는 매뉴얼 형식과 헤더가 일치하지 않습니다.");
         }
 
-        List<ParsedColumn> columns = List.of(
-                new ParsedColumn("공정 순서(사진)", SafetyManualColumn.TYPE_PHOTO, 150),
-                new ParsedColumn("공정 순서(설명)", SafetyManualColumn.TYPE_TEXT, 270),
-                new ParsedColumn("위험요인", SafetyManualColumn.TYPE_TEXT, 400),
-                new ParsedColumn("안전 보호구", SafetyManualColumn.TYPE_TEXT, 150),
-                new ParsedColumn("비고", SafetyManualColumn.TYPE_TEXT, 120));
+        // 열은 헤더 행에서 읽는다 — 파일마다 열 구성이 다르다.
+        // (예: 어떤 파일은 "안전 보호구" 가 있고 어떤 파일은 없다. 고정 인덱스로 읽으면 값이 밀린다.)
+        List<ParsedColumn> columns = new ArrayList<>();
+        List<Integer> sourceColumnIndexes = new ArrayList<>();
+        int photoColumnIndex = -1;
+        for (int colIdx = 0; colIdx <= headerRow.getLastCellNum(); colIdx++) {
+            String label = flatten(cellText(headerRow.getCell(colIdx)));
+            if (label.isBlank()) continue;
+            if (label.startsWith(HEADER_NO) || label.equals(HEADER_TITLE)) continue;   // 번호/제목은 열이 아니다
+
+            if (label.contains(HEADER_PHOTO)) {
+                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_PHOTO, 150));
+                photoColumnIndex = colIdx;
+            } else {
+                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_TEXT, 260));
+            }
+            sourceColumnIndexes.add(colIdx);
+        }
+        if (columns.isEmpty()) {
+            return ParsedSheet.rejected(sheetName, "표의 열 머리글을 읽을 수 없습니다.");
+        }
 
         Map<Integer, List<ParsedPhoto>> photosByRow = extractPhotosByRow(sheet);
         List<ParsedRow> rows = new ArrayList<>();
@@ -139,29 +158,29 @@ public class SafetyExcelParser {
             if (row == null) continue;
 
             Integer stepNo = cellInt(row.getCell(COL_NO));
-            String description = cellText(row.getCell(COL_DESC));
-            String hazard = cellText(row.getCell(COL_HAZARD));
-            String equipment = cellText(row.getCell(COL_EQUIPMENT));
-            String remark = cellText(row.getCell(COL_REMARK));
             List<ParsedPhoto> photos = photosByRow.getOrDefault(rowIdx, List.of());
 
-            boolean hasAnyContent = stepNo != null || !photos.isEmpty()
-                    || !description.isBlank() || !hazard.isBlank()
-                    || !equipment.isBlank() || !remark.isBlank();
-            if (!hasAnyContent) continue;
+            List<ParsedCell> cells = new ArrayList<>();
+            boolean hasContent = !photos.isEmpty();
+            for (int i = 0; i < columns.size(); i++) {
+                if (columns.get(i).type().equals(SafetyManualColumn.TYPE_PHOTO)) {
+                    cells.add(ParsedCell.empty());   // 사진은 값이 아니라 photos 로 들어간다
+                    continue;
+                }
+                String text = cellText(row.getCell(sourceColumnIndexes.get(i))).trim();
+                if (!text.isBlank()) hasContent = true;
+                cells.add(ParsedCell.text(text));
+            }
 
-            List<ParsedCell> cells = List.of(
-                    ParsedCell.empty(),                 // 사진 열은 값 대신 photos 로 채운다
-                    ParsedCell.text(description),
-                    ParsedCell.text(hazard),
-                    ParsedCell.text(equipment),
-                    ParsedCell.text(remark));
+            // 번호만 찍혀 있고 내용이 하나도 없는 행(빈 양식)은 가져오지 않는다
+            if (!hasContent) continue;
+
             rows.add(new ParsedRow(stepNo != null ? stepNo : order, order, cells, photos));
             order++;
         }
 
         if (rows.isEmpty()) {
-            return ParsedSheet.rejected(sheetName, "인식 가능한 단계(행)가 없습니다.");
+            return ParsedSheet.rejected(sheetName, "내용이 채워진 행이 없습니다. (빈 양식 시트로 보입니다)");
         }
         return ParsedSheet.accepted(sheetName, SafetyFormType.WORK_METHOD,
                 extractWorkMethodTitle(sheet), List.of(), columns, rows);

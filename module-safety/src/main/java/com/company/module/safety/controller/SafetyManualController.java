@@ -101,6 +101,16 @@ public class SafetyManualController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
+    /** 매뉴얼을 다른 분류로 옮긴다 (목록에서 분류 트리로 끌어다 놓는 경우) */
+    @PutMapping("/safety-api/manuals/{manualId}/category")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<ManualSummaryResponse>> moveToCategory(
+            @PathVariable Long manualId, @RequestParam Long categoryId, Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(
+                manualService.moveToCategory(manualId, categoryId, updatedBy)));
+    }
+
     // ================================================================
     // 표의 열 관리 — 이름/유형/순서/폭 변경, 체크 열 추가 (관리자)
     // ================================================================

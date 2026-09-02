@@ -192,6 +192,22 @@ body{
 .tr-tools button.danger:hover{background:#fee2e2; color:#dc2626}
 /* 단계별 들여쓰기 (대 > 중 > 소) */
 .tree-children{margin-left:13px; border-left:1px dashed var(--line); padding-left:5px}
+
+/* 매뉴얼을 분류로 끌어다 놓기 (수정 모드) */
+.manual-row[draggable="true"]{cursor:grab}
+.manual-row.dragging{opacity:.45}
+/* 받을 수 있는 분류(중분류)는 점선으로, 지금 올라가 있는 곳은 진하게 */
+body.dnd-active .tree-row.drop-ok{outline:1px dashed var(--brand); outline-offset:-2px}
+.tree-row.drop-over{background:var(--brand); }
+.tree-row.drop-over .tr-name,
+.tree-row.drop-over .tr-icon{color:#fff}
+.tree-row.drop-over .tr-count{background:#fff; color:var(--brand)}
+/* 대분류처럼 받을 수 없는 곳은 표시하지 않는다 */
+body.dnd-active .tree-row:not(.drop-ok){opacity:.5}
+.dnd-hint{
+  font-size:.74rem; color:var(--brand); background:var(--brand-soft);
+  border-radius:8px; padding:5px 10px; margin-top:8px;
+}
 .tree-empty{padding:26px 14px; text-align:center; color:var(--muted); font-size:.82rem}
 
 /* ---- 우측: 매뉴얼 목록 ---- */

@@ -140,7 +140,11 @@ function renderNodes(nodes) {
     const tools = (addButton || editButtons)
       ? `<span class="tr-tools" onclick="event.stopPropagation()">${addButton}${editButtons}</span>` : '';
     return `<div class="tree-node">
-        <div class="tree-row ${on}" onclick="selectCategory(${id})" title="${SAFETY.escapeHtml(n.name)}">
+        <div class="tree-row ${on} ${n.levelNo === 2 ? 'drop-ok' : ''}" onclick="selectCategory(${id})"
+             title="${SAFETY.escapeHtml(n.name)}"
+             ondragover="onCategoryDragOver(event, ${id}, ${n.levelNo})"
+             ondragleave="onCategoryDragLeave(event)"
+             ondrop="onCategoryDrop(event, ${id}, ${n.levelNo})">
           ${caret}
           <span class="tr-icon"><i class="fas ${icons[n.levelNo] || 'fa-folder'}"></i></span>
           <span class="tr-name">${SAFETY.escapeHtml(n.name)}</span>
@@ -265,6 +269,7 @@ function renderManualList() {
   document.getElementById('listCount').textContent =
     keyword ? `${shown.length}건 / ${manuals.length}건` : `${manuals.length}건`;
   renderSearchHint(shown.length);
+  renderDragHint();
 
   if (!shown.length) {
     const message = contentKeyword
@@ -274,11 +279,13 @@ function renderManualList() {
     return;
   }
 
+  const canDrag = isAdminUser && editMode;
   holder.innerHTML = shown.map(m => {
     const snippets = (m.matchSnippets || []);
     const more = (m.matchCount || 0) - snippets.length;
     return `
-    <div class="manual-row" onclick="openDetail(${m.manualId})">
+    <div class="manual-row" onclick="openDetail(${m.manualId})"
+         ${canDrag ? `draggable="true" ondragstart="onManualDragStart(event, ${m.manualId})" ondragend="onManualDragEnd()"` : ''}>
       <div class="mr-left">
         <span class="mr-ico"><i class="fas fa-file-lines"></i></span>
         <div style="min-width:0">
@@ -326,8 +333,13 @@ function toggleEditMode() {
   btn.classList.toggle('on', editMode);
   document.getElementById('btn-edit-mode-label').textContent = editMode ? '수정 종료' : '수정';
   document.getElementById('btn-excel-upload').classList.toggle('d-none', !editMode);
+  if (!editMode) {
+    const hint = document.getElementById('searchHint');
+    if (hint && !contentKeyword) hint.innerHTML = '';
+  }
   renderNotices();
   renderTree();
+  renderManualList();   // 드래그 가능 여부가 바뀌므로 목록도 다시 그린다
   updateAddButtonLabel();
   if (currentDetail) renderDetail();
 }
@@ -737,6 +749,71 @@ function renderPhotos(photos) {
   return photos.map(p => `<img class="step-photo" src="${SAFETY.escapeHtml(p.url)}"
       alt="${SAFETY.escapeHtml(p.originalName || '')}" data-name="${SAFETY.escapeHtml(p.originalName || '')}"
       onclick="openLightboxFrom(this)" title="클릭하면 크게 볼 수 있습니다">`).join('');
+}
+
+// ================================================================
+// 매뉴얼을 분류로 끌어다 놓기 (수정 모드에서만)
+// ================================================================
+let draggingManualId = null;
+
+/** 목록에서 매뉴얼을 집었을 때 */
+function onManualDragStart(event, manualId) {
+  if (!isAdminUser || !editMode) { event.preventDefault(); return; }
+  draggingManualId = Number(manualId);
+  event.dataTransfer.effectAllowed = 'move';
+  // 일부 브라우저는 데이터가 없으면 드래그를 시작하지 않는다
+  event.dataTransfer.setData('text/plain', String(manualId));
+  event.currentTarget.classList.add('dragging');
+  document.body.classList.add('dnd-active');
+}
+
+function onManualDragEnd() {
+  draggingManualId = null;
+  document.body.classList.remove('dnd-active');
+  document.querySelectorAll('.manual-row.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.tree-row.drop-over').forEach(el => el.classList.remove('drop-over'));
+}
+
+/** 매뉴얼은 중분류에만 붙일 수 있으므로 대분류 위에서는 받지 않는다 */
+function onCategoryDragOver(event, categoryId, levelNo) {
+  if (draggingManualId == null || levelNo !== 2) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('drop-over');
+}
+
+function onCategoryDragLeave(event) {
+  event.currentTarget.classList.remove('drop-over');
+}
+
+async function onCategoryDrop(event, categoryId, levelNo) {
+  if (draggingManualId == null) return;
+  event.preventDefault();
+  event.currentTarget.classList.remove('drop-over');
+  if (levelNo !== 2) {
+    SAFETY.toast('매뉴얼은 중분류에만 넣을 수 있습니다.', false);
+    return;
+  }
+
+  const manualId = draggingManualId;
+  const manual = manuals.find(m => Number(m.manualId) === manualId);
+  if (manual && Number(manual.categoryId) === Number(categoryId)) return;   // 제자리
+  onManualDragEnd();
+
+  try {
+    await SAFETY.api(`/safety-api/manuals/${manualId}/category?categoryId=${categoryId}`, { method: 'PUT' });
+    SAFETY.toast(`'${manual ? manual.title : '매뉴얼'}' 을(를) ${pathOf(categoryId).join(' > ')} (으)로 옮겼습니다.`);
+    await refreshAll();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 수정 모드에서 목록 위에 사용법을 한 줄 띄운다 */
+function renderDragHint() {
+  const hint = document.getElementById('searchHint');
+  if (!hint || !(isAdminUser && editMode) || contentKeyword) return;
+  hint.innerHTML = '<i class="fas fa-hand-pointer me-1"></i>매뉴얼을 왼쪽 분류(중분류)로 끌어다 놓으면 그 분류로 옮겨집니다.';
 }
 
 // ================================================================

@@ -242,6 +242,25 @@ public class SafetyManualService {
         return getDetail(manualId);
     }
 
+    /**
+     * 매뉴얼을 다른 분류로 옮긴다 (화면에서 목록의 매뉴얼을 분류로 끌어다 놓는 경우).
+     * <p>제목·정렬순서는 건드리지 않고 분류만 바꾼다. 대상은 중분류여야 한다.
+     */
+    @Transactional
+    public ManualSummaryResponse moveToCategory(Long manualId, Long categoryId, String updatedBy) {
+        SafetyManual manual = findActive(manualId);
+        SafetyManualCategory target = categoryService.findActiveLeaf(categoryId);
+        if (manual.getCategory() != null && target.getCategoryId().equals(manual.getCategory().getCategoryId())) {
+            return ManualSummaryResponse.from(manual);   // 같은 분류면 그대로 둔다
+        }
+        if (manualRepository.existsByTitleAndCategory_CategoryId(manual.getTitle(), categoryId)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE,
+                    "'" + target.getName() + "' 분류에 같은 제목의 매뉴얼이 이미 있습니다. title=" + manual.getTitle());
+        }
+        manual.changeCategory(target, updatedBy);
+        return ManualSummaryResponse.from(manual);
+    }
+
     // ================================================================
     // 매뉴얼 삭제 (관리자) — 소프트 삭제. 하위 행도 함께 소프트 삭제.
     // ================================================================
