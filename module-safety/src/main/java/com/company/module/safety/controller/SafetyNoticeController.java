@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 안전작업방식 매뉴얼 화면의 공지사항 REST API.
+ * 안전작업 매뉴얼 화면의 공지사항 REST API.
  * <p>조회는 인증된 사용자 누구나, 등록/수정/삭제는 SAFETY 관리자만 가능하다.
  */
 @RestController

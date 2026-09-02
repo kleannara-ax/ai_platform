@@ -17,7 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 안전작업방식 매뉴얼 (원본 엑셀의 시트 1개 = 매뉴얼 1개).
+ * 안전작업 매뉴얼 (원본 엑셀의 시트 1개 = 매뉴얼 1개).
  * <p>매뉴얼은 분류({@link SafetyManualCategory}) 아래에 속하고,
  * 순서(단계) 목록은 {@link SafetyManualStep} 으로 별도 관리한다.
  */

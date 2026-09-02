@@ -99,11 +99,11 @@ const mockMenus = [
       { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 컬럼관리', menuType:'PAGE', menuUrl:'/dailyreport/page/column-mgmt', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
-  // ── 안전작업방식 매뉴얼 (sql/module-safety/02_menu.sql 과 같은 구조) ──
+  // ── 안전작업 매뉴얼 (sql/module-safety/02_menu.sql 과 같은 구조) ──
   // menuUrl 이 /safety/ 로 시작하면 SPA 가 iframe 모듈로 연다 (app static index.html 참고)
-  { menuId:110, menuCode:'SAFETY_MGMT', menuName:'안전작업방식 매뉴얼', menuType:'MENU', menuUrl:null, icon:'shield-alt', parentId:null, sortOrder:70, isActive:true, isVisible:true, allowedIps:null, description:'안전작업방식 매뉴얼',
+  { menuId:110, menuCode:'SAFETY_MGMT', menuName:'안전작업 매뉴얼', menuType:'MENU', menuUrl:null, icon:'shield-alt', parentId:null, sortOrder:70, isActive:true, isVisible:true, allowedIps:null, description:'안전작업 매뉴얼',
     children: [
-      { menuId:111, menuCode:'SAFETY_CATEGORY', menuName:'분류/매뉴얼 목록', menuType:'MENU', menuUrl:'/safety/index.html', parentId:110, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+      { menuId:111, menuCode:'SAFETY_CATEGORY', menuName:'안전작업 매뉴얼', menuType:'MENU', menuUrl:'/safety/index.html', parentId:110, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
 ];
@@ -159,7 +159,7 @@ const mockCodeGroups = [
 const _allFacilityMenus = [6,62,67,68,69,63,64,65,66,70,71,72,73,74];
 const _fireOnlyMenus    = [6,62,67,68,69,63,64,65,66,70];         // 공통도면+소방QR+소방설비
 const _otherOnlyMenus   = [6,62,67,71,72,73,74];                  // 공통도면+기타설비+기타QR (소방QR 제외)
-// 안전작업방식 매뉴얼: 110(상위), 111(분류/매뉴얼 목록) — ADMIN/MANAGER/USER 에 부여
+// 안전작업 매뉴얼: 110(상위), 111(페이지) — ADMIN/MANAGER/USER 에 부여
 const _safetyMenus = [110, 111];
 const mockPermissions = mockRoles.map(r => ({
   role: r.code,
@@ -175,7 +175,7 @@ const mockPermissions = mockRoles.map(r => ({
 }));
 
 // ══════════════════════════════════════════
-//  Mock: 안전작업방식 매뉴얼 (module-safety)
+//  Mock: 안전작업 매뉴얼 (module-safety)
 //  분류는 대(1)/중(2)/소(3) 3단계 고정, 매뉴얼은 소분류에만 붙는다.
 // ══════════════════════════════════════════
 const _safety = {
@@ -1444,7 +1444,7 @@ const server = http.createServer((req, res) => {
     }
 
     // ══════════════════════════════════════════
-    //  Mock API: /safety-api/** (안전작업방식 매뉴얼)
+    //  Mock API: /safety-api/** (안전작업 매뉴얼)
     // ══════════════════════════════════════════
     if (pathname.startsWith('/safety-api/')) {
       let mt;

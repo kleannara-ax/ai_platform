@@ -15,7 +15,7 @@ SET NAMES utf8mb4;
 
 -- 1) 코드 그룹
 INSERT INTO code_group (GROUP_CODE, GROUP_NAME, DESCRIPTION, IS_ACTIVE, SORT_ORDER)
-VALUES ('SAFETY_PERM', '안전매뉴얼 관리자', '안전작업방식 매뉴얼(SAFETY) 관리자 권한을 가진 로그인 ID 목록', 1, 130)
+VALUES ('SAFETY_PERM', '안전매뉴얼 관리자', '안전작업 매뉴얼(SAFETY) 관리자 권한을 가진 로그인 ID 목록', 1, 130)
 ON DUPLICATE KEY UPDATE GROUP_NAME = VALUES(GROUP_NAME), DESCRIPTION = VALUES(DESCRIPTION), IS_ACTIVE = VALUES(IS_ACTIVE);
 
 -- 관리자 명단은 자동으로 채우지 않는다.

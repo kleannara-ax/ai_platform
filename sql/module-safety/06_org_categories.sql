@@ -1,6 +1,6 @@
 -- ============================================================
 --  06_org_categories.sql
---  안전작업방식 매뉴얼 — 조직(팀) 기준 대분류 일괄 등록
+--  안전작업 매뉴얼 — 조직(팀) 기준 대분류 일괄 등록
 --
 --  실행: mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_categories.sql
 --        (utf8mb4 옵션을 빼면 한글이 mojibake 로 저장된다 — README 참고)

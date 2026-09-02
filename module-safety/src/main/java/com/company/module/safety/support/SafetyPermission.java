@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * SAFETY(안전작업방식 매뉴얼) 모듈 관리자 권한 판정.
+ * SAFETY(안전작업 매뉴얼) 모듈 관리자 권한 판정.
  *
  * <p>관리자는 <b>공통코드 그룹 {@code SAFETY_PERM}</b> 에 등록된 로그인 ID <b>만</b> 이다.
  * (소방 {@code FIRE_PERM}, KIMS {@code KIMS_PERM} 과 같은 방식 —

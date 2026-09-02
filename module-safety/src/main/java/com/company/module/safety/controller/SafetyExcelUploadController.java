@@ -21,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * 안전작업방식 매뉴얼 엑셀 일괄업로드 REST API (SAFETY 관리자만).
+ * 안전작업 매뉴얼 엑셀 일괄업로드 REST API (SAFETY 관리자만).
  *
  * <p>사용자 요구사항: "시트의 형식 확인한 후 업로드" — 반드시 2단계로 나눠 호출한다.
  * <ol>

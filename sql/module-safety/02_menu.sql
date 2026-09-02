@@ -1,5 +1,5 @@
 -- ============================================================
---  module-safety: 안전작업방식 매뉴얼 플랫폼 메뉴 등록
+--  module-safety: 안전작업 매뉴얼 플랫폼 메뉴 등록
 --
 --  SAFETY_MGMT(그룹) 아래 페이지 메뉴. MENU_URL = /safety/index.html
 --  (SPA 가 /safety/ 로 시작하는 메뉴를 iframe 으로 로드한다)
@@ -17,7 +17,7 @@ SET NAMES utf8mb4;
 
 -- 1) 상위 그룹 (URL 없는 그룹 메뉴)
 INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYPE, SORT_ORDER, IS_VISIBLE, IS_ACTIVE, CREATED_AT)
-VALUES ('SAFETY_MGMT', '안전작업방식 매뉴얼', NULL, NULL, 'shield-alt', 'MENU', 70, 1, 1, NOW())
+VALUES ('SAFETY_MGMT', '안전작업 매뉴얼', NULL, NULL, 'shield-alt', 'MENU', 70, 1, 1, NOW())
 ON DUPLICATE KEY UPDATE
     MENU_NAME  = VALUES(MENU_NAME),
     MENU_URL   = VALUES(MENU_URL),
@@ -26,10 +26,10 @@ ON DUPLICATE KEY UPDATE
     IS_VISIBLE = VALUES(IS_VISIBLE),
     IS_ACTIVE  = VALUES(IS_ACTIVE);
 
--- 2) 페이지 (parent = SAFETY_MGMT) — 분류/매뉴얼 목록 1개뿐 (엑셀 업로드는 이 화면의 모달)
+-- 2) 페이지 (parent = SAFETY_MGMT) — 페이지 1개뿐 (엑셀 업로드는 이 화면의 모달)
 --    같은 테이블을 참조하므로 파생 테이블로 한 번 감싼다 (MariaDB 제약).
 INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYPE, SORT_ORDER, IS_VISIBLE, IS_ACTIVE, CREATED_AT)
-VALUES ('SAFETY_CATEGORY', '분류/매뉴얼 목록',
+VALUES ('SAFETY_CATEGORY', '안전작업 매뉴얼',
         (SELECT MENU_ID FROM (SELECT MENU_ID FROM core_menu WHERE MENU_CODE = 'SAFETY_MGMT') AS g),
         '/safety/index.html', 'list', 'MENU', 1, 1, 1, NOW())
 ON DUPLICATE KEY UPDATE

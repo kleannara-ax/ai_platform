@@ -23,7 +23,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_cate
 
 > ⚠️ **반드시 `--default-character-set=utf8mb4` 옵션을 붙여서 실행할 것.**
 > mysql 클라이언트의 기본 접속 캐릭터셋은 `latin1` 이라, 이 옵션 없이 실행하면
-> UTF-8로 저장된 한글 리터럴(`INSERT ... VALUES ('안전작업방식 매뉴얼', ...)` 등)이
+> UTF-8로 저장된 한글 리터럴(`INSERT ... VALUES ('안전작업 매뉴얼', ...)` 등)이
 > latin1로 잘못 해석되어 DB에 깨진 상태(mojibake)로 저장된다. 컬럼 자체는 `utf8mb4`라
 > 오류 없이 들어가 버리므로 반드시 옵션을 챙겨야 한다.
 
@@ -107,8 +107,8 @@ UPDATE safety_manual_category   SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELET
 ## 메뉴 구조
 
 ```
-SAFETY_MGMT (그룹, URL 없음)               "안전작업방식 매뉴얼"
- └─ SAFETY_CATEGORY  /safety/index.html    "분류/매뉴얼 목록"   (ROLE_ADMIN/MANAGER/USER)
+SAFETY_MGMT (그룹, URL 없음)               "안전작업 매뉴얼"
+ └─ SAFETY_CATEGORY  /safety/index.html    "안전작업 매뉴얼"   (ROLE_ADMIN/MANAGER/USER)
 ```
 
 엑셀 일괄업로드는 더 이상 별도 페이지(`upload.html`)가 아니라 `index.html` 안의 모달(`#excelModal`)로
@@ -202,7 +202,7 @@ node preview-server.js 8081     # http://localhost:8081  (admin / 아무 비밀�
 
 | 항목 | 값 |
 |------|-----|
-| 메뉴명 | 안전작업방식 매뉴얼 > 분류/매뉴얼 목록 |
+| 메뉴명 | 안전작업 매뉴얼 (그룹) > 안전작업 매뉴얼 (페이지) |
 | 메뉴 코드 | `SAFETY_MGMT` (그룹), `SAFETY_CATEGORY` (페이지) |
 | 메뉴 URL | `/safety/index.html` |
 | API Prefix | `/safety-api` |

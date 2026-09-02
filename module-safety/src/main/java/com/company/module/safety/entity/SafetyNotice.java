@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 안전작업방식 매뉴얼 화면 좌측에 노출하는 공지사항.
+ * 안전작업 매뉴얼 화면 좌측에 노출하는 공지사항.
  *
  * <p>분류/매뉴얼과 직접 연결되지 않는 독립 게시물이며, 상단 고정({@code PINNED_YN})한 글이
  * 먼저 보인다. 삭제는 물리 삭제하지 않고 {@code DELETED_YN='Y'} 로만 처리한다.

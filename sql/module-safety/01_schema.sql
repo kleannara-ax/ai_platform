@@ -1,5 +1,5 @@
 -- ============================================================
---  module-safety : 안전작업방식 매뉴얼 테이블 스키마
+--  module-safety : 안전작업 매뉴얼 테이블 스키마
 --
 --  ddl-auto=none 이라 JPA 가 표를 만들지 않으므로 반드시 먼저 실행할 것.
 --  신규 설치는 이 파일로 표를 만든 뒤 02_menu.sql, 03_perm_code.sql 을 실행한다.
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `safety_manual_category` (
   PRIMARY KEY (`CATEGORY_ID`),
   KEY `IDX_SAFETY_CATEGORY_PARENT` (`PARENT_ID`),
   CONSTRAINT `FK_SAFETY_CATEGORY_PARENT` FOREIGN KEY (`PARENT_ID`) REFERENCES `safety_manual_category` (`CATEGORY_ID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='안전작업방식 매뉴얼 분류(계층형)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='안전작업 매뉴얼 분류(계층형)';
 
 CREATE TABLE IF NOT EXISTS `safety_manual` (
   `MANUAL_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '매뉴얼 ID (PK)',
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `safety_manual` (
   PRIMARY KEY (`MANUAL_ID`),
   KEY `IDX_SAFETY_MANUAL_CATEGORY` (`CATEGORY_ID`),
   CONSTRAINT `FK_SAFETY_MANUAL_CATEGORY` FOREIGN KEY (`CATEGORY_ID`) REFERENCES `safety_manual_category` (`CATEGORY_ID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='안전작업방식 매뉴얼 (엑셀 시트 1개 = 매뉴얼 1개)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='안전작업 매뉴얼 (엑셀 시트 1개 = 매뉴얼 1개)';
 
 CREATE TABLE IF NOT EXISTS `safety_manual_step` (
   `STEP_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '단계 ID (PK)',

@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 안전작업방식 매뉴얼(본문) 관련 비즈니스 로직.
+ * 안전작업 매뉴얼(본문) 관련 비즈니스 로직.
  * <p>매뉴얼 CRUD + 단계(순서) CRUD를 담당한다. 사진은 {@code SafetyPhotoService} 에서 별도 처리한다.
  */
 @Service

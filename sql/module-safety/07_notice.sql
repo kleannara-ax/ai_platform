@@ -1,6 +1,6 @@
 -- ============================================================
 --  07_notice.sql
---  안전작업방식 매뉴얼 — 공지사항 테이블
+--  안전작업 매뉴얼 — 공지사항 테이블
 --
 --  실행: mysql -u platform_user --default-character-set=utf8mb4 platform_db < 07_notice.sql
 --
@@ -26,6 +26,6 @@ CREATE TABLE IF NOT EXISTS `safety_notice` (
   PRIMARY KEY (`NOTICE_ID`),
   KEY `IDX_SAFETY_NOTICE_LIST` (`DELETED_YN`, `PINNED_YN`, `CREATED_AT`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-  COMMENT='안전작업방식 매뉴얼 공지사항';
+  COMMENT='안전작업 매뉴얼 공지사항';
 
 SELECT '--- safety_notice 준비 완료 ---' AS '';

@@ -137,7 +137,7 @@ const SAFETY = (() => {
     const html = css + `
       <aside class="safety-sidebar">
         <a class="safety-brand text-decoration-none d-block" href="index.html">
-          <div class="b1">SAFETY</div><div class="b2">안전작업방식 매뉴얼</div>
+          <div class="b1">SAFETY</div><div class="b2">안전작업 매뉴얼</div>
         </a>
         <div class="safety-user">
           <div class="safety-avatar">${initial}</div>

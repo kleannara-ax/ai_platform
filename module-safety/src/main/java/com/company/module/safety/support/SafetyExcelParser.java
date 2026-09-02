@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 안전작업방식 매뉴얼 엑셀(.xlsx) 파서.
+ * 안전작업 매뉴얼 엑셀(.xlsx) 파서.
  *
  * <p>실제 현장 파일(안전_작업방식 메뉴얼 양식) 구조 분석 결과를 반영한다:
  * <ul>
