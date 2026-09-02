@@ -39,6 +39,33 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
             """)
     List<SafetyManual> findInCategorySubtree(@Param("categoryId") Long categoryId);
 
+    /**
+     * 분류 하위에서 <b>단계 본문</b>(공정 설명/위험요인/안전보호구/비고)에 키워드가 들어간 매뉴얼.
+     * <p>제목 검색과 달리 매뉴얼 안쪽 내용을 뒤진다. {@code categoryId} 가 null 이면 전체가 대상이다.
+     */
+    @Query("""
+            SELECT DISTINCT m FROM SafetyManual m
+            JOIN FETCH m.category c
+            LEFT JOIN FETCH c.parent p
+            LEFT JOIN FETCH p.parent gp
+            WHERE m.deletedYn = 'N' AND c.deletedYn = 'N'
+              AND (:categoryId IS NULL
+                   OR c.categoryId = :categoryId
+                   OR p.categoryId = :categoryId
+                   OR gp.categoryId = :categoryId)
+              AND EXISTS (
+                  SELECT 1 FROM SafetyManualStep s
+                  WHERE s.manual = m AND s.deletedYn = 'N'
+                    AND (LOWER(s.description)     LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      OR LOWER(s.hazard)          LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      OR LOWER(s.safetyEquipment) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                      OR LOWER(s.remark)          LIKE LOWER(CONCAT('%', :keyword, '%')))
+              )
+            ORDER BY c.sortOrder ASC, c.categoryId ASC, m.sortOrder ASC, m.manualId ASC
+            """)
+    List<SafetyManual> searchByStepContent(@Param("categoryId") Long categoryId,
+                                            @Param("keyword") String keyword);
+
     /** 소분류별 매뉴얼 건수 (좌측 분류 트리의 건수 배지 계산용) */
     @Query("""
             SELECT m.category.categoryId AS categoryId, COUNT(m) AS manualCount

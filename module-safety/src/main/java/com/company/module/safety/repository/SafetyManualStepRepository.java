@@ -18,4 +18,17 @@ public interface SafetyManualStepRepository extends JpaRepository<SafetyManualSt
     List<SafetyManualStep> findByManualIdOrderBySortOrder(@Param("manualId") Long manualId);
 
     long countByManual_ManualIdAndDeletedYn(Long manualId, String deletedYn);
+
+    /** 내용 검색 결과에서 "어디가 걸렸는지" 보여주기 위해, 키워드가 들어간 단계만 모아 온다. */
+    @Query("""
+            SELECT s FROM SafetyManualStep s
+            WHERE s.deletedYn = 'N' AND s.manual.manualId IN :manualIds
+              AND (LOWER(s.description)     LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(s.hazard)          LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(s.safetyEquipment) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(s.remark)          LIKE LOWER(CONCAT('%', :keyword, '%')))
+            ORDER BY s.manual.manualId ASC, s.sortOrder ASC, s.stepId ASC
+            """)
+    List<SafetyManualStep> findMatchingSteps(@Param("manualIds") List<Long> manualIds,
+                                              @Param("keyword") String keyword);
 }

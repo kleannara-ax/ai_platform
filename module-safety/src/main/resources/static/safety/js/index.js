@@ -5,12 +5,30 @@ let nodeIndex = new Map();     // categoryId -> 노드 (부모 참조 __parent �
 let expanded = new Set();      // 펼쳐진 분류 id
 let selectedId = null;         // 선택한 분류 id (null = 전체)
 let manuals = [];              // 선택한 분류 하위 매뉴얼 전체
+/** 서버에 걸어 둔 내용 검색어. 비어 있으면 분류 전체 목록을 본다. */
+let contentKeyword = '';
 let currentManualId = null;
 let currentDetail = null;
 let isAdminUser = false;
 // 관리(수정) 모드. 기본은 꺼짐 — 관리 버튼/관리 칸은 이 모드에서만 나타난다.
 let editMode = false;
 let detailModal = null;
+
+// ── 단계 표 컬럼 폭 ──
+// 폭은 px 가 아니라 "비중"으로 들고 다닌다. 모달 폭이 얼마든 비중대로 나눠 담기 때문에
+// 항상 가로로 꽉 차고 좁은 화면에서도 잘리지 않는다. 경계를 끌면 이 비중이 바뀐다.
+const STEP_COL_LABELS = {
+  no: 'No.', photo: '공정 순서(사진)', desc: '공정 순서(설명)',
+  hazard: '위험요인', equip: '안전 보호구', remark: '비고', manage: '관리',
+};
+// 위험요인이 가장 중요한 항목이라 기본 비중을 가장 크게 잡는다.
+const STEP_COL_DEFAULT_WEIGHTS = { no: 46, photo: 150, desc: 270, hazard: 400, equip: 150, remark: 120, manage: 80 };
+const STEP_COL_MIN = 44;
+/** 이 폭보다 좁으면 표 대신 항목별 카드로 쌓아 보여준다 */
+const STEP_STACK_BREAKPOINT = 760;
+const STEP_COL_STORAGE_KEY = 'safety.stepColWeights';
+let stepColWeights = loadStepColWeights();
+let stepColWidths = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!SAFETY.requireAuth()) return;
@@ -19,6 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   isAdminUser = await SAFETY.isAdmin();
   if (isAdminUser) document.getElementById('btn-edit-mode').classList.remove('d-none');
   bindLightbox();
+  bindStepColResize();
+  await loadNotices();
   await loadTree();
   // 첫 화면은 전체 매뉴얼 목록
   await selectCategory(null);
@@ -104,8 +124,11 @@ function renderNodes(nodes) {
     const caret = hasChildren
       ? `<button class="tr-caret ${isOpen ? 'open' : ''}" onclick="event.stopPropagation(); toggleExpand(${id})" title="${isOpen ? '접기' : '펼치기'}"><i class="fas fa-chevron-right"></i></button>`
       : `<span class="tr-caret leaf"></span>`;
+    // 분류 추가는 이 트리 안에서만 한다 — 소분류 아래에는 더 만들 수 없으므로 버튼도 내지 않는다.
+    const childLabel = { 1: '중분류 추가', 2: '소분류 추가' }[n.levelNo];
     const tools = (isAdminUser && editMode)
       ? `<span class="tr-tools" onclick="event.stopPropagation()">
+           ${childLabel ? `<button onclick="openCategoryCreateModal(${id})" title="${childLabel}"><i class="fas fa-plus"></i></button>` : ''}
            <button onclick="openCategoryEditModal(${id})" title="분류 수정"><i class="fas fa-pen"></i></button>
            <button class="danger" onclick="deleteCategory(${id})" title="분류 삭제"><i class="fas fa-trash"></i></button>
          </span>`
@@ -162,8 +185,11 @@ async function loadManuals() {
   const holder = document.getElementById('manualRows');
   holder.innerHTML = `<div class="empty-state"><i class="fas fa-spinner fa-spin"></i>불러오는 중...</div>`;
   try {
-    const query = (selectedId === null) ? '' : ('?categoryId=' + selectedId);
-    manuals = await SAFETY.api('/safety-api/manuals/by-category' + query) || [];
+    const params = new URLSearchParams();
+    if (selectedId !== null) params.set('categoryId', selectedId);
+    if (contentKeyword) params.set('content', contentKeyword);
+    const query = params.toString();
+    manuals = await SAFETY.api('/safety-api/manuals/by-category' + (query ? '?' + query : '')) || [];
   } catch (e) {
     manuals = [];
     SAFETY.toast(e.message, false);
@@ -180,37 +206,99 @@ function renderListHead() {
     (selectedId === null) ? '모든 분류' : names.join(' > ');
 }
 
+// ================================================================
+// 검색 — 매뉴얼명(화면 필터) / 내용(서버 조회) 두 가지
+// ================================================================
+function onContentFilterInput() {
+  const value = document.getElementById('contentFilter').value.trim();
+  document.getElementById('contentFilterClear').style.display = value ? '' : 'none';
+  // 입력만으로는 조회하지 않는다 (내용 검색은 서버를 타므로 Enter/버튼으로 실행)
+  if (!value && contentKeyword) clearContentSearch();
+}
+
+async function runContentSearch() {
+  const value = document.getElementById('contentFilter').value.trim();
+  if (value === contentKeyword) return;
+  contentKeyword = value;
+  await loadManuals();
+}
+
+async function clearContentSearch() {
+  document.getElementById('contentFilter').value = '';
+  document.getElementById('contentFilterClear').style.display = 'none';
+  if (!contentKeyword) return;
+  contentKeyword = '';
+  await loadManuals();
+}
+
+function clearTitleFilter() {
+  document.getElementById('listFilter').value = '';
+  renderManualList();
+}
+
+/** 발췌에서 검색어에 해당하는 부분만 표시를 입힌다 */
+function highlight(text, keyword) {
+  const safe = SAFETY.escapeHtml(text);
+  if (!keyword) return safe;
+  const needle = SAFETY.escapeHtml(keyword);
+  const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(pattern, 'gi'), m => `<mark>${m}</mark>`);
+}
+
 function renderManualList() {
   const holder = document.getElementById('manualRows');
-  const keyword = document.getElementById('listFilter').value.trim().toLowerCase();
+  const titleInput = document.getElementById('listFilter');
+  const keyword = titleInput.value.trim().toLowerCase();
+  document.getElementById('listFilterClear').style.display = keyword ? '' : 'none';
+
   const shown = keyword
     ? manuals.filter(m => String(m.title || '').toLowerCase().includes(keyword)
         || String(m.categoryPath || '').toLowerCase().includes(keyword))
     : manuals;
 
   document.getElementById('listCount').textContent =
-    keyword ? `${shown.length}건 / 전체 ${manuals.length}건` : `${manuals.length}건`;
+    keyword ? `${shown.length}건 / ${manuals.length}건` : `${manuals.length}건`;
+  renderSearchHint(shown.length);
 
   if (!shown.length) {
-    holder.innerHTML = `<div class="empty-state"><i class="fas fa-file-circle-question"></i>${
-      keyword ? '검색 결과가 없습니다.' : '이 분류에 등록된 매뉴얼이 없습니다.'}</div>`;
+    const message = contentKeyword
+      ? `'${SAFETY.escapeHtml(contentKeyword)}' 이(가) 들어간 매뉴얼이 없습니다.`
+      : (keyword ? '검색 결과가 없습니다.' : '이 분류에 등록된 매뉴얼이 없습니다.');
+    holder.innerHTML = `<div class="empty-state"><i class="fas fa-file-circle-question"></i>${message}</div>`;
     return;
   }
 
-  holder.innerHTML = shown.map(m => `
+  holder.innerHTML = shown.map(m => {
+    const snippets = (m.matchSnippets || []);
+    const more = (m.matchCount || 0) - snippets.length;
+    return `
     <div class="manual-row" onclick="openDetail(${m.manualId})">
       <div class="mr-left">
         <span class="mr-ico"><i class="fas fa-file-lines"></i></span>
         <div style="min-width:0">
           <div class="mr-title">${SAFETY.escapeHtml(m.title)}</div>
           <div class="mr-path">${SAFETY.escapeHtml(m.categoryPath || m.categoryName || '')}</div>
+          ${snippets.length ? `<div class="mr-snippets">
+            ${snippets.map(t => `<div class="mr-snippet">${highlight(t, contentKeyword)}</div>`).join('')}
+            ${more > 0 ? `<div class="mr-match-more">외 ${more}개 단계에서 더 발견</div>` : ''}
+          </div>` : ''}
         </div>
       </div>
       <div class="mr-right">
         <span class="mr-date">${formatDate(m.updatedAt)}</span>
         <span class="mr-chevron"><i class="fas fa-chevron-right"></i></span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+/** 지금 어떤 검색이 걸려 있는지 한 줄로 알려 준다 */
+function renderSearchHint(shownCount) {
+  const hint = document.getElementById('searchHint');
+  if (!contentKeyword) { hint.innerHTML = ''; return; }
+  const scope = (selectedId === null) ? '전체 분류' : pathOf(selectedId).join(' > ');
+  hint.innerHTML = `<i class="fas fa-magnifying-glass me-1"></i>${SAFETY.escapeHtml(scope)}에서 `
+    + `내용에 <b>${SAFETY.escapeHtml(contentKeyword)}</b> 이(가) 들어간 매뉴얼 ${shownCount}건`;
 }
 
 function formatDate(value) {
@@ -227,25 +315,18 @@ function toggleEditMode() {
   btn.classList.toggle('on', editMode);
   document.getElementById('btn-edit-mode-label').textContent = editMode ? '수정 종료' : '수정';
   document.getElementById('btn-excel-upload').classList.toggle('d-none', !editMode);
+  document.getElementById('btn-add-notice').classList.toggle('d-none', !editMode);
+  renderNotices();
   renderTree();
   updateAddButtonLabel();
   if (currentDetail) renderDetail();
 }
 
+/** 수정 모드에서만 "내용 추가"(매뉴얼)와 트리의 대분류 추가 버튼을 보여준다. */
 function updateAddButtonLabel() {
-  const btn = document.getElementById('btn-add-context');
-  if (!isAdminUser || !editMode) { btn.classList.add('d-none'); return; }
-  const node = findNode(selectedId);
-  const level = node ? node.levelNo : 0;
-  const labels = { 0: '대분류 추가', 1: '중분류 추가', 2: '소분류 추가', 3: '매뉴얼 추가' };
-  document.getElementById('btn-add-context-label').textContent = labels[level];
-  btn.classList.remove('d-none');
-}
-
-function onAddContextClick() {
-  const node = findNode(selectedId);
-  if (node && node.levelNo === 3) openManualCreateModal();
-  else openCategoryCreateModal();
+  const show = isAdminUser && editMode;
+  document.getElementById('btn-add-manual').classList.toggle('d-none', !show);
+  document.getElementById('btn-add-major').classList.toggle('d-none', !show);
 }
 
 // ================================================================
@@ -286,8 +367,10 @@ function renderDetail() {
 
 function renderDetailTools() {
   const el = document.getElementById('detailTools');
-  if (!isAdminUser) { el.innerHTML = ''; return; }
-  el.innerHTML = `
+  const resetBtn = `<button class="btn-modern btn-outline-modern" onclick="resetStepColWidths()"
+      title="열 너비를 기본값으로"><i class="fas fa-table-columns"></i>열 너비 초기화</button>`;
+  if (!isAdminUser) { el.innerHTML = resetBtn; return; }
+  el.innerHTML = resetBtn + `
     <button class="btn-modern btn-edit-toggle ${editMode ? 'on' : ''}" onclick="toggleEditMode()">
       <i class="fas fa-pen"></i>${editMode ? '수정 종료' : '수정'}</button>
     ${editMode ? `
@@ -298,34 +381,172 @@ function renderDetailTools() {
 /** 관리 칸은 수정 모드에서만 만들고, 평상시에는 열 자체를 없애 본문을 넓게 쓴다. */
 function renderSteps(steps) {
   const manage = isAdminUser && editMode;
-  document.getElementById('stepCols').innerHTML = manage
-    ? `<col style="width:46px"><col style="width:170px"><col><col style="width:15%"><col style="width:15%"><col style="width:13%"><col style="width:86px">`
-    : `<col style="width:46px"><col style="width:190px"><col><col style="width:17%"><col style="width:17%"><col style="width:15%">`;
-  document.getElementById('stepHead').innerHTML =
-    `<tr><th>No.</th><th>공정 순서(사진)</th><th>공정 순서(설명)</th><th>위험요인</th><th>안전 보호구</th><th>비고</th>${
-      manage ? '<th>관리</th>' : ''}</tr>`;
+  const keys = stepColKeys();
+  document.getElementById('stepHead').innerHTML = '<tr>' + keys.map((k, i) =>
+    `<th class="${k === 'hazard' ? 'col-hazard' : ''}" data-col="${k}" title="${STEP_COL_LABELS[k]}"
+       >${STEP_COL_LABELS[k]}${i < keys.length - 1
+         ? `<span class="col-resizer" data-col="${k}" title="경계를 끌어 폭 조절"></span>` : ''}</th>`).join('') + '</tr>';
 
   const tbody = document.getElementById('stepRows');
-  const colCount = manage ? 7 : 6;
+  const colCount = keys.length;
   if (!steps.length) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted py-4">등록된 단계가 없습니다.</td></tr>`;
+    applyStepColWidths();
     return;
   }
   tbody.innerHTML = steps.map(s => `
     <tr>
-      <td class="text-center"><span class="step-no-badge">${s.stepNo}</span></td>
-      <td>${renderPhotos(s.photos)}</td>
-      <td style="white-space:pre-wrap">${SAFETY.escapeHtml(s.description || '')}</td>
-      <td style="white-space:pre-wrap">${SAFETY.escapeHtml(s.hazard || '')}</td>
-      <td style="white-space:pre-wrap">${SAFETY.escapeHtml(s.safetyEquipment || '')}</td>
-      <td style="white-space:pre-wrap">${SAFETY.escapeHtml(s.remark || '')}</td>
-      ${manage ? `<td>
+      <td class="text-center" data-label="${STEP_COL_LABELS.no}"><span class="step-no-badge">${s.stepNo}</span></td>
+      <td data-label="${STEP_COL_LABELS.photo}">${renderPhotos(s.photos)}</td>
+      <td data-label="${STEP_COL_LABELS.desc}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.description || '')}</td>
+      <td class="col-hazard" data-label="${STEP_COL_LABELS.hazard}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.hazard || '')}</td>
+      <td data-label="${STEP_COL_LABELS.equip}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.safetyEquipment || '')}</td>
+      <td data-label="${STEP_COL_LABELS.remark}" style="white-space:pre-wrap">${SAFETY.escapeHtml(s.remark || '')}</td>
+      ${manage ? `<td data-label="${STEP_COL_LABELS.manage}">
         <div class="step-manage">
           <button class="btn btn-sm btn-outline-secondary" onclick="openStepModal(${s.stepId})" title="단계 수정"><i class="fas fa-pen"></i></button>
           <button class="btn btn-sm btn-outline-danger" onclick="deleteStep(${s.stepId})" title="단계 삭제"><i class="fas fa-trash"></i></button>
         </div>
       </td>` : ''}
     </tr>`).join('');
+  applyStepColWidths();
+}
+
+// ================================================================
+// 단계 표 컬럼 폭 — px 절대값, 머리글 경계 드래그로 조절
+// ================================================================
+function stepColKeys() {
+  const keys = ['no', 'photo', 'desc', 'hazard', 'equip', 'remark'];
+  if (isAdminUser && editMode) keys.push('manage');
+  return keys;
+}
+
+function loadStepColWeights() {
+  const weights = Object.assign({}, STEP_COL_DEFAULT_WEIGHTS);
+  try {
+    const saved = JSON.parse(localStorage.getItem(STEP_COL_STORAGE_KEY) || '{}');
+    Object.keys(weights).forEach(k => { if (Number(saved[k]) > 0) weights[k] = Number(saved[k]); });
+  } catch (e) { /* 저장값이 없거나 못 읽는 환경이면 기본 비중 그대로 */ }
+  return weights;
+}
+
+function saveStepColWeights() {
+  try { localStorage.setItem(STEP_COL_STORAGE_KEY, JSON.stringify(stepColWeights)); }
+  catch (e) { /* 저장 못해도 이번 세션 동안은 그대로 쓴다 */ }
+}
+
+/** 표가 들어갈 실제 가용 폭. 모달이 보이기 전에는 0 이 나올 수 있다. */
+function stepColAvailableWidth() {
+  const holder = document.querySelector('#detailModal .table-responsive');
+  return holder ? Math.floor(holder.clientWidth) : 0;
+}
+
+/** 가용 폭을 비중대로 나눈다. 마지막 칸이 반올림 오차를 흡수해 합계가 정확히 맞는다. */
+function fitStepColWidths(keys, available) {
+  const totalWeight = keys.reduce((sum, k) => sum + stepColWeights[k], 0);
+  const widths = {};
+  let used = 0;
+  keys.forEach((k, i) => {
+    if (i === keys.length - 1) {
+      widths[k] = Math.max(STEP_COL_MIN, available - used);
+    } else {
+      widths[k] = Math.max(STEP_COL_MIN, Math.round(available * stepColWeights[k] / totalWeight));
+      used += widths[k];
+    }
+  });
+  return widths;
+}
+
+/** colgroup 만 현재 폭으로 다시 씌운다 (드래그 중 매 프레임 호출) */
+function paintStepCols(keys) {
+  document.getElementById('stepCols').innerHTML =
+    keys.map(k => `<col style="width:${stepColWidths[k]}px">`).join('');
+}
+
+/**
+ * 현재 모달 폭에 맞춰 컬럼 폭을 다시 계산해 적용한다 (행 내용은 건드리지 않는다).
+ * 표로 읽을 수 없을 만큼 좁으면 항목별 카드 형태로 전환한다.
+ */
+function applyStepColWidths() {
+  const table = document.querySelector('#detailModal .step-table');
+  if (!table) return;
+  const available = stepColAvailableWidth();
+
+  if (available > 0 && available < STEP_STACK_BREAKPOINT) {
+    table.classList.add('stacked');
+    table.style.width = '';
+    document.getElementById('stepCols').innerHTML = '';
+    return;
+  }
+  table.classList.remove('stacked');
+
+  const keys = stepColKeys();
+  stepColWidths = fitStepColWidths(keys, (available > 0 ? available : 1100) - 1);
+  paintStepCols(keys);
+  table.style.width = keys.reduce((sum, k) => sum + stepColWidths[k], 0) + 'px';
+}
+
+function bindStepColResize() {
+  // 모달이 완전히 열린 뒤에야 표 영역의 실제 폭을 알 수 있으므로 그때 한 번 더 맞춘다.
+  document.getElementById('detailModal').addEventListener('shown.bs.modal', () => applyStepColWidths());
+
+  // 표 영역 폭이 바뀔 때마다 다시 맞춘다 — 세로 스크롤바 등장, 사이드바 접기, 창 크기 변경까지 포함.
+  // 표 자체 폭을 바꾸는 것은 감시 대상(컨테이너) 폭에 영향을 주지 않으므로 순환하지 않는다.
+  const holder = document.querySelector('#detailModal .table-responsive');
+  if (holder && window.ResizeObserver) {
+    let lastWidth = 0;
+    new ResizeObserver(() => {
+      const width = holder.clientWidth;
+      if (width > 0 && width !== lastWidth) { lastWidth = width; applyStepColWidths(); }
+    }).observe(holder);
+  } else {
+    window.addEventListener('resize', () => {
+      if (document.getElementById('detailModal').classList.contains('show')) applyStepColWidths();
+    });
+  }
+
+  // 경계를 끌면 양옆 두 칸이 폭을 주고받는다. 합계가 그대로라 표는 항상 화면에 꼭 맞는다.
+  document.getElementById('stepHead').addEventListener('mousedown', (e) => {
+    const handle = e.target.closest('.col-resizer');
+    if (!handle) return;
+    const keys = stepColKeys();
+    const index = keys.indexOf(handle.dataset.col);
+    const nextKey = keys[index + 1];
+    if (index < 0 || !nextKey) return;          // 마지막 칸 오른쪽 경계는 옮길 대상이 없다
+    e.preventDefault();
+
+    const key = keys[index];
+    const startX = e.clientX;
+    const startWidth = stepColWidths[key];
+    const startNext = stepColWidths[nextKey];
+    if (!startWidth || !startNext) return;
+    document.body.classList.add('col-resizing');
+
+    const onMove = (ev) => {
+      const delta = Math.max(STEP_COL_MIN - startWidth,
+                    Math.min(startNext - STEP_COL_MIN, ev.clientX - startX));
+      stepColWidths[key] = startWidth + delta;
+      stepColWidths[nextKey] = startNext - delta;
+      // 현재 px 값을 그대로 비중으로 삼는다 — 다른 폭의 화면에서도 같은 비율로 재현된다.
+      keys.forEach(k => { stepColWeights[k] = stepColWidths[k]; });
+      paintStepCols(keys);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.classList.remove('col-resizing');
+      saveStepColWeights();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+function resetStepColWidths() {
+  stepColWeights = Object.assign({}, STEP_COL_DEFAULT_WEIGHTS);
+  saveStepColWeights();
+  applyStepColWidths();
+  SAFETY.toast('열 너비를 기본 비율로 되돌렸습니다.');
 }
 
 function renderPhotos(photos) {
@@ -333,6 +554,97 @@ function renderPhotos(photos) {
   return photos.map(p => `<img class="step-photo" src="${SAFETY.escapeHtml(p.url)}"
       alt="${SAFETY.escapeHtml(p.originalName || '')}" data-name="${SAFETY.escapeHtml(p.originalName || '')}"
       onclick="openLightboxFrom(this)" title="클릭하면 크게 볼 수 있습니다">`).join('');
+}
+
+// ================================================================
+// 공지사항 (좌측 패널)
+// ================================================================
+let notices = [];
+/** 본문을 펼쳐 둔 공지 id */
+let expandedNotices = new Set();
+
+async function loadNotices() {
+  try {
+    notices = await SAFETY.api('/safety-api/notices') || [];
+  } catch (e) {
+    notices = [];
+    console.warn('공지사항 조회 실패', e);
+  }
+  renderNotices();
+}
+
+function renderNotices() {
+  const holder = document.getElementById('noticeList');
+  if (!notices.length) {
+    holder.innerHTML = '<div class="notice-empty">등록된 공지사항이 없습니다.</div>';
+    return;
+  }
+  const manage = isAdminUser && editMode;
+  holder.innerHTML = notices.map(n => {
+    const open = expandedNotices.has(Number(n.noticeId));
+    return `<div class="notice-row ${n.pinned ? 'pinned' : ''}">
+      <div class="notice-top">
+        ${n.pinned ? '<span class="notice-pin" title="상단 고정"><i class="fas fa-thumbtack"></i></span>' : ''}
+        <div class="notice-title" onclick="toggleNotice(${n.noticeId})"
+             title="${SAFETY.escapeHtml(n.title)}">${SAFETY.escapeHtml(n.title)}</div>
+        ${manage ? `<span class="notice-tools">
+          <button onclick="openNoticeModal(${n.noticeId})" title="공지 수정"><i class="fas fa-pen"></i></button>
+          <button class="danger" onclick="deleteNotice(${n.noticeId})" title="공지 삭제"><i class="fas fa-trash"></i></button>
+        </span>` : ''}
+      </div>
+      <div class="notice-date">${formatDate(n.createdAt)}${n.createdBy ? ' · ' + SAFETY.escapeHtml(n.createdBy) : ''}</div>
+      ${open && n.content ? `<div class="notice-body">${SAFETY.escapeHtml(n.content)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/** 제목을 누르면 본문을 펼치고 접는다 */
+function toggleNotice(noticeId) {
+  const key = Number(noticeId);
+  if (expandedNotices.has(key)) expandedNotices.delete(key); else expandedNotices.add(key);
+  renderNotices();
+}
+
+function openNoticeModal(noticeId) {
+  const notice = noticeId ? notices.find(n => Number(n.noticeId) === Number(noticeId)) : null;
+  document.getElementById('notice-id').value = notice ? notice.noticeId : '';
+  document.getElementById('notice-title').value = notice ? notice.title : '';
+  document.getElementById('notice-content').value = notice ? (notice.content || '') : '';
+  document.getElementById('notice-pinned').checked = notice ? !!notice.pinned : false;
+  document.getElementById('noticeModalTitle').textContent = notice ? '공지사항 수정' : '공지사항 등록';
+  new bootstrap.Modal(document.getElementById('noticeModal')).show();
+}
+
+async function saveNotice() {
+  const id = document.getElementById('notice-id').value;
+  const title = document.getElementById('notice-title').value.trim();
+  if (!title) { SAFETY.toast('공지 제목을 입력하세요.', false); return; }
+  const body = {
+    title,
+    content: document.getElementById('notice-content').value,
+    pinned: document.getElementById('notice-pinned').checked,
+  };
+  try {
+    if (id) await SAFETY.api('/safety-api/notices/' + id, { method: 'PUT', body });
+    else await SAFETY.api('/safety-api/notices', { method: 'POST', body });
+    bootstrap.Modal.getInstance(document.getElementById('noticeModal')).hide();
+    SAFETY.toast('저장되었습니다.');
+    await loadNotices();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+async function deleteNotice(noticeId) {
+  if (!confirm('이 공지사항을 삭제하시겠습니까?')) return;
+  try {
+    await SAFETY.api('/safety-api/notices/' + noticeId, { method: 'DELETE' });
+    SAFETY.toast('삭제되었습니다.');
+    expandedNotices.delete(Number(noticeId));
+    await loadNotices();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
 }
 
 // ================================================================
@@ -418,22 +730,26 @@ function lbOpenRaw() {
 // ================================================================
 // 분류 등록/수정
 // ================================================================
-function openCategoryCreateModal() {
-  const parent = findNode(selectedId);
+/** 분류 추가. parentId 가 null 이면 대분류, 아니면 그 분류의 하위로 만든다. (좌측 트리에서만 호출) */
+let categoryParentId = null;
+function openCategoryCreateModal(parentId) {
+  const parent = findNode(parentId);
   if (parent && parent.levelNo === 3) { SAFETY.toast('소분류 아래에는 분류를 추가할 수 없습니다.', false); return; }
+  categoryParentId = parent ? Number(parent.categoryId) : null;
   document.getElementById('cat-id').value = '';
   document.getElementById('cat-name').value = '';
   document.getElementById('cat-sort').value = 0;
   const labels = { 1: '아래 중분류', 2: '아래 소분류' };
   document.getElementById('cat-context-text').textContent =
     parent ? (pathOf(parent.categoryId).join(' > ') + ' ' + labels[parent.levelNo]) : '최상위(대분류)';
-  document.getElementById('categoryModalTitle').textContent = '분류 추가';
+  document.getElementById('categoryModalTitle').textContent = parent ? '하위 분류 추가' : '대분류 추가';
   new bootstrap.Modal(document.getElementById('categoryModal')).show();
 }
 
 function openCategoryEditModal(categoryId) {
   const node = findNode(categoryId);
   if (!node) return;
+  categoryParentId = null;
   document.getElementById('cat-id').value = categoryId;
   document.getElementById('cat-name').value = node.name;
   document.getElementById('cat-sort').value = node.sortOrder;
@@ -451,8 +767,8 @@ async function saveCategory() {
     if (id) {
       await SAFETY.api('/safety-api/categories/' + id, { method: 'PUT', body: { name, sortOrder } });
     } else {
-      await SAFETY.api('/safety-api/categories', { method: 'POST', body: { name, parentId: selectedId, sortOrder } });
-      if (selectedId !== null) expanded.add(Number(selectedId));
+      await SAFETY.api('/safety-api/categories', { method: 'POST', body: { name, parentId: categoryParentId, sortOrder } });
+      if (categoryParentId !== null) expanded.add(Number(categoryParentId));
     }
     bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
     SAFETY.toast('저장되었습니다.');
@@ -486,30 +802,53 @@ async function refreshAll() {
 // ================================================================
 // 매뉴얼 등록/삭제
 // ================================================================
+/** 트리 전체의 소분류를 "대 > 중 > 소" 경로로 모아 준다 (매뉴얼/엑셀 업로드의 분류 선택지) */
+function minorCategoryOptions() {
+  const options = [];
+  nodeIndex.forEach(node => {
+    if (node.levelNo === 3) options.push({ id: Number(node.categoryId), path: pathOf(node.categoryId).join(' > ') });
+  });
+  return options.sort((a, b) => a.path.localeCompare(b.path));
+}
+
 function openManualCreateModal() {
-  const node = findNode(selectedId);
-  if (!node || node.levelNo !== 3) { SAFETY.toast('먼저 소분류를 선택하세요.', false); return; }
+  const options = minorCategoryOptions();
+  if (!options.length) {
+    SAFETY.toast('먼저 좌측 분류에서 소분류까지 만들어 주세요. 매뉴얼은 소분류에만 등록할 수 있습니다.', false);
+    return;
+  }
+  const select = document.getElementById('man-category');
+  select.innerHTML = options.map(o => `<option value="${o.id}">${SAFETY.escapeHtml(o.path)}</option>`).join('');
+  // 지금 보고 있는 분류가 소분류면 그걸 기본값으로
+  const current = findNode(selectedId);
+  select.value = (current && current.levelNo === 3) ? String(current.categoryId) : String(options[0].id);
+
   document.getElementById('man-id').value = '';
   document.getElementById('man-title').value = '';
   document.getElementById('man-sort').value = 0;
   document.getElementById('man-context-note').textContent =
-    '등록 분류: ' + pathOf(selectedId).join(' > ') + ' · 등록 후 목록에서 열어 단계(공정 순서)를 추가할 수 있습니다.';
-  document.getElementById('manualModalTitle').textContent = '매뉴얼 추가';
+    '저장하면 바로 상세 화면이 열립니다. 거기서 "단계 추가"로 공정 사진과 내용을 하나씩 넣으세요.';
+  document.getElementById('manualModalTitle').textContent = '내용 추가 (매뉴얼)';
   new bootstrap.Modal(document.getElementById('manualModal')).show();
 }
 
 async function saveManual() {
   const title = document.getElementById('man-title').value.trim();
   if (!title) { SAFETY.toast('매뉴얼 제목을 입력하세요.', false); return; }
+  const categoryId = Number(document.getElementById('man-category').value);
+  if (!categoryId) { SAFETY.toast('등록할 분류를 선택하세요.', false); return; }
   const sortOrder = Number(document.getElementById('man-sort').value) || 0;
   try {
-    await SAFETY.api('/safety-api/manuals', {
+    const created = await SAFETY.api('/safety-api/manuals', {
       method: 'POST',
-      body: { categoryId: selectedId, title, sortOrder, steps: [] },
+      body: { categoryId, title, sortOrder, steps: [] },
     });
     bootstrap.Modal.getInstance(document.getElementById('manualModal')).hide();
-    SAFETY.toast('매뉴얼이 등록되었습니다.');
-    await refreshAll();
+    SAFETY.toast('매뉴얼이 등록되었습니다. 이어서 단계를 추가하세요.');
+    // 방금 만든 매뉴얼이 보이도록 그 분류로 이동한 뒤, 상세를 열어 바로 단계를 넣게 한다.
+    await loadTree();
+    await selectCategory(categoryId);
+    if (created && created.manualId) await openDetail(created.manualId);
   } catch (e) {
     SAFETY.toast(e.message, false);
   }
@@ -535,7 +874,7 @@ async function deleteManual() {
 function openStepModal(stepId) {
   document.getElementById('stepModalTitle').textContent = stepId ? '단계 수정' : '단계 추가';
   document.getElementById('step-id').value = stepId || '';
-  document.getElementById('step-photo-upload-wrap').style.display = stepId ? '' : 'none';
+  document.getElementById('step-photo-upload-wrap').style.display = '';   // 새 단계도 사진을 바로 첨부할 수 있다
   document.getElementById('step-photo-file').value = '';
   const step = stepId ? (currentDetail && (currentDetail.steps || []).find(x => Number(x.stepId) === Number(stepId))) : null;
   document.getElementById('step-no').value = step ? step.stepNo : '';
@@ -593,14 +932,18 @@ async function deleteStep(stepId) {
 // ================================================================
 let euPreviewData = [];
 let euSelected = { major: null, middle: null, minor: null };
+/** 시트 index -> 사용자가 그 행에서 직접 고른 소분류 id. 여기 없으면 상단 기본 분류를 따른다. */
+let euRowCategory = {};
 
 function openExcelModal() {
   document.getElementById('eu-file').value = '';
+  document.getElementById('euFileStatus').textContent = '';
   document.getElementById('euStep2').style.display = 'none';
   document.getElementById('euStep3').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
   euPreviewData = [];
   euSelected = { major: null, middle: null, minor: null };
+  euRowCategory = {};
   document.getElementById('eu-add-major-form').classList.add('d-none');
   document.getElementById('eu-add-middle-form').classList.add('d-none');
   document.getElementById('eu-add-minor-form').classList.add('d-none');
@@ -687,6 +1030,7 @@ async function euCreateCategory(level) {
     const created = await SAFETY.api('/safety-api/categories', { method: 'POST', body: { name, parentId, sortOrder: 0 } });
     await loadTree();
     renderTree();
+    euRefreshRowCategoryOptions();
     nameInput.value = '';
     document.getElementById('eu-add-' + level + '-form').classList.add('d-none');
     SAFETY.toast('분류가 추가되었습니다.');
@@ -708,66 +1052,172 @@ async function euCreateCategory(level) {
   }
 }
 
+/** 시트별 분류 선택지 (매뉴얼 등록 모달과 같은 목록을 쓴다) */
+function euMinorOptions() {
+  return minorCategoryOptions();
+}
+
+/** 그 행에 실제로 적용될 분류 id (직접 고른 값 우선, 없으면 상단 기본 분류) */
+function euCategoryOf(idx) {
+  if (euRowCategory[idx] != null) return Number(euRowCategory[idx]);
+  return euSelected.minor ? Number(euSelected.minor) : null;
+}
+
+function euOnRowCategoryChange(idx, value) {
+  if (value) euRowCategory[idx] = Number(value);
+  else delete euRowCategory[idx];
+  euRefreshRowCategories();
+  euUpdateSummary();
+}
+
+/** 행별 분류 선택 상태를 다시 칠한다 (기본값 반영 + 변경된 행 강조) */
+function euRefreshRowCategories() {
+  document.querySelectorAll('.eu-row-cat').forEach(sel => {
+    const idx = Number(sel.dataset.idx);
+    const changed = euRowCategory[idx] != null;
+    const applied = euCategoryOf(idx);
+    sel.value = applied != null ? String(applied) : '';
+    sel.classList.toggle('changed', changed);
+    const reset = document.querySelector(`.eu-cat-reset[data-idx="${idx}"]`);
+    if (reset) reset.style.display = changed ? '' : 'none';
+  });
+}
+
+/** 분류를 새로 추가한 뒤, 이미 그려진 행 셀렉트의 선택지만 갱신한다 (체크 상태는 유지) */
+function euRefreshRowCategoryOptions() {
+  const selects = document.querySelectorAll('.eu-row-cat');
+  if (!selects.length) return;
+  const optionHtml = '<option value="">기본 분류 사용</option>' +
+    euMinorOptions().map(o => `<option value="${o.id}">${SAFETY.escapeHtml(o.path)}</option>`).join('');
+  selects.forEach(sel => { sel.innerHTML = optionHtml; });
+  euRefreshRowCategories();
+}
+
+function euResetRowCategory(idx) {
+  delete euRowCategory[idx];
+  euRefreshRowCategories();
+  euUpdateSummary();
+}
+
 function euUpdateSummary() {
   const box = document.getElementById('euSummary');
   const btn = document.getElementById('eu-confirm-btn');
-  if (euSelected.minor) {
-    box.innerHTML = `<i class="fas fa-folder-tree me-1"></i>등록 위치: <b>${SAFETY.escapeHtml(pathOf(euSelected.minor).join(' > '))}</b>`;
-    box.style.display = '';
-    if (euPreviewData.length) btn.classList.remove('d-none');
-  } else {
-    box.innerHTML = '소분류까지 선택하면 업로드 버튼이 활성화됩니다.';
-    btn.classList.add('d-none');
-  }
+  euRefreshRowCategories();
+
+  const base = euSelected.minor
+    ? `<i class="fas fa-folder-tree me-1"></i>기본 등록 위치: <b>${SAFETY.escapeHtml(pathOf(euSelected.minor).join(' > '))}</b>`
+    : '<i class="fas fa-folder-tree me-1"></i>기본 등록 위치를 고르거나, 시트마다 등록 분류를 직접 선택하세요.';
+  const changedCount = Object.keys(euRowCategory).length;
+  box.innerHTML = base + (changedCount ? ` · 개별 지정 <b>${changedCount}</b>건` : '');
+  box.style.display = '';
+
+  // 선택된 시트가 모두 분류를 갖고 있어야 업로드할 수 있다
+  const checked = Array.from(document.querySelectorAll('.eu-sheet-chk:checked'));
+  const ready = euPreviewData.length && checked.length
+    && checked.every(c => euCategoryOf(Number(c.dataset.idx)) != null);
+  btn.classList.toggle('d-none', !ready);
 }
 
+/** 파일을 고르면 자동으로 호출된다 (별도 "형식 확인" 버튼 없음) */
 async function euDoPreview() {
+  const status = document.getElementById('euFileStatus');
   const file = document.getElementById('eu-file').files[0];
-  if (!file) { SAFETY.toast('엑셀 파일을 선택하세요.', false); return; }
+  if (!file) {
+    status.textContent = '';
+    document.getElementById('euStep2').style.display = 'none';
+    return;
+  }
+  euPreviewData = [];
+  euRowCategory = {};
+  document.getElementById('euStep3').style.display = 'none';
+  document.getElementById('eu-confirm-btn').classList.add('d-none');
+  status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
+
   try {
     euPreviewData = await SAFETY.uploadMultipart('/safety-api/excel-upload/preview', { file });
+    const recognized = euPreviewData.filter(s => s.recognized).length;
+    status.innerHTML = `<i class="fas fa-circle-check text-success me-1"></i>`
+      + `${SAFETY.escapeHtml(file.name)} — 시트 ${euPreviewData.length}개 중 ${recognized}개 인식됨`;
     euRenderPreview();
     document.getElementById('euStep2').style.display = '';
-    document.getElementById('euStep3').style.display = 'none';
     euUpdateSummary();
   } catch (e) {
+    status.innerHTML = `<span class="text-danger"><i class="fas fa-circle-exclamation me-1"></i>${SAFETY.escapeHtml(e.message)}</span>`;
+    document.getElementById('euStep2').style.display = 'none';
     SAFETY.toast(e.message, false);
   }
 }
 
 function euRenderPreview() {
   const recognizedCount = euPreviewData.filter(s => s.recognized).length;
+  const options = euMinorOptions();
+  const optionHtml = '<option value="">기본 분류 사용</option>' +
+    options.map(o => `<option value="${o.id}">${SAFETY.escapeHtml(o.path)}</option>`).join('');
+
   document.getElementById('eu-check-all').checked = true;
   document.getElementById('euPreviewRows').innerHTML = euPreviewData.map((s, idx) => `
     <tr class="${s.recognized ? '' : 'excluded'}">
-      <td><input type="checkbox" class="eu-sheet-chk" data-idx="${idx}" ${s.selected ? 'checked' : ''} ${s.recognized ? '' : 'disabled'}></td>
+      <td><input type="checkbox" class="eu-sheet-chk" data-idx="${idx}" ${s.selected ? 'checked' : ''} ${s.recognized ? '' : 'disabled'}
+             onchange="euUpdateSummary()"></td>
       <td>${SAFETY.escapeHtml(s.sheetName)}</td>
       <td>${s.recognized ? '<span class="badge-ok">인식됨</span>' : `<span class="badge-no">제외</span>`}</td>
       <td>${SAFETY.escapeHtml(s.detectedTitle || '')}${!s.recognized && s.reason ? `<div class="small text-muted">${SAFETY.escapeHtml(s.reason)}</div>` : ''}</td>
+      <td>
+        <div class="d-flex align-items-center gap-1">
+          <select class="eu-row-cat" data-idx="${idx}" ${s.recognized ? '' : 'disabled'}
+                  onchange="euOnRowCategoryChange(${idx}, this.value)">${optionHtml}</select>
+          <button class="eu-cat-reset" data-idx="${idx}" style="display:none" title="기본 분류로 되돌리기"
+                  onclick="euResetRowCategory(${idx})"><i class="fas fa-rotate-left"></i></button>
+        </div>
+      </td>
       <td class="text-center">${s.stepCount}</td>
       <td class="text-center">${s.photoCount}</td>
       <td class="small">${(s.stepPreviewLines || []).slice(0, 3).map(l => SAFETY.escapeHtml(l)).join('<br>')}</td>
     </tr>`).join('');
+
   const note = document.querySelector('#euStep2 .eu-note');
-  if (note) note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. 필요 없는 시트만 체크 해제하세요.`;
+  if (note) {
+    note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. `
+      + '필요 없는 시트는 체크를 해제하고, 다른 분류에 넣을 시트는 "등록 분류"에서 직접 고르세요.';
+  }
+  euRefreshRowCategories();
 }
 
 function euToggleAll(box) {
   document.querySelectorAll('.eu-sheet-chk:not(:disabled)').forEach(c => { c.checked = box.checked; });
+  euUpdateSummary();
 }
 
 async function euDoConfirm() {
-  if (!euSelected.minor) { SAFETY.toast('등록할 소분류를 선택하세요.', false); return; }
   const file = document.getElementById('eu-file').files[0];
   if (!file) { SAFETY.toast('엑셀 파일이 없습니다. 다시 선택 후 형식 확인을 눌러주세요.', false); return; }
-  const selectedNames = Array.from(document.querySelectorAll('.eu-sheet-chk:checked'))
-    .map(c => euPreviewData[Number(c.dataset.idx)].sheetName);
-  if (!selectedNames.length) { SAFETY.toast('가져올 시트를 하나 이상 선택하세요.', false); return; }
-  if (!confirm(`선택한 ${selectedNames.length}개 시트를 매뉴얼로 등록하시겠습니까?`)) return;
+
+  const checked = Array.from(document.querySelectorAll('.eu-sheet-chk:checked'));
+  if (!checked.length) { SAFETY.toast('가져올 시트를 하나 이상 선택하세요.', false); return; }
+
+  const assignments = [];
+  const missing = [];
+  checked.forEach(c => {
+    const idx = Number(c.dataset.idx);
+    const categoryId = euCategoryOf(idx);
+    if (categoryId == null) missing.push(euPreviewData[idx].sheetName);
+    else assignments.push({ sheetName: euPreviewData[idx].sheetName, categoryId });
+  });
+  if (missing.length) {
+    SAFETY.toast(`등록 분류가 지정되지 않은 시트가 있습니다: ${missing.join(', ')}`, false);
+    return;
+  }
+
+  // 어느 분류에 몇 건이 들어가는지 확인시켜 준다 (시트마다 다를 수 있으므로)
+  const countByCategory = {};
+  assignments.forEach(a => { countByCategory[a.categoryId] = (countByCategory[a.categoryId] || 0) + 1; });
+  const summary = Object.entries(countByCategory)
+    .map(([id, count]) => `- ${pathOf(id).join(' > ')} : ${count}건`).join('\n');
+  if (!confirm(`선택한 ${assignments.length}개 시트를 아래 분류에 등록합니다.\n\n${summary}\n\n진행할까요?`)) return;
 
   try {
     const result = await SAFETY.uploadMultipart('/safety-api/excel-upload/confirm', {
-      file, categoryId: euSelected.minor, sheetNames: selectedNames.join(','),
+      file, assignments: JSON.stringify(assignments),
     });
     euRenderResult(result);
     SAFETY.toast(result.importedCount + '개 매뉴얼이 등록되었습니다.');

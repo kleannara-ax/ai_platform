@@ -25,6 +25,10 @@ public class ManualSummaryResponse {
     private final String sourceSheetName;
     private final int sortOrder;
     private final LocalDateTime updatedAt;
+    /** 내용 검색으로 걸린 단계 수. 내용 검색이 아니면 0. */
+    private final int matchCount;
+    /** 내용 검색으로 걸린 부분의 짧은 발췌 (왜 걸렸는지 화면에 보여주기 위함). 내용 검색이 아니면 빈 목록. */
+    private final List<String> matchSnippets;
 
     public static ManualSummaryResponse from(SafetyManual entity) {
         SafetyManualCategory category = entity.getCategory();
@@ -38,6 +42,25 @@ public class ManualSummaryResponse {
                 .sourceSheetName(entity.getSourceSheetName())
                 .sortOrder(entity.getSortOrder())
                 .updatedAt(entity.getUpdatedAt())
+                .matchSnippets(List.of())
+                .build();
+    }
+
+    /** 내용 검색 결과용 — 걸린 단계 수와 발췌를 함께 담는다. */
+    public static ManualSummaryResponse withMatches(SafetyManual entity, int matchCount, List<String> snippets) {
+        SafetyManualCategory category = entity.getCategory();
+        return ManualSummaryResponse.builder()
+                .manualId(entity.getManualId())
+                .categoryId(category != null ? category.getCategoryId() : null)
+                .categoryName(category != null ? category.getName() : null)
+                .categoryPath(buildPath(category))
+                .title(entity.getTitle())
+                .sourceFileName(entity.getSourceFileName())
+                .sourceSheetName(entity.getSourceSheetName())
+                .sortOrder(entity.getSortOrder())
+                .updatedAt(entity.getUpdatedAt())
+                .matchCount(matchCount)
+                .matchSnippets(snippets)
                 .build();
     }
 

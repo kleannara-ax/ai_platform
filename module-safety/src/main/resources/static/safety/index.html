@@ -25,20 +25,19 @@ body{
   font-family:'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background:var(--bg); color:var(--text); min-height:100vh;
 }
-.safety-main{max-width:1480px; margin:0 auto; padding:24px 22px 60px;}
+.safety-main{max-width:1480px; margin:0 auto; padding:18px 22px 60px;}
 .page-header{
-  display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
-  margin-bottom:18px; flex-wrap:wrap;
+  display:flex; justify-content:space-between; align-items:center; gap:16px;
+  margin-bottom:14px; flex-wrap:wrap;
 }
 .page-header h1{
-  font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.3px;
+  font-size:1.5rem; font-weight:800; margin:0; letter-spacing:-.3px;
   display:flex; align-items:center; gap:10px;
 }
 .page-header h1 .icon-badge{
   width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; font-size:1rem; box-shadow:var(--shadow-sm);
 }
-.page-header p{color:var(--muted); font-size:.86rem; margin:0}
 .header-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .btn-modern{
   border:none; border-radius:11px; padding:9px 16px; font-size:.86rem; font-weight:600;
@@ -70,19 +69,54 @@ body{
 .safety-layout{display:grid; grid-template-columns:296px minmax(0,1fr); gap:18px; align-items:start}
 @media (max-width: 991.98px){ .safety-layout{grid-template-columns:1fr} }
 
+/* 좌측 컬럼 — 분류 트리 / 연락처 / 공지사항 카드가 세로로 쌓인다 */
+.side-column{display:flex; flex-direction:column; gap:14px; position:sticky; top:18px}
+@media (max-width: 991.98px){ .side-column{position:static} }
+.side-card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden}
+.side-card-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:12px 16px; border-bottom:1px solid var(--line);
+}
+.side-card-head h6{margin:0; font-size:.9rem; font-weight:800; display:flex; align-items:center; gap:7px}
+.side-card-head h6 i{color:var(--brand)}
+.side-card-head .btn-modern{padding:4px 10px; font-size:.76rem}
+.side-photo{display:block; width:100%; height:auto; cursor:zoom-in; transition:.15s}
+.side-photo:hover{filter:brightness(1.03)}
+
+/* 공지사항 */
+.notice-card #noticeList{max-height:300px; overflow-y:auto}
+.notice-row{padding:11px 16px; border-bottom:1px solid var(--line)}
+.notice-row:last-child{border-bottom:none}
+.notice-row.pinned{background:#fffbeb}
+.notice-top{display:flex; align-items:flex-start; gap:6px}
+.notice-title{
+  flex:1 1 auto; min-width:0; font-size:.85rem; font-weight:700; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.notice-title:hover{color:var(--brand)}
+.notice-pin{color:#f59e0b; font-size:.72rem; flex:0 0 auto; margin-top:2px}
+.notice-tools{flex:0 0 auto; display:flex; gap:2px}
+.notice-tools button{
+  width:22px; height:22px; border-radius:6px; border:none; background:transparent; color:#9aa0b4; font-size:.66rem;
+}
+.notice-tools button:hover{background:#e9ebf5; color:var(--text)}
+.notice-tools button.danger:hover{background:#fee2e2; color:#dc2626}
+.notice-date{font-size:.7rem; color:var(--muted); margin-top:2px}
+.notice-body{font-size:.8rem; color:#4b5563; margin-top:6px; white-space:pre-wrap; line-height:1.5}
+.notice-empty{padding:22px 14px; text-align:center; color:var(--muted); font-size:.8rem}
+
 /* ---- 좌측: 스택형 분류 트리 ---- */
 .tree-panel{
   background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm);
-  position:sticky; top:18px; overflow:hidden;
+  overflow:hidden;
 }
-@media (max-width: 991.98px){ .tree-panel{position:static} }
 .tree-head{
   display:flex; align-items:center; justify-content:space-between; gap:8px;
   padding:14px 16px; border-bottom:1px solid var(--line);
 }
 .tree-head h6{margin:0; font-size:.9rem; font-weight:800; display:flex; align-items:center; gap:7px}
 .tree-head h6 i{color:var(--brand)}
-.tree-body{padding:8px; max-height:calc(100vh - 190px); overflow-y:auto}
+.tree-body{padding:8px; max-height:calc(100vh - 480px); min-height:190px; overflow-y:auto}
 @media (max-width: 991.98px){ .tree-body{max-height:420px} }
 
 .tree-row{
@@ -127,9 +161,27 @@ body{
 .list-head h5{font-size:1.02rem; font-weight:800; margin:0}
 .list-head .lh-path{font-size:.76rem; color:var(--muted); margin-top:3px}
 .lh-count{font-size:.78rem; color:var(--muted); font-weight:600; white-space:nowrap}
-.list-search{position:relative; margin-top:12px; max-width:340px}
-.list-search input{padding-left:34px; border-radius:10px; border-color:var(--line); font-size:.85rem}
-.list-search i{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9aa0b4; font-size:.8rem}
+/* 검색 두 종류: 왼쪽은 매뉴얼명(화면에서 즉시 필터), 오른쪽은 내용(서버 조회) */
+.search-row{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center}
+.list-search{position:relative; flex:1 1 260px; min-width:220px; max-width:360px}
+.list-search input{padding-left:34px; padding-right:30px; border-radius:10px; border-color:var(--line); font-size:.85rem}
+.list-search > i{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9aa0b4; font-size:.8rem}
+.search-clear{
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  border:none; background:transparent; color:#9aa0b4; font-size:.75rem; padding:4px 6px; border-radius:6px;
+}
+.search-clear:hover{background:#f1f2f7; color:var(--text)}
+.search-hint{font-size:.76rem; color:var(--muted); margin-top:7px; min-height:1em}
+.search-hint b{color:var(--brand)}
+
+/* 내용 검색으로 걸린 부분 발췌 */
+.mr-snippets{margin-top:5px; display:flex; flex-direction:column; gap:2px}
+.mr-snippet{
+  font-size:.75rem; color:#4b5563; background:#f8f9fd; border-left:3px solid var(--brand-soft);
+  border-radius:0 6px 6px 0; padding:3px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.mr-snippet mark{background:#fef08a; color:inherit; padding:0 1px; border-radius:2px}
+.mr-match-more{font-size:.72rem; color:var(--muted); padding-left:8px}
 
 .manual-row{
   display:flex; align-items:center; justify-content:space-between; gap:14px;
@@ -164,21 +216,66 @@ body{
 .form-control, .form-select{border-radius:10px; border-color:var(--line); font-size:.88rem}
 .form-control:focus, .form-select:focus{border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft)}
 
+/* 매뉴얼 상세 모달은 단계 표가 주인공이라 기본 modal-xl 보다 넓게 쓴다.
+   플랫폼 SPA 안에서는 iframe 폭이 상한이므로 가용 폭을 거의 전부 쓰고,
+   본문 여백도 줄여 표에 넓이를 몰아준다. */
+#detailModal .modal-dialog{max-width:min(1900px, 98vw); margin:12px auto}
+#detailModal .modal-body{padding:14px 12px}
+#detailModal .modal-header{padding:16px 16px}
 .detail-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; width:100%}
 .detail-path{color:var(--muted); font-size:.78rem; font-weight:500; margin-top:3px}
 .detail-tools{display:flex; gap:7px; flex-wrap:wrap}
-.step-table{width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed}
+/* 컬럼 폭은 px 절대값이고 표 전체 폭은 JS가 합계로 지정한다.
+   합계가 화면보다 넓어지면 .table-responsive 가 가로 스크롤을 만든다. */
+.step-table{border-collapse:separate; border-spacing:0; table-layout:fixed}
 .step-table th{
-  background:#f8f9fd; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase;
-  padding:10px 8px; text-align:center; border-bottom:2px solid var(--line);
+  position:relative; background:#f8f9fd; color:var(--muted); font-size:.9rem; font-weight:700;
+  padding:12px 10px; text-align:center; border-bottom:2px solid var(--line);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.step-table td{padding:12px 10px; border-bottom:1px solid var(--line); font-size:.86rem; vertical-align:top}
+/* 머리글 오른쪽 경계를 잡고 끌면 그 컬럼 폭이 바뀐다 */
+.col-resizer{
+  position:absolute; top:0; right:-4px; width:9px; height:100%; z-index:2; cursor:col-resize;
+}
+.col-resizer::after{
+  content:''; position:absolute; top:7px; bottom:7px; left:3px; width:3px;
+  border-radius:2px; background:transparent; transition:background .12s;
+}
+.col-resizer:hover::after{background:var(--brand)}
+.step-table th:last-child .col-resizer{right:0; width:6px}
+body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select:none !important}
+body.col-resizing .col-resizer::after{background:var(--brand)}
+.step-table td{padding:15px 12px; border-bottom:1px solid var(--line); font-size:1.06rem; line-height:1.6; vertical-align:top}
+/* 위험요인은 이 화면에서 가장 중요한 항목이라 넓게 잡고 굵게 표시한다 (색 강조는 쓰지 않는다) */
+.step-table td.col-hazard{font-size:1.14rem; font-weight:700}
+.step-table th.col-hazard{color:var(--text)}
 .step-table tr:hover td{background:#fafbff}
 .step-no-badge{
   display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%;
   background:var(--brand-soft); color:var(--brand); font-weight:700; font-size:.78rem;
 }
 .step-manage{display:flex; gap:5px; justify-content:center}
+
+/* 좁은 화면(표 영역 760px 미만): 표를 포기하고 단계별 카드로 쌓는다.
+   가로 스크롤로 내용이 잘려 나가는 것보다 항목명을 붙여 세로로 쌓는 편이 읽기 쉽다. */
+.step-table.stacked{width:100% !important; display:block}
+.step-table.stacked thead{display:none}
+.step-table.stacked tbody{display:block}
+.step-table.stacked tr{
+  display:block; border:1px solid var(--line); border-radius:14px;
+  padding:10px 4px; margin-bottom:12px; background:var(--surface);
+}
+.step-table.stacked tr:hover td{background:transparent}
+.step-table.stacked td{
+  display:block; width:auto !important; border-bottom:none; padding:7px 12px;
+}
+.step-table.stacked td::before{
+  content:attr(data-label); display:block; font-size:.76rem; font-weight:700;
+  color:var(--muted); margin-bottom:3px;
+}
+.step-table.stacked td.text-center{text-align:left !important}
+/* 카드형에서는 사진이 화면을 통째로 먹지 않도록 높이를 제한한다 (누르면 확대 뷰어로 크게 볼 수 있다) */
+.step-table.stacked .step-photo{max-height:320px}
 /* 클릭하면 확대되는 단계 사진 */
 .step-photo{
   max-width:100%; max-height:130px; display:block; margin-bottom:5px; cursor:zoom-in;
@@ -238,6 +335,15 @@ body{
   margin-bottom:10px;
 }
 .eu-note{font-size:.76rem; color:var(--muted); margin-top:6px}
+/* 시트별 등록 분류 선택 — 기본값에서 바꾼 행은 눈에 띄게 표시한다 */
+.eu-row-cat{font-size:.78rem; padding:4px 6px; border-radius:8px; border:1px solid var(--line); width:100%}
+.eu-row-cat:focus{border-color:var(--brand); outline:none; box-shadow:0 0 0 3px var(--brand-soft)}
+.eu-row-cat.changed{border-color:var(--brand); background:var(--brand-soft); font-weight:600}
+.eu-row-cat:disabled{background:#f4f5fa; color:#aeb3c2}
+.eu-cat-reset{
+  border:none; background:transparent; color:var(--muted); font-size:.7rem; padding:2px 4px; border-radius:6px;
+}
+.eu-cat-reset:hover{background:#f1f2f7; color:var(--text)}
 </style>
 </head>
 <body>
@@ -247,7 +353,6 @@ body{
   <div class="page-header">
     <div>
       <h1><span class="icon-badge"><i class="fas fa-shield-alt"></i></span>안전작업방식 매뉴얼</h1>
-      <p>왼쪽에서 대분류·중분류·소분류를 선택하면 그 아래 매뉴얼이 모두 표시됩니다.</p>
     </div>
     <div class="header-actions">
       <button class="btn-modern btn-edit-toggle d-none" id="btn-edit-mode" onclick="toggleEditMode()">
@@ -256,8 +361,8 @@ body{
       <button class="btn-modern btn-success-modern d-none" id="btn-excel-upload" onclick="openExcelModal()">
         <i class="fas fa-file-excel"></i>엑셀 일괄 업로드
       </button>
-      <button class="btn-modern btn-primary-modern d-none" id="btn-add-context" onclick="onAddContextClick()">
-        <i class="fas fa-plus"></i><span id="btn-add-context-label">분류 추가</span>
+      <button class="btn-modern btn-primary-modern d-none" id="btn-add-manual" onclick="openManualCreateModal()">
+        <i class="fas fa-plus"></i>내용 추가
       </button>
     </div>
   </div>
@@ -266,17 +371,39 @@ body{
 
   <div class="safety-layout">
 
-    <!-- 좌측: 스택형 분류 트리 -->
+    <!-- 좌측: 분류 트리 + 방재센터 연락처 + 공지사항 -->
+    <div class="side-column">
     <aside class="tree-panel">
       <div class="tree-head">
         <h6><i class="fas fa-folder-tree"></i>분류</h6>
         <div class="d-flex gap-1">
+          <button class="tr-caret d-none" id="btn-add-major" style="width:26px;height:26px" title="대분류 추가"
+                  onclick="openCategoryCreateModal(null)"><i class="fas fa-plus"></i></button>
           <button class="tr-caret" style="width:26px;height:26px" title="모두 펼치기" onclick="expandAll(true)"><i class="fas fa-angles-down"></i></button>
           <button class="tr-caret" style="width:26px;height:26px" title="모두 접기" onclick="expandAll(false)"><i class="fas fa-angles-up"></i></button>
         </div>
       </div>
       <div class="tree-body" id="treeBody"></div>
     </aside>
+
+    <!-- 방재센터 연락처 — 눌러서 크게 볼 수 있다 -->
+    <section class="side-card">
+      <img class="side-photo" src="img/emergency-contacts.jpg" alt="방재센터 전화번호"
+           title="클릭하면 크게 볼 수 있습니다"
+           onclick="openLightbox(this.getAttribute('src'), '방재센터 전화번호')">
+    </section>
+
+    <!-- 공지사항 -->
+    <section class="side-card notice-card">
+      <div class="side-card-head">
+        <h6><i class="fas fa-bullhorn"></i>공지사항</h6>
+        <button class="btn-modern btn-outline-modern d-none" id="btn-add-notice" onclick="openNoticeModal()">
+          <i class="fas fa-plus"></i>등록
+        </button>
+      </div>
+      <div id="noticeList"></div>
+    </section>
+    </div>
 
     <!-- 우측: 선택한 분류의 매뉴얼 목록 -->
     <section class="list-panel">
@@ -288,10 +415,25 @@ body{
           </div>
           <div class="lh-count" id="listCount"></div>
         </div>
-        <div class="list-search">
-          <i class="fas fa-search"></i>
-          <input class="form-control" id="listFilter" placeholder="매뉴얼명으로 찾기" oninput="renderManualList()">
+        <div class="search-row">
+          <div class="list-search">
+            <i class="fas fa-file-signature"></i>
+            <input class="form-control" id="listFilter" placeholder="매뉴얼명으로 찾기" oninput="renderManualList()">
+            <button class="search-clear" id="listFilterClear" style="display:none" title="지우기"
+                    onclick="clearTitleFilter()"><i class="fas fa-xmark"></i></button>
+          </div>
+          <div class="list-search">
+            <i class="fas fa-magnifying-glass"></i>
+            <input class="form-control" id="contentFilter" placeholder="내용으로 찾기 (공정·위험요인·보호구·비고)"
+                   onkeydown="if(event.key==='Enter') runContentSearch()" oninput="onContentFilterInput()">
+            <button class="search-clear" id="contentFilterClear" style="display:none" title="내용 검색 해제"
+                    onclick="clearContentSearch()"><i class="fas fa-xmark"></i></button>
+          </div>
+          <button class="btn-modern btn-outline-modern" onclick="runContentSearch()">
+            <i class="fas fa-magnifying-glass"></i>내용 검색
+          </button>
         </div>
+        <div class="search-hint" id="searchHint"></div>
       </div>
       <div id="manualRows"></div>
     </section>
@@ -341,6 +483,21 @@ body{
   <div class="lb-hint">이미지를 클릭하면 확대/축소, 마우스 휠로 배율 조절, Esc로 닫기</div>
 </div>
 
+<!-- 공지사항 등록/수정 모달 -->
+<div class="modal fade" id="noticeModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="noticeModalTitle">공지사항 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="notice-id">
+    <div class="mb-3"><label class="form-label-modern">제목 *</label><input id="notice-title" class="form-control" maxlength="200"></div>
+    <div class="mb-3"><label class="form-label-modern">내용</label><textarea id="notice-content" class="form-control" rows="5"></textarea></div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="notice-pinned">
+      <label class="form-check-label" for="notice-pinned" style="font-size:.85rem">상단 고정</label>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">취소</button><button class="btn-modern btn-primary-modern" onclick="saveNotice()">저장</button></div>
+</div></div></div>
+
 <!-- 분류 등록/수정 모달 -->
 <div class="modal fade" id="categoryModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
   <div class="modal-header"><h5 class="modal-title" id="categoryModalTitle">분류 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -361,7 +518,11 @@ body{
   <div class="modal-header"><h5 class="modal-title" id="manualModalTitle">매뉴얼 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">
     <input type="hidden" id="man-id">
-    <div class="mb-3"><label class="form-label-modern">매뉴얼 제목(공정명) *</label><input id="man-title" class="form-control"></div>
+    <div class="mb-3">
+      <label class="form-label-modern">등록할 분류(소분류) *</label>
+      <select id="man-category" class="form-select"></select>
+    </div>
+    <div class="mb-3"><label class="form-label-modern">매뉴얼 제목(공정명) *</label><input id="man-title" class="form-control" placeholder="예: 독타 블레이드 교체"></div>
     <div class="mb-1"><label class="form-label-modern">표시 순서</label><input id="man-sort" type="number" class="form-control" value="0"></div>
     <div class="eu-note mt-2" id="man-context-note"></div>
   </div>
@@ -397,15 +558,15 @@ body{
   </div>
   <div class="modal-body">
 
-    <div class="eu-step active" id="eu-step1-label"><span class="num">1</span>엑셀 파일 선택 후 형식 확인</div>
-    <div class="row g-2 align-items-end mb-2">
-      <div class="col-md-8"><input type="file" id="eu-file" class="form-control" accept=".xlsx,.xls"></div>
-      <div class="col-md-4"><button class="btn-modern btn-outline-modern w-100" onclick="euDoPreview()"><i class="fas fa-search"></i>형식 확인</button></div>
+    <div class="eu-step active" id="eu-step1-label"><span class="num">1</span>엑셀 파일 선택 (선택하면 형식을 자동으로 확인합니다)</div>
+    <div class="mb-2">
+      <input type="file" id="eu-file" class="form-control" accept=".xlsx,.xls" onchange="euDoPreview()">
+      <div class="eu-note" id="euFileStatus"></div>
     </div>
 
     <div id="euStep2" style="display:none">
       <hr class="my-3">
-      <div class="eu-step active" id="eu-step2-label"><span class="num">2</span>등록할 분류 선택 (소분류까지 선택해야 업로드할 수 있어요)</div>
+      <div class="eu-step active" id="eu-step2-label"><span class="num">2</span>등록할 분류 선택 (아래에서 시트마다 따로 바꿀 수 있어요)</div>
 
       <div class="row g-3 mb-2">
         <div class="col-md-4">
@@ -450,8 +611,9 @@ body{
         <table class="eu-sheet-table mb-0">
           <thead class="sticky-top"><tr>
             <th style="width:34px"><input type="checkbox" id="eu-check-all" checked onchange="euToggleAll(this)"></th>
-            <th style="width:140px">시트명</th><th style="width:90px">인식결과</th><th>매뉴얼명(추정)</th>
-            <th style="width:60px">단계수</th><th style="width:60px">사진수</th><th style="width:220px">미리보기</th>
+            <th style="width:130px">시트명</th><th style="width:76px">인식결과</th><th>매뉴얼명(추정)</th>
+            <th style="width:250px">등록 분류</th>
+            <th style="width:54px">단계수</th><th style="width:54px">사진수</th><th style="width:180px">미리보기</th>
           </tr></thead>
           <tbody id="euPreviewRows"></tbody>
         </table>

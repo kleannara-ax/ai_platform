@@ -2,6 +2,7 @@ package com.company.module.safety.service;
 
 import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
+import com.company.module.safety.dto.request.ExcelSheetAssignRequest;
 import com.company.module.safety.dto.response.ExcelImportResultResponse;
 import com.company.module.safety.dto.response.ExcelSheetPreviewResponse;
 import com.company.module.safety.dto.response.ManualSummaryResponse;
@@ -22,8 +23,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * 안전작업방식 매뉴얼 엑셀 일괄업로드 오케스트레이션.
@@ -33,6 +36,7 @@ import java.util.Set;
  *   <li>1단계 {@link #preview}: 업로드된 워크북의 시트별 형식을 확인만 하고 DB 에는 아무것도 쓰지 않는다.
  *       (개요/범례 시트 — 예: "초지" — 는 여기서 자동으로 인식 실패(recognized=false) 처리되어 제외된다)</li>
  *   <li>2단계 {@link #confirmImport}: 사용자가 화면에서 확인 후 선택한 시트만 실제로 매뉴얼로 저장한다.
+ *       시트마다 등록할 분류를 따로 지정할 수 있으므로 시트→분류 매핑을 받는다.
  *       (파일은 서버에 임시 저장하지 않으므로 2단계 호출 시 파일을 함께 다시 전송받는다)</li>
  * </ol>
  */
@@ -94,39 +98,54 @@ public class SafetyExcelUploadService {
     // 2단계: 확정 업로드 (선택된 시트만 실제 저장)
     // ================================================================
     @Transactional
-    public ExcelImportResultResponse confirmImport(MultipartFile file, Long categoryId,
-                                                    Set<String> selectedSheetNames, String createdBy) {
-        SafetyManualCategory category = categoryService.findActiveMinor(categoryId);
+    public ExcelImportResultResponse confirmImport(MultipartFile file,
+                                                    List<ExcelSheetAssignRequest> assignments, String createdBy) {
+        Map<String, Long> categoryBySheet = toCategoryBySheet(assignments);
         List<ParsedSheet> sheets = parseWorkbook(file);
         String sourceFileName = (file.getOriginalFilename() != null) ? file.getOriginalFilename() : "upload.xlsx";
+
+        // 같은 분류를 여러 시트가 함께 쓰는 경우가 흔하므로 분류 조회 결과와 정렬순서를 분류별로 들고 간다.
+        Map<Long, SafetyManualCategory> categoryCache = new HashMap<>();
+        Map<Long, Integer> nextSortOrder = new HashMap<>();
 
         List<ManualSummaryResponse> created = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
 
         for (ParsedSheet sheet : sheets) {
-            if (selectedSheetNames != null && !selectedSheetNames.isEmpty()
-                    && !selectedSheetNames.contains(sheet.getSheetName())) {
+            Long categoryId = categoryBySheet.get(sheet.getSheetName());
+            if (categoryId == null) {
                 continue; // 사용자가 선택하지 않은 시트는 건너뜀
             }
             if (!sheet.isRecognized()) {
                 skipped.add(sheet.getSheetName() + " - " + sheet.getReason());
                 continue;
             }
+
+            SafetyManualCategory category = categoryCache.get(categoryId);
+            if (category == null) {
+                category = categoryService.findActiveMinor(categoryId);
+                categoryCache.put(categoryId, category);
+            }
+
             String title = sheet.getTitle();
             if (title == null || title.isBlank()) {
                 title = sheet.getSheetName();
             }
             if (manualRepository.existsByTitleAndCategory_CategoryId(title, categoryId)) {
-                skipped.add(sheet.getSheetName() + " - 같은 분류에 이미 존재하는 매뉴얼 제목(" + title + ")입니다.");
+                skipped.add(sheet.getSheetName() + " - '" + category.getName()
+                        + "' 분류에 이미 존재하는 매뉴얼 제목(" + title + ")입니다.");
                 continue;
             }
+
+            int sortOrder = nextSortOrder.getOrDefault(categoryId, 0);
+            nextSortOrder.put(categoryId, sortOrder + 1);
 
             SafetyManual manual = manualRepository.save(SafetyManual.builder()
                     .category(category)
                     .title(title)
                     .sourceFileName(sourceFileName)
                     .sourceSheetName(sheet.getSheetName())
-                    .sortOrder(created.size())
+                    .sortOrder(sortOrder)
                     .createdBy(createdBy)
                     .build());
 
@@ -154,6 +173,26 @@ public class SafetyExcelUploadService {
                 .manuals(created)
                 .skipped(skipped)
                 .build();
+    }
+
+    /** 시트→분류 매핑으로 정리한다. 같은 시트가 중복으로 오면 마지막 지정을 쓴다. */
+    private Map<String, Long> toCategoryBySheet(List<ExcelSheetAssignRequest> assignments) {
+        if (assignments == null || assignments.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "가져올 시트를 하나 이상 선택하세요.");
+        }
+        Map<String, Long> categoryBySheet = new LinkedHashMap<>();
+        for (ExcelSheetAssignRequest assignment : assignments) {
+            String sheetName = (assignment.getSheetName() != null) ? assignment.getSheetName().trim() : "";
+            if (sheetName.isEmpty()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "시트명이 비어 있는 항목이 있습니다.");
+            }
+            if (assignment.getCategoryId() == null) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "'" + sheetName + "' 시트의 등록 분류를 선택하세요.");
+            }
+            categoryBySheet.put(sheetName, assignment.getCategoryId());
+        }
+        return categoryBySheet;
     }
 
     // ----------------------------------------------------------------

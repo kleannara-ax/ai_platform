@@ -38,6 +38,11 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class SafetyManualService {
 
+    /** 한 매뉴얼당 보여줄 발췌 최대 개수 */
+    private static final int SNIPPET_LIMIT = 3;
+    /** 발췌에서 키워드 앞뒤로 남길 글자 수 */
+    private static final int SNIPPET_CONTEXT = 30;
+
     private final SafetyManualRepository manualRepository;
     private final SafetyManualStepRepository stepRepository;
     private final SafetyManualStepPhotoRepository photoRepository;
@@ -68,6 +73,63 @@ public class SafetyManualService {
     public List<ManualSummaryResponse> getListInSubtree(Long categoryId) {
         return manualRepository.findInCategorySubtree(categoryId)
                 .stream().map(ManualSummaryResponse::from).toList();
+    }
+
+    /**
+     * 분류 하위에서 <b>단계 본문</b>으로 매뉴얼을 찾는다 (제목 검색과 별개).
+     * <p>왜 걸렸는지 알 수 있도록 매칭된 부분의 짧은 발췌를 함께 담아 준다.
+     */
+    public List<ManualSummaryResponse> searchByContent(Long categoryId, String keyword) {
+        String needle = emptyToNull(keyword);
+        if (needle == null) {
+            return getListInSubtree(categoryId);
+        }
+        List<SafetyManual> manuals = manualRepository.searchByStepContent(categoryId, needle);
+        if (manuals.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> manualIds = manuals.stream().map(SafetyManual::getManualId).toList();
+        Map<Long, List<SafetyManualStep>> stepsByManual = stepRepository.findMatchingSteps(manualIds, needle)
+                .stream().collect(Collectors.groupingBy(step -> step.getManual().getManualId()));
+
+        return manuals.stream().map(manual -> {
+            List<SafetyManualStep> matched = stepsByManual.getOrDefault(manual.getManualId(), List.of());
+            List<String> snippets = matched.stream()
+                    .limit(SNIPPET_LIMIT)
+                    .map(step -> buildSnippet(step, needle))
+                    .filter(text -> !text.isBlank())
+                    .toList();
+            return ManualSummaryResponse.withMatches(manual, matched.size(), snippets);
+        }).toList();
+    }
+
+    /** 키워드가 걸린 칸을 찾아 "N단계 항목명: ...앞뒤 문맥..." 형태로 짧게 잘라낸다. */
+    private String buildSnippet(SafetyManualStep step, String keyword) {
+        String[][] fields = {
+                {"공정 순서", step.getDescription()},
+                {"위험요인", step.getHazard()},
+                {"안전 보호구", step.getSafetyEquipment()},
+                {"비고", step.getRemark()},
+        };
+        String lowerKeyword = keyword.toLowerCase();
+        for (String[] field : fields) {
+            String value = field[1];
+            if (value == null) {
+                continue;
+            }
+            // Java 15+ 에서 "\s" 는 문자열 이스케이프(공백)라 정규식으로 넘기려면 반드시 두 번 escape 해야 한다.
+            String flat = value.replaceAll("\\s+", " ").trim();
+            int at = flat.toLowerCase().indexOf(lowerKeyword);
+            if (at < 0) {
+                continue;
+            }
+            int from = Math.max(0, at - SNIPPET_CONTEXT);
+            int to = Math.min(flat.length(), at + keyword.length() + SNIPPET_CONTEXT);
+            String excerpt = (from > 0 ? "..." : "") + flat.substring(from, to) + (to < flat.length() ? "..." : "");
+            return step.getStepNo() + "단계 " + field[0] + ": " + excerpt;
+        }
+        return "";
     }
 
     // ================================================================

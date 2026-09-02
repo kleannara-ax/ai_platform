@@ -12,6 +12,7 @@
 | 3 | `03_perm_code.sql` | 공통코드 `SAFETY_PERM` (SAFETY 관리자 명단, 기존 ROLE_ADMIN 계정으로 자동 시딩) |
 | 4 | `04_data.sql` | (선택) 최상위 분류 데모 데이터 1건 |
 | 5 | `05_category_level.sql` | 분류 3단계(대/중/소) 고정 구조 도입: `LEVEL_NO` 컬럼 추가 + 기존 데이터 레벨 백필 + 소분류가 아닌 곳에 매뉴얼이 붙어 있으면 자동으로 "미분류" 하위 분류를 만들어 이동시키는 1회성 마이그레이션 |
+| 6 | `06_org_categories.sql` | 조직(팀) 기준 **대분류 12건** 일괄 등록. 같은 이름의 활성 대분류가 있으면 건너뛴다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
@@ -19,6 +20,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 02_menu.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 03_perm_code.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 04_data.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 05_category_level.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_categories.sql
 ```
 
 > ⚠️ **반드시 `--default-character-set=utf8mb4` 옵션을 붙여서 실행할 것.**
@@ -30,6 +32,21 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 05_category
 모든 파일은 재실행해도 안전하다(표는 `CREATE TABLE IF NOT EXISTS`, 메뉴는 삭제 후 재삽입,
 권한 명단/분류는 없을 때만 추가, `05_category_level.sql`은 `ADD COLUMN IF NOT EXISTS` + 마이그레이션
 프로시저를 실행 후 즉시 DROP하는 방식이라 반복 실행해도 안전하다).
+`06_org_categories.sql` 도 `NOT EXISTS` 조건으로만 INSERT 하므로 몇 번을 실행해도 대분류가 중복되지 않는다.
+
+### 기존 분류/매뉴얼을 비우고 싶을 때
+
+이 디렉터리의 스크립트는 데이터를 지우지 않는다(모듈 표준상 `DROP`/`TRUNCATE`/무조건 `DELETE` 금지).
+초기화가 필요하면 물리 삭제 대신 소프트 삭제로 처리한다 — 아래 순서로 자식부터 지워야 화면에서 사라진다.
+
+```sql
+UPDATE safety_manual_step_photo SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELETED_YN='N';
+UPDATE safety_manual_step       SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELETED_YN='N';
+UPDATE safety_manual            SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELETED_YN='N';
+UPDATE safety_manual_category   SET DELETED_YN='Y', DELETED_AT=NOW() WHERE DELETED_YN='N';
+```
+
+`DELETED_YN='N'` 으로 되돌리면 복구된다. 업로드된 사진 파일 자체는 디스크에 그대로 남는다.
 
 ## 분류 체계 (대분류/중분류/소분류 3단계 고정)
 
@@ -112,7 +129,7 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 | GET | `/safety-api/photos/{photoId}/view` | 사진 원본 조회 | **공개**(인증 불필요, `<img>` 태그용) |
 | DELETE | `/safety-api/photos/{photoId}` | 사진 삭제 | 관리자 |
 | POST | `/safety-api/excel-upload/preview` | 엑셀 업로드 1단계: 형식 확인(DB 미반영) | 관리자 |
-| POST | `/safety-api/excel-upload/confirm` | 엑셀 업로드 2단계: 선택 시트 확정 반영 | 관리자 |
+| POST | `/safety-api/excel-upload/confirm` | 엑셀 업로드 2단계: 확정 반영. multipart 로 `file` 과 `assignments`(JSON 문자열 `[{"sheetName":"...","categoryId":1}, ...]`)를 보낸다. **시트마다 다른 분류를 지정할 수 있고**, 목록에 없는 시트는 가져오지 않는다 | 관리자 |
 
 `/safety/**` 정적 페이지와 `/safety-api/photos/*/view` 는 `SafetySecurityConfig`(`@Order(-2)`)에서
 독립된 `SecurityFilterChain` 으로 permitAll 처리한다(core의 보안 설정은 건드리지 않음).
@@ -128,12 +145,19 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
      사유 표시) — 초지 시트는 매뉴얼이 아닌 개요/범례이므로 업로드 대상에서 항상 제외한다.
    - 프론트엔드는 인식된 시트(`recognized=true`)의 체크박스를 **기본적으로 체크된 상태**로 보여주고,
      사용자는 확인/해제만 하면 된다(요구사항: "시트를 확인하고 기본적으로 적용, 사용자는 확인·수정만").
-   - 모달에는 대분류/중분류/소분류 3단계 select 가 있어 매뉴얼이 들어갈 위치(소분류)를 고르며,
+   - 모달 상단의 대분류/중분류/소분류 3단계 select 는 **기본 등록 위치**를 정한다.
      각 select 옆의 "+" 버튼으로 그 자리에서 바로 새 분류를 추가할 수 있다.
-2. **확정 업로드** (`POST /excel-upload/confirm`, `categoryId`(소분류 ID) + 선택한 `sheetNames` CSV 전달):
-   같은 파일을 다시 업로드받아 재파싱한 뒤, 선택되고 인식된 시트만 매뉴얼+단계+사진으로 실제 저장한다.
+   - **시트 목록의 "등록 분류" 칸에서 시트마다 다른 소분류를 직접 고를 수 있다.**
+     비워 두면 상단의 기본 등록 위치를 따르고, 직접 고른 행은 강조 표시되며 되돌리기 버튼이 나타난다.
+     선택지는 트리 전체의 소분류를 `대 > 중 > 소` 경로로 보여주므로 상단 선택과 무관하게 아무 분류나 고를 수 있다.
+2. **확정 업로드** (`POST /excel-upload/confirm`): multipart 로 `file` 과 `assignments` 를 보낸다.
+   `assignments` 는 `[{"sheetName":"...","categoryId":1}, ...]` 형태의 JSON 문자열이며,
+   **시트 하나하나가 들어갈 분류를 담는다**(목록에 없는 시트는 가져오지 않는다 = 선택 해제와 같음).
+   시트명에 쉼표가 들어갈 수 있어 CSV 대신 JSON 을 쓴다.
+   같은 파일을 다시 업로드받아 재파싱한 뒤, 지정되고 인식된 시트만 매뉴얼+단계+사진으로 실제 저장한다.
    (서버는 상태를 저장하지 않으므로 phase 1/2 모두 같은 파일을 다시 업로드해야 한다)
-   `categoryId`는 반드시 소분류(3단계)여야 하며, 아니면 400 에러로 거부된다.
+   각 `categoryId` 는 반드시 소분류(3단계)여야 하며, 아니면 400 에러로 거부된다.
+   매뉴얼 제목 중복 검사와 정렬순서(`SORT_ORDER`)는 **그 시트가 들어갈 분류 기준**으로 따로 매겨진다.
 
 ## 프론트엔드 화면 (index.html, 단일 페이지)
 
