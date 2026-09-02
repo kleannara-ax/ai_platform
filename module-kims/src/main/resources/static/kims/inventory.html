@@ -157,6 +157,9 @@
         <div class="col"><label class="form-label small mb-0">연결 요청 ID *</label><input id="is-req" type="number" class="form-control form-control-sm"></div>
         <div class="col"><label class="form-label small mb-0">지급 수량 *</label><input id="is-qty" type="number" class="form-control form-control-sm"></div>
       </div>
+      <div class="row g-2 mt-0" id="is-subtype-row" style="display:none">
+        <div class="col"><label class="form-label small mb-0">세부 구분 *</label><select id="is-subtype" class="form-select form-select-sm"></select></div>
+      </div>
       <div class="row g-2 mt-0">
         <div class="col"><label class="form-label small mb-0">지급 대상자 *</label><input id="is-receiver" class="form-control form-control-sm"></div>
         <div class="col"><label class="form-label small mb-0">부서</label><input id="is-dept" class="form-control form-control-sm"></div>
@@ -198,6 +201,12 @@
     // 재고 세부 구분(막대 색 분할): 신형/구형, 태블릿은 레노버/갤럭시/대여, 그 외 미구분
     const SEG_ORDER = ['신형', '구형', '레노버', '갤럭시', '대여', '미구분'];
     const SEG_COLOR = { '신형': '#0d6efd', '구형': '#adb5bd', '레노버': '#198754', '갤럭시': '#6f42c1', '대여': '#fd7e14', '미구분': '#20c997' };
+    // 품목명 → 지급 시 선택 가능한 세부 구분 목록. 이 목록에 없는 품목은 세부 구분 선택 UI를 표시하지 않는다.
+    const SUBTYPE_BY_ITEM = {
+      '마우스': ['신형', '구형'], '키보드': ['신형', '구형'], '노트북': ['신형', '구형'],
+      '모니터': ['신형', '구형'], '데스크탑 본체': ['신형', '구형'],
+      '태블릿': ['레노버', '갤럭시', '대여'],
+    };
     // 품목 비고에서 세부 수량 파싱 (예: "신형 5 / 구형 8", "레노버 1대 / 갤럭시 6대 / 대여 3대 ...")
     function itemBreakdown(it) {
       const r = it.remark || '';
@@ -493,13 +502,26 @@
       ['is-req', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
       document.getElementById('is-by').value = KIMS.getUser() || '';
       document.getElementById('is-at').value = new Date().toISOString().substring(0, 10);
+      // 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
+      const subRow = document.getElementById('is-subtype-row');
+      const sub = document.getElementById('is-subtype');
+      const options = SUBTYPE_BY_ITEM[name];
+      if (options) {
+        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        subRow.style.display = '';
+      } else {
+        sub.innerHTML = '';
+        subRow.style.display = 'none';
+      }
       issueModal.show();
     }
     async function issue() {
+      const subRow = document.getElementById('is-subtype-row');
+      const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('is-subtype').value : null;
       const payload = { itemId: Number(document.getElementById('is-itemId').value), requestId: Number(document.getElementById('is-req').value),
         quantity: Number(document.getElementById('is-qty').value), receiverName: document.getElementById('is-receiver').value.trim(),
         department: document.getElementById('is-dept').value.trim(), issuedBy: document.getElementById('is-by').value.trim(),
-        issuedAt: document.getElementById('is-at').value || null };
+        issuedAt: document.getElementById('is-at').value || null, subType: subType };
       if (!payload.requestId || !payload.quantity || !payload.receiverName || !payload.issuedBy) { KIMS.toast('요청ID/수량/대상자/담당자는 필수입니다.', false); return; }
       try {
         // 재고 사전 검사 — 부족하면 지급하지 않고 모달로 안내
@@ -636,7 +658,26 @@
         const sel = document.getElementById('rd-item');
         if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
           + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.currentStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+        updateReqSubTypeUI();
       } catch (e) { /* 무시 */ }
+    }
+
+    // 요청 상세 모달의 품목 선택에 따라 신형/구형(또는 제조사) 세부 구분 선택 UI를 표시/숨김
+    function updateReqSubTypeUI() {
+      const sel = document.getElementById('rd-item');
+      const wrap = document.getElementById('rd-subtype-wrap');
+      const sub = document.getElementById('rd-subtype');
+      if (!sel || !wrap || !sub) return;
+      const opt = sel.options[sel.selectedIndex];
+      const name = opt ? (opt.dataset.name || '') : '';
+      const options = SUBTYPE_BY_ITEM[name];
+      if (options) {
+        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        wrap.style.display = '';
+      } else {
+        sub.innerHTML = '';
+        wrap.style.display = 'none';
+      }
     }
 
     // 상태값에 따른 액션 버튼 스타일/문구 결정
@@ -697,9 +738,12 @@
           `</tbody></table>`);
         return;
       }
+      const subWrap = document.getElementById('rd-subtype-wrap');
+      const subType = (subWrap && subWrap.style.display !== 'none')
+        ? document.getElementById('rd-subtype').value : null;
       const payload = { requestId: reqDetailId, itemId: Number(itemId), quantity: qty,
         receiverName: receiver, department: (reqDetailCur && reqDetailCur.department) || '',
-        issuedBy: KIMS.getUser() || 'admin' };
+        issuedBy: KIMS.getUser() || 'admin', subType: subType };
       try {
         await KIMS.api('/kims-api/supply-issues', { method:'POST', body:payload });
         // 지급 전에 상태 드롭다운을 이미 다른 값(예: 완료)으로 선택해둔 경우 —
@@ -787,8 +831,9 @@
                 <hr class="my-2">
                 <h6>소모품 지급 처리 <small class="text-muted">(재고 차감 · 상태에 따라 버튼 동작 변경)</small></h6>
                 <div class="row g-1">
-                  <div class="col"><select id="rd-item" class="form-select form-select-sm"><option value="">품목 불러오는 중...</option></select></div>
-                  <div class="col-4"><input id="rd-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
+                  <div class="col"><select id="rd-item" class="form-select form-select-sm" onchange="updateReqSubTypeUI()"><option value="">품목 불러오는 중...</option></select></div>
+                  <div class="col-3"><input id="rd-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
+                  <div class="col-4" id="rd-subtype-wrap" style="display:none"><select id="rd-subtype" class="form-select form-select-sm"></select></div>
                 </div>
                 <input id="rd-receiver" class="form-control form-control-sm mt-1" placeholder="지급 대상자" value="${E(d.requesterName||'')}">
                 <button id="rd-action-btn" class="${reqActionBtnAttrs.cls}" onclick="handleReqDetailAction()">${reqActionBtnAttrs.text}</button>
