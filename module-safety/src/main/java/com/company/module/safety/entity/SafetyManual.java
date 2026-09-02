@@ -40,6 +40,10 @@ public class SafetyManual extends BaseTimeEntity {
     @Column(name = "TITLE", nullable = false, length = 200)
     private String title;
 
+    /** 서식 유형 — 표의 열 구성과 머리말 항목이 서식마다 다르다. {@link SafetyFormType} */
+    @Column(name = "FORM_TYPE", nullable = false, length = 30)
+    private String formType;
+
     /** 엑셀 일괄업로드로 생성된 경우 원본 파일명 (직접 등록 시 null) */
     @Column(name = "SOURCE_FILE_NAME", length = 255)
     private String sourceFileName;
@@ -52,13 +56,14 @@ public class SafetyManual extends BaseTimeEntity {
     private int sortOrder;
 
     @Builder
-    private SafetyManual(SafetyManualCategory category, String title, String sourceFileName,
-                          String sourceSheetName, int sortOrder, String createdBy) {
+    private SafetyManual(SafetyManualCategory category, String title, SafetyFormType formType,
+                          String sourceFileName, String sourceSheetName, int sortOrder, String createdBy) {
         if (title == null || title.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "매뉴얼 제목은 필수입니다.");
         }
         this.category = category;
         this.title = title;
+        this.formType = (formType != null ? formType : SafetyFormType.WORK_METHOD).name();
         this.sourceFileName = sourceFileName;
         this.sourceSheetName = sourceSheetName;
         this.sortOrder = sortOrder;
@@ -77,6 +82,11 @@ public class SafetyManual extends BaseTimeEntity {
         this.title = title;
         this.sortOrder = sortOrder;
         markUpdatedBy(updatedBy);
+    }
+
+    /** 서식 유형을 코드가 아닌 열거형으로 다룬다. 알 수 없는 값이면 기본 서식으로 본다. */
+    public SafetyFormType formType() {
+        return SafetyFormType.of(this.formType);
     }
 
     public void changeCategory(SafetyManualCategory category, String updatedBy) {
