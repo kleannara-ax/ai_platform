@@ -1290,7 +1290,6 @@ function openExcelModal() {
   document.getElementById('eu-file').value = '';
   document.getElementById('euFileStatus').textContent = '';
   document.getElementById('euStep2').style.display = 'none';
-  document.getElementById('euStep3').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
   euPreviewData = [];
   euSelected = { major: null, middle: null };
@@ -1453,7 +1452,6 @@ async function euDoPreview() {
   }
   euPreviewData = [];
   euRowCategory = {};
-  document.getElementById('euStep3').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
   status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
 
@@ -1543,24 +1541,51 @@ async function euDoConfirm() {
     const result = await SAFETY.uploadMultipart('/safety-api/excel-upload/confirm', {
       file, assignments: JSON.stringify(assignments),
     });
-    euRenderResult(result);
-    SAFETY.toast(result.importedCount + '개 매뉴얼이 등록되었습니다.');
     await refreshAll();
+    showUploadResult(result);
   } catch (e) {
     SAFETY.toast(e.message, false);
   }
 }
 
-function euRenderResult(result) {
-  document.getElementById('euStep3').style.display = '';
-  let html = `<p class="mb-2">총 <b>${result.importedCount}</b>건 등록됨</p>`;
-  if (result.manuals && result.manuals.length) {
-    html += '<ul class="mb-2">' + result.manuals.map(m => `<li>${SAFETY.escapeHtml(m.title)}</li>`).join('') + '</ul>';
+/** 업로드 결과를 별도 팝업으로 보여준다 (엑셀 모달 위에 겹쳐 뜬다) */
+let uploadDoneModal = null;
+function showUploadResult(result) {
+  const imported = result.importedCount || 0;
+  const manuals = result.manuals || [];
+  const skipped = result.skipped || [];
+
+  let html = `<div class="ud-count ${imported ? '' : 'none'}">
+      <i class="fas ${imported ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
+      <span><span class="num">${imported}</span>건이 등록되었습니다.</span>
+    </div>`;
+
+  if (manuals.length) {
+    html += `<div class="ud-section">
+      <h6><i class="fas fa-file-lines"></i>등록된 매뉴얼</h6>
+      <ul class="ud-list">${manuals.map(m => `<li>${SAFETY.escapeHtml(m.title)}
+        <span class="ud-where">${SAFETY.escapeHtml(m.categoryPath || '')}</span></li>`).join('')}</ul>
+    </div>`;
   }
-  if (result.skipped && result.skipped.length) {
-    html += '<div class="text-muted small">건너뜀:</div><ul class="small text-muted">' +
-      result.skipped.map(s => `<li>${SAFETY.escapeHtml(s)}</li>`).join('') + '</ul>';
+  if (skipped.length) {
+    html += `<div class="ud-section">
+      <h6><i class="fas fa-circle-minus text-muted"></i>건너뛴 시트 ${skipped.length}건</h6>
+      <ul class="ud-list skipped">${skipped.map(x => `<li>${SAFETY.escapeHtml(x)}</li>`).join('')}</ul>
+    </div>`;
   }
-  document.getElementById('euResultBody').innerHTML = html;
+  if (!manuals.length && !skipped.length) {
+    html += '<div class="eu-note">가져온 시트가 없습니다. 시트 선택과 등록 분류를 확인해 주세요.</div>';
+  }
+
+  document.getElementById('uploadDoneBody').innerHTML = html;
   document.getElementById('eu-confirm-btn').classList.add('d-none');
+  if (!uploadDoneModal) uploadDoneModal = new bootstrap.Modal(document.getElementById('uploadDoneModal'));
+  uploadDoneModal.show();
+}
+
+/** 완료 팝업의 "확인" — 팝업과 업로드 창을 함께 닫는다 */
+function closeUploadFlow() {
+  if (uploadDoneModal) uploadDoneModal.hide();
+  const excelModal = bootstrap.Modal.getInstance(document.getElementById('excelModal'));
+  if (excelModal) excelModal.hide();
 }

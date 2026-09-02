@@ -430,6 +430,19 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
   margin-bottom:10px;
 }
 .eu-note{font-size:.76rem; color:var(--muted); margin-top:6px}
+
+/* 업로드 완료 팝업 */
+.ud-count{
+  display:flex; align-items:center; gap:10px; background:#ecfdf5; color:#047857;
+  border-radius:12px; padding:14px 16px; font-weight:700; margin-bottom:14px;
+}
+.ud-count .num{font-size:1.5rem; font-weight:800}
+.ud-count.none{background:#fef2f2; color:#b91c1c}
+.ud-section{margin-top:12px}
+.ud-section h6{font-size:.84rem; font-weight:800; margin:0 0 6px; display:flex; align-items:center; gap:6px}
+.ud-list{margin:0; padding-left:18px; font-size:.85rem; line-height:1.7}
+.ud-list.skipped{color:var(--muted); font-size:.8rem}
+.ud-where{font-size:.76rem; color:var(--muted)}
 /* 시트별 등록 분류 선택 — 기본값에서 바꾼 행은 눈에 띄게 표시한다 */
 .eu-row-cat{font-size:.78rem; padding:4px 6px; border-radius:8px; border:1px solid var(--line); width:100%}
 .eu-row-cat:focus{border-color:var(--brand); outline:none; box-shadow:0 0 0 3px var(--brand-soft)}
@@ -562,6 +575,19 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
     <div id="columnAdmin"></div>
   </div>
 </div></div></div>
+
+<!-- 업로드 완료 팝업 — 확인을 누르면 업로드 창까지 함께 닫힌다 -->
+<div class="modal fade" id="uploadDoneModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title"><i class="fas fa-circle-check text-success me-2"></i>업로드 완료</h5>
+    </div>
+    <div class="modal-body" id="uploadDoneBody"></div>
+    <div class="modal-footer">
+      <button class="btn-modern btn-primary-modern" onclick="closeUploadFlow()">확인</button>
+    </div>
+  </div></div>
+</div>
 
 <!-- 표 열 추가/수정 모달 -->
 <div class="modal fade" id="columnModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
@@ -737,11 +763,6 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
       </div>
     </div>
 
-    <div id="euStep3" style="display:none">
-      <hr class="my-3">
-      <div class="eu-step active"><span class="num"><i class="fas fa-check" style="font-size:.6rem"></i></span>업로드 결과</div>
-      <div id="euResultBody"></div>
-    </div>
   </div>
   <div class="modal-footer">
     <button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">닫기</button>
