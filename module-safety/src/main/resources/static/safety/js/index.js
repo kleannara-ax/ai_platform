@@ -35,7 +35,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   SAFETY.renderNav('index.html');
   detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
   isAdminUser = await SAFETY.isAdmin();
-  if (isAdminUser) document.getElementById('btn-edit-mode').classList.remove('d-none');
+  if (isAdminUser) {
+    // 수정 모드와 무관하게 항상 보이는 버튼들 (추가 계열)
+    document.getElementById('btn-edit-mode').classList.remove('d-none');
+    document.getElementById('btn-add-major').classList.remove('d-none');
+    document.getElementById('btn-add-notice').classList.remove('d-none');
+  }
   bindLightbox();
   bindStepColResize();
   await loadNotices();
@@ -125,14 +130,15 @@ function renderNodes(nodes) {
       ? `<button class="tr-caret ${isOpen ? 'open' : ''}" onclick="event.stopPropagation(); toggleExpand(${id})" title="${isOpen ? '접기' : '펼치기'}"><i class="fas fa-chevron-right"></i></button>`
       : `<span class="tr-caret leaf"></span>`;
     // 분류 추가는 이 트리 안에서만 한다 — 소분류 아래에는 더 만들 수 없으므로 버튼도 내지 않는다.
+    // 추가 버튼은 항상 보이고, 수정/삭제는 수정 모드에서만 보인다.
     const childLabel = { 1: '중분류 추가', 2: '소분류 추가' }[n.levelNo];
-    const tools = (isAdminUser && editMode)
-      ? `<span class="tr-tools" onclick="event.stopPropagation()">
-           ${childLabel ? `<button onclick="openCategoryCreateModal(${id})" title="${childLabel}"><i class="fas fa-plus"></i></button>` : ''}
-           <button onclick="openCategoryEditModal(${id})" title="분류 수정"><i class="fas fa-pen"></i></button>
-           <button class="danger" onclick="deleteCategory(${id})" title="분류 삭제"><i class="fas fa-trash"></i></button>
-         </span>`
-      : '';
+    const addButton = (isAdminUser && childLabel)
+      ? `<button onclick="openCategoryCreateModal(${id})" title="${childLabel}"><i class="fas fa-plus"></i></button>` : '';
+    const editButtons = (isAdminUser && editMode)
+      ? `<button onclick="openCategoryEditModal(${id})" title="분류 수정"><i class="fas fa-pen"></i></button>
+         <button class="danger" onclick="deleteCategory(${id})" title="분류 삭제"><i class="fas fa-trash"></i></button>` : '';
+    const tools = (addButton || editButtons)
+      ? `<span class="tr-tools" onclick="event.stopPropagation()">${addButton}${editButtons}</span>` : '';
     return `<div class="tree-node">
         <div class="tree-row ${on}" onclick="selectCategory(${id})" title="${SAFETY.escapeHtml(n.name)}">
           ${caret}
@@ -320,18 +326,20 @@ function toggleEditMode() {
   btn.classList.toggle('on', editMode);
   document.getElementById('btn-edit-mode-label').textContent = editMode ? '수정 종료' : '수정';
   document.getElementById('btn-excel-upload').classList.toggle('d-none', !editMode);
-  document.getElementById('btn-add-notice').classList.toggle('d-none', !editMode);
   renderNotices();
   renderTree();
   updateAddButtonLabel();
   if (currentDetail) renderDetail();
 }
 
-/** 수정 모드에서만 "내용 추가"(매뉴얼)와 트리의 대분류 추가 버튼을 보여준다. */
+/**
+ * 관리자에게만 보이는 버튼들의 노출을 맞춘다.
+ * 추가 계열(대분류 추가)은 수정 모드와 무관하게 보이고, "내용 추가"는 수정 모드에서만 보인다.
+ */
 function updateAddButtonLabel() {
-  const show = isAdminUser && editMode;
-  document.getElementById('btn-add-manual').classList.toggle('d-none', !show);
-  document.getElementById('btn-add-major').classList.toggle('d-none', !show);
+  document.getElementById('btn-add-major').classList.toggle('d-none', !isAdminUser);
+  document.getElementById('btn-add-notice').classList.toggle('d-none', !isAdminUser);
+  document.getElementById('btn-add-manual').classList.toggle('d-none', !(isAdminUser && editMode));
 }
 
 // ================================================================

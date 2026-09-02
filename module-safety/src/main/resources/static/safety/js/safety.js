@@ -76,12 +76,11 @@ const SAFETY = (() => {
   }
 
   // ---- SAFETY 관리자 판정 ----
-  // 관리자 명단은 공통코드 그룹 'SAFETY_PERM' + 플랫폼 ROLE_ADMIN (서버 SafetyPermission 과 같은 기준).
+  // 공통코드 그룹 'SAFETY_PERM' 에 등록된 로그인 ID 만 관리자다 (서버 SafetyPermission 과 같은 기준).
+  // 플랫폼 ROLE_ADMIN 이라도 이 명단에 없으면 관리자가 아니다.
   let _adminCache = null;
   async function isAdmin() {
     if (_adminCache !== null) return _adminCache;
-    const roles = getRoles();
-    if (roles.includes('ADMIN')) return (_adminCache = true);
     const session = platformSession();
     const loginId = String(session.loginId || localStorage.getItem(USER_KEY) || '').trim().toLowerCase();
     if (!loginId) return (_adminCache = false);

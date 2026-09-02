@@ -3,7 +3,6 @@ package com.company.module.safety.support;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -15,7 +14,7 @@ import java.util.stream.Collectors;
 /**
  * SAFETY(안전작업방식 매뉴얼) 모듈 관리자 권한 판정.
  *
- * <p>관리자는 <b>공통코드 그룹 {@code SAFETY_PERM}</b> 에 등록된 로그인 ID 로 정한다.
+ * <p>관리자는 <b>공통코드 그룹 {@code SAFETY_PERM}</b> 에 등록된 로그인 ID <b>만</b> 이다.
  * (소방 {@code FIRE_PERM}, KIMS {@code KIMS_PERM} 과 같은 방식 —
  *  공통코드 관리 화면에서 사람만 추가/제거하면 된다.)
  *
@@ -68,19 +67,14 @@ public class SafetyPermission {
         return cachedIds;
     }
 
-    /** SAFETY_PERM 명단 + 플랫폼 ROLE_ADMIN 은 항상 관리자로 인정한다. */
+    /**
+     * 공통코드 {@code SAFETY_PERM} 명단에 있는 계정만 관리자로 본다.
+     * <p>플랫폼 {@code ROLE_ADMIN} 이라도 이 명단에 없으면 관리자가 아니다 — 관리 권한은
+     * 공통코드 한 곳에서만 관리한다.
+     */
     public boolean isAdmin(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) return false;
-        if (hasRole(authentication, "ROLE_ADMIN")) return true;
         String name = authentication.getName();
         return name != null && adminLoginIds().contains(name.trim().toLowerCase(Locale.ROOT));
-    }
-
-    private boolean hasRole(Authentication authentication, String role) {
-        if (authentication == null || authentication.getAuthorities() == null) return false;
-        for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (role.equals(authority.getAuthority())) return true;
-        }
-        return false;
     }
 }
