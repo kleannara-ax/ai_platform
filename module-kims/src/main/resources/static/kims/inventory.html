@@ -201,11 +201,33 @@
     // 품목 비고에서 세부 수량 파싱 (예: "신형 5 / 구형 8", "레노버 1대 / 갤럭시 6대 / 대여 3대 ...")
     function itemBreakdown(it) {
       const r = it.remark || '';
+      let raw = null;
       const sin = r.match(/신형\s*(\d+)/), gu = r.match(/구형\s*(\d+)/);
-      if (sin || gu) return { '신형': sin ? +sin[1] : 0, '구형': gu ? +gu[1] : 0 };
-      const le = r.match(/레노버\s*(\d+)/), ga = r.match(/갤럭시\s*(\d+)/), dae = r.match(/대여\s*(\d+)/);
-      if (le || ga || dae) return { '레노버': le ? +le[1] : 0, '갤럭시': ga ? +ga[1] : 0, '대여': dae ? +dae[1] : 0 };
-      return { '미구분': it.currentStock };
+      if (sin || gu) raw = { '신형': sin ? +sin[1] : 0, '구형': gu ? +gu[1] : 0 };
+      else {
+        const le = r.match(/레노버\s*(\d+)/), ga = r.match(/갤럭시\s*(\d+)/), dae = r.match(/대여\s*(\d+)/);
+        if (le || ga || dae) raw = { '레노버': le ? +le[1] : 0, '갤럭시': ga ? +ga[1] : 0, '대여': dae ? +dae[1] : 0 };
+      }
+      if (!raw) return { '미구분': it.currentStock };
+      // 비고(remark)의 세부 수량 합계는 지급/입고 후에도 자동 갱신되지 않아
+      // 실제 현재재고(currentStock)와 어긋날 수 있다. 그래프는 항상 실제 재고를
+      // 기준으로 표시해야 하므로, remark의 비율은 유지하되 합계는 currentStock에
+      // 정확히 맞도록 보정한다(마지막 항목에 나머지를 배정).
+      const rawTotal = Object.values(raw).reduce((a, b) => a + b, 0);
+      if (rawTotal === it.currentStock || rawTotal === 0) return raw;
+      const keys = Object.keys(raw);
+      const scaled = {};
+      let allocated = 0;
+      keys.forEach((k, idx) => {
+        if (idx === keys.length - 1) {
+          scaled[k] = Math.max(0, it.currentStock - allocated);
+        } else {
+          const v = Math.max(0, Math.round(raw[k] * it.currentStock / rawTotal));
+          scaled[k] = v;
+          allocated += v;
+        }
+      });
+      return scaled;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
