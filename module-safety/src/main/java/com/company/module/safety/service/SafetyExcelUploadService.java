@@ -96,7 +96,7 @@ public class SafetyExcelUploadService {
     @Transactional
     public ExcelImportResultResponse confirmImport(MultipartFile file, Long categoryId,
                                                     Set<String> selectedSheetNames, String createdBy) {
-        SafetyManualCategory category = categoryService.findActive(categoryId);
+        SafetyManualCategory category = categoryService.findActiveMinor(categoryId);
         List<ParsedSheet> sheets = parseWorkbook(file);
         String sourceFileName = (file.getOriginalFilename() != null) ? file.getOriginalFilename() : "upload.xlsx";
 

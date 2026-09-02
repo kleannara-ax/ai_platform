@@ -87,7 +87,7 @@ public class SafetyManualService {
     // ================================================================
     @Transactional
     public ManualDetailResponse create(ManualCreateRequest request, String createdBy) {
-        SafetyManualCategory category = categoryService.findActive(request.getCategoryId());
+        SafetyManualCategory category = categoryService.findActiveMinor(request.getCategoryId());
         if (manualRepository.existsByTitleAndCategory_CategoryId(request.getTitle(), request.getCategoryId())) {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE,
                     "같은 분류 안에 이미 존재하는 매뉴얼 제목입니다. title=" + request.getTitle());
@@ -124,7 +124,7 @@ public class SafetyManualService {
     @Transactional
     public ManualDetailResponse update(Long manualId, ManualUpdateRequest request, String updatedBy) {
         SafetyManual manual = findActive(manualId);
-        SafetyManualCategory category = categoryService.findActive(request.getCategoryId());
+        SafetyManualCategory category = categoryService.findActiveMinor(request.getCategoryId());
         manual.update(category, request.getTitle(), request.getSortOrder(), updatedBy);
         return getDetail(manualId);
     }

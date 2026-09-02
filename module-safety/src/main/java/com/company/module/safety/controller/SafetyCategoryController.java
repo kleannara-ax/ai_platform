@@ -36,6 +36,13 @@ public class SafetyCategoryController {
         return ResponseEntity.ok(ApiResponse.success(categoryService.getTree()));
     }
 
+    /** 특정 부모의 하위 분류 목록 (parentId 없으면 대분류 목록). 단계별 선택(드릴다운) UI 및 엑셀 업로드 모달의 분류 선택기에서 사용. */
+    @GetMapping("/safety-api/categories/children")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getChildren(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long parentId) {
+        return ResponseEntity.ok(ApiResponse.success(categoryService.getChildren(parentId)));
+    }
+
     @GetMapping("/safety-api/categories/{categoryId}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getDetail(@PathVariable Long categoryId) {
         return ResponseEntity.ok(ApiResponse.success(categoryService.getDetail(categoryId)));

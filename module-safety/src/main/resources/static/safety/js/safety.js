@@ -107,34 +107,33 @@ const SAFETY = (() => {
     const user = getUser() || '사용자';
     const initial = escapeHtml(user.charAt(0) || 'S');
     const links = [
-      { href: 'index.html', label: '분류/매뉴얼', icon: '📋' },
-      { href: 'upload.html', label: '엑셀 일괄업로드', icon: '📤' },
+      { href: 'index.html', label: '분류/매뉴얼', icon: 'fa-shield-alt' },
     ];
     const items = links.map(l =>
       `<a class="safety-navlink ${l.href === active ? 'active' : ''}" href="${l.href}">
-         <span class="safety-navicon">${l.icon}</span><span>${l.label}</span></a>`
+         <span class="safety-navicon"><i class="fas ${l.icon}"></i></span><span>${l.label}</span></a>`
     ).join('');
     const css = `<style id="safety-nav-style">
       body { padding-left: 220px; }
       .safety-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
-        background: #0f172a; color: #cbd5e1; display: flex; flex-direction: column;
-        z-index: 1030; overflow-y: auto; }
-      .safety-brand { padding: 18px 20px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .safety-brand .b1 { font-weight: 700; font-size: 1.15rem; color: #fff; letter-spacing: .5px; }
-      .safety-brand .b2 { font-size: 11px; color: #64748b; }
-      .safety-user { display: flex; gap: 10px; align-items: center; padding: 14px 20px;
-        border-bottom: 1px solid rgba(255,255,255,.08); }
-      .safety-avatar { width: 36px; height: 36px; border-radius: 50%; background: #d97706; color: #fff;
-        display: flex; align-items: center; justify-content: center; font-weight: 600; flex: 0 0 auto; }
-      .safety-user .u1 { font-weight: 600; font-size: 13px; color: #e2e8f0; }
-      .safety-user .u2 { font-size: 11px; color: #64748b; }
-      .safety-nav { display: flex; flex-direction: column; padding: 10px 0; flex: 1 1 auto; }
-      .safety-navlink { display: flex; align-items: center; gap: 10px; padding: 10px 20px;
-        color: #cbd5e1; text-decoration: none; font-size: 14px; border-left: 3px solid transparent; }
-      .safety-navlink:hover { background: rgba(255,255,255,.06); color: #fff; }
-      .safety-navlink.active { background: rgba(217,119,6,.18); color: #fff; border-left-color: #d97706; font-weight: 600; }
+        background: linear-gradient(180deg,#1e1b4b,#312e81); color: #e0e7ff; display: flex; flex-direction: column;
+        z-index: 1030; overflow-y: auto; box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+      .safety-brand { padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.10); }
+      .safety-brand .b1 { font-weight: 800; font-size: 1.2rem; color: #fff; letter-spacing: .5px; }
+      .safety-brand .b2 { font-size: 11px; color: #a5b4fc; }
+      .safety-user { display: flex; gap: 10px; align-items: center; padding: 16px 20px;
+        border-bottom: 1px solid rgba(255,255,255,.10); }
+      .safety-avatar { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg,#f59e0b,#f97316); color: #fff;
+        display: flex; align-items: center; justify-content: center; font-weight: 700; flex: 0 0 auto; }
+      .safety-user .u1 { font-weight: 700; font-size: 13px; color: #fff; }
+      .safety-user .u2 { font-size: 11px; color: #a5b4fc; }
+      .safety-nav { display: flex; flex-direction: column; padding: 12px 12px; flex: 1 1 auto; gap: 2px; }
+      .safety-navlink { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px;
+        color: #c7d2fe; text-decoration: none; font-size: 14px; }
+      .safety-navlink:hover { background: rgba(255,255,255,.08); color: #fff; }
+      .safety-navlink.active { background: #fff; color: #4338ca; font-weight: 700; }
       .safety-navicon { width: 18px; text-align: center; }
-      .safety-logout { margin: 12px 16px 16px; }
+      .safety-logout { margin: 12px 16px 16px; border-radius: 10px; border-color: rgba(255,255,255,.3); }
     </style>`;
     const html = css + `
       <aside class="safety-sidebar">

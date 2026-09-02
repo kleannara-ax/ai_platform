@@ -1,5 +1,7 @@
 package com.company.module.safety.entity;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,15 +17,24 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 안전작업방식 매뉴얼 분류 (계층형: 부서 &gt; 라인/호기 등).
- * <p>예: "화장지생산팀"(최상위) &gt; "초지"(하위) 처럼 자기참조로 트리를 구성한다.
- * 최상위 분류는 {@link #parent} 가 null 이다.
+ * 안전작업방식 매뉴얼 분류 — 정확히 3단계로 고정된 계층 구조.
+ * <ul>
+ *   <li>1단계(대분류) — 예: 제지 / 화장지 / 패드</li>
+ *   <li>2단계(중분류) — 예: 3호기 / 4호기 / 5호기</li>
+ *   <li>3단계(소분류) — 예: 설비 / 안전 / 작업 / 원료 (매뉴얼은 항상 이 단계에만 속한다)</li>
+ * </ul>
+ * 각 단계의 이름은 사용자가 화면에서 자유롭게 추가/수정할 수 있으며, 스키마에는 값으로 고정하지 않는다.
+ * {@link #parent} 로 자기참조 트리를 구성하고, {@link #levelNo} 로 정확한 단계를 명시적으로 검증한다.
  */
 @Entity
 @Table(name = "safety_manual_category")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SafetyManualCategory extends BaseTimeEntity {
+
+    public static final int LEVEL_MAJOR = 1;   // 대분류
+    public static final int LEVEL_MIDDLE = 2;  // 중분류
+    public static final int LEVEL_MINOR = 3;   // 소분류 (매뉴얼이 속하는 최하위 단계)
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,18 +44,34 @@ public class SafetyManualCategory extends BaseTimeEntity {
     @Column(name = "NAME", nullable = false, length = 100)
     private String name;
 
-    /** 상위 분류 (최상위면 null) */
+    /** 상위 분류 (대분류면 null) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "PARENT_ID")
     private SafetyManualCategory parent;
+
+    /** 분류 단계: 1=대분류, 2=중분류, 3=소분류 */
+    @Column(name = "LEVEL_NO", nullable = false)
+    private int levelNo;
 
     @Column(name = "SORT_ORDER", nullable = false)
     private int sortOrder;
 
     @Builder
     private SafetyManualCategory(String name, SafetyManualCategory parent, int sortOrder, String createdBy) {
+        if (name == null || name.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "분류명은 필수입니다.");
+        }
+        int level = LEVEL_MAJOR;
+        if (parent != null) {
+            level = parent.getLevelNo() + 1;
+            if (level > LEVEL_MINOR) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "분류는 대분류/중분류/소분류 3단계까지만 만들 수 있습니다.");
+            }
+        }
         this.name = name;
         this.parent = parent;
+        this.levelNo = level;
         this.sortOrder = sortOrder;
         markCreatedBy(createdBy);
     }
@@ -53,7 +80,14 @@ public class SafetyManualCategory extends BaseTimeEntity {
     // 비즈니스 메서드
     // ----------------------------------------------------------------
 
+    public boolean isMinor() {
+        return levelNo == LEVEL_MINOR;
+    }
+
     public void update(String name, int sortOrder, String updatedBy) {
+        if (name == null || name.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "분류명은 필수입니다.");
+        }
         this.name = name;
         this.sortOrder = sortOrder;
         markUpdatedBy(updatedBy);

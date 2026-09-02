@@ -13,6 +13,8 @@ public class CategoryResponse {
     private final Long categoryId;
     private final String name;
     private final Long parentId;
+    /** 1=대분류, 2=중분류, 3=소분류 */
+    private final int levelNo;
     private final int sortOrder;
     private final List<CategoryResponse> children;
 
@@ -21,6 +23,7 @@ public class CategoryResponse {
                 .categoryId(entity.getCategoryId())
                 .name(entity.getName())
                 .parentId(entity.getParent() != null ? entity.getParent().getCategoryId() : null)
+                .levelNo(entity.getLevelNo())
                 .sortOrder(entity.getSortOrder())
                 .build();
     }
@@ -30,6 +33,7 @@ public class CategoryResponse {
                 .categoryId(entity.getCategoryId())
                 .name(entity.getName())
                 .parentId(entity.getParent() != null ? entity.getParent().getCategoryId() : null)
+                .levelNo(entity.getLevelNo())
                 .sortOrder(entity.getSortOrder())
                 .children(children)
                 .build();

@@ -8,15 +8,17 @@
 | 순서 | 파일 | 설명 |
 |------|------|------|
 | 1 | `01_schema.sql` | SAFETY 테이블 4개 (구조만). ddl-auto=none 이라 반드시 먼저 실행 |
-| 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (SAFETY_MGMT 그룹 + 페이지 2개) + 역할별 노출 권한 |
+| 2 | `02_menu.sql` | 플랫폼 메뉴 등록 (SAFETY_MGMT 그룹 + 페이지 1개 — 엑셀 업로드는 별도 페이지가 아니라 모달로 통합됨) + 역할별 노출 권한 |
 | 3 | `03_perm_code.sql` | 공통코드 `SAFETY_PERM` (SAFETY 관리자 명단, 기존 ROLE_ADMIN 계정으로 자동 시딩) |
 | 4 | `04_data.sql` | (선택) 최상위 분류 데모 데이터 1건 |
+| 5 | `05_category_level.sql` | 분류 3단계(대/중/소) 고정 구조 도입: `LEVEL_NO` 컬럼 추가 + 기존 데이터 레벨 백필 + 소분류가 아닌 곳에 매뉴얼이 붙어 있으면 자동으로 "미분류" 하위 분류를 만들어 이동시키는 1회성 마이그레이션 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 02_menu.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 03_perm_code.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 04_data.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 05_category_level.sql
 ```
 
 > ⚠️ **반드시 `--default-character-set=utf8mb4` 옵션을 붙여서 실행할 것.**
@@ -25,8 +27,26 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 04_data.sql
 > latin1로 잘못 해석되어 DB에 깨진 상태(mojibake)로 저장된다. 컬럼 자체는 `utf8mb4`라
 > 오류 없이 들어가 버리므로 반드시 옵션을 챙겨야 한다.
 
-네 파일 모두 재실행해도 안전하다(표는 `CREATE TABLE IF NOT EXISTS`, 메뉴는 삭제 후 재삽입,
-권한 명단/분류는 없을 때만 추가).
+모든 파일은 재실행해도 안전하다(표는 `CREATE TABLE IF NOT EXISTS`, 메뉴는 삭제 후 재삽입,
+권한 명단/분류는 없을 때만 추가, `05_category_level.sql`은 `ADD COLUMN IF NOT EXISTS` + 마이그레이션
+프로시저를 실행 후 즉시 DROP하는 방식이라 반복 실행해도 안전하다).
+
+## 분류 체계 (대분류/중분류/소분류 3단계 고정)
+
+분류는 자기참조 트리(`PARENT_ID`)이지만, **딱 3단계까지만** 만들 수 있도록 서비스 계층에서 강제한다
+(`LEVEL_NO`: 1=대분류, 2=중분류, 3=소분류). 예시:
+
+```
+대분류: 제지 / 화장지 / 패드 ...
+  중분류: 3호기 / 4호기 / 5호기 ...
+    소분류: 설비 / 안전 / 작업 / 원료 ...
+```
+
+- 모든 레벨은 관리자가 화면에서 자유롭게 추가/수정할 수 있다 (엑셀 업로드 모달 안에서도 각 레벨마다
+  인라인 "+" 추가 버튼 제공).
+- **매뉴얼은 반드시 소분류(3단계)에만 등록**할 수 있다. 대분류/중분류에 매뉴얼을 붙이려 하면
+  `SafetyCategoryService.findActiveMinor()` 가드가 400 에러로 거부한다.
+- 소분류 아래에는 4단계 하위 분류를 만들 수 없다(`SafetyCategoryService.create()` 가드).
 
 ## 테이블 (4개, 플랫폼 DB 공용)
 
@@ -64,9 +84,11 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 04_data.sql
 
 ```
 SAFETY_MGMT (그룹, URL 없음)               "안전작업방식 매뉴얼"
- ├─ SAFETY_CATEGORY  /safety/index.html    "분류/매뉴얼 목록"   (ROLE_ADMIN/MANAGER/USER)
- └─ SAFETY_UPLOAD    /safety/upload.html   "엑셀 일괄업로드"    (ROLE_ADMIN/MANAGER 만)
+ └─ SAFETY_CATEGORY  /safety/index.html    "분류/매뉴얼 목록"   (ROLE_ADMIN/MANAGER/USER)
 ```
+
+엑셀 일괄업로드는 더 이상 별도 페이지(`upload.html`)가 아니라 `index.html` 안의 모달(`#excelModal`)로
+통합되었다. 별도 메뉴/페이지가 없으므로 위 메뉴 1개만 존재한다.
 
 SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 시작하는 메뉴를
 `safety::` 접두사로 감지해 iframe 으로 로드한다(KIMS 모듈과 동일한 패턴, `navigateToSafetyPage()`).
@@ -75,7 +97,8 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 
 | Method | Path | 설명 | 권한 |
 |--------|------|------|------|
-| GET | `/safety-api/categories` | 분류 트리 조회 | 인증 사용자 |
+| GET | `/safety-api/categories` | 분류 트리 조회 (각 노드에 `levelNo` 포함) | 인증 사용자 |
+| GET | `/safety-api/categories/children?parentId=` | 특정 부모의 하위 분류 목록(parentId 없으면 대분류 목록) — 드릴다운/엑셀 모달용 편의 API | 인증 사용자 |
 | GET | `/safety-api/categories/{id}` | 분류 상세 | 인증 사용자 |
 | POST/PUT/DELETE | `/safety-api/categories[/{id}]` | 분류 등록/수정/삭제 | 관리자(safetyPerm) |
 | GET | `/safety-api/manuals` | 매뉴얼 검색(키워드/분류, 페이징) | 인증 사용자 |
@@ -95,14 +118,30 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 
 ## 엑셀 일괄업로드 (2단계)
 
+프론트엔드는 `index.html` 안의 `#excelModal` 모달 하나로 아래 흐름을 처리한다(별도 페이지 없음):
+
 1. **미리보기** (`POST /excel-upload/preview`, DB 쓰기 없음): 업로드한 엑셀의 각 시트를 파싱해
    시트별 인식 여부/제목/단계 수/사진 수/미리보기 라인을 반환한다.
    - 시트 헤더에 `공정 순서` 가 있으면 매뉴얼 시트로 인식(`recognized=true`)
    - 헤더에 `공정단계`(초지 개요/범례 시트) 가 있으면 **의도적으로 제외**(`recognized=false`,
      사유 표시) — 초지 시트는 매뉴얼이 아닌 개요/범례이므로 업로드 대상에서 항상 제외한다.
-2. **확정 업로드** (`POST /excel-upload/confirm`, `categoryId` + 선택한 `sheetNames` CSV 전달):
+   - 프론트엔드는 인식된 시트(`recognized=true`)의 체크박스를 **기본적으로 체크된 상태**로 보여주고,
+     사용자는 확인/해제만 하면 된다(요구사항: "시트를 확인하고 기본적으로 적용, 사용자는 확인·수정만").
+   - 모달에는 대분류/중분류/소분류 3단계 select 가 있어 매뉴얼이 들어갈 위치(소분류)를 고르며,
+     각 select 옆의 "+" 버튼으로 그 자리에서 바로 새 분류를 추가할 수 있다.
+2. **확정 업로드** (`POST /excel-upload/confirm`, `categoryId`(소분류 ID) + 선택한 `sheetNames` CSV 전달):
    같은 파일을 다시 업로드받아 재파싱한 뒤, 선택되고 인식된 시트만 매뉴얼+단계+사진으로 실제 저장한다.
    (서버는 상태를 저장하지 않으므로 phase 1/2 모두 같은 파일을 다시 업로드해야 한다)
+   `categoryId`는 반드시 소분류(3단계)여야 하며, 아니면 400 에러로 거부된다.
+
+## 프론트엔드 화면 (index.html, 단일 페이지)
+
+- 카드 그리드 방식의 드릴다운 네비게이션: 대분류 카드 → 중분류 카드 → 소분류 카드 → 매뉴얼 목록
+  (상단 breadcrumb 로 언제든 상위 단계로 이동 가능).
+- 매뉴얼 목록에는 **출처(엑셀 파일명/시트명) 컬럼을 표시하지 않는다** — 제목과 수정일만 노출.
+  (백엔드 응답 DTO에는 `sourceFileName`/`sourceSheetName` 필드가 여전히 존재하지만 목록 화면에서만
+  숨김 처리했을 뿐, 상세 화면 등에서 필요하면 그대로 사용 가능하다.)
+- 매뉴얼 상세는 기존과 동일하게 단계별 사진/공정순서/위험요인/안전보호구/비고 테이블로 표시한다.
 
 ## 참고: 문자 인코딩(mojibake) 관련 주의사항
 
