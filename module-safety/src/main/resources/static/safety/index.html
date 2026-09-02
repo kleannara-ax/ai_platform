@@ -25,13 +25,13 @@ body{
   font-family:'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background:var(--bg); color:var(--text); min-height:100vh;
 }
-.safety-main{max-width:1180px; margin:0 auto; padding:28px 24px 60px;}
+.safety-main{max-width:1480px; margin:0 auto; padding:24px 22px 60px;}
 .page-header{
   display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
-  margin-bottom:22px; flex-wrap:wrap;
+  margin-bottom:18px; flex-wrap:wrap;
 }
 .page-header h1{
-  font-size:1.55rem; font-weight:800; margin:0 0 4px; letter-spacing:-.3px;
+  font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.3px;
   display:flex; align-items:center; gap:10px;
 }
 .page-header h1 .icon-badge{
@@ -39,7 +39,7 @@ body{
   background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; font-size:1rem; box-shadow:var(--shadow-sm);
 }
 .page-header p{color:var(--muted); font-size:.86rem; margin:0}
-.header-actions{display:flex; gap:8px; flex-wrap:wrap}
+.header-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .btn-modern{
   border:none; border-radius:11px; padding:9px 16px; font-size:.86rem; font-weight:600;
   display:inline-flex; align-items:center; gap:7px; transition:.15s; box-shadow:var(--shadow-sm);
@@ -51,8 +51,13 @@ body{
 .btn-outline-modern:hover{background:var(--brand-soft); color:var(--brand)}
 .btn-success-modern{background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff}
 .btn-success-modern:hover{filter:brightness(1.06); color:#fff}
-.btn-ghost-sm{background:transparent; border:none; color:var(--muted); font-size:.78rem; padding:4px 8px; border-radius:8px}
-.btn-ghost-sm:hover{background:#f1f2f7; color:var(--text)}
+.btn-danger-soft{background:#fef2f2; color:#dc2626}
+.btn-danger-soft:hover{background:#fee2e2; color:#b91c1c}
+/* 관리(수정) 모드 토글 — 켜져 있을 때 확실히 구분되도록 */
+.btn-edit-toggle{background:#fff; color:var(--muted); border:1.5px solid var(--line)}
+.btn-edit-toggle:hover{background:#f8f9fd; color:var(--text)}
+.btn-edit-toggle.on{background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; border-color:transparent}
+.btn-edit-toggle.on:hover{filter:brightness(1.06); color:#fff}
 
 #msg{
   border:none; border-radius:12px; font-size:.86rem; font-weight:600; padding:12px 16px;
@@ -61,84 +66,95 @@ body{
 #msg.alert-success{background:#ecfdf5; color:#047857}
 #msg.alert-danger{background:#fef2f2; color:#b91c1c}
 
-/* Breadcrumb */
-.crumb-bar{
-  display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:18px;
-  background:var(--surface); border-radius:var(--radius-sm); padding:10px 14px; box-shadow:var(--shadow-sm);
-}
-.crumb-item{
-  border:none; background:transparent; font-size:.85rem; font-weight:600; color:var(--muted);
-  padding:5px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;
-}
-.crumb-item:hover{background:#f1f2f7; color:var(--text)}
-.crumb-item.active{color:var(--brand); background:var(--brand-soft)}
-.crumb-sep{color:#c7cad6; font-size:.7rem}
-.level-tag{
-  font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:2px;
-  background:#eef2ff; color:#4338ca;
-}
+/* ================= 본문 2단 레이아웃 ================= */
+.safety-layout{display:grid; grid-template-columns:296px minmax(0,1fr); gap:18px; align-items:start}
+@media (max-width: 991.98px){ .safety-layout{grid-template-columns:1fr} }
 
-/* Category grid */
-.cat-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(215px,1fr)); gap:14px;}
-.cat-card{
-  background:var(--surface); border-radius:var(--radius); padding:18px 16px; box-shadow:var(--shadow-sm);
-  cursor:pointer; transition:.18s; position:relative; border:1px solid transparent;
+/* ---- 좌측: 스택형 분류 트리 ---- */
+.tree-panel{
+  background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm);
+  position:sticky; top:18px; overflow:hidden;
 }
-.cat-card:hover{box-shadow:var(--shadow-md); transform:translateY(-2px); border-color:var(--brand-soft)}
-.cat-card .cat-icon{
-  width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center;
-  font-size:1.15rem; margin-bottom:12px; color:#fff;
+@media (max-width: 991.98px){ .tree-panel{position:static} }
+.tree-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:14px 16px; border-bottom:1px solid var(--line);
 }
-.cat-card .cat-name{font-weight:700; font-size:.98rem; margin:0 0 2px; word-break:break-word}
-.cat-card .cat-sub{font-size:.74rem; color:var(--muted)}
-.cat-card .cat-tools{
-  position:absolute; top:10px; right:10px; display:flex; gap:4px; opacity:0; transition:.15s;
-}
-.cat-card:hover .cat-tools{opacity:1}
-.cat-tools button{
-  width:26px; height:26px; border-radius:8px; border:none; background:#f4f5fa; color:var(--muted); font-size:.72rem;
-}
-.cat-tools button:hover{background:#e7e9f2; color:var(--text)}
-.cat-tools button.danger:hover{background:#fee2e2; color:#dc2626}
+.tree-head h6{margin:0; font-size:.9rem; font-weight:800; display:flex; align-items:center; gap:7px}
+.tree-head h6 i{color:var(--brand)}
+.tree-body{padding:8px; max-height:calc(100vh - 190px); overflow-y:auto}
+@media (max-width: 991.98px){ .tree-body{max-height:420px} }
 
-.empty-state{
-  text-align:center; padding:56px 20px; color:var(--muted); background:var(--surface); border-radius:var(--radius);
-  box-shadow:var(--shadow-sm);
+.tree-row{
+  display:flex; align-items:center; gap:4px; width:100%; border:none; background:transparent;
+  border-radius:10px; padding:7px 8px; cursor:pointer; text-align:left; transition:.12s;
 }
-.empty-state i{font-size:2rem; opacity:.35; margin-bottom:10px; display:block}
+.tree-row:hover{background:#f5f6fb}
+.tree-row.selected{background:var(--brand-soft)}
+.tree-row.selected .tr-name{color:var(--brand); font-weight:700}
+.tr-caret{
+  width:20px; height:20px; flex:0 0 auto; border:none; background:transparent; color:#9aa0b4; font-size:.68rem;
+  border-radius:6px; display:flex; align-items:center; justify-content:center; transition:transform .15s;
+}
+.tr-caret:hover{background:#e9ebf5; color:var(--text)}
+.tr-caret.open{transform:rotate(90deg)}
+.tr-caret.leaf{visibility:hidden}
+.tr-icon{width:18px; flex:0 0 auto; text-align:center; font-size:.76rem; color:#9aa0b4}
+.tree-row.selected .tr-icon{color:var(--brand)}
+.tr-name{
+  flex:1 1 auto; min-width:0; font-size:.855rem; font-weight:500; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.tr-count{
+  flex:0 0 auto; font-size:.68rem; font-weight:700; color:var(--muted);
+  background:#f1f2f7; border-radius:20px; padding:1px 7px; min-width:24px; text-align:center;
+}
+.tree-row.selected .tr-count{background:#fff; color:var(--brand)}
+.tr-tools{flex:0 0 auto; display:flex; gap:2px}
+.tr-tools button{
+  width:24px; height:24px; border-radius:7px; border:none; background:transparent; color:#9aa0b4; font-size:.68rem;
+}
+.tr-tools button:hover{background:#e9ebf5; color:var(--text)}
+.tr-tools button.danger:hover{background:#fee2e2; color:#dc2626}
+/* 단계별 들여쓰기 (대 > 중 > 소) */
+.tree-children{margin-left:13px; border-left:1px dashed var(--line); padding-left:5px}
+.tree-empty{padding:26px 14px; text-align:center; color:var(--muted); font-size:.82rem}
 
-/* Manual list */
-.manual-card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden}
-.manual-card .mc-head{
-  display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--line);
-}
-.manual-card .mc-head h5{font-size:1rem; font-weight:800; margin:0}
+/* ---- 우측: 매뉴얼 목록 ---- */
+.list-panel{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden}
+.list-head{padding:16px 20px; border-bottom:1px solid var(--line)}
+.list-head .lh-top{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.list-head h5{font-size:1.02rem; font-weight:800; margin:0}
+.list-head .lh-path{font-size:.76rem; color:var(--muted); margin-top:3px}
+.lh-count{font-size:.78rem; color:var(--muted); font-weight:600; white-space:nowrap}
+.list-search{position:relative; margin-top:12px; max-width:340px}
+.list-search input{padding-left:34px; border-radius:10px; border-color:var(--line); font-size:.85rem}
+.list-search i{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9aa0b4; font-size:.8rem}
+
 .manual-row{
-  display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--line);
-  transition:.12s; text-decoration:none; color:var(--text);
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:13px 20px; border-bottom:1px solid var(--line);
+  transition:.12s; text-decoration:none; color:var(--text); cursor:pointer;
 }
 .manual-row:last-child{border-bottom:none}
 .manual-row:hover{background:#f8f9fd}
-.manual-row .mr-title{font-weight:600; font-size:.92rem; display:flex; align-items:center; gap:10px}
-.manual-row .mr-title i{color:var(--brand); font-size:.85rem}
-.manual-row .mr-date{font-size:.76rem; color:var(--muted); min-width:130px; text-align:right}
-
-/* Detail */
-.detail-card{background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:22px}
-.detail-card h5{font-weight:800; font-size:1.15rem; margin-bottom:2px}
-.detail-meta{color:var(--muted); font-size:.82rem; margin-bottom:16px}
-.step-table{width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed}
-.step-table th{
-  background:#f8f9fd; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase;
-  padding:10px 8px; text-align:center; border-bottom:2px solid var(--line);
+.mr-left{min-width:0; display:flex; align-items:center; gap:11px}
+.mr-ico{
+  width:32px; height:32px; flex:0 0 auto; border-radius:10px; background:var(--brand-soft); color:var(--brand);
+  display:flex; align-items:center; justify-content:center; font-size:.82rem;
 }
-.step-table td{padding:12px 8px; border-bottom:1px solid var(--line); font-size:.84rem; vertical-align:top}
-.step-table tr:hover td{background:#fafbff}
-.step-no-badge{
-  display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%;
-  background:var(--brand-soft); color:var(--brand); font-weight:700; font-size:.78rem;
-}
+.mr-title{font-weight:600; font-size:.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.mr-path{font-size:.73rem; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.mr-right{flex:0 0 auto; display:flex; align-items:center; gap:12px}
+.mr-date{font-size:.75rem; color:var(--muted); white-space:nowrap}
+.mr-chevron{color:#c7cad6; font-size:.75rem}
 
+.empty-state{
+  text-align:center; padding:56px 20px; color:var(--muted);
+}
+.empty-state i{font-size:2rem; opacity:.35; margin-bottom:10px; display:block}
+
+/* ================= 매뉴얼 상세 모달 ================= */
 .modal-content{border-radius:20px; border:none; box-shadow:var(--shadow-lg)}
 .modal-header{border-bottom:1px solid var(--line); padding:18px 22px}
 .modal-header .modal-title{font-weight:800; font-size:1.05rem}
@@ -148,7 +164,54 @@ body{
 .form-control, .form-select{border-radius:10px; border-color:var(--line); font-size:.88rem}
 .form-control:focus, .form-select:focus{border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft)}
 
-/* Excel upload modal */
+.detail-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; width:100%}
+.detail-path{color:var(--muted); font-size:.78rem; font-weight:500; margin-top:3px}
+.detail-tools{display:flex; gap:7px; flex-wrap:wrap}
+.step-table{width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed}
+.step-table th{
+  background:#f8f9fd; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase;
+  padding:10px 8px; text-align:center; border-bottom:2px solid var(--line);
+}
+.step-table td{padding:12px 10px; border-bottom:1px solid var(--line); font-size:.86rem; vertical-align:top}
+.step-table tr:hover td{background:#fafbff}
+.step-no-badge{
+  display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%;
+  background:var(--brand-soft); color:var(--brand); font-weight:700; font-size:.78rem;
+}
+.step-manage{display:flex; gap:5px; justify-content:center}
+/* 클릭하면 확대되는 단계 사진 */
+.step-photo{
+  max-width:100%; max-height:130px; display:block; margin-bottom:5px; cursor:zoom-in;
+  border:1px solid var(--line); border-radius:8px; transition:.15s;
+}
+.step-photo:hover{border-color:var(--brand); box-shadow:var(--shadow-md)}
+
+/* ================= 이미지 확대 뷰어(라이트박스) ================= */
+.lightbox{
+  position:fixed; inset:0; z-index:20000; background:rgba(9,11,20,.92);
+  display:none; flex-direction:column;
+}
+.lightbox.open{display:flex}
+.lb-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 18px; color:#e5e7eb; font-size:.82rem; flex:0 0 auto;
+}
+.lb-name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
+.lb-actions{display:flex; align-items:center; gap:6px; flex:0 0 auto}
+.lb-actions button{
+  border:none; background:rgba(255,255,255,.12); color:#fff; border-radius:9px;
+  width:34px; height:34px; font-size:.82rem;
+}
+.lb-actions button.wide{width:auto; padding:0 12px; font-size:.78rem; font-weight:600}
+.lb-actions button:hover{background:rgba(255,255,255,.24)}
+.lb-zoom{min-width:52px; text-align:center; font-weight:700; color:#cbd5e1}
+.lb-stage{flex:1 1 auto; overflow:auto; display:flex; align-items:center; justify-content:center; padding:0 18px 18px}
+.lb-stage img{display:block; margin:auto; background:#fff; border-radius:8px; cursor:zoom-in}
+.lb-stage img.fit{max-width:100%; max-height:100%}
+.lb-stage img.zoomed{cursor:zoom-out; max-width:none; max-height:none}
+.lb-hint{text-align:center; color:#94a3b8; font-size:.72rem; padding-bottom:12px; flex:0 0 auto}
+
+/* ================= 엑셀 업로드 모달 ================= */
 .eu-step{display:flex; align-items:center; gap:8px; font-size:.8rem; font-weight:700; color:var(--muted); margin-bottom:14px}
 .eu-step .num{
   width:22px; height:22px; border-radius:50%; background:#f1f2f7; color:var(--muted); font-size:.72rem;
@@ -184,9 +247,12 @@ body{
   <div class="page-header">
     <div>
       <h1><span class="icon-badge"><i class="fas fa-shield-alt"></i></span>안전작업방식 매뉴얼</h1>
-      <p>대분류 → 중분류 → 소분류 순으로 분류를 선택하면 매뉴얼을 확인할 수 있습니다.</p>
+      <p>왼쪽에서 대분류·중분류·소분류를 선택하면 그 아래 매뉴얼이 모두 표시됩니다.</p>
     </div>
     <div class="header-actions">
+      <button class="btn-modern btn-edit-toggle d-none" id="btn-edit-mode" onclick="toggleEditMode()">
+        <i class="fas fa-pen"></i><span id="btn-edit-mode-label">수정</span>
+      </button>
       <button class="btn-modern btn-success-modern d-none" id="btn-excel-upload" onclick="openExcelModal()">
         <i class="fas fa-file-excel"></i>엑셀 일괄 업로드
       </button>
@@ -198,37 +264,81 @@ body{
 
   <div id="msg" class="alert d-none mb-3" role="alert"></div>
 
-  <!-- 브레드크럼 -->
-  <div class="crumb-bar" id="crumbBar"></div>
+  <div class="safety-layout">
 
-  <!-- 분류 카드 그리드 / 매뉴얼 목록 -->
-  <div id="browsePane"></div>
-
-  <!-- 매뉴얼 상세 -->
-  <div id="manualDetailPane" style="display:none">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <button class="btn-modern btn-outline-modern" onclick="closeDetail()"><i class="fas fa-arrow-left"></i>목록으로</button>
-      <div>
-        <button class="btn-modern btn-outline-modern d-none" id="btn-add-step" onclick="openStepModal()"><i class="fas fa-plus"></i>단계 추가</button>
-        <button class="btn-modern d-none" id="btn-delete-manual" style="background:#fef2f2;color:#dc2626" onclick="deleteManual()"><i class="fas fa-trash"></i>매뉴얼 삭제</button>
+    <!-- 좌측: 스택형 분류 트리 -->
+    <aside class="tree-panel">
+      <div class="tree-head">
+        <h6><i class="fas fa-folder-tree"></i>분류</h6>
+        <div class="d-flex gap-1">
+          <button class="tr-caret" style="width:26px;height:26px" title="모두 펼치기" onclick="expandAll(true)"><i class="fas fa-angles-down"></i></button>
+          <button class="tr-caret" style="width:26px;height:26px" title="모두 접기" onclick="expandAll(false)"><i class="fas fa-angles-up"></i></button>
+        </div>
       </div>
-    </div>
-    <div class="detail-card">
-      <h5 id="detailTitle"></h5>
-      <div class="detail-meta" id="detailMeta"></div>
-      <div class="table-responsive">
-        <table class="step-table">
-          <colgroup>
-            <col style="width:46px"><col style="width:170px"><col><col style="width:15%"><col style="width:15%"><col style="width:13%"><col style="width:64px">
-          </colgroup>
-          <thead>
-            <tr><th>No.</th><th>공정 순서(사진)</th><th>공정 순서(설명)</th><th>위험요인</th><th>안전 보호구</th><th>비고</th><th>관리</th></tr>
-          </thead>
-          <tbody id="stepRows"></tbody>
-        </table>
+      <div class="tree-body" id="treeBody"></div>
+    </aside>
+
+    <!-- 우측: 선택한 분류의 매뉴얼 목록 -->
+    <section class="list-panel">
+      <div class="list-head">
+        <div class="lh-top">
+          <div style="min-width:0">
+            <h5 id="listTitle">전체 매뉴얼</h5>
+            <div class="lh-path" id="listPath">모든 분류</div>
+          </div>
+          <div class="lh-count" id="listCount"></div>
+        </div>
+        <div class="list-search">
+          <i class="fas fa-search"></i>
+          <input class="form-control" id="listFilter" placeholder="매뉴얼명으로 찾기" oninput="renderManualList()">
+        </div>
+      </div>
+      <div id="manualRows"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- 매뉴얼 상세 모달 (목록에서 선택 시 수칙 표시) -->
+<div class="modal fade" id="detailModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header">
+    <div class="detail-head">
+      <div style="min-width:0">
+        <h5 class="modal-title" id="detailTitle">매뉴얼</h5>
+        <div class="detail-path" id="detailPath"></div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="detail-tools" id="detailTools"></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
     </div>
   </div>
+  <div class="modal-body">
+    <div class="table-responsive">
+      <table class="step-table">
+        <colgroup id="stepCols"></colgroup>
+        <thead id="stepHead"></thead>
+        <tbody id="stepRows"></tbody>
+      </table>
+    </div>
+  </div>
+</div></div></div>
+
+<!-- 이미지 확대 뷰어 -->
+<div class="lightbox" id="lightbox">
+  <div class="lb-bar">
+    <div class="lb-name" id="lbName"></div>
+    <div class="lb-actions">
+      <button title="축소" onclick="lbZoom(-1)"><i class="fas fa-magnifying-glass-minus"></i></button>
+      <span class="lb-zoom" id="lbZoomLabel">맞춤</span>
+      <button title="확대" onclick="lbZoom(1)"><i class="fas fa-magnifying-glass-plus"></i></button>
+      <button class="wide" onclick="lbFit()">화면 맞춤</button>
+      <button title="새 탭에서 원본 보기" onclick="lbOpenRaw()"><i class="fas fa-up-right-from-square"></i></button>
+      <button title="닫기 (Esc)" onclick="closeLightbox()"><i class="fas fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="lb-stage" id="lbStage"><img id="lbImg" class="fit" src="" alt=""></div>
+  <div class="lb-hint">이미지를 클릭하면 확대/축소, 마우스 휠로 배율 조절, Esc로 닫기</div>
 </div>
 
 <!-- 분류 등록/수정 모달 -->
@@ -246,7 +356,7 @@ body{
   <div class="modal-footer"><button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">취소</button><button class="btn-modern btn-primary-modern" onclick="saveCategory()">저장</button></div>
 </div></div></div>
 
-<!-- 매뉴얼 등록/수정 모달 -->
+<!-- 매뉴얼 등록 모달 -->
 <div class="modal fade" id="manualModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
   <div class="modal-header"><h5 class="modal-title" id="manualModalTitle">매뉴얼 추가</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">

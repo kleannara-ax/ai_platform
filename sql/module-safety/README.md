@@ -102,7 +102,8 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 | GET | `/safety-api/categories/{id}` | 분류 상세 | 인증 사용자 |
 | POST/PUT/DELETE | `/safety-api/categories[/{id}]` | 분류 등록/수정/삭제 | 관리자(safetyPerm) |
 | GET | `/safety-api/manuals` | 매뉴얼 검색(키워드/분류, 페이징) | 인증 사용자 |
-| GET | `/safety-api/categories/{categoryId}/manuals` | 분류별 매뉴얼 목록 | 인증 사용자 |
+| GET | `/safety-api/categories/{categoryId}/manuals` | 해당 분류에 **직접** 속한 매뉴얼 목록 | 인증 사용자 |
+| GET | `/safety-api/manuals/by-category?categoryId=` | 분류 **하위 전체**(대/중/소 무관) 매뉴얼 목록. `categoryId` 생략 시 전체. 좌측 분류 트리에서 어느 단계를 눌러도 그 아래 매뉴얼을 모두 보여주는 데 쓴다 | 인증 사용자 |
 | GET | `/safety-api/manuals/{manualId}` | 매뉴얼 상세(단계+사진 포함) | 인증 사용자 |
 | POST/PUT/DELETE | `/safety-api/manuals[/{id}]` | 매뉴얼 등록/수정/삭제 | 관리자 |
 | POST | `/safety-api/manuals/{manualId}/steps` | 단계 추가 | 관리자 |
@@ -136,12 +137,35 @@ SPA(`app/src/main/resources/static/index.html`)는 `menuUrl` 이 `/safety/` 로 
 
 ## 프론트엔드 화면 (index.html, 단일 페이지)
 
-- 카드 그리드 방식의 드릴다운 네비게이션: 대분류 카드 → 중분류 카드 → 소분류 카드 → 매뉴얼 목록
-  (상단 breadcrumb 로 언제든 상위 단계로 이동 가능).
-- 매뉴얼 목록에는 **출처(엑셀 파일명/시트명) 컬럼을 표시하지 않는다** — 제목과 수정일만 노출.
+플랫폼 SPA 안에서 iframe 모듈로 열린다(메뉴 URL `/safety/index.html`). 좌측 트리 + 우측 목록의
+2단 레이아웃이며, 단계를 눌러야 다음 단계가 보이던 드릴다운 방식은 쓰지 않는다.
+
+- **좌측 — 스택형 분류 트리**: 대분류/중분류/소분류를 한 화면에 계층으로 펼쳐 둔다. 화살표로 접고 펴며,
+  각 분류 옆 배지는 **하위 분류까지 합산한 매뉴얼 건수**(`CategoryResponse.manualCount`)다.
+- **우측 — 매뉴얼 목록**: 좌측에서 어느 단계를 고르든 그 분류 **하위 전체** 매뉴얼을 보여준다
+  (`/safety-api/manuals/by-category`). 각 행에 `대분류 > 중분류 > 소분류` 경로를 함께 표시하고,
+  제목/경로로 거르는 검색창을 제공한다. 최상단 "전체"를 고르면 모든 매뉴얼을 한 번에 본다.
+- **매뉴얼 상세는 모달**: 목록에서 행을 누르면 별도 모달이 열려 수칙(단계) 표를 보여준다.
+- **관리 UI는 기본으로 숨긴다**: 상단(및 상세 모달)의 "수정" 버튼을 눌러야 관리 모드가 켜지고,
+  그때만 분류 수정/삭제 버튼, 분류·매뉴얼 추가, 엑셀 업로드, 상세 표의 **관리 칸**이 나타난다.
+  관리 모드가 꺼져 있으면 관리 칸 자체가 없어 본문 컬럼이 그만큼 넓게 보인다.
+- **사진 확대**: 단계 사진을 누르면 확대 뷰어가 열린다(휠/버튼으로 배율 조절, 화면 맞춤,
+  새 탭에서 원본 열기, Esc 로 닫기 — Esc 는 뷰어만 닫고 매뉴얼 모달은 유지된다).
+- 매뉴얼 목록에는 **출처(엑셀 파일명/시트명) 컬럼을 표시하지 않는다** — 제목·분류 경로·수정일만 노출.
   (백엔드 응답 DTO에는 `sourceFileName`/`sourceSheetName` 필드가 여전히 존재하지만 목록 화면에서만
   숨김 처리했을 뿐, 상세 화면 등에서 필요하면 그대로 사용 가능하다.)
-- 매뉴얼 상세는 기존과 동일하게 단계별 사진/공정순서/위험요인/안전보호구/비고 테이블로 표시한다.
+
+### 로컬 미리보기
+
+DB 없이 화면만 확인할 때는 저장소 루트의 `preview-server.js` 를 쓴다. module-safety 의 정적 파일과
+`/safety-api/**` 목(mock) 응답, `SAFETY_MGMT` 메뉴가 등록되어 있어 실제와 같이 **플랫폼 SPA 안의
+모듈**로 열린다.
+
+```
+node preview-server.js 8081     # http://localhost:8081  (admin / 아무 비밀번호)
+```
+
+(사진 업로드·엑셀 업로드는 목 서버에서 지원하지 않으므로 실제 서버에서 확인한다.)
 
 ## 참고: 문자 인코딩(mojibake) 관련 주의사항
 

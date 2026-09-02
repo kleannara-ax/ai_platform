@@ -46,10 +46,20 @@ public class SafetyManualController {
         return ResponseEntity.ok(ApiResponse.success(manualService.getList(keyword, categoryId, page, size)));
     }
 
-    /** 특정 분류에 속한 매뉴얼 목록 (분류 클릭 시 목록 화면) */
+    /** 특정 분류에 직접 속한 매뉴얼 목록 (소분류 클릭 시 목록 화면) */
     @GetMapping("/safety-api/categories/{categoryId}/manuals")
     public ResponseEntity<ApiResponse<List<ManualSummaryResponse>>> getListByCategory(@PathVariable Long categoryId) {
         return ResponseEntity.ok(ApiResponse.success(manualService.getListByCategory(categoryId)));
+    }
+
+    /**
+     * 분류 하위 전체 매뉴얼 목록 (좌측 트리에서 대/중/소 어느 단계를 눌러도 그 아래 매뉴얼을 모두 조회).
+     * <p>{@code categoryId} 를 생략하면 전체 매뉴얼을 반환한다.
+     */
+    @GetMapping("/safety-api/manuals/by-category")
+    public ResponseEntity<ApiResponse<List<ManualSummaryResponse>>> getListInSubtree(
+            @RequestParam(required = false) Long categoryId) {
+        return ResponseEntity.ok(ApiResponse.success(manualService.getListInSubtree(categoryId)));
     }
 
     /** 매뉴얼 상세 (원본 엑셀과 같은 레이아웃: 단계 + 단계별 사진) */

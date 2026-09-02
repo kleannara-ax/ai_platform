@@ -9,7 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-const PORT = 3000;
+// 포트: `node preview-server.js 8081` 또는 PORT 환경변수로 바꿀 수 있다 (기본 3000)
+const PORT = Number(process.argv[2] || process.env.PORT) || 3000;
 
 // ── MIME Types ──
 const MIME = {
@@ -35,6 +36,7 @@ const STATIC_DIRS = [
   path.join(__dirname, 'module-fire/src/main/resources/static'),
   path.join(__dirname, 'module-ps-insp/src/main/resources/static'),
   path.join(__dirname, 'module-dailyreport/src/main/resources/static'),
+  path.join(__dirname, 'module-safety/src/main/resources/static'),
 ];
 const TEMPLATE_DIR = path.join(__dirname, 'module-ps-insp/src/main/resources/templates');
 const TEST_UI_DIR = path.join(__dirname, 'test-ui');
@@ -97,6 +99,13 @@ const mockMenus = [
       { menuId:102, menuCode:'DAILY_REPORT_AUTH', menuName:'세부공장일보 컬럼관리', menuType:'PAGE', menuUrl:'/dailyreport/page/column-mgmt', parentId:100, sortOrder:2, isActive:true, isVisible:true, allowedIps:null },
     ]
   },
+  // ── 안전작업방식 매뉴얼 (sql/module-safety/02_menu.sql 과 같은 구조) ──
+  // menuUrl 이 /safety/ 로 시작하면 SPA 가 iframe 모듈로 연다 (app static index.html 참고)
+  { menuId:110, menuCode:'SAFETY_MGMT', menuName:'안전작업방식 매뉴얼', menuType:'MENU', menuUrl:null, icon:'shield-alt', parentId:null, sortOrder:70, isActive:true, isVisible:true, allowedIps:null, description:'안전작업방식 매뉴얼',
+    children: [
+      { menuId:111, menuCode:'SAFETY_CATEGORY', menuName:'분류/매뉴얼 목록', menuType:'MENU', menuUrl:'/safety/index.html', parentId:110, sortOrder:1, isActive:true, isVisible:true, allowedIps:null },
+    ]
+  },
 ];
 
 const mockRoles = [
@@ -150,18 +159,119 @@ const mockCodeGroups = [
 const _allFacilityMenus = [6,62,67,68,69,63,64,65,66,70,71,72,73,74];
 const _fireOnlyMenus    = [6,62,67,68,69,63,64,65,66,70];         // 공통도면+소방QR+소방설비
 const _otherOnlyMenus   = [6,62,67,71,72,73,74];                  // 공통도면+기타설비+기타QR (소방QR 제외)
+// 안전작업방식 매뉴얼: 110(상위), 111(분류/매뉴얼 목록) — ADMIN/MANAGER/USER 에 부여
+const _safetyMenus = [110, 111];
 const mockPermissions = mockRoles.map(r => ({
   role: r.code,
   roleDescription: r.codeName,
   // 세부공장일보(100,101,102)는 모든 역할에 개방 — 실제 접근은 cell_auth 프론트 필터링으로 제어
-  menuIds: r.code === 'ROLE_ADMIN'             ? [1,2,3,4,5, ..._allFacilityMenus, 7, 100,101,102] :
-           r.code === 'ROLE_MANAGER'           ? [1,2,5, 7, 100,101,102] :
-           r.code === 'ROLE_USER'              ? [1, 7, 100,101,102] :
+  menuIds: r.code === 'ROLE_ADMIN'             ? [1,2,3,4,5, ..._allFacilityMenus, 7, 100,101,102, ..._safetyMenus] :
+           r.code === 'ROLE_MANAGER'           ? [1,2,5, 7, 100,101,102, ..._safetyMenus] :
+           r.code === 'ROLE_USER'              ? [1, 7, 100,101,102, ..._safetyMenus] :
            r.code === 'ROLE_FACILITY_MANAGER'  ? [1, ..._allFacilityMenus, 100,101,102] :
            r.code === 'ROLE_FIRE_MANAGER'      ? [1, ..._fireOnlyMenus, 100,101,102] :
            r.code === 'ROLE_EQUIPMENT_MANAGER' ? [1, ..._otherOnlyMenus, 100,101,102] :
            [1]
 }));
+
+// ══════════════════════════════════════════
+//  Mock: 안전작업방식 매뉴얼 (module-safety)
+//  분류는 대(1)/중(2)/소(3) 3단계 고정, 매뉴얼은 소분류에만 붙는다.
+// ══════════════════════════════════════════
+const _safety = {
+  seq: 1000,
+  categories: [
+    { categoryId: 1, name: '제지',     parentId: null, levelNo: 1, sortOrder: 0 },
+    { categoryId: 2, name: '3호기',    parentId: 1,    levelNo: 2, sortOrder: 0 },
+    { categoryId: 3, name: '설비',     parentId: 2,    levelNo: 3, sortOrder: 0 },
+    { categoryId: 4, name: '안전',     parentId: 2,    levelNo: 3, sortOrder: 1 },
+    { categoryId: 5, name: '4호기',    parentId: 1,    levelNo: 2, sortOrder: 1 },
+    { categoryId: 6, name: '작업',     parentId: 5,    levelNo: 3, sortOrder: 0 },
+    { categoryId: 7, name: '화장지',   parentId: null, levelNo: 1, sortOrder: 1 },
+    { categoryId: 8, name: '가공라인', parentId: 7,    levelNo: 2, sortOrder: 0 },
+    { categoryId: 9, name: '설비',     parentId: 8,    levelNo: 3, sortOrder: 0 },
+  ],
+  manuals: [
+    { manualId: 1, categoryId: 3, title: '슬리터 칼날 교체',        sortOrder: 0, updatedAt: '2026-08-20T10:30:00' },
+    { manualId: 2, categoryId: 3, title: '드라이어 캔버스 점검',    sortOrder: 1, updatedAt: '2026-08-21T09:10:00' },
+    { manualId: 3, categoryId: 4, title: '고소작업 안전벨트 착용',  sortOrder: 0, updatedAt: '2026-08-22T14:05:00' },
+    { manualId: 4, categoryId: 6, title: '원단 교체 작업',          sortOrder: 0, updatedAt: '2026-08-19T08:40:00' },
+    { manualId: 5, categoryId: 9, title: '리와인더 청소',           sortOrder: 0, updatedAt: '2026-08-18T16:20:00' },
+  ],
+  steps: [
+    { stepId: 11, manualId: 1, stepNo: 1, description: '설비 정지 및 전원 차단(LOTO)',   hazard: '감전, 기동',  safetyEquipment: '절연장갑, 안전모',   remark: '',                sortOrder: 1, photoIds: [1] },
+    { stepId: 12, manualId: 1, stepNo: 2, description: '칼날 커버 분리 후 칼날 탈거',    hazard: '베임, 끼임',  safetyEquipment: '방검장갑, 보안경',   remark: '2인 1조',         sortOrder: 2, photoIds: [2] },
+    { stepId: 13, manualId: 1, stepNo: 3, description: '신규 칼날 장착 및 시운전',       hazard: '협착',        safetyEquipment: '안전화',             remark: '토크 규격 확인',  sortOrder: 3, photoIds: [] },
+    { stepId: 21, manualId: 2, stepNo: 1, description: '캔버스 장력 확인',               hazard: '끼임',        safetyEquipment: '안전모, 보호장갑',   remark: '',                sortOrder: 1, photoIds: [3] },
+    { stepId: 31, manualId: 3, stepNo: 1, description: '안전벨트 훅 체결 상태 확인',     hazard: '추락',        safetyEquipment: '안전벨트, 안전모',   remark: '2m 이상 필수',    sortOrder: 1, photoIds: [4] },
+    { stepId: 41, manualId: 4, stepNo: 1, description: '원단 지관 제거',                 hazard: '협착',        safetyEquipment: '보호장갑',           remark: '',                sortOrder: 1, photoIds: [] },
+    { stepId: 51, manualId: 5, stepNo: 1, description: '잔지 제거 및 표면 청소',         hazard: '베임',        safetyEquipment: '보호장갑',           remark: '',                sortOrder: 1, photoIds: [5] },
+  ],
+};
+function _safetyChildren(parentId) {
+  return _safety.categories.filter(c => c.parentId === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+/** 하위 분류의 매뉴얼까지 합산한 건수 (좌측 트리 배지) */
+function _safetyCount(categoryId) {
+  return _safety.manuals.filter(m => m.categoryId === categoryId).length
+    + _safetyChildren(categoryId).reduce((sum, c) => sum + _safetyCount(c.categoryId), 0);
+}
+function _safetyNode(c) {
+  return {
+    categoryId: c.categoryId, name: c.name, parentId: c.parentId, levelNo: c.levelNo,
+    sortOrder: c.sortOrder, manualCount: _safetyCount(c.categoryId),
+    children: _safetyChildren(c.categoryId).map(_safetyNode),
+  };
+}
+function _safetyTree() { return _safetyChildren(null).map(_safetyNode); }
+/** 대분류 > 중분류 > 소분류 경로 문자열 */
+function _safetyPath(categoryId) {
+  const names = [];
+  let c = _safety.categories.find(x => x.categoryId === categoryId);
+  while (c) { names.unshift(c.name); c = _safety.categories.find(x => x.categoryId === c.parentId); }
+  return names.join(' > ');
+}
+function _safetySubtreeIds(categoryId) {
+  const ids = [categoryId];
+  _safetyChildren(categoryId).forEach(c => ids.push(..._safetySubtreeIds(c.categoryId)));
+  return ids;
+}
+function _safetySummary(m) {
+  const cat = _safety.categories.find(c => c.categoryId === m.categoryId);
+  return {
+    manualId: m.manualId, categoryId: m.categoryId, categoryName: cat ? cat.name : null,
+    categoryPath: _safetyPath(m.categoryId), title: m.title,
+    sourceFileName: null, sourceSheetName: null, sortOrder: m.sortOrder, updatedAt: m.updatedAt,
+  };
+}
+function _safetyDetail(manualId) {
+  const m = _safety.manuals.find(x => x.manualId === manualId);
+  if (!m) return null;
+  const cat = _safety.categories.find(c => c.categoryId === m.categoryId);
+  const steps = _safety.steps.filter(s => s.manualId === manualId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(s => Object.assign({}, s, {
+      photos: (s.photoIds || []).map(pid => ({
+        photoId: pid, originalName: '공정사진' + pid + '.png', contentType: 'image/svg+xml',
+        fileSize: 20480, sortOrder: 0, url: '/safety-api/photos/' + pid + '/view',
+      })),
+    }));
+  return {
+    manualId: m.manualId, categoryId: m.categoryId, categoryName: cat ? cat.name : null,
+    title: m.title, sortOrder: m.sortOrder, updatedAt: m.updatedAt, steps,
+  };
+}
+/** 실제 업로드 사진 대신 쓰는 자리표시 이미지 (확대 뷰어 동작 확인용, 1200x800) */
+function _safetyPhotoSvg(id) {
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">'
+    + '<rect width="1200" height="800" fill="#eef2ff"/>'
+    + '<rect x="60" y="60" width="1080" height="680" rx="24" fill="#c7d2fe"/>'
+    + '<circle cx="600" cy="380" r="180" fill="#4f46e5"/>'
+    + '<text x="600" y="410" font-size="110" text-anchor="middle" fill="#fff" font-family="sans-serif">사진 ' + id + '</text>'
+    + '<text x="600" y="690" font-size="40" text-anchor="middle" fill="#3730a3" font-family="sans-serif">미리보기용 자리표시 이미지 (1200 x 800)</text>'
+    + '</svg>';
+}
 
 // ── Helper: Mock PS-INSP Inspection Data (20건) ──
 function _mockInspections() {
@@ -1331,6 +1441,117 @@ const server = http.createServer((req, res) => {
 
       // ── Catch-all dailyreport-api ──
       return jsonRes(res, { message: 'Daily Report Mock API', path: pathname });
+    }
+
+    // ══════════════════════════════════════════
+    //  Mock API: /safety-api/** (안전작업방식 매뉴얼)
+    // ══════════════════════════════════════════
+    if (pathname.startsWith('/safety-api/')) {
+      let mt;
+      const b = jsonBody || {};
+
+      // 사진 조회 — <img src> 가 직접 부르므로 ApiResponse 가 아니라 이미지 본문을 준다
+      if ((mt = pathname.match(/^\/safety-api\/photos\/(\d+)\/view$/))) {
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' });
+        return res.end(_safetyPhotoSvg(mt[1]));
+      }
+
+      // ── 분류 ──
+      if (pathname === '/safety-api/categories' && method === 'GET') return apiOk(res, _safetyTree());
+      if (pathname === '/safety-api/categories' && method === 'POST') {
+        const parentId = b.parentId ? Number(b.parentId) : null;
+        const parent = _safety.categories.find(c => c.categoryId === parentId);
+        const created = {
+          categoryId: ++_safety.seq, name: b.name, parentId,
+          levelNo: parent ? parent.levelNo + 1 : 1, sortOrder: Number(b.sortOrder) || 0,
+        };
+        _safety.categories.push(created);
+        return apiOk(res, created);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/categories\/(\d+)$/)) && method === 'PUT') {
+        const cat = _safety.categories.find(c => c.categoryId === Number(mt[1]));
+        if (!cat) return apiErr(res, '분류를 찾을 수 없습니다.', 404);
+        cat.name = b.name;
+        cat.sortOrder = Number(b.sortOrder) || 0;
+        return apiOk(res, cat);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/categories\/(\d+)$/)) && method === 'DELETE') {
+        const id = Number(mt[1]);
+        if (_safetyChildren(id).length) return apiErr(res, '하위 분류가 있어 삭제할 수 없습니다.');
+        if (_safety.manuals.some(m => m.categoryId === id)) return apiErr(res, '이 분류에 속한 매뉴얼이 있어 삭제할 수 없습니다.');
+        _safety.categories = _safety.categories.filter(c => c.categoryId !== id);
+        return apiOk(res, null);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/categories\/(\d+)\/manuals$/))) {
+        const id = Number(mt[1]);
+        return apiOk(res, _safety.manuals.filter(m => m.categoryId === id).map(_safetySummary));
+      }
+
+      // ── 매뉴얼 ──
+      if (pathname === '/safety-api/manuals/by-category') {
+        const raw = parsedUrl.query.categoryId;
+        if (!raw) return apiOk(res, _safety.manuals.map(_safetySummary));
+        const ids = _safetySubtreeIds(Number(raw));
+        return apiOk(res, _safety.manuals.filter(m => ids.includes(m.categoryId)).map(_safetySummary));
+      }
+      if (pathname === '/safety-api/manuals' && method === 'POST') {
+        const created = {
+          manualId: ++_safety.seq, categoryId: Number(b.categoryId), title: b.title,
+          sortOrder: Number(b.sortOrder) || 0, updatedAt: new Date().toISOString().substring(0, 19),
+        };
+        _safety.manuals.push(created);
+        return apiOk(res, _safetyDetail(created.manualId));
+      }
+      if ((mt = pathname.match(/^\/safety-api\/manuals\/(\d+)$/)) && method === 'GET') {
+        const detail = _safetyDetail(Number(mt[1]));
+        return detail ? apiOk(res, detail) : apiErr(res, '매뉴얼을 찾을 수 없습니다.', 404);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/manuals\/(\d+)$/)) && method === 'DELETE') {
+        const id = Number(mt[1]);
+        _safety.manuals = _safety.manuals.filter(m => m.manualId !== id);
+        _safety.steps = _safety.steps.filter(st => st.manualId !== id);
+        return apiOk(res, null);
+      }
+
+      // ── 단계 ──
+      if ((mt = pathname.match(/^\/safety-api\/manuals\/(\d+)\/steps$/)) && method === 'POST') {
+        const created = {
+          stepId: ++_safety.seq, manualId: Number(mt[1]), stepNo: Number(b.stepNo) || 0,
+          description: b.description, hazard: b.hazard,
+          safetyEquipment: b.safetyEquipment, remark: b.remark,
+          sortOrder: Number(b.sortOrder) || 0, photoIds: [],
+        };
+        _safety.steps.push(created);
+        return apiOk(res, created);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/steps\/(\d+)$/)) && method === 'PUT') {
+        const step = _safety.steps.find(st => st.stepId === Number(mt[1]));
+        if (!step) return apiErr(res, '단계를 찾을 수 없습니다.', 404);
+        Object.assign(step, {
+          stepNo: Number(b.stepNo) || 0, description: b.description, hazard: b.hazard,
+          safetyEquipment: b.safetyEquipment, remark: b.remark,
+          sortOrder: Number(b.sortOrder) || 0,
+        });
+        return apiOk(res, step);
+      }
+      if ((mt = pathname.match(/^\/safety-api\/steps\/(\d+)$/)) && method === 'DELETE') {
+        _safety.steps = _safety.steps.filter(st => st.stepId !== Number(mt[1]));
+        return apiOk(res, null);
+      }
+
+      // 사진/엑셀 업로드는 미리보기 서버에서 파일 파싱까지 흉내내지 않는다
+      if (pathname.match(/^\/safety-api\/steps\/\d+\/photos$/)) {
+        return apiErr(res, '미리보기 서버에서는 사진 업로드를 지원하지 않습니다. 실제 서버에서 확인하세요.');
+      }
+      if (pathname.startsWith('/safety-api/excel-upload/')) {
+        return apiErr(res, '미리보기 서버에서는 엑셀 업로드를 지원하지 않습니다. 실제 서버에서 확인하세요.');
+      }
+      return apiOk(res, null);
+    }
+
+    // SAFETY 관리자 명단(공통코드 그룹) — 미리보기에서는 admin 을 관리자로 본다
+    if (pathname === '/common-api/codes/lookup/SAFETY_PERM') {
+      return apiOk(res, [{ code: 'admin', codeName: 'SAFETY 관리자' }]);
     }
 
     // ── Catch-all for unknown API paths ──

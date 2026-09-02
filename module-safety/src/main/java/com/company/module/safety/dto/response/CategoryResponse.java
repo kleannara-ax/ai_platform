@@ -16,6 +16,8 @@ public class CategoryResponse {
     /** 1=대분류, 2=중분류, 3=소분류 */
     private final int levelNo;
     private final int sortOrder;
+    /** 이 분류와 하위 분류에 속한 매뉴얼 총 건수 (트리 화면의 건수 배지) */
+    private final long manualCount;
     private final List<CategoryResponse> children;
 
     public static CategoryResponse from(SafetyManualCategory entity) {
@@ -28,13 +30,15 @@ public class CategoryResponse {
                 .build();
     }
 
-    public static CategoryResponse withChildren(SafetyManualCategory entity, List<CategoryResponse> children) {
+    public static CategoryResponse withChildren(SafetyManualCategory entity, List<CategoryResponse> children,
+                                                long manualCount) {
         return CategoryResponse.builder()
                 .categoryId(entity.getCategoryId())
                 .name(entity.getName())
                 .parentId(entity.getParent() != null ? entity.getParent().getCategoryId() : null)
                 .levelNo(entity.getLevelNo())
                 .sortOrder(entity.getSortOrder())
+                .manualCount(manualCount)
                 .children(children)
                 .build();
     }

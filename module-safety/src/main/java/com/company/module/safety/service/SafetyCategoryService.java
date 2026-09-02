@@ -39,20 +39,30 @@ public class SafetyCategoryService {
         Map<Long, List<SafetyManualCategory>> childrenByParent = all.stream()
                 .filter(c -> c.getParent() != null)
                 .collect(Collectors.groupingBy(c -> c.getParent().getCategoryId()));
+        Map<Long, Long> directCounts = manualRepository.countActiveGroupByCategory().stream()
+                .collect(Collectors.toMap(
+                        SafetyManualRepository.CategoryManualCount::getCategoryId,
+                        SafetyManualRepository.CategoryManualCount::getManualCount));
 
         return all.stream()
                 .filter(c -> c.getParent() == null)
-                .map(root -> buildNode(root, childrenByParent))
+                .map(root -> buildNode(root, childrenByParent, directCounts))
                 .toList();
     }
 
-    private CategoryResponse buildNode(SafetyManualCategory node, Map<Long, List<SafetyManualCategory>> childrenByParent) {
+    /** 하위 분류를 먼저 만들고 그 건수를 합산해 올린다. 대/중분류의 건수 배지는 하위 매뉴얼까지 포함한 값이다. */
+    private CategoryResponse buildNode(SafetyManualCategory node,
+                                       Map<Long, List<SafetyManualCategory>> childrenByParent,
+                                       Map<Long, Long> directCounts) {
         List<SafetyManualCategory> children = childrenByParent.getOrDefault(node.getCategoryId(), List.of());
         List<CategoryResponse> childResponses = new ArrayList<>();
+        long total = directCounts.getOrDefault(node.getCategoryId(), 0L);
         for (SafetyManualCategory child : children) {
-            childResponses.add(buildNode(child, childrenByParent));
+            CategoryResponse childResponse = buildNode(child, childrenByParent, directCounts);
+            childResponses.add(childResponse);
+            total += childResponse.getManualCount();
         }
-        return CategoryResponse.withChildren(node, childResponses);
+        return CategoryResponse.withChildren(node, childResponses, total);
     }
 
     public CategoryResponse getDetail(Long categoryId) {

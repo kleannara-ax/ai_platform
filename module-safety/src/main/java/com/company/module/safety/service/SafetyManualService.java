@@ -60,6 +60,16 @@ public class SafetyManualService {
                 .stream().map(ManualSummaryResponse::from).toList();
     }
 
+    /**
+     * 분류 하위 전체 매뉴얼.
+     * <p>좌측 분류 트리에서 대분류/중분류/소분류 어느 단계를 클릭하더라도 그 아래 매뉴얼을 모두 보여주기 위한 조회이다.
+     * {@code categoryId} 가 null 이면 전체 매뉴얼을 반환한다.
+     */
+    public List<ManualSummaryResponse> getListInSubtree(Long categoryId) {
+        return manualRepository.findInCategorySubtree(categoryId)
+                .stream().map(ManualSummaryResponse::from).toList();
+    }
+
     // ================================================================
     // 매뉴얼 상세 (엑셀과 같은 레이아웃: 단계 + 단계별 사진)
     // ================================================================
