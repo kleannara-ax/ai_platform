@@ -617,6 +617,43 @@
       } catch (e) { /* 무시 */ }
     }
 
+    // 상태값에 따른 액션 버튼 스타일/문구 결정
+    // - 보류/반려/취소: 빨간색 '상태 변경' 버튼 (지급 대신 상태변경만 수행)
+    // - 그 외(접수/완료 등): 초록색 '이 요청으로 소모품 지급' 버튼
+    function reqActionButtonAttrs(status) {
+      const BLOCK_STATUSES = ['ON_HOLD', 'REJECTED', 'CANCELED'];
+      return BLOCK_STATUSES.includes(status)
+        ? { cls: 'btn btn-danger btn-sm mt-1 w-100', text: '상태 변경' }
+        : { cls: 'btn btn-success btn-sm mt-1 w-100', text: '이 요청으로 소모품 지급' };
+    }
+    // 상태 드롭다운 변경 시 버튼 색상/문구를 즉시 갱신
+    function updateReqActionButtonStyle() {
+      const btn = document.getElementById('rd-action-btn');
+      const sel = document.getElementById('rd-status');
+      if (!btn || !sel) return;
+      const attrs = reqActionButtonAttrs(sel.value);
+      btn.className = attrs.cls;
+      btn.textContent = attrs.text;
+    }
+    // 단일 액션 버튼 클릭 핸들러 — 현재 선택된 상태값에 따라 동작 분기
+    async function handleReqDetailAction() {
+      const status = document.getElementById('rd-status').value;
+      const BLOCK_STATUSES = ['ON_HOLD', 'REJECTED', 'CANCELED'];
+      if (BLOCK_STATUSES.includes(status)) {
+        // 보류/반려/취소 선택 시 → 상태 변경만 수행 (소모품 지급 없음)
+        await changeReqDetailStatus();
+        return;
+      }
+      if (status !== 'COMPLETED') {
+        // 접수(등 완료 이외) 상태에서 바로 지급을 시도하면 경고만 표시하고 중단
+        KIMS.alertModal('⚠ 상태 변경 필요',
+          '소모품을 지급하려면 먼저 위 상태를 <b>완료</b>로 선택해주세요.<br>' +
+          '(현재 상태: ' + E((REQ_STATUS_CHOICES[status] || RH_STATUS[status] || status)) + ')', 'danger');
+        return;
+      }
+      await issueSupplyFromDetail();
+    }
+
     async function issueSupplyFromDetail() {
       const sel = document.getElementById('rd-item');
       const itemId = sel.value;
@@ -698,6 +735,7 @@
         const memoList = (d.logs||[]).filter(l => l.logType === 'PROCESS_NOTE').map(l =>
           `<div class="border-bottom py-1">${E(l.content||'')} <span class="text-muted small">— ${E(l.changedBy)}, ${(l.createdAt||'').substring(0,16).replace('T',' ')}</span></div>`
         ).join('') || '<span class="text-muted">등록된 메모 없음</span>';
+        const reqActionBtnAttrs = reqActionButtonAttrs(d.status);
         const info = `
           <div class="row">
             <div class="col-md-7">
@@ -713,26 +751,26 @@
             </div>
             <div class="col-md-5">
               <div class="card bg-light"><div class="card-body py-2">
-                <h6>처리상태 변경</h6>
+                <h6>처리상태</h6>
                 <div class="row g-1">
-                  <div class="col"><select id="rd-status" class="form-select form-select-sm">${statusSel}</select></div>
+                  <div class="col"><select id="rd-status" class="form-select form-select-sm" onchange="updateReqActionButtonStyle()">${statusSel}</select></div>
                   <div class="col"><input id="rd-assignee" class="form-control form-control-sm" placeholder="담당자" value="${E(d.assignee||'')}"></div>
                 </div>
-                <input id="rd-reason" class="form-control form-control-sm mt-1" placeholder="변경 사유">
-                <button class="btn btn-primary btn-sm mt-1 w-100" onclick="changeReqDetailStatus()">상태 변경</button>
+                <input id="rd-reason" class="form-control form-control-sm mt-1" placeholder="변경 사유 (반려·보류·취소 시 입력 권장)">
                 <hr class="my-2">
                 <h6>처리내용 메모</h6>
                 <div class="border rounded bg-white p-1 mb-1 small" style="max-height:140px;overflow:auto">${memoList}</div>
                 <input id="rd-note" class="form-control form-control-sm" placeholder="처리내용 메모 입력">
                 <button class="btn btn-outline-primary btn-sm mt-1 w-100" onclick="addReqDetailNote()">메모 추가</button>
                 <hr class="my-2">
-                <h6>소모품 지급 처리 <small class="text-muted">(재고 차감)</small></h6>
+                <h6>소모품 지급 처리 <small class="text-muted">(재고 차감 · 상태에 따라 버튼 동작 변경)</small></h6>
                 <div class="row g-1">
                   <div class="col"><select id="rd-item" class="form-select form-select-sm"><option value="">품목 불러오는 중...</option></select></div>
                   <div class="col-4"><input id="rd-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
                 </div>
                 <input id="rd-receiver" class="form-control form-control-sm mt-1" placeholder="지급 대상자" value="${E(d.requesterName||'')}">
-                <button class="btn btn-success btn-sm mt-1 w-100" onclick="issueSupplyFromDetail()">이 요청으로 소모품 지급</button>
+                <button id="rd-action-btn" class="${reqActionBtnAttrs.cls}" onclick="handleReqDetailAction()">${reqActionBtnAttrs.text}</button>
+                <p class="small text-muted mt-1 mb-0">※ 상태가 <b>접수</b>이면 먼저 <b>완료</b>로 선택해야 지급이 진행됩니다. 상태가 <b>보류/반려/취소</b>이면 이 버튼은 상태 변경만 수행합니다.</p>
               </div></div>
             </div>
           </div>`;
@@ -756,6 +794,7 @@
 
         reqDetailModal.show();
         populateReqDetailItems();
+        updateReqActionButtonStyle();
       } catch (e) { KIMS.toast(e.message, false); }
     }
   </script>
