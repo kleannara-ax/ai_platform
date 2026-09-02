@@ -2,10 +2,12 @@ package com.company.module.safety.controller;
 
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
+import com.company.module.safety.dto.request.ColumnSaveRequest;
 import com.company.module.safety.dto.request.ManualCreateRequest;
 import com.company.module.safety.dto.request.ManualUpdateRequest;
 import com.company.module.safety.dto.request.StepCreateRequest;
 import com.company.module.safety.dto.request.StepUpdateRequest;
+import com.company.module.safety.dto.response.ColumnResponse;
 import com.company.module.safety.dto.response.ManualDetailResponse;
 import com.company.module.safety.dto.response.ManualSummaryResponse;
 import com.company.module.safety.dto.response.StepResponse;
@@ -100,6 +102,55 @@ public class SafetyManualController {
     }
 
     // ================================================================
+    // 표의 열 관리 — 이름/유형/순서/폭 변경, 체크 열 추가 (관리자)
+    // ================================================================
+
+    /** 열 목록 (왼쪽부터) */
+    @GetMapping("/safety-api/manuals/{manualId}/columns")
+    public ResponseEntity<ApiResponse<List<ColumnResponse>>> getColumns(@PathVariable Long manualId) {
+        return ResponseEntity.ok(ApiResponse.success(manualService.getColumns(manualId)));
+    }
+
+    /** 열 추가 — {@code columnType=CHECK} 로 보내면 체크버튼 열이 된다 */
+    @PostMapping("/safety-api/manuals/{manualId}/columns")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<List<ColumnResponse>>> addColumn(
+            @PathVariable Long manualId, @Valid @RequestBody ColumnSaveRequest request,
+            Authentication authentication) {
+        String createdBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.created(manualService.addColumn(manualId, request, createdBy)));
+    }
+
+    /** 열 이름/유형/순서/폭 수정 */
+    @PutMapping("/safety-api/columns/{columnId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<List<ColumnResponse>>> updateColumn(
+            @PathVariable Long columnId, @Valid @RequestBody ColumnSaveRequest request,
+            Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(manualService.updateColumn(columnId, request, updatedBy)));
+    }
+
+    /** 열 삭제 — 그 열에 들어 있던 값도 함께 소프트 삭제된다 */
+    @DeleteMapping("/safety-api/columns/{columnId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<List<ColumnResponse>>> deleteColumn(
+            @PathVariable Long columnId, Authentication authentication) {
+        String deletedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(manualService.deleteColumn(columnId, deletedBy)));
+    }
+
+    /** 열 순서 일괄 변경 — 보낸 순서대로 왼쪽부터 다시 매긴다 */
+    @PutMapping("/safety-api/manuals/{manualId}/columns/order")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<List<ColumnResponse>>> reorderColumns(
+            @PathVariable Long manualId, @RequestBody List<Long> columnIds, Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(
+                manualService.reorderColumns(manualId, columnIds, updatedBy)));
+    }
+
+    // ================================================================
     // 단계(순서) 관리 — 매뉴얼 상세 화면에서 개별 추가/수정/삭제
     // ================================================================
 
@@ -117,6 +168,17 @@ public class SafetyManualController {
             @PathVariable Long stepId, @RequestBody StepUpdateRequest request, Authentication authentication) {
         String updatedBy = (authentication != null) ? authentication.getName() : null;
         return ResponseEntity.ok(ApiResponse.success(manualService.updateStep(stepId, request, updatedBy)));
+    }
+
+    /** 체크 열 하나만 켜고 끈다 (표에서 체크버튼 클릭). 관리자만 바꿀 수 있다. */
+    @PutMapping("/safety-api/steps/{stepId}/checks/{columnId}")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<StepResponse>> toggleCheck(
+            @PathVariable Long stepId, @PathVariable Long columnId,
+            @RequestParam boolean checked, Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(
+                manualService.toggleCheck(stepId, columnId, checked, updatedBy)));
     }
 
     @DeleteMapping("/safety-api/steps/{stepId}")

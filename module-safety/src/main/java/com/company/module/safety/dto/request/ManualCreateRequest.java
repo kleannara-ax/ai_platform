@@ -21,5 +21,8 @@ public class ManualCreateRequest {
 
     private int sortOrder;
 
+    /** 서식 코드 (WORK_METHOD / RISK_ASSESSMENT). 비우면 안전작업 매뉴얼로 만든다. */
+    private String formType;
+
     private List<StepCreateRequest> steps = new ArrayList<>();
 }

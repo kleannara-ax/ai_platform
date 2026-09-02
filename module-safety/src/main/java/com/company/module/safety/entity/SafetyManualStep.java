@@ -70,6 +70,17 @@ public class SafetyManualStep extends BaseTimeEntity {
         markCreatedBy(createdBy);
     }
 
+    /**
+     * 행의 번호와 순서만 바꾼다.
+     * <p>칸 내용은 열 구성이 매뉴얼마다 달라 {@code SafetyManualStepValue} 로 따로 관리한다.
+     * (아래 고정 컬럼들은 옛 구조의 잔재이며 새로 쓰지 않는다 — 운영 안전 규칙상 컬럼을 지우지는 않았다.)
+     */
+    public void updatePosition(int stepNo, int sortOrder, String updatedBy) {
+        this.stepNo = stepNo;
+        this.sortOrder = sortOrder;
+        markUpdatedBy(updatedBy);
+    }
+
     // ----------------------------------------------------------------
     // 비즈니스 메서드
     // ----------------------------------------------------------------

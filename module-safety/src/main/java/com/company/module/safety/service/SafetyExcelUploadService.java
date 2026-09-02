@@ -8,13 +8,22 @@ import com.company.module.safety.dto.response.ExcelSheetPreviewResponse;
 import com.company.module.safety.dto.response.ManualSummaryResponse;
 import com.company.module.safety.entity.SafetyManual;
 import com.company.module.safety.entity.SafetyManualCategory;
+import com.company.module.safety.entity.SafetyManualColumn;
+import com.company.module.safety.entity.SafetyManualMeta;
 import com.company.module.safety.entity.SafetyManualStep;
+import com.company.module.safety.entity.SafetyManualStepValue;
+import com.company.module.safety.repository.SafetyManualColumnRepository;
+import com.company.module.safety.repository.SafetyManualMetaRepository;
 import com.company.module.safety.repository.SafetyManualRepository;
 import com.company.module.safety.repository.SafetyManualStepRepository;
+import com.company.module.safety.repository.SafetyManualStepValueRepository;
 import com.company.module.safety.support.SafetyExcelParser;
+import com.company.module.safety.support.SafetyExcelParser.ParsedCell;
+import com.company.module.safety.support.SafetyExcelParser.ParsedColumn;
+import com.company.module.safety.support.SafetyExcelParser.ParsedMeta;
 import com.company.module.safety.support.SafetyExcelParser.ParsedPhoto;
+import com.company.module.safety.support.SafetyExcelParser.ParsedRow;
 import com.company.module.safety.support.SafetyExcelParser.ParsedSheet;
-import com.company.module.safety.support.SafetyExcelParser.ParsedStep;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,16 +38,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 안전작업 매뉴얼 엑셀 일괄업로드 오케스트레이션.
+ * 안전 엑셀 일괄업로드 오케스트레이션 (안전작업 매뉴얼 / 작업 위험성 평가서 공통).
  *
  * <p>사용자 요구사항에 따라 <b>2단계</b>로 동작한다.
  * <ol>
- *   <li>1단계 {@link #preview}: 업로드된 워크북의 시트별 형식을 확인만 하고 DB 에는 아무것도 쓰지 않는다.
- *       (개요/범례 시트 — 예: "초지" — 는 여기서 자동으로 인식 실패(recognized=false) 처리되어 제외된다)</li>
- *   <li>2단계 {@link #confirmImport}: 사용자가 화면에서 확인 후 선택한 시트만 실제로 매뉴얼로 저장한다.
- *       시트마다 등록할 분류를 따로 지정할 수 있으므로 시트→분류 매핑을 받는다.
+ *   <li>1단계 {@link #preview}: 시트별 형식만 확인하고 DB 에는 아무것도 쓰지 않는다.</li>
+ *   <li>2단계 {@link #confirmImport}: 시트마다 지정한 분류에 실제로 저장한다.
  *       (파일은 서버에 임시 저장하지 않으므로 2단계 호출 시 파일을 함께 다시 전송받는다)</li>
  * </ol>
+ *
+ * <p>표의 열 구성은 서식마다 다르므로 파서가 돌려준 열 정의를 매뉴얼마다 그대로 만들어 두고,
+ * 각 칸 값을 {@link SafetyManualStepValue} 로 넣는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,6 +59,9 @@ public class SafetyExcelUploadService {
 
     private final SafetyManualRepository manualRepository;
     private final SafetyManualStepRepository stepRepository;
+    private final SafetyManualColumnRepository columnRepository;
+    private final SafetyManualStepValueRepository valueRepository;
+    private final SafetyManualMetaRepository metaRepository;
     private final SafetyCategoryService categoryService;
     private final SafetyPhotoService photoService;
 
@@ -66,31 +79,21 @@ public class SafetyExcelUploadService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "시트 개수가 너무 많습니다. (" + sheets.size() + "개, 최대 " + maxSheetsPerUpload + "개)");
         }
-
-        List<ExcelSheetPreviewResponse> result = new ArrayList<>();
-        for (ParsedSheet sheet : sheets) {
-            result.add(toPreview(sheet));
-        }
-        return result;
+        return sheets.stream().map(this::toPreview).toList();
     }
 
     private ExcelSheetPreviewResponse toPreview(ParsedSheet sheet) {
-        List<String> previewLines = new ArrayList<>();
-        if (sheet.isRecognized()) {
-            for (ParsedStep step : sheet.getSteps()) {
-                if (previewLines.size() >= PREVIEW_LINE_LIMIT) break;
-                previewLines.add(step.stepNo() + ". " + truncate(step.description()));
-            }
-        }
         return ExcelSheetPreviewResponse.builder()
                 .sheetName(sheet.getSheetName())
                 .recognized(sheet.isRecognized())
                 .reason(sheet.getReason())
-                .stepCount(sheet.getSteps().size())
+                .formType(sheet.isRecognized() ? sheet.getFormType().name() : null)
+                .formTypeName(sheet.isRecognized() ? sheet.getFormType().displayName() : null)
+                .stepCount(sheet.getRows().size())
                 .photoCount(sheet.getPhotoCount())
                 .detectedTitle(sheet.getTitle())
                 .selected(sheet.isRecognized())
-                .stepPreviewLines(previewLines)
+                .stepPreviewLines(sheet.isRecognized() ? sheet.previewLines(PREVIEW_LINE_LIMIT) : List.of())
                 .build();
     }
 
@@ -143,28 +146,17 @@ public class SafetyExcelUploadService {
             SafetyManual manual = manualRepository.save(SafetyManual.builder()
                     .category(category)
                     .title(title)
+                    .formType(sheet.getFormType())
                     .sourceFileName(sourceFileName)
                     .sourceSheetName(sheet.getSheetName())
                     .sortOrder(sortOrder)
                     .createdBy(createdBy)
                     .build());
 
-            for (ParsedStep parsedStep : sheet.getSteps()) {
-                SafetyManualStep step = stepRepository.save(SafetyManualStep.builder()
-                        .manual(manual)
-                        .stepNo(parsedStep.stepNo())
-                        .description(parsedStep.description())
-                        .hazard(parsedStep.hazard())
-                        .safetyEquipment(parsedStep.safetyEquipment())
-                        .remark(parsedStep.remark())
-                        .sortOrder(parsedStep.sortOrder())
-                        .createdBy(createdBy)
-                        .build());
+            saveMeta(manual, sheet.getMeta(), createdBy);
+            List<SafetyManualColumn> columns = saveColumns(manual, sheet.getColumns(), createdBy);
+            saveRows(manual, columns, sheet.getRows(), createdBy);
 
-                for (ParsedPhoto photo : parsedStep.photos()) {
-                    photoService.saveParsedPhoto(step, photo, createdBy);
-                }
-            }
             created.add(ManualSummaryResponse.from(manual));
         }
 
@@ -173,6 +165,72 @@ public class SafetyExcelUploadService {
                 .manuals(created)
                 .skipped(skipped)
                 .build();
+    }
+
+    private void saveMeta(SafetyManual manual, List<ParsedMeta> parsedMeta, String createdBy) {
+        int order = 1;
+        for (ParsedMeta meta : parsedMeta) {
+            metaRepository.save(SafetyManualMeta.builder()
+                    .manual(manual)
+                    .label(meta.label())
+                    .valueText(meta.value())
+                    .sortOrder(order++)
+                    .createdBy(createdBy)
+                    .build());
+        }
+    }
+
+    /** 파서가 돌려준 열 정의를 그대로 만든다. 반환 순서는 파서의 열 순서와 같아 셀과 1:1 대응한다. */
+    private List<SafetyManualColumn> saveColumns(SafetyManual manual, List<ParsedColumn> parsedColumns,
+                                                  String createdBy) {
+        List<SafetyManualColumn> columns = new ArrayList<>();
+        int order = 1;
+        for (ParsedColumn parsed : parsedColumns) {
+            columns.add(columnRepository.save(SafetyManualColumn.builder()
+                    .manual(manual)
+                    .label(parsed.label())
+                    .columnType(parsed.type())
+                    .sortOrder(order++)
+                    .widthWeight(parsed.widthWeight())
+                    .createdBy(createdBy)
+                    .build()));
+        }
+        return columns;
+    }
+
+    private void saveRows(SafetyManual manual, List<SafetyManualColumn> columns,
+                          List<ParsedRow> rows, String createdBy) {
+        for (ParsedRow row : rows) {
+            SafetyManualStep step = stepRepository.save(SafetyManualStep.builder()
+                    .manual(manual)
+                    .stepNo(row.stepNo())
+                    .sortOrder(row.sortOrder())
+                    .createdBy(createdBy)
+                    .build());
+
+            for (int i = 0; i < columns.size() && i < row.cells().size(); i++) {
+                SafetyManualColumn column = columns.get(i);
+                if (column.isPhoto()) {
+                    continue;   // 사진 열은 값 대신 사진 테이블로 들어간다
+                }
+                ParsedCell cell = row.cells().get(i);
+                boolean hasText = cell.text() != null && !cell.text().isBlank();
+                if (!column.isCheck() && !hasText) {
+                    continue;   // 빈 텍스트 칸은 굳이 행을 만들지 않는다
+                }
+                valueRepository.save(SafetyManualStepValue.builder()
+                        .step(step)
+                        .column(column)
+                        .textValue(cell.text())
+                        .checked(cell.checked())
+                        .createdBy(createdBy)
+                        .build());
+            }
+
+            for (ParsedPhoto photo : row.photos()) {
+                photoService.saveParsedPhoto(step, photo, createdBy);
+            }
+        }
     }
 
     /** 시트→분류 매핑으로 정리한다. 같은 시트가 중복으로 오면 마지막 지정을 쓴다. */
@@ -208,13 +266,8 @@ public class SafetyExcelUploadService {
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다: " + e.getMessage());
         } catch (IllegalArgumentException e) {
+            // POI 내부에서 올라오는 형식 오류를 업무 예외로 바꿔 준다.
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, e.getMessage());
         }
-    }
-
-    private String truncate(String s) {
-        if (s == null) return "";
-        String flat = s.replaceAll("\\s+", " ").trim();
-        return flat.length() > 40 ? flat.substring(0, 40) + "..." : flat;
     }
 }
