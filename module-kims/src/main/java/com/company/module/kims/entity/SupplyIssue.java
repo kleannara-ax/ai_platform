@@ -62,10 +62,18 @@ public class SupplyIssue extends BaseTimeEntity {
     @Column(name = "ISSUED_AT", nullable = false)
     private LocalDate issuedAt;
 
+    /**
+     * 세부 구분(신형/구형, 제조사 등). 구분이 있는 품목을 지급했을 때만 값이 채워진다.
+     * <p>지급 취소/원복(reverseByRequest) 시 이 값을 기준으로 품목 비고(remark)의
+     * 해당 구분 수치를 정확히 되돌리기 위해 저장해 둔다.
+     */
+    @Column(name = "SUB_TYPE", length = 20)
+    private String subType;
+
     @Builder
     private SupplyIssue(ServiceRequest serviceRequest, InventoryItem inventoryItem,
                         int quantity, String receiverName, String department,
-                        String issuedBy, LocalDate issuedAt) {
+                        String issuedBy, LocalDate issuedAt, String subType) {
         this.serviceRequest = serviceRequest;
         this.inventoryItem = inventoryItem;
         this.quantity = quantity;
@@ -73,5 +81,6 @@ public class SupplyIssue extends BaseTimeEntity {
         this.department = department;
         this.issuedBy = issuedBy;
         this.issuedAt = issuedAt;
+        this.subType = subType;
     }
 }

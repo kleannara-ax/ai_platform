@@ -62,6 +62,15 @@ public class SupplyIssueService {
         item.decreaseStock(quantity);
         int after = item.getCurrentStock();
 
+        // 2-1) 세부 구분(신형/구형, 제조사 등)이 선택된 경우, 비고(remark)의 해당
+        //      구분 수치도 함께 차감한다 — 대시보드 재고 막대그래프가 remark 를 파싱해
+        //      세부 구분을 그리므로, 실제 지급 내역과 어긋나지 않도록 여기서 반영한다.
+        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
+                ? request.getSubType() : null;
+        if (subType != null) {
+            item.adjustRemarkSegment(subType, -quantity);
+        }
+
         // 3) 지급일 기본값 = 오늘
         LocalDate issuedAt = (request.getIssuedAt() != null) ? request.getIssuedAt() : LocalDate.now();
 
@@ -74,6 +83,7 @@ public class SupplyIssueService {
                 .department(request.getDepartment())
                 .issuedBy(request.getIssuedBy())
                 .issuedAt(issuedAt)
+                .subType(subType)
                 .build();
         SupplyIssue saved = supplyIssueRepository.save(issue);
 
@@ -114,6 +124,11 @@ public class SupplyIssueService {
             int before = item.getCurrentStock();
             item.increaseStock(issue.getQuantity());
             int after = item.getCurrentStock();
+            // 지급 시 세부 구분(신형/구형 등)을 차감해 두었다면, 원복 시에도 그만큼
+            // 되돌려 remark 세부 수치가 실제 재고와 계속 일치하도록 한다.
+            if (issue.getSubType() != null && !issue.getSubType().isBlank()) {
+                item.adjustRemarkSegment(issue.getSubType(), issue.getQuantity());
+            }
             inventoryTransactionRepository.save(InventoryTransaction.ofInbound(
                     item, issue.getQuantity(), before, after, by, "요청 취소/반려로 지급 취소·재고 반환"));
             reversedQty += issue.getQuantity();

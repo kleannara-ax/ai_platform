@@ -27,6 +27,7 @@ public class SupplyIssueResponse {
     private final String department;
     private final String issuedBy;
     private final LocalDate issuedAt;
+    private final String subType;   // 세부 구분 (신형/구형/레노버/갤럭시/대여 등, 없으면 null)
     private final LocalDateTime createdAt;
 
     /**
@@ -46,6 +47,7 @@ public class SupplyIssueResponse {
                 .department(entity.getDepartment())
                 .issuedBy(entity.getIssuedBy())
                 .issuedAt(entity.getIssuedAt())
+                .subType(entity.getSubType())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }
