@@ -36,9 +36,18 @@
 -- 주의: 순수 신규 테이블 생성이며 기존 테이블에는 어떤 영향도 주지 않는다.
 --       재실행해도 안전(idempotent) — CREATE TABLE IF NOT EXISTS 사용.
 --       운영 DB 반영은 담당자가 직접 검토 후 수동으로 실행해야 함.
+--
+--       ★ 2026-09 수정: 이 파일은 더 이상 USE dailyreport_dev;로 대상 스키마를
+--       강제 전환하지 않는다(자체 테스트용 개발 DB 이름이 하드코딩되어 있어,
+--       운영 DB(예: platform_db)에 그대로 실행하면 세션이 dailyreport_dev로
+--       전환되어 실패하거나 잘못된 스키마에 테이블이 생성되는 문제가 있었음).
+--       대신 12_alter_batchjob_date_to_date_type.sql과 동일한 방식으로
+--       DATABASE()(현재 mysql 접속 시 지정한 DB)를 그대로 사용한다.
+--       → 실행 전, mysql 커맨드라인/클라이언트에서 대상 DB를 반드시 먼저
+--       지정해야 한다:
+--         자체 테스트: mysql -u factory_admin -p dailyreport_dev < 11_add_daily_batchjob.sql
+--         운영/플랫폼: mysql -u {user} -p platform_db < 11_add_daily_batchjob.sql
 -- ============================================================
-
-USE dailyreport_dev;
 
 -- ═══════════════════════════════════════════════
 -- 0. 사전 점검 — 기존 테이블 존재 여부 확인
@@ -47,7 +56,7 @@ SELECT '=== 0. 사전 점검: daily_batchjob 존재 여부 ===' AS section;
 
 SELECT TABLE_NAME, TABLE_COMMENT
   FROM information_schema.TABLES
- WHERE TABLE_SCHEMA = 'dailyreport_dev'
+ WHERE TABLE_SCHEMA = DATABASE()
    AND TABLE_NAME = 'daily_batchjob';
 
 
@@ -83,12 +92,12 @@ SELECT '=== 2. 사후 검증: daily_batchjob 생성 확인 ===' AS section;
 
 SELECT TABLE_NAME, TABLE_COMMENT
   FROM information_schema.TABLES
- WHERE TABLE_SCHEMA = 'dailyreport_dev'
+ WHERE TABLE_SCHEMA = DATABASE()
    AND TABLE_NAME = 'daily_batchjob';
 
 SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT
   FROM information_schema.COLUMNS
- WHERE TABLE_SCHEMA = 'dailyreport_dev'
+ WHERE TABLE_SCHEMA = DATABASE()
    AND TABLE_NAME = 'daily_batchjob'
  ORDER BY ORDINAL_POSITION;
 
