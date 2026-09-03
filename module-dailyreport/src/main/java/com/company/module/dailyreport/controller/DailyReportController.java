@@ -1,9 +1,13 @@
 package com.company.module.dailyreport.controller;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.ApiResponse;
+import com.company.module.dailyreport.dto.BatchJobRequest;
 import com.company.module.dailyreport.dto.DailyReportRequest;
 import com.company.module.dailyreport.dto.DailyReportResponse;
 import com.company.module.dailyreport.service.DailyReportService;
+import com.company.module.dailyreport.service.MenuPermissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +29,7 @@ import java.time.LocalDate;
 public class DailyReportController {
 
     private final DailyReportService dailyReportService;
+    private final MenuPermissionService menuPermissionService;
 
     /**
      * 일보 목록 조회 (기간·상태 필터 + 페이징)
@@ -120,5 +125,35 @@ public class DailyReportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         int updatedCount = dailyReportService.refreshRollingHeaders(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(updatedCount));
+    }
+
+    /**
+     * ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 등록 (2026-08 신규)
+     *
+     * "저장" 구간(05:00:00~08:09:59) 밖의 시간에 값을 저장/수정한 사용자가 "수정"
+     * 버튼 클릭 시 라디오 버튼으로 선택한 게시판 구분(공장일보/세부공장일보/모두)에
+     * 따라 daily_batchjob에 요청 행을 1건 등록한다. 실제 게시판 갱신은 이 API가
+     * 하지 않으며, 별도 PC의 배치 시스템이 이 테이블을 5초 주기로 폴링하여 처리한다.
+     * 저장 구간(05:00:00~08:09:59) 안에는 서비스 계층에서 이 요청 자체를 거부한다.
+     *
+     * POST /dailyreport-api/reports/{reportId}/batch-jobs
+     * body: { "batchType": "1" | "2" | "3" }
+     */
+    @PostMapping("/{reportId}/batch-jobs")
+    public ResponseEntity<ApiResponse<Void>> requestBatchJob(
+            @PathVariable Long reportId,
+            @Valid @RequestBody BatchJobRequest request,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
+
+        // ★ 1계층: 입력 페이지 쓰기 권한 확인 (CellController.saveCells와 동일한 패턴)
+        // — 이 API는 게시판 재업로드 요청을 실제로 큐에 적재하므로, 쓰기 권한이
+        //   없는 사용자가 API를 직접 호출해 요청을 등록하는 것을 막아야 한다.
+        if (!menuPermissionService.canWriteInputPage(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED,
+                    "세부공장일보 입력 페이지에 대한 쓰기 권한이 없습니다.");
+        }
+
+        dailyReportService.requestBatchJob(reportId, request.getBatchType(), userId);
+        return ResponseEntity.ok(ApiResponse.created());
     }
 }

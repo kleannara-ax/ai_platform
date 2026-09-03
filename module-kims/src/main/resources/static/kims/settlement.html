@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS - 월말 결산</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div id="nav"></div>
+  <div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="m-0">월말 결산 <span class="badge bg-secondary">ADMIN 전용</span></h4>
+      <div class="d-flex gap-2 align-items-end">
+        <div><label class="form-label small mb-0">시작일</label><input id="from" type="date" class="form-control form-control-sm"></div>
+        <div><label class="form-label small mb-0">종료일</label><input id="to" type="date" class="form-control form-control-sm"></div>
+        <button class="btn btn-secondary btn-sm" onclick="load()">조회</button>
+        <button class="btn btn-outline-success btn-sm" onclick="excel()">Excel 다운로드</button>
+      </div>
+    </div>
+    <div id="msg" class="alert d-none" role="alert"></div>
+    <p id="periodInfo" class="text-muted small"></p>
+
+    <!-- 집계 카드 -->
+    <div class="row g-3 mb-2">
+      <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6>업무유형별 처리 건수</h6><div id="byType"></div></div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6>담당자별 처리 건수</h6><div id="byAssignee"></div></div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6>부서별 요청 건수</h6><div id="byDept"></div></div></div></div>
+    </div>
+    <div class="row g-3 mb-2">
+      <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6>불편유형별 처리 건수 <small class="text-muted">(PC관련 불편사항 조치)</small></h6><div id="byIssue"></div></div></div></div>
+    </div>
+    <div class="row g-3 mb-2">
+      <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>소모품 품목별 지급수량</h6><div id="supItem"></div></div></div></div>
+      <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>부서별 지급수량</h6><div id="supDept"></div></div></div></div>
+      <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>요청자별 지급수량</h6><div id="supReq"></div></div></div></div>
+      <div class="col-md-3"><div class="card h-100"><div class="card-body"><h6>담당자별 지급수량</h6><div id="supBy"></div></div></div></div>
+    </div>
+
+    <!-- 미완료 요청 -->
+    <div class="card mb-2"><div class="card-body">
+      <h6 class="text-danger">미완료 요청 목록 <span class="badge bg-danger" id="incCount">0</span></h6>
+      <div id="incomplete"></div>
+    </div></div>
+
+    <!-- 도메인별 내역 -->
+    <div class="accordion" id="acc"></div>
+  </div>
+
+  <script src="js/kims.js"></script>
+  <script>
+    if (!KIMS.requireAuth()) { } else { KIMS.renderNav('settlement.html'); }
+    const E = KIMS.escapeHtml;
+    document.addEventListener('DOMContentLoaded', load);
+
+    function nameCountTable(list) {
+      if (!list || !list.length) return '<p class="text-muted small mb-0">(없음)</p>';
+      return '<table class="table table-sm mb-0"><tbody>' + list.map(x => `<tr><td>${E(x.name)}</td><td class="text-end fw-bold">${x.value}</td></tr>`).join('') + '</tbody></table>';
+    }
+    function tbl(headers, rows) {
+      return `<table class="table table-sm table-bordered"><thead class="table-light"><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||('<tr><td colspan="'+headers.length+'" class="text-muted">없음</td></tr>')}</tbody></table>`;
+    }
+    function accItem(id, title, count, body) {
+      return `<div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${id}">${title} <span class="badge bg-secondary ms-2">${count}</span></button></h2>
+        <div id="${id}" class="accordion-collapse collapse" data-bs-parent="#acc"><div class="accordion-body">${body}</div></div></div>`;
+    }
+
+    async function load() {
+      const p = new URLSearchParams();
+      if (document.getElementById('from').value) p.set('from', document.getElementById('from').value);
+      if (document.getElementById('to').value) p.set('to', document.getElementById('to').value);
+      try {
+        const d = await KIMS.api('/kims-api/settlement?' + p.toString());
+        document.getElementById('from').value = d.from; document.getElementById('to').value = d.to;
+        document.getElementById('periodInfo').textContent = '결산 기간: ' + d.from + ' ~ ' + d.to;
+        document.getElementById('byType').innerHTML = nameCountTable(d.requestByType);
+        document.getElementById('byIssue').innerHTML = nameCountTable(d.requestByIssueType);
+        document.getElementById('byAssignee').innerHTML = nameCountTable(d.requestByAssignee);
+        document.getElementById('byDept').innerHTML = nameCountTable(d.requestByDepartment);
+        document.getElementById('supItem').innerHTML = nameCountTable(d.supplyByItem);
+        document.getElementById('supDept').innerHTML = nameCountTable(d.supplyByDepartment);
+        document.getElementById('supReq').innerHTML = nameCountTable(d.supplyByRequester);
+        document.getElementById('supBy').innerHTML = nameCountTable(d.supplyByIssuedBy);
+
+        document.getElementById('incCount').textContent = (d.incompleteRequests||[]).length;
+        document.getElementById('incomplete').innerHTML = tbl(['요청번호','요청일','요청자','부서','유형','상태','담당자'],
+          (d.incompleteRequests||[]).map(r => `<tr><td>${E(r.requestNo)}</td><td>${(r.createdAt||'').substring(0,10)}</td><td>${E(r.requesterName)}</td><td>${E(r.department)}</td><td>${E(r.requestTypeLabel)}</td><td>${E(r.statusLabel)}</td><td>${E(r.assignee)}</td></tr>`).join(''));
+
+        const acc = document.getElementById('acc');
+        acc.innerHTML =
+          accItem('a1', '소모품 지급 내역', (d.supplyIssues||[]).length, tbl(['지급일','품목','수량','대상자','부서','담당자','요청번호'],
+            (d.supplyIssues||[]).map(s => `<tr><td>${E(s.issuedAt)}</td><td>${E(s.itemName)}</td><td>${s.quantity}</td><td>${E(s.receiverName)}</td><td>${E(s.department)}</td><td>${E(s.issuedBy)}</td><td>${E(s.requestNo)}</td></tr>`).join(''))) +
+          accItem('a2', 'IP 변경/생성/회수 내역', (d.ipChanges||[]).length, tbl(['일시','IP','유형','품의','품의번호','변경자'],
+            (d.ipChanges||[]).map(h => `<tr><td>${(h.createdAt||'').substring(0,10)}</td><td>${E(h.ipAddress)}</td><td>${E(h.changeTypeLabel)}</td><td>${h.approved?'Y':'N'}</td><td>${E(h.approvalNo)}</td><td>${E(h.changedBy)}</td></tr>`).join(''))) +
+          accItem('a3', '미품의 IP 변경 내역', (d.unapprovedIpChanges||[]).length, tbl(['일시','IP','유형','변경자'],
+            (d.unapprovedIpChanges||[]).map(h => `<tr><td>${(h.createdAt||'').substring(0,10)}</td><td>${E(h.ipAddress)}</td><td>${E(h.changeTypeLabel)}</td><td>${E(h.changedBy)}</td></tr>`).join(''))) +
+          accItem('a4', '프로그램 설치 내역', (d.programInstalls||[]).length, tbl(['설치일','프로그램','대상PC','요청자','담당자'],
+            (d.programInstalls||[]).map(p => `<tr><td>${E(p.installedAt)}</td><td>${E(p.programName)}</td><td>${E(p.targetPc)}</td><td>${E(p.requesterName)}</td><td>${E(p.installedBy)}</td></tr>`).join(''))) +
+          accItem('a5', '인터넷 공사 내역', (d.internetWorks||[]).length, tbl(['공사유형','상태','위치','외부업체','공사비','담당자','완료일'],
+            (d.internetWorks||[]).map(w => `<tr><td>${E(w.workTypeLabel)}</td><td>${E(w.statusLabel)}</td><td>${E(w.location)}</td><td>${w.externalVendor?'Y':'N'}</td><td>${w.cost!=null?Number(w.cost).toLocaleString():''}</td><td>${E(w.assignee)}</td><td>${E(w.completedAt)}</td></tr>`).join('')));
+      } catch (e) { KIMS.toast(e.message + ' (월말 결산은 ADMIN 전용)', false); }
+    }
+
+    async function excel() {
+      const p = new URLSearchParams();
+      if (document.getElementById('from').value) p.set('from', document.getElementById('from').value);
+      if (document.getElementById('to').value) p.set('to', document.getElementById('to').value);
+      try { await KIMS.download('/kims-api/settlement/excel?' + p.toString(), 'settlement.xlsx'); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

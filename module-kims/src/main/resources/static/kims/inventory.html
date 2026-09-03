@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS - 소모품 관리</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div id="nav"></div>
+  <div class="container-fluid px-4">
+    <h4 class="mb-3">소모품 관리</h4>
+    <div id="msg" class="alert d-none" role="alert"></div>
+
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item"><button class="nav-link active" id="tab-dash" onclick="showTab('dash')">대시보드</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-inbound" onclick="showTab('inbound')">입고 내역</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-issue" onclick="showTab('issue')">지급 내역</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-reqhist" onclick="showTab('reqhist')">소모품 업무요청 이력</button></li>
+    </ul>
+
+    <!-- ============ 대시보드 탭 ============ -->
+    <div id="pane-dash">
+      <!-- 재고 현황 (분류별) -->
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="m-0">재고 현황 (분류별 보유 수량)</h6>
+          <div class="small">
+            <span class="badge bg-secondary">총 품목 <span id="s-total">0</span></span>
+            <span class="badge bg-danger">재고부족 <span id="s-low">0</span></span>
+            <span class="badge bg-primary">총 재고수량 <span id="s-sum">0</span></span>
+          </div>
+        </div>
+        <div class="row g-2" id="catCharts"></div>
+      </div></div>
+
+      <!-- 신규 지급 요청 목록 -->
+      <div class="card"><div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="m-0">신규 지급 요청 <span class="badge bg-warning text-dark" id="sr-cnt">0</span></h6>
+          <span class="small text-muted">전산소모품 지급 요청 중 '접수' 상태</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered bg-white align-middle mb-0">
+            <thead class="table-light"><tr>
+              <th>요청번호</th><th>요청자</th><th>부서</th><th>요청내용</th><th>요청일</th><th style="width:90px">처리</th>
+            </tr></thead>
+            <tbody id="supplyReqRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============ 입고 내역 탭 ============ -->
+    <div id="pane-inbound" style="display:none">
+      <div class="d-flex justify-content-between align-items-end mb-2">
+        <div class="d-flex gap-2 align-items-end">
+          <div><label class="form-label small mb-0">품목명 검색</label><input id="in-keyword" class="form-control form-control-sm"></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadInboundTab()">검색</button>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openItemCreate()">+ 품목 등록</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+          <thead class="table-light"><tr>
+            <th>품목명</th><th>카테고리</th><th>현재재고</th><th>단위</th><th>최근 입고 내역</th><th style="width:150px">관리</th>
+          </tr></thead>
+          <tbody id="inboundRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ 지급 내역 탭 ============ -->
+    <div id="pane-issue" style="display:none">
+      <div class="d-flex justify-content-between align-items-end mb-2">
+        <div class="d-flex gap-2 align-items-end">
+          <div><label class="form-label small mb-0">품목명 검색</label><input id="is-keyword" class="form-control form-control-sm"></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadIssueTab()">검색</button>
+        </div>
+        <button class="btn btn-outline-success btn-sm" onclick="downloadIssueExcel()">Excel 다운로드</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+          <thead class="table-light"><tr>
+            <th>품목명</th><th>카테고리</th><th>현재재고</th><th>단위</th><th>최신 지급 내역</th><th style="width:150px">관리</th>
+          </tr></thead>
+          <tbody id="issueRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ 소모품 업무요청 이력 탭 (전산소모품 지급 요청만) ============ -->
+    <div id="pane-reqhist" style="display:none">
+      <div class="card mb-3"><div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2"><label class="form-label small mb-0">기간(부터)</label><input id="rh-from" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">기간(까지)</label><input id="rh-to" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">처리상태</label><select id="rh-status" class="form-select form-select-sm"><option value="">전체</option></select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">요청자</label><input id="rh-requester" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">부서</label><input id="rh-dept" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label small mb-0">담당자</label><input id="rh-assignee" class="form-control form-control-sm"></div>
+          <div class="col-12 mt-2"><button class="btn btn-secondary btn-sm" onclick="rhPage=0;loadReqHist()">검색</button>
+            <button class="btn btn-light btn-sm" onclick="resetReqHist()">초기화</button>
+            <span class="small text-muted ms-2">전산소모품 지급 요청만 표시됩니다.</span></div>
+        </div>
+      </div></div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+          <thead class="table-light"><tr>
+            <th>요청번호</th><th>요청일</th><th>요청자</th><th>부서</th><th>상태</th><th>담당자</th><th>요청 소모품</th><th style="width:70px">상세</th>
+          </tr></thead>
+          <tbody id="reqhistRows"><tr><td colspan="8" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="reqhistPager" class="d-flex justify-content-center gap-2"></div>
+    </div>
+  </div>
+
+  <!-- 품목 등록 모달 -->
+  <div class="modal fade" id="itemModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">품목 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col"><label class="form-label small mb-0">품목명 *</label><input id="it-name" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">카테고리 *</label>
+          <input id="it-cat" class="form-control form-control-sm" list="catList" placeholder="PC소모품/PC/케이블">
+          <datalist id="catList"><option>PC소모품</option><option>PC</option><option>케이블</option><option>기타 소모품</option><option>태블릿</option></datalist></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">현재재고 *</label><input id="it-stock" type="number" class="form-control form-control-sm" value="0"></div>
+        <div class="col"><label class="form-label small mb-0">최소재고 *</label><input id="it-min" type="number" class="form-control form-control-sm" value="0"></div>
+        <div class="col"><label class="form-label small mb-0">단위 *</label><input id="it-unit" class="form-control form-control-sm" value="개"></div>
+      </div>
+      <div class="mb-2 mt-1"><label class="form-label small mb-0">비고</label><input id="it-remark" class="form-control form-control-sm"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="createItem()">등록</button></div>
+  </div></div></div>
+
+  <!-- 입고 모달 -->
+  <div class="modal fade" id="inboundModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="inboundTitle">입고 등록</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="in-itemId">
+      <div class="mb-2"><label class="form-label small mb-0">입고 수량 *</label><input id="in-qty" type="number" class="form-control form-control-sm"></div>
+      <div class="mb-2"><label class="form-label small mb-0">입고 담당자 *</label><input id="in-by" class="form-control form-control-sm"></div>
+      <div class="mb-2"><label class="form-label small mb-0">비고</label><input id="in-note" class="form-control form-control-sm"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="inbound()">입고</button></div>
+  </div></div></div>
+
+  <!-- 지급 모달 -->
+  <div class="modal fade" id="issueModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="issueTitle">소모품 지급</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="is-itemId">
+      <div class="row g-2">
+        <div class="col"><label class="form-label small mb-0">연결 요청 ID *</label><input id="is-req" type="number" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">지급 수량 *</label><input id="is-qty" type="number" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0" id="is-subtype-row" style="display:none">
+        <div class="col"><label class="form-label small mb-0">세부 구분 *</label><select id="is-subtype" class="form-select form-select-sm"></select></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">지급 대상자 *</label><input id="is-receiver" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">부서</label><input id="is-dept" class="form-control form-control-sm"></div>
+      </div>
+      <div class="row g-2 mt-0">
+        <div class="col"><label class="form-label small mb-0">지급 담당자 *</label><input id="is-by" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">지급일</label><input id="is-at" type="date" class="form-control form-control-sm"></div>
+      </div>
+      <p class="text-muted small mt-2 mb-0">※ 지급 시 재고가 자동 차감됩니다. 재고 부족 시 등록이 거부됩니다.</p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="issue()">지급</button></div>
+  </div></div></div>
+
+  <!-- 이력 모달 -->
+  <div class="modal fade" id="histModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="histTitle">이력</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="histBody"></div>
+  </div></div></div>
+
+  <!-- 업무요청 상세 모달 (신규 지급 요청 "처리" 버튼에서 바로 열림 — request.html 이동 없이 처리) -->
+  <div class="modal fade" id="reqDetailModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="reqDetailTitle">요청 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="reqDetailBody"></div>
+  </div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="js/kims.js"></script>
+  <script>
+    if (!KIMS.requireAuth()) { } else { KIMS.renderNav('inventory.html'); }
+    const E = KIMS.escapeHtml;
+    let itemModal, inboundModal, issueModal, histModal, reqDetailModal;
+    let reqDetailId = null, reqDetailCur = null;
+    let catCharts = [];
+    // 분류 순서 / 색상
+    const CAT_ORDER = ['PC소모품', 'PC', '케이블', '기타 소모품', '태블릿'];
+    const CAT_COLOR = { 'PC소모품': '#0d6efd', 'PC': '#198754', '케이블': '#fd7e14', '기타 소모품': '#6f42c1', '태블릿': '#d63384' };
+
+    // 재고 세부 구분(막대 색 분할): 신형/구형, 태블릿은 레노버/갤럭시/대여, 그 외 미구분
+    const SEG_ORDER = ['신형', '구형', '레노버', '갤럭시', '대여', '미구분'];
+    const SEG_COLOR = { '신형': '#0d6efd', '구형': '#adb5bd', '레노버': '#198754', '갤럭시': '#6f42c1', '대여': '#fd7e14', '미구분': '#20c997' };
+    // 품목명 → 지급 시 선택 가능한 세부 구분 목록. 이 목록에 없는 품목은 세부 구분 선택 UI를 표시하지 않는다.
+    const SUBTYPE_BY_ITEM = {
+      '마우스': ['신형', '구형'], '키보드': ['신형', '구형'], '노트북': ['신형', '구형'],
+      '모니터': ['신형', '구형'], '데스크탑 본체': ['신형', '구형'],
+      '태블릿': ['레노버', '갤럭시', '대여'],
+    };
+    // 품목 비고에서 세부 수량 파싱 (예: "신형 5 / 구형 8", "레노버 1대 / 갤럭시 6대 / 대여 3대 ...")
+    function itemBreakdown(it) {
+      const r = it.remark || '';
+      let raw = null;
+      const sin = r.match(/신형\s*(\d+)/), gu = r.match(/구형\s*(\d+)/);
+      if (sin || gu) raw = { '신형': sin ? +sin[1] : 0, '구형': gu ? +gu[1] : 0 };
+      else {
+        const le = r.match(/레노버\s*(\d+)/), ga = r.match(/갤럭시\s*(\d+)/), dae = r.match(/대여\s*(\d+)/);
+        if (le || ga || dae) raw = { '레노버': le ? +le[1] : 0, '갤럭시': ga ? +ga[1] : 0, '대여': dae ? +dae[1] : 0 };
+      }
+      if (!raw) return { '미구분': it.currentStock };
+      // 비고(remark)의 세부 수량 합계는 지급/입고 후에도 자동 갱신되지 않아
+      // 실제 현재재고(currentStock)와 어긋날 수 있다. 그래프는 항상 실제 재고를
+      // 기준으로 표시해야 하므로, remark의 비율은 유지하되 합계는 currentStock에
+      // 정확히 맞도록 보정한다(마지막 항목에 나머지를 배정).
+      const rawTotal = Object.values(raw).reduce((a, b) => a + b, 0);
+      if (rawTotal === it.currentStock || rawTotal === 0) return raw;
+      const keys = Object.keys(raw);
+      const scaled = {};
+      let allocated = 0;
+      keys.forEach((k, idx) => {
+        if (idx === keys.length - 1) {
+          scaled[k] = Math.max(0, it.currentStock - allocated);
+        } else {
+          const v = Math.max(0, Math.round(raw[k] * it.currentStock / rawTotal));
+          scaled[k] = v;
+          allocated += v;
+        }
+      });
+      return scaled;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      itemModal = new bootstrap.Modal('#itemModal');
+      inboundModal = new bootstrap.Modal('#inboundModal');
+      issueModal = new bootstrap.Modal('#issueModal');
+      histModal = new bootstrap.Modal('#histModal');
+      reqDetailModal = new bootstrap.Modal('#reqDetailModal');
+      showTab('dash');
+    });
+
+    // ---------- 탭 전환 ----------
+    function showTab(t) {
+      ['dash', 'inbound', 'issue', 'reqhist'].forEach(x => {
+        document.getElementById('pane-' + x).style.display = (x === t) ? '' : 'none';
+        document.getElementById('tab-' + x).classList.toggle('active', x === t);
+      });
+      if (t === 'dash') loadDashboard();
+      if (t === 'inbound') loadInboundTab();
+      if (t === 'issue') loadIssueTab();
+      if (t === 'reqhist') loadReqHist();
+    }
+
+    const dateOnly = s => (s || '').substring(0, 10);
+
+    // ================= 대시보드 =================
+    async function loadDashboard() { loadStockChart(); loadSupplyRequests(); }
+
+    // 대여 막대 클릭 → 배치처(대여처) 모달
+    function showRentalDetail(it) {
+      const r = it.remark || '';
+      const m = r.match(/대여\s*(\d+)\s*대?\s*[(（]([^)）]*)[)）]/);
+      const count = m ? m[1] : '';
+      const dests = m ? m[2].split(/[,、]/).map(s => s.trim()).filter(Boolean) : [];
+      const body = dests.length
+        ? `<p class="mb-2"><b>${E(it.itemName)}</b> 대여 ${count}대 배치처</p>
+           <ol class="mb-0 ps-3">${dests.map(d => `<li>${E(d)}</li>`).join('')}</ol>`
+        : '<p class="mb-0 text-muted">대여 배치처 정보가 없습니다. (비고에 괄호로 기입하세요)</p>';
+      KIMS.alertModal('🔗 대여 현황', body, 'info');
+    }
+
+    // 재고 현황 (분류별 3개 차트)
+    async function loadStockChart() {
+      try {
+        const data = await KIMS.api('/kims-api/inventory-items?size=200');
+        const items = (data.content || []).slice().sort((a, b) => a.itemId - b.itemId);
+        document.getElementById('s-total').textContent = items.length;
+        document.getElementById('s-low').textContent = items.filter(i => i.belowMinStock).length;
+        document.getElementById('s-sum').textContent = items.reduce((a, i) => a + i.currentStock, 0);
+
+        const box = document.getElementById('catCharts');
+        box.innerHTML = '';
+        catCharts.forEach(c => c.destroy()); catCharts = [];
+        const cats = CAT_ORDER.concat([...new Set(items.map(i => i.category))].filter(c => !CAT_ORDER.includes(c)));
+
+        cats.forEach((cat, idx) => {
+          const its = items.filter(i => i.category === cat);
+          if (!its.length) return;
+          const catSum = its.reduce((a, i) => a + i.currentStock, 0);
+          const h = Math.max(140, its.length * 32 + 20);
+          const col = document.createElement('div');
+          col.className = 'col-12 col-lg-4';
+          col.innerHTML = `<div class="card h-100"><div class="card-body py-2">
+            <h6 class="m-0 mb-1">${E(cat)} <span class="text-muted small">· ${its.length}종 / 재고 ${catSum}</span></h6>
+            <div style="height:${h}px"><canvas id="cc${idx}"></canvas></div></div></div>`;
+          box.appendChild(col);
+          // 품목별 세부 구분 → 세그먼트별 누적 데이터셋 구성
+          const bds = its.map(itemBreakdown);
+          const present = SEG_ORDER.filter(k => bds.some(b => (b[k] || 0) > 0));
+          const segs = present.length ? present : ['미구분'];
+          const datasets = segs.map(k => ({
+            label: k, data: bds.map(b => b[k] || 0),
+            backgroundColor: SEG_COLOR[k] || (CAT_COLOR[cat] || '#6c757d'),
+            stack: 'stock', borderWidth: 0, barThickness: 18
+          }));
+          const showLegend = !(segs.length === 1 && segs[0] === '미구분');   // 구분 없는 분류는 범례 숨김
+          catCharts.push(new Chart(document.getElementById('cc' + idx), {
+            type: 'bar',
+            data: { labels: its.map(i => i.itemName), datasets },
+            options: {
+              indexAxis: 'y', maintainAspectRatio: false,
+              interaction: { mode: 'index', axis: 'y', intersect: false },
+              onClick: (evt, els) => {
+                if (!els.length) return;
+                const el = els.find(e => datasets[e.datasetIndex].label === '대여') || els[0];
+                if (datasets[el.datasetIndex].label === '대여') showRentalDetail(its[el.index]);
+              },
+              onHover: (evt, els) => {
+                const over = els.some(e => datasets[e.datasetIndex].label === '대여');
+                evt.native.target.style.cursor = over ? 'pointer' : 'default';
+              },
+              plugins: {
+                legend: { display: showLegend, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                tooltip: {
+                  filter: (c) => c.parsed.x > 0,
+                  callbacks: {
+                    label: (c) => (c.dataset.label === '미구분' ? '재고' : c.dataset.label)
+                                  + ' ' + c.parsed.x + (its[c.dataIndex].unit || ''),
+                    footer: (items) => items.length ? ('합계 ' + items.reduce((a, i) => a + i.parsed.x, 0)) : ''
+                  }
+                }
+              },
+              scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }
+            }
+          }));
+        });
+      } catch (e) { /* 차트는 보조 정보 */ }
+    }
+
+    // 신규 지급 요청 목록 (전산소모품 지급 · 접수)
+    async function loadSupplyRequests() {
+      const tb = document.getElementById('supplyReqRows');
+      try {
+        const data = await KIMS.api('/kims-api/requests?requestType=SUPPLY&status=RECEIVED&size=100');
+        const list = data.content || [];
+        document.getElementById('sr-cnt').textContent = list.length;
+        tb.innerHTML = list.length ? list.map(r => `
+          <tr>
+            <td><b>${E(r.requestNo)}</b> ${r.urgent ? '<span class="badge bg-danger">긴급</span>' : ''}</td>
+            <td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
+            <td class="text-truncate" style="max-width:380px">${E(r.contentSummary)}</td>
+            <td>${dateOnly((r.createdAt || '').replace('T', ' '))}</td>
+            <td><button class="btn btn-outline-primary btn-sm py-0" onclick="openReqDetail(${r.requestId})">처리</button></td>
+          </tr>`).join('')
+          : '<tr><td colspan="6" class="text-center text-muted">신규 지급 요청이 없습니다. 👍</td></tr>';
+      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // ================= 공통: 품목 목록 =================
+    async function fetchItems(keyword) {
+      const p = new URLSearchParams(); p.set('size', '200');
+      if (keyword) p.set('keyword', keyword);
+      const data = await KIMS.api('/kims-api/inventory-items?' + p.toString());
+      return (data.content || []).slice().sort((a, b) => a.itemId - b.itemId);
+    }
+
+    // ================= 입고 내역 탭 =================
+    async function loadInboundTab() {
+      const tb = document.getElementById('inboundRows');
+      try {
+        const items = await fetchItems(document.getElementById('in-keyword').value.trim());
+        // 품목별 최근 입고(INBOUND) 1건
+        const txLists = await Promise.all(items.map(i => KIMS.api('/kims-api/inventory-items/' + i.itemId + '/transactions').catch(() => [])));
+        tb.innerHTML = items.length ? items.map((r, idx) => {
+          const ins = (txLists[idx] || []).filter(t => t.transactionType === 'INBOUND')
+            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+          const last = ins[0];
+          const lastTxt = last
+            ? `${dateOnly(last.createdAt)} · <span class="text-success">+${last.quantity}</span> · ${E(last.createdBy || '')}`
+            : '<span class="text-muted">입고 내역 없음</span>';
+          return `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
+            <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
+            <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
+            <td>${E(r.unit)}</td><td>${lastTxt}</td>
+            <td>
+              <button class="btn btn-outline-success btn-sm py-0" onclick="openInbound(${r.itemId},'${E(r.itemName)}')">입고</button>
+              <button class="btn btn-outline-secondary btn-sm py-0" onclick="showInboundHist(${r.itemId},'${E(r.itemName)}')">이력</button>
+            </td></tr>`;
+        }).join('') : '<tr><td colspan="6" class="text-center text-muted">데이터가 없습니다.</td></tr>';
+      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // ================= 지급 내역 탭 =================
+    async function loadIssueTab() {
+      const tb = document.getElementById('issueRows');
+      try {
+        const [items, issuesData] = await Promise.all([
+          fetchItems(document.getElementById('is-keyword').value.trim()),
+          KIMS.api('/kims-api/supply-issues?size=500')
+        ]);
+        const issues = issuesData.content || [];
+        // 품목별 최신 지급 1건
+        const lastByItem = {};
+        issues.forEach(s => {
+          const cur = lastByItem[s.itemId];
+          if (!cur || (s.issuedAt || '') > (cur.issuedAt || '')) lastByItem[s.itemId] = s;
+        });
+        tb.innerHTML = items.length ? items.map(r => {
+          const last = lastByItem[r.itemId];
+          const lastTxt = last
+            ? `${E(last.issuedAt)} · <span class="text-primary">-${last.quantity}</span> · ${E(last.receiverName || '')}`
+            : '<span class="text-muted">지급 내역 없음</span>';
+          return `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
+            <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
+            <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
+            <td>${E(r.unit)}</td><td>${lastTxt}</td>
+            <td>
+              <button class="btn btn-outline-primary btn-sm py-0" onclick="openIssue(${r.itemId},'${E(r.itemName)}')">지급</button>
+              <button class="btn btn-outline-secondary btn-sm py-0" onclick="showIssueHist(${r.itemId},'${E(r.itemName)}')">이력</button>
+            </td></tr>`;
+        }).join('') : '<tr><td colspan="6" class="text-center text-muted">데이터가 없습니다.</td></tr>';
+      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // ================= 이력 모달 =================
+    // 입고 이력 (INBOUND 만)
+    async function showInboundHist(id, name) {
+      try {
+        const list = (await KIMS.api('/kims-api/inventory-items/' + id + '/transactions'))
+          .filter(t => t.transactionType === 'INBOUND')
+          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        document.getElementById('histTitle').textContent = '입고 이력 - ' + name;
+        document.getElementById('histBody').innerHTML = list.length ? `
+          <table class="table table-sm table-bordered"><thead class="table-light"><tr>
+            <th>일시</th><th>입고수량</th><th>변동전</th><th>변동후</th><th>입고담당자</th><th>비고</th></tr></thead><tbody>
+          ${list.map(t => `<tr><td>${(t.createdAt || '').substring(0, 19).replace('T', ' ')}</td>
+            <td class="text-success">+${t.quantity}</td><td>${t.beforeStock}</td><td>${t.afterStock}</td>
+            <td>${E(t.createdBy)}</td><td>${E(t.note)}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="text-muted">입고 이력이 없습니다.</p>';
+        histModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 지급 이력 (해당 품목 지급 내역)
+    async function showIssueHist(id, name) {
+      try {
+        const data = await KIMS.api('/kims-api/supply-issues?itemId=' + id + '&size=500');
+        const list = (data.content || []).sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || ''));
+        document.getElementById('histTitle').textContent = '지급 이력 - ' + name;
+        document.getElementById('histBody').innerHTML = list.length ? `
+          <table class="table table-sm table-bordered"><thead class="table-light"><tr>
+            <th>지급일</th><th>수량</th><th>대상자</th><th>부서</th><th>지급담당자</th><th>요청번호</th></tr></thead><tbody>
+          ${list.map(s => `<tr><td>${E(s.issuedAt)}</td><td class="text-primary">-${s.quantity}</td>
+            <td>${E(s.receiverName)}</td><td>${E(s.department)}</td><td>${E(s.issuedBy)}</td><td>${E(s.requestNo)}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="text-muted">지급 이력이 없습니다.</p>';
+        histModal.show();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ================= 품목 등록 / 입고 / 지급 =================
+    function openItemCreate() {
+      ['it-name', 'it-cat', 'it-remark'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('it-stock').value = 0; document.getElementById('it-min').value = 0; document.getElementById('it-unit').value = '개';
+      itemModal.show();
+    }
+    async function createItem() {
+      const payload = { itemName: document.getElementById('it-name').value.trim(), category: document.getElementById('it-cat').value.trim(),
+        currentStock: Number(document.getElementById('it-stock').value), minStock: Number(document.getElementById('it-min').value),
+        unit: document.getElementById('it-unit').value.trim(), remark: document.getElementById('it-remark').value.trim() };
+      if (!payload.itemName || !payload.category || !payload.unit) { KIMS.toast('품목명/카테고리/단위는 필수입니다.', false); return; }
+      try { await KIMS.api('/kims-api/inventory-items', { method: 'POST', body: payload }); KIMS.toast('등록되었습니다.'); itemModal.hide(); loadInboundTab(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    function openInbound(id, name) {
+      document.getElementById('inboundTitle').textContent = '입고 등록 - ' + name;
+      document.getElementById('in-itemId').value = id;
+      document.getElementById('in-qty').value = ''; document.getElementById('in-note').value = '';
+      document.getElementById('in-by').value = KIMS.getUser() || '';
+      inboundModal.show();
+    }
+    async function inbound() {
+      const id = document.getElementById('in-itemId').value;
+      const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim() };
+      if (!payload.quantity || payload.quantity <= 0 || !payload.createdBy) { KIMS.toast('수량(1+)과 담당자는 필수입니다.', false); return; }
+      try { await KIMS.api('/kims-api/inventory-items/' + id + '/inbound', { method: 'POST', body: payload }); KIMS.toast('입고되었습니다.'); inboundModal.hide(); loadInboundTab(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    function openIssue(id, name) {
+      document.getElementById('issueTitle').textContent = '소모품 지급 - ' + name;
+      document.getElementById('is-itemId').value = id;
+      ['is-req', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
+      document.getElementById('is-by').value = KIMS.getUser() || '';
+      document.getElementById('is-at').value = new Date().toISOString().substring(0, 10);
+      // 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
+      const subRow = document.getElementById('is-subtype-row');
+      const sub = document.getElementById('is-subtype');
+      const options = SUBTYPE_BY_ITEM[name];
+      if (options) {
+        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        subRow.style.display = '';
+      } else {
+        sub.innerHTML = '';
+        subRow.style.display = 'none';
+      }
+      issueModal.show();
+    }
+    async function issue() {
+      const subRow = document.getElementById('is-subtype-row');
+      const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('is-subtype').value : null;
+      const payload = { itemId: Number(document.getElementById('is-itemId').value), requestId: Number(document.getElementById('is-req').value),
+        quantity: Number(document.getElementById('is-qty').value), receiverName: document.getElementById('is-receiver').value.trim(),
+        department: document.getElementById('is-dept').value.trim(), issuedBy: document.getElementById('is-by').value.trim(),
+        issuedAt: document.getElementById('is-at').value || null, subType: subType };
+      if (!payload.requestId || !payload.quantity || !payload.receiverName || !payload.issuedBy) { KIMS.toast('요청ID/수량/대상자/담당자는 필수입니다.', false); return; }
+      try {
+        // 재고 사전 검사 — 부족하면 지급하지 않고 모달로 안내
+        const item = await KIMS.api('/kims-api/inventory-items/' + payload.itemId);
+        if (payload.quantity > item.currentStock) { showShortage(item, payload.quantity); return; }
+        await KIMS.api('/kims-api/supply-issues', { method: 'POST', body: payload });
+        KIMS.toast('지급되었습니다. (재고 차감)'); issueModal.hide(); loadIssueTab(); loadStockChart && loadStockChart();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 재고 부족', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
+    }
+
+    // 재고 부족 안내 모달 (부족 수량 명시)
+    function showShortage(item, requested) {
+      const short = requested - item.currentStock;
+      KIMS.alertModal('⚠ 재고 부족',
+        `<b>${E(item.itemName)}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
+        `<table class="table table-sm mb-0"><tbody>` +
+        `<tr><td>현재 재고</td><td class="text-end fw-bold">${item.currentStock} ${E(item.unit||'')}</td></tr>` +
+        `<tr><td>요청 수량</td><td class="text-end fw-bold">${requested} ${E(item.unit||'')}</td></tr>` +
+        `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${short} ${E(item.unit||'')}</td></tr>` +
+        `</tbody></table>`);
+    }
+
+    async function downloadIssueExcel() {
+      try { await KIMS.download('/kims-api/supply-issues/excel', 'supply_issues.xlsx'); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // ================= 소모품 업무요청 이력 탭 =================
+    // 업무요청 목록과 동일한 스타일 + '요청 소모품' 컬럼(지급된 품목) — 전산소모품 지급(SUPPLY)만
+    let rhPage = 0; const rhSize = 20;
+    const RH_STATUS = { RECEIVED:'접수', IN_PROGRESS:'처리중', ON_HOLD:'보류', COMPLETED:'완료', REJECTED:'반려', CANCELED:'취소' };
+    const RH_SB = { RECEIVED:'bg-secondary', IN_PROGRESS:'bg-info', ON_HOLD:'bg-warning text-dark', COMPLETED:'bg-success', REJECTED:'bg-danger', CANCELED:'bg-dark' };
+    let rhStatusFilled = false;
+
+    function resetReqHist() {
+      ['rh-from','rh-to','rh-requester','rh-dept','rh-assignee'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('rh-status').value = '';
+      rhPage = 0; loadReqHist();
+    }
+
+    async function loadReqHist() {
+      if (!rhStatusFilled) {
+        document.getElementById('rh-status').innerHTML = '<option value="">전체</option>' +
+          Object.entries(RH_STATUS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+        rhStatusFilled = true;
+      }
+      const tb = document.getElementById('reqhistRows');
+      try {
+        const p = new URLSearchParams();
+        const g = id => document.getElementById(id).value.trim();
+        p.set('requestType', 'SUPPLY');                       // 소모품 지급 요청만
+        if (g('rh-from')) p.set('from', g('rh-from') + 'T00:00:00');
+        if (g('rh-to'))   p.set('to',   g('rh-to')   + 'T23:59:59');
+        if (document.getElementById('rh-status').value) p.set('status', document.getElementById('rh-status').value);
+        if (g('rh-requester')) p.set('requester', g('rh-requester'));
+        if (g('rh-dept'))      p.set('department', g('rh-dept'));
+        if (g('rh-assignee'))  p.set('assignee', g('rh-assignee'));
+        p.set('page', rhPage); p.set('size', rhSize);
+
+        // 요청 목록 + 지급내역(요청별 품목) 동시 조회
+        const [reqData, issuesData] = await Promise.all([
+          KIMS.api('/kims-api/requests?' + p.toString()),
+          KIMS.api('/kims-api/supply-issues?size=500')
+        ]);
+        // 요청ID -> "품목 수량" 목록
+        const itemsByReq = {};
+        (issuesData.content || []).forEach(s => {
+          (itemsByReq[s.requestId] = itemsByReq[s.requestId] || []).push(`${s.itemName} ${s.quantity}`);
+        });
+
+        const list = reqData.content || [];
+        tb.innerHTML = list.length ? list.map(r => {
+          const items = itemsByReq[r.requestId];
+          const itemsTxt = items && items.length
+            ? items.map(E).join(', ')
+            : '<span class="text-muted">미지급</span>';
+          return `<tr>
+            <td><b>${E(r.requestNo)}</b> ${r.urgent?'<span class="badge bg-danger">긴급</span>':''}</td>
+            <td>${dateOnly(r.createdAt)}</td><td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
+            <td><span class="badge ${RH_SB[r.status]||'bg-secondary'}">${E(r.statusLabel)}</span></td>
+            <td>${E(r.assignee)}</td>
+            <td>${itemsTxt}</td>
+            <td><button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${r.requestId})">상세</button></td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="8" class="text-center text-muted">해당 조건의 소모품 요청이 없습니다.</td></tr>';
+        renderReqHistPager(reqData);
+      } catch (e) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    function renderReqHistPager(d) {
+      const pg = document.getElementById('reqhistPager'); const cur = d.page, total = d.totalPages;
+      pg.innerHTML = `<button class="btn btn-sm btn-outline-secondary" ${cur<=0?'disabled':''} onclick="rhPage=${cur-1};loadReqHist()">이전</button>
+        <span class="align-self-center small">${total===0?0:cur+1} / ${total} (총 ${d.totalElements}건)</span>
+        <button class="btn btn-sm btn-outline-secondary" ${cur>=total-1?'disabled':''} onclick="rhPage=${cur+1};loadReqHist()">다음</button>`;
+    }
+
+    // ================= 업무요청 상세 모달 (request.html 이동 없이 인벤토리 페이지 내에서 처리) =================
+    const REQ_STATUS_CHOICES = { RECEIVED:'접수', COMPLETED:'완료', ON_HOLD:'보류', REJECTED:'반려', CANCELED:'취소' };
+
+    function reqBadge(s, label) {
+      return `<span class="badge ${RH_SB[s]||'bg-secondary'}">${E(label||RH_STATUS[s]||s)}</span>`;
+    }
+    function reqSec(title, head, rows) {
+      return `<h6 class="mt-3">${title}</h6><table class="table table-sm table-bordered"><thead class="table-light"><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    function reqFormatSize(b) {
+      if (b == null) return '';
+      if (b < 1024) return b + 'B';
+      if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+      return (b/1048576).toFixed(1) + 'MB';
+    }
+    async function reqDlAttach(id, name) {
+      try { await KIMS.download('/kims-api/attachments/' + id + '/download', name); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function reqUploadAttach() {
+      const inp = document.getElementById('rd-attfile');
+      if (!inp.files.length) { KIMS.toast('파일을 선택하세요.', false); return; }
+      try { for (const f of inp.files) { await KIMS.uploadFile('/kims-api/requests/' + reqDetailId + '/attachments', f); } KIMS.toast('첨부되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+    async function reqDelAttach(id) {
+      if (!confirm('이 첨부파일을 삭제할까요?')) return;
+      try { await KIMS.api('/kims-api/attachments/' + id, { method:'DELETE' }); KIMS.toast('삭제되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function populateReqDetailItems() {
+      try {
+        const data = await KIMS.api('/kims-api/inventory-items?size=200');
+        const sel = document.getElementById('rd-item');
+        if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
+          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.currentStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+        updateReqSubTypeUI();
+      } catch (e) { /* 무시 */ }
+    }
+
+    // 요청 상세 모달의 품목 선택에 따라 신형/구형(또는 제조사) 세부 구분 선택 UI를 표시/숨김
+    function updateReqSubTypeUI() {
+      const sel = document.getElementById('rd-item');
+      const wrap = document.getElementById('rd-subtype-wrap');
+      const sub = document.getElementById('rd-subtype');
+      if (!sel || !wrap || !sub) return;
+      const opt = sel.options[sel.selectedIndex];
+      const name = opt ? (opt.dataset.name || '') : '';
+      const options = SUBTYPE_BY_ITEM[name];
+      if (options) {
+        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        wrap.style.display = '';
+      } else {
+        sub.innerHTML = '';
+        wrap.style.display = 'none';
+      }
+    }
+
+    // 상태값에 따른 액션 버튼 스타일/문구 결정
+    // - 보류/반려/취소: 빨간색 '상태 변경' 버튼 (지급 대신 상태변경만 수행)
+    // - 그 외(접수/완료 등): 초록색 '이 요청으로 소모품 지급' 버튼
+    function reqActionButtonAttrs(status) {
+      const BLOCK_STATUSES = ['ON_HOLD', 'REJECTED', 'CANCELED'];
+      return BLOCK_STATUSES.includes(status)
+        ? { cls: 'btn btn-danger btn-sm mt-1 w-100', text: '상태 변경' }
+        : { cls: 'btn btn-success btn-sm mt-1 w-100', text: '이 요청으로 소모품 지급' };
+    }
+    // 상태 드롭다운 변경 시 버튼 색상/문구를 즉시 갱신
+    function updateReqActionButtonStyle() {
+      const btn = document.getElementById('rd-action-btn');
+      const sel = document.getElementById('rd-status');
+      if (!btn || !sel) return;
+      const attrs = reqActionButtonAttrs(sel.value);
+      btn.className = attrs.cls;
+      btn.textContent = attrs.text;
+    }
+    // 단일 액션 버튼 클릭 핸들러 — 현재 선택된 상태값에 따라 동작 분기
+    async function handleReqDetailAction() {
+      const status = document.getElementById('rd-status').value;
+      const BLOCK_STATUSES = ['ON_HOLD', 'REJECTED', 'CANCELED'];
+      if (BLOCK_STATUSES.includes(status)) {
+        // 보류/반려/취소 선택 시 → 상태 변경만 수행 (소모품 지급 없음)
+        await changeReqDetailStatus();
+        return;
+      }
+      if (status !== 'COMPLETED') {
+        // 접수(등 완료 이외) 상태에서 바로 지급을 시도하면 경고만 표시하고 중단
+        KIMS.alertModal('⚠ 상태 변경 필요',
+          '소모품을 지급하려면 먼저 위 상태를 <b>완료</b>로 선택해주세요.<br>' +
+          '(현재 상태: ' + E((REQ_STATUS_CHOICES[status] || RH_STATUS[status] || status)) + ')', 'danger');
+        return;
+      }
+      await issueSupplyFromDetail();
+    }
+
+    async function issueSupplyFromDetail() {
+      const sel = document.getElementById('rd-item');
+      const itemId = sel.value;
+      const qty = Number(document.getElementById('rd-qty').value);
+      const receiver = document.getElementById('rd-receiver').value.trim();
+      if (!itemId) { KIMS.toast('지급할 품목을 선택하세요.', false); return; }
+      if (!qty || qty < 1) { KIMS.toast('수량을 1 이상 입력하세요.', false); return; }
+      if (!receiver) { KIMS.toast('지급 대상자를 입력하세요.', false); return; }
+      const opt = sel.options[sel.selectedIndex];
+      const stock = Number(opt.dataset.stock || 0);
+      if (qty > stock) {
+        const unit = opt.dataset.unit || '';
+        KIMS.alertModal('⚠ 재고 부족',
+          `<b>${E(opt.dataset.name||'')}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
+          `<table class="table table-sm mb-0"><tbody>` +
+          `<tr><td>현재 재고</td><td class="text-end fw-bold">${stock} ${E(unit)}</td></tr>` +
+          `<tr><td>요청 수량</td><td class="text-end fw-bold">${qty} ${E(unit)}</td></tr>` +
+          `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${qty - stock} ${E(unit)}</td></tr>` +
+          `</tbody></table>`);
+        return;
+      }
+      const subWrap = document.getElementById('rd-subtype-wrap');
+      const subType = (subWrap && subWrap.style.display !== 'none')
+        ? document.getElementById('rd-subtype').value : null;
+      const payload = { requestId: reqDetailId, itemId: Number(itemId), quantity: qty,
+        receiverName: receiver, department: (reqDetailCur && reqDetailCur.department) || '',
+        issuedBy: KIMS.getUser() || 'admin', subType: subType };
+      try {
+        await KIMS.api('/kims-api/supply-issues', { method:'POST', body:payload });
+        // 지급 전에 상태 드롭다운을 이미 다른 값(예: 완료)으로 선택해둔 경우 —
+        // '상태 변경' 버튼을 따로 누르지 않아도 지급과 함께 상태 변경도 반영한다.
+        // (드롭다운 '선택'과 '상태 변경' 버튼 클릭이 분리되어 있어 혼란을 유발하던 문제 보완)
+        const selStatus = document.getElementById('rd-status').value;
+        if (selStatus && reqDetailCur && selStatus !== reqDetailCur.status) {
+          const statusPayload = { status: selStatus, changedBy: KIMS.getUser()||'admin',
+            assignee: document.getElementById('rd-assignee').value.trim(),
+            reason: document.getElementById('rd-reason').value.trim() || '소모품 지급 처리' };
+          try { await KIMS.api('/kims-api/requests/' + reqDetailId + '/status', { method:'PATCH', body:statusPayload }); }
+          catch (e2) { KIMS.toast('지급은 완료되었으나 상태 변경에는 실패했습니다: ' + e2.message, false); }
+        }
+        KIMS.toast('소모품이 지급되었습니다. (재고 차감 + 지급내역 기록)');
+        openReqDetail(reqDetailId);
+        refreshReqLists();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 재고 부족', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
+    }
+
+    async function changeReqDetailStatus() {
+      const status = document.getElementById('rd-status').value;
+      const payload = { status, changedBy: KIMS.getUser()||'admin',
+        assignee: document.getElementById('rd-assignee').value.trim(), reason: document.getElementById('rd-reason').value.trim() };
+      try { await KIMS.api('/kims-api/requests/' + reqDetailId + '/status', { method:'PATCH', body:payload }); KIMS.toast('상태가 변경되었습니다.'); openReqDetail(reqDetailId); refreshReqLists(); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    async function addReqDetailNote() {
+      const content = document.getElementById('rd-note').value.trim();
+      if (!content) { KIMS.toast('처리내용을 입력하세요.', false); return; }
+      try { await KIMS.api('/kims-api/requests/' + reqDetailId + '/logs', { method:'POST', body:{ changedBy: KIMS.getUser()||'admin', content } }); KIMS.toast('추가되었습니다.'); openReqDetail(reqDetailId); }
+      catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 현재 화면(대시보드 신규 지급 요청 / 이력 탭 / 재고 차트)을 최신 상태로 새로고침
+    function refreshReqLists() {
+      loadSupplyRequests();
+      loadStockChart();
+      const reqhistPane = document.getElementById('pane-reqhist');
+      if (reqhistPane && reqhistPane.style.display !== 'none') loadReqHist();
+    }
+
+    async function openReqDetail(id) {
+      reqDetailId = id;
+      try {
+        const d = await KIMS.api('/kims-api/requests/' + id);
+        reqDetailCur = d;
+        document.getElementById('reqDetailTitle').textContent = '요청 상세 - ' + d.requestNo;
+        const choices = Object.assign({}, REQ_STATUS_CHOICES);
+        if (!choices[d.status]) choices[d.status] = RH_STATUS[d.status] || d.status;
+        const statusSel = Object.entries(choices).map(([k,v]) => `<option value="${k}" ${k===d.status?'selected':''}>${v}</option>`).join('');
+        const memoList = (d.logs||[]).filter(l => l.logType === 'PROCESS_NOTE').map(l =>
+          `<div class="border-bottom py-1">${E(l.content||'')} <span class="text-muted small">— ${E(l.changedBy)}, ${(l.createdAt||'').substring(0,16).replace('T',' ')}</span></div>`
+        ).join('') || '<span class="text-muted">등록된 메모 없음</span>';
+        const reqActionBtnAttrs = reqActionButtonAttrs(d.status);
+        const info = `
+          <div class="row">
+            <div class="col-md-7">
+              <table class="table table-sm">
+                <tr><th width="110">요청번호</th><td>${E(d.requestNo)}</td><th width="90">상태</th><td>${reqBadge(d.status,d.statusLabel)}</td></tr>
+                <tr><th>요청자</th><td>${E(d.requesterName)}</td><th>부서</th><td>${E(d.department)}</td></tr>
+                <tr><th>연락처</th><td>${E(d.contact)}</td><th>위치</th><td>${E(d.location)}</td></tr>
+                <tr><th>유형</th><td>${E(d.requestTypeLabel)}</td><th>긴급</th><td>${d.urgent?'<span class="text-danger">긴급</span>':'일반'}</td></tr>
+                <tr><th>접수채널</th><td>${E(d.receivedChannelLabel)}</td><th>담당자</th><td>${E(d.assignee)}</td></tr>
+                <tr><th>완료일</th><td colspan="3">${E(d.completedAt)}</td></tr>
+                <tr><th>요청내용</th><td colspan="3" style="white-space:pre-wrap">${E(d.content)}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-5">
+              <div class="card bg-light"><div class="card-body py-2">
+                <h6>처리상태</h6>
+                <div class="row g-1">
+                  <div class="col"><select id="rd-status" class="form-select form-select-sm" onchange="updateReqActionButtonStyle()">${statusSel}</select></div>
+                  <div class="col"><input id="rd-assignee" class="form-control form-control-sm" placeholder="담당자" value="${E(d.assignee||'')}"></div>
+                </div>
+                <input id="rd-reason" class="form-control form-control-sm mt-1" placeholder="변경 사유 (반려·보류·취소 시 입력 권장)">
+                <hr class="my-2">
+                <h6>처리내용 메모</h6>
+                <div class="border rounded bg-white p-1 mb-1 small" style="max-height:140px;overflow:auto">${memoList}</div>
+                <input id="rd-note" class="form-control form-control-sm" placeholder="처리내용 메모 입력">
+                <button class="btn btn-outline-primary btn-sm mt-1 w-100" onclick="addReqDetailNote()">메모 추가</button>
+                <hr class="my-2">
+                <h6>소모품 지급 처리 <small class="text-muted">(재고 차감 · 상태에 따라 버튼 동작 변경)</small></h6>
+                <div class="row g-1">
+                  <div class="col"><select id="rd-item" class="form-select form-select-sm" onchange="updateReqSubTypeUI()"><option value="">품목 불러오는 중...</option></select></div>
+                  <div class="col-3"><input id="rd-qty" type="number" min="1" value="1" class="form-control form-control-sm" placeholder="수량"></div>
+                  <div class="col-4" id="rd-subtype-wrap" style="display:none"><select id="rd-subtype" class="form-select form-select-sm"></select></div>
+                </div>
+                <input id="rd-receiver" class="form-control form-control-sm mt-1" placeholder="지급 대상자" value="${E(d.requesterName||'')}">
+                <button id="rd-action-btn" class="${reqActionBtnAttrs.cls}" onclick="handleReqDetailAction()">${reqActionBtnAttrs.text}</button>
+                <p class="small text-muted mt-1 mb-0">※ 상태가 <b>접수</b>이면 먼저 <b>완료</b>로 선택해야 지급이 진행됩니다. 상태가 <b>보류/반려/취소</b>이면 이 버튼은 상태 변경만 수행합니다.</p>
+              </div></div>
+            </div>
+          </div>`;
+        const logRows = (d.logs||[]).map(l => `<tr><td>${(l.createdAt||'').substring(0,19).replace('T',' ')}</td><td>${E(l.logTypeLabel)}</td>
+          <td>${l.beforeStatus?E(RH_STATUS[l.beforeStatus]):''}${l.afterStatus?' → '+E(RH_STATUS[l.afterStatus]):''}</td>
+          <td>${E(l.content||l.reason||'')}</td><td>${E(l.changedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const supplyRows = (d.supplyIssues||[]).map(s => `<tr><td>${E(s.issuedAt)}</td><td>${E(s.itemName)}</td><td>${s.quantity}</td><td>${E(s.receiverName)}</td><td>${E(s.issuedBy)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const attRows = (d.attachments||[]).map(a => `<tr>
+          <td><a href="#" onclick="reqDlAttach(${a.attachmentId},'${E(a.originalName)}');return false;">${E(a.originalName)}</a></td>
+          <td>${reqFormatSize(a.fileSize)}</td><td>${E(a.uploadedBy)}</td><td>${(a.createdAt||'').substring(0,16).replace('T',' ')}</td>
+          <td><button class="btn btn-outline-danger btn-sm py-0" onclick="reqDelAttach(${a.attachmentId})">삭제</button></td>
+        </tr>`).join('') || '<tr><td colspan="5" class="text-muted">없음</td></tr>';
+        const attUpload = `<div class="input-group input-group-sm mt-1" style="max-width:480px">
+          <input type="file" id="rd-attfile" class="form-control"><button class="btn btn-outline-primary" onclick="reqUploadAttach()">첨부 추가</button></div>`;
+
+        document.getElementById('reqDetailBody').innerHTML = info
+          + reqSec('처리 이력 로그', '<th>일시</th><th>유형</th><th>상태변화</th><th>내용</th><th>처리자</th>', logRows)
+          + reqSec('관련 소모품 지급', '<th>지급일</th><th>품목</th><th>수량</th><th>대상자</th><th>담당자</th>', supplyRows)
+          + '<h6 class="mt-3">첨부파일</h6>'
+          + `<table class="table table-sm table-bordered"><thead class="table-light"><tr><th>파일명</th><th>크기</th><th>등록자</th><th>등록일시</th><th>관리</th></tr></thead><tbody>${attRows}</tbody></table>` + attUpload;
+
+        reqDetailModal.show();
+        populateReqDetailItems();
+        updateReqActionButtonStyle();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+  </script>
+</body>
+</html>

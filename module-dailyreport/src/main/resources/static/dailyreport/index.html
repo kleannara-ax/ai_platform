@@ -63,6 +63,16 @@
     .confirm-modal-btn:hover { background:#f1f5f9; }
     .confirm-modal-btn.confirm { background:var(--blue); color:#fff; border-color:var(--blue); }
     .confirm-modal-btn.confirm:hover { background:#1d4ed8; }
+    /* ★★ 게시판 재업로드 요청 라디오 그룹 (2026-08 신규) — 저장 구간(05:00~08:09:59) 밖의
+       "수정" 확인 모달에서만 표시. 기본 선택 없음(사용자가 반드시 3개 중 하나를 명시적으로 골라야 함). */
+    .confirm-modal-radio-group { margin-top:16px; text-align:left; display:flex; flex-direction:column; gap:10px; }
+    .confirm-modal-radio-item { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:background .15s, border-color .15s; }
+    .confirm-modal-radio-item:hover { background:#f8fafc; }
+    .confirm-modal-radio-item.checked { border-color:var(--blue); background:var(--blue-soft); }
+    .confirm-modal-radio-item input[type="radio"] { margin-top:2px; accent-color:var(--blue); cursor:pointer; flex-shrink:0; width:16px; height:16px; }
+    .confirm-modal-radio-item label { font-size:13px; font-weight:700; color:#334155; line-height:1.45; cursor:pointer; }
+    .confirm-modal-radio-warning { display:none; margin-top:10px; font-size:12px; font-weight:800; color:#dc2626; text-align:left; }
+    .confirm-modal-radio-warning.show { display:block; }
 
     /* ── 알림/범례 ── */
     .notice { width:min(1551px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
@@ -187,12 +197,20 @@
     .upload-preview-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:14px; }
     .upload-empty { border:1px dashed #d1d5db; border-radius:12px; padding:22px 14px; text-align:center; color:#94a3b8; font-size:13px; }
     .upload-card { border:1px solid #dbe4f0; border-radius:14px; overflow:hidden; background:#fff; }
+    /* ★★ 2026-08: "저장" 전 대기 상태(신규 업로드 대기/기존 이미지 삭제 예정) 시각 구분 */
+    .upload-card-pending { border-color:#93c5fd; box-shadow:0 0 0 1px #93c5fd inset; }
+    .upload-card-marked-delete { opacity:.55; border-color:#fca5a5; }
+    .upload-card-badges { display:flex; gap:4px; margin-bottom:4px; flex-wrap:wrap; }
+    .upload-card-badge { display:inline-block; font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px; }
+    .upload-card-badge-pending { background:#dbeafe; color:#1d4ed8; }
+    .upload-card-badge-delete { background:#fee2e2; color:#b91c1c; }
     .upload-thumb { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#f8fafc; }
     .upload-thumb-loading { display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8; }
     .upload-card-body { padding:10px; }
     .upload-card-name { font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upload-card-meta { margin-top:4px; font-size:11px; color:#64748b; }
     .upload-card-remove { margin-top:8px; width:100%; min-height:32px; border:1px solid #fecaca; border-radius:8px; background:#fff1f2; color:#be123c; font-size:12px; font-weight:800; cursor:pointer; }
+    .upload-card-undo { margin-top:8px; width:100%; min-height:32px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#0f172a; font-size:12px; font-weight:800; cursor:pointer; }
     .upload-card-download { margin-top:8px; width:100%; min-height:32px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:800; cursor:pointer; }
     .upload-card-download:disabled { opacity:.6; cursor:not-allowed; }
 
@@ -253,7 +271,7 @@
         <div class="user-chip" id="userChip">인증 확인중...</div>
         <div class="date-chip save-chip idle" id="saveChip">저장 전</div>
         <button class="toolbar-btn refresh" type="button" onclick="refreshData()" title="다른 사용자가 입력한 값을 최신으로 갱신합니다">&#8635; 새로고침</button>
-        <button class="toolbar-btn primary" type="button" onclick="saveInputs()">저장</button>
+        <button class="toolbar-btn primary" type="button" id="saveBtn" onclick="saveInputs()">저장</button>
         <button class="toolbar-btn ppt-capture" type="button" id="pptCaptureBtn" onclick="capturePptSlide()" title="표 1~4를 PPT 16:9 슬라이드 폭(1920px)에 맞춰 캡처하고 클립보드에 복사합니다">&#128247; 화면 캡처</button>
         <div class="auto-refresh-indicator" id="autoRefreshIndicator" style="display:none">
           <span class="dot"></span>
@@ -298,10 +316,14 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- 커스텀 확인 모달 (브라우저 기본 confirm() 대체 — 주소/origin 표시 없이 순수 문구만 표시) -->
+  <!-- 커스텀 확인 모달 (브라우저 기본 confirm() 대체 — 주소/origin 표시 없이 순수 문구만 표시)
+       ★★ 저장 구간(05:00~08:09:59) 밖의 "수정" 흐름에서는 confirmModalRadioGroup에 게시판
+       재업로드 대상을 고르는 라디오 3개(기본 선택 없음)가 동적으로 추가되어 표시된다 (2026-08 신규). -->
   <div class="confirm-modal-overlay" id="confirmModalOverlay">
     <div class="confirm-modal-box">
       <div class="confirm-modal-message" id="confirmModalMessage"></div>
+      <div class="confirm-modal-radio-group" id="confirmModalRadioGroup" style="display:none;"></div>
+      <div class="confirm-modal-radio-warning" id="confirmModalRadioWarning">재업로드할 게시판을 선택해 주세요.</div>
       <div class="confirm-modal-actions">
         <button class="confirm-modal-btn cancel" type="button" id="confirmModalCancelBtn">취소</button>
         <button class="confirm-modal-btn confirm" type="button" id="confirmModalOkBtn">확인</button>
@@ -309,7 +331,7 @@
     </div>
   </div>
 
-  <!-- 특이사항 분량 제한(줄바꿈 17회 / 글자수 1206자 / 한 줄 84자) 초과 시 표시되는 알림 전용 팝업 -->
+  <!-- 특이사항 분량 제한(줄바꿈 15회 / 글자수 1206자 / 한 줄 84자) 초과 시 표시되는 알림 전용 팝업 -->
   <div class="confirm-modal-overlay" id="limitAlertOverlay">
     <div class="confirm-modal-box">
       <div class="confirm-modal-message" id="limitAlertMessage"></div>
@@ -340,6 +362,48 @@
     const API_BASE = '/dailyreport-api';
     const MAX_UPLOAD_IMAGES = 8;
     const AUTO_REFRESH_INTERVAL_MS = 180000; // 3분마다 자동 새로고침
+
+    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규, 시간대 방식으로 변경)
+    // - "저장" 버튼 활성 구간: 05:00:00 ~ 08:09:59 (이 구간에서는 daily_batchjob을
+    //   전혀 참조하지 않는 기존 저장 흐름 그대로 유지)
+    // - 그 외 나머지 모든 시간(08:10:00 ~ 다음날 04:59:59, 자정을 넘나드는 새벽 포함):
+    //   "수정" 버튼 + daily_batchjob 재업로드 요청 흐름 활성화
+    //   서버(DailyReportService.SAVE_WINDOW_START_TIME/SAVE_WINDOW_END_TIME)와 반드시
+    //   동일한 구간(05:00:00~08:09:59, 2026-08 8:05→8:10으로 조정)을 사용해야 한다.
+    // - "수정" 확인 시에는 아래 3개 라디오 중 정확히 1개를 사용자가 직접 선택해야
+    //   하며(기본 선택 없음), 선택값(batchType)을 저장 성공 후
+    //   POST /reports/{id}/batch-jobs 로 전송해 재업로드 요청 큐에 적재한다.
+    const SAVE_WINDOW_START_HOUR = 5;
+    const SAVE_WINDOW_START_MINUTE = 0;
+    const SAVE_WINDOW_END_HOUR = 8;
+    const SAVE_WINDOW_END_MINUTE = 10; // 종료는 배타적(exclusive) — 08:09:59는 저장, 08:10:00부터 수정
+    const BATCH_JOB_RADIO_OPTIONS = [
+      { value: '1', label: '공장일보 재업로드(특이사항/제지 재공품 항목 수정)' },
+      { value: '2', label: '세부공장일보 재업로드(표 1, 2, 3, 4 값 수정/보고서 이미지 수정)' },
+      { value: '3', label: '모두 재업로드' },
+    ];
+
+    /** 현재 시각이 "저장" 구간(05:00:00~08:09:59) 안에 있는지 판정 */
+    function isWithinSaveWindow() {
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(SAVE_WINDOW_START_HOUR, SAVE_WINDOW_START_MINUTE, 0, 0);
+      const end = new Date(now);
+      end.setHours(SAVE_WINDOW_END_HOUR, SAVE_WINDOW_END_MINUTE, 0, 0);
+      return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
+    }
+
+    /** 저장 구간(05:00:00~08:09:59) 밖이면 "수정" 흐름(재업로드 요청 대상) */
+    function isAfterBatchJobCutoff() {
+      return !isWithinSaveWindow();
+    }
+
+    /** 저장 구간 여부에 따라 저장 버튼 라벨을 "저장"/"수정"으로 전환하고, 매분 재확인한다 */
+    function updateSaveButtonLabel() {
+      const btn = document.getElementById('saveBtn');
+      if (!btn) return;
+      btn.textContent = isWithinSaveWindow() ? '저장' : '수정';
+    }
 
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
     const _urlParams = new URLSearchParams(window.location.search);
@@ -397,8 +461,8 @@
     // ★★ 특이사항 분량 제한 (백엔드 DailyReportService의 동일 상수와 반드시 일치시킬 것)
     // - 줄바꿈/전체 글자수: 5개 사업부 행 "전체 합산" 공유 총량
     // - 한 줄(개행 기준) 글자수: 각 행 자신만의 독립된 제한
-    // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정
-    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
+    // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정 → 이후 15회로 재조정
+    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 15;
     const SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
     const SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
     let reportData = null;         // /view/render 응답 전체
@@ -591,17 +655,58 @@
      * 커스텀 확인 모달 — 브라우저 기본 confirm() 대체
      * - 브라우저 기본 confirm()은 보안상 사이트 주소(origin)가 강제로 함께 표시되어
      *   순수 문구만 보여줄 수 없음 → 화면 내 커스텀 모달로 대체
-     * - Promise<boolean> 반환: 확인 클릭 시 true, 취소/오버레이 클릭/ESC 시 false
+     * - radioOptions 미지정(기존 호출 방식): Promise<boolean> 반환
+     *   (확인 클릭 시 true, 취소/오버레이 클릭/ESC 시 false — 기존 동작 100% 동일)
+     * - radioOptions 지정(★ 2026-08 신규, 게시판 재업로드 요청용): 3개 라디오
+     *   ({value,label})를 모달 안에 렌더링하고, 기본 선택 없음 상태로 표시한다.
+     *   사용자가 라디오 하나를 선택하지 않은 채 "확인"을 누르면 경고 문구만 보여주고
+     *   모달을 닫지 않는다(취소/오버레이/ESC는 선택 여부와 무관하게 항상 취소 가능).
+     *   Promise<{confirmed:boolean, batchType:string|null}> 반환.
      */
-    function showConfirmModal(message) {
+    function showConfirmModal(message, radioOptions) {
       return new Promise((resolve) => {
         const overlay = document.getElementById('confirmModalOverlay');
         const msgEl = document.getElementById('confirmModalMessage');
         const okBtn = document.getElementById('confirmModalOkBtn');
         const cancelBtn = document.getElementById('confirmModalCancelBtn');
+        const radioGroup = document.getElementById('confirmModalRadioGroup');
+        const radioWarning = document.getElementById('confirmModalRadioWarning');
+        const hasRadio = Array.isArray(radioOptions) && radioOptions.length > 0;
 
         msgEl.textContent = message;
+
+        // ── 라디오 옵션 렌더링 (기본 선택 없음) ──
+        radioGroup.innerHTML = '';
+        radioWarning.classList.remove('show');
+        if (hasRadio) {
+          radioOptions.forEach((opt, idx) => {
+            const item = document.createElement('div');
+            item.className = 'confirm-modal-radio-item';
+            const inputId = `confirmModalRadio_${idx}`;
+            item.innerHTML = `
+              <input type="radio" name="confirmModalRadio" id="${inputId}" value="${escapeHtml(opt.value)}">
+              <label for="${inputId}">${escapeHtml(opt.label)}</label>
+            `;
+            item.addEventListener('click', () => {
+              const input = item.querySelector('input[type="radio"]');
+              input.checked = true;
+              radioGroup.querySelectorAll('.confirm-modal-radio-item').forEach(el => el.classList.remove('checked'));
+              item.classList.add('checked');
+              radioWarning.classList.remove('show');
+            });
+            radioGroup.appendChild(item);
+          });
+          radioGroup.style.display = 'flex';
+        } else {
+          radioGroup.style.display = 'none';
+        }
+
         overlay.classList.add('show');
+
+        function getSelectedBatchType() {
+          const checked = radioGroup.querySelector('input[type="radio"]:checked');
+          return checked ? checked.value : null;
+        }
 
         function cleanup(result) {
           overlay.classList.remove('show');
@@ -611,12 +716,24 @@
           document.removeEventListener('keydown', onKeydown);
           resolve(result);
         }
-        function onOk() { cleanup(true); }
-        function onCancel() { cleanup(false); }
-        function onOverlayClick(e) { if (e.target === overlay) cleanup(false); }
+        function onOk() {
+          if (hasRadio) {
+            const batchType = getSelectedBatchType();
+            if (!batchType) {
+              // ★ 3개 중 하나를 반드시 선택해야 함 — 미선택 시 모달을 닫지 않고 경고만 표시
+              radioWarning.classList.add('show');
+              return;
+            }
+            cleanup({ confirmed: true, batchType });
+          } else {
+            cleanup(true);
+          }
+        }
+        function onCancel() { cleanup(hasRadio ? { confirmed: false, batchType: null } : false); }
+        function onOverlayClick(e) { if (e.target === overlay) onCancel(); }
         function onKeydown(e) {
-          if (e.key === 'Escape') cleanup(false);
-          if (e.key === 'Enter') cleanup(true);
+          if (e.key === 'Escape') onCancel();
+          if (e.key === 'Enter') onOk();
         }
 
         okBtn.addEventListener('click', onOk);
@@ -904,12 +1021,18 @@
       try {
         // 현재 내가 수정한 셀 값 보존
         const myDirtyValues = collectMyDirtyValues();
+        // ★★ 2026-08: 이미지도 "저장" 버튼을 눌러야만 서버에 반영되므로, 새로고침으로
+        //   화면이 다시 그려지기 전에 아직 저장하지 않은 신규 업로드 대기/삭제 대기
+        //   이미지 상태를 보존해뒀다가 새로고침 후 복원한다 (그렇지 않으면 서버의
+        //   최신 이미지 목록으로 화면이 덮어써지면서 저장하지 않은 변경이 사라짐).
+        const pendingImageState = collectPendingImageState();
 
         // 서버에서 최신 데이터 다시 로드
         await loadReport(currentReportDate, true /* silent */);
 
         // 내가 수정중인 값 복원
         restoreMyDirtyValues(myDirtyValues);
+        restorePendingImageState(pendingImageState);
 
         showToast('최신 데이터로 갱신되었습니다.');
       } catch (err) {
@@ -960,6 +1083,59 @@
     }
 
     /**
+     * ★★ 2026-08: 이미지도 "저장" 버튼을 눌러야만 서버에 반영되도록 바뀌면서, 아직
+     * 저장하지 않은 상태(신규 업로드 대기 파일 / 기존 이미지 삭제 표시)가 존재할 수
+     * 있다. uploadedImages 배열의 각 항목은 다음 3가지 상태 중 하나다:
+     *  1) 서버에 이미 저장된 이미지: { imageId, name, storedPath, sizeText, dataUrl,
+     *     markedForDelete } — markedForDelete=true면 "저장" 시 DELETE 대상
+     *  2) 아직 서버에 없는 신규 업로드 대기 이미지: { isPending:true, pendingFile(File),
+     *     name, sizeText, dataUrl(blob: 미리보기) } — "저장" 시 업로드 API 호출 대상
+     * hasPendingImageChanges()는 이 중 하나라도 있으면 true를 반환한다(자동 새로고침
+     * 일시정지 판단용).
+     */
+    function hasPendingImageChanges() {
+      return uploadedImages.some(img => img.isPending || img.markedForDelete);
+    }
+
+    /**
+     * 수동 새로고침(refreshData) 직전에, 아직 저장하지 않은 이미지 대기 상태를
+     * 저장해 둔다 — refreshData가 서버 데이터로 화면을 다시 그린 뒤 복원한다.
+     * (신규 업로드 대기 파일의 File 객체와 미리보기 blob URL, 삭제 표시된 기존
+     *  이미지의 imageId 목록을 그대로 보존한다.)
+     */
+    function collectPendingImageState() {
+      return {
+        pendingUploads: uploadedImages.filter(img => img.isPending),
+        markedForDeleteIds: uploadedImages.filter(img => img.markedForDelete && img.imageId)
+          .map(img => img.imageId),
+      };
+    }
+
+    /**
+     * collectPendingImageState()로 보존해둔 이미지 대기 상태를 새로고침 후
+     * 다시 그려진 uploadedImages 배열에 재적용한다.
+     */
+    function restorePendingImageState(state) {
+      if (!state) return;
+      const { pendingUploads, markedForDeleteIds } = state;
+
+      if (markedForDeleteIds && markedForDeleteIds.length > 0) {
+        uploadedImages.forEach(img => {
+          if (img.imageId && markedForDeleteIds.includes(img.imageId)) {
+            img.markedForDelete = true;
+          }
+        });
+      }
+      if (pendingUploads && pendingUploads.length > 0) {
+        uploadedImages.push(...pendingUploads);
+      }
+      if ((markedForDeleteIds && markedForDeleteIds.length > 0) || (pendingUploads && pendingUploads.length > 0)) {
+        setSaveState('저장 필요', 'dirty');
+      }
+      renderUploadedImages();
+    }
+
+    /**
      * 자동 새로고침 시작 (3분 간격)
      */
     function startAutoRefresh() {
@@ -968,8 +1144,8 @@
       indicator.style.display = 'flex';
 
       autoRefreshTimer = setInterval(async () => {
-        // 저장 필요 상태에서는 자동 갱신 일시정지
-        if (dirtyCoords.size > 0) {
+        // 저장 필요 상태(셀 입력 중 또는 이미지 업로드/삭제 대기 중)에서는 자동 갱신 일시정지
+        if (dirtyCoords.size > 0 || hasPendingImageChanges()) {
           indicator.classList.add('paused');
           document.getElementById('autoRefreshLabel').textContent = '수정중 — 일시정지';
           return;
@@ -1512,7 +1688,7 @@
       return { totalNewlines, totalChars };
     }
 
-    /** 특이사항 섹션 타이틀 바의 "(줄바꿈: n/17회) (글자 수: nnn/1206자)" 카운터를 갱신한다. */
+    /** 특이사항 섹션 타이틀 바의 "(줄바꿈: n/15회) (글자 수: nnn/1206자)" 카운터를 갱신한다. */
     function updateSpecialNoteCounter() {
       const el = document.getElementById('specialNoteCounter');
       if (!el) return;
@@ -1526,7 +1702,7 @@
 
     /**
      * 특이사항 textarea 입력값을 분량 제한에 맞게 다듬는다.
-     * - 공유 총량(줄바꿈 17회 / 글자수 1206자)을 넘는 "신규 입력분"은 넘치는 부분만 잘라낸다
+     * - 공유 총량(줄바꿈 15회 / 글자수 1206자)을 넘는 "신규 입력분"은 넘치는 부분만 잘라낸다
      *   (붙여넣기로 한 번에 대량 입력된 경우에도 가능한 곳까지만 반영).
      * - 한 줄(개행 기준) 84자 제한은 하드 블록 대상 — 이 함수에서는 자르지 않고
      *   호출부(onSpecialNoteInput)에서 별도로 감지해 팝업 + 되돌리기를 수행한다.
@@ -1589,7 +1765,7 @@
     }
 
     /**
-     * 특이사항 textarea input 이벤트 핸들러 — 공유 총량(17회/1206자) 초과분은 잘라내고,
+     * 특이사항 textarea input 이벤트 핸들러 — 공유 총량(15회/1206자) 초과분은 잘라내고,
      * 한 줄 84자 초과는 하드 블록 + 팝업으로 되돌린다.
      * (한글 등 IME 조합 중에는 검증을 건너뛰어 조합 자체가 깨지지 않도록 한다.)
      */
@@ -1622,7 +1798,7 @@
         return;
       }
 
-      // 2) 공유 총량(줄바꿈 17회 / 글자수 1206자) 초과 — 넘치는 부분만 잘라서 반영
+      // 2) 공유 총량(줄바꿈 15회 / 글자수 1206자) 초과 — 넘치는 부분만 잘라서 반영
       const { text, newlineBlocked, charBlocked } = trimToSpecialNoteBudget(code, raw);
       if (text !== raw) {
         textarea.value = text;
@@ -1740,7 +1916,7 @@
         </div>
       `;
 
-      // 변경 감지 (행별 textarea 각각에 바인딩) + 분량 제한(줄바꿈 17회/글자수 1206자
+      // 변경 감지 (행별 textarea 각각에 바인딩) + 분량 제한(줄바꿈 15회/글자수 1206자
       // 공유 총량, 한 줄 84자 개별 제한) 실시간 검증
       setTimeout(() => {
         specialNoteLastValue = {};
@@ -1802,7 +1978,7 @@
           <label class="upload-btn" for="imageUploadInput">이미지 선택</label>
           <input id="imageUploadInput" class="upload-input" type="file" accept="image/*" multiple />
           <button class="toolbar-btn" type="button" id="clearImagesBtn" onclick="clearUploadedImages()">이미지 비우기</button>
-          <div class="upload-help">업로드한 이미지는 아래 미리보기에 표시되며 저장 버튼으로 서버에 저장됩니다. (어제/오늘/미래 또는 매월 말일 일보에서만 등록·삭제 가능)</div>
+          <div class="upload-help">선택한 이미지는 아래 미리보기에 "대기중"으로 표시되며, "저장"(또는 "수정") 버튼을 눌러야 서버에 반영됩니다. (어제/오늘/미래 또는 매월 말일 일보에서만 등록·삭제 가능)</div>
         `
         : `
           <label class="upload-btn disabled" for="imageUploadInput">이미지 선택</label>
@@ -1884,26 +2060,41 @@
       }
 
       // ★★ 다운로드는 날짜와 무관하게 항상 가능.
-      //    삭제는 어제 이후(어제/오늘/미래, =수정 가능 기간) 일보일 때만 추가로 노출.
+      //    삭제(대기 표시)는 어제 이후(어제/오늘/미래, =수정 가능 기간) 일보일 때만 추가로 노출.
       const isEditableDate = isImageEditableDate(currentReportDate);
       const canWrite = currentUser?.permissions?.canWriteInput !== false;
       const canDelete = canWrite && isEditableDate;
 
-      grid.innerHTML = uploadedImages.map((img, i) => `
-        <div class="upload-card">
+      // ★★ 2026-08: 이미지도 "저장" 버튼을 눌러야만 서버에 반영되므로, 아래 두 가지
+      // 대기 상태를 카드에 함께 표시한다.
+      //  - isPending(신규 업로드 대기): 이름 옆에 "(대기중)" 배지, 카드 테두리를
+      //    파란색으로 강조 — 아직 서버에 없으므로 "삭제" 클릭 시 목록에서 즉시 제거.
+      //  - markedForDelete(기존 이미지 삭제 예정): 카드를 흐리게(dim) 표시하고
+      //    "(삭제 예정)" 배지 + 버튼을 "삭제 취소"로 전환 — "저장" 전까지는 서버에
+      //    아무 변화가 없으며, 다시 클릭하면 삭제 예정 표시가 취소된다.
+      grid.innerHTML = uploadedImages.map((img, i) => {
+        const isPending = !!img.isPending;
+        const isMarkedForDelete = !!img.markedForDelete;
+        const cardClass = 'upload-card' + (isPending ? ' upload-card-pending' : '') + (isMarkedForDelete ? ' upload-card-marked-delete' : '');
+        const badges = (isPending ? '<span class="upload-card-badge upload-card-badge-pending">대기중</span>' : '')
+          + (isMarkedForDelete ? '<span class="upload-card-badge upload-card-badge-delete">삭제 예정</span>' : '');
+        const removeBtnHtml = isMarkedForDelete
+          ? `<button class="upload-card-undo" type="button" onclick="undoRemoveUploadedImage(${i})">삭제 취소</button>`
+          : `<button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})">삭제</button>`;
+        return `
+        <div class="${cardClass}">
           ${img.loading
             ? '<div class="upload-thumb upload-thumb-loading">불러오는 중...</div>'
             : `<img class="upload-thumb" src="${img.dataUrl || ''}" alt="${escapeHtml(img.name || `image-${i+1}`)}" onerror="this.style.display='none'" />`}
           <div class="upload-card-body">
+            ${badges ? `<div class="upload-card-badges">${badges}</div>` : ''}
             <div class="upload-card-name" title="${escapeHtml(img.name || '')}">${escapeHtml(img.name || `image-${i+1}`)}</div>
-            <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}${img.uploading ? ' · 업로드 중...' : ''}</div>
+            <div class="upload-card-meta">${escapeHtml(img.sizeText || '')}</div>
             <button class="upload-card-download" type="button" onclick="downloadUploadedImage(${i})" ${(img.loading || !img.dataUrl) ? 'disabled' : ''}>다운로드</button>
-            ${canDelete
-              ? `<button class="upload-card-remove" type="button" onclick="removeUploadedImage(${i})" ${img.uploading ? 'disabled' : ''}>삭제</button>`
-              : ''}
+            ${canDelete ? removeBtnHtml : ''}
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     }
 
     /**
@@ -1922,103 +2113,100 @@
     }
 
     /**
-     * 이미지 삭제
-     * - 이미 서버에 저장된 이미지(imageId 존재)는 DELETE API를 호출해
-     *   DB 메타 + 물리 파일을 함께 제거한다 (업로드가 즉시 반영되는 구조이므로
-     *   "저장" 버튼과 무관하게 바로 삭제됨).
+     * ★★ 2026-08 변경: 이미지도 셀/특이사항과 동일하게 "저장" 버튼을 눌러야만
+     * 서버에 반영되도록 바뀌었다. 삭제도 즉시 DELETE 호출하지 않고:
+     *  - 신규 업로드 대기(isPending) 이미지: 아직 서버에 없으므로 목록에서 즉시 제거
+     *  - 이미 서버에 저장된 이미지(imageId 존재): markedForDelete=true로 표시만
+     *    해두고, 실제 DELETE 호출은 saveInputs()에서 저장 시점에 수행한다.
+     *    (다시 "삭제 취소"를 누르면 표시만 되돌릴 수 있다.)
      */
-    async function removeUploadedImage(idx) {
+    function removeUploadedImage(idx) {
       const img = uploadedImages[idx];
       if (!img) return;
 
-      if (img.imageId) {
-        try {
-          await apiFetch(`/reports/${currentReportId}/images/${img.imageId}`, { method: 'DELETE' });
-        } catch (err) {
-          showToast('이미지 삭제 실패: ' + err.message);
-          return;
-        }
+      if (img.isPending) {
+        // 아직 서버에 없는 대기 파일 — 목록에서 바로 제거
+        if (img.dataUrl && img.dataUrl.startsWith('blob:')) URL.revokeObjectURL(img.dataUrl);
+        uploadedImages.splice(idx, 1);
+      } else if (img.imageId) {
+        // 이미 서버에 저장된 이미지 — "삭제 예정" 표시만, 실제 삭제는 저장 시점
+        img.markedForDelete = true;
       }
-      if (img.dataUrl && img.dataUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(img.dataUrl);
-      }
-      uploadedImages.splice(idx, 1);
       renderUploadedImages();
-      showToast('이미지가 삭제되었습니다.');
+      setSaveState('저장 필요', 'dirty');
+      showToast(img.isPending ? '업로드 대기 목록에서 제거했습니다.' : '삭제 예정으로 표시했습니다. "저장"을 눌러야 실제로 삭제됩니다.');
+    }
+
+    /** 삭제 예정 표시를 취소(원상 복구) */
+    function undoRemoveUploadedImage(idx) {
+      const img = uploadedImages[idx];
+      if (!img) return;
+      img.markedForDelete = false;
+      renderUploadedImages();
+      if (!hasPendingImageChanges() && dirtyCoords.size === 0) {
+        setSaveState('저장 전', 'idle');
+      }
+      showToast('삭제 예정 표시를 취소했습니다.');
     }
 
     /**
-     * 전체 이미지 비우기 — 서버에 저장된 이미지는 모두 DELETE API로 제거
+     * 전체 이미지 비우기 — 신규 업로드 대기 항목은 목록에서 즉시 제거하고,
+     * 이미 서버에 저장된 이미지는 모두 "삭제 예정"으로 표시한다(저장 시 실제 삭제).
      */
-    async function clearUploadedImages() {
+    function clearUploadedImages() {
       if (!uploadedImages.length) return;
-      const toDelete = uploadedImages.filter(img => img.imageId);
-      for (const img of toDelete) {
-        try {
-          await apiFetch(`/reports/${currentReportId}/images/${img.imageId}`, { method: 'DELETE' });
-        } catch (err) {
-          console.warn('이미지 삭제 실패:', img.name, err);
+      uploadedImages = uploadedImages.filter(img => {
+        if (img.isPending) {
+          if (img.dataUrl && img.dataUrl.startsWith('blob:')) URL.revokeObjectURL(img.dataUrl);
+          return false; // 목록에서 제거
         }
-      }
-      uploadedImages.forEach(img => {
-        if (img.dataUrl && img.dataUrl.startsWith('blob:')) URL.revokeObjectURL(img.dataUrl);
+        img.markedForDelete = true;
+        return true; // 삭제 예정으로 표시만 하고 유지
       });
-      uploadedImages = [];
       renderUploadedImages();
       const input = document.getElementById('imageUploadInput');
       if (input) input.value = '';
-      showToast('이미지를 모두 삭제했습니다.');
+      if (hasPendingImageChanges()) {
+        setSaveState('저장 필요', 'dirty');
+        showToast('전체 삭제 예정으로 표시했습니다. "저장"을 눌러야 실제로 삭제됩니다.');
+      } else {
+        showToast('업로드 대기 이미지를 모두 제거했습니다.');
+      }
     }
 
     /**
-     * 이미지 파일 선택/드롭 시 즉시 서버로 업로드
-     * - 서버가 최종 개수 제한(최대 8장)을 강제하므로, 프론트는 UX용 사전 안내만 수행
+     * 이미지 파일 선택/드롭 — ★★ 2026-08 변경: 더 이상 즉시 서버로 업로드하지
+     * 않고, File 객체를 그대로 uploadedImages 배열에 "업로드 대기(isPending)"
+     * 상태로 담아두기만 한다. 미리보기는 URL.createObjectURL(file)로 즉시
+     * 생성되므로 사용자 체감 UX는 기존과 동일하다. 실제 서버 업로드는
+     * saveInputs()에서 "저장"/"수정" 버튼을 눌렀을 때 수행된다.
+     * - 최대 개수 제한(8장)은 여기서 "서버에 이미 있는 것 + 삭제 예정 아닌 것 +
+     *   업로드 대기중인 것"을 합산해 프론트에서 먼저 안내한다(서버도 최종
+     *   저장 시점에 동일 한도로 재검증한다).
      */
-    async function handleImageFiles(fileList) {
+    function handleImageFiles(fileList) {
       if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
       const files = Array.from(fileList || []).filter(f => f.type && f.type.startsWith('image/'));
       if (!files.length) return;
 
-      const available = Math.max(0, MAX_UPLOAD_IMAGES - uploadedImages.length);
-      const toUpload = files.slice(0, available);
-      if (!toUpload.length) { showToast(`이미지는 최대 ${MAX_UPLOAD_IMAGES}장까지 등록할 수 있습니다.`); return; }
-      if (files.length > toUpload.length) showToast(`최대 ${MAX_UPLOAD_IMAGES}장까지만 업로드됩니다.`);
+      const effectiveCount = uploadedImages.filter(img => !img.markedForDelete).length;
+      const available = Math.max(0, MAX_UPLOAD_IMAGES - effectiveCount);
+      const toAdd = files.slice(0, available);
+      if (!toAdd.length) { showToast(`이미지는 최대 ${MAX_UPLOAD_IMAGES}장까지 등록할 수 있습니다.`); return; }
+      if (files.length > toAdd.length) showToast(`최대 ${MAX_UPLOAD_IMAGES}장까지만 담을 수 있습니다.`);
 
-      for (const file of toUpload) {
-        // 업로드 진행 중 placeholder 카드 표시
-        const placeholder = { name: file.name, sizeText: humanFileSize(file.size), dataUrl: '', uploading: true };
-        uploadedImages.push(placeholder);
-        renderUploadedImages();
-
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const saved = await apiUpload(`/reports/${currentReportId}/images/upload`, formData);
-
-          placeholder.imageId = saved.imageId;
-          placeholder.name = saved.originalName;
-          placeholder.storedPath = saved.storedPath;
-          placeholder.sizeText = humanFileSize(saved.fileSize);
-          placeholder.uploading = false;
-          placeholder.loading = true;
-          renderUploadedImages();
-
-          try {
-            placeholder.dataUrl = await fetchImageBlobUrl(saved.storedPath);
-          } catch (err) {
-            console.warn('업로드된 이미지 미리보기 로드 실패:', err);
-          } finally {
-            placeholder.loading = false;
-            renderUploadedImages();
-          }
-        } catch (err) {
-          // 업로드 실패 → placeholder 제거
-          const idx = uploadedImages.indexOf(placeholder);
-          if (idx > -1) uploadedImages.splice(idx, 1);
-          renderUploadedImages();
-          showToast(`이미지 업로드 실패 (${file.name}): ${err.message}`);
-        }
-      }
+      toAdd.forEach(file => {
+        uploadedImages.push({
+          isPending: true,
+          pendingFile: file,
+          name: file.name,
+          sizeText: humanFileSize(file.size),
+          dataUrl: URL.createObjectURL(file),
+        });
+      });
+      renderUploadedImages();
+      setSaveState('저장 필요', 'dirty');
+      showToast(`${toAdd.length}장을 업로드 대기 목록에 담았습니다. "저장"을 눌러야 서버에 반영됩니다.`);
     }
 
     // ── 저장 ──
@@ -2027,10 +2215,21 @@
       if (!currentUser.permissions.canWriteInput) { showToast('쓰기 권한이 없습니다.'); return; }
       if (!currentReportId) { showToast('일보가 로드되지 않았습니다.'); return; }
 
-      // 저장 전 확인 팝업: "YYYY.MM.DD 일자로 저장하시겠습니까?" (커스텀 모달, 주소 표시 없음)
+      // 저장 전 확인 팝업
+      // - 저장 구간(05:00:00~08:09:59): "YYYY.MM.DD 일자로 저장하시겠습니까?" (기존 문구/흐름 그대로 유지)
+      // - 그 외 나머지 모든 시간(수정 구간): "YYYY.MM.DD 일보를 수정하시겠습니까?" + 재업로드
+      //   대상 게시판을 고르는 라디오 3개(기본 선택 없음)를 함께 표시한다 (★ 2026-08 신규).
       const dateLabel = formatDateDots(currentReportDate);
-      const confirmed = await showConfirmModal(`${dateLabel} 일자로 저장하시겠습니까?`);
-      if (!confirmed) return;
+      const isBatchJobFlow = isAfterBatchJobCutoff();
+      let selectedBatchType = null;
+      if (isBatchJobFlow) {
+        const result = await showConfirmModal(`${dateLabel} 일보를 수정하시겠습니까?`, BATCH_JOB_RADIO_OPTIONS);
+        if (!result.confirmed) return;
+        selectedBatchType = result.batchType;
+      } else {
+        const confirmed = await showConfirmModal(`${dateLabel} 일자로 저장하시겠습니까?`);
+        if (!confirmed) return;
+      }
 
       try {
         // 1. 셀 데이터 수집 (표별로 그룹핑)
@@ -2120,20 +2319,84 @@
           }
         }
 
+        // 3.5. ★★ 이미지 업로드/삭제 처리 (2026-08 신규) — 이미지도 셀/특이사항과
+        //   동일하게 "저장" 버튼을 눌러야만 서버에 반영되도록 바뀌었다. 여기서:
+        //   (a) 업로드 대기(isPending) 이미지를 실제로 업로드하고,
+        //   (b) 삭제 예정(markedForDelete) 이미지를 실제로 DELETE 한다.
+        //   실패한 항목은 대기/삭제예정 상태를 그대로 유지해 재시도할 수 있게 한다.
+        let imageUploadCount = 0, imageDeleteCount = 0;
+        const imageFailures = [];
+        for (const img of uploadedImages) {
+          if (img.isPending) {
+            try {
+              const formData = new FormData();
+              formData.append('file', img.pendingFile);
+              const saved = await apiUpload(`/reports/${currentReportId}/images/upload`, formData);
+              if (img.dataUrl && img.dataUrl.startsWith('blob:')) URL.revokeObjectURL(img.dataUrl);
+              img.isPending = false;
+              img.pendingFile = null;
+              img.imageId = saved.imageId;
+              img.name = saved.originalName;
+              img.storedPath = saved.storedPath;
+              img.sizeText = humanFileSize(saved.fileSize);
+              imageUploadCount++;
+            } catch (err) {
+              console.warn(`이미지 업로드 실패 (${img.name}):`, err);
+              imageFailures.push(`업로드 실패(${img.name}): ${err.message || '알 수 없는 오류'}`);
+            }
+          } else if (img.markedForDelete && img.imageId) {
+            try {
+              await apiFetch(`/reports/${currentReportId}/images/${img.imageId}`, { method: 'DELETE' });
+              img._deleted = true; // 아래에서 배열 필터링용 표시
+              imageDeleteCount++;
+            } catch (err) {
+              console.warn(`이미지 삭제 실패 (${img.name}):`, err);
+              imageFailures.push(`삭제 실패(${img.name}): ${err.message || '알 수 없는 오류'}`);
+            }
+          }
+        }
+        // 성공적으로 삭제된 이미지는 배열에서 제거
+        uploadedImages = uploadedImages.filter(img => !img._deleted);
+        const imageChanged = imageUploadCount > 0 || imageDeleteCount > 0;
+        const imageSaveFailed = imageFailures.length > 0;
+
         // 4. 저장 완료/실패 표시
         dirtyCoords.clear();
         const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
-        if (failedGroups.length > 0 || noteSaveFailed) {
+        if (failedGroups.length > 0 || noteSaveFailed || imageSaveFailed) {
           // 일부 또는 전체 저장 실패 → 성공으로 오인하지 않도록 명확히 실패로 표시
           setSaveState(`저장 실패 있음 ${timeStr}`, 'dirty');
           const detail = failedGroups.map(f => `${f.tableCode}(${f.count}개): ${f.message}`).join(' / ');
-          const noteDetail = noteSaveFailed ? (detail ? ' / 특이사항 저장 실패' : '특이사항 저장 실패') : '';
-          showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 셀 실패${detail ? ' - ' + detail : ''}${noteDetail}`);
+          const noteDetail = noteSaveFailed ? '특이사항 저장 실패' : '';
+          const imageDetail = imageSaveFailed ? `이미지 ${imageFailures.length}건 실패(${imageFailures.join(' / ')})` : '';
+          const details = [detail, noteDetail, imageDetail].filter(Boolean).join(' / ');
+          showToast(`⚠️ 저장 실패 · ${totalSaved}개 저장됨, ${failedGroups.reduce((s,f)=>s+f.count,0)}개 셀 실패${details ? ' - ' + details : ''}`);
         } else {
           setSaveState(`저장됨 ${timeStr}`, 'saved');
-          showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 ${noteSaveCount}건 반영`);
+          const imagePart = imageChanged
+            ? ` · 이미지 ${imageUploadCount > 0 ? `업로드 ${imageUploadCount}건` : ''}${imageUploadCount > 0 && imageDeleteCount > 0 ? ', ' : ''}${imageDeleteCount > 0 ? `삭제 ${imageDeleteCount}건` : ''}`
+            : '';
+          showToast(`저장 완료 · ${totalSaved}개 담당 셀 + 특이사항 ${noteSaveCount}건 반영${imagePart}`);
+
+          // ★★ 게시판 재업로드 요청 (2026-08 신규) — 저장 구간(05:00:00~08:09:59) 밖의
+          // "수정" 흐름이고 셀/특이사항/이미지 저장이 모두 성공했을 때만, 사용자가 고른
+          // 게시판(batchType)을 재업로드 요청 큐(daily_batchjob)에 적재한다. 이 요청은
+          // 별도 PC의 배치 시스템이 5초 주기로 폴링하여 처리하므로, 여기서는 등록만
+          // 하고 끝낸다. (저장 자체는 이미 완료되었으므로, 이 요청이 실패해도 저장
+          // 실패로 간주하지 않고 토스트로만 별도 안내한다.)
+          if (isBatchJobFlow && selectedBatchType) {
+            try {
+              await apiFetch(`/reports/${currentReportId}/batch-jobs`, {
+                method: 'POST',
+                body: JSON.stringify({ batchType: selectedBatchType })
+              });
+            } catch (err) {
+              console.warn('게시판 재업로드 요청 등록 실패:', err);
+              showToast(`⚠️ 저장은 완료되었으나 재업로드 요청 등록에 실패했습니다: ${err.message}`);
+            }
+          }
         }
 
         // 자동 새로고침 표시 복원
@@ -2143,10 +2406,22 @@
           document.getElementById('autoRefreshLabel').textContent = '자동 갱신 3분';
         }
 
-        // ★★ 특이사항은 서버에서 remarkId/savedByName/savedAt이 갱신되므로
-        //    저장 직후 최신 상태를 다시 불러와 화면에 반영한다 (silent 새로고침).
-        if (noteSaveCount > 0) {
+        // ★★ 특이사항/이미지는 서버에서 ID·경로 등이 갱신되므로 저장 직후
+        //    최신 상태를 다시 불러와 화면에 반영한다 (silent 새로고침).
+        // ★★ 버그 수정(2026-08): 위 이미지 처리 루프에서 일부 항목이 업로드/삭제에
+        //    실패하면 해당 항목은 isPending/markedForDelete 상태를 그대로 유지해
+        //    재시도 가능하게 남겨뒀다. 그런데 noteSaveCount>0 또는 imageChanged(다른
+        //    항목은 성공)로 아래 loadReport()가 실행되면 createImageUploadSection()이
+        //    서버 데이터로 uploadedImages를 통째로 재구성하면서 이 "실패 후 대기중"
+        //    상태가 화면에서 조용히 사라져버리는 문제가 있었다. refreshData()와 동일한
+        //    패턴으로 reload 직전에 남아있는 대기/삭제예정 상태를 수집해뒀다가, reload
+        //    후 다시 적용해 실패한 항목이 계속 보이고 재시도할 수 있게 한다.
+        if (noteSaveCount > 0 || imageChanged) {
+          const pendingImageStateAfterSave = collectPendingImageState();
           await loadReport(currentReportDate, true);
+          restorePendingImageState(pendingImageStateAfterSave);
+        } else {
+          renderUploadedImages();
         }
 
       } catch (err) {
@@ -2487,6 +2762,12 @@
     async function init() {
       // 날짜 입력 기본값
       document.getElementById('reportDateInput').value = getTodayStr();
+
+      // ★ 저장 구간(05:00:00~08:09:59) 기준 저장/수정 버튼 라벨 초기 반영 + 매분 재확인
+      //   (사용자가 구간 경계를 걸쳐 페이지를 오래 열어둔 채로 있어도 라벨이
+      //    실시간으로 전환되도록 60초 주기로 다시 판정한다)
+      updateSaveButtonLabel();
+      setInterval(updateSaveButtonLabel, 60000);
 
       // AI 플랫폼 인증 확인 + 1계층 권한 검증 + 일보 로드
       await checkPermissionsAndInit();

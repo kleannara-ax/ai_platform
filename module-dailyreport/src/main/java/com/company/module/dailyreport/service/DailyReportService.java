@@ -44,7 +44,18 @@ public class DailyReportService {
     private final DailyReportImageRepository imageRepository;
     private final CellOwnershipSyncService cellOwnershipSyncService;
     private final CellAuthRepository cellAuthRepository;
+    private final DailyBatchJobRepository batchJobRepository;
     private final EntityManager entityManager;
+
+    /** ★★ "저장" 버튼이 활성화되는 구간(2026-08, 시간대 방식으로 변경) — 이 구간
+     *  [SAVE_WINDOW_START, SAVE_WINDOW_END) 안에서만 "저장" 버튼 + daily_batchjob을
+     *  전혀 참조하지 않는 기존 흐름이 유지된다. 이 구간을 벗어난 나머지 모든
+     *  시간(자정을 넘나드는 새벽 포함)은 "수정" 버튼 + daily_batchjob 재업로드
+     *  요청 흐름이 활성화된다. */
+    private static final java.time.LocalTime SAVE_WINDOW_START_TIME = java.time.LocalTime.of(5, 0, 0);
+    /** ★★ 저장 구간 종료 시각(배타적, exclusive) — 08:09:59는 "저장", 08:10:00부터는 "수정"
+     *  (2026-08 8:05→8:10으로 조정) */
+    private static final java.time.LocalTime SAVE_WINDOW_END_TIME = java.time.LocalTime.of(8, 10, 0);
 
     /** ★★ 특이사항(사업부별 5행) 전용 가상 표 코드 — daily_report_cell_auth의
      *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
@@ -60,16 +71,17 @@ public class DailyReportService {
         SPECIAL_NOTE_CATEGORIES.put("ETC", "기타");
     }
 
-    /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정)
+    /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정, 2026-08 17→15 재조정)
      *  - 줄바꿈/전체 글자수는 5개 사업부 행 전체를 합산한 "공유 총량"이다
      *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
      *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
      *  - 줄바꿈 총량은 원래 특이사항이 분리되기 전 하나의 자유서술 칸 기준 21회였으나,
      *    5개 사업부(제지/화장지/패드/사고안전사고/기타) 행으로 나뉘며 행 사이 구분선이
-     *    4곳(5개 항목 사이 간격) 생겨 그만큼 공간을 차지하므로 21에서 4를 뺀 17을 사용한다.
+     *    4곳(5개 항목 사이 간격) 생겨 그만큼 공간을 차지하므로 21에서 4를 뺀 17을 사용했다가,
+     *    이후 15로 재조정되었다.
      *  프론트(index.html)에서도 동일한 상수로 실시간 검증을 하지만, 프론트 검증은
      *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
-    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 17;
+    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 15;
     private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
 
@@ -541,7 +553,7 @@ public class DailyReportService {
 
     /**
      * ★★ 특이사항 분량 제한 검증 (신규 작성)
-     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(17회/1206자)를
+     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(15회/1206자)를
      *   넘지 않는지 확인한다. 다른 사업부 행에 이미 저장된 내용까지 합산 대상이다.
      * - 자신이 입력하는 내용 자체의 한 줄(개행 기준) 길이가 84자를 넘지 않는지 확인한다.
      */
@@ -1090,5 +1102,72 @@ public class DailyReportService {
      */
     private boolean isLastDayOfMonth(LocalDate date) {
         return date != null && date.getDayOfMonth() == date.lengthOfMonth();
+    }
+
+    // ─────────────────────────────────────────────
+    // ★★ 게시판(공장일보/세부공장일보) 재업로드 요청 (2026-08 신규)
+    // ─────────────────────────────────────────────
+
+    /**
+     * "수정" 흐름(저장 구간 05:00:00~08:09:59 이외의 모든 시간)에서 값을 저장했을 때,
+     * 사용자가 선택한 게시판 구분에 따라 daily_batchjob에 재업로드 요청 행을 1건
+     * INSERT한다.
+     *
+     * ★★ 서버 측 시간 재검증(2026-08): 프론트엔드가 저장 구간 여부를 자체 판단해
+     * "저장" 버튼일 때는 이 API를 호출조차 하지 않지만, 클라이언트 시계 조작/오차로
+     * 인해 저장 구간(05:00:00~08:09:59) 중에 이 API가 호출되는 것을 서버에서도
+     * 한 번 더 차단한다 — 저장 구간에는 daily_batchjob을 절대 참조/적재하지 않아야
+     * 하기 때문이다.
+     *
+     * ※ 이 메서드는 요청 등록만 담당하며, 실제 게시판 갱신은 별도 PC에서
+     *   동작하는 배치 시스템이 이 테이블을 5초 주기로 폴링하여 처리한다.
+     *   CREATE_YN/RESULT_VALUE 등 처리 결과 필드는 그 배치 시스템만 갱신하므로
+     *   이 메서드는 항상 CREATE_YN='N'(대기 상태)으로만 INSERT한다.
+     *
+     * @param reportId  대상 일보 ID (BATCH_DATE 산출용)
+     * @param batchType "1"(공장일보) / "2"(세부공장일보) / "3"(모두)
+     * @param userId    요청자 (core_user FK)
+     */
+    @Transactional
+    public void requestBatchJob(Long reportId, String batchType, Long userId) {
+        if (isWithinSaveWindow()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "저장 시간대(05:00~08:09:59)에는 게시판 재업로드 요청을 등록할 수 없습니다.");
+        }
+
+        DailyReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new EntityNotFoundException("일보를 찾을 수 없습니다. ID: " + reportId));
+
+        // ★ 2026-08: BATCH_DATE는 daily_report.REPORT_DATE와 동일한 DATE 타입으로
+        //   통일되어 있으므로, 문자열 변환 없이 report.getReportDate()(LocalDate)를 그대로 사용한다.
+        DailyBatchJob job = DailyBatchJob.builder()
+                .batchDate(report.getReportDate())
+                .batchType(batchType)
+                .createdBy(userId)
+                .build();
+        batchJobRepository.save(job);
+    }
+
+    /**
+     * ★★ 현재 서버 시각(Asia/Seoul)이 "저장" 구간(05:00:00~08:09:59, 시작 포함/종료
+     * 배타) 안에 있는지 여부. true면 "저장" 버튼 + 기존 흐름(daily_batchjob 미참조),
+     * false면 "수정" 버튼 + daily_batchjob 재업로드 요청 흐름이 활성화된다.
+     *
+     * 자정을 넘나드는 새벽 시간(00:00:00~04:59:59)도 저장 구간 밖이므로 "수정"으로
+     * 판정된다 — 하루를 "저장 구간"과 "그 외 나머지 전체 시간(수정 구간)" 두 구간으로
+     * 나누는 것이며, "그 외 나머지"가 자정을 사이에 두고 이어져 있을 뿐이다.
+     */
+    private boolean isWithinSaveWindow() {
+        java.time.LocalTime now = java.time.LocalTime.now();
+        return !now.isBefore(SAVE_WINDOW_START_TIME) && now.isBefore(SAVE_WINDOW_END_TIME);
+    }
+
+    /**
+     * ★★ 현재 서버 시각이 "수정" 흐름(=저장 구간 밖)인지 여부. 프론트엔드가 별도로
+     * 자체 시각을 판단해 버튼 라벨을 전환하지만, 참고/검증용으로 서버에도 동일 기준을
+     * 노출한다.
+     */
+    public boolean isAfterBatchJobCutoff() {
+        return !isWithinSaveWindow();
     }
 }

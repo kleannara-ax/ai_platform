@@ -125,13 +125,18 @@ public class FireDataInitializer implements ApplicationRunner {
     // ----------------------------------------------------------------
 
     private void insertIgnoreBuilding(long id, String name) {
-        int affected = jdbc.update(
-                "INSERT INTO building (BUILDING_ID, BUILDING_NAME, IS_ACTIVE) " +
-                        "SELECT ?, ?, 1 " +
-                        "WHERE NOT EXISTS (SELECT 1 FROM building WHERE BUILDING_NAME = ?)",
-                id, name, name);
-        if (affected > 0) {
-            log.info("[FireDataInitializer] building 추가: id={}, name={}", id, name);
+        try {
+            int affected = jdbc.update(
+                    "INSERT INTO building (BUILDING_ID, BUILDING_NAME, IS_ACTIVE) " +
+                            "SELECT ?, ?, 1 " +
+                            "WHERE NOT EXISTS (SELECT 1 FROM building WHERE BUILDING_NAME = ?)",
+                    id, name, name);
+            if (affected > 0) {
+                log.info("[FireDataInitializer] building 추가: id={}, name={}", id, name);
+            }
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // BUILDING_ID PK가 이미 다른 이름(인코딩 이슈 등)으로 선점된 경우 — 앱 기동을 막지 않고 스킵
+            log.warn("[FireDataInitializer] building id={} 중복으로 스킵 (name={})", id, name);
         }
     }
 

@@ -6,6 +6,7 @@
 --       - 일보 업무 테이블 5개 (daily_report, daily_report_table, daily_report_cell,
 --         daily_report_remark, daily_report_image)
 --       - ★ 신규: daily_report_cell_auth (셀 단위 접근 권한 관리)
+--       - ★★ 신규(2026-08): daily_batchjob (게시판 재업로드 요청 큐)
 -- ============================================================
 -- 변경이력:
 --   v1.0: 최초 작성
@@ -15,10 +16,13 @@
 --     - 2계층: daily_report_cell_auth → 셀 단위 입력 권한 (관리자 설정)
 --     - 3계층: core_menu_permission → '세부공장일보 컬럼관리' 관리 페이지 접근 권한
 --     ※ 레거시 daily_report_cell_permission 제거 → daily_report_cell_auth로 대체
---   v3.1 (현재): core_user/core_menu 스텁을 V2.0.0 운영 스키마로 동기화
+--   v3.1: core_user/core_menu 스텁을 V2.0.0 운영 스키마로 동기화
 --     - core_user: IS_ACTIVE→enabled, DEPARTMENT/POSITION 제거, phone/created_by/updated_by 추가
 --     - core_menu: V2.0.0 소문자 컬럼명 + is_visible/allowed_ips 추가
 --     - core_menu_permission: 코드 미참조 명시 (CellAuth 기반으로 전환 완료)
+--   v3.2 (현재, 2026-08): daily_batchjob 추가 — 오전 8:05 이후 수정 시
+--     공장일보/세부공장일보 게시판 재업로드가 필요함을 별도 PC 배치 시스템에
+--     알리는 요청 큐 (11_add_daily_batchjob.sql 참고)
 -- ============================================================
 
 USE dailyreport_dev;
@@ -265,6 +269,33 @@ CREATE TABLE IF NOT EXISTS daily_report_image (
 
 
 -- ────────────────────────────────────────────
+-- 7. ★★ daily_batchjob (신규, 2026-08) — 게시판 재업로드 요청 큐
+--    오전 8:05 이후 사람이 값을 "수정"하면, 별도 PC에서 동작하는 배치
+--    시스템이 5초 주기로 이 테이블을 훑어 공장일보/세부공장일보 게시글을
+--    다시 게시(재업로드)하도록 요청 행을 남긴다.
+--    (11_add_daily_batchjob.sql 참고 — 상세 배경 설명)
+-- ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS daily_batchjob (
+    SEQ_NO       BIGINT        NOT NULL AUTO_INCREMENT                COMMENT '순번',
+    BATCH_DATE   DATE          NOT NULL                                COMMENT '일자 (일보 대상 날짜, daily_report.REPORT_DATE와 동일 규칙)',
+    BATCH_TYPE   VARCHAR(1)    NOT NULL                                COMMENT '구분 (1:공장일보, 2:세부공장일보, 3:모두)',
+    CREATE_YN    VARCHAR(1)    NOT NULL DEFAULT 'N'                    COMMENT '생성여부 (배치가 처리 완료 시 Y로 갱신)',
+    CREATED_AT   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP      COMMENT '요청일시',
+    CREATED_BY   BIGINT        NOT NULL                                COMMENT '요청자 (core_user FK)',
+    UPDATED_AT   DATETIME      NULL     ON UPDATE CURRENT_TIMESTAMP    COMMENT '수정일시 (배치가 처리 시 갱신)',
+    UPDATED_BY   BIGINT        NULL                                    COMMENT '수정자 (배치 처리 주체 식별용, 필요 시 사용)',
+    RESULT_VALUE VARCHAR(1)    NULL                                    COMMENT '성공여부 (배치가 처리 후 Y/N 등으로 기록)',
+    REMARKS1     VARCHAR(100)  NULL                                    COMMENT '비고1',
+    REMARKS2     VARCHAR(100)  NULL                                    COMMENT '비고2',
+    REMARKS3     VARCHAR(100)  NULL                                    COMMENT '비고3',
+    PRIMARY KEY (SEQ_NO),
+    INDEX IDX_BATCHJOB_DATE (BATCH_DATE),
+    INDEX IDX_BATCHJOB_CREATE_YN (CREATE_YN)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='게시판(공장일보/세부공장일보) 재업로드 요청 큐 — 별도 PC 배치 시스템이 5초 주기로 폴링';
+
+
+-- ────────────────────────────────────────────
 -- 검증: 테이블 생성 확인
 -- ────────────────────────────────────────────
 SELECT TABLE_NAME, TABLE_COMMENT
@@ -272,4 +303,4 @@ SELECT TABLE_NAME, TABLE_COMMENT
  WHERE TABLE_SCHEMA = 'dailyreport_dev'
  ORDER BY TABLE_NAME;
 
-SELECT '=== 01_schema.sql 실행 완료 (9 테이블) ===' AS message;
+SELECT '=== 01_schema.sql 실행 완료 (10 테이블) ===' AS message;

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KIMS 전산업무 요청</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container" style="max-width: 480px; margin-top: 4vh; margin-bottom: 4vh;">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h4 class="mb-1">전산업무 요청</h4>
+        <p class="text-muted small mb-3">QR로 접속하셨습니다. 아래 위치/부서로 접수됩니다.</p>
+
+        <div id="loc" class="alert alert-info mb-3">위치 정보를 불러오는 중...</div>
+
+        <!-- 요청 입력 폼 -->
+        <form id="form" class="d-none" onsubmit="submitReq(event)">
+          <div class="mb-3">
+            <label class="form-label">요청유형 <span class="text-danger">*</span></label>
+            <select id="requestType" class="form-select" required>
+              <option value="">선택하세요</option>
+              <option value="PROGRAM">PC관련 불편사항 조치 (PC 느림/오류/프린터 등)</option>
+              <option value="SUPPLY">전산소모품 지급</option>
+              <option value="IP">IP 변경/생성</option>
+              <option value="INTERNET">인터넷 공사</option>
+            </select>
+          </div>
+          <!-- PC관련 불편사항 조치 선택 시에만 표시 -->
+          <div class="mb-3 d-none" id="issueBlock">
+            <label class="form-label">불편유형 <span class="text-danger">*</span></label>
+            <select id="issueType" class="form-select">
+              <option value="">불편유형 선택</option>
+              <option value="PC_USE">PC 사용불편문의 (안켜짐, 느림 등)</option>
+              <option value="MONITOR">모니터 관련 문의 (안켜짐, 어두워짐 등)</option>
+              <option value="NETWORK">인터넷 관련 문의 (네트워크 안됨, 느림)</option>
+              <option value="PROGRAM_INSTALL">프로그램 설치 문의</option>
+              <option value="PC_NEW">PC 신규 설치 문의</option>
+              <option value="PRINTER">프린터 관련 문의 (스캔, 인쇄안됨, 신규설치 등)</option>
+              <option value="LABEL_PRINTER">라벨프린터 관련 문의</option>
+              <option value="KIOSK">키오스크 관련 문의</option>
+              <option value="PDA">PDA 관련 문의</option>
+              <option value="ETC">기타 문의</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">요청자명 <span class="text-danger">*</span></label>
+            <input id="requesterName" class="form-control" placeholder="성함" required maxlength="50">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">연락처</label>
+            <input id="contact" class="form-control" inputmode="tel" placeholder="내선/휴대폰 (선택)" maxlength="30">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">요청내용 <span class="text-danger">*</span></label>
+            <textarea id="content" class="form-control" rows="4" placeholder="어떤 문제/요청인지 적어주세요." required></textarea>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="urgent">
+            <label class="form-check-label" for="urgent">긴급 요청</label>
+          </div>
+          <button id="submitBtn" type="submit" class="btn btn-primary w-100 btn-lg">요청 접수</button>
+        </form>
+
+        <!-- 접수 완료 -->
+        <div id="done" class="text-center py-3 d-none">
+          <div style="font-size:2.5rem">✅</div>
+          <h5 class="mt-2 mb-1">접수되었습니다</h5>
+          <p class="mb-1 text-muted small">요청번호</p>
+          <p class="fs-5 fw-bold" id="doneNo">-</p>
+          <p class="text-muted small">담당자가 확인 후 처리합니다.</p>
+          <button class="btn btn-outline-secondary" onclick="resetForm()">새 요청 작성</button>
+        </div>
+      </div>
+    </div>
+    <p class="text-center text-muted small mt-2">Kleannara IT Operation Management System</p>
+  </div>
+
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+    const box = document.getElementById('loc');
+    const form = document.getElementById('form');
+    const done = document.getElementById('done');
+
+    if (!token) {
+      box.className = 'alert alert-danger mb-0';
+      box.textContent = '잘못된 접근입니다. (토큰 없음)';
+    } else {
+      fetch('/qr-api/locations/' + encodeURIComponent(token))
+        .then(r => r.json())
+        .then(j => {
+          if (!j.success) throw new Error(j.message || '유효하지 않은 QR 입니다.');
+          const d = j.data;
+          box.className = 'alert alert-success mb-3';
+          box.innerHTML = '<b>위치:</b> ' + (d.location || '-') + '<br><b>부서:</b> ' + (d.department || '-')
+            + (d.name ? '<br><b>구역:</b> ' + d.name : '');
+          form.classList.remove('d-none');
+        })
+        .catch(e => { box.className = 'alert alert-danger mb-0'; box.textContent = e.message; });
+    }
+
+    // PC관련 불편사항 조치(PROGRAM) 선택 시 불편유형 드롭다운 표시/숨김
+    document.getElementById('requestType').addEventListener('change', function () {
+      const isIssue = this.value === 'PROGRAM';
+      document.getElementById('issueBlock').classList.toggle('d-none', !isIssue);
+      if (!isIssue) document.getElementById('issueType').value = '';
+    });
+
+    async function submitReq(ev) {
+      ev.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const reqType = document.getElementById('requestType').value;
+      const issueType = document.getElementById('issueType').value;
+      const payload = {
+        requesterName: document.getElementById('requesterName').value.trim(),
+        contact: document.getElementById('contact').value.trim(),
+        requestType: reqType,
+        issueType: reqType === 'PROGRAM' ? issueType : null,
+        content: document.getElementById('content').value.trim(),
+        urgent: document.getElementById('urgent').checked,
+      };
+      if (!payload.requesterName || !payload.requestType || !payload.content) return;
+      if (reqType === 'PROGRAM' && !issueType) { alert('불편유형을 선택하세요.'); return; }
+      btn.disabled = true; btn.textContent = '접수 중...';
+      try {
+        const res = await fetch('/qr-api/requests/' + encodeURIComponent(token), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const j = await res.json();
+        if (!res.ok || !j.success) throw new Error(j.message || '접수에 실패했습니다.');
+        document.getElementById('doneNo').textContent = j.data.requestNo || '-';
+        form.classList.add('d-none');
+        box.classList.add('d-none');
+        done.classList.remove('d-none');
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = '요청 접수';
+      }
+    }
+
+    function resetForm() {
+      form.reset();
+      done.classList.add('d-none');
+      box.classList.remove('d-none');
+      form.classList.remove('d-none');
+    }
+  </script>
+</body>
+</html>

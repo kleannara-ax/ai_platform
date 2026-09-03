@@ -94,6 +94,22 @@ ps-insp:
     # MES 전송 URL은 코드에 하드코딩됨 (https://mes.kleannara.com/mobile/saveDustInspectionResult.data)
     # 타임아웃: Connect 60초 / Read 60초
 
+# ── KIMS 모듈 설정 ──
+kims:
+  # 첨부파일 저장 디렉토리 (운영은 환경변수 KIMS_UPLOAD_DIR 로 주입 권장)
+  upload-dir: ${KIMS_UPLOAD_DIR:${user.home}/kims-uploads}
+  qr:
+    # QR 코드가 가리킬 외부 베이스 URL. 비우면 접속한 호스트로 자동 구성.
+    base-url: ${KIMS_QR_BASE_URL:}
+
+# ── 안전작업방식 매뉴얼(SAFETY) 모듈 설정 ──
+safety:
+  # 매뉴얼 단계별 사진 저장 디렉토리 (운영은 환경변수 SAFETY_UPLOAD_DIR 로 주입 권장)
+  upload-dir: ${SAFETY_UPLOAD_DIR:${user.home}/safety-uploads}
+  # 엑셀 일괄업로드 1회 최대 시트(매뉴얼) 개수 — 과도한 업로드 방지
+  excel:
+    max-sheets-per-upload: 100
+
 # ── 로깅 ──
 logging:
   level:
