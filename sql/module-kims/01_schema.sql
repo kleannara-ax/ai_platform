@@ -277,6 +277,7 @@ CREATE TABLE IF NOT EXISTS `supply_issue` (
   `DEPARTMENT` varchar(50) DEFAULT NULL COMMENT '대상자 부서',
   `ISSUED_BY` varchar(50) NOT NULL COMMENT '지급 담당자',
   `ISSUED_AT` date NOT NULL COMMENT '지급일',
+  `SUB_TYPE` varchar(20) DEFAULT NULL COMMENT '세부 구분 (신형/구형/레노버/갤럭시/대여 등)',
   `CREATED_AT` datetime NOT NULL DEFAULT current_timestamp() COMMENT '생성일시',
   `UPDATED_AT` datetime NOT NULL DEFAULT current_timestamp() COMMENT '수정일시',
   `CREATED_BY` varchar(50) DEFAULT NULL COMMENT '생성자(로그인ID)',

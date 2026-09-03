@@ -7,7 +7,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 
 번호는 실행 순서 그대로다(건너뛰는 번호 없음). 모든 파일이 재실행해도 안전한 idempotent
 패턴(표는 `IF NOT EXISTS`, 컬럼/인덱스는 `INFORMATION_SCHEMA` 존재 체크 후 추가, 메뉴는 삭제 후
-재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 07번까지
+재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 08번까지
 순서대로 전부 실행**하면 된다.
 
 | 순서 | 파일 | 설명 |
@@ -19,6 +19,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 | 5 | `05_pc_site_column.sql` | `ip_address.SITE` 컬럼/인덱스 보강 — 01_schema.sql 에 이미 반영된 신규 설치 DB에서는 실행해도 아무 변화 없음(idempotent). 01_schema.sql 을 갱신하기 전에 만들어진 기존 배포 DB에만 실질적인 효과가 있음 |
 | 6 | `06_seoul_perm_code.sql` | 공통코드 `KIMS_PERM_SEOUL` ("KIMS 서울", PC 관리 서울 전용 접근 그룹) 생성 |
 | 7 | `07_seoul_ip_band_backfill.sql` | 서울 IP 대역(192.1.17/104/107/117.x) 기존 데이터 `SITE` 보정 |
+| 8 | `08_supply_issue_subtype_column.sql` | `supply_issue.SUB_TYPE` 컬럼 추가 — 지급 시 선택한 세부 구분(신형/구형/제조사 등) 기록. 01_schema.sql 에 이미 반영된 신규 설치 DB에서는 실행해도 아무 변화 없음(idempotent) |
 
 ```bash
 mysql -u root --default-character-set=utf8mb4 {db} < 01_schema.sql
@@ -28,6 +29,7 @@ mysql -u root --default-character-set=utf8mb4 {db} < 04_data.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 05_pc_site_column.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 06_seoul_perm_code.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 07_seoul_ip_band_backfill.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 08_supply_issue_subtype_column.sql
 ```
 
 ### 기존 KIMS 데이터를 함께 옮길 때
