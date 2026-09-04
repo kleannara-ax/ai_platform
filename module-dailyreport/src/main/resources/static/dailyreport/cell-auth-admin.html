@@ -238,6 +238,12 @@
                 <option value="TBL_ENERGY">에너지 원단위</option>
                 <option value="TBL_BOILER">보일러 운영</option>
                 <option value="TBL_SPECIAL_NOTE">특이사항</option>
+                <option value="TBL_SAFETY_INCIDENT_COUNT">안전사고 발생건수</option>
+                <option value="TBL_SAFETY_INCIDENT_AMOUNT">안전사고 손실금액</option>
+                <option value="TBL_SAFETY_YEARLY_TREND">안전사고 연도별 추이</option>
+                <option value="TBL_SAFETY_MONTHLY_TREND">안전사고 월별 추이</option>
+                <option value="TBL_SAFETY_AMOUNT_NOTE">사고 금액 특이사항</option>
+                <option value="TBL_SAFETY_TREND_NOTE">안전사고 발생추이 특이사항</option>
               </select>
             </div>
             <button class="btn primary" type="button" onclick="openCreateModal()">+ 권한 추가</button>
@@ -327,6 +333,12 @@
                 <option value="TBL_ENERGY">에너지 원단위</option>
                 <option value="TBL_BOILER">보일러 운영 현황</option>
                 <option value="TBL_SPECIAL_NOTE">특이사항</option>
+                <option value="TBL_SAFETY_INCIDENT_COUNT">안전사고 발생건수</option>
+                <option value="TBL_SAFETY_INCIDENT_AMOUNT">안전사고 손실금액</option>
+                <option value="TBL_SAFETY_YEARLY_TREND">안전사고 연도별 추이</option>
+                <option value="TBL_SAFETY_MONTHLY_TREND">안전사고 월별 추이</option>
+                <option value="TBL_SAFETY_AMOUNT_NOTE">사고 금액 특이사항</option>
+                <option value="TBL_SAFETY_TREND_NOTE">안전사고 발생추이 특이사항</option>
               </select>
             </div>
             <div class="form-group">
@@ -361,6 +373,12 @@
               <option value="TBL_ENERGY">에너지 원단위</option>
               <option value="TBL_BOILER">보일러 운영 현황</option>
               <option value="TBL_SPECIAL_NOTE">특이사항</option>
+              <option value="TBL_SAFETY_INCIDENT_COUNT">안전사고 발생건수</option>
+              <option value="TBL_SAFETY_INCIDENT_AMOUNT">안전사고 손실금액</option>
+              <option value="TBL_SAFETY_YEARLY_TREND">안전사고 연도별 추이</option>
+              <option value="TBL_SAFETY_MONTHLY_TREND">안전사고 월별 추이</option>
+              <option value="TBL_SAFETY_AMOUNT_NOTE">사고 금액 특이사항</option>
+              <option value="TBL_SAFETY_TREND_NOTE">안전사고 발생추이 특이사항</option>
             </select>
           </div>
           <div class="form-group">
@@ -504,14 +522,28 @@
       'TBL_INVENTORY': '재공품/야적',
       'TBL_ENERGY': '에너지 원단위',
       'TBL_BOILER': '보일러 운영',
-      'TBL_SPECIAL_NOTE': '특이사항'
+      'TBL_SPECIAL_NOTE': '특이사항',
+      'TBL_SAFETY_INCIDENT_COUNT': '안전사고 발생건수',
+      'TBL_SAFETY_INCIDENT_AMOUNT': '안전사고 손실금액',
+      'TBL_SAFETY_YEARLY_TREND': '안전사고 연도별 추이',
+      'TBL_SAFETY_MONTHLY_TREND': '안전사고 월별 추이',
+      // ★★ 2026-09 신규 — 사고통계 페이지 하단 특이사항표 2개 (물리 테이블이 아닌
+      // TABLE_CODE 문자열만 이용하는 가상 테이블 — daily_report_table에 로우를 생성하지 않음)
+      'TBL_SAFETY_AMOUNT_NOTE': '사고 금액 특이사항',
+      'TBL_SAFETY_TREND_NOTE': '안전사고 발생추이 특이사항'
     };
     const TABLE_ORDER = {
       'TBL_PRODUCTION_INDEX': '1',
       'TBL_INVENTORY': '2',
       'TBL_ENERGY': '3',
       'TBL_BOILER': '4',
-      'TBL_SPECIAL_NOTE': '5'
+      'TBL_SPECIAL_NOTE': '5',
+      'TBL_SAFETY_INCIDENT_COUNT': '6',
+      'TBL_SAFETY_INCIDENT_AMOUNT': '7',
+      'TBL_SAFETY_YEARLY_TREND': '8',
+      'TBL_SAFETY_MONTHLY_TREND': '9',
+      'TBL_SAFETY_AMOUNT_NOTE': '10',
+      'TBL_SAFETY_TREND_NOTE': '11'
     };
 
     // ── 셀 좌표 → 사람이 읽을 수 있는 라벨 매핑 ──
@@ -619,6 +651,122 @@
         'PAD':    { section:'특이사항', row:'패드' },
         'SAFETY': { section:'특이사항', row:'사고/안전사고' },
         'ETC':    { section:'특이사항', row:'기타' },
+      },
+      // ★ 안전사고 발생건수/손실금액(표5/6): "당월" 4개 컬럼(기계/전기/생산/소계)만
+      //   DATA(라이브 입력) — 나머지(연도평균/당월-2/당월-1)는 READONLY 롤링 표시
+      'TBL_SAFETY_INCIDENT_COUNT': {
+        'O3':  { section:'제지',      row:'당월', colType:'기계' },
+        'P3':  { section:'제지',      row:'당월', colType:'전기' },
+        'Q3':  { section:'제지',      row:'당월', colType:'생산' },
+        'R3':  { section:'제지',      row:'당월', colType:'소계' },
+        'O4':  { section:'화장지초지', row:'당월', colType:'기계' },
+        'P4':  { section:'화장지초지', row:'당월', colType:'전기' },
+        'Q4':  { section:'화장지초지', row:'당월', colType:'생산' },
+        'R4':  { section:'화장지초지', row:'당월', colType:'소계' },
+        'O5':  { section:'화장지가공', row:'당월', colType:'기계' },
+        'P5':  { section:'화장지가공', row:'당월', colType:'전기' },
+        'Q5':  { section:'화장지가공', row:'당월', colType:'생산' },
+        'R5':  { section:'화장지가공', row:'당월', colType:'소계' },
+        'O6':  { section:'생리대',    row:'당월', colType:'기계' },
+        'P6':  { section:'생리대',    row:'당월', colType:'전기' },
+        'Q6':  { section:'생리대',    row:'당월', colType:'생산' },
+        'R6':  { section:'생리대',    row:'당월', colType:'소계' },
+        'O7':  { section:'기저귀',    row:'당월', colType:'기계' },
+        'P7':  { section:'기저귀',    row:'당월', colType:'전기' },
+        'Q7':  { section:'기저귀',    row:'당월', colType:'생산' },
+        'R7':  { section:'기저귀',    row:'당월', colType:'소계' },
+        'O8':  { section:'6호기',     row:'당월', colType:'기계' },
+        'P8':  { section:'6호기',     row:'당월', colType:'전기' },
+        'Q8':  { section:'6호기',     row:'당월', colType:'생산' },
+        'R8':  { section:'6호기',     row:'당월', colType:'소계' },
+        'O9':  { section:'에너지',    row:'당월', colType:'기계' },
+        'P9':  { section:'에너지',    row:'당월', colType:'전기' },
+        'Q9':  { section:'에너지',    row:'당월', colType:'생산' },
+        'R9':  { section:'에너지',    row:'당월', colType:'소계' },
+        'O10': { section:'합계',      row:'당월', colType:'기계' },
+        'P10': { section:'합계',      row:'당월', colType:'전기' },
+        'Q10': { section:'합계',      row:'당월', colType:'생산' },
+        'R10': { section:'합계',      row:'당월', colType:'소계' },
+      },
+      // ★ 손실금액(표6)은 표5(발생건수)와 좌표 구조가 완전히 동일함
+      'TBL_SAFETY_INCIDENT_AMOUNT': {
+        'O3':  { section:'제지',      row:'당월', colType:'기계' },
+        'P3':  { section:'제지',      row:'당월', colType:'전기' },
+        'Q3':  { section:'제지',      row:'당월', colType:'생산' },
+        'R3':  { section:'제지',      row:'당월', colType:'소계' },
+        'O4':  { section:'화장지초지', row:'당월', colType:'기계' },
+        'P4':  { section:'화장지초지', row:'당월', colType:'전기' },
+        'Q4':  { section:'화장지초지', row:'당월', colType:'생산' },
+        'R4':  { section:'화장지초지', row:'당월', colType:'소계' },
+        'O5':  { section:'화장지가공', row:'당월', colType:'기계' },
+        'P5':  { section:'화장지가공', row:'당월', colType:'전기' },
+        'Q5':  { section:'화장지가공', row:'당월', colType:'생산' },
+        'R5':  { section:'화장지가공', row:'당월', colType:'소계' },
+        'O6':  { section:'생리대',    row:'당월', colType:'기계' },
+        'P6':  { section:'생리대',    row:'당월', colType:'전기' },
+        'Q6':  { section:'생리대',    row:'당월', colType:'생산' },
+        'R6':  { section:'생리대',    row:'당월', colType:'소계' },
+        'O7':  { section:'기저귀',    row:'당월', colType:'기계' },
+        'P7':  { section:'기저귀',    row:'당월', colType:'전기' },
+        'Q7':  { section:'기저귀',    row:'당월', colType:'생산' },
+        'R7':  { section:'기저귀',    row:'당월', colType:'소계' },
+        'O8':  { section:'6호기',     row:'당월', colType:'기계' },
+        'P8':  { section:'6호기',     row:'당월', colType:'전기' },
+        'Q8':  { section:'6호기',     row:'당월', colType:'생산' },
+        'R8':  { section:'6호기',     row:'당월', colType:'소계' },
+        'O9':  { section:'에너지',    row:'당월', colType:'기계' },
+        'P9':  { section:'에너지',    row:'당월', colType:'전기' },
+        'Q9':  { section:'에너지',    row:'당월', colType:'생산' },
+        'R9':  { section:'에너지',    row:'당월', colType:'소계' },
+        'O10': { section:'합계',      row:'당월', colType:'기계' },
+        'P10': { section:'합계',      row:'당월', colType:'전기' },
+        'Q10': { section:'합계',      row:'당월', colType:'생산' },
+        'R10': { section:'합계',      row:'당월', colType:'소계' },
+      },
+      // ★ 연도별 추이(표7): 마지막 컬럼(2026년, col11=L)만 DATA — 나머지 연도는 정적 시드
+      'TBL_SAFETY_YEARLY_TREND': {
+        'L2':  { section:'청주공장 · 공장',  row:'재해자수' },
+        'L3':  { section:'청주공장 · 공장',  row:'사망자수' },
+        'L4':  { section:'청주공장 · 공장',  row:'발생건수' },
+        'L5':  { section:'청주공장 · 협력사', row:'재해자수' },
+        'L6':  { section:'청주공장 · 협력사', row:'사망자수' },
+        'L7':  { section:'청주공장 · 협력사', row:'발생건수' },
+        'L8':  { section:'청주공장',         row:'총 발생건수' },
+        'L9':  { section:'자회사',           row:'재해자수' },
+        'L10': { section:'자회사',           row:'사망자수' },
+        'L11': { section:'자회사',           row:'총 발생건수' },
+        'L12': { section:'합계',             row:'재해자수' },
+        'L13': { section:'합계',             row:'사망자수' },
+        'L14': { section:'합계',             row:'총 발생건수' },
+      },
+      // ★ 월별 추이(표8): 마지막 컬럼('26년 8월=당월, col18=S)만 DATA — 나머지 월은 정적 시드
+      //   (표7과 달리 "청주공장 총 발생건수" 단독 행이 없음)
+      'TBL_SAFETY_MONTHLY_TREND': {
+        'S3':  { section:'청주공장 · 공장',  row:'재해자수' },
+        'S4':  { section:'청주공장 · 공장',  row:'사망자수' },
+        'S5':  { section:'청주공장 · 공장',  row:'총 발생건수' },
+        'S6':  { section:'청주공장 · 협력사', row:'재해자수' },
+        'S7':  { section:'청주공장 · 협력사', row:'사망자수' },
+        'S8':  { section:'청주공장 · 협력사', row:'총 발생건수' },
+        'S9':  { section:'자회사',           row:'재해자수' },
+        'S10': { section:'자회사',           row:'사망자수' },
+        'S11': { section:'자회사',           row:'총 발생건수' },
+        'S12': { section:'합계',             row:'재해자수' },
+        'S13': { section:'합계',             row:'사망자수' },
+        'S14': { section:'합계',             row:'총 발생건수' },
+      },
+      // ★★ 2026-09 신규 — 표9. 사고 금액 특이사항: TBL_SPECIAL_NOTE와 동일하게
+      //   실제 셀 좌표가 아닌 사업부 구분 코드를 "좌표"로 재사용
+      //   (DailyReportService.SPECIAL_NOTE_SPECS의 TBL_SAFETY_AMOUNT_NOTE 카테고리와 동일 코드 유지)
+      'TBL_SAFETY_AMOUNT_NOTE': {
+        'PAPER':  { section:'사고 금액 특이사항', row:'제지' },
+        'TISSUE': { section:'사고 금액 특이사항', row:'화장지' },
+        'PAD':    { section:'사고 금액 특이사항', row:'패드' },
+      },
+      // ★★ 2026-09 신규 — 표10. 안전사고 발생추이 특이사항: 단일 행(구분 없음),
+      //   카테고리 코드 'ALL' 하나만 존재
+      'TBL_SAFETY_TREND_NOTE': {
+        'ALL': { section:'안전사고 발생추이 특이사항', row:'전체' },
       }
     };
 

@@ -58,7 +58,26 @@ public class CellService {
     private static final Map<String, Integer> ROLLING_LIVE_COL_BY_TABLE = Map.of(
             "TBL_PRODUCTION_INDEX", 13,
             "TBL_INVENTORY", 11,
-            "TBL_BOILER", 6
+            "TBL_BOILER", 6,
+            // ★ 표5/6(안전사고 발생건수/손실금액): "당월" 4개 서브컬럼(기계/전기/생산/소계)
+            //   중 대표(소계, col17) 1개만 등록 — 저장 시 헤더("'26년 08월" 등) 재계산을
+            //   트리거하는 용도일 뿐, 편집 가능 여부는 CellAuth로 4개 컬럼 각각 독립 판단됨
+            "TBL_SAFETY_INCIDENT_COUNT", 17,
+            "TBL_SAFETY_INCIDENT_AMOUNT", 17
+            // ★ 표7/8(연도별/월별 추이)은 헤더가 고정 시드(정적)이므로 롤링 재계산 대상 아님
+    );
+
+    /**
+     * ★★★★★★ 사고통계 페이지(표5/6/7/8) 데이터표 코드 — 2026-09 "과거/현재/미래
+     * 전부 수정 가능" 정책 적용 대상.
+     * 이 표코드에 속한 셀은 {@link #isCellEditableForUser}의 날짜(어제 이후 +
+     * 매월 말일) 제한을 받지 않는다. 일반 일보(표1~4)는 기존 정책을 그대로 유지한다.
+     */
+    private static final Set<String> SAFETY_STATS_DATE_UNRESTRICTED_TABLE_CODES = Set.of(
+            "TBL_SAFETY_INCIDENT_COUNT",
+            "TBL_SAFETY_INCIDENT_AMOUNT",
+            "TBL_SAFETY_YEARLY_TREND",
+            "TBL_SAFETY_MONTHLY_TREND"
     );
 
     /**
@@ -388,6 +407,8 @@ public class CellService {
             case "TBL_PRODUCTION_INDEX" -> 36;
             case "TBL_INVENTORY" -> 8;
             case "TBL_BOILER" -> 3;
+            // 표5/6: 과거 2개월(당월-2/당월-1) 컬럼만 롤링되므로 +2개월까지 확인
+            case "TBL_SAFETY_INCIDENT_COUNT", "TBL_SAFETY_INCIDENT_AMOUNT" -> 2;
             default -> 0;
         };
         if (maxHorizonMonths <= 0) {
@@ -488,7 +509,13 @@ public class CellService {
         if (reportDate == null) {
             return false;
         }
-        if (reportDate.isBefore(yesterday) && !isLastDayOfMonth(reportDate)) {
+        // ★★★★★★ 2026-09: 사고통계 페이지(표5/6/7/8)는 과거/현재/미래 구분 없이
+        // 항상 편집 가능 — 날짜 제한을 완전히 건너뛴다. 일반 일보(표1~4)는
+        // 아래 기존 정책을 그대로 유지한다.
+        String tableCode = cell.getReportTable() != null ? cell.getReportTable().getTableCode() : null;
+        boolean dateRestrictionExempt = SAFETY_STATS_DATE_UNRESTRICTED_TABLE_CODES.contains(tableCode);
+        if (!dateRestrictionExempt
+                && reportDate.isBefore(yesterday) && !isLastDayOfMonth(reportDate)) {
             return false;
         }
 
