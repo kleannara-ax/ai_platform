@@ -91,6 +91,30 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
             @Param("endDate") LocalDate endDate);
 
     /**
+     * ★ 표7(안전사고 연도별 추이) 롤링(연도 이동) 실측값 조회 전용 — 특정 표코드 +
+     * 좌표(rowIndex/colIndex)의 "매일(daily)" 입력 컬럼에서, 주어진 연도(targetYear)
+     * 전체 기간(1/1~12/31) 내 가장 최근 값이 채워진 셀부터 최신순으로 반환한다.
+     *
+     * - {@link #findMonthlyValueCandidates}와 동일한 원리를 "연도" 단위로 적용한 것.
+     * - 호출측(DailyReportService)이 결과 리스트의 첫 번째(가장 최근 날짜) 값을
+     *   그 연도의 "연말 대표값(연간 누적값)"으로 사용한다.
+     * - 표5/6과 마찬가지로 신규 기능이라 커트오프 정책이 없다 — 항상 해당 연도
+     *   전체 기간을 조회한다.
+     */
+    @Query("SELECT c FROM DailyReportCell c " +
+           "WHERE c.reportTable.tableCode = :tableCode " +
+           "AND c.rowIndex = :rowIndex AND c.colIndex = :colIndex " +
+           "AND c.cellType = 'DATA' " +
+           "AND c.cellValue IS NOT NULL AND c.cellValue <> '' " +
+           "AND YEAR(c.reportTable.dailyReport.reportDate) = :targetYear " +
+           "ORDER BY c.reportTable.dailyReport.reportDate DESC")
+    List<DailyReportCell> findYearlyValueCandidates(
+            @Param("tableCode") String tableCode,
+            @Param("rowIndex") int rowIndex,
+            @Param("colIndex") int colIndex,
+            @Param("targetYear") int targetYear);
+
+    /**
      * ★ 셀 hover 시 "최종 저장자/시각" 표시용 fallback 조회 (2026-08).
      * - 이월(carryOverValue)된 셀은 LAST_EDITOR_ID/LAST_EDITED_AT이 항상 NULL이므로
      *   (전파 제어 플래그와 겸용되기 때문에 의도적으로 세팅하지 않음), 화면 표시만을

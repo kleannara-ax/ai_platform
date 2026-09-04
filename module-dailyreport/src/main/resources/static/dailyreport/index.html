@@ -26,7 +26,12 @@
 
     /* ── 앱 쉘 ── */
     .app-shell { min-height:100vh; display:flex; flex-direction:column; }
-    .topbar { position:sticky; top:0; z-index:30; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 18px; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); border-bottom:1px solid rgba(148,163,184,.35); }
+    /* ★★ 2026-09 — 이 iframe 내부 topbar는 화면에 그리지 않는다. 툴바(날짜/조회/저장/
+       새로고침/캡처 등)는 부모(AI Platform App Shell)의 상단 타이틀 옆으로 이동되어
+       그곳에서 렌더링된다(부모가 이 iframe의 contentWindow 함수를 직접 호출/폴링으로
+       상태를 동기화). 여기 요소들은 id/로직을 그대로 유지한 채 화면에서만 숨긴다 —
+       기존 함수(loadReportByDate 등)가 getElementById로 이 요소들을 계속 참조하기 때문. */
+    .topbar { display:none; }
     .topbar-title { font-size:18px; font-weight:800; }
     .topbar-subtitle { font-size:12px; color:var(--muted); margin-top:2px; }
     .topbar-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -259,10 +264,6 @@
   ═══════════════════════════════════════════════════ -->
   <section class="app-shell" id="appShell">
     <div class="topbar">
-      <div>
-        <div class="topbar-title">7월 공장일보(세부)</div>
-        <div class="topbar-subtitle">표 1~4와 특이사항만 분리 표시</div>
-      </div>
       <div class="topbar-actions">
         <div class="date-picker-wrap">
           <input type="date" id="reportDateInput" />
@@ -461,8 +462,10 @@
     // ★★ 특이사항 분량 제한 (백엔드 DailyReportService의 동일 상수와 반드시 일치시킬 것)
     // - 줄바꿈/전체 글자수: 5개 사업부 행 "전체 합산" 공유 총량
     // - 한 줄(개행 기준) 글자수: 각 행 자신만의 독립된 제한
-    // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정 → 이후 15회로 재조정
-    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 15;
+    // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정 → 15회로 재조정
+    //   → 5개 행이 모두 채워지는 최악의 경우 22줄 포맷을 2줄 초과하는 문제가 확인되어 13으로 재조정
+    //   (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 → 최대 안전 줄바꿈 수 = 22-5-4=13)
+    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 13;
     const SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
     const SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
     let reportData = null;         // /view/render 응답 전체

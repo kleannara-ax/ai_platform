@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,6 +62,12 @@ public class DailyReportService {
      *  TABLE_CODE로도 그대로 사용되어 셀과 동일한 방식으로 담당자를 배정한다. */
     public static final String SPECIAL_NOTE_TABLE_CODE = "TBL_SPECIAL_NOTE";
 
+    /** ★★ 사고 통계 페이지(표5~8) 하단에 추가되는 특이사항 표 2종 전용 가상 표 코드
+     *  (2026-09 신규) — TBL_SPECIAL_NOTE와 완전히 독립된 별도의 줄바꿈/글자수
+     *  예산 및 CellAuth 담당자 배정을 갖는다. */
+    public static final String SAFETY_AMOUNT_NOTE_TABLE_CODE = "TBL_SAFETY_AMOUNT_NOTE";
+    public static final String SAFETY_TREND_NOTE_TABLE_CODE = "TBL_SAFETY_TREND_NOTE";
+
     /** 사업부 코드 → 한글 라벨, 화면에 표시할 고정 5행 순서 그대로 */
     public static final Map<String, String> SPECIAL_NOTE_CATEGORIES = new LinkedHashMap<>();
     static {
@@ -71,19 +78,71 @@ public class DailyReportService {
         SPECIAL_NOTE_CATEGORIES.put("ETC", "기타");
     }
 
-    /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정, 2026-08 17→15 재조정)
-     *  - 줄바꿈/전체 글자수는 5개 사업부 행 전체를 합산한 "공유 총량"이다
+    /** ★★ 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE) 카테고리 — 제지/화장지/패드 3행
+     *  (2026-09 신규). TBL_SPECIAL_NOTE의 PAPER/TISSUE/PAD와 같은 코드값을 재사용하지만,
+     *  모든 조회/검증/이어받기 로직이 TABLE_CODE로 먼저 스코프되므로 값이 서로 섞이지 않는다. */
+    public static final Map<String, String> SAFETY_AMOUNT_NOTE_CATEGORIES = new LinkedHashMap<>();
+    static {
+        SAFETY_AMOUNT_NOTE_CATEGORIES.put("PAPER", "제지");
+        SAFETY_AMOUNT_NOTE_CATEGORIES.put("TISSUE", "화장지");
+        SAFETY_AMOUNT_NOTE_CATEGORIES.put("PAD", "패드");
+    }
+
+    /** ★★ 안전사고 발생추이 특이사항표(TBL_SAFETY_TREND_NOTE) 카테고리 — 분할 없는 단일 행
+     *  (2026-09 신규). */
+    public static final Map<String, String> SAFETY_TREND_NOTE_CATEGORIES = new LinkedHashMap<>();
+    static {
+        SAFETY_TREND_NOTE_CATEGORIES.put("ALL", "전체");
+    }
+
+    /**
+     * ★★ 특이사항류(TBL_SPECIAL_NOTE 및 사고 통계 특이사항표) 분량 제한 스펙을
+     *  표코드별로 묶어 관리한다 (2026-09 일반화). 각 표는 독립적인 카테고리 그룹과
+     *  줄바꿈/글자수 "공유 총량"(같은 표 안의 행들끼리만 합산)을 가지며, 서로의
+     *  예산에 전혀 영향을 주지 않는다.
+     */
+    private record SpecialNoteSpec(Map<String, String> categories, int maxTotalNewlines,
+                                    int maxTotalChars, int maxLineLength) {
+    }
+
+    /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정, 2026-08 17→15 재조정,
+     *  2026-09 15→13 재조정)
+     *  - 줄바꿈/전체 글자수는 같은 표 안의 사업부 행 전체를 합산한 "공유 총량"이다
      *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
      *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
-     *  - 줄바꿈 총량은 원래 특이사항이 분리되기 전 하나의 자유서술 칸 기준 21회였으나,
-     *    5개 사업부(제지/화장지/패드/사고안전사고/기타) 행으로 나뉘며 행 사이 구분선이
-     *    4곳(5개 항목 사이 간격) 생겨 그만큼 공간을 차지하므로 21에서 4를 뺀 17을 사용했다가,
-     *    이후 15로 재조정되었다.
-     *  프론트(index.html)에서도 동일한 상수로 실시간 검증을 하지만, 프론트 검증은
-     *  우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
-    private static final int SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 15;
-    private static final int SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
+     *  - TBL_SPECIAL_NOTE(5행)의 줄바꿈 총량은 원래 분리되기 전 하나의 자유서술 칸
+     *    기준 21회였으나, 5개 사업부(제지/화장지/패드/사고안전사고/기타) 행으로 나뉘며
+     *    행 사이 구분선이 4곳(5개 항목 사이 간격) 생겨 그만큼 공간을 차지하므로 21에서
+     *    4를 뺀 17을 사용했다가, 이후 15로 재조정되었으나, 5개 행이 모두 채워지는
+     *    최악의 경우(구분선 4 + 각 행 기본 1줄×5) 22줄 포맷을 2줄 초과하는 문제가
+     *    확인되어 13으로 재조정했다.
+     *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 → 최대 안전 줄바꿈 수 = 22-5-4=13)
+     *  - 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE, 3행)/안전사고 발생추이
+     *    특이사항표(TBL_SAFETY_TREND_NOTE, 1행)는 각각 사용자가 직접 지정한
+     *    줄바꿈 한도(9회/6회)를 기준으로, 동일한 (줄바꿈+행수)×67자 공식으로
+     *    글자수 한도를 산출했다: (9+3)×67=804자, (6+1)×67=469자.
+     *  프론트(index.html/safety-stats.html)에서도 동일한 상수로 실시간 검증을 하지만,
+     *  프론트 검증은 우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
+    private static final Map<String, SpecialNoteSpec> SPECIAL_NOTE_SPECS = new LinkedHashMap<>();
+    static {
+        SPECIAL_NOTE_SPECS.put(SPECIAL_NOTE_TABLE_CODE,
+                new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 13, 1206, SPECIAL_NOTE_MAX_LINE_LENGTH));
+        SPECIAL_NOTE_SPECS.put(SAFETY_AMOUNT_NOTE_TABLE_CODE,
+                new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 804, SPECIAL_NOTE_MAX_LINE_LENGTH));
+        SPECIAL_NOTE_SPECS.put(SAFETY_TREND_NOTE_TABLE_CODE,
+                new SpecialNoteSpec(SAFETY_TREND_NOTE_CATEGORIES, 6, 469, SPECIAL_NOTE_MAX_LINE_LENGTH));
+    }
+
+    /** tableCode에 해당하는 분량 제한 스펙을 반환한다 (등록되지 않은 코드면 예외). */
+    private SpecialNoteSpec specialNoteSpec(String tableCode) {
+        SpecialNoteSpec spec = SPECIAL_NOTE_SPECS.get(tableCode);
+        if (spec == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "올바르지 않은 특이사항 표 코드입니다: " + tableCode);
+        }
+        return spec;
+    }
 
     // ─────────────────────────────────────────────
     // 일보 CRUD
@@ -122,27 +181,33 @@ public class DailyReportService {
                     // (이전 버전에서 테이블만 생성하고 셀을 누락한 데이터 보완)
                     boolean cellsMissing = report.getTables().stream()
                             .anyMatch(t -> t.getCells().isEmpty());
-                    if (cellsMissing) {
+                    // ★★ 이 기능 배포 이전에 생성된 일보처럼 표 자체가 통째로 누락된
+                    // 경우(예: 안전사고 표4개 신규 추가)도 함께 보충 대상인지 미리 확인
+                    Set<String> existingCodes = report.getTables().stream()
+                            .map(DailyReportTable::getTableCode).collect(Collectors.toSet());
+                    boolean tablesMissing = java.util.Arrays.stream(TABLE_DEFINITIONS)
+                            .anyMatch(def -> !existingCodes.contains(def[0]));
+                    if (cellsMissing || tablesMissing) {
                         // ★ 값 이어받기: 보충되는 표에도 직전 일보의 값을 초기값으로 반영
                         Map<String, String> previousValues = findPreviousCellValues(reportDate);
-                        for (DailyReportTable table : report.getTables()) {
-                            if (table.getCells().isEmpty()) {
-                                DefaultCellTemplate.populateDefaultCells(table, reportDate, historicalValueLookup());
-                                applyCarriedOverValues(table, previousValues);
-                                // ★ 하드코딩 제거: 생성 즉시 현재 활성 CellAuth 담당자를 반영
-                                cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
+                        if (cellsMissing) {
+                            for (DailyReportTable table : report.getTables()) {
+                                if (table.getCells().isEmpty()) {
+                                    DefaultCellTemplate.populateDefaultCells(table, reportDate, historicalValueLookup(), historicalYearlyValueLookup());
+                                    applyCarriedOverValues(table, previousValues);
+                                    // ★ 하드코딩 제거: 생성 즉시 현재 활성 CellAuth 담당자를 반영
+                                    cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
+                                }
                             }
                         }
+                        if (tablesMissing) {
+                            addMissingTablesToExistingReport(report, previousValues);
+                        }
                     }
-                    // ★★ 2026-08 추가: 이 기능 배포 이전에 만들어진 일보 등, 5개 사업부
-                    // 특이사항 행이 누락된 경우 보충한다 (기존에 이미 입력된 행은 건드리지 않음)
-                    boolean remarksMissing = SPECIAL_NOTE_CATEGORIES.keySet().stream()
-                            .anyMatch(cat -> report.getRemarks().stream()
-                                    .noneMatch(r -> cat.equals(r.getCategory())));
-                    if (remarksMissing) {
-                        Map<String, String> previousRemarkValues = findPreviousRemarkValues(reportDate);
-                        ensureDefaultRemarks(report, previousRemarkValues);
-                    }
+                    // ★★ 2026-08 추가(2026-09 사고 통계 특이사항표 2종 포함으로 확장):
+                    // 이 기능 배포 이전에 만들어진 일보 등, 특이사항류 표의 행이
+                    // 누락된 경우 보충한다 (기존에 이미 입력된 행은 건드리지 않음)
+                    ensureAllDefaultRemarks(report, reportDate);
                     return DailyReportResponse.fromWithDetails(report);
                 })
                 .orElseGet(() -> {
@@ -156,13 +221,33 @@ public class DailyReportService {
                     // ★ 값 이어받기: 직전 일보의 DATA 셀 값을 새 표의 초기값으로 반영
                     Map<String, String> previousValues = findPreviousCellValues(reportDate);
                     createDefaultTables(report, previousValues);
-                    // ★★ 2026-08 추가: 특이사항도 셀과 동일하게 직전 일보의 사업부별
-                    // 내용을 이어받아 5개 행을 미리 만들어둔다
-                    Map<String, String> previousRemarkValues = findPreviousRemarkValues(reportDate);
-                    ensureDefaultRemarks(report, previousRemarkValues);
+                    // ★★ 2026-08 추가(2026-09 사고 통계 특이사항표 2종 포함으로 확장):
+                    // 특이사항류도 셀과 동일하게 직전 일보의 사업부별 내용을 이어받아
+                    // 행을 미리 만들어둔다
+                    ensureAllDefaultRemarks(report, reportDate);
                     reportRepository.save(report);
                     return DailyReportResponse.fromWithDetails(report);
                 });
+    }
+
+    /**
+     * ★★ 2026-09 신규 — 특이사항류 표 3종(TBL_SPECIAL_NOTE, TBL_SAFETY_AMOUNT_NOTE,
+     * TBL_SAFETY_TREND_NOTE) 전체에 대해 {@link #ensureDefaultRemarks}를 반복 적용한다.
+     * 각 표는 독립된 tableCode+카테고리 그룹을 가지므로 서로의 행/이어받기 값에
+     * 전혀 영향을 주지 않는다.
+     */
+    private void ensureAllDefaultRemarks(DailyReport report, LocalDate reportDate) {
+        for (Map.Entry<String, SpecialNoteSpec> entry : SPECIAL_NOTE_SPECS.entrySet()) {
+            String tableCode = entry.getKey();
+            Map<String, String> categories = entry.getValue().categories();
+            boolean missing = categories.keySet().stream()
+                    .anyMatch(cat -> report.getRemarks().stream()
+                            .noneMatch(r -> tableCode.equals(r.getTableCode()) && cat.equals(r.getCategory())));
+            if (missing) {
+                Map<String, String> previousValues = findPreviousRemarkValues(reportDate, tableCode);
+                ensureDefaultRemarks(report, tableCode, categories, previousValues);
+            }
+        }
     }
 
     /**
@@ -191,10 +276,9 @@ public class DailyReportService {
         Map<String, String> previousValues = findPreviousCellValues(request.getReportDate());
         createDefaultTables(report, previousValues);
 
-        // ★★ 2026-08 추가: 특이사항도 셀과 동일하게 직전 일보의 사업부별 내용을
-        // 이어받아 5개 행을 미리 만들어둔다
-        Map<String, String> previousRemarkValues = findPreviousRemarkValues(request.getReportDate());
-        ensureDefaultRemarks(report, previousRemarkValues);
+        // ★★ 2026-08 추가(2026-09 사고 통계 특이사항표 2종 포함으로 확장): 특이사항류도
+        // 셀과 동일하게 직전 일보의 사업부별 내용을 이어받아 행을 미리 만들어둔다
+        ensureAllDefaultRemarks(report, request.getReportDate());
 
         reportRepository.save(report);
         return DailyReportResponse.fromWithDetails(report);
@@ -301,7 +385,7 @@ public class DailyReportService {
                 .rowCount(table.getRowCount())
                 .colCount(table.getColCount())
                 .build();
-        DefaultCellTemplate.populateDefaultCells(freshTable, reportDate, historicalValueLookup());
+        DefaultCellTemplate.populateDefaultCells(freshTable, reportDate, historicalValueLookup(), historicalYearlyValueLookup());
 
         // 좌표(EXCEL_COORD) → 새로 계산된 값, HEADER/READONLY만 대상
         Map<String, String> freshValuesByCoord = new LinkedHashMap<>();
@@ -362,21 +446,34 @@ public class DailyReportService {
     }
 
     /**
-     * 특이사항 목록 조회 (사용자 기준) — 각 사업부 행에 대해:
-     * - editable: 이 사용자가 이 사업부 행을 편집할 수 있는지 (CellAuth 기반, 셀과 동일 원칙:
-     *   담당자가 배정되지 않은 행은 아무도 편집 불가)
-     * - ownerNames: 이 사업부 행의 담당자 이름 (쉼표 구분)
-     * - savedByName: 마지막으로 저장(작성/수정)한 사람의 이름
+     * 특이사항 목록 조회 (사용자 기준, 기존 TBL_SPECIAL_NOTE 전용 — 하위 호환 유지)
      */
     public List<RemarkResponse> getRemarksForUser(Long reportId, Long userId) {
-        List<DailyReportRemark> remarks =
-                remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId);
+        return getRemarksForUser(reportId, userId, SPECIAL_NOTE_TABLE_CODE);
+    }
 
-        // 특이사항(TBL_SPECIAL_NOTE)의 활성 CellAuth 전체 조회 → 사업부코드별 담당자 매핑
-        List<CellAuth> specialAuths =
-                cellAuthRepository.findByTableCodeAndIsActiveTrue(SPECIAL_NOTE_TABLE_CODE);
+    /**
+     * ★★ 2026-09 일반화 — 특이사항류 표(tableCode)별 목록 조회 (사용자 기준) — 각 행에 대해:
+     * - editable: 이 사용자가 이 행을 편집할 수 있는지 (CellAuth 기반, 셀과 동일 원칙:
+     *   담당자가 배정되지 않은 행은 아무도 편집 불가)
+     * - ownerNames: 이 행의 담당자 이름 (쉼표 구분)
+     * - savedByName: 마지막으로 저장(작성/수정)한 사람의 이름
+     *
+     * ★ tableCode로 CellAuth 조회 + 응답 필터링을 모두 스코프하므로, 사고 통계
+     * 특이사항표가 TBL_SPECIAL_NOTE와 같은 카테고리 코드(PAPER/TISSUE/PAD)를
+     * 재사용해도 담당자 배정/저장 데이터가 서로 섞이지 않는다.
+     */
+    public List<RemarkResponse> getRemarksForUser(Long reportId, Long userId, String tableCode) {
+        Map<String, String> categories = specialNoteSpec(tableCode).categories();
+
+        List<DailyReportRemark> remarks =
+                remarkRepository.findByDailyReport_ReportIdAndTableCodeOrderBySortOrderAsc(reportId, tableCode);
+
+        // 이 표(tableCode)의 활성 CellAuth 전체 조회 → 카테고리코드별 담당자 매핑
+        List<CellAuth> auths =
+                cellAuthRepository.findByTableCodeAndIsActiveTrue(tableCode);
         Map<String, List<Long>> categoryToUserIds = new LinkedHashMap<>();
-        for (CellAuth auth : specialAuths) {
+        for (CellAuth auth : auths) {
             for (String coord : auth.getCellCoordList()) {
                 String normalized = coord == null ? null : coord.trim().toUpperCase();
                 if (normalized == null || normalized.isEmpty()) continue;
@@ -393,15 +490,12 @@ public class DailyReportService {
         }
         Map<Long, String> userNameMap = resolveUserNames(allUserIds);
 
-        boolean userIsOwnerSomewhere = userId != null && categoryToUserIds.values().stream()
-                .anyMatch(ids -> ids.contains(userId));
-
         Map<String, DailyReportRemark> byCategory = remarks.stream()
                 .collect(Collectors.toMap(DailyReportRemark::getCategory, r -> r,
                         (a, b) -> a, LinkedHashMap::new));
 
         List<RemarkResponse> result = new ArrayList<>();
-        for (Map.Entry<String, String> catEntry : SPECIAL_NOTE_CATEGORIES.entrySet()) {
+        for (Map.Entry<String, String> catEntry : categories.entrySet()) {
             String category = catEntry.getKey();
             List<Long> ownerIds = categoryToUserIds.getOrDefault(category, List.of());
             String ownerNames = ownerIds.stream()
@@ -413,7 +507,7 @@ public class DailyReportService {
 
             DailyReportRemark existing = byCategory.get(category);
             RemarkResponse.RemarkResponseBuilder builder = RemarkResponse.builder()
-                    .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                    .tableCode(tableCode)
                     .category(category)
                     .editable(editable)
                     .ownerNames(ownerNames.isBlank() ? null : ownerNames);
@@ -436,41 +530,39 @@ public class DailyReportService {
             result.add(builder.build());
         }
 
-        // 참고용: userIsOwnerSomewhere는 향후 "내 담당 행만 보기" 등 확장에 대비해 계산해 둔 값
-        // (현재는 응답에 직접 포함하지 않음 — 필요 시 DTO 확장)
-        if (userIsOwnerSomewhere) {
-            // no-op: 계산은 위 editable 값에 이미 반영됨
-        }
-
         return result;
     }
 
     /**
      * 특이사항 추가 (사업부 1행 신규 작성)
-     * - CellAuth 기반 권한 검증: 이 사용자가 이 사업부(category)에 배정된 담당자여야 한다
-     *   (셀과 동일 원칙 — 담당자 미배정 행은 아무도 편집 불가).
-     * - ★★ 2026-08: 이 기능 배포 이후에는 일보 생성 시 5개 사업부 행이 항상
-     *   미리 만들어져 있으므로(ensureDefaultRemarks), 이 메서드는 그 이전에
+     * - CellAuth 기반 권한 검증: 이 사용자가 이 표(tableCode)의 이 카테고리(category)에
+     *   배정된 담당자여야 한다 (셀과 동일 원칙 — 담당자 미배정 행은 아무도 편집 불가).
+     * - ★★ 2026-08: 이 기능 배포 이후에는 일보 생성 시 각 특이사항류 표의 행이 항상
+     *   미리 만들어져 있으므로(ensureAllDefaultRemarks), 이 메서드는 그 이전에
      *   만들어진 레거시 일보에 행이 누락된 경우에만 실제로 호출된다. 정상적으로
      *   새 값이 저장되었으므로 값 전파도 함께 수행한다.
+     * - ★★ 2026-09: request.tableCode가 비어 있으면(기존 프론트 호환) TBL_SPECIAL_NOTE로 간주한다.
      */
     @Transactional
     public RemarkResponse addRemark(Long reportId, RemarkRequest request, Long userId) {
         DailyReport report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new EntityNotFoundException("일보를 찾을 수 없습니다. ID: " + reportId));
 
+        String tableCode = request.getTableCode() != null && !request.getTableCode().isBlank()
+                ? request.getTableCode() : SPECIAL_NOTE_TABLE_CODE;
+
         validateReportEditable(report);
-        validateRemarkEditableDate(report);
-        validateSpecialNoteCategory(request.getCategory());
-        validateRemarkOwnership(request.getCategory(), userId);
-        validateSpecialNoteLimits(reportId, request.getCategory(), request.getContent());
+        validateRemarkEditableDate(report, tableCode);
+        validateSpecialNoteCategory(tableCode, request.getCategory());
+        validateRemarkOwnership(tableCode, request.getCategory(), userId);
+        validateSpecialNoteLimits(reportId, tableCode, request.getCategory(), request.getContent());
 
         int sortOrder = request.getSortOrder() != null
                 ? request.getSortOrder()
-                : (int) remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId).size() + 1;
+                : (int) remarkRepository.findByDailyReport_ReportIdAndTableCodeOrderBySortOrderAsc(reportId, tableCode).size() + 1;
 
         DailyReportRemark remark = DailyReportRemark.builder()
-                .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                .tableCode(tableCode)
                 .category(request.getCategory())
                 .content(request.getContent())
                 .sortOrder(sortOrder)
@@ -482,7 +574,7 @@ public class DailyReportService {
 
         // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
         // 특이사항 값도 최신화
-        propagateRemarkForward(report.getReportDate(), request.getCategory(), request.getContent());
+        propagateRemarkForward(report.getReportDate(), tableCode, request.getCategory(), request.getContent());
 
         return RemarkResponse.from(remark);
     }
@@ -506,9 +598,11 @@ public class DailyReportService {
         DailyReportRemark remark = remarkRepository.findById(remarkId)
                 .orElseThrow(() -> new EntityNotFoundException("특이사항을 찾을 수 없습니다. ID: " + remarkId));
 
+        String tableCode = remark.getTableCode();
+
         validateReportEditable(remark.getDailyReport());
-        validateRemarkEditableDate(remark.getDailyReport());
-        validateRemarkOwnership(remark.getCategory(), userId);
+        validateRemarkEditableDate(remark.getDailyReport(), tableCode);
+        validateRemarkOwnership(tableCode, remark.getCategory(), userId);
 
         boolean unchanged = Objects.equals(remark.getContent(), request.getContent())
                 && Objects.equals(remark.getCategory(), request.getCategory());
@@ -517,12 +611,12 @@ public class DailyReportService {
         }
 
         validateSpecialNoteLimits(remark.getDailyReport().getReportId(), remark.getRemarkId(),
-                remark.getCategory(), request.getContent());
+                tableCode, remark.getCategory(), request.getContent());
         remark.updateContent(request.getContent(), request.getCategory(), userId);
 
         // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
         // 특이사항 값도 최신화
-        propagateRemarkForward(remark.getDailyReport().getReportDate(), remark.getCategory(), request.getContent());
+        propagateRemarkForward(remark.getDailyReport().getReportDate(), tableCode, remark.getCategory(), request.getContent());
 
         return RemarkResponse.from(remark);
     }
@@ -536,50 +630,52 @@ public class DailyReportService {
                 .orElseThrow(() -> new EntityNotFoundException("특이사항을 찾을 수 없습니다. ID: " + remarkId));
 
         validateReportEditable(remark.getDailyReport());
-        validateRemarkEditableDate(remark.getDailyReport());
-        validateRemarkOwnership(remark.getCategory(), userId);
+        validateRemarkEditableDate(remark.getDailyReport(), remark.getTableCode());
+        validateRemarkOwnership(remark.getTableCode(), remark.getCategory(), userId);
         remarkRepository.delete(remark);
     }
 
     /**
-     * 사업부 코드 유효성 검증 (제지/화장지/패드/사고·안전사고/기타 중 하나)
+     * ★★ 2026-09 일반화: tableCode에 등록된 카테고리 목록 중 하나인지 검증
      */
-    private void validateSpecialNoteCategory(String category) {
-        if (category == null || !SPECIAL_NOTE_CATEGORIES.containsKey(category)) {
+    private void validateSpecialNoteCategory(String tableCode, String category) {
+        Map<String, String> categories = specialNoteSpec(tableCode).categories();
+        if (category == null || !categories.containsKey(category)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT,
-                    "올바르지 않은 사업부 구분입니다: " + category);
+                    "올바르지 않은 구분입니다: " + category);
         }
     }
 
     /**
-     * ★★ 특이사항 분량 제한 검증 (신규 작성)
-     * - 5개 사업부 행 전체(자신 포함)의 줄바꿈/글자수 합계가 공유 한도(15회/1206자)를
-     *   넘지 않는지 확인한다. 다른 사업부 행에 이미 저장된 내용까지 합산 대상이다.
-     * - 자신이 입력하는 내용 자체의 한 줄(개행 기준) 길이가 84자를 넘지 않는지 확인한다.
+     * ★★ 특이사항 분량 제한 검증 (신규 작성) — tableCode 스펙(줄바꿈/글자수 한도)을
+     * 사용해 같은 표 안의 행 전체(자신 포함) 합계가 한도를 넘지 않는지 확인한다.
+     * 다른 표(tableCode가 다른)의 내용은 전혀 합산 대상이 아니다.
      */
-    private void validateSpecialNoteLimits(Long reportId, String category, String content) {
-        validateSpecialNoteLimits(reportId, null, category, content);
+    private void validateSpecialNoteLimits(Long reportId, String tableCode, String category, String content) {
+        validateSpecialNoteLimits(reportId, null, tableCode, category, content);
     }
 
     /**
      * ★★ 특이사항 분량 제한 검증 (수정) — excludeRemarkId: 수정 대상 자신의 기존
      * 레코드는 합산에서 제외하고 새 content로 교체하여 계산한다.
      */
-    private void validateSpecialNoteLimits(Long reportId, Long excludeRemarkId, String category, String content) {
+    private void validateSpecialNoteLimits(Long reportId, Long excludeRemarkId, String tableCode,
+                                            String category, String content) {
+        SpecialNoteSpec spec = specialNoteSpec(tableCode);
         String safeContent = content == null ? "" : content;
 
         // 1) 한 줄(개행 기준) 길이 제한 — 자신이 입력한 내용만 검사
         for (String line : safeContent.split("\n", -1)) {
-            if (line.length() > SPECIAL_NOTE_MAX_LINE_LENGTH) {
+            if (line.length() > spec.maxLineLength()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT,
                         String.format("한 줄에 입력 가능한 최대 글자수는 %d자입니다. %d/%d",
-                                SPECIAL_NOTE_MAX_LINE_LENGTH, line.length(), SPECIAL_NOTE_MAX_LINE_LENGTH));
+                                spec.maxLineLength(), line.length(), spec.maxLineLength()));
             }
         }
 
-        // 2) 5개 사업부 행 전체 합산 — 다른 행의 기존 저장 내용 + 이번에 저장하려는 내용
+        // 2) 같은 표(tableCode)의 행 전체 합산 — 다른 행의 기존 저장 내용 + 이번에 저장하려는 내용
         List<DailyReportRemark> remarks =
-                remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(reportId);
+                remarkRepository.findByDailyReport_ReportIdAndTableCodeOrderBySortOrderAsc(reportId, tableCode);
 
         int totalNewlines = 0;
         int totalChars = 0;
@@ -587,7 +683,7 @@ public class DailyReportService {
             if (excludeRemarkId != null && excludeRemarkId.equals(r.getRemarkId())) continue;
             String cat = r.getCategory();
             if (category != null && category.equals(cat)) {
-                // 같은 사업부(자기 자신 행) 기존 내용은 새 content로 대체되므로 건너뛴다
+                // 같은 카테고리(자기 자신 행) 기존 내용은 새 content로 대체되므로 건너뛴다
                 continue;
             }
             String c = r.getContent() == null ? "" : r.getContent();
@@ -598,13 +694,13 @@ public class DailyReportService {
         totalNewlines += countNewlines(safeContent);
         totalChars += safeContent.length();
 
-        if (totalNewlines > SPECIAL_NOTE_MAX_TOTAL_NEWLINES) {
+        if (totalNewlines > spec.maxTotalNewlines()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT,
-                    String.format("줄바꿈 %d회를 모두 사용했습니다.", SPECIAL_NOTE_MAX_TOTAL_NEWLINES));
+                    String.format("줄바꿈 %d회를 모두 사용했습니다.", spec.maxTotalNewlines()));
         }
-        if (totalChars > SPECIAL_NOTE_MAX_TOTAL_CHARS) {
+        if (totalChars > spec.maxTotalChars()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT,
-                    String.format("글자수 %d자 이상 기재할 수 없습니다.", SPECIAL_NOTE_MAX_TOTAL_CHARS));
+                    String.format("글자수 %d자 이상 기재할 수 없습니다.", spec.maxTotalChars()));
         }
     }
 
@@ -618,12 +714,13 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 셀과 동일한 원칙: 이 사업부(category) 행에 대해 활성 CellAuth로 배정된
-     * 담당자만 편집 가능. 담당자가 아예 배정되지 않은 행은 아무도 편집할 수 없다.
+     * ★★ 셀과 동일한 원칙: 이 표(tableCode)의 이 카테고리(category) 행에 대해
+     * 활성 CellAuth로 배정된 담당자만 편집 가능. 담당자가 아예 배정되지 않은
+     * 행은 아무도 편집할 수 없다.
      */
-    private void validateRemarkOwnership(String category, Long userId) {
+    private void validateRemarkOwnership(String tableCode, String category, Long userId) {
         List<CellAuth> auths = cellAuthRepository
-                .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, SPECIAL_NOTE_TABLE_CODE);
+                .findAllByUserIdAndTableCodeAndIsActiveTrue(userId, tableCode);
         boolean isOwner = auths.stream().anyMatch(auth -> auth.coversCoord(category));
         if (!isOwner) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
@@ -641,7 +738,16 @@ public class DailyReportService {
     @SuppressWarnings("unchecked")
     Map<Long, String> resolveUserNames(Set<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
-            return Map.of();
+            // ★★ 버그 수정(2026-09) — Map.of()(불변 맵)는 get(null)을 호출하면
+            // (내부적으로 Objects.requireNonNull(key)를 먼저 실행하기 때문에)
+            // 무조건 NullPointerException을 던진다. 담당자가 아직 배정되지 않고
+            // 아무도 저장한 적 없는 이어받기 상태의 특이사항 행(createdBy/updatedBy
+            // 모두 null)에 대해 getRemarksForUser()가 userNameMap.get(lastEditorId)
+            // (lastEditorId가 null일 수 있음)를 호출하면서 이 문제가 발생했다
+            // (TBL_SAFETY_AMOUNT_NOTE/TBL_SAFETY_TREND_NOTE처럼 신규 생성되어
+            // 아직 아무도 손대지 않은 표에서 재현됨). HashMap은 null 키 조회 시
+            // 안전하게 null을 반환하므로 이를 대신 사용한다.
+            return new HashMap<>();
         }
         List<Object[]> rows = entityManager.createNativeQuery(
                         "SELECT user_id, COALESCE(NULLIF(TRIM(user_name), ''), login_id) AS user_name " +
@@ -767,43 +873,88 @@ public class DailyReportService {
     // ─────────────────────────────────────────────
 
     /**
-     * 4개 기본 표 구조 생성
+     * 8개 기본 표 정의 (표코드/표명/행수/열수) — sortOrder는 배열 순서(index+1)로 결정된다.
      * HTML 원본 기준:
-     *   1. 주요 생산 지표 현황 (table1) — 10행 15열
-     *   2. 제지 재공품 및 야적현황 (table2) — 10행 13열
-     *   3. 에너지 원단위 (table3) — 8행 6열
-     *   4. 보일러 운영 현황 (table4) — 7행 8열
+     *   1. 주요 생산 지표 현황 — 10행 15열
+     *   2. 제지 재공품 및 야적현황 — 10행 13열
+     *   3. 에너지 원단위 — 8행 6열
+     *   4. 보일러 운영 현황 — 7행 8열
+     * PPT(일일현황보고) 기준 — "세부공장일보 사고 통계" 메뉴 전용 4개 표:
+     *   5. 안전사고 발생건수 — 10행 18열
+     *   6. 안전사고 손실금액 — 10행 18열
+     *   7. 안전사고 연도별 추이 — 14행 12열
+     *   8. 안전사고 월별 추이 — 14행 19열
      */
+    private static final String[][] TABLE_DEFINITIONS = {
+            {"TBL_PRODUCTION_INDEX",       "주요 생산 지표 현황",       "10", "15"},
+            {"TBL_INVENTORY",              "제지 재공품 및 야적현황",   "10", "13"},
+            {"TBL_ENERGY",                 "에너지 원단위",             "8",  "6"},
+            {"TBL_BOILER",                 "보일러 운영 현황",          "7",  "8"},
+            {"TBL_SAFETY_INCIDENT_COUNT",  "안전사고 발생건수",         "10", "18"},
+            {"TBL_SAFETY_INCIDENT_AMOUNT", "안전사고 손실금액",         "10", "18"},
+            {"TBL_SAFETY_YEARLY_TREND",    "안전사고 연도별 추이",      "14", "12"},
+            {"TBL_SAFETY_MONTHLY_TREND",   "안전사고 월별 추이",        "14", "19"},
+    };
+
+    /** 8개 기본 표 구조 생성 (신규 일보 자동 생성 시) */
     private void createDefaultTables(DailyReport report, Map<String, String> previousValues) {
-        String[][] tableDefinitions = {
-                {"TBL_PRODUCTION_INDEX", "주요 생산 지표 현황",     "10", "15"},
-                {"TBL_INVENTORY",        "제지 재공품 및 야적현황", "10", "13"},
-                {"TBL_ENERGY",           "에너지 원단위",           "8",  "6"},
-                {"TBL_BOILER",           "보일러 운영 현황",        "7",  "8"},
-        };
-
-        for (int i = 0; i < tableDefinitions.length; i++) {
-            DailyReportTable table = DailyReportTable.builder()
-                    .tableCode(tableDefinitions[i][0])
-                    .tableName(tableDefinitions[i][1])
-                    .sortOrder(i + 1)
-                    .rowCount(Integer.parseInt(tableDefinitions[i][2]))
-                    .colCount(Integer.parseInt(tableDefinitions[i][3]))
-                    .build();
+        for (int i = 0; i < TABLE_DEFINITIONS.length; i++) {
+            DailyReportTable table = buildDefaultTable(TABLE_DEFINITIONS[i], i + 1);
             report.addTable(table);
-
-            // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
-            // ★ 담당자(OWNER_IDS/OWNER_NAMES)는 하드코딩하지 않음 — 항상 NULL로 시작
-            // ★ 표1/표2 "진짜 값 롤링" — 과거 달의 월말 실측값을 DB에서 조회하는
-            //   콜백(historicalValueLookup)을 넘긴다 (커트오프 이전 달은 템플릿
-            //   내부에서 실측 조회를 시도하지 않고 하드코딩 샘플로 대체하므로
-            //   이 콜백은 호출되지 않음)
-            DefaultCellTemplate.populateDefaultCells(table, report.getReportDate(), historicalValueLookup());
-            // ★ 값 이어받기: 직전 일보에 입력되어 있던 DATA 셀 값을 새 표의 초기값으로 반영
-            applyCarriedOverValues(table, previousValues);
-            // ★ 생성 즉시 현재 활성 CellAuth 담당자를 반영 (코드 수정/재배포 불필요)
-            cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
+            populateAndSyncNewTable(table, report.getReportDate(), previousValues);
         }
+    }
+
+    /**
+     * ★★ 기존 일보(이 기능 배포 이전에 이미 생성되어 있던 report row)에 표 자체가
+     *   통째로 누락되어 있으면(예: 신규 표4개 추가 배포 이전에 만들어진 과거/미래 일보)
+     *   보충 생성한다. {@code cellsMissing}(표는 있는데 셀만 빈 경우) 케이스와 달리
+     *   이 케이스는 report.getTables()에 해당 tableCode 자체가 없는 경우를 다룬다.
+     *
+     * @return 실제로 표가 추가되었으면 true (호출측에서 저장 필요 여부 판단용)
+     */
+    private boolean addMissingTablesToExistingReport(DailyReport report, Map<String, String> previousValues) {
+        Set<String> existingCodes = report.getTables().stream()
+                .map(DailyReportTable::getTableCode)
+                .collect(Collectors.toSet());
+        boolean added = false;
+        for (int i = 0; i < TABLE_DEFINITIONS.length; i++) {
+            String code = TABLE_DEFINITIONS[i][0];
+            if (existingCodes.contains(code)) {
+                continue;
+            }
+            DailyReportTable table = buildDefaultTable(TABLE_DEFINITIONS[i], i + 1);
+            report.addTable(table);
+            populateAndSyncNewTable(table, report.getReportDate(), previousValues);
+            added = true;
+        }
+        return added;
+    }
+
+    private DailyReportTable buildDefaultTable(String[] def, int sortOrder) {
+        return DailyReportTable.builder()
+                .tableCode(def[0])
+                .tableName(def[1])
+                .sortOrder(sortOrder)
+                .rowCount(Integer.parseInt(def[2]))
+                .colCount(Integer.parseInt(def[3]))
+                .build();
+    }
+
+    /** 표 1개에 기본 셀 생성 + 값 이어받기 + 담당자(OWNER) 동기화를 공통 수행 */
+    private void populateAndSyncNewTable(DailyReportTable table, LocalDate reportDate,
+                                          Map<String, String> previousValues) {
+        // 기본 셀(HEADER + READONLY + DATA) 생성 — 프론트엔드 표 렌더링에 필수
+        // ★ 담당자(OWNER_IDS/OWNER_NAMES)는 하드코딩하지 않음 — 항상 NULL로 시작
+        // ★ 표1/표2 "진짜 값 롤링" — 과거 달의 월말 실측값을 DB에서 조회하는
+        //   콜백(historicalValueLookup)을 넘긴다 (커트오프 이전 달은 템플릿
+        //   내부에서 실측 조회를 시도하지 않고 하드코딩 샘플로 대체하므로
+        //   이 콜백은 호출되지 않음)
+        DefaultCellTemplate.populateDefaultCells(table, reportDate, historicalValueLookup(), historicalYearlyValueLookup());
+        // ★ 값 이어받기: 직전 일보에 입력되어 있던 DATA 셀 값을 새 표의 초기값으로 반영
+        applyCarriedOverValues(table, previousValues);
+        // ★ 생성 즉시 현재 활성 CellAuth 담당자를 반영 (코드 수정/재배포 불필요)
+        cellOwnershipSyncService.applyCurrentOwnersToNewTable(table);
     }
 
     /**
@@ -828,6 +979,24 @@ public class DailyReportService {
             }
             List<DailyReportCell> candidates = cellRepository.findMonthlyValueCandidates(
                     tableCode, rowIndex, liveColIndex, rangeStart, monthEnd);
+            return candidates.isEmpty() ? null : candidates.get(0).getCellValue();
+        };
+    }
+
+    /**
+     * ★ 표7(안전사고 연도별 추이) 롤링 과거 컬럼의 실측(연말 대표값=연간 누적값)
+     *   조회 콜백 생성.
+     *
+     * - 표5/6과 마찬가지로 신규 기능이라 FEATURE_CUTOFF_DATE 커트오프를 두지 않고
+     *   항상 조회를 시도한다.
+     * - "그 연도의 대표값"은 해당 연도(1/1~12/31) 범위 내에서 가장 최근 날짜에
+     *   기록된 실측(라이브 DATA 컬럼) 값으로 정의한다 (표1/표2의 월말 대표값과
+     *   동일한 원리를 연 단위로 적용).
+     */
+    private DefaultCellTemplate.HistoricalYearlyValueLookup historicalYearlyValueLookup() {
+        return (tableCode, rowIndex, liveColIndex, targetYear) -> {
+            List<DailyReportCell> candidates = cellRepository.findYearlyValueCandidates(
+                    tableCode, rowIndex, liveColIndex, targetYear);
             return candidates.isEmpty() ? null : candidates.get(0).getCellValue();
         };
     }
@@ -910,15 +1079,20 @@ public class DailyReportService {
      *   동일한 원리이며, 셀과 마찬가지로 "누가 입력했는지(사람/이어받기)"와 무관하게
      *   비어있지 않은 내용은 모두 이어받기 후보가 된다.
      *
-     * @return key = 사업부 코드(PAPER/TISSUE/PAD/SAFETY/ETC), value = 직전 일보에 입력된 내용
+     * ★★ 2026-09: tableCode로 스코프 — 사고 통계 특이사항표(TBL_SAFETY_AMOUNT_NOTE 등)가
+     * TBL_SPECIAL_NOTE와 카테고리 코드(PAPER/TISSUE/PAD)를 재사용하므로, tableCode
+     * 없이 조회하면 서로 다른 표의 값이 뒤섞인다.
+     *
+     * @return key = 사업부/카테고리 코드, value = 직전 일보에 입력된 내용
      */
-    private Map<String, String> findPreviousRemarkValues(LocalDate reportDate) {
+    private Map<String, String> findPreviousRemarkValues(LocalDate reportDate, String tableCode) {
         Optional<DailyReport> previous = reportRepository
                 .findTopByReportDateLessThanOrderByReportDateDesc(reportDate);
         if (previous.isEmpty()) {
             return Map.of();
         }
-        return remarkRepository.findByDailyReport_ReportIdOrderBySortOrderAsc(previous.get().getReportId())
+        return remarkRepository.findByDailyReport_ReportIdAndTableCodeOrderBySortOrderAsc(
+                        previous.get().getReportId(), tableCode)
                 .stream()
                 .filter(r -> r.getContent() != null && !r.getContent().isBlank())
                 .collect(Collectors.toMap(DailyReportRemark::getCategory, DailyReportRemark::getContent,
@@ -936,18 +1110,20 @@ public class DailyReportService {
      * - 이 기능 배포 이전에 만들어진 기존 일보를 다시 열었을 때는 누락된 카테고리만
      *   보충한다(이미 사람이 입력해 둔 다른 카테고리 행은 그대로 유지).
      */
-    private void ensureDefaultRemarks(DailyReport report, Map<String, String> previousValues) {
+    private void ensureDefaultRemarks(DailyReport report, String tableCode, Map<String, String> categories,
+                                       Map<String, String> previousValues) {
         Set<String> existingCategories = report.getRemarks().stream()
+                .filter(r -> tableCode.equals(r.getTableCode()))
                 .map(DailyReportRemark::getCategory)
                 .collect(Collectors.toSet());
         int sortOrder = report.getRemarks().size();
-        for (String category : SPECIAL_NOTE_CATEGORIES.keySet()) {
+        for (String category : categories.keySet()) {
             if (existingCategories.contains(category)) {
                 continue;
             }
             sortOrder++;
             DailyReportRemark remark = DailyReportRemark.builder()
-                    .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                    .tableCode(tableCode)
                     .category(category)
                     .content(previousValues.getOrDefault(category, ""))
                     .sortOrder(sortOrder)
@@ -957,16 +1133,21 @@ public class DailyReportService {
         }
     }
 
-    /** SPECIAL_NOTE_CATEGORIES 정의 순서 기준 사업부 코드의 고정 정렬 순서(1부터 시작) */
-    private int sortOrderOfCategory(String category) {
+    /**
+     * ★★ 2026-09: tableCode별 SpecialNoteSpec.categories() 정의 순서 기준 카테고리
+     * 코드의 고정 정렬 순서(1부터 시작). tableCode마다 카테고리 집합이 다르므로
+     * (예: TBL_SAFETY_TREND_NOTE는 ALL 하나뿐) 반드시 tableCode를 받아야 한다.
+     */
+    private int sortOrderOfCategory(String tableCode, String category) {
+        Map<String, String> categories = specialNoteSpec(tableCode).categories();
         int i = 1;
-        for (String c : SPECIAL_NOTE_CATEGORIES.keySet()) {
+        for (String c : categories.keySet()) {
             if (c.equals(category)) {
                 return i;
             }
             i++;
         }
-        return SPECIAL_NOTE_CATEGORIES.size() + 1; // 이론상 도달 불가 (category는 항상 유효한 값)
+        return categories.size() + 1; // 이론상 도달 불가 (category는 항상 유효한 값)
     }
 
     /**
@@ -988,7 +1169,7 @@ public class DailyReportService {
      *   상태가 그대로 유지된다.
      * ※ 무한 루프/과도한 조회 방지를 위해 최대 366일(약 1년)까지만 전파한다.
      */
-    private void propagateRemarkForward(LocalDate fromDate, String category, String newContent) {
+    private void propagateRemarkForward(LocalDate fromDate, String tableCode, String category, String newContent) {
         LocalDate cursor = fromDate;
         for (int hop = 0; hop < 366; hop++) {
             DailyReport nextReport = reportRepository
@@ -1000,17 +1181,17 @@ public class DailyReportService {
             cursor = nextReport.getReportDate();
 
             DailyReportRemark nextRemark = remarkRepository
-                    .findByDailyReport_ReportIdAndCategory(nextReport.getReportId(), category)
+                    .findByDailyReport_ReportIdAndTableCodeAndCategory(nextReport.getReportId(), tableCode, category)
                     .orElse(null);
 
             if (nextRemark == null) {
                 // 이 기능 배포 이전에 만들어진 미래 일보 등, 해당 사업부 행이 아직 없는
                 // 경우 — 이어받기 상태의 새 행을 만들어 전파를 계속한다.
                 DailyReportRemark created = DailyReportRemark.builder()
-                        .tableCode(SPECIAL_NOTE_TABLE_CODE)
+                        .tableCode(tableCode)
                         .category(category)
                         .content(newContent)
-                        .sortOrder(sortOrderOfCategory(category))
+                        .sortOrder(sortOrderOfCategory(tableCode, category))
                         .createdBy(null)
                         .build();
                 nextReport.addRemark(created);
@@ -1071,15 +1252,39 @@ public class DailyReportService {
     }
 
     /**
+     * ★★★★★★ 사고통계 페이지(표9/10 특이사항) 표코드 — 2026-09 "과거/현재/미래
+     * 전부 수정 가능" 정책 적용 대상. TBL_SPECIAL_NOTE(표1~4 특이사항)는
+     * 기존 날짜 제한 정책을 그대로 유지한다.
+     */
+    private static final Set<String> SAFETY_STATS_NOTE_TABLE_CODES = Set.of(
+            SAFETY_AMOUNT_NOTE_TABLE_CODE,
+            SAFETY_TREND_NOTE_TABLE_CODE
+    );
+
+    /**
      * ★★ 특이사항(등록/수정/삭제)도 셀·이미지와 동일하게 "어제 이후(어제/오늘/미래
      * 전체)" 날짜의 일보에서만 허용한다. 그 이전 과거 일보의 특이사항은 조회는
      * 항상 가능하지만 등록/수정/삭제는 서버에서 거부한다.
+     * (하위 호환 오버로드 — TBL_SPECIAL_NOTE 등 일반 특이사항 전용, 날짜 제한 적용)
      */
     private void validateRemarkEditableDate(DailyReport report) {
         if (!isEditableReportDate(report.getReportDate())) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED,
                     "특이사항은 어제 이후(어제/오늘/미래) 날짜의 일보에서만 등록/수정할 수 있습니다.");
         }
+    }
+
+    /**
+     * ★★★★★★ 2026-09: tableCode를 받아 사고통계 특이사항표(표9/10,
+     * SAFETY_STATS_NOTE_TABLE_CODES)인 경우에는 날짜 제한을 완전히 건너뛴다
+     * (과거/현재/미래 전부 수정 가능). 그 외(TBL_SPECIAL_NOTE 등)는 기존
+     * 날짜 제한 정책을 그대로 적용한다.
+     */
+    private void validateRemarkEditableDate(DailyReport report, String tableCode) {
+        if (SAFETY_STATS_NOTE_TABLE_CODES.contains(tableCode)) {
+            return;
+        }
+        validateRemarkEditableDate(report);
     }
 
     /**
