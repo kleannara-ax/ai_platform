@@ -35,6 +35,8 @@
 | `V33__add_facility_aircon_equipment_code.sql` | 에어컨 자동 ID(`EQUIPMENT_CODE`, `AC-000001` 형식) 추가. 기존 식별 No.(`SERIAL_NUMBER`)와 별도 관리하며, 정수기는 기존 `SERIAL_NUMBER` 기반 `WP-000001` 자동 생성 정책을 유지 |
 | `V37__migrate_fire_permission_to_user_codes.sql` | FIRE_PERM 레거시 CSV 권한을 사용자별 코드값으로 전환 |
 | `V38__migrate_other_permission_to_user_codes.sql` | OTHER_PERM 레거시 CSV 권한을 사용자별 코드값으로 전환 |
+| `V39__add_facility_water_consumption.sql` | 정수기 QR 물통 사용/보급 이력 테이블 추가 |
+| `V40__fix_co2_extinguisher_replacement_cycle.sql` | 이산화탄소소화기 교체주기 99년 고정 (기존 데이터 보정, 반영구적 사용) |
 
 ## 실행 순서
 
@@ -68,6 +70,8 @@
 27. V33__add_facility_aircon_equipment_code.sql -- 에어컨 자동 ID 추가
 28. V37__migrate_fire_permission_to_user_codes.sql -- 소방 권한 사용자 코드 전환
 29. V38__migrate_other_permission_to_user_codes.sql -- 기타시설관리 권한 사용자 코드 전환
+30. V39__add_facility_water_consumption.sql -- 정수기 QR 물통 사용/보급 이력 테이블 추가
+31. V40__fix_co2_extinguisher_replacement_cycle.sql -- 이산화탄소소화기 교체주기 99년 고정 (기존 데이터 보정)
 ```
 
 ## 사전 조건
@@ -115,6 +119,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V33__add_facility_aircon_equipment_code.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V37__migrate_fire_permission_to_user_codes.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V38__migrate_other_permission_to_user_codes.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V39__add_facility_water_consumption.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V40__fix_co2_extinguisher_replacement_cycle.sql
 ```
 
 ## 테이블 구조
