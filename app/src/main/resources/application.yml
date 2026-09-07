@@ -109,6 +109,10 @@ safety:
   # 엑셀 일괄업로드 1회 최대 시트(매뉴얼) 개수 — 과도한 업로드 방지
   excel:
     max-sheets-per-upload: 100
+    # 분할 업로드 1건의 총 용량 상한 (byte, 기본 150MB).
+    # 브라우저가 파일을 4MB 조각으로 잘라 보내므로 앞단 웹서버(nginx client_max_body_size 등)의
+    # 제한과는 무관하다. 이 값은 임시 파일이 디스크를 잠식하지 않게 막는 용도다.
+    max-upload-size: 157286400
 
 # ── 로깅 ──
 logging:

@@ -541,6 +541,8 @@ server {
     # return 301 https://$host$request_uri;
 
     # 요청 본문 크기 제한
+    # 안전(SAFETY) 엑셀 일괄업로드는 50~90MB 파일을 다루지만, 브라우저가 4MB 조각으로 잘라
+    # 여러 번 보내므로(분할 업로드) 이 값을 올리지 않아도 된다.
     client_max_body_size 10M;
 
     # 정적 파일 캐시 (SPA 에셋)
