@@ -444,13 +444,18 @@ function startCellEdit(event, stepId, columnId) {
   // 입력창을 새로 띄우지 않고 칸 글자 자리를 그대로 고쳐 쓴다 — 표 모양이 흔들리지 않는다
   const span = td.querySelector('.cell-text');
   if (!span) return;
+
+  // 누른 자리가 글자의 몇 번째인지 먼저 알아 둔다.
+  // 편집 상태로 바꾸면 글자 노드가 새로 만들어져 그 뒤에는 클릭 좌표로 찾을 수 없다.
+  const clickedAt = caretOffsetFromPoint(span, event.clientX, event.clientY);
+
   td.classList.add('cell-editing');
   span.classList.remove('empty');
   span.textContent = before;
   span.contentEditable = 'true';
   span.spellcheck = false;
   span.focus();
-  placeCaretAtEnd(span);
+  placeCaretAt(span, clickedAt);
 
   let done = false;
   const finish = async (save) => {
@@ -487,6 +492,44 @@ function placeCaretAtEnd(el) {
   const range = document.createRange();
   range.selectNodeContents(el);
   range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/**
+ * 화면 좌표(클릭 지점)가 el 안 글자의 몇 번째인지 돌려준다.
+ * 글자 위가 아니거나(여백·빈 칸) 브라우저가 지원하지 않으면 -1.
+ */
+function caretOffsetFromPoint(el, x, y) {
+  let range = null;
+  if (document.caretRangeFromPoint) {                 // Chrome/Edge/Safari
+    range = document.caretRangeFromPoint(x, y);
+  } else if (document.caretPositionFromPoint) {       // Firefox
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+    }
+  }
+  if (!range || !el.contains(range.startContainer)) return -1;
+
+  const upToClick = document.createRange();
+  upToClick.selectNodeContents(el);
+  upToClick.setEnd(range.startContainer, range.startOffset);
+  return upToClick.toString().length;
+}
+
+/** 커서를 글자 offset 자리에 놓는다. 범위를 벗어나면 끝으로 보낸다. */
+function placeCaretAt(el, offset) {
+  const node = el.firstChild;
+  if (!node || offset < 0 || offset > (node.textContent || '').length) {
+    placeCaretAtEnd(el);
+    return;
+  }
+  const range = document.createRange();
+  range.setStart(node, offset);
+  range.collapse(true);
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
