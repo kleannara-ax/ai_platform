@@ -22,6 +22,11 @@ const STEP_NO_WIDTH = 46;
 /** 관리 열도 고정 (수정 모드에서만) */
 const STEP_MANAGE_WIDTH = 80;
 const STEP_COL_MIN = 44;
+/**
+ * 사진 칸의 최소 폭 = 사진 상자 폭(CSS .step-photo 180px) + 칸 좌우 여백(12px x 2).
+ * 사진은 어느 매뉴얼에서든 같은 크기로 고정이라, 칸이 이보다 좁아지면 사진이 칸을 넘친다.
+ */
+const STEP_PHOTO_COL_MIN = 180 + 24;
 /** 이 폭보다 좁으면 표 대신 항목별 카드로 쌓아 보여준다 */
 const STEP_STACK_BREAKPOINT = 760;
 const STEP_COL_STORAGE_KEY = 'safety.stepColWeights';
@@ -916,12 +921,16 @@ function buildStepColLayout() {
   columns.forEach(column => {
     if (column.columnType === 'PHOTO' && !hasAnyPhoto) return;   // 사진이 없으면 사진 열은 아예 만들지 않는다
     const key = 'c' + column.columnId;
+    // 사진이 들어갈 수 있는 칸(사진 열 + 사진이 붙은 글 열)은 사진 상자보다 좁아지지 않게 한다
+    const holdsPhoto = column.columnType === 'PHOTO'
+      || (detail.steps || []).some(step => (step.photos || []).some(p => p.columnId === column.columnId));
     layout.push({
       key,
       columnId: column.columnId,
       label: column.label,
       type: column.columnType,
       weight: Number(saved[key]) > 0 ? Number(saved[key]) : (column.widthWeight || 200),
+      minWidth: holdsPhoto ? STEP_PHOTO_COL_MIN : STEP_COL_MIN,
       fixed: false,
     });
   });
@@ -947,10 +956,11 @@ function fitStepColWidths(layout, available) {
   const totalWeight = flex.reduce((sum, col) => sum + col.weight, 0) || 1;
   let used = 0;
   flex.forEach((col, i) => {
+    const min = col.minWidth || STEP_COL_MIN;
     if (i === flex.length - 1) {
-      widths[col.key] = Math.max(STEP_COL_MIN, remaining - used);
+      widths[col.key] = Math.max(min, remaining - used);
     } else {
-      widths[col.key] = Math.max(STEP_COL_MIN, Math.round(remaining * col.weight / totalWeight));
+      widths[col.key] = Math.max(min, Math.round(remaining * col.weight / totalWeight));
       used += widths[col.key];
     }
   });

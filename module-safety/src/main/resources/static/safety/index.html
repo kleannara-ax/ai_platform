@@ -489,16 +489,22 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
   color:var(--muted); margin-bottom:3px;
 }
 .step-table.stacked td.text-center{text-align:left !important}
-/* 카드형에서는 사진 칸을 조금 더 크게 잡는다 (누르면 확대 뷰어로 원본을 볼 수 있다) */
-.step-table.stacked .step-photo{height:240px}
 /*
- * 목록의 단계 사진 — 세로/가로 사진이 섞여 있어도 칸 크기를 똑같이 맞춘다.
+ * 목록의 단계 사진 — 어디서든 같은 크기로 고정한다.
+ *
+ * 예전에는 width:100% 라 칸 너비를 따라갔다. 그래서 창 폭·매뉴얼·열 너비 조절에 따라
+ * 사진 크기가 계속 달라졌고(같은 사진이 92px ~ 215px), 비고 같은 글 칸에 붙은 사진은
+ * 사진 열보다 넓게 나와 제각각이었다. 이제 180x130 px 로 못 박는다.
+ *
  * object-fit:fill 이라 세로 사진은 가로로 늘어난다(잘리지 않는다).
  * 원본 비율은 눌러서 여는 확대 뷰어에서 그대로 볼 수 있다.
+ * 폭을 고정했으므로 사진이 들어갈 수 있는 칸은 이보다 좁아지지 않는다
+ * (js/index.js 의 STEP_PHOTO_COL_MIN).
  */
 .step-photo{
-  width:100%; height:130px; object-fit:fill; display:block; margin-bottom:5px; cursor:zoom-in;
+  width:180px; height:130px; object-fit:fill; display:block; margin-bottom:5px; cursor:zoom-in;
   border:1px solid var(--line); border-radius:8px; transition:.15s; background:#fff;
+  flex:0 0 auto;
 }
 .step-photo:hover{border-color:var(--brand); box-shadow:var(--shadow-md)}
 
