@@ -1639,7 +1639,17 @@ function showUploadResult(result) {
 
   document.getElementById('uploadDoneBody').innerHTML = html;
   document.getElementById('eu-confirm-btn').classList.add('d-none');
-  if (!uploadDoneModal) uploadDoneModal = new bootstrap.Modal(document.getElementById('uploadDoneModal'));
+
+  const el = document.getElementById('uploadDoneModal');
+  if (!uploadDoneModal) {
+    uploadDoneModal = new bootstrap.Modal(el);
+    // 두 번째로 열리는 모달의 배경은 부트스트랩이 1050 으로 만들어서 업로드 창(1055) 아래에 깔린다.
+    // 완료 팝업(1080) 바로 밑으로 올려야 업로드 창이 어두워지고 팝업이 앞에 있는 것으로 보인다.
+    el.addEventListener('shown.bs.modal', () => {
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      if (backdrops.length > 1) backdrops[backdrops.length - 1].style.zIndex = '1075';
+    });
+  }
   uploadDoneModal.show();
 }
 
