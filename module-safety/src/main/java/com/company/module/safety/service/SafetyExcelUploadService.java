@@ -107,7 +107,9 @@ public class SafetyExcelUploadService {
                 .stepCount(sheet.getRows().size())
                 .photoCount(sheet.getPhotoCount())
                 .detectedTitle(sheet.getTitle())
-                .selected(sheet.isRecognized())
+                // 추정으로 읽은 시트는 기본 선택하지 않는다 — 사람이 미리보기로 확인하고 고르게 한다
+                .selected(sheet.isRecognized() && sheet.isConfident())
+                .confident(sheet.isConfident())
                 .stepPreviewLines(sheet.isRecognized() ? sheet.previewLines(PREVIEW_LINE_LIMIT) : List.of())
                 .build();
     }

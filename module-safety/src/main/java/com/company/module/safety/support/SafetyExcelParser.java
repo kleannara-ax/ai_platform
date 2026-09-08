@@ -63,6 +63,8 @@ public class SafetyExcelParser {
     private static final String HEADER_MARK_OVERVIEW = "공정단계";
     /** 머리글 행을 찾을 최대 행 — 위에 제목/여백 행이 붙어 있는 파일이 있어 1행만 보지 않는다. */
     private static final int WORK_HEADER_SCAN_LIMIT = 10;
+    /** 정해진 문구 없이 표로 인정하려면 이름이 붙은 칸이 최소 이만큼은 있어야 한다. */
+    private static final int MIN_TABLE_COLUMNS = 3;
 
     /** 행 번호 칸 (열 정의에는 넣지 않고 stepNo 로 쓴다) */
     private static final String HEADER_NO = "No.";
@@ -268,10 +270,21 @@ public class SafetyExcelParser {
                 overviewRowIdx = rowIdx;
             }
         }
-        if (headerRowIdx < 0) {
-            return ParsedSheet.rejected(sheetName, (overviewRowIdx >= 0)
-                    ? "개요/범례 시트로 추정되어 매뉴얼 대상에서 제외됩니다."
-                    : "지원하는 매뉴얼 형식과 헤더가 일치하지 않습니다. (머리글에 '공정 순서' 가 있어야 합니다)");
+
+        // "공정 순서" 라는 문구가 확실한 신호이긴 하지만, 표 자체는 열 구성이 자유롭다.
+        // 문구가 없어도 표처럼 생겼으면 받아 준다 — 다만 확신이 없으므로 기본 선택은 하지 않고,
+        // 화면에서 사람이 미리보기로 확인한 뒤 고르게 한다.
+        boolean confident = headerRowIdx >= 0;
+        if (!confident) {
+            if (overviewRowIdx >= 0) {
+                return ParsedSheet.rejected(sheetName, "개요/범례 시트로 추정되어 매뉴얼 대상에서 제외됩니다.");
+            }
+            headerRowIdx = findTableHeaderRow(sheet, scanLimit);
+            if (headerRowIdx < 0) {
+                return ParsedSheet.rejected(sheetName,
+                        "표로 읽을 만한 머리글을 찾지 못했습니다. "
+                        + "안전작업 매뉴얼은 머리글 행이, 작업 위험성 평가서는 '작업 순서'와 '발생 가능한 위험' 이 필요합니다.");
+            }
         }
         Row headerRow = sheet.getRow(headerRowIdx);
 
@@ -341,8 +354,51 @@ public class SafetyExcelParser {
         // 제목은 시트명을 쓴다 — 시트 안의 "공정명" 은 비어 있거나(예: 가공4·5호기 파일)
         // 서로 다른 시트가 같은 값을 갖는 경우(예: "손잡이 테이프 교체 작업")가 많아
         // 제목 중복으로 뒤 시트가 통째로 건너뛰어졌다.
-        return ParsedSheet.accepted(sheetName, SafetyFormType.WORK_METHOD,
+        ParsedSheet parsed = ParsedSheet.accepted(sheetName, SafetyFormType.WORK_METHOD,
                 flatten(sheetName), List.of(), columns, rows);
+        if (!confident) {
+            parsed.markNeedsReview("머리글을 자동으로 판단했습니다. 미리보기로 내용을 확인한 뒤 선택하세요.");
+        }
+        return parsed;
+    }
+
+    /**
+     * 정해진 문구가 없어도 "표의 머리글"로 보이는 행을 찾는다.
+     *
+     * <p>이 모듈의 표는 열 구성이 자유롭기 때문에(열 정의가 데이터다) 엑셀도 같은 수준으로
+     * 받아 줘야 한다. 위쪽 몇 행 중 <b>이름이 붙은 칸이 가장 많은 행</b>을 머리글로 보고,
+     * 그 아래에 내용이 있는 행이 실제로 있어야 인정한다.
+     *
+     * @return 머리글 행 번호. 표로 볼 수 없으면 -1
+     */
+    private int findTableHeaderRow(Sheet sheet, int scanLimit) {
+        int bestRow = -1;
+        int bestLabels = 0;
+        for (int rowIdx = 0; rowIdx <= scanLimit; rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row == null) continue;
+            int labels = 0;
+            for (int colIdx = 0; colIdx < row.getLastCellNum(); colIdx++) {
+                String label = flatten(cellText(row.getCell(colIdx)));
+                // 머리글은 짧은 이름이다. 문장이 들어 있으면 데이터 행으로 본다.
+                if (!label.isBlank() && label.length() <= 40) labels++;
+            }
+            if (labels > bestLabels) {
+                bestLabels = labels;
+                bestRow = rowIdx;
+            }
+        }
+        if (bestRow < 0 || bestLabels < MIN_TABLE_COLUMNS) return -1;
+        return hasContentBelow(sheet, bestRow) ? bestRow : -1;
+    }
+
+    /** 머리글 아래에 내용이 채워진 행이 하나라도 있는지 */
+    private boolean hasContentBelow(Sheet sheet, int headerRowIdx) {
+        for (int rowIdx = headerRowIdx + 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row != null && !joinRow(row).isBlank()) return true;
+        }
+        return false;
     }
 
     /** "No." / "NO" / "번호" 처럼 행 번호를 뜻하는 머리글인지. */
@@ -558,7 +614,20 @@ public class SafetyExcelParser {
                 return pos;
             }
         }
-        return -1;   // No./공정명 칸에만 걸쳐 있는 그림 — 화면에서 기본 사진 열로 간다
+        // 표의 열과 하나도 겹치지 않는 그림(No./공정명 칸에만 걸쳐 있는 경우)은
+        // 가장 가까운 열에 붙인다. 사진 전용 열이 없는 시트도 있어서, 여기서 -1 로 두면
+        // 갈 곳이 없어 화면에 아예 나오지 않는다.
+        int nearest = -1;
+        int nearestGap = Integer.MAX_VALUE;
+        for (int pos = 0; pos < sourceColumnIndexes.size(); pos++) {
+            int sourceCol = sourceColumnIndexes.get(pos);
+            int gap = (sourceCol < firstCol) ? firstCol - sourceCol : sourceCol - lastCol;
+            if (gap < nearestGap) {
+                nearestGap = gap;
+                nearest = pos;
+            }
+        }
+        return nearest;
     }
 
     /**
@@ -719,7 +788,9 @@ public class SafetyExcelParser {
     public static final class ParsedSheet {
         private final String sheetName;
         private final boolean recognized;
-        private final String reason;
+        private String reason;
+        /** 정해진 문구로 확실히 가려낸 시트인지. false 면 화면에서 기본 선택하지 않는다. */
+        private boolean confident = true;
         private final SafetyFormType formType;
         private final String title;
         private final List<ParsedMeta> meta;
@@ -747,8 +818,15 @@ public class SafetyExcelParser {
             return new ParsedSheet(sheetName, false, reason, null, null, List.of(), List.of(), List.of());
         }
 
+        /** 머리글을 추정으로 잡았을 때 — 인식은 하되 사람이 확인하도록 표시한다. */
+        void markNeedsReview(String note) {
+            this.confident = false;
+            this.reason = note;
+        }
+
         public String getSheetName() { return sheetName; }
         public boolean isRecognized() { return recognized; }
+        public boolean isConfident() { return confident; }
         public String getReason() { return reason; }
         public SafetyFormType getFormType() { return formType; }
         public String getTitle() { return title; }
