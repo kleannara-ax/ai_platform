@@ -89,8 +89,11 @@ body{
 /* 머리글: 끌어서 순서 변경 + 이름 수정 */
 .step-table th.col-movable{cursor:grab}
 .step-table th .col-title{pointer-events:none}
+/* 열이 좁으면 머리글 글자에 밀려 아이콘이 잘리므로, 오른쪽 끝에 겹쳐서 띄운다 */
 .step-table th .col-tools{
-  display:none; gap:2px; margin-left:6px; vertical-align:middle;
+  display:none; position:absolute; top:50%; right:16px; transform:translateY(-50%);
+  gap:2px; padding:2px 3px; border-radius:7px;
+  background:#f8f9fd; box-shadow:-6px 0 6px -4px rgba(17,24,39,.18);
 }
 .step-table th.col-movable:hover .col-tools{display:inline-flex}
 .step-table th .col-tools button{
