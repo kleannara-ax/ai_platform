@@ -1,7 +1,5 @@
 package com.company.module.safety.controller;
 
-import com.company.core.common.exception.BusinessException;
-import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.ApiResponse;
 import com.company.module.safety.dto.request.ExcelSheetAssignRequest;
 import com.company.module.safety.dto.request.ExcelStagedImportRequest;
@@ -11,8 +9,6 @@ import com.company.module.safety.dto.request.ExcelStagedSheetRequest;
 import com.company.module.safety.dto.response.ExcelChunkUploadResponse;
 import com.company.module.safety.dto.response.ExcelImportResultResponse;
 import com.company.module.safety.dto.response.ExcelSheetDetailResponse;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.company.module.safety.dto.response.ExcelSheetPreviewResponse;
 import com.company.module.safety.support.SafetyExcelParser.ParsedPhoto;
 import com.company.module.safety.service.SafetyExcelStagingService;
@@ -51,7 +47,6 @@ public class SafetyExcelUploadController {
 
     private final SafetyExcelUploadService excelUploadService;
     private final SafetyExcelStagingService stagingService;
-    private final ObjectMapper objectMapper;
 
     /** 1단계: 형식 확인 / 미리보기 */
     @PostMapping("/safety-api/excel-upload/preview")
@@ -75,9 +70,8 @@ public class SafetyExcelUploadController {
             @RequestParam("assignments") String assignmentsJson,
             Authentication authentication) {
         String createdBy = (authentication != null) ? authentication.getName() : null;
-        List<ExcelSheetAssignRequest> assignments = parseAssignments(assignmentsJson);
         return ResponseEntity.ok(ApiResponse.created(
-                excelUploadService.confirmImport(file, assignments, createdBy)));
+                excelUploadService.confirmImport(file, assignmentsJson, createdBy)));
     }
 
     // ================================================================
@@ -182,12 +176,4 @@ public class SafetyExcelUploadController {
         return (authentication != null) ? authentication.getName() : null;
     }
 
-    private List<ExcelSheetAssignRequest> parseAssignments(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<ExcelSheetAssignRequest>>() { });
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
-                    "시트별 분류 지정 형식이 올바르지 않습니다: " + e.getMessage());
-        }
-    }
 }

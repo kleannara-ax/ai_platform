@@ -25,6 +25,8 @@ import com.company.module.safety.support.SafetyExcelParser.ParsedMeta;
 import com.company.module.safety.support.SafetyExcelParser.ParsedPhoto;
 import com.company.module.safety.support.SafetyExcelParser.ParsedRow;
 import com.company.module.safety.support.SafetyExcelParser.ParsedSheet;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -67,6 +69,7 @@ public class SafetyExcelUploadService {
     private final SafetyManualMetaRepository metaRepository;
     private final SafetyCategoryService categoryService;
     private final SafetyPhotoService photoService;
+    private final ObjectMapper objectMapper;
 
     @Value("${safety.excel.max-sheets-per-upload:100}")
     private int maxSheetsPerUpload;
@@ -197,6 +200,26 @@ public class SafetyExcelUploadService {
     // ================================================================
     // 2단계: 확정 업로드 (선택된 시트만 실제 저장)
     // ================================================================
+    /**
+     * 파일과 함께 multipart 로 받은 시트별 분류 지정(JSON 문자열)을 풀어서 저장한다.
+     *
+     * <p>파일과 같이 보내야 해서 본문을 JSON 으로 받을 수 없어 문자열 파트로 온다.
+     * (시트명에 쉼표가 들어갈 수 있어 CSV 대신 JSON 을 쓴다)
+     */
+    @Transactional
+    public ExcelImportResultResponse confirmImport(MultipartFile file, String assignmentsJson, String createdBy) {
+        return confirmImport(file, parseAssignments(assignmentsJson), createdBy);
+    }
+
+    private List<ExcelSheetAssignRequest> parseAssignments(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<ExcelSheetAssignRequest>>() { });
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "시트별 분류 지정 형식이 올바르지 않습니다: " + e.getMessage());
+        }
+    }
+
     @Transactional
     public ExcelImportResultResponse confirmImport(MultipartFile file,
                                                     List<ExcelSheetAssignRequest> assignments, String createdBy) {

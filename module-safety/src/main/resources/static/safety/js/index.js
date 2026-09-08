@@ -22,6 +22,11 @@ const STEP_NO_WIDTH = 46;
 /** 관리 열도 고정 (수정 모드에서만) */
 const STEP_MANAGE_WIDTH = 80;
 const STEP_COL_MIN = 44;
+/**
+ * 사진 칸의 최소 폭 = 사진 상자 폭(CSS .step-photo 180px) + 칸 좌우 여백(12px x 2).
+ * 사진은 어느 매뉴얼에서든 같은 크기로 고정이라, 칸이 이보다 좁아지면 사진이 칸을 넘친다.
+ */
+const STEP_PHOTO_COL_MIN = 180 + 24;
 /** 이 폭보다 좁으면 표 대신 항목별 카드로 쌓아 보여준다 */
 const STEP_STACK_BREAKPOINT = 760;
 const STEP_COL_STORAGE_KEY = 'safety.stepColWeights';
@@ -439,13 +444,18 @@ function startCellEdit(event, stepId, columnId) {
   // 입력창을 새로 띄우지 않고 칸 글자 자리를 그대로 고쳐 쓴다 — 표 모양이 흔들리지 않는다
   const span = td.querySelector('.cell-text');
   if (!span) return;
+
+  // 누른 자리가 글자의 몇 번째인지 먼저 알아 둔다.
+  // 편집 상태로 바꾸면 글자 노드가 새로 만들어져 그 뒤에는 클릭 좌표로 찾을 수 없다.
+  const clickedAt = caretOffsetFromPoint(span, event.clientX, event.clientY);
+
   td.classList.add('cell-editing');
   span.classList.remove('empty');
   span.textContent = before;
   span.contentEditable = 'true';
   span.spellcheck = false;
   span.focus();
-  placeCaretAtEnd(span);
+  placeCaretAt(span, clickedAt);
 
   let done = false;
   const finish = async (save) => {
@@ -482,6 +492,44 @@ function placeCaretAtEnd(el) {
   const range = document.createRange();
   range.selectNodeContents(el);
   range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/**
+ * 화면 좌표(클릭 지점)가 el 안 글자의 몇 번째인지 돌려준다.
+ * 글자 위가 아니거나(여백·빈 칸) 브라우저가 지원하지 않으면 -1.
+ */
+function caretOffsetFromPoint(el, x, y) {
+  let range = null;
+  if (document.caretRangeFromPoint) {                 // Chrome/Edge/Safari
+    range = document.caretRangeFromPoint(x, y);
+  } else if (document.caretPositionFromPoint) {       // Firefox
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+    }
+  }
+  if (!range || !el.contains(range.startContainer)) return -1;
+
+  const upToClick = document.createRange();
+  upToClick.selectNodeContents(el);
+  upToClick.setEnd(range.startContainer, range.startOffset);
+  return upToClick.toString().length;
+}
+
+/** 커서를 글자 offset 자리에 놓는다. 범위를 벗어나면 끝으로 보낸다. */
+function placeCaretAt(el, offset) {
+  const node = el.firstChild;
+  if (!node || offset < 0 || offset > (node.textContent || '').length) {
+    placeCaretAtEnd(el);
+    return;
+  }
+  const range = document.createRange();
+  range.setStart(node, offset);
+  range.collapse(true);
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
@@ -916,12 +964,16 @@ function buildStepColLayout() {
   columns.forEach(column => {
     if (column.columnType === 'PHOTO' && !hasAnyPhoto) return;   // 사진이 없으면 사진 열은 아예 만들지 않는다
     const key = 'c' + column.columnId;
+    // 사진이 들어갈 수 있는 칸(사진 열 + 사진이 붙은 글 열)은 사진 상자보다 좁아지지 않게 한다
+    const holdsPhoto = column.columnType === 'PHOTO'
+      || (detail.steps || []).some(step => (step.photos || []).some(p => p.columnId === column.columnId));
     layout.push({
       key,
       columnId: column.columnId,
       label: column.label,
       type: column.columnType,
       weight: Number(saved[key]) > 0 ? Number(saved[key]) : (column.widthWeight || 200),
+      minWidth: holdsPhoto ? STEP_PHOTO_COL_MIN : STEP_COL_MIN,
       fixed: false,
     });
   });
@@ -947,10 +999,11 @@ function fitStepColWidths(layout, available) {
   const totalWeight = flex.reduce((sum, col) => sum + col.weight, 0) || 1;
   let used = 0;
   flex.forEach((col, i) => {
+    const min = col.minWidth || STEP_COL_MIN;
     if (i === flex.length - 1) {
-      widths[col.key] = Math.max(STEP_COL_MIN, remaining - used);
+      widths[col.key] = Math.max(min, remaining - used);
     } else {
-      widths[col.key] = Math.max(STEP_COL_MIN, Math.round(remaining * col.weight / totalWeight));
+      widths[col.key] = Math.max(min, Math.round(remaining * col.weight / totalWeight));
       used += widths[col.key];
     }
   });
