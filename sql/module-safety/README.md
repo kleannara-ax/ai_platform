@@ -15,6 +15,7 @@
 | 7 | `07_notice.sql` | 공지사항 테이블 |
 | 8 | `08_flexible_columns.sql` | 서식 구분(`FORM_TYPE`) + 상세 표의 열을 데이터로 빼는 구조(머리말/열 정의/행x열 값) + 기존 고정 컬럼 값 백필 |
 | 9 | `09_two_level_categories.sql` | 예전 3단계 DB 정리: 소분류에 붙어 있던 매뉴얼을 부모 중분류로 옮기고 소분류를 소프트 삭제. **신규 DB에서는 대상이 없어 아무 것도 하지 않는다** |
+| 10 | `10_step_photo_column.sql` | 사진이 표의 **어느 칸**에 들어가는지 기록하는 `COLUMN_ID` 추가. 비고 칸처럼 글과 사진이 함께 있는 칸을 지원한다. 기존 행은 `NULL`(기본 사진 열)이라 적용 전과 동작이 같다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
@@ -25,6 +26,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 06_org_cate
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 07_notice.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 08_flexible_columns.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 09_two_level_categories.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 10_step_photo_column.sql
 ```
 
 > 신규 DB에 이 순서대로 올리면 **대분류 12건만 있는 2단계 구조**가 만들어진다.
@@ -35,6 +37,53 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 09_two_leve
 > UTF-8로 저장된 한글 리터럴(`INSERT ... VALUES ('안전작업 매뉴얼', ...)` 등)이
 > latin1로 잘못 해석되어 DB에 깨진 상태(mojibake)로 저장된다. 컬럼 자체는 `utf8mb4`라
 > 오류 없이 들어가 버리므로 반드시 옵션을 챙겨야 한다.
+
+## 플랫폼 app 설정에 추가 필요
+
+업무 모듈은 `application.yml` 을 직접 만들거나 고치지 않는다. 아래 값이 필요하면 **운영자가 플랫폼
+`app/src/main/resources/application.yml` 에 추가**한다. 모두 코드에 기본값이 있어 넣지 않아도 동작한다.
+
+| 설정 키 | 기본값 | 설명 |
+|---|---|---|
+| `safety.upload-dir` | `${user.home}/safety-uploads` | 매뉴얼 사진 저장 디렉토리 (환경변수 `SAFETY_UPLOAD_DIR`) |
+| `safety.excel.max-sheets-per-upload` | `100` | 엑셀 1회 업로드 최대 시트 수 |
+| `safety.excel.max-upload-size` | `157286400` (150MB) | 분할 업로드 1건의 총 용량 상한. 임시 파일이 디스크를 잠식하지 않게 막는 용도 |
+
+### JVM 힙
+
+엑셀 일괄업로드는 사진이 많은 50~90MB 파일을 다룬다. 파싱은 파일 기반이라 100MB 안쪽이면 되지만,
+확정 저장 시 추출한 사진 원본을 저장 전까지 들고 있어야 해서 **`-Xmx1024m` 이상**을 권장한다.
+(실측: 파일당 사진 보유량 최대 89MB) `-Xmx384m` 에서는 `OutOfMemoryError` 가 난다.
+
+### 리버스 프록시
+
+**설정을 바꾸지 않아도 된다.** 브라우저가 파일을 4MB 조각으로 잘라 보내므로(분할 업로드)
+nginx `client_max_body_size` 기본값에 걸리지 않는다.
+
+## core 에 추가로 필요한 기능
+
+| 항목 | 현재 상태 | 필요 사항 |
+|---|---|---|
+| `CurrentUserProvider` | core 에 없음 | 표준 규격은 `com.company.core.security.CurrentUserProvider` 로 사용자 ID 를 얻도록 정하고 있으나 core 에 해당 컴포넌트가 없다. 현재는 컨트롤러가 주입받은 `Authentication#getName()`(로그인 ID)을 서비스로 넘겨 `CREATED_BY` 등에 저장한다. **core 에 `CurrentUserProvider` 추가 필요** — 추가되면 로그인 ID 문자열 대신 사용자 ID(BIGINT)로 정리할 수 있다. |
+| 권한 코드 | 공통코드 `SAFETY_PERM` 명단으로 판정 | 표준 규격의 `@PreAuthorize("hasAuthority('SAFETY_WRITE')")` 방식이 아니라, 공통코드 그룹 `SAFETY_PERM` 에 등록된 로그인 ID 를 관리자로 본다. core 에 권한 코드 체계가 정리되면 그쪽으로 옮기는 것이 맞다. |
+| 공개 경로 등록 | 모듈이 `SafetySecurityConfig` 로 직접 선언 | **표준은 SecurityConfig 생성을 금지**하고 core 가 공개 경로를 관리하도록 한다. `module-fire`·`module-ps-insp` 는 실제로 core 목록(`/fire/**`, `/ps-insp-api/health` 등)에 등록해 쓰고 자기 설정이 없다. safety 도 그렇게 옮겨야 하지만 core 수정이 필요해 남겨 뒀다. **아래 2줄을 core `SecurityConfig` 공개 경로 목록에 추가하면 `module-safety/.../config/SafetySecurityConfig.java` 를 삭제할 수 있다.** |
+
+```java
+// core/src/main/java/com/company/core/config/SecurityConfig.java 의 기존 permitAll 목록에 추가
+.requestMatchers("/safety/**").permitAll()                  // 화면 (플랫폼 SPA 안에서 iframe 로드)
+.requestMatchers("/safety-api/photos/*/view").permitAll()   // <img> 는 Authorization 헤더를 보낼 수 없음
+```
+
+> 지금 `SafetySecurityConfig` 를 그냥 지우면 `/safety/**` 가 core 의 `anyRequest().authenticated()` 에
+> 걸려 화면이 401 로 뜨지 않는다. (확인: 토큰 없이 `/safety/index.html` 200,
+> `/safety-api/manuals` 401 — 화면 공개는 이 설정이 담당하고 있다)
+
+## 규격 예외 (의도적으로 다르게 둔 부분)
+
+| 항목 | 표준 | 현재 | 사유 |
+|---|---|---|---|
+| 사진 조회 응답 | `ApiResponse<T>` 로 감싸기 | `ResponseEntity<byte[]>` | 이미지 바이트 응답이라 JSON 으로 감쌀 수 없다. `/safety-api/photos/{id}/view`, `/safety-api/excel-upload/preview-photo` 두 곳뿐이다 |
+| SQL 파일명 | `01_schema.sql`, `02_seed_data.sql` | `01_schema.sql` ~ `10_*.sql` | 이 모듈은 이미 순번 마이그레이션 방식으로 운영 중이라 기존 순서를 유지한다 |
 
 > 번호 `04` 는 과거 데모 분류 1건을 넣던 파일이었고, 조직 기준 대분류를 넣는 `06_org_categories.sql`
 > 로 대체되어 삭제했다. 이미 실행한 환경에 남아 있는 데모 분류는 화면에서 지우면 된다.

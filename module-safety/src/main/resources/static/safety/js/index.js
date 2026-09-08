@@ -22,6 +22,11 @@ const STEP_NO_WIDTH = 46;
 /** 관리 열도 고정 (수정 모드에서만) */
 const STEP_MANAGE_WIDTH = 80;
 const STEP_COL_MIN = 44;
+/**
+ * 사진 칸의 최소 폭 = 사진 상자 폭(CSS .step-photo 180px) + 칸 좌우 여백(12px x 2).
+ * 사진은 어느 매뉴얼에서든 같은 크기로 고정이라, 칸이 이보다 좁아지면 사진이 칸을 넘친다.
+ */
+const STEP_PHOTO_COL_MIN = 180 + 24;
 /** 이 폭보다 좁으면 표 대신 항목별 카드로 쌓아 보여준다 */
 const STEP_STACK_BREAKPOINT = 760;
 const STEP_COL_STORAGE_KEY = 'safety.stepColWeights';
@@ -405,27 +410,336 @@ function renderDetailMeta(meta) {
 }
 
 /** 표의 열 관리 — 수정 모드에서만 보인다 */
+/**
+ * 표 아래에 있던 '표의 열' 패널은 없앴다.
+ * 열 이름·순서·유형·삭제를 모두 표 머리글에서 직접 다루는 편이 직관적이라,
+ * 여기서는 수정 모드일 때 쓰는 법만 한 줄 안내한다.
+ */
 function renderColumnAdmin() {
   const box = document.getElementById('columnAdmin');
   if (!isAdminUser || !editMode || !currentDetail) { box.innerHTML = ''; return; }
-  const columns = currentDetail.columns || [];
-  const typeName = { TEXT: '글', CHECK: '체크', PHOTO: '사진' };
-  box.innerHTML = `<div class="col-admin">
-    <div class="col-admin-head">
-      <h6><i class="fas fa-table-columns"></i>표의 열</h6>
-      <button class="btn-modern btn-outline-modern" onclick="openColumnModal()"><i class="fas fa-plus"></i>열 추가</button>
-    </div>
-    <div class="col-chip-row">${columns.map((c, i) => `
-      <span class="col-chip">
-        <span class="cc-type">${typeName[c.columnType] || c.columnType}</span>
-        <span>${SAFETY.escapeHtml(c.label)}</span>
-        <button onclick="moveColumn(${c.columnId}, -1)" title="왼쪽으로" ${i === 0 ? 'disabled' : ''}><i class="fas fa-arrow-left"></i></button>
-        <button onclick="moveColumn(${c.columnId}, 1)" title="오른쪽으로" ${i === columns.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-right"></i></button>
-        <button onclick="openColumnModal(${c.columnId})" title="이름/유형 수정"><i class="fas fa-pen"></i></button>
-        <button class="danger" onclick="deleteColumn(${c.columnId})" title="열 삭제"><i class="fas fa-trash"></i></button>
-      </span>`).join('')}</div>
-    <div class="eu-note">열을 추가하거나 이름·순서를 바꿀 수 있습니다. 체크버튼도 열 유형 중 하나입니다.</div>
+  box.innerHTML = `<div class="edit-hint">
+    <i class="fas fa-circle-info"></i>
+    칸을 눌러 내용을 고치고(Esc 취소), 사진은 끌어서 다른 칸으로 옮기거나 사진 파일을 칸에 바로 떨어뜨릴 수 있습니다.
+    머리글은 끌어서 순서를 바꾸고, <i class="fas fa-pen"></i> 로 이름을 고칩니다.
   </div>`;
+}
+
+// ================================================================
+// 표에서 바로 고치기 — 칸 클릭 편집 / 머리글 이름·순서 / 사진 끌어다 놓기
+//  (모두 수정 모드 + SAFETY 관리자일 때만 동작한다)
+// ================================================================
+
+/** 칸을 눌러 그 자리에서 내용을 고친다. 사진이나 버튼을 누른 것이면 편집하지 않는다. */
+function startCellEdit(event, stepId, columnId) {
+  if (!isAdminUser || !editMode) return;
+  if (event.target.closest('img, button, a, textarea')) return;
+  const td = event.currentTarget;
+  if (td.querySelector('.cell-input')) return;          // 이미 편집 중
+
+  const step = (currentDetail.steps || []).find(s => Number(s.stepId) === Number(stepId));
+  const value = ((step && step.values) || []).find(v => Number(v.columnId) === Number(columnId));
+  const before = (value && value.text) ? value.text : '';
+
+  // 입력창을 새로 띄우지 않고 칸 글자 자리를 그대로 고쳐 쓴다 — 표 모양이 흔들리지 않는다
+  const span = td.querySelector('.cell-text');
+  if (!span) return;
+
+  // 누른 자리가 글자의 몇 번째인지 먼저 알아 둔다.
+  // 편집 상태로 바꾸면 글자 노드가 새로 만들어져 그 뒤에는 클릭 좌표로 찾을 수 없다.
+  const clickedAt = caretOffsetFromPoint(span, event.clientX, event.clientY);
+
+  td.classList.add('cell-editing');
+  span.classList.remove('empty');
+  span.textContent = before;
+  span.contentEditable = 'true';
+  span.spellcheck = false;
+  span.focus();
+  placeCaretAt(span, clickedAt);
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    span.contentEditable = 'false';
+    td.classList.remove('cell-editing');
+    const after = span.innerText.replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+    if (!save || after === before) { await loadDetail(); return; }
+    try {
+      await saveCellValue(stepId, columnId, after);
+    } catch (e) {
+      SAFETY.toast(e.message, false);
+    }
+    await loadDetail();
+  };
+  span.addEventListener('blur', () => finish(true));
+  span.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    // 줄바꿈이 필요한 칸이 많아 Enter 는 줄바꿈으로 두고, 저장은 Ctrl+Enter 로 한다
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); span.blur(); }
+  });
+  // 서식이 딸려 오지 않게 글은 항상 평문으로 붙인다 (사진 붙여넣기는 칸의 onpaste 가 맡는다)
+  span.addEventListener('paste', (e) => {
+    const items = [...((e.clipboardData && e.clipboardData.items) || [])];
+    if (items.some(i => i.kind === 'file' && i.type.startsWith('image/'))) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text'));
+  });
+}
+
+/** 커서를 글자 끝으로 */
+function placeCaretAtEnd(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/**
+ * 화면 좌표(클릭 지점)가 el 안 글자의 몇 번째인지 돌려준다.
+ * 글자 위가 아니거나(여백·빈 칸) 브라우저가 지원하지 않으면 -1.
+ */
+function caretOffsetFromPoint(el, x, y) {
+  let range = null;
+  if (document.caretRangeFromPoint) {                 // Chrome/Edge/Safari
+    range = document.caretRangeFromPoint(x, y);
+  } else if (document.caretPositionFromPoint) {       // Firefox
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+    }
+  }
+  if (!range || !el.contains(range.startContainer)) return -1;
+
+  const upToClick = document.createRange();
+  upToClick.selectNodeContents(el);
+  upToClick.setEnd(range.startContainer, range.startOffset);
+  return upToClick.toString().length;
+}
+
+/** 커서를 글자 offset 자리에 놓는다. 범위를 벗어나면 끝으로 보낸다. */
+function placeCaretAt(el, offset) {
+  const node = el.firstChild;
+  if (!node || offset < 0 || offset > (node.textContent || '').length) {
+    placeCaretAtEnd(el);
+    return;
+  }
+  const range = document.createRange();
+  range.setStart(node, offset);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/** 칸 하나만 바뀌어도 서버는 행 전체를 받으므로, 나머지 값은 그대로 실어 보낸다. */
+async function saveCellValue(stepId, columnId, text) {
+  const step = (currentDetail.steps || []).find(s => Number(s.stepId) === Number(stepId));
+  if (!step) return;
+  const columns = currentDetail.columns || [];
+  const byColumn = {};
+  (step.values || []).forEach(v => { byColumn[v.columnId] = v; });
+
+  const values = columns.filter(c => c.columnType !== 'PHOTO').map(c => {
+    const v = byColumn[c.columnId];
+    if (Number(c.columnId) === Number(columnId)) {
+      return { columnId: c.columnId, text, checked: false };
+    }
+    return { columnId: c.columnId, text: (v && v.text) || null, checked: !!(v && v.checked) };
+  });
+  await SAFETY.api('/safety-api/steps/' + stepId, {
+    method: 'PUT',
+    body: { stepNo: step.stepNo, sortOrder: step.sortOrder, values },
+  });
+}
+
+/** 머리글 이름을 그 자리에서 고친다 */
+function startColumnRename(event, columnId) {
+  event.stopPropagation();
+  const th = event.target.closest('th');
+  const span = th && th.querySelector('.col-title');
+  if (!span || th.querySelector('.col-input')) return;
+  const column = (currentDetail.columns || []).find(c => Number(c.columnId) === Number(columnId));
+  if (!column) return;
+
+  const input = document.createElement('input');
+  input.className = 'col-input';
+  input.value = column.label;
+  input.maxLength = 100;
+  th.setAttribute('draggable', 'false');     // 편집 중에는 끌리지 않게
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (!save || !name || name === column.label) { await loadDetail(); return; }
+    try {
+      await SAFETY.api('/safety-api/columns/' + columnId, {
+        method: 'PUT',
+        body: {
+          label: name, columnType: column.columnType,
+          sortOrder: column.sortOrder, widthWeight: column.widthWeight,
+        },
+      });
+      SAFETY.toast('열 이름을 바꿨습니다.');
+    } catch (e) {
+      SAFETY.toast(e.message, false);
+    }
+    await loadDetail();
+  };
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+}
+
+// ── 머리글을 끌어 열 순서 바꾸기 ────────────────────────────────
+let draggingColumnId = null;
+
+function onColDragStart(event, columnId) {
+  if (event.target.closest('.col-resizer, .col-tools, .col-input')) { event.preventDefault(); return; }
+  draggingColumnId = columnId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', 'column:' + columnId);
+  event.currentTarget.classList.add('col-dragging');
+}
+
+function onColDragOver(event, columnId) {
+  if (draggingColumnId == null || draggingColumnId === columnId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('col-drop-target');
+}
+
+function onColDragLeave(event) { event.currentTarget.classList.remove('col-drop-target'); }
+
+function onColDragEnd() {
+  draggingColumnId = null;
+  document.querySelectorAll('.col-dragging, .col-drop-target')
+    .forEach(el => el.classList.remove('col-dragging', 'col-drop-target'));
+}
+
+async function onColDrop(event, targetColumnId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('col-drop-target');
+  const moved = draggingColumnId;
+  onColDragEnd();
+  if (moved == null || moved === targetColumnId) return;
+
+  const ids = (currentDetail.columns || []).map(c => Number(c.columnId));
+  const from = ids.indexOf(Number(moved));
+  const to = ids.indexOf(Number(targetColumnId));
+  if (from < 0 || to < 0) return;
+  ids.splice(to, 0, ids.splice(from, 1)[0]);
+  await saveColumnOrder(ids);
+}
+
+// ── 사진을 다른 칸으로 끌어다 놓기 / 파일을 칸에 떨어뜨려 올리기 ──────
+let draggingPhotoId = null;
+
+function onPhotoDragStart(event, photoId) {
+  draggingPhotoId = photoId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', 'photo:' + photoId);
+  event.target.classList.add('photo-dragging');
+  event.stopPropagation();
+}
+
+function onPhotoDragEnd() {
+  draggingPhotoId = null;
+  document.querySelectorAll('.photo-dragging').forEach(el => el.classList.remove('photo-dragging'));
+  document.querySelectorAll('.cell-drop-target').forEach(el => el.classList.remove('cell-drop-target'));
+}
+
+/** 표 안의 사진이든, 바탕화면에서 끌어온 파일이든 받는다 */
+function onCellDragOver(event) {
+  const fromOutside = [...(event.dataTransfer.types || [])].includes('Files');
+  if (draggingPhotoId == null && !fromOutside) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = draggingPhotoId != null ? 'move' : 'copy';
+  event.currentTarget.classList.add('cell-drop-target');
+}
+
+function onCellDragLeave(event) { event.currentTarget.classList.remove('cell-drop-target'); }
+
+async function onCellDrop(event, stepId, columnId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('cell-drop-target');
+  const photoId = draggingPhotoId;
+  onPhotoDragEnd();
+
+  try {
+    // 표 안의 사진을 끄는 중이면 '이동'이다.
+    // 브라우저가 페이지 안의 <img> 를 끌 때 dataTransfer.files 에도 그 이미지를 넣어 주기 때문에,
+    // 파일부터 확인하면 이동이 아니라 새 업로드(=복사)가 되어 버린다. 이동을 먼저 본다.
+    if (photoId != null) {
+      await SAFETY.api('/safety-api/photos/' + photoId + '/column',
+        { method: 'PUT', body: { stepId, columnId } });
+    } else {
+      const files = [...((event.dataTransfer && event.dataTransfer.files) || [])]
+        .filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      for (const file of files) {
+        await SAFETY.uploadMultipart('/safety-api/steps/' + stepId + '/photos', { file, columnId });
+      }
+      SAFETY.toast(files.length + '장을 올렸습니다.');
+    }
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 클립보드의 사진을 그 칸에 붙여 넣는다 (캡처 후 Ctrl+V) */
+async function onCellPaste(event, stepId, columnId) {
+  if (!isAdminUser || !editMode) return;
+  const items = [...((event.clipboardData && event.clipboardData.items) || [])];
+  const images = items.filter(i => i.kind === 'file' && i.type.startsWith('image/'));
+  if (!images.length) return;      // 글 붙여넣기는 그대로 두고 사진일 때만 가로챈다
+
+  event.preventDefault();
+  try {
+    for (const item of images) {
+      const blob = item.getAsFile();
+      if (!blob) continue;
+      const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      const file = new File([blob], 'clipboard-' + Date.now() + '.' + ext, { type: blob.type });
+      await SAFETY.uploadMultipart('/safety-api/steps/' + stepId + '/photos', { file, columnId });
+    }
+    SAFETY.toast(images.length + '장을 붙여 넣었습니다.');
+    await loadDetail();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** "행 추가" — 모달 없이 빈 행을 바로 만들고 첫 칸을 편집 상태로 연다 */
+async function addStepInline() {
+  try {
+    const no = nextStepNo();
+    const created = await SAFETY.api('/safety-api/manuals/' + currentManualId + '/steps', {
+      method: 'POST',
+      body: { stepNo: no, sortOrder: no, values: [] },
+    });
+    await loadDetail();
+    const rows = [...document.querySelectorAll('#stepRows tr')];
+    const row = rows.find(tr => tr.innerHTML.includes('startCellEdit(event, ' + created.stepId + ','));
+    const cell = row && row.querySelector('.cell-editable');
+    if (cell) {
+      cell.scrollIntoView({ block: 'nearest' });
+      cell.click();
+    }
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
 }
 
 // ================================================================
@@ -473,13 +787,8 @@ async function deleteColumn(columnId) {
   }
 }
 
-/** 열을 한 칸 왼쪽/오른쪽으로 옮긴다 */
-async function moveColumn(columnId, direction) {
-  const ids = (currentDetail.columns || []).map(c => Number(c.columnId));
-  const at = ids.indexOf(Number(columnId));
-  const to = at + direction;
-  if (at < 0 || to < 0 || to >= ids.length) return;
-  ids.splice(to, 0, ids.splice(at, 1)[0]);
+/** 열 순서를 저장한다 (머리글을 끌어다 놓으면 onColDrop 이 부른다) */
+async function saveColumnOrder(ids) {
   try {
     await SAFETY.api(`/safety-api/manuals/${currentManualId}/columns/order`, { method: 'PUT', body: ids });
     await loadDetail();
@@ -497,7 +806,10 @@ function renderDetailTools() {
     <button class="btn-modern btn-edit-toggle ${editMode ? 'on' : ''}" onclick="toggleEditMode()">
       <i class="fas fa-pen"></i>${editMode ? '수정 종료' : '수정'}</button>
     ${editMode ? `
-      <button class="btn-modern btn-outline-modern" onclick="openStepModal()"><i class="fas fa-plus"></i>행 추가</button>
+      <button class="btn-modern btn-outline-modern" onclick="addStepInline()"
+              title="빈 행을 바로 추가합니다. 칸을 눌러 내용을 넣으세요."><i class="fas fa-plus"></i>행 추가</button>
+      <button class="btn-modern btn-outline-modern" onclick="openColumnModal()"
+              title="표에 열을 추가합니다"><i class="fas fa-table-columns"></i>열 추가</button>
       <button class="btn-modern btn-danger-soft" onclick="deleteManual()"><i class="fas fa-trash"></i>매뉴얼 삭제</button>` : ''}`;
 }
 
@@ -510,10 +822,25 @@ function renderDetailTools() {
 function renderSteps(steps) {
   stepColLayout = buildStepColLayout();
 
-  document.getElementById('stepHead').innerHTML = '<tr>' + stepColLayout.map((col, i) =>
-    `<th class="${col.type === 'CHECK' ? 'col-check' : ''}" data-col="${col.key}" title="${SAFETY.escapeHtml(col.label)}"
-       >${SAFETY.escapeHtml(col.label)}${i < stepColLayout.length - 1
-         ? `<span class="col-resizer" data-col="${col.key}" title="경계를 끌어 폭 조절"></span>` : ''}</th>`).join('') + '</tr>';
+  const canEditColumns = isAdminUser && editMode;
+  document.getElementById('stepHead').innerHTML = '<tr>' + stepColLayout.map((col, i) => {
+    // No./관리 열은 서버의 열 정의가 아니라 화면이 붙인 것이라 이름·순서를 바꿀 수 없다
+    const movable = canEditColumns && col.columnId != null;
+    const dnd = movable ? ` draggable="true"
+       ondragstart="onColDragStart(event, ${col.columnId})" ondragend="onColDragEnd(event)"
+       ondragover="onColDragOver(event, ${col.columnId})" ondragleave="onColDragLeave(event)"
+       ondrop="onColDrop(event, ${col.columnId})"` : '';
+    const tools = movable ? `<span class="col-tools">
+         <button type="button" onclick="startColumnRename(event, ${col.columnId})" title="열 이름 수정"><i class="fas fa-pen"></i></button>
+         <button type="button" onclick="openColumnModal(${col.columnId})" title="열 유형 변경"><i class="fas fa-sliders"></i></button>
+         <button type="button" class="danger" onclick="deleteColumn(${col.columnId})" title="열 삭제"><i class="fas fa-trash"></i></button>
+       </span>` : '';
+    return `<th class="${col.type === 'CHECK' ? 'col-check' : ''}${movable ? ' col-movable' : ''}"
+       data-col="${col.key}" data-column-id="${col.columnId != null ? col.columnId : ''}"
+       title="${SAFETY.escapeHtml(col.label)}${movable ? ' — 끌어서 순서 변경' : ''}"${dnd}
+       ><span class="col-title">${SAFETY.escapeHtml(col.label)}</span>${tools}${i < stepColLayout.length - 1
+         ? `<span class="col-resizer" data-col="${col.key}" title="경계를 끌어 폭 조절"></span>` : ''}</th>`;
+  }).join('') + '</tr>';
 
   const tbody = document.getElementById('stepRows');
   if (!steps.length) {
@@ -532,17 +859,26 @@ function renderSteps(steps) {
 
 function renderStepCell(col, step, value) {
   const label = ` data-label="${SAFETY.escapeHtml(col.label)}"`;
+  const canEdit = isAdminUser && editMode;
   if (col.type === 'NO') {
     return `<td class="text-center"${label}><span class="step-no-badge">${step.stepNo}</span></td>`;
   }
   if (col.type === 'MANAGE') {
     return `<td${label}><div class="step-manage">
-      <button class="btn btn-sm btn-outline-secondary" onclick="openStepModal(${step.stepId})" title="행 수정"><i class="fas fa-pen"></i></button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="openStepModal(${step.stepId})"
+              title="행 번호·정렬, 사진 목록"><i class="fas fa-sliders"></i></button>
       <button class="btn btn-sm btn-outline-danger" onclick="deleteStep(${step.stepId})" title="행 삭제"><i class="fas fa-trash"></i></button>
     </div></td>`;
   }
+  // 사진을 끌어다 놓거나, 파일을 바로 떨어뜨려 올릴 수 있는 칸
+  const drop = canEdit ? ` ondragover="onCellDragOver(event)" ondragleave="onCellDragLeave(event)"
+      ondrop="onCellDrop(event, ${step.stepId}, ${col.columnId})"
+      onpaste="onCellPaste(event, ${step.stepId}, ${col.columnId})"` : '';
   if (col.type === 'PHOTO') {
-    return `<td${label}>${renderPhotos(step.photos)}</td>`;
+    // 사진 칸에는 글자가 없어 포커스를 받을 수 없다 — 붙여넣기를 받으려면 tabindex 가 필요하다
+    return `<td class="cell-droppable${canEdit ? ' cell-pastable' : ''}"${
+      canEdit ? ' tabindex="0" title="사진을 끌어다 놓거나 Ctrl+V 로 붙여넣기"' : ''}${label}${drop}>${
+      renderPhotos(photosOfColumn(step, col.columnId, true), canEdit)}</td>`;
   }
   if (col.type === 'CHECK') {
     const checked = value && value.checked;
@@ -554,8 +890,25 @@ function renderStepCell(col, step, value) {
         <i class="fas ${checked ? 'fa-square-check' : 'fa-square'}"></i>
       </button></td>`;
   }
+  // 글 열이라도 그 칸에 지정된 사진이 있으면 글 아래에 함께 보여준다 (예: 비고 칸의 사진)
   const text = (value && value.text) ? value.text : '';
-  return `<td style="white-space:pre-wrap"${label}>${SAFETY.escapeHtml(text)}</td>`;
+  const photos = photosOfColumn(step, col.columnId, false);
+  const photoHtml = photos.length ? `<div class="cell-photos">${renderPhotos(photos, canEdit)}</div>` : '';
+  const editable = canEdit
+    ? ` class="cell-droppable cell-editable" onclick="startCellEdit(event, ${step.stepId}, ${col.columnId})"
+        title="눌러서 내용 수정"`
+    : ' class="cell-droppable"';
+  return `<td style="white-space:pre-wrap"${editable}${label}${drop}><span class="cell-text${
+    text ? '' : ' empty'}">${text ? SAFETY.escapeHtml(text) : (canEdit ? '내용 입력' : '')}</span>${photoHtml}</td>`;
+}
+
+/**
+ * 이 칸에 보여줄 사진들.
+ * columnId 가 없는(예전에 올렸거나 엑셀에서 열을 못 정한) 사진은 기본 사진 열이 떠맡는다.
+ */
+function photosOfColumn(step, columnId, isDefaultPhotoColumn) {
+  return (step.photos || []).filter(p =>
+    p.columnId === columnId || (isDefaultPhotoColumn && p.columnId == null));
 }
 
 /** 체크버튼 토글 — 관리자만, 수정 모드에서만 */
@@ -599,7 +952,11 @@ function saveStepColWeights() {
 function buildStepColLayout() {
   const detail = currentDetail || {};
   const columns = detail.columns || [];
-  const hasAnyPhoto = (detail.steps || []).some(step => (step.photos || []).length > 0);
+  // 사진 열에 실제로 들어갈 사진(열 지정이 없거나 사진 열을 가리키는 것)이 있는지 본다.
+  // 비고 칸에만 사진이 있는 매뉴얼에서 빈 사진 열이 생기지 않도록 한다.
+  const photoColumnIds = columns.filter(c => c.columnType === 'PHOTO').map(c => c.columnId);
+  const hasAnyPhoto = (detail.steps || []).some(step =>
+    (step.photos || []).some(p => p.columnId == null || photoColumnIds.includes(p.columnId)));
   const manualId = detail.manualId;
   const saved = (manualId != null && stepColWeights[manualId]) ? stepColWeights[manualId] : {};
 
@@ -607,12 +964,16 @@ function buildStepColLayout() {
   columns.forEach(column => {
     if (column.columnType === 'PHOTO' && !hasAnyPhoto) return;   // 사진이 없으면 사진 열은 아예 만들지 않는다
     const key = 'c' + column.columnId;
+    // 사진이 들어갈 수 있는 칸(사진 열 + 사진이 붙은 글 열)은 사진 상자보다 좁아지지 않게 한다
+    const holdsPhoto = column.columnType === 'PHOTO'
+      || (detail.steps || []).some(step => (step.photos || []).some(p => p.columnId === column.columnId));
     layout.push({
       key,
       columnId: column.columnId,
       label: column.label,
       type: column.columnType,
       weight: Number(saved[key]) > 0 ? Number(saved[key]) : (column.widthWeight || 200),
+      minWidth: holdsPhoto ? STEP_PHOTO_COL_MIN : STEP_COL_MIN,
       fixed: false,
     });
   });
@@ -638,10 +999,11 @@ function fitStepColWidths(layout, available) {
   const totalWeight = flex.reduce((sum, col) => sum + col.weight, 0) || 1;
   let used = 0;
   flex.forEach((col, i) => {
+    const min = col.minWidth || STEP_COL_MIN;
     if (i === flex.length - 1) {
-      widths[col.key] = Math.max(STEP_COL_MIN, remaining - used);
+      widths[col.key] = Math.max(min, remaining - used);
     } else {
-      widths[col.key] = Math.max(STEP_COL_MIN, Math.round(remaining * col.weight / totalWeight));
+      widths[col.key] = Math.max(min, Math.round(remaining * col.weight / totalWeight));
       used += widths[col.key];
     }
   });
@@ -744,11 +1106,20 @@ function resetStepColWidths() {
   SAFETY.toast('열 너비를 기본 비율로 되돌렸습니다.');
 }
 
-function renderPhotos(photos) {
-  if (!photos || !photos.length) return '<span class="text-muted small">-</span>';
-  return photos.map(p => `<img class="step-photo" src="${SAFETY.escapeHtml(p.url)}"
+function renderPhotos(photos, draggable) {
+  if (!photos || !photos.length) {
+    return draggable ? '<span class="cell-photo-hint">사진을 끌어다 놓기</span>' : '<span class="text-muted small">-</span>';
+  }
+  return photos.map(p => {
+    const img = `<img class="step-photo" src="${SAFETY.escapeHtml(p.url)}"
       alt="${SAFETY.escapeHtml(p.originalName || '')}" data-name="${SAFETY.escapeHtml(p.originalName || '')}"
-      onclick="openLightboxFrom(this)" title="클릭하면 크게 볼 수 있습니다">`).join('');
+      ${draggable ? `draggable="true" ondragstart="onPhotoDragStart(event, ${p.photoId})" ondragend="onPhotoDragEnd(event)"` : ''}
+      onclick="openLightboxFrom(this)"
+      title="${draggable ? '끌어서 다른 칸으로 옮기기 · 클릭하면 크게 보기' : '클릭하면 크게 볼 수 있습니다'}">`;
+    if (!draggable) return img;
+    return `<span class="photo-chip">${img}<button type="button" class="photo-del"
+      onclick="deleteStepPhoto(${p.photoId})" title="사진 삭제"><i class="fas fa-xmark"></i></button></span>`;
+  }).join('');
 }
 
 // ================================================================
@@ -1230,9 +1601,87 @@ function renderStepModalFields(step) {
     </div>`;
   }).join('');
 
-  // 사진 열이 있는 매뉴얼에서만 사진 첨부를 보여준다
-  const hasPhotoColumn = columns.some(c => c.columnType === 'PHOTO');
-  document.getElementById('step-photo-upload-wrap').style.display = hasPhotoColumn ? '' : 'none';
+  // 사진을 넣을 수 있는 칸: 사진 열 + 모든 글 열 (체크 열은 제외)
+  // 예전에는 사진 열이 있는 매뉴얼에서만 첨부가 보였는데,
+  // 비고처럼 글 칸에도 사진을 넣을 수 있어야 해서 글 열이 하나라도 있으면 보여준다.
+  const targets = photoTargetColumns();
+  document.getElementById('step-photo-upload-wrap').style.display = targets.length ? '' : 'none';
+
+  const select = document.getElementById('step-photo-column');
+  select.innerHTML = targets.map(c =>
+    `<option value="${c.columnId}">${SAFETY.escapeHtml(c.label)}</option>`).join('');
+
+  renderStepPhotoList(step);
+}
+
+/** 사진을 넣을 수 있는 열 (사진 열 먼저, 그다음 글 열) */
+function photoTargetColumns() {
+  const columns = (currentDetail && currentDetail.columns) || [];
+  return [
+    ...columns.filter(c => c.columnType === 'PHOTO'),
+    ...columns.filter(c => c.columnType === 'TEXT'),
+  ];
+}
+
+/** 이미 올라가 있는 사진 목록 — 칸을 바꾸거나 삭제할 수 있다 */
+function renderStepPhotoList(step) {
+  const holder = document.getElementById('step-photo-list');
+  const photos = (step && step.photos) || [];
+  if (!photos.length) { holder.innerHTML = ''; return; }
+
+  const targets = photoTargetColumns();
+  const defaultPhotoColumn = targets.find(c => c.columnType === 'PHOTO');
+  holder.innerHTML = photos.map(p => {
+    // columnId 가 없는 사진(예전 데이터)은 기본 사진 열에 있는 것으로 보여준다
+    const current = p.columnId != null ? p.columnId : (defaultPhotoColumn ? defaultPhotoColumn.columnId : '');
+    const options = targets.map(c =>
+      `<option value="${c.columnId}" ${c.columnId === current ? 'selected' : ''}>${
+        SAFETY.escapeHtml(c.label)}</option>`).join('');
+    return `<div class="step-photo-item">
+      <img src="${SAFETY.escapeHtml(p.url)}" alt="">
+      <span class="spi-name" title="${SAFETY.escapeHtml(p.originalName || '')}">${
+        SAFETY.escapeHtml(p.originalName || '')}</span>
+      <select onchange="moveStepPhoto(${p.photoId}, this.value)" title="이 사진을 넣을 칸">${options}</select>
+      <button type="button" class="btn btn-sm btn-outline-danger"
+              onclick="deleteStepPhoto(${p.photoId})" title="사진 삭제"><i class="fas fa-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+/** 사진을 다른 칸으로 옮긴다 */
+async function moveStepPhoto(photoId, columnId) {
+  try {
+    await SAFETY.api('/safety-api/photos/' + photoId + '/column',
+      { method: 'PUT', body: { columnId: Number(columnId) } });
+    SAFETY.toast('사진 위치를 옮겼습니다.');
+    await reloadStepModalPhotos();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 사진 삭제 — 표의 x 버튼과 단계 수정 창 양쪽에서 쓴다 */
+async function deleteStepPhoto(photoId, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('이 사진을 삭제하시겠습니까?')) return;
+  try {
+    await SAFETY.api('/safety-api/photos/' + photoId, { method: 'DELETE' });
+    SAFETY.toast('사진을 삭제했습니다.');
+    await reloadStepModalPhotos();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 사진을 바꾼 뒤 상세와 수정 창의 목록을 함께 새로 고친다 */
+async function reloadStepModalPhotos() {
+  await loadDetail();
+  // 표에서 지운 경우에는 단계 수정 창이 열려 있지 않다
+  const holder = document.getElementById('step-photo-list');
+  const idField = document.getElementById('step-id');
+  if (!holder || !idField || !idField.value) return;
+  const step = (currentDetail.steps || []).find(s => s.stepId === Number(idField.value));
+  renderStepPhotoList(step);
 }
 
 async function saveStep() {
@@ -1255,9 +1704,12 @@ async function saveStep() {
       const created = await SAFETY.api('/safety-api/manuals/' + currentManualId + '/steps', { method: 'POST', body: payload });
       savedStepId = created.stepId;
     }
-    const file = document.getElementById('step-photo-file').files[0];
-    if (file && savedStepId) {
-      await SAFETY.uploadMultipart('/safety-api/steps/' + savedStepId + '/photos', { file });
+    const files = [...document.getElementById('step-photo-file').files];
+    const columnId = document.getElementById('step-photo-column').value;
+    for (const file of files) {
+      if (!savedStepId) break;
+      await SAFETY.uploadMultipart('/safety-api/steps/' + savedStepId + '/photos',
+        columnId ? { file, columnId } : { file });
     }
     bootstrap.Modal.getInstance(document.getElementById('stepModal')).hide();
     SAFETY.toast('저장되었습니다.');
@@ -1285,12 +1737,52 @@ let euPreviewData = [];
 let euSelected = { major: null, middle: null };
 /** 시트 index -> 사용자가 그 행에서 직접 고른 중분류 id. 여기 없으면 상단 기본 분류를 따른다. */
 let euRowCategory = {};
+/** 분할 업로드로 서버에 올려 둔 파일의 식별자. 미리보기와 확정이 이 파일을 함께 쓴다. */
+let euUploadId = null;
+
+/**
+ * 파일을 조각내서 올린다.
+ *
+ * <p>앞단 웹서버(nginx client_max_body_size 등)가 요청 본문 크기를 제한하고 있어,
+ * 사진이 많은 50~90MB 매뉴얼 파일을 한 번에 보내면 413 으로 잘린다.
+ * 조각 하나가 4MB 라 어떤 제한에도 걸리지 않는다.
+ * 파일은 여기서 한 번만 올라가고, 확정 업로드는 서버에 있는 그 파일을 그대로 쓴다.
+ */
+const EU_CHUNK_SIZE = 4 * 1024 * 1024;
+
+async function euUploadInChunks(file, onProgress) {
+  const totalChunks = Math.max(1, Math.ceil(file.size / EU_CHUNK_SIZE));
+  let uploadId = '';
+  for (let i = 0; i < totalChunks; i++) {
+    const blob = file.slice(i * EU_CHUNK_SIZE, Math.min(file.size, (i + 1) * EU_CHUNK_SIZE));
+    const res = await SAFETY.uploadMultipart('/safety-api/excel-upload/chunk', {
+      uploadId, chunkIndex: String(i), totalChunks: String(totalChunks), fileName: file.name,
+      file: new File([blob], file.name),
+    });
+    uploadId = res.uploadId;
+    onProgress(i + 1, totalChunks);
+  }
+  return uploadId;
+}
+
+/** 서버에 올려 둔 임시 파일을 버린다 (다른 파일을 다시 고르거나 창을 열 때) */
+async function euDiscardStaged() {
+  if (!euUploadId) return;
+  const id = euUploadId;
+  euUploadId = null;
+  try {
+    await SAFETY.api('/safety-api/excel-upload/discard-staged', { method: 'POST', body: { uploadId: id } });
+  } catch (e) {
+    // 임시 파일은 서버가 주기적으로 정리하므로 실패해도 넘어간다
+  }
+}
 
 function openExcelModal() {
   document.getElementById('eu-file').value = '';
   document.getElementById('euFileStatus').textContent = '';
   document.getElementById('euStep2').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
+  euDiscardStaged();
   euPreviewData = [];
   euSelected = { major: null, middle: null };
   euRowCategory = {};
@@ -1446,17 +1938,29 @@ async function euDoPreview() {
   const status = document.getElementById('euFileStatus');
   const file = document.getElementById('eu-file').files[0];
   if (!file) {
+    await euDiscardStaged();
     status.textContent = '';
     document.getElementById('euStep2').style.display = 'none';
     return;
   }
+  await euDiscardStaged();
   euPreviewData = [];
   euRowCategory = {};
   document.getElementById('eu-confirm-btn').classList.add('d-none');
-  status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
 
+  const sizeMb = (file.size / 1024 / 1024).toFixed(1);
   try {
-    euPreviewData = await SAFETY.uploadMultipart('/safety-api/excel-upload/preview', { file });
+    // 1) 파일을 조각내서 올린다 (여기서 딱 한 번만 전송한다)
+    euUploadId = await euUploadInChunks(file, (done, total) => {
+      const pct = Math.round(done / total * 100);
+      status.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>`
+        + `파일을 올리는 중입니다... ${pct}% (${done}/${total}, ${sizeMb}MB)`;
+    });
+
+    // 2) 올라간 파일로 형식만 확인한다 (파일을 다시 보내지 않는다)
+    status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
+    euPreviewData = await SAFETY.api('/safety-api/excel-upload/preview-staged',
+      { method: 'POST', body: { uploadId: euUploadId } });
     const recognized = euPreviewData.filter(s => s.recognized).length;
     status.innerHTML = `<i class="fas fa-circle-check text-success me-1"></i>`
       + `${SAFETY.escapeHtml(file.name)} — 시트 ${euPreviewData.length}개 중 ${recognized}개 인식됨`;
@@ -1464,6 +1968,7 @@ async function euDoPreview() {
     document.getElementById('euStep2').style.display = '';
     euUpdateSummary();
   } catch (e) {
+    await euDiscardStaged();
     status.innerHTML = `<span class="text-danger"><i class="fas fa-circle-exclamation me-1"></i>${SAFETY.escapeHtml(e.message)}</span>`;
     document.getElementById('euStep2').style.display = 'none';
     SAFETY.toast(e.message, false);
@@ -1478,12 +1983,15 @@ function euRenderPreview() {
 
   document.getElementById('eu-check-all').checked = true;
   document.getElementById('euPreviewRows').innerHTML = euPreviewData.map((s, idx) => `
-    <tr class="${s.recognized ? '' : 'excluded'}">
+    <tr class="${s.recognized ? (s.confident === false ? 'needs-review' : '') : 'excluded'}">
       <td><input type="checkbox" class="eu-sheet-chk" data-idx="${idx}" ${s.selected ? 'checked' : ''} ${s.recognized ? '' : 'disabled'}
              onchange="euUpdateSummary()"></td>
       <td>${SAFETY.escapeHtml(s.sheetName)}</td>
-      <td>${s.recognized ? '<span class="badge-ok">인식됨</span>' : `<span class="badge-no">제외</span>`}</td>
-      <td>${SAFETY.escapeHtml(s.detectedTitle || '')}${!s.recognized && s.reason ? `<div class="small text-muted">${SAFETY.escapeHtml(s.reason)}</div>` : ''}</td>
+      <td>${!s.recognized ? '<span class="badge-no">제외</span>'
+            : s.confident === false ? '<span class="badge-check">확인 필요</span>'
+            : '<span class="badge-ok">인식됨</span>'}</td>
+      <td>${SAFETY.escapeHtml(s.detectedTitle || '')}${s.reason
+            ? `<div class="small text-muted">${SAFETY.escapeHtml(s.reason)}</div>` : ''}</td>
       <td>
         <div class="d-flex align-items-center gap-1">
           <select class="eu-row-cat" data-idx="${idx}" ${s.recognized ? '' : 'disabled'}
@@ -1494,15 +2002,122 @@ function euRenderPreview() {
       </td>
       <td class="text-center">${s.stepCount}</td>
       <td class="text-center">${s.photoCount}</td>
-      <td class="small">${(s.stepPreviewLines || []).slice(0, 3).map(l => SAFETY.escapeHtml(l)).join('<br>')}</td>
+      <td class="small">${(s.stepPreviewLines || []).slice(0, 2).map(l => SAFETY.escapeHtml(l)).join('<br>')}
+        ${s.recognized ? `<button class="btn-preview" onclick="openSheetPreview(${idx})"
+             title="등록될 표를 그대로 봅니다"><i class="fas fa-eye"></i>미리보기</button>` : ''}</td>
     </tr>`).join('');
 
   const note = document.querySelector('#euStep2 .eu-note');
   if (note) {
-    note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. `
+    const reviewCount = euPreviewData.filter(s => s.recognized && s.confident === false).length;
+    note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount - reviewCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. `
+      + (reviewCount ? `머리글을 추정으로 읽은 ${reviewCount}개는 "확인 필요"로 두었습니다 — 미리보기로 내용을 보고 직접 체크하세요. ` : '')
       + '필요 없는 시트는 체크를 해제하고, 다른 분류에 넣을 시트는 "등록 분류"에서 직접 고르세요.';
   }
   euRefreshRowCategories();
+}
+
+// ================================================================
+// 엑셀 미리보기 — 시트 하나가 어떤 표로 등록될지 그대로 보여준다
+//  사진은 올려 둔 임시 파일에서 화면에 보이는 것만 낱장으로 가져온다.
+// ================================================================
+let sheetPreviewModal = null;
+let sheetPreviewBlobs = [];      // 창을 닫을 때 정리할 blob URL
+
+async function openSheetPreview(idx) {
+  const sheet = euPreviewData[idx];
+  if (!sheet || !sheet.recognized || !euUploadId) return;
+
+  const body = document.getElementById('sheetPreviewBody');
+  document.getElementById('sheetPreviewTitle').textContent = sheet.sheetName;
+  document.getElementById('sheetPreviewSub').textContent =
+    `${sheet.formTypeName || ''} · 단계 ${sheet.stepCount}개 · 사진 ${sheet.photoCount}장`;
+  body.innerHTML = '<div class="text-center text-muted py-5"><i class="fas fa-spinner fa-spin me-2"></i>불러오는 중...</div>';
+  if (!sheetPreviewModal) {
+    sheetPreviewModal = new bootstrap.Modal(document.getElementById('sheetPreviewModal'));
+    document.getElementById('sheetPreviewModal').addEventListener('hidden.bs.modal', releaseSheetPreviewBlobs);
+  }
+  sheetPreviewModal.show();
+
+  try {
+    const detail = await SAFETY.api('/safety-api/excel-upload/preview-sheet',
+      { method: 'POST', body: { uploadId: euUploadId, sheetName: sheet.sheetName } });
+    renderSheetPreview(detail);
+  } catch (e) {
+    body.innerHTML = `<div class="text-danger py-4">${SAFETY.escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderSheetPreview(detail) {
+  const cols = detail.columns || [];
+  const metaHtml = (detail.meta || []).length
+    ? `<div class="sp-meta">${detail.meta.map(m =>
+        `<span><b>${SAFETY.escapeHtml(m.label)}</b> ${SAFETY.escapeHtml(m.value || '')}</span>`).join('')}</div>`
+    : '';
+
+  const head = '<tr><th class="sp-no">No.</th>' + cols.map(c =>
+    `<th>${SAFETY.escapeHtml(c.label)}${
+      c.type === 'PHOTO' ? ' <i class="fas fa-image sp-type"></i>'
+      : c.type === 'CHECK' ? ' <i class="fas fa-square-check sp-type"></i>' : ''}</th>`).join('') + '</tr>';
+
+  const rows = (detail.rows || []).map(row =>
+    '<tr><td class="sp-no">' + row.stepNo + '</td>' + row.cells.map((cell, i) => {
+      const type = (cols[i] || {}).type;
+      if (type === 'CHECK') {
+        return `<td class="text-center">${cell.checked
+          ? '<i class="fas fa-square-check text-success"></i>' : '<i class="fas fa-square text-muted"></i>'}</td>`;
+      }
+      const photos = (cell.photoIndexes || []).map(n =>
+        `<img class="sp-photo" data-photo="${n}" data-sheet="${SAFETY.escapeHtml(detail.sheetName)}" alt="사진 ${n}">`).join('');
+      const text = cell.text ? SAFETY.escapeHtml(cell.text) : '';
+      return `<td>${text}${photos ? `<div class="sp-photos">${photos}</div>` : ''}</td>`;
+    }).join('') + '</tr>').join('');
+
+  document.getElementById('sheetPreviewBody').innerHTML = metaHtml + `
+    <div class="sp-note">아래 내용 그대로 매뉴얼로 등록됩니다. 제목은 시트명(<b>${
+      SAFETY.escapeHtml(detail.title)}</b>)이 됩니다.</div>
+    <div class="table-responsive"><table class="sp-table">
+      <thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+
+  loadPreviewPhotos();
+}
+
+/** 화면에 들어온 사진만 그때그때 받아 온다 (시트에 60장이 든 파일도 있다) */
+function loadPreviewPhotos() {
+  const imgs = [...document.querySelectorAll('#sheetPreviewBody .sp-photo')];
+  if (!imgs.length) return;
+
+  const fetchOne = async (img) => {
+    if (img.dataset.loaded) return;
+    img.dataset.loaded = '1';
+    try {
+      const res = await fetch('/safety-api/excel-upload/preview-photo', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SAFETY.getToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId: euUploadId, sheetName: img.dataset.sheet, photoIndex: Number(img.dataset.photo),
+        }),
+      });
+      if (!res.ok) throw new Error('불러오기 실패');
+      const url = URL.createObjectURL(await res.blob());
+      sheetPreviewBlobs.push(url);
+      img.src = url;
+    } catch (e) {
+      img.replaceWith(Object.assign(document.createElement('span'),
+        { className: 'sp-photo-fail', textContent: '사진 없음' }));
+    }
+  };
+
+  if (!('IntersectionObserver' in window)) { imgs.forEach(fetchOne); return; }
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.filter(e => e.isIntersecting).forEach(e => { obs.unobserve(e.target); fetchOne(e.target); });
+  }, { root: document.getElementById('sheetPreviewBody'), rootMargin: '200px' });
+  imgs.forEach(img => io.observe(img));
+}
+
+function releaseSheetPreviewBlobs() {
+  sheetPreviewBlobs.forEach(url => URL.revokeObjectURL(url));
+  sheetPreviewBlobs = [];
 }
 
 function euToggleAll(box) {
@@ -1511,8 +2126,7 @@ function euToggleAll(box) {
 }
 
 async function euDoConfirm() {
-  const file = document.getElementById('eu-file').files[0];
-  if (!file) { SAFETY.toast('엑셀 파일이 없습니다. 다시 선택 후 형식 확인을 눌러주세요.', false); return; }
+  if (!euUploadId) { SAFETY.toast('엑셀 파일이 없습니다. 파일을 다시 선택해 주세요.', false); return; }
 
   const checked = Array.from(document.querySelectorAll('.eu-sheet-chk:checked'));
   if (!checked.length) { SAFETY.toast('가져올 시트를 하나 이상 선택하세요.', false); return; }
@@ -1537,14 +2151,22 @@ async function euDoConfirm() {
     .map(([id, count]) => `- ${pathOf(id).join(' > ')} : ${count}건`).join('\n');
   if (!confirm(`선택한 ${assignments.length}개 시트를 아래 분류에 등록합니다.\n\n${summary}\n\n진행할까요?`)) return;
 
+  // 파일은 이미 서버에 올라가 있으므로 식별자와 시트별 분류만 보낸다
+  const btn = document.getElementById('eu-confirm-btn');
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>등록하는 중...';
   try {
-    const result = await SAFETY.uploadMultipart('/safety-api/excel-upload/confirm', {
-      file, assignments: JSON.stringify(assignments),
-    });
+    const result = await SAFETY.api('/safety-api/excel-upload/confirm-staged',
+      { method: 'POST', body: { uploadId: euUploadId, assignments } });
+    euUploadId = null;   // 서버가 확정과 함께 임시 파일을 지웠다
     await refreshAll();
     showUploadResult(result);
   } catch (e) {
     SAFETY.toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = label;
   }
 }
 
@@ -1579,7 +2201,17 @@ function showUploadResult(result) {
 
   document.getElementById('uploadDoneBody').innerHTML = html;
   document.getElementById('eu-confirm-btn').classList.add('d-none');
-  if (!uploadDoneModal) uploadDoneModal = new bootstrap.Modal(document.getElementById('uploadDoneModal'));
+
+  const el = document.getElementById('uploadDoneModal');
+  if (!uploadDoneModal) {
+    uploadDoneModal = new bootstrap.Modal(el);
+    // 두 번째로 열리는 모달의 배경은 부트스트랩이 1050 으로 만들어서 업로드 창(1055) 아래에 깔린다.
+    // 완료 팝업(1080) 바로 밑으로 올려야 업로드 창이 어두워지고 팝업이 앞에 있는 것으로 보인다.
+    el.addEventListener('shown.bs.modal', () => {
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      if (backdrops.length > 1) backdrops[backdrops.length - 1].style.zIndex = '1075';
+    });
+  }
   uploadDoneModal.show();
 }
 

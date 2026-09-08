@@ -69,6 +69,12 @@ const SAFETY = (() => {
     const res = await fetch(path, { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: fd });
     let json = null;
     try { json = await res.json(); } catch (e) { /* ignore */ }
+    // 413 은 앱이 아니라 앞단 웹서버(nginx/Apache)가 본문 크기 제한으로 잘라낸 것이라
+    // JSON 이 아니라 HTML 이 돌아온다. 원인을 알 수 있게 문구를 따로 준다.
+    if (res.status === 413) {
+      throw new Error('파일이 너무 커서 서버가 받지 못했습니다 (HTTP 413). '
+        + '웹서버(nginx: client_max_body_size / Apache: LimitRequestBody)의 업로드 크기 제한을 늘려야 합니다.');
+    }
     if (!res.ok || (json && json.success === false)) {
       throw new Error((json && json.message) ? json.message : ('요청 실패 (HTTP ' + res.status + ')'));
     }

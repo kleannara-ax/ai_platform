@@ -4,6 +4,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.safety.dto.request.ExcelSheetAssignRequest;
 import com.company.module.safety.dto.response.ExcelImportResultResponse;
+import com.company.module.safety.dto.response.ExcelSheetDetailResponse;
 import com.company.module.safety.dto.response.ExcelSheetPreviewResponse;
 import com.company.module.safety.dto.response.ManualSummaryResponse;
 import com.company.module.safety.entity.SafetyManual;
@@ -24,6 +25,8 @@ import com.company.module.safety.support.SafetyExcelParser.ParsedMeta;
 import com.company.module.safety.support.SafetyExcelParser.ParsedPhoto;
 import com.company.module.safety.support.SafetyExcelParser.ParsedRow;
 import com.company.module.safety.support.SafetyExcelParser.ParsedSheet;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -64,6 +69,7 @@ public class SafetyExcelUploadService {
     private final SafetyManualMetaRepository metaRepository;
     private final SafetyCategoryService categoryService;
     private final SafetyPhotoService photoService;
+    private final ObjectMapper objectMapper;
 
     @Value("${safety.excel.max-sheets-per-upload:100}")
     private int maxSheetsPerUpload;
@@ -73,8 +79,17 @@ public class SafetyExcelUploadService {
     // ================================================================
     // 1단계: 형식 확인 / 미리보기 (DB 변경 없음)
     // ================================================================
+    /** 파일을 통째로 받아 형식만 확인한다. (작은 파일용 — 큰 파일은 분할 업로드 후 아래 메서드를 쓴다) */
     public List<ExcelSheetPreviewResponse> preview(MultipartFile file) {
-        List<ParsedSheet> sheets = parseWorkbook(file);
+        return toPreviews(parseWorkbook(file, false));
+    }
+
+    /** 분할 업로드로 서버에 이미 올라온 파일의 형식을 확인한다. */
+    public List<ExcelSheetPreviewResponse> preview(Path excelFile) {
+        return toPreviews(parseStaged(excelFile, false));
+    }
+
+    private List<ExcelSheetPreviewResponse> toPreviews(List<ParsedSheet> sheets) {
         if (sheets.size() > maxSheetsPerUpload) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "시트 개수가 너무 많습니다. (" + sheets.size() + "개, 최대 " + maxSheetsPerUpload + "개)");
@@ -92,21 +107,139 @@ public class SafetyExcelUploadService {
                 .stepCount(sheet.getRows().size())
                 .photoCount(sheet.getPhotoCount())
                 .detectedTitle(sheet.getTitle())
-                .selected(sheet.isRecognized())
+                // 추정으로 읽은 시트는 기본 선택하지 않는다 — 사람이 미리보기로 확인하고 고르게 한다
+                .selected(sheet.isRecognized() && sheet.isConfident())
+                .confident(sheet.isConfident())
                 .stepPreviewLines(sheet.isRecognized() ? sheet.previewLines(PREVIEW_LINE_LIMIT) : List.of())
                 .build();
     }
 
     // ================================================================
+    // 1단계 상세: 시트 하나를 표 그대로 미리보기 (DB 변경 없음)
+    // ================================================================
+
+    /** 고른 시트의 열 구성과 행 내용을 등록될 모습 그대로 돌려준다. */
+    public ExcelSheetDetailResponse previewSheet(Path excelFile, String sheetName) {
+        ParsedSheet sheet;
+        try {
+            sheet = parser.parseOneSheet(excelFile.toFile(), sheetName);
+        } catch (IllegalArgumentException e) {
+            throw poiFormatError(e);
+        }
+        if (sheet == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "'" + sheetName + "' 시트를 찾을 수 없습니다.");
+        }
+        if (!sheet.isRecognized()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "미리볼 수 없는 시트입니다. " + sheet.getReason());
+        }
+
+        List<ParsedColumn> columns = sheet.getColumns();
+        return ExcelSheetDetailResponse.builder()
+                .sheetName(sheet.getSheetName())
+                .title(sheet.getTitle())
+                .formType(sheet.getFormType().name())
+                .formTypeName(sheet.getFormType().displayName())
+                .meta(sheet.getMeta().stream()
+                        .map(m -> ExcelSheetDetailResponse.MetaLine.builder()
+                                .label(m.label()).value(m.value()).build())
+                        .toList())
+                .columns(columns.stream()
+                        .map(c -> ExcelSheetDetailResponse.Column.builder()
+                                .label(c.label()).type(c.type()).build())
+                        .toList())
+                .rows(sheet.getRows().stream()
+                        .map(row -> toPreviewRow(row, columns))
+                        .toList())
+                .build();
+    }
+
+    /** 사진은 칸(열)별로 나눠 담는다. 열을 못 정한 사진은 사진 열이 떠맡는다(화면과 같은 규칙). */
+    private ExcelSheetDetailResponse.Row toPreviewRow(ParsedRow row, List<ParsedColumn> columns) {
+        int columnCount = columns.size();
+        List<List<Integer>> photosByColumn = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            photosByColumn.add(new ArrayList<>());
+        }
+        for (ParsedPhoto photo : row.photos()) {
+            int at = photo.columnIndex();
+            if (at < 0 || at >= columnCount) {
+                at = defaultPhotoColumn(columns);
+            }
+            if (at >= 0) photosByColumn.get(at).add(photo.index());
+        }
+
+        List<ExcelSheetDetailResponse.Cell> cells = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            ParsedCell cell = (i < row.cells().size()) ? row.cells().get(i) : null;
+            cells.add(ExcelSheetDetailResponse.Cell.builder()
+                    .text((cell != null) ? cell.text() : null)
+                    .checked(cell != null && cell.checked())
+                    .photoIndexes(photosByColumn.get(i))
+                    .build());
+        }
+        return ExcelSheetDetailResponse.Row.builder().stepNo(row.stepNo()).cells(cells).build();
+    }
+
+    /** 열을 못 정한 사진이 갈 곳 — 사진 열이 없으면 -1(어디에도 넣지 않는다) */
+    private int defaultPhotoColumn(List<ParsedColumn> columns) {
+        for (int i = 0; i < columns.size(); i++) {
+            if (SafetyManualColumn.TYPE_PHOTO.equals(columns.get(i).type())) return i;
+        }
+        return -1;
+    }
+
+    /** 사진 한 장의 원본. 미리보기 화면의 &lt;img&gt; 가 보이는 것만 가져간다. */
+    public ParsedPhoto previewPhoto(Path excelFile, String sheetName, int photoIndex) {
+        ParsedPhoto photo = parser.findPhoto(excelFile.toFile(), sheetName, photoIndex);
+        if (photo == null || photo.data() == null) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사진을 찾을 수 없습니다.");
+        }
+        return photo;
+    }
+
+    // ================================================================
     // 2단계: 확정 업로드 (선택된 시트만 실제 저장)
     // ================================================================
+    /**
+     * 파일과 함께 multipart 로 받은 시트별 분류 지정(JSON 문자열)을 풀어서 저장한다.
+     *
+     * <p>파일과 같이 보내야 해서 본문을 JSON 으로 받을 수 없어 문자열 파트로 온다.
+     * (시트명에 쉼표가 들어갈 수 있어 CSV 대신 JSON 을 쓴다)
+     */
+    @Transactional
+    public ExcelImportResultResponse confirmImport(MultipartFile file, String assignmentsJson, String createdBy) {
+        return confirmImport(file, parseAssignments(assignmentsJson), createdBy);
+    }
+
+    private List<ExcelSheetAssignRequest> parseAssignments(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<ExcelSheetAssignRequest>>() { });
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "시트별 분류 지정 형식이 올바르지 않습니다: " + e.getMessage());
+        }
+    }
+
     @Transactional
     public ExcelImportResultResponse confirmImport(MultipartFile file,
                                                     List<ExcelSheetAssignRequest> assignments, String createdBy) {
         Map<String, Long> categoryBySheet = toCategoryBySheet(assignments);
-        List<ParsedSheet> sheets = parseWorkbook(file);
         String sourceFileName = (file.getOriginalFilename() != null) ? file.getOriginalFilename() : "upload.xlsx";
+        return importSheets(parseWorkbook(file, true), sourceFileName, categoryBySheet, createdBy);
+    }
 
+    /** 분할 업로드로 서버에 이미 올라온 파일을 확정 저장한다. (파일을 다시 받지 않는다) */
+    @Transactional
+    public ExcelImportResultResponse confirmImport(Path excelFile, String sourceFileName,
+                                                    List<ExcelSheetAssignRequest> assignments, String createdBy) {
+        Map<String, Long> categoryBySheet = toCategoryBySheet(assignments);
+        return importSheets(parseStaged(excelFile, true), sourceFileName, categoryBySheet, createdBy);
+    }
+
+    private ExcelImportResultResponse importSheets(List<ParsedSheet> sheets, String sourceFileName,
+                                                    Map<String, Long> categoryBySheet, String createdBy) {
         // 같은 분류를 여러 시트가 함께 쓰는 경우가 흔하므로 분류 조회 결과와 정렬순서를 분류별로 들고 간다.
         Map<Long, SafetyManualCategory> categoryCache = new HashMap<>();
         Map<Long, Integer> nextSortOrder = new HashMap<>();
@@ -115,7 +248,7 @@ public class SafetyExcelUploadService {
         List<String> skipped = new ArrayList<>();
 
         for (ParsedSheet sheet : sheets) {
-            Long categoryId = categoryBySheet.get(sheet.getSheetName());
+            Long categoryId = categoryBySheet.get(sheetKey(sheet.getSheetName()));
             if (categoryId == null) {
                 continue; // 사용자가 선택하지 않은 시트는 건너뜀
             }
@@ -228,7 +361,13 @@ public class SafetyExcelUploadService {
             }
 
             for (ParsedPhoto photo : row.photos()) {
-                photoService.saveParsedPhoto(step, photo, createdBy);
+                if (photo.data() == null || photo.data().length == 0) {
+                    continue;   // 미리보기 파싱 결과(사진 개수만 센 것)로는 저장하지 않는다
+                }
+                // 사진이 놓여 있던 칸을 그대로 살린다 (비고 칸에 있던 사진은 비고 칸에)
+                SafetyManualColumn photoColumn = (photo.columnIndex() >= 0
+                        && photo.columnIndex() < columns.size()) ? columns.get(photo.columnIndex()) : null;
+                photoService.saveParsedPhoto(step, photoColumn, photo, createdBy);
             }
         }
     }
@@ -240,7 +379,7 @@ public class SafetyExcelUploadService {
         }
         Map<String, Long> categoryBySheet = new LinkedHashMap<>();
         for (ExcelSheetAssignRequest assignment : assignments) {
-            String sheetName = (assignment.getSheetName() != null) ? assignment.getSheetName().trim() : "";
+            String sheetName = sheetKey(assignment.getSheetName());
             if (sheetName.isEmpty()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "시트명이 비어 있는 항목이 있습니다.");
             }
@@ -253,21 +392,65 @@ public class SafetyExcelUploadService {
         return categoryBySheet;
     }
 
+    /**
+     * 시트명 대조용 키. 앞뒤 공백을 떼고 맞춘다.
+     * <p>실제 파일 중에 시트명이 " Core MC원지교체" 처럼 앞에 공백이 붙은 것이 있어,
+     * 한쪽만 trim 하면 지정한 시트를 못 찾고 조용히 건너뛰게 된다.
+     */
+    private String sheetKey(String sheetName) {
+        return (sheetName != null) ? sheetName.trim() : "";
+    }
+
+    /** 분할 업로드로 이미 디스크에 있는 파일을 파싱한다. (임시 파일로 옮기는 단계가 필요 없다) */
+    private List<ParsedSheet> parseStaged(Path excelFile, boolean includePhotoData) {
+        try {
+            return includePhotoData
+                    ? parser.parse(excelFile.toFile())
+                    : parser.parseForPreview(excelFile.toFile());
+        } catch (IllegalArgumentException e) {
+            throw poiFormatError(e);
+        }
+    }
+
+    /** POI 내부에서 올라오는 형식 오류를 업무 예외로 바꿔 준다. */
+    private BusinessException poiFormatError(IllegalArgumentException e) {
+        return new BusinessException(ErrorCode.INVALID_INPUT_VALUE, e.getMessage());
+    }
+
     // ----------------------------------------------------------------
     // 내부 공통
     // ----------------------------------------------------------------
 
-    private List<ParsedSheet> parseWorkbook(MultipartFile file) {
+    /**
+     * 업로드된 파일을 임시 파일로 떨어뜨린 뒤 파싱한다.
+     *
+     * <p>스트림째로 POI 에 넘기면 zip 전체가 힙에 올라간다. 이 모듈이 다루는 매뉴얼 파일은
+     * 사진 때문에 50~90MB 인 것이 흔해서, 스트림으로 읽으면 힙 250MB 이상을 잡아먹고
+     * 운영 설정({@code -Xmx384m})에서 OutOfMemoryError 로 업로드가 실패한다.
+     *
+     * @param includePhotoData 확정 저장이면 true. 미리보기는 사진 개수만 필요해 원본을 읽지 않는다.
+     */
+    private List<ParsedSheet> parseWorkbook(MultipartFile file, boolean includePhotoData) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 엑셀 파일이 없습니다.");
         }
+        Path temp = null;
         try {
-            return parser.parse(file.getInputStream());
+            temp = Files.createTempFile("safety-excel-", ".xlsx");
+            file.transferTo(temp);
+            return includePhotoData ? parser.parse(temp.toFile()) : parser.parseForPreview(temp.toFile());
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다: " + e.getMessage());
         } catch (IllegalArgumentException e) {
-            // POI 내부에서 올라오는 형식 오류를 업무 예외로 바꿔 준다.
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, e.getMessage());
+            throw poiFormatError(e);
+        } finally {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    // 임시 파일이 남아도 업로드 자체는 성공이므로 무시한다 (OS 가 정리)
+                }
+            }
         }
     }
 }

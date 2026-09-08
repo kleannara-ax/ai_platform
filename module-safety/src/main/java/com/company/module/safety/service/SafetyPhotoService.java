@@ -4,8 +4,10 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.safety.dto.response.StepPhotoResponse;
+import com.company.module.safety.entity.SafetyManualColumn;
 import com.company.module.safety.entity.SafetyManualStep;
 import com.company.module.safety.entity.SafetyManualStepPhoto;
+import com.company.module.safety.repository.SafetyManualColumnRepository;
 import com.company.module.safety.repository.SafetyManualStepPhotoRepository;
 import com.company.module.safety.repository.SafetyManualStepRepository;
 import com.company.module.safety.support.SafetyExcelParser.ParsedPhoto;
@@ -33,6 +35,7 @@ public class SafetyPhotoService {
 
     private final SafetyManualStepPhotoRepository photoRepository;
     private final SafetyManualStepRepository stepRepository;
+    private final SafetyManualColumnRepository columnRepository;
 
     /** 업로드 디렉토리 (application.yml: safety.upload-dir) */
     @Value("${safety.upload-dir}")
@@ -41,12 +44,17 @@ public class SafetyPhotoService {
     // ================================================================
     // 사진 업로드 (관리자, 매뉴얼 상세 화면에서 직접 첨부)
     // ================================================================
+    /**
+     * @param columnId 사진을 넣을 열. null 이면 매뉴얼의 기본 '사진' 열에 표시된다.
+     *                 비고처럼 글과 사진이 같이 들어가는 칸을 지정할 수 있다.
+     */
     @Transactional
-    public StepPhotoResponse upload(Long stepId, MultipartFile file, String uploadedBy) {
+    public StepPhotoResponse upload(Long stepId, Long columnId, MultipartFile file, String uploadedBy) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 사진이 없습니다.");
         }
         SafetyManualStep step = findActiveStep(stepId);
+        SafetyManualColumn column = findTargetColumn(step, columnId);
 
         String original = (file.getOriginalFilename() != null) ? file.getOriginalFilename() : "photo";
         String stored = UUID.randomUUID() + extension(original);
@@ -61,6 +69,7 @@ public class SafetyPhotoService {
 
         SafetyManualStepPhoto entity = SafetyManualStepPhoto.builder()
                 .step(step)
+                .column(column)
                 .originalName(original)
                 .storedName(stored)
                 .contentType(file.getContentType())
@@ -75,7 +84,8 @@ public class SafetyPhotoService {
     // 엑셀 일괄업로드에서 추출된 사진(byte[])을 디스크에 저장 (2단계: 확정 시에만 호출)
     // ================================================================
     @Transactional
-    public StepPhotoResponse saveParsedPhoto(SafetyManualStep step, ParsedPhoto parsed, String createdBy) {
+    public StepPhotoResponse saveParsedPhoto(SafetyManualStep step, SafetyManualColumn column,
+                                              ParsedPhoto parsed, String createdBy) {
         String stored = UUID.randomUUID() + extension(parsed.fileName());
         try {
             Path dir = Paths.get(uploadDir);
@@ -87,6 +97,7 @@ public class SafetyPhotoService {
 
         SafetyManualStepPhoto entity = SafetyManualStepPhoto.builder()
                 .step(step)
+                .column(column)
                 .originalName(parsed.fileName())
                 .storedName(stored)
                 .contentType(parsed.contentType())
@@ -111,6 +122,24 @@ public class SafetyPhotoService {
     }
 
     // ================================================================
+    // 사진을 다른 칸으로 옮기기 (관리자)
+    // ================================================================
+    @Transactional
+    public StepPhotoResponse moveToColumn(Long photoId, Long stepId, Long columnId, String updatedBy) {
+        SafetyManualStepPhoto photo = findActive(photoId);
+        SafetyManualStep step = photo.getStep();
+        if (stepId != null && !stepId.equals(step.getStepId())) {
+            SafetyManualStep target = findActiveStep(stepId);
+            if (!target.getManual().getManualId().equals(step.getManual().getManualId())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "다른 매뉴얼의 행으로는 옮길 수 없습니다.");
+            }
+            step = target;
+        }
+        photo.moveTo(step, findTargetColumn(step, columnId), updatedBy);
+        return StepPhotoResponse.from(photo);
+    }
+
+    // ================================================================
     // 사진 삭제 (관리자)
     // ================================================================
     @Transactional
@@ -127,6 +156,20 @@ public class SafetyPhotoService {
     // ----------------------------------------------------------------
     // 내부 공통
     // ----------------------------------------------------------------
+
+    /**
+     * 사진을 넣을 열을 찾는다. 지정이 없으면 null(기본 사진 열)이고,
+     * 지정했다면 같은 매뉴얼의 살아 있는 열인지까지 확인한다.
+     */
+    private SafetyManualColumn findTargetColumn(SafetyManualStep step, Long columnId) {
+        if (columnId == null) return null;
+        SafetyManualColumn column = columnRepository.findActiveById(columnId)
+                .orElseThrow(() -> new EntityNotFoundException("열을 찾을 수 없습니다. id=" + columnId));
+        if (!column.getManual().getManualId().equals(step.getManual().getManualId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "이 매뉴얼의 열이 아닙니다.");
+        }
+        return column;
+    }
 
     private SafetyManualStep findActiveStep(Long stepId) {
         return stepRepository.findActiveById(stepId)

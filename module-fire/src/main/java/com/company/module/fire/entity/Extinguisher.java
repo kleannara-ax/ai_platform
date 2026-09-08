@@ -80,6 +80,18 @@ public class Extinguisher {
     @OrderBy("inspectionDate DESC, inspectionId DESC")
     private List<ExtinguisherInspection> inspections = new ArrayList<>();
 
+    /** 이산화탄소소화기는 반영구적으로 사용하므로 교체 주기를 99년으로 고정한다. */
+    private static final String CO2_EXTINGUISHER_TYPE = "이산화탄소소화기";
+    private static final int CO2_REPLACEMENT_CYCLE_YEARS = 99;
+
+    /** 소화기 종류에 따른 교체 주기 결정 (이산화탄소소화기는 99년 고정, 그 외는 기존 로직 유지) */
+    private static int resolveReplacementCycleYears(String extinguisherType, int requestedYears) {
+        if (CO2_EXTINGUISHER_TYPE.equals(extinguisherType)) {
+            return CO2_REPLACEMENT_CYCLE_YEARS;
+        }
+        return requestedYears > 0 ? requestedYears : 10;
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -112,7 +124,7 @@ public class Extinguisher {
         this.group = group;
         this.extinguisherType = extinguisherType;
         this.manufactureDate = manufactureDate;
-        this.replacementCycleYears = replacementCycleYears > 0 ? replacementCycleYears : 10;
+        this.replacementCycleYears = resolveReplacementCycleYears(extinguisherType, replacementCycleYears);
         this.quantity = quantity > 0 ? quantity : 1;
         this.x = x;
         this.y = y;
@@ -133,7 +145,7 @@ public class Extinguisher {
         this.group = group;
         this.extinguisherType = extinguisherType;
         this.manufactureDate = manufactureDate;
-        this.replacementCycleYears = replacementCycleYears > 0 ? replacementCycleYears : 10;
+        this.replacementCycleYears = resolveReplacementCycleYears(extinguisherType, replacementCycleYears);
         this.quantity = quantity > 0 ? quantity : 1;
         this.x = x;
         this.y = y;
