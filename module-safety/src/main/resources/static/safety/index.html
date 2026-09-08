@@ -58,9 +58,117 @@ body{
 .btn-edit-toggle.on{background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; border-color:transparent}
 .btn-edit-toggle.on:hover{filter:brightness(1.06); color:#fff}
 
-/* 업로드 완료 팝업은 업로드 창(excelModal) 위에 겹쳐 뜬다.
+/* 업로드 완료 팝업과 시트 미리보기는 업로드 창(excelModal) 위에 겹쳐 뜬다.
    HTML 상 excelModal 보다 앞에 있어서 z-index 가 같으면 뒤로 밀리므로 명시적으로 올린다. */
 #uploadDoneModal{--bs-modal-zindex:1080; z-index:1080}
+#sheetPreviewModal{--bs-modal-zindex:1078; z-index:1078}
+
+/* ── 엑셀 시트 미리보기 ─────────────────────────────────────── */
+.btn-preview{
+  display:inline-flex; align-items:center; gap:5px; margin-top:6px;
+  border:1px solid var(--brand-soft); background:#fff; color:var(--brand);
+  border-radius:8px; padding:3px 9px; font-size:.74rem; font-weight:700;
+}
+.btn-preview:hover{background:var(--brand-soft)}
+.sp-note{
+  margin-bottom:10px; padding:9px 13px; border-radius:9px;
+  background:#f5f7ff; color:var(--muted); font-size:.8rem;
+}
+.sp-meta{display:flex; flex-wrap:wrap; gap:6px 16px; margin-bottom:10px; font-size:.8rem; color:var(--muted)}
+.sp-meta b{color:var(--text); margin-right:4px}
+.sp-table{width:100%; border-collapse:separate; border-spacing:0; font-size:.84rem}
+.sp-table th{
+  position:sticky; top:0; z-index:1; background:#f8f9fd; color:var(--muted);
+  font-weight:700; padding:9px 10px; text-align:center; border-bottom:2px solid var(--line);
+}
+.sp-table td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; white-space:pre-wrap}
+.sp-table .sp-no{width:48px; text-align:center; color:var(--muted); white-space:nowrap}
+.sp-type{color:#a9b0c8; font-size:.72rem}
+.sp-photos{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
+.sp-photo{
+  width:104px; height:78px; object-fit:cover; border-radius:7px;
+  border:1px solid var(--line); background:#f1f3fa;
+}
+.sp-photo-fail{
+  display:inline-flex; align-items:center; justify-content:center; width:104px; height:78px;
+  border-radius:7px; border:1px dashed var(--line); color:#b7bdd0; font-size:.72rem;
+}
+
+/* 글 칸 안에 함께 들어가는 사진 (예: 비고 칸의 개선 전/후 사진) */
+.cell-photos{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+
+/* ── 수정 모드: 표에서 바로 고치기 ───────────────────────────── */
+.edit-hint{
+  margin-top:10px; padding:10px 14px; border-radius:10px; background:#f5f7ff;
+  color:var(--muted); font-size:.8rem; line-height:1.6;
+}
+.edit-hint i{color:var(--brand); margin-right:4px}
+
+/* 클릭해서 고칠 수 있는 칸 */
+.step-table td.cell-editable{cursor:text}
+.step-table td.cell-editable:hover{background:#f7f9ff; box-shadow:inset 0 0 0 1.5px var(--brand-soft)}
+.cell-text.empty{color:#b7bdd0; font-style:italic}
+/* 표 자리에서 그대로 고친다 — 입력창을 새로 띄우지 않아 표가 흔들리지 않는다 */
+.cell-text[contenteditable="true"]{
+  display:block; outline:none; white-space:pre-wrap; word-break:break-word; min-height:1.6em;
+}
+.step-table td.cell-editing{
+  background:#fff !important; box-shadow:inset 0 0 0 2px var(--brand) !important;
+}
+/* 사진 칸도 Ctrl+V 를 받으려면 포커스를 받아야 한다 */
+.step-table td.cell-pastable:focus{outline:none; box-shadow:inset 0 0 0 2px var(--brand)}
+
+/* 표에서 바로 사진 지우기 */
+.photo-chip{position:relative; display:inline-block; line-height:0}
+.photo-chip .photo-del{
+  position:absolute; top:3px; right:3px; display:none;
+  width:20px; height:20px; padding:0; border:none; border-radius:50%;
+  background:rgba(17,24,39,.72); color:#fff; font-size:.66rem; line-height:1;
+}
+.photo-chip:hover .photo-del{display:block}
+.photo-chip .photo-del:hover{background:#dc2626}
+/* 사진을 받을 수 있는 칸 */
+.cell-drop-target{background:#eef2ff !important; box-shadow:inset 0 0 0 2px var(--brand) !important}
+.cell-photo-hint{color:#b7bdd0; font-size:.76rem; font-style:italic}
+.step-photo[draggable="true"]{cursor:grab}
+.photo-dragging{opacity:.4}
+
+/* 머리글: 끌어서 순서 변경 + 이름 수정 */
+.step-table th.col-movable{cursor:grab}
+.step-table th .col-title{pointer-events:none}
+/* 열이 좁으면 머리글 글자에 밀려 아이콘이 잘리므로, 오른쪽 끝에 겹쳐서 띄운다 */
+.step-table th .col-tools{
+  display:none; position:absolute; top:50%; right:16px; transform:translateY(-50%);
+  gap:2px; padding:2px 3px; border-radius:7px;
+  background:#f8f9fd; box-shadow:-6px 0 6px -4px rgba(17,24,39,.18);
+}
+.step-table th.col-movable:hover .col-tools{display:inline-flex}
+.step-table th .col-tools button{
+  width:20px; height:20px; border:none; border-radius:5px; background:#e9ecf7; color:var(--muted);
+  font-size:.62rem; line-height:1; padding:0;
+}
+.step-table th .col-tools button:hover{background:var(--brand); color:#fff}
+.step-table th .col-tools button.danger:hover{background:#dc2626}
+.col-input{
+  width:calc(100% - 14px); border:1.5px solid var(--brand); border-radius:6px;
+  padding:3px 6px; font:inherit; font-size:.86rem; text-align:center;
+}
+.col-dragging{opacity:.45}
+.col-drop-target{box-shadow:inset 3px 0 0 var(--brand)}
+
+/* 단계 수정 창의 첨부된 사진 목록 — 칸 이동과 삭제를 여기서 한다 */
+.step-photo-list{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.step-photo-list:empty{display:none}
+.step-photo-item{
+  display:flex; align-items:center; gap:10px; padding:6px 8px;
+  border:1px solid var(--line); border-radius:10px; background:#fbfcff;
+}
+.step-photo-item img{width:52px; height:52px; object-fit:cover; border-radius:8px; flex:0 0 auto}
+.step-photo-item .spi-name{
+  flex:1 1 auto; min-width:0; font-size:.78rem; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.step-photo-item select{flex:0 0 auto; max-width:170px; font-size:.8rem; padding:4px 8px}
 
 /* 안내 메시지는 화면 위에 떠 있어야 한다.
    본문 흐름에 두면 모달이 열려 있을 때 배경(backdrop) 뒤에 가려 아무것도 안 보인다. */
@@ -593,6 +701,23 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
   </div>
 </div></div></div>
 
+<!-- 엑셀 시트 미리보기 — 확정 전에 등록될 표를 그대로 보여준다 (업로드 창 위에 겹쳐 뜬다) -->
+<div class="modal fade" id="sheetPreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header">
+      <div style="min-width:0">
+        <h5 class="modal-title" id="sheetPreviewTitle">시트 미리보기</h5>
+        <div class="detail-path" id="sheetPreviewSub"></div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body" id="sheetPreviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">닫기</button>
+    </div>
+  </div></div>
+</div>
+
 <!-- 업로드 완료 팝업 — 확인을 누르면 업로드 창까지 함께 닫힌다 -->
 <div class="modal fade" id="uploadDoneModal" tabindex="-1" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
@@ -715,7 +840,14 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
     <div id="step-fields" class="mt-2"></div>
     <div class="mb-1" id="step-photo-upload-wrap" style="display:none">
       <label class="form-label-modern">사진 첨부</label>
-      <input type="file" id="step-photo-file" class="form-control" accept="image/*">
+      <!-- 어느 칸에 넣을지 고른다 — 비고처럼 글과 사진이 함께 들어가는 칸도 선택할 수 있다 -->
+      <div class="d-flex gap-2 align-items-center">
+        <select id="step-photo-column" class="form-select" style="max-width:200px"></select>
+        <input type="file" id="step-photo-file" class="form-control" accept="image/*" multiple>
+      </div>
+      <div class="form-text">여러 장을 한 번에 고를 수 있습니다. 고른 사진은 모두 위에서 선택한 칸에 들어갑니다.</div>
+      <!-- 이미 올라가 있는 사진 — 여기서 바로 지우거나 다른 칸으로 옮길 수 있다 -->
+      <div id="step-photo-list" class="step-photo-list"></div>
     </div>
   </div>
   <div class="modal-footer"><button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">취소</button><button class="btn-modern btn-primary-modern" onclick="saveStep()">저장</button></div>
