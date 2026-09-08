@@ -231,7 +231,7 @@ public class SafetyExcelParser {
                     cells.add(ParsedCell.empty());   // 사진은 값이 아니라 photos 로 들어간다
                     continue;
                 }
-                String text = cellText(row.getCell(sourceColumnIndexes.get(i))).trim();
+                String text = tidyText(cellText(row.getCell(sourceColumnIndexes.get(i))));
                 if (!text.isBlank()) hasContent = true;
                 cells.add(ParsedCell.text(text));
             }
@@ -315,7 +315,7 @@ public class SafetyExcelParser {
                 if (SafetyManualColumn.TYPE_CHECK.equals(columns.get(i).type())) {
                     cells.add(ParsedCell.check(isChecked(raw)));
                 } else {
-                    String text = raw.trim();
+                    String text = tidyText(raw);
                     if (!text.isBlank()) hasText = true;
                     cells.add(ParsedCell.text(text));
                 }
@@ -499,6 +499,38 @@ public class SafetyExcelParser {
     private String flatten(String raw) {
         if (raw == null) return "";
         return raw.replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * 셀 안의 과한 공백을 정리한다. (표에 저장되는 본문 값 전용)
+     *
+     * <p>엑셀에서 칸 너비에 맞추려고 {@code "지필연결시 2인1조 작업                    "} 처럼
+     * 공백을 여러 개 넣어 둔 곳이 많다. 화면은 표 폭이 달라서 그대로 두면 문장 중간이 뚝 벌어져 보인다.
+     * 줄바꿈은 작성자가 의도한 것이라 살리고, <b>한 줄 안의 연속 공백만</b> 하나로 줄인다.
+     * 앞뒤 빈 줄은 버리고, 중간의 연속 빈 줄은 한 줄까지만 남긴다.
+     *
+     * <p>일반 공백뿐 아니라 탭·줄바꿈 없는 공백(U+00A0)·전각 공백(U+3000)도 함께 다룬다
+     * — 한글 엑셀에서 자주 섞여 들어온다.
+     */
+    private String tidyText(String raw) {
+        if (raw == null) return "";
+        String[] lines = raw.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        boolean pendingBlankLine = false;
+        for (String line : lines) {
+            String tidy = line.replaceAll("[ \\t\\u00A0\\u3000]+", " ").trim();
+            if (tidy.isEmpty()) {
+                pendingBlankLine = (sb.length() > 0);
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('\n');
+                if (pendingBlankLine) sb.append('\n');
+            }
+            pendingBlankLine = false;
+            sb.append(tidy);
+        }
+        return sb.toString();
     }
 
     /**
