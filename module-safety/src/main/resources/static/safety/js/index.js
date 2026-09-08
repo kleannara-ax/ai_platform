@@ -1983,12 +1983,15 @@ function euRenderPreview() {
 
   document.getElementById('eu-check-all').checked = true;
   document.getElementById('euPreviewRows').innerHTML = euPreviewData.map((s, idx) => `
-    <tr class="${s.recognized ? '' : 'excluded'}">
+    <tr class="${s.recognized ? (s.confident === false ? 'needs-review' : '') : 'excluded'}">
       <td><input type="checkbox" class="eu-sheet-chk" data-idx="${idx}" ${s.selected ? 'checked' : ''} ${s.recognized ? '' : 'disabled'}
              onchange="euUpdateSummary()"></td>
       <td>${SAFETY.escapeHtml(s.sheetName)}</td>
-      <td>${s.recognized ? '<span class="badge-ok">인식됨</span>' : `<span class="badge-no">제외</span>`}</td>
-      <td>${SAFETY.escapeHtml(s.detectedTitle || '')}${!s.recognized && s.reason ? `<div class="small text-muted">${SAFETY.escapeHtml(s.reason)}</div>` : ''}</td>
+      <td>${!s.recognized ? '<span class="badge-no">제외</span>'
+            : s.confident === false ? '<span class="badge-check">확인 필요</span>'
+            : '<span class="badge-ok">인식됨</span>'}</td>
+      <td>${SAFETY.escapeHtml(s.detectedTitle || '')}${s.reason
+            ? `<div class="small text-muted">${SAFETY.escapeHtml(s.reason)}</div>` : ''}</td>
       <td>
         <div class="d-flex align-items-center gap-1">
           <select class="eu-row-cat" data-idx="${idx}" ${s.recognized ? '' : 'disabled'}
@@ -2006,7 +2009,9 @@ function euRenderPreview() {
 
   const note = document.querySelector('#euStep2 .eu-note');
   if (note) {
-    note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. `
+    const reviewCount = euPreviewData.filter(s => s.recognized && s.confident === false).length;
+    note.textContent = `총 ${euPreviewData.length}개 시트 중 ${recognizedCount - reviewCount}개가 매뉴얼로 인식되어 기본 선택되었습니다. `
+      + (reviewCount ? `머리글을 추정으로 읽은 ${reviewCount}개는 "확인 필요"로 두었습니다 — 미리보기로 내용을 보고 직접 체크하세요. ` : '')
       + '필요 없는 시트는 체크를 해제하고, 다른 분류에 넣을 시트는 "등록 분류"에서 직접 고르세요.';
   }
   euRefreshRowCategories();

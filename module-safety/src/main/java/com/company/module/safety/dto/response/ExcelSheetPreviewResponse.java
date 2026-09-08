@@ -37,8 +37,15 @@ public class ExcelSheetPreviewResponse {
     /** 매뉴얼 제목으로 쓸 값 (병합된 공정명 셀에서 추출, 공백 정리됨) */
     private final String detectedTitle;
 
-    /** 업로드 확정 시 이 시트를 가져올지 여부 (기본값 = recognized) — 사용자가 화면에서 토글 가능 */
+    /** 업로드 확정 시 이 시트를 가져올지 여부 — 사용자가 화면에서 토글 가능 */
     private final boolean selected;
+
+    /**
+     * 머리글을 정해진 문구로 확실히 가려냈는지.
+     * <p>false 면 표처럼 보여서 읽기는 했지만 확신이 없다는 뜻이라, 기본 선택에서 빼고
+     * 화면에서 확인하도록 안내한다. ({@code reason} 에 안내 문구가 들어 있다)
+     */
+    private final boolean confident;
 
     /** 단계별 미리보기 (앞부분 몇 개만) */
     private final List<String> stepPreviewLines;
