@@ -66,6 +66,17 @@ nginx `client_max_body_size` 기본값에 걸리지 않는다.
 |---|---|---|
 | `CurrentUserProvider` | core 에 없음 | 표준 규격은 `com.company.core.security.CurrentUserProvider` 로 사용자 ID 를 얻도록 정하고 있으나 core 에 해당 컴포넌트가 없다. 현재는 컨트롤러가 주입받은 `Authentication#getName()`(로그인 ID)을 서비스로 넘겨 `CREATED_BY` 등에 저장한다. **core 에 `CurrentUserProvider` 추가 필요** — 추가되면 로그인 ID 문자열 대신 사용자 ID(BIGINT)로 정리할 수 있다. |
 | 권한 코드 | 공통코드 `SAFETY_PERM` 명단으로 판정 | 표준 규격의 `@PreAuthorize("hasAuthority('SAFETY_WRITE')")` 방식이 아니라, 공통코드 그룹 `SAFETY_PERM` 에 등록된 로그인 ID 를 관리자로 본다. core 에 권한 코드 체계가 정리되면 그쪽으로 옮기는 것이 맞다. |
+| 공개 경로 등록 | 모듈이 `SafetySecurityConfig` 로 직접 선언 | **표준은 SecurityConfig 생성을 금지**하고 core 가 공개 경로를 관리하도록 한다. `module-fire`·`module-ps-insp` 는 실제로 core 목록(`/fire/**`, `/ps-insp-api/health` 등)에 등록해 쓰고 자기 설정이 없다. safety 도 그렇게 옮겨야 하지만 core 수정이 필요해 남겨 뒀다. **아래 2줄을 core `SecurityConfig` 공개 경로 목록에 추가하면 `module-safety/.../config/SafetySecurityConfig.java` 를 삭제할 수 있다.** |
+
+```java
+// core/src/main/java/com/company/core/config/SecurityConfig.java 의 기존 permitAll 목록에 추가
+.requestMatchers("/safety/**").permitAll()                  // 화면 (플랫폼 SPA 안에서 iframe 로드)
+.requestMatchers("/safety-api/photos/*/view").permitAll()   // <img> 는 Authorization 헤더를 보낼 수 없음
+```
+
+> 지금 `SafetySecurityConfig` 를 그냥 지우면 `/safety/**` 가 core 의 `anyRequest().authenticated()` 에
+> 걸려 화면이 401 로 뜨지 않는다. (확인: 토큰 없이 `/safety/index.html` 200,
+> `/safety-api/manuals` 401 — 화면 공개는 이 설정이 담당하고 있다)
 
 ## 규격 예외 (의도적으로 다르게 둔 부분)
 
