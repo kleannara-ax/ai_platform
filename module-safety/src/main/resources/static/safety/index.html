@@ -58,9 +58,18 @@ body{
 .btn-edit-toggle.on{background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; border-color:transparent}
 .btn-edit-toggle.on:hover{filter:brightness(1.06); color:#fff}
 
+/* 업로드 완료 팝업은 업로드 창(excelModal) 위에 겹쳐 뜬다.
+   HTML 상 excelModal 보다 앞에 있어서 z-index 가 같으면 뒤로 밀리므로 명시적으로 올린다. */
+#uploadDoneModal{--bs-modal-zindex:1080; z-index:1080}
+
+/* 안내 메시지는 화면 위에 떠 있어야 한다.
+   본문 흐름에 두면 모달이 열려 있을 때 배경(backdrop) 뒤에 가려 아무것도 안 보인다. */
 #msg{
+  position:fixed; top:16px; left:50%; transform:translateX(-50%);
+  z-index:1090;                 /* 모달(1055) · 업로드 완료 팝업(1080) 보다 위 */
+  min-width:280px; max-width:min(560px, calc(100vw - 32px)); text-align:center;
   border:none; border-radius:12px; font-size:.86rem; font-weight:600; padding:12px 16px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:0 10px 30px rgba(9,11,20,.22);
 }
 #msg.alert-success{background:#ecfdf5; color:#047857}
 #msg.alert-danger{background:#fef2f2; color:#b91c1c}
@@ -289,18 +298,26 @@ body.dnd-active .tree-row:not(.drop-ok){opacity:.5}
   padding:12px 10px; text-align:center; border-bottom:2px solid var(--line);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-/* 머리글 오른쪽 경계를 잡고 끌면 그 컬럼 폭이 바뀐다 */
+/* 머리글 오른쪽 경계를 잡고 끌면 그 컬럼 폭이 바뀐다.
+   예전에는 평소에 투명이라 마우스를 대 봐야 찾을 수 있었다 — 항상 손잡이가 보이게 한다. */
 .col-resizer{
-  position:absolute; top:0; right:-4px; width:9px; height:100%; z-index:2; cursor:col-resize;
+  position:absolute; top:0; right:0; width:14px; height:100%; z-index:3; cursor:col-resize;
+  display:flex; align-items:center; justify-content:flex-end;
 }
 .col-resizer::after{
-  content:''; position:absolute; top:7px; bottom:7px; left:3px; width:3px;
-  border-radius:2px; background:transparent; transition:background .12s;
+  content:''; width:2px; height:46%; margin-right:4px; border-radius:2px;
+  background:#c3c8da;                                  /* 평소에도 보이는 옅은 손잡이 */
+  box-shadow:3px 0 0 #c3c8da;                          /* 2px 두 줄 = 잡는 곳처럼 보이게 */
+  transition:background .12s, box-shadow .12s, height .12s;
 }
-.col-resizer:hover::after{background:var(--brand)}
-.step-table th:last-child .col-resizer{right:0; width:6px}
+/* 표에 마우스를 올리면 모든 경계가 또렷해져 어디를 끌 수 있는지 한눈에 보인다 */
+.step-table:hover .col-resizer::after{background:#96a0c0; box-shadow:3px 0 0 #96a0c0}
+.col-resizer:hover::after,
+body.col-resizing .col-resizer::after{
+  height:72%; background:var(--brand); box-shadow:3px 0 0 var(--brand);
+}
+.step-table th:last-child .col-resizer{width:10px}
 body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select:none !important}
-body.col-resizing .col-resizer::after{background:var(--brand)}
 .step-table td{padding:15px 12px; border-bottom:1px solid var(--line); font-size:1.06rem; line-height:1.6; vertical-align:top}
 /* 위험요인은 이 화면에서 가장 중요한 항목이라 넓게 잡고 굵게 표시한다 (색 강조는 쓰지 않는다) */
 .step-table td.col-hazard{font-size:1.14rem; font-weight:700}
@@ -754,7 +771,7 @@ body.col-resizing .col-resizer::after{background:var(--brand)}
         <table class="eu-sheet-table mb-0">
           <thead class="sticky-top"><tr>
             <th style="width:34px"><input type="checkbox" id="eu-check-all" checked onchange="euToggleAll(this)"></th>
-            <th style="width:130px">시트명</th><th style="width:76px">인식결과</th><th>매뉴얼명(추정)</th>
+            <th style="width:130px">시트명</th><th style="width:76px">인식결과</th><th>등록될 매뉴얼명(=시트명)</th>
             <th style="width:250px">등록 분류</th>
             <th style="width:54px">단계수</th><th style="width:54px">사진수</th><th style="width:180px">미리보기</th>
           </tr></thead>

@@ -1285,12 +1285,52 @@ let euPreviewData = [];
 let euSelected = { major: null, middle: null };
 /** 시트 index -> 사용자가 그 행에서 직접 고른 중분류 id. 여기 없으면 상단 기본 분류를 따른다. */
 let euRowCategory = {};
+/** 분할 업로드로 서버에 올려 둔 파일의 식별자. 미리보기와 확정이 이 파일을 함께 쓴다. */
+let euUploadId = null;
+
+/**
+ * 파일을 조각내서 올린다.
+ *
+ * <p>앞단 웹서버(nginx client_max_body_size 등)가 요청 본문 크기를 제한하고 있어,
+ * 사진이 많은 50~90MB 매뉴얼 파일을 한 번에 보내면 413 으로 잘린다.
+ * 조각 하나가 4MB 라 어떤 제한에도 걸리지 않는다.
+ * 파일은 여기서 한 번만 올라가고, 확정 업로드는 서버에 있는 그 파일을 그대로 쓴다.
+ */
+const EU_CHUNK_SIZE = 4 * 1024 * 1024;
+
+async function euUploadInChunks(file, onProgress) {
+  const totalChunks = Math.max(1, Math.ceil(file.size / EU_CHUNK_SIZE));
+  let uploadId = '';
+  for (let i = 0; i < totalChunks; i++) {
+    const blob = file.slice(i * EU_CHUNK_SIZE, Math.min(file.size, (i + 1) * EU_CHUNK_SIZE));
+    const res = await SAFETY.uploadMultipart('/safety-api/excel-upload/chunk', {
+      uploadId, chunkIndex: String(i), totalChunks: String(totalChunks), fileName: file.name,
+      file: new File([blob], file.name),
+    });
+    uploadId = res.uploadId;
+    onProgress(i + 1, totalChunks);
+  }
+  return uploadId;
+}
+
+/** 서버에 올려 둔 임시 파일을 버린다 (다른 파일을 다시 고르거나 창을 열 때) */
+async function euDiscardStaged() {
+  if (!euUploadId) return;
+  const id = euUploadId;
+  euUploadId = null;
+  try {
+    await SAFETY.api('/safety-api/excel-upload/discard-staged', { method: 'POST', body: { uploadId: id } });
+  } catch (e) {
+    // 임시 파일은 서버가 주기적으로 정리하므로 실패해도 넘어간다
+  }
+}
 
 function openExcelModal() {
   document.getElementById('eu-file').value = '';
   document.getElementById('euFileStatus').textContent = '';
   document.getElementById('euStep2').style.display = 'none';
   document.getElementById('eu-confirm-btn').classList.add('d-none');
+  euDiscardStaged();
   euPreviewData = [];
   euSelected = { major: null, middle: null };
   euRowCategory = {};
@@ -1446,17 +1486,29 @@ async function euDoPreview() {
   const status = document.getElementById('euFileStatus');
   const file = document.getElementById('eu-file').files[0];
   if (!file) {
+    await euDiscardStaged();
     status.textContent = '';
     document.getElementById('euStep2').style.display = 'none';
     return;
   }
+  await euDiscardStaged();
   euPreviewData = [];
   euRowCategory = {};
   document.getElementById('eu-confirm-btn').classList.add('d-none');
-  status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
 
+  const sizeMb = (file.size / 1024 / 1024).toFixed(1);
   try {
-    euPreviewData = await SAFETY.uploadMultipart('/safety-api/excel-upload/preview', { file });
+    // 1) 파일을 조각내서 올린다 (여기서 딱 한 번만 전송한다)
+    euUploadId = await euUploadInChunks(file, (done, total) => {
+      const pct = Math.round(done / total * 100);
+      status.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>`
+        + `파일을 올리는 중입니다... ${pct}% (${done}/${total}, ${sizeMb}MB)`;
+    });
+
+    // 2) 올라간 파일로 형식만 확인한다 (파일을 다시 보내지 않는다)
+    status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>형식을 확인하는 중입니다...';
+    euPreviewData = await SAFETY.api('/safety-api/excel-upload/preview-staged',
+      { method: 'POST', body: { uploadId: euUploadId } });
     const recognized = euPreviewData.filter(s => s.recognized).length;
     status.innerHTML = `<i class="fas fa-circle-check text-success me-1"></i>`
       + `${SAFETY.escapeHtml(file.name)} — 시트 ${euPreviewData.length}개 중 ${recognized}개 인식됨`;
@@ -1464,6 +1516,7 @@ async function euDoPreview() {
     document.getElementById('euStep2').style.display = '';
     euUpdateSummary();
   } catch (e) {
+    await euDiscardStaged();
     status.innerHTML = `<span class="text-danger"><i class="fas fa-circle-exclamation me-1"></i>${SAFETY.escapeHtml(e.message)}</span>`;
     document.getElementById('euStep2').style.display = 'none';
     SAFETY.toast(e.message, false);
@@ -1511,8 +1564,7 @@ function euToggleAll(box) {
 }
 
 async function euDoConfirm() {
-  const file = document.getElementById('eu-file').files[0];
-  if (!file) { SAFETY.toast('엑셀 파일이 없습니다. 다시 선택 후 형식 확인을 눌러주세요.', false); return; }
+  if (!euUploadId) { SAFETY.toast('엑셀 파일이 없습니다. 파일을 다시 선택해 주세요.', false); return; }
 
   const checked = Array.from(document.querySelectorAll('.eu-sheet-chk:checked'));
   if (!checked.length) { SAFETY.toast('가져올 시트를 하나 이상 선택하세요.', false); return; }
@@ -1537,14 +1589,22 @@ async function euDoConfirm() {
     .map(([id, count]) => `- ${pathOf(id).join(' > ')} : ${count}건`).join('\n');
   if (!confirm(`선택한 ${assignments.length}개 시트를 아래 분류에 등록합니다.\n\n${summary}\n\n진행할까요?`)) return;
 
+  // 파일은 이미 서버에 올라가 있으므로 식별자와 시트별 분류만 보낸다
+  const btn = document.getElementById('eu-confirm-btn');
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>등록하는 중...';
   try {
-    const result = await SAFETY.uploadMultipart('/safety-api/excel-upload/confirm', {
-      file, assignments: JSON.stringify(assignments),
-    });
+    const result = await SAFETY.api('/safety-api/excel-upload/confirm-staged',
+      { method: 'POST', body: { uploadId: euUploadId, assignments } });
+    euUploadId = null;   // 서버가 확정과 함께 임시 파일을 지웠다
     await refreshAll();
     showUploadResult(result);
   } catch (e) {
     SAFETY.toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = label;
   }
 }
 
@@ -1579,7 +1639,17 @@ function showUploadResult(result) {
 
   document.getElementById('uploadDoneBody').innerHTML = html;
   document.getElementById('eu-confirm-btn').classList.add('d-none');
-  if (!uploadDoneModal) uploadDoneModal = new bootstrap.Modal(document.getElementById('uploadDoneModal'));
+
+  const el = document.getElementById('uploadDoneModal');
+  if (!uploadDoneModal) {
+    uploadDoneModal = new bootstrap.Modal(el);
+    // 두 번째로 열리는 모달의 배경은 부트스트랩이 1050 으로 만들어서 업로드 창(1055) 아래에 깔린다.
+    // 완료 팝업(1080) 바로 밑으로 올려야 업로드 창이 어두워지고 팝업이 앞에 있는 것으로 보인다.
+    el.addEventListener('shown.bs.modal', () => {
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      if (backdrops.length > 1) backdrops[backdrops.length - 1].style.zIndex = '1075';
+    });
+  }
   uploadDoneModal.show();
 }
 

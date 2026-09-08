@@ -10,27 +10,36 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFAnchor;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFPictureData;
 import org.apache.poi.xssf.usermodel.XSSFShape;
+import org.apache.poi.xssf.usermodel.XSSFShapeGroup;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 안전 관련 엑셀 파서 — 두 가지 서식을 읽는다.
  *
  * <p><b>1) 안전작업 매뉴얼</b> (기존, .xlsx)
  * <ul>
- *   <li>시트 1개 = 매뉴얼 1개. 헤더(1행)에 "공정 순서" 가 있어야 인식한다.</li>
- *   <li>공정명(B열)은 시트 전체에 병합되어 매뉴얼 제목 역할을 한다.</li>
- *   <li>사진은 C열에 도형으로 삽입되어 있고, 앵커의 행 위치로 어느 단계인지 판별한다.</li>
+ *   <li>시트 1개 = 매뉴얼 1개. 머리글 행에 "공정 순서" 가 있어야 인식한다.
+ *       (머리글이 항상 1행에 있지는 않아 위쪽 몇 행을 훑어서 찾는다)</li>
+ *   <li>매뉴얼 제목은 <b>시트명</b>을 쓴다. 시트 안의 "공정명" 칸은 파일마다 비어 있거나
+ *       여러 시트가 같은 값을 갖는 경우가 많아 제목으로 쓰기에 적합하지 않다.</li>
+ *   <li>열 구성은 파일마다 다르므로 머리글 행에서 읽는다. ("No." / "공정명" 칸은 열이 아니다)</li>
+ *   <li>사진은 시트에 도형으로 삽입되어 있고, 앵커의 행 위치로 어느 단계인지 판별한다.
+ *       사진과 화살표/타원 같은 도형이 <b>그룹으로 묶여 있으면</b> 그룹 안까지 훑어 사진만 꺼낸다.</li>
  * </ul>
  *
  * <p><b>2) 작업 위험성 평가서</b> (신규, .xls)
@@ -48,22 +57,23 @@ import java.util.Map;
 public class SafetyExcelParser {
 
     // ── 안전작업 매뉴얼 서식 ──
-    /** 매뉴얼 시트로 인식하려면 헤더에 이 문구가 있어야 한다. */
+    /** 매뉴얼 시트로 인식하려면 머리글 행에 이 문구가 있어야 한다. */
     private static final String HEADER_MARK_STEP = "공정 순서";
-    /** 개요/범례 시트(예: "초지" 시트)의 특징적 헤더 문구 — 이게 있으면 매뉴얼이 아니라 제외한다. */
+    /** 개요/범례 시트(예: "초지" 시트)의 특징적 머리글 문구 — 이게 있으면 매뉴얼이 아니라 제외한다. */
     private static final String HEADER_MARK_OVERVIEW = "공정단계";
+    /** 머리글 행을 찾을 최대 행 — 위에 제목/여백 행이 붙어 있는 파일이 있어 1행만 보지 않는다. */
+    private static final int WORK_HEADER_SCAN_LIMIT = 10;
 
     /** 행 번호 칸 (열 정의에는 넣지 않고 stepNo 로 쓴다) */
     private static final String HEADER_NO = "No.";
-    /** 매뉴얼 제목이 병합되어 들어 있는 칸 (열 정의에는 넣지 않는다) */
+    /** 시트 안의 공정명 칸 (제목은 시트명을 쓰므로 열 정의에도 넣지 않는다) */
     private static final String HEADER_TITLE = "공정명";
     /** 사진이 들어가는 칸 */
     private static final String HEADER_PHOTO = "사진";
 
-    private static final int COL_NO = 0;
-    private static final int COL_TITLE = 1;
-    private static final int COL_PHOTO = 2;
-    private static final int COL_DESC = 3;
+    /** 화면(<img>)에서 그대로 보여줄 수 있는 그림 형식만 가져온다. (wmf/emf/wdp 등은 제외) */
+    private static final Set<String> WEB_IMAGE_EXTENSIONS =
+            Set.of("png", "jpg", "jpeg", "gif", "bmp", "webp");
 
     // ── 작업 위험성 평가서 서식 ──
     /** 표 머리글 첫 칸 문구 */
@@ -82,24 +92,60 @@ public class SafetyExcelParser {
             "부서명", "작업인원", "작업장소", "작업주기", "작업일",
             "목적", "개인보호구", "중요위험요소");
 
+    /**
+     * 사진 원본까지 모두 읽는다. (확정 업로드용)
+     *
+     * <p>스트림이 아니라 <b>파일</b>로 받는 것이 중요하다. POI 는 스트림을 받으면 zip 전체를
+     * 메모리에 올리지만, 파일을 받으면 필요한 부분만 읽는다. 사진이 많은 90MB 짜리 파일 기준으로
+     * 힙 사용량이 약 250MB → 90MB 로 줄어든다.
+     */
+    public List<ParsedSheet> parse(File excelFile) {
+        return parse(excelFile, true);
+    }
+
+    /**
+     * 형식 확인(미리보기)용 — 사진의 <b>개수</b>만 세고 원본 바이트는 읽지 않는다.
+     * <p>사진이 수백 장 들어 있는 파일이 많아, 미리보기까지 전부 메모리에 올리면 낭비가 크다.
+     */
+    public List<ParsedSheet> parseForPreview(File excelFile) {
+        return parse(excelFile, false);
+    }
+
+    /** 사진 원본까지 모두 읽는다. (파일로 떨어뜨릴 수 없을 때만 — 메모리를 훨씬 많이 쓴다) */
     public List<ParsedSheet> parse(InputStream excelStream) {
         try (Workbook workbook = WorkbookFactory.create(excelStream)) {
-            List<ParsedSheet> result = new ArrayList<>();
-            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                result.add(parseSheet(workbook.getSheetAt(i)));
-            }
-            return result;
+            return parseSheets(workbook, true);
         } catch (IOException e) {
-            // 표준상 RuntimeException/IllegalArgumentException 을 직접 던지지 않고 core 예외를 쓴다.
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
-                    "엑셀 파일을 읽을 수 없습니다: " + e.getMessage());
+            throw readFailed(e);
         }
     }
 
+    private List<ParsedSheet> parse(File excelFile, boolean includePhotoData) {
+        try (Workbook workbook = WorkbookFactory.create(excelFile, null, true)) {
+            return parseSheets(workbook, includePhotoData);
+        } catch (IOException e) {
+            throw readFailed(e);
+        }
+    }
+
+    private List<ParsedSheet> parseSheets(Workbook workbook, boolean includePhotoData) {
+        List<ParsedSheet> result = new ArrayList<>();
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+            result.add(parseSheet(workbook.getSheetAt(i), includePhotoData));
+        }
+        return result;
+    }
+
+    /** 표준상 RuntimeException/IllegalArgumentException 을 직접 던지지 않고 core 예외를 쓴다. */
+    private BusinessException readFailed(IOException e) {
+        return new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                "엑셀 파일을 읽을 수 없습니다: " + e.getMessage());
+    }
+
     /** 서식을 판별해 해당 파서로 넘긴다. 어느 쪽도 아니면 사유를 담아 제외한다. */
-    private ParsedSheet parseSheet(Sheet sheet) {
+    private ParsedSheet parseSheet(Sheet sheet, boolean includePhotoData) {
         String sheetName = sheet.getSheetName();
-        if (sheet.getRow(0) == null) {
+        if (sheet.getLastRowNum() < 0 || sheet.getPhysicalNumberOfRows() == 0) {
             return ParsedSheet.rejected(sheetName, "빈 시트입니다.");
         }
 
@@ -107,39 +153,55 @@ public class SafetyExcelParser {
         if (riskHeaderRow >= 0) {
             return parseRiskAssessment(sheet, riskHeaderRow);
         }
-        return parseWorkMethod(sheet);
+        return parseWorkMethod(sheet, includePhotoData);
     }
 
     // ================================================================
     // 서식 1 — 안전작업 매뉴얼
     // ================================================================
-    private ParsedSheet parseWorkMethod(Sheet sheet) {
+    private ParsedSheet parseWorkMethod(Sheet sheet, boolean includePhotoData) {
         String sheetName = sheet.getSheetName();
-        Row headerRow = sheet.getRow(0);
 
-        String headerTitleCol = cellText(headerRow.getCell(COL_TITLE));
-        String headerPhotoOrDescCol = cellText(headerRow.getCell(COL_PHOTO)) + " " + cellText(headerRow.getCell(COL_DESC));
-
-        if (headerTitleCol.contains(HEADER_MARK_OVERVIEW)) {
-            return ParsedSheet.rejected(sheetName, "개요/범례 시트로 추정되어 매뉴얼 대상에서 제외됩니다.");
+        int headerRowIdx = -1;
+        int overviewRowIdx = -1;
+        int scanLimit = Math.min(sheet.getLastRowNum(), WORK_HEADER_SCAN_LIMIT);
+        for (int rowIdx = 0; rowIdx <= scanLimit; rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row == null) continue;
+            String joined = squeeze(joinRow(row));
+            boolean hasStepMark = joined.contains(squeeze(HEADER_MARK_STEP));
+            boolean hasOverviewMark = joined.contains(squeeze(HEADER_MARK_OVERVIEW));
+            if (hasStepMark && !hasOverviewMark) {
+                headerRowIdx = rowIdx;
+                break;
+            }
+            if (hasOverviewMark && overviewRowIdx < 0) {
+                overviewRowIdx = rowIdx;
+            }
         }
-        if (!headerPhotoOrDescCol.contains(HEADER_MARK_STEP)) {
-            return ParsedSheet.rejected(sheetName, "지원하는 매뉴얼 형식과 헤더가 일치하지 않습니다.");
+        if (headerRowIdx < 0) {
+            return ParsedSheet.rejected(sheetName, (overviewRowIdx >= 0)
+                    ? "개요/범례 시트로 추정되어 매뉴얼 대상에서 제외됩니다."
+                    : "지원하는 매뉴얼 형식과 헤더가 일치하지 않습니다. (머리글에 '공정 순서' 가 있어야 합니다)");
         }
+        Row headerRow = sheet.getRow(headerRowIdx);
 
-        // 열은 헤더 행에서 읽는다 — 파일마다 열 구성이 다르다.
+        // 열은 머리글 행에서 읽는다 — 파일마다 열 구성이 다르다.
         // (예: 어떤 파일은 "안전 보호구" 가 있고 어떤 파일은 없다. 고정 인덱스로 읽으면 값이 밀린다.)
         List<ParsedColumn> columns = new ArrayList<>();
         List<Integer> sourceColumnIndexes = new ArrayList<>();
-        int photoColumnIndex = -1;
-        for (int colIdx = 0; colIdx <= headerRow.getLastCellNum(); colIdx++) {
+        int noColumnIndex = -1;
+        for (int colIdx = 0; colIdx < headerRow.getLastCellNum(); colIdx++) {
             String label = flatten(cellText(headerRow.getCell(colIdx)));
             if (label.isBlank()) continue;
-            if (label.startsWith(HEADER_NO) || label.equals(HEADER_TITLE)) continue;   // 번호/제목은 열이 아니다
+            if (isNoLabel(label)) {                       // 번호 칸은 열이 아니라 stepNo 로 쓴다
+                if (noColumnIndex < 0) noColumnIndex = colIdx;
+                continue;
+            }
+            if (squeeze(label).equals(squeeze(HEADER_TITLE))) continue;   // 공정명 칸은 열이 아니다
 
             if (label.contains(HEADER_PHOTO)) {
                 columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_PHOTO, 150));
-                photoColumnIndex = colIdx;
             } else {
                 columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_TEXT, 260));
             }
@@ -149,16 +211,18 @@ public class SafetyExcelParser {
             return ParsedSheet.rejected(sheetName, "표의 열 머리글을 읽을 수 없습니다.");
         }
 
-        Map<Integer, List<ParsedPhoto>> photosByRow = extractPhotosByRow(sheet);
+        Map<Integer, List<ParsedPhoto>> photosByRow = extractPhotosByRow(sheet, includePhotoData);
         List<ParsedRow> rows = new ArrayList<>();
         int lastRow = sheet.getLastRowNum();
         int order = 1;
-        for (int rowIdx = 1; rowIdx <= lastRow; rowIdx++) {
+        for (int rowIdx = headerRowIdx + 1; rowIdx <= lastRow; rowIdx++) {
             Row row = sheet.getRow(rowIdx);
-            if (row == null) continue;
-
-            Integer stepNo = cellInt(row.getCell(COL_NO));
             List<ParsedPhoto> photos = photosByRow.getOrDefault(rowIdx, List.of());
+            if (row == null) {
+                continue;   // 값이 하나도 없는 행 — 사진만 있는 행은 아래에서 걸러진다
+            }
+
+            Integer stepNo = (noColumnIndex >= 0) ? cellInt(row.getCell(noColumnIndex)) : null;
 
             List<ParsedCell> cells = new ArrayList<>();
             boolean hasContent = !photos.isEmpty();
@@ -167,7 +231,7 @@ public class SafetyExcelParser {
                     cells.add(ParsedCell.empty());   // 사진은 값이 아니라 photos 로 들어간다
                     continue;
                 }
-                String text = cellText(row.getCell(sourceColumnIndexes.get(i))).trim();
+                String text = tidyText(cellText(row.getCell(sourceColumnIndexes.get(i))));
                 if (!text.isBlank()) hasContent = true;
                 cells.add(ParsedCell.text(text));
             }
@@ -182,26 +246,17 @@ public class SafetyExcelParser {
         if (rows.isEmpty()) {
             return ParsedSheet.rejected(sheetName, "내용이 채워진 행이 없습니다. (빈 양식 시트로 보입니다)");
         }
+        // 제목은 시트명을 쓴다 — 시트 안의 "공정명" 은 비어 있거나(예: 가공4·5호기 파일)
+        // 서로 다른 시트가 같은 값을 갖는 경우(예: "손잡이 테이프 교체 작업")가 많아
+        // 제목 중복으로 뒤 시트가 통째로 건너뛰어졌다.
         return ParsedSheet.accepted(sheetName, SafetyFormType.WORK_METHOD,
-                extractWorkMethodTitle(sheet), List.of(), columns, rows);
+                flatten(sheetName), List.of(), columns, rows);
     }
 
-    /** B열(공정명) 병합영역에서 매뉴얼 제목을 추출한다. 병합이 없으면 첫 데이터 행의 값을 쓴다. */
-    private String extractWorkMethodTitle(Sheet sheet) {
-        String raw = null;
-        for (CellRangeAddress region : sheet.getMergedRegions()) {
-            if (region.getFirstColumn() == COL_TITLE && region.getLastColumn() == COL_TITLE
-                    && region.getFirstRow() == 1) {
-                Row row = sheet.getRow(region.getFirstRow());
-                raw = (row != null) ? cellText(row.getCell(COL_TITLE)) : null;
-                break;
-            }
-        }
-        if (raw == null || raw.isBlank()) {
-            Row firstDataRow = sheet.getRow(1);
-            raw = (firstDataRow != null) ? cellText(firstDataRow.getCell(COL_TITLE)) : "";
-        }
-        return flatten(raw);
+    /** "No." / "NO" / "번호" 처럼 행 번호를 뜻하는 머리글인지. */
+    private boolean isNoLabel(String label) {
+        String squeezed = squeeze(label).replace(".", "");
+        return squeezed.equalsIgnoreCase("NO") || squeezed.equals("번호");
     }
 
     // ================================================================
@@ -260,7 +315,7 @@ public class SafetyExcelParser {
                 if (SafetyManualColumn.TYPE_CHECK.equals(columns.get(i).type())) {
                     cells.add(ParsedCell.check(isChecked(raw)));
                 } else {
-                    String text = raw.trim();
+                    String text = tidyText(raw);
                     if (!text.isBlank()) hasText = true;
                     cells.add(ParsedCell.text(text));
                 }
@@ -365,10 +420,12 @@ public class SafetyExcelParser {
     // ================================================================
 
     /**
-     * 시트에 삽입된 그림을 앵커의 행 번호(0-based) 기준으로 그룹핑한다.
+     * 시트에 삽입된 그림을 앵커의 행 번호(0-based) 기준으로 묶는다.
      * <p>.xls(HSSF)에는 이 서식의 사진이 없으므로 .xlsx(XSSF)일 때만 훑는다.
+     *
+     * @param includeData false 면 개수만 세고 원본 바이트는 읽지 않는다 (미리보기용)
      */
-    private Map<Integer, List<ParsedPhoto>> extractPhotosByRow(Sheet sheet) {
+    private Map<Integer, List<ParsedPhoto>> extractPhotosByRow(Sheet sheet, boolean includeData) {
         Map<Integer, List<ParsedPhoto>> result = new LinkedHashMap<>();
         if (!(sheet instanceof XSSFSheet xssfSheet)) {
             return result;
@@ -376,26 +433,57 @@ public class SafetyExcelParser {
         XSSFDrawing drawing = xssfSheet.getDrawingPatriarch();
         if (drawing == null) return result;
 
-        int seq = 0;
+        int[] seq = {0};
         for (XSSFShape shape : drawing.getShapes()) {
-            if (!(shape instanceof XSSFPicture picture)) continue;
-            var anchor = picture.getClientAnchor();
-            if (anchor == null) continue;
-            int rowIdx = anchor.getRow1();
-
-            var pictureData = picture.getPictureData();
-            String ext = pictureData.suggestFileExtension();
-            // WMF/EMF 등 웹에서 바로 표시 불가능한 포맷은 건너뛴다.
-            if ("wmf".equalsIgnoreCase(ext) || "emf".equalsIgnoreCase(ext)) {
-                continue;
-            }
-            String fileName = "sheet_" + sheet.getSheetName().replaceAll("[^a-zA-Z0-9가-힣]", "_")
-                    + "_row" + rowIdx + "_" + (seq++) + "." + ext;
-
-            result.computeIfAbsent(rowIdx, k -> new ArrayList<>())
-                    .add(new ParsedPhoto(fileName, pictureData.getMimeType(), pictureData.getData()));
+            collectPhotos(sheet, shape, -1, result, seq, includeData);
         }
         return result;
+    }
+
+    /**
+     * 그림이면 담고, 그룹(사진 + 화살표/타원 등이 묶인 도형)이면 그 안까지 들어가 그림만 꺼낸다.
+     *
+     * <p>그룹 안의 그림은 자기 앵커가 없으므로({@code getAnchor()} 가 null) 바깥 그룹의 앵커 행을 쓴다.
+     * 그룹에 함께 묶인 도형(화살표·타원·설명상자)은 벡터 도형이라 그림 파일로 뽑을 수 없어
+     * 사진만 저장된다 — 표시는 원본 엑셀보다 단순해진다.
+     *
+     * @param inheritedRow 바깥 그룹에서 물려받은 행 번호 (최상위 도형이면 -1)
+     */
+    private void collectPhotos(Sheet sheet, XSSFShape shape, int inheritedRow,
+                               Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData) {
+        if (shape instanceof XSSFShapeGroup group) {
+            int groupRow = anchorRow(group);
+            if (groupRow < 0) groupRow = inheritedRow;
+            for (XSSFShape child : group) {
+                collectPhotos(sheet, child, groupRow, result, seq, includeData);
+            }
+            return;
+        }
+        if (!(shape instanceof XSSFPicture picture)) return;
+
+        int rowIdx = anchorRow(picture);
+        if (rowIdx < 0) rowIdx = inheritedRow;
+        if (rowIdx < 0) return;
+
+        XSSFPictureData pictureData = picture.getPictureData();
+        if (pictureData == null) return;
+        String ext = pictureData.suggestFileExtension();
+        // WMF/EMF/WDP 등 웹에서 바로 표시할 수 없는 포맷은 건너뛴다.
+        if (ext == null || !WEB_IMAGE_EXTENSIONS.contains(ext.toLowerCase())) {
+            return;
+        }
+        String fileName = "sheet_" + sheet.getSheetName().replaceAll("[^a-zA-Z0-9가-힣]", "_")
+                + "_row" + rowIdx + "_" + (seq[0]++) + "." + ext;
+
+        result.computeIfAbsent(rowIdx, k -> new ArrayList<>())
+                .add(new ParsedPhoto(fileName, pictureData.getMimeType(),
+                        includeData ? pictureData.getData() : null));
+    }
+
+    /** 도형이 놓인 셀의 행 번호(0-based). 그룹 안의 자식 도형처럼 시트 앵커가 없으면 -1. */
+    private int anchorRow(XSSFShape shape) {
+        XSSFAnchor anchor = shape.getAnchor();
+        return (anchor instanceof XSSFClientAnchor clientAnchor) ? clientAnchor.getRow1() : -1;
     }
 
     private String joinRow(Row row) {
@@ -413,16 +501,69 @@ public class SafetyExcelParser {
         return raw.replaceAll("\\s+", " ").trim();
     }
 
+    /**
+     * 셀 안의 과한 공백을 정리한다. (표에 저장되는 본문 값 전용)
+     *
+     * <p>엑셀에서 칸 너비에 맞추려고 {@code "지필연결시 2인1조 작업                    "} 처럼
+     * 공백을 여러 개 넣어 둔 곳이 많다. 화면은 표 폭이 달라서 그대로 두면 문장 중간이 뚝 벌어져 보인다.
+     * 줄바꿈은 작성자가 의도한 것이라 살리고, <b>한 줄 안의 연속 공백만</b> 하나로 줄인다.
+     * 앞뒤 빈 줄은 버리고, 중간의 연속 빈 줄은 한 줄까지만 남긴다.
+     *
+     * <p>일반 공백뿐 아니라 탭·줄바꿈 없는 공백(U+00A0)·전각 공백(U+3000)도 함께 다룬다
+     * — 한글 엑셀에서 자주 섞여 들어온다.
+     */
+    private String tidyText(String raw) {
+        if (raw == null) return "";
+        String[] lines = raw.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        boolean pendingBlankLine = false;
+        for (String line : lines) {
+            String tidy = line.replaceAll("[ \\t\\u00A0\\u3000]+", " ").trim();
+            if (tidy.isEmpty()) {
+                pendingBlankLine = (sb.length() > 0);
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('\n');
+                if (pendingBlankLine) sb.append('\n');
+            }
+            pendingBlankLine = false;
+            sb.append(tidy);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 공백을 모두 지운다. 머리글 비교 전용 —
+     * 같은 양식이라도 파일마다 "공정 순서 / 공정순서 / 공정  순서" 처럼 띄어쓰기가 제각각이다.
+     */
+    private String squeeze(String raw) {
+        if (raw == null) return "";
+        return raw.replaceAll("\\s+", "");
+    }
+
     private String cellText(Cell cell) {
         if (cell == null) return "";
         try {
-            if (cell.getCellType() == CellType.NUMERIC) {
-                double v = cell.getNumericCellValue();
-                if (v == Math.floor(v)) return String.valueOf((long) v);
-                return String.valueOf(v);
+            CellType type = cell.getCellType();
+            if (type == CellType.FORMULA) {
+                type = cell.getCachedFormulaResultType();   // 수식은 엑셀이 저장해 둔 결과값을 쓴다
             }
-            String s = cell.getStringCellValue();
-            return (s != null) ? s : "";
+            switch (type) {
+                case NUMERIC: {
+                    double v = cell.getNumericCellValue();
+                    return (v == Math.floor(v)) ? String.valueOf((long) v) : String.valueOf(v);
+                }
+                case BOOLEAN:
+                    return String.valueOf(cell.getBooleanCellValue());
+                case STRING: {
+                    String s = (cell.getCellType() == CellType.FORMULA)
+                            ? cell.getStringCellValue() : cell.getRichStringCellValue().getString();
+                    return (s != null) ? s : "";
+                }
+                default:
+                    return "";
+            }
         } catch (Exception e) {
             return "";
         }
