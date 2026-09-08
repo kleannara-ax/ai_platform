@@ -63,15 +63,15 @@ public class SafetyPhotoController {
                 .body(f.data());
     }
 
-    /** 사진을 다른 칸으로 옮기기 (columnId 를 비우면 기본 사진 열로) — SAFETY 관리자만 */
+    /** 사진을 다른 칸으로 옮기기 (표에서 끌어다 놓기). columnId 를 비우면 기본 사진 열로 — SAFETY 관리자만 */
     @PutMapping("/safety-api/photos/{photoId}/column")
     @PreAuthorize("@safetyPerm.isAdmin(authentication)")
     public ResponseEntity<ApiResponse<StepPhotoResponse>> moveToColumn(
             @PathVariable Long photoId, @RequestBody PhotoColumnUpdateRequest request,
             Authentication authentication) {
         String updatedBy = (authentication != null) ? authentication.getName() : null;
-        return ResponseEntity.ok(ApiResponse.success(
-                photoService.moveToColumn(photoId, request.getColumnId(), updatedBy)));
+        return ResponseEntity.ok(ApiResponse.success(photoService.moveToColumn(
+                photoId, request.getStepId(), request.getColumnId(), updatedBy)));
     }
 
     /** 사진 삭제 — SAFETY 관리자만 */

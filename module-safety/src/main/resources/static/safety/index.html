@@ -65,6 +65,47 @@ body{
 /* 글 칸 안에 함께 들어가는 사진 (예: 비고 칸의 개선 전/후 사진) */
 .cell-photos{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
 
+/* ── 수정 모드: 표에서 바로 고치기 ───────────────────────────── */
+.edit-hint{
+  margin-top:10px; padding:10px 14px; border-radius:10px; background:#f5f7ff;
+  color:var(--muted); font-size:.8rem; line-height:1.6;
+}
+.edit-hint i{color:var(--brand); margin-right:4px}
+
+/* 클릭해서 고칠 수 있는 칸 */
+.step-table td.cell-editable{cursor:text}
+.step-table td.cell-editable:hover{background:#f7f9ff; box-shadow:inset 0 0 0 1.5px var(--brand-soft)}
+.cell-text.empty{color:#b7bdd0; font-style:italic}
+.cell-input{
+  width:100%; min-height:64px; border:1.5px solid var(--brand); border-radius:8px;
+  padding:8px 10px; font:inherit; line-height:1.6; resize:vertical; background:#fff;
+}
+/* 사진을 받을 수 있는 칸 */
+.cell-drop-target{background:#eef2ff !important; box-shadow:inset 0 0 0 2px var(--brand) !important}
+.cell-photo-hint{color:#b7bdd0; font-size:.76rem; font-style:italic}
+.step-photo[draggable="true"]{cursor:grab}
+.photo-dragging{opacity:.4}
+
+/* 머리글: 끌어서 순서 변경 + 이름 수정 */
+.step-table th.col-movable{cursor:grab}
+.step-table th .col-title{pointer-events:none}
+.step-table th .col-tools{
+  display:none; gap:2px; margin-left:6px; vertical-align:middle;
+}
+.step-table th.col-movable:hover .col-tools{display:inline-flex}
+.step-table th .col-tools button{
+  width:20px; height:20px; border:none; border-radius:5px; background:#e9ecf7; color:var(--muted);
+  font-size:.62rem; line-height:1; padding:0;
+}
+.step-table th .col-tools button:hover{background:var(--brand); color:#fff}
+.step-table th .col-tools button.danger:hover{background:#dc2626}
+.col-input{
+  width:calc(100% - 14px); border:1.5px solid var(--brand); border-radius:6px;
+  padding:3px 6px; font:inherit; font-size:.86rem; text-align:center;
+}
+.col-dragging{opacity:.45}
+.col-drop-target{box-shadow:inset 3px 0 0 var(--brand)}
+
 /* 단계 수정 창의 첨부된 사진 목록 — 칸 이동과 삭제를 여기서 한다 */
 .step-photo-list{display:flex; flex-direction:column; gap:6px; margin-top:8px}
 .step-photo-list:empty{display:none}

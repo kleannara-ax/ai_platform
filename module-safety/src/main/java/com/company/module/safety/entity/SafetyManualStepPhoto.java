@@ -76,8 +76,14 @@ public class SafetyManualStepPhoto extends BaseTimeEntity {
         markCreatedBy(createdBy);
     }
 
-    /** 사진이 표시될 열을 옮긴다. null 이면 기본 사진 열로 되돌린다. */
-    public void moveToColumn(SafetyManualColumn column, String updatedBy) {
+    /**
+     * 사진을 다른 칸으로 옮긴다. (표에서 끌어다 놓기)
+     *
+     * @param step   옮겨 갈 행. null 이면 지금 행 그대로
+     * @param column 옮겨 갈 열. null 이면 기본 사진 열로 되돌린다
+     */
+    public void moveTo(SafetyManualStep step, SafetyManualColumn column, String updatedBy) {
+        if (step != null) this.step = step;
         this.column = column;
         markUpdatedBy(updatedBy);
     }

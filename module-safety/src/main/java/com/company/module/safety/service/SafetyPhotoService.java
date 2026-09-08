@@ -125,9 +125,17 @@ public class SafetyPhotoService {
     // 사진을 다른 칸으로 옮기기 (관리자)
     // ================================================================
     @Transactional
-    public StepPhotoResponse moveToColumn(Long photoId, Long columnId, String updatedBy) {
+    public StepPhotoResponse moveToColumn(Long photoId, Long stepId, Long columnId, String updatedBy) {
         SafetyManualStepPhoto photo = findActive(photoId);
-        photo.moveToColumn(findTargetColumn(photo.getStep(), columnId), updatedBy);
+        SafetyManualStep step = photo.getStep();
+        if (stepId != null && !stepId.equals(step.getStepId())) {
+            SafetyManualStep target = findActiveStep(stepId);
+            if (!target.getManual().getManualId().equals(step.getManual().getManualId())) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "다른 매뉴얼의 행으로는 옮길 수 없습니다.");
+            }
+            step = target;
+        }
+        photo.moveTo(step, findTargetColumn(step, columnId), updatedBy);
         return StepPhotoResponse.from(photo);
     }
 
