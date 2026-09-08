@@ -108,10 +108,25 @@ body{
 .step-table td.cell-editable{cursor:text}
 .step-table td.cell-editable:hover{background:#f7f9ff; box-shadow:inset 0 0 0 1.5px var(--brand-soft)}
 .cell-text.empty{color:#b7bdd0; font-style:italic}
-.cell-input{
-  width:100%; min-height:64px; border:1.5px solid var(--brand); border-radius:8px;
-  padding:8px 10px; font:inherit; line-height:1.6; resize:vertical; background:#fff;
+/* 표 자리에서 그대로 고친다 — 입력창을 새로 띄우지 않아 표가 흔들리지 않는다 */
+.cell-text[contenteditable="true"]{
+  display:block; outline:none; white-space:pre-wrap; word-break:break-word; min-height:1.6em;
 }
+.step-table td.cell-editing{
+  background:#fff !important; box-shadow:inset 0 0 0 2px var(--brand) !important;
+}
+/* 사진 칸도 Ctrl+V 를 받으려면 포커스를 받아야 한다 */
+.step-table td.cell-pastable:focus{outline:none; box-shadow:inset 0 0 0 2px var(--brand)}
+
+/* 표에서 바로 사진 지우기 */
+.photo-chip{position:relative; display:inline-block; line-height:0}
+.photo-chip .photo-del{
+  position:absolute; top:3px; right:3px; display:none;
+  width:20px; height:20px; padding:0; border:none; border-radius:50%;
+  background:rgba(17,24,39,.72); color:#fff; font-size:.66rem; line-height:1;
+}
+.photo-chip:hover .photo-del{display:block}
+.photo-chip .photo-del:hover{background:#dc2626}
 /* 사진을 받을 수 있는 칸 */
 .cell-drop-target{background:#eef2ff !important; box-shadow:inset 0 0 0 2px var(--brand) !important}
 .cell-photo-hint{color:#b7bdd0; font-size:.76rem; font-style:italic}
