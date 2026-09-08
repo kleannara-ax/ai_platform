@@ -58,9 +58,41 @@ body{
 .btn-edit-toggle.on{background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff; border-color:transparent}
 .btn-edit-toggle.on:hover{filter:brightness(1.06); color:#fff}
 
-/* 업로드 완료 팝업은 업로드 창(excelModal) 위에 겹쳐 뜬다.
+/* 업로드 완료 팝업과 시트 미리보기는 업로드 창(excelModal) 위에 겹쳐 뜬다.
    HTML 상 excelModal 보다 앞에 있어서 z-index 가 같으면 뒤로 밀리므로 명시적으로 올린다. */
 #uploadDoneModal{--bs-modal-zindex:1080; z-index:1080}
+#sheetPreviewModal{--bs-modal-zindex:1078; z-index:1078}
+
+/* ── 엑셀 시트 미리보기 ─────────────────────────────────────── */
+.btn-preview{
+  display:inline-flex; align-items:center; gap:5px; margin-top:6px;
+  border:1px solid var(--brand-soft); background:#fff; color:var(--brand);
+  border-radius:8px; padding:3px 9px; font-size:.74rem; font-weight:700;
+}
+.btn-preview:hover{background:var(--brand-soft)}
+.sp-note{
+  margin-bottom:10px; padding:9px 13px; border-radius:9px;
+  background:#f5f7ff; color:var(--muted); font-size:.8rem;
+}
+.sp-meta{display:flex; flex-wrap:wrap; gap:6px 16px; margin-bottom:10px; font-size:.8rem; color:var(--muted)}
+.sp-meta b{color:var(--text); margin-right:4px}
+.sp-table{width:100%; border-collapse:separate; border-spacing:0; font-size:.84rem}
+.sp-table th{
+  position:sticky; top:0; z-index:1; background:#f8f9fd; color:var(--muted);
+  font-weight:700; padding:9px 10px; text-align:center; border-bottom:2px solid var(--line);
+}
+.sp-table td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; white-space:pre-wrap}
+.sp-table .sp-no{width:48px; text-align:center; color:var(--muted); white-space:nowrap}
+.sp-type{color:#a9b0c8; font-size:.72rem}
+.sp-photos{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
+.sp-photo{
+  width:104px; height:78px; object-fit:cover; border-radius:7px;
+  border:1px solid var(--line); background:#f1f3fa;
+}
+.sp-photo-fail{
+  display:inline-flex; align-items:center; justify-content:center; width:104px; height:78px;
+  border-radius:7px; border:1px dashed var(--line); color:#b7bdd0; font-size:.72rem;
+}
 
 /* 글 칸 안에 함께 들어가는 사진 (예: 비고 칸의 개선 전/후 사진) */
 .cell-photos{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
@@ -653,6 +685,23 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
     <div id="columnAdmin"></div>
   </div>
 </div></div></div>
+
+<!-- 엑셀 시트 미리보기 — 확정 전에 등록될 표를 그대로 보여준다 (업로드 창 위에 겹쳐 뜬다) -->
+<div class="modal fade" id="sheetPreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header">
+      <div style="min-width:0">
+        <h5 class="modal-title" id="sheetPreviewTitle">시트 미리보기</h5>
+        <div class="detail-path" id="sheetPreviewSub"></div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body" id="sheetPreviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-modern btn-outline-modern" data-bs-dismiss="modal">닫기</button>
+    </div>
+  </div></div>
+</div>
 
 <!-- 업로드 완료 팝업 — 확인을 누르면 업로드 창까지 함께 닫힌다 -->
 <div class="modal fade" id="uploadDoneModal" tabindex="-1" data-bs-backdrop="static">

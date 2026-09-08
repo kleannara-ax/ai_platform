@@ -1888,7 +1888,9 @@ function euRenderPreview() {
       </td>
       <td class="text-center">${s.stepCount}</td>
       <td class="text-center">${s.photoCount}</td>
-      <td class="small">${(s.stepPreviewLines || []).slice(0, 3).map(l => SAFETY.escapeHtml(l)).join('<br>')}</td>
+      <td class="small">${(s.stepPreviewLines || []).slice(0, 2).map(l => SAFETY.escapeHtml(l)).join('<br>')}
+        ${s.recognized ? `<button class="btn-preview" onclick="openSheetPreview(${idx})"
+             title="등록될 표를 그대로 봅니다"><i class="fas fa-eye"></i>미리보기</button>` : ''}</td>
     </tr>`).join('');
 
   const note = document.querySelector('#euStep2 .eu-note');
@@ -1897,6 +1899,109 @@ function euRenderPreview() {
       + '필요 없는 시트는 체크를 해제하고, 다른 분류에 넣을 시트는 "등록 분류"에서 직접 고르세요.';
   }
   euRefreshRowCategories();
+}
+
+// ================================================================
+// 엑셀 미리보기 — 시트 하나가 어떤 표로 등록될지 그대로 보여준다
+//  사진은 올려 둔 임시 파일에서 화면에 보이는 것만 낱장으로 가져온다.
+// ================================================================
+let sheetPreviewModal = null;
+let sheetPreviewBlobs = [];      // 창을 닫을 때 정리할 blob URL
+
+async function openSheetPreview(idx) {
+  const sheet = euPreviewData[idx];
+  if (!sheet || !sheet.recognized || !euUploadId) return;
+
+  const body = document.getElementById('sheetPreviewBody');
+  document.getElementById('sheetPreviewTitle').textContent = sheet.sheetName;
+  document.getElementById('sheetPreviewSub').textContent =
+    `${sheet.formTypeName || ''} · 단계 ${sheet.stepCount}개 · 사진 ${sheet.photoCount}장`;
+  body.innerHTML = '<div class="text-center text-muted py-5"><i class="fas fa-spinner fa-spin me-2"></i>불러오는 중...</div>';
+  if (!sheetPreviewModal) {
+    sheetPreviewModal = new bootstrap.Modal(document.getElementById('sheetPreviewModal'));
+    document.getElementById('sheetPreviewModal').addEventListener('hidden.bs.modal', releaseSheetPreviewBlobs);
+  }
+  sheetPreviewModal.show();
+
+  try {
+    const detail = await SAFETY.api('/safety-api/excel-upload/preview-sheet',
+      { method: 'POST', body: { uploadId: euUploadId, sheetName: sheet.sheetName } });
+    renderSheetPreview(detail);
+  } catch (e) {
+    body.innerHTML = `<div class="text-danger py-4">${SAFETY.escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderSheetPreview(detail) {
+  const cols = detail.columns || [];
+  const metaHtml = (detail.meta || []).length
+    ? `<div class="sp-meta">${detail.meta.map(m =>
+        `<span><b>${SAFETY.escapeHtml(m.label)}</b> ${SAFETY.escapeHtml(m.value || '')}</span>`).join('')}</div>`
+    : '';
+
+  const head = '<tr><th class="sp-no">No.</th>' + cols.map(c =>
+    `<th>${SAFETY.escapeHtml(c.label)}${
+      c.type === 'PHOTO' ? ' <i class="fas fa-image sp-type"></i>'
+      : c.type === 'CHECK' ? ' <i class="fas fa-square-check sp-type"></i>' : ''}</th>`).join('') + '</tr>';
+
+  const rows = (detail.rows || []).map(row =>
+    '<tr><td class="sp-no">' + row.stepNo + '</td>' + row.cells.map((cell, i) => {
+      const type = (cols[i] || {}).type;
+      if (type === 'CHECK') {
+        return `<td class="text-center">${cell.checked
+          ? '<i class="fas fa-square-check text-success"></i>' : '<i class="fas fa-square text-muted"></i>'}</td>`;
+      }
+      const photos = (cell.photoIndexes || []).map(n =>
+        `<img class="sp-photo" data-photo="${n}" data-sheet="${SAFETY.escapeHtml(detail.sheetName)}" alt="사진 ${n}">`).join('');
+      const text = cell.text ? SAFETY.escapeHtml(cell.text) : '';
+      return `<td>${text}${photos ? `<div class="sp-photos">${photos}</div>` : ''}</td>`;
+    }).join('') + '</tr>').join('');
+
+  document.getElementById('sheetPreviewBody').innerHTML = metaHtml + `
+    <div class="sp-note">아래 내용 그대로 매뉴얼로 등록됩니다. 제목은 시트명(<b>${
+      SAFETY.escapeHtml(detail.title)}</b>)이 됩니다.</div>
+    <div class="table-responsive"><table class="sp-table">
+      <thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+
+  loadPreviewPhotos();
+}
+
+/** 화면에 들어온 사진만 그때그때 받아 온다 (시트에 60장이 든 파일도 있다) */
+function loadPreviewPhotos() {
+  const imgs = [...document.querySelectorAll('#sheetPreviewBody .sp-photo')];
+  if (!imgs.length) return;
+
+  const fetchOne = async (img) => {
+    if (img.dataset.loaded) return;
+    img.dataset.loaded = '1';
+    try {
+      const res = await fetch('/safety-api/excel-upload/preview-photo', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SAFETY.getToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId: euUploadId, sheetName: img.dataset.sheet, photoIndex: Number(img.dataset.photo),
+        }),
+      });
+      if (!res.ok) throw new Error('불러오기 실패');
+      const url = URL.createObjectURL(await res.blob());
+      sheetPreviewBlobs.push(url);
+      img.src = url;
+    } catch (e) {
+      img.replaceWith(Object.assign(document.createElement('span'),
+        { className: 'sp-photo-fail', textContent: '사진 없음' }));
+    }
+  };
+
+  if (!('IntersectionObserver' in window)) { imgs.forEach(fetchOne); return; }
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.filter(e => e.isIntersecting).forEach(e => { obs.unobserve(e.target); fetchOne(e.target); });
+  }, { root: document.getElementById('sheetPreviewBody'), rootMargin: '200px' });
+  imgs.forEach(img => io.observe(img));
+}
+
+function releaseSheetPreviewBlobs() {
+  sheetPreviewBlobs.forEach(url => URL.revokeObjectURL(url));
+  sheetPreviewBlobs = [];
 }
 
 function euToggleAll(box) {

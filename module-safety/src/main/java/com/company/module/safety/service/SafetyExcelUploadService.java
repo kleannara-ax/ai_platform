@@ -4,6 +4,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.safety.dto.request.ExcelSheetAssignRequest;
 import com.company.module.safety.dto.response.ExcelImportResultResponse;
+import com.company.module.safety.dto.response.ExcelSheetDetailResponse;
 import com.company.module.safety.dto.response.ExcelSheetPreviewResponse;
 import com.company.module.safety.dto.response.ManualSummaryResponse;
 import com.company.module.safety.entity.SafetyManual;
@@ -106,6 +107,91 @@ public class SafetyExcelUploadService {
                 .selected(sheet.isRecognized())
                 .stepPreviewLines(sheet.isRecognized() ? sheet.previewLines(PREVIEW_LINE_LIMIT) : List.of())
                 .build();
+    }
+
+    // ================================================================
+    // 1단계 상세: 시트 하나를 표 그대로 미리보기 (DB 변경 없음)
+    // ================================================================
+
+    /** 고른 시트의 열 구성과 행 내용을 등록될 모습 그대로 돌려준다. */
+    public ExcelSheetDetailResponse previewSheet(Path excelFile, String sheetName) {
+        ParsedSheet sheet;
+        try {
+            sheet = parser.parseOneSheet(excelFile.toFile(), sheetName);
+        } catch (IllegalArgumentException e) {
+            throw poiFormatError(e);
+        }
+        if (sheet == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "'" + sheetName + "' 시트를 찾을 수 없습니다.");
+        }
+        if (!sheet.isRecognized()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "미리볼 수 없는 시트입니다. " + sheet.getReason());
+        }
+
+        List<ParsedColumn> columns = sheet.getColumns();
+        return ExcelSheetDetailResponse.builder()
+                .sheetName(sheet.getSheetName())
+                .title(sheet.getTitle())
+                .formType(sheet.getFormType().name())
+                .formTypeName(sheet.getFormType().displayName())
+                .meta(sheet.getMeta().stream()
+                        .map(m -> ExcelSheetDetailResponse.MetaLine.builder()
+                                .label(m.label()).value(m.value()).build())
+                        .toList())
+                .columns(columns.stream()
+                        .map(c -> ExcelSheetDetailResponse.Column.builder()
+                                .label(c.label()).type(c.type()).build())
+                        .toList())
+                .rows(sheet.getRows().stream()
+                        .map(row -> toPreviewRow(row, columns))
+                        .toList())
+                .build();
+    }
+
+    /** 사진은 칸(열)별로 나눠 담는다. 열을 못 정한 사진은 사진 열이 떠맡는다(화면과 같은 규칙). */
+    private ExcelSheetDetailResponse.Row toPreviewRow(ParsedRow row, List<ParsedColumn> columns) {
+        int columnCount = columns.size();
+        List<List<Integer>> photosByColumn = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            photosByColumn.add(new ArrayList<>());
+        }
+        for (ParsedPhoto photo : row.photos()) {
+            int at = photo.columnIndex();
+            if (at < 0 || at >= columnCount) {
+                at = defaultPhotoColumn(columns);
+            }
+            if (at >= 0) photosByColumn.get(at).add(photo.index());
+        }
+
+        List<ExcelSheetDetailResponse.Cell> cells = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            ParsedCell cell = (i < row.cells().size()) ? row.cells().get(i) : null;
+            cells.add(ExcelSheetDetailResponse.Cell.builder()
+                    .text((cell != null) ? cell.text() : null)
+                    .checked(cell != null && cell.checked())
+                    .photoIndexes(photosByColumn.get(i))
+                    .build());
+        }
+        return ExcelSheetDetailResponse.Row.builder().stepNo(row.stepNo()).cells(cells).build();
+    }
+
+    /** 열을 못 정한 사진이 갈 곳 — 사진 열이 없으면 -1(어디에도 넣지 않는다) */
+    private int defaultPhotoColumn(List<ParsedColumn> columns) {
+        for (int i = 0; i < columns.size(); i++) {
+            if (SafetyManualColumn.TYPE_PHOTO.equals(columns.get(i).type())) return i;
+        }
+        return -1;
+    }
+
+    /** 사진 한 장의 원본. 미리보기 화면의 &lt;img&gt; 가 보이는 것만 가져간다. */
+    public ParsedPhoto previewPhoto(Path excelFile, String sheetName, int photoIndex) {
+        ParsedPhoto photo = parser.findPhoto(excelFile.toFile(), sheetName, photoIndex);
+        if (photo == null || photo.data() == null) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사진을 찾을 수 없습니다.");
+        }
+        return photo;
     }
 
     // ================================================================
