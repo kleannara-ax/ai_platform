@@ -246,6 +246,7 @@ public class SafetyExcelUploadService {
 
         List<ManualSummaryResponse> created = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
+        List<String> overwritten = new ArrayList<>();
 
         for (ParsedSheet sheet : sheets) {
             Long categoryId = categoryBySheet.get(sheetKey(sheet.getSheetName()));
@@ -267,24 +268,32 @@ public class SafetyExcelUploadService {
             if (title == null || title.isBlank()) {
                 title = sheet.getSheetName();
             }
-            if (manualRepository.existsByTitleAndCategory_CategoryId(title, categoryId)) {
-                skipped.add(sheet.getSheetName() + " - '" + category.getName()
-                        + "' 분류에 이미 존재하는 매뉴얼 제목(" + title + ")입니다.");
-                continue;
+
+            // 같은 분류에 같은 제목이 있으면 건너뛰지 않고 덮어쓴다.
+            // 지워 둔 매뉴얼이면 되살린다 — 엑셀을 고쳐서 다시 올리는 일이 잦다.
+            SafetyManual existing = manualRepository.findByTitleIncludingDeleted(title, categoryId)
+                    .stream().findFirst().orElse(null);
+            SafetyManual manual;
+            if (existing != null) {
+                boolean wasDeleted = existing.isDeleted();
+                clearManualContent(existing, createdBy);
+                existing.reimport(sheet.getFormType(), sourceFileName, sheet.getSheetName(), createdBy);
+                manual = existing;
+                overwritten.add(sheet.getSheetName() + " → '" + category.getName() + "' 의 기존 매뉴얼 '"
+                        + title + "' 을 " + (wasDeleted ? "되살려 덮어썼습니다." : "덮어썼습니다."));
+            } else {
+                int sortOrder = nextSortOrder.getOrDefault(categoryId, 0);
+                nextSortOrder.put(categoryId, sortOrder + 1);
+                manual = manualRepository.save(SafetyManual.builder()
+                        .category(category)
+                        .title(title)
+                        .formType(sheet.getFormType())
+                        .sourceFileName(sourceFileName)
+                        .sourceSheetName(sheet.getSheetName())
+                        .sortOrder(sortOrder)
+                        .createdBy(createdBy)
+                        .build());
             }
-
-            int sortOrder = nextSortOrder.getOrDefault(categoryId, 0);
-            nextSortOrder.put(categoryId, sortOrder + 1);
-
-            SafetyManual manual = manualRepository.save(SafetyManual.builder()
-                    .category(category)
-                    .title(title)
-                    .formType(sheet.getFormType())
-                    .sourceFileName(sourceFileName)
-                    .sourceSheetName(sheet.getSheetName())
-                    .sortOrder(sortOrder)
-                    .createdBy(createdBy)
-                    .build());
 
             saveMeta(manual, sheet.getMeta(), createdBy);
             List<SafetyManualColumn> columns = saveColumns(manual, sheet.getColumns(), createdBy);
@@ -297,7 +306,26 @@ public class SafetyExcelUploadService {
                 .importedCount(created.size())
                 .manuals(created)
                 .skipped(skipped)
+                .overwritten(overwritten)
                 .build();
+    }
+
+    /**
+     * 덮어쓰기 전에 기존 내용을 비운다 — 머리말·열·행·값·사진을 모두 소프트 삭제한다.
+     *
+     * <p>물리 삭제하지 않으므로 되돌릴 수 있고, 사진 파일도 디스크에 그대로 남는다.
+     */
+    private void clearManualContent(SafetyManual manual, String deletedBy) {
+        Long manualId = manual.getManualId();
+        metaRepository.findByManualId(manualId)
+                .forEach(meta -> meta.delete(deletedBy));
+        for (SafetyManualStep step : stepRepository.findByManualIdOrderBySortOrder(manualId)) {
+            valueRepository.findByStepId(step.getStepId()).forEach(value -> value.delete(deletedBy));
+            photoService.deletePhotosOfStep(step.getStepId(), deletedBy);
+            step.delete(deletedBy);
+        }
+        columnRepository.findByManualId(manualId)
+                .forEach(column -> column.delete(deletedBy));
     }
 
     private void saveMeta(SafetyManual manual, List<ParsedMeta> parsedMeta, String createdBy) {

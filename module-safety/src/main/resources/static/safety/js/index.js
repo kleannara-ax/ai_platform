@@ -387,7 +387,13 @@ async function loadDetail() {
 function renderDetail() {
   const d = currentDetail;
   if (!d) return;
-  document.getElementById('detailTitle').textContent = d.title || '';
+  const titleEl = document.getElementById('detailTitle');
+  titleEl.textContent = d.title || '';
+  // 수정 모드에서는 제목을 눌러 그 자리에서 고친다 (표의 칸 편집과 같은 방식)
+  const canRename = isAdminUser && editMode;
+  titleEl.classList.toggle('editable-title', canRename);
+  titleEl.onclick = canRename ? startTitleEdit : null;
+  titleEl.title = canRename ? '눌러서 매뉴얼 이름 수정' : '';
   const summary = manuals.find(m => Number(m.manualId) === Number(currentManualId));
   const path = (summary && summary.categoryPath) ? summary.categoryPath : (d.categoryName || '');
   document.getElementById('detailPath').textContent =
@@ -553,6 +559,60 @@ async function saveCellValue(stepId, columnId, text) {
   await SAFETY.api('/safety-api/steps/' + stepId, {
     method: 'PUT',
     body: { stepNo: step.stepNo, sortOrder: step.sortOrder, values },
+  });
+}
+
+/**
+ * 매뉴얼 이름을 상단 제목에서 그 자리에서 고친다.
+ * 표의 칸 편집과 같은 방식 — Enter 저장, Esc 취소.
+ */
+function startTitleEdit(event) {
+  if (!isAdminUser || !editMode || !currentDetail) return;
+  const el = event.currentTarget;
+  if (el.isContentEditable) return;
+  const before = currentDetail.title || '';
+
+  el.contentEditable = 'true';
+  el.spellcheck = false;
+  el.classList.add('editing');
+  el.focus();
+  placeCaretAt(el, caretOffsetFromPoint(el, event.clientX, event.clientY));
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    const after = el.innerText.replace(/\s+/g, ' ').trim();
+    if (!save || !after || after === before) { el.textContent = before; return; }
+    try {
+      await SAFETY.api('/safety-api/manuals/' + currentManualId, {
+        method: 'PUT',
+        body: {
+          categoryId: currentDetail.categoryId,
+          title: after,
+          sortOrder: currentDetail.sortOrder || 0,
+        },
+      });
+      SAFETY.toast('매뉴얼 이름을 바꿨습니다.');
+      await refreshAll();
+      await loadDetail();
+    } catch (e) {
+      SAFETY.toast(e.message, false);
+      el.textContent = before;
+    }
+  };
+  // 저장을 blur 에만 맡기지 않는다. 이 제목은 모달 머리말 안에 있어 부트스트랩이 포커스를
+  // 되돌리는 일이 있고, 그러면 blur 가 오지 않아 고친 내용이 조용히 사라진다.
+  el.addEventListener('blur', () => finish(true));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  el.addEventListener('paste', (e) => {
+    e.preventDefault();
+    document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text'));
   });
 }
 
@@ -2176,6 +2236,7 @@ function showUploadResult(result) {
   const imported = result.importedCount || 0;
   const manuals = result.manuals || [];
   const skipped = result.skipped || [];
+  const overwritten = result.overwritten || [];
 
   let html = `<div class="ud-count ${imported ? '' : 'none'}">
       <i class="fas ${imported ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
@@ -2189,13 +2250,19 @@ function showUploadResult(result) {
         <span class="ud-where">${SAFETY.escapeHtml(m.categoryPath || '')}</span></li>`).join('')}</ul>
     </div>`;
   }
+  if (overwritten.length) {
+    html += `<div class="ud-section">
+      <h6><i class="fas fa-rotate text-warning"></i>덮어쓴 매뉴얼 ${overwritten.length}건</h6>
+      <ul class="ud-list">${overwritten.map(x => `<li>${SAFETY.escapeHtml(x)}</li>`).join('')}</ul>
+    </div>`;
+  }
   if (skipped.length) {
     html += `<div class="ud-section">
       <h6><i class="fas fa-circle-minus text-muted"></i>건너뛴 시트 ${skipped.length}건</h6>
       <ul class="ud-list skipped">${skipped.map(x => `<li>${SAFETY.escapeHtml(x)}</li>`).join('')}</ul>
     </div>`;
   }
-  if (!manuals.length && !skipped.length) {
+  if (!manuals.length && !skipped.length && !overwritten.length) {
     html += '<div class="eu-note">가져온 시트가 없습니다. 시트 선택과 등록 분류를 확인해 주세요.</div>';
   }
 

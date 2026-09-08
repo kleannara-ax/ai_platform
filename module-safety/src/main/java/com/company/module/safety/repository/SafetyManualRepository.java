@@ -93,4 +93,15 @@ public interface SafetyManualRepository extends JpaRepository<SafetyManual, Long
                                Pageable pageable);
 
     boolean existsByTitleAndCategory_CategoryId(String title, Long categoryId);
+
+    /**
+     * 같은 분류에 같은 제목의 매뉴얼을 찾는다. <b>소프트 삭제된 것도 포함</b>한다.
+     *
+     * <p>엑셀을 다시 올릴 때 기존 매뉴얼을 덮어쓰고, 지워 둔 매뉴얼이면 되살리기 위해 쓴다.
+     * 살아 있는 것을 먼저 주고, 여러 건이면 오래된 것부터 준다.
+     */
+    @Query("SELECT m FROM SafetyManual m WHERE m.title = :title "
+            + "AND m.category.categoryId = :categoryId ORDER BY m.deletedYn ASC, m.manualId ASC")
+    List<SafetyManual> findByTitleIncludingDeleted(@Param("title") String title,
+                                                   @Param("categoryId") Long categoryId);
 }
