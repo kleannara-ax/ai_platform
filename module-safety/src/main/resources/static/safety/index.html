@@ -298,18 +298,26 @@ body.dnd-active .tree-row:not(.drop-ok){opacity:.5}
   padding:12px 10px; text-align:center; border-bottom:2px solid var(--line);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-/* 머리글 오른쪽 경계를 잡고 끌면 그 컬럼 폭이 바뀐다 */
+/* 머리글 오른쪽 경계를 잡고 끌면 그 컬럼 폭이 바뀐다.
+   예전에는 평소에 투명이라 마우스를 대 봐야 찾을 수 있었다 — 항상 손잡이가 보이게 한다. */
 .col-resizer{
-  position:absolute; top:0; right:-4px; width:9px; height:100%; z-index:2; cursor:col-resize;
+  position:absolute; top:0; right:0; width:14px; height:100%; z-index:3; cursor:col-resize;
+  display:flex; align-items:center; justify-content:flex-end;
 }
 .col-resizer::after{
-  content:''; position:absolute; top:7px; bottom:7px; left:3px; width:3px;
-  border-radius:2px; background:transparent; transition:background .12s;
+  content:''; width:2px; height:46%; margin-right:4px; border-radius:2px;
+  background:#c3c8da;                                  /* 평소에도 보이는 옅은 손잡이 */
+  box-shadow:3px 0 0 #c3c8da;                          /* 2px 두 줄 = 잡는 곳처럼 보이게 */
+  transition:background .12s, box-shadow .12s, height .12s;
 }
-.col-resizer:hover::after{background:var(--brand)}
-.step-table th:last-child .col-resizer{right:0; width:6px}
+/* 표에 마우스를 올리면 모든 경계가 또렷해져 어디를 끌 수 있는지 한눈에 보인다 */
+.step-table:hover .col-resizer::after{background:#96a0c0; box-shadow:3px 0 0 #96a0c0}
+.col-resizer:hover::after,
+body.col-resizing .col-resizer::after{
+  height:72%; background:var(--brand); box-shadow:3px 0 0 var(--brand);
+}
+.step-table th:last-child .col-resizer{width:10px}
 body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select:none !important}
-body.col-resizing .col-resizer::after{background:var(--brand)}
 .step-table td{padding:15px 12px; border-bottom:1px solid var(--line); font-size:1.06rem; line-height:1.6; vertical-align:top}
 /* 위험요인은 이 화면에서 가장 중요한 항목이라 넓게 잡고 굵게 표시한다 (색 강조는 쓰지 않는다) */
 .step-table td.col-hazard{font-size:1.14rem; font-weight:700}
