@@ -19,6 +19,12 @@ import org.apache.poi.xssf.usermodel.XSSFShape;
 import org.apache.poi.xssf.usermodel.XSSFShapeGroup;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -163,7 +169,7 @@ public class SafetyExcelParser {
             Map<Integer, List<ParsedPhoto>> found = new LinkedHashMap<>();
             int[] seq = {0};
             for (XSSFShape shape : drawing.getShapes()) {
-                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1);
+                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1, 0, -1);
                 if (seq[0] > index) break;
             }
             for (List<ParsedPhoto> photos : found.values()) {
@@ -187,7 +193,8 @@ public class SafetyExcelParser {
             if (picture != null) {
                 XSSFPictureData data = picture.getPictureData();
                 return new ParsedPhoto(photo.fileName(), photo.contentType(),
-                        (data != null) ? data.getData() : null, photo.columnIndex(), index);
+                        (data != null) ? uprightBytes(picture, data, data.suggestFileExtension()) : null,
+                        photo.columnIndex(), index);
             }
         }
         return null;
@@ -315,8 +322,9 @@ public class SafetyExcelParser {
             return ParsedSheet.rejected(sheetName, "표의 열 머리글을 읽을 수 없습니다.");
         }
 
-        Map<Integer, List<ParsedPhoto>> photosByRow =
-                extractPhotosByRow(sheet, includePhotoData, sourceColumnIndexes, photoColumnPos);
+        Map<Integer, List<ParsedPhoto>> photosByRow = extractPhotosByRow(
+                sheet, includePhotoData, sourceColumnIndexes, photoColumnPos,
+                headerRowIdx + 1, sheet.getLastRowNum());
         List<ParsedRow> rows = new ArrayList<>();
         int lastRow = sheet.getLastRowNum();
         int order = 1;
@@ -575,7 +583,8 @@ public class SafetyExcelParser {
      */
     private Map<Integer, List<ParsedPhoto>> extractPhotosByRow(Sheet sheet, boolean includeData,
                                                                List<Integer> sourceColumnIndexes,
-                                                               int photoColumnPos) {
+                                                               int photoColumnPos,
+                                                               int firstDataRow, int lastDataRow) {
         Map<Integer, List<ParsedPhoto>> result = new LinkedHashMap<>();
         if (!(sheet instanceof XSSFSheet xssfSheet)) {
             return result;
@@ -585,9 +594,28 @@ public class SafetyExcelParser {
 
         int[] seq = {0};
         for (XSSFShape shape : drawing.getShapes()) {
-            collectPhotos(sheet, shape, null, result, seq, includeData, sourceColumnIndexes, photoColumnPos);
+            collectPhotos(sheet, shape, null, result, seq, includeData,
+                    sourceColumnIndexes, photoColumnPos, firstDataRow, lastDataRow);
         }
         return result;
+    }
+
+    /**
+     * 그림이 놓인 행. 앵커의 <b>세로 가운데</b>를 쓴다.
+     *
+     * <p>맨 윗줄({@code row1})을 쓰면 여러 행에 걸친 그림이 실제로 보이는 자리보다 위로 밀린다.
+     * 예를 들어 "행1~행3" 에 걸친 그림은 눈으로는 2행 자리인데 1행으로 붙었다.
+     *
+     * <p>머리글 위/표 아래로 삐져나온 그림은 버리지 않고 가장 가까운 데이터 행으로 당긴다.
+     * 예전에는 머리글 행(0행)에서 시작하는 그림이 통째로 사라졌다.
+     */
+    private int anchorRowOf(XSSFClientAnchor anchor, int firstDataRow, int lastDataRow) {
+        int top = anchor.getRow1();
+        int bottom = Math.max(anchor.getRow2(), top);
+        int center = top + (bottom - top) / 2;
+        if (center < firstDataRow) return firstDataRow;
+        if (lastDataRow >= firstDataRow && center > lastDataRow) return lastDataRow;
+        return center;
     }
 
     /**
@@ -641,13 +669,14 @@ public class SafetyExcelParser {
      */
     private void collectPhotos(Sheet sheet, XSSFShape shape, XSSFClientAnchor inherited,
                                Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData,
-                               List<Integer> sourceColumnIndexes, int photoColumnPos) {
+                               List<Integer> sourceColumnIndexes, int photoColumnPos,
+                               int firstDataRow, int lastDataRow) {
         if (shape instanceof XSSFShapeGroup group) {
             XSSFClientAnchor groupAnchor = clientAnchor(group);
             if (groupAnchor == null) groupAnchor = inherited;
             for (XSSFShape child : group) {
                 collectPhotos(sheet, child, groupAnchor, result, seq, includeData,
-                        sourceColumnIndexes, photoColumnPos);
+                        sourceColumnIndexes, photoColumnPos, firstDataRow, lastDataRow);
             }
             return;
         }
@@ -656,8 +685,8 @@ public class SafetyExcelParser {
         XSSFClientAnchor anchor = clientAnchor(picture);
         if (anchor == null) anchor = inherited;   // 그룹 안의 그림은 자기 앵커가 없다 — 그룹 것을 쓴다
         if (anchor == null) return;
-        int rowIdx = anchor.getRow1();
-        if (rowIdx < 0) return;
+        if (anchor.getRow1() < 0) return;
+        int rowIdx = anchorRowOf(anchor, firstDataRow, lastDataRow);
         int columnPos = resolvePhotoColumn(anchor.getCol1(), anchor.getCol2(),
                 sourceColumnIndexes, photoColumnPos);
 
@@ -674,7 +703,57 @@ public class SafetyExcelParser {
 
         result.computeIfAbsent(rowIdx, k -> new ArrayList<>())
                 .add(new ParsedPhoto(fileName, pictureData.getMimeType(),
-                        includeData ? pictureData.getData() : null, columnPos, seqNo));
+                        includeData ? uprightBytes(picture, pictureData, ext) : null, columnPos, seqNo));
+    }
+
+    /**
+     * 엑셀에서 돌려 놓은 그림은 돌린 상태로 저장한다.
+     *
+     * <p>엑셀은 원본 그림을 그대로 두고 도형에 회전값만 걸어 두기 때문에, 원본 바이트를 그대로
+     * 쓰면 화면에서 눕혀져 보인다. 세로로 찍은 사진을 엑셀에서 세워 놓은 경우가 특히 그렇다.
+     * 90도 단위 회전만 다룬다(그 외 각도는 원본 그대로 둔다).
+     */
+    private byte[] uprightBytes(XSSFPicture picture, XSSFPictureData pictureData, String ext) {
+        byte[] data = pictureData.getData();
+        int degrees = rotationDegrees(picture);
+        if (degrees == 0 || data == null || data.length == 0) return data;
+        try {
+            BufferedImage src = ImageIO.read(new ByteArrayInputStream(data));
+            if (src == null) return data;
+            boolean quarter = (degrees == 90 || degrees == 270);
+            int w = quarter ? src.getHeight() : src.getWidth();
+            int h = quarter ? src.getWidth() : src.getHeight();
+            BufferedImage out = new BufferedImage(w, h,
+                    src.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.translate(w / 2.0, h / 2.0);
+            g.rotate(Math.toRadians(degrees));
+            g.translate(-src.getWidth() / 2.0, -src.getHeight() / 2.0);
+            g.drawImage(src, 0, 0, null);
+            g.dispose();
+
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            String format = "png".equalsIgnoreCase(ext) ? "png" : "jpg";
+            if (!ImageIO.write(out, format, buffer)) return data;
+            return buffer.toByteArray();
+        } catch (Exception e) {
+            return data;   // 못 돌리면 원본 그대로 — 사진이 사라지는 것보다 낫다
+        }
+    }
+
+    /** 도형에 걸린 회전각을 90도 단위로 정규화한다. 90의 배수가 아니면 0. */
+    private int rotationDegrees(XSSFPicture picture) {
+        try {
+            var shapeProperties = picture.getCTPicture().getSpPr();
+            if (shapeProperties == null || !shapeProperties.isSetXfrm()) return 0;
+            var xfrm = shapeProperties.getXfrm();
+            if (!xfrm.isSetRot()) return 0;
+            long degrees = Math.floorMod(xfrm.getRot() / 60000L, 360L);   // 1/60000 도 단위
+            return (degrees % 90 == 0) ? (int) degrees : 0;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     /** 시트 좌표에 붙은 앵커. 그룹 안의 자식 도형은 자기 앵커가 없어 null 이다. */
