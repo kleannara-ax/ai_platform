@@ -238,7 +238,9 @@ public class SafetyManualService {
     public ManualDetailResponse update(Long manualId, ManualUpdateRequest request, String updatedBy) {
         SafetyManual manual = findActive(manualId);
         SafetyManualCategory category = categoryService.findActiveLeaf(request.getCategoryId());
-        manual.update(category, request.getTitle(), request.getSortOrder(), updatedBy);
+        // 이름만 바꾸는 화면에서 정렬순서를 안 보낼 수 있다 — 0 이하면 지금 순서를 그대로 둔다
+        int sortOrder = (request.getSortOrder() > 0) ? request.getSortOrder() : manual.getSortOrder();
+        manual.update(category, request.getTitle(), sortOrder, updatedBy);
         return getDetail(manualId);
     }
 

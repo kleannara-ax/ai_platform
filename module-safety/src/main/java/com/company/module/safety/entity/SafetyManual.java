@@ -102,4 +102,19 @@ public class SafetyManual extends BaseTimeEntity {
     public void restore() {
         markRestored();
     }
+
+    /**
+     * 같은 제목의 매뉴얼에 엑셀을 다시 올렸을 때 — 지워져 있었다면 되살리고 출처를 갱신한다.
+     *
+     * <p>제목과 분류는 그대로 둔다(그 둘로 찾아온 것이라 같다).
+     * 내용(열·행·사진)은 호출한 쪽에서 갈아 끼운다.
+     */
+    public void reimport(SafetyFormType formType, String sourceFileName,
+                         String sourceSheetName, String updatedBy) {
+        markRestored();
+        if (formType != null) this.formType = formType.name();
+        this.sourceFileName = sourceFileName;
+        this.sourceSheetName = sourceSheetName;
+        markUpdatedBy(updatedBy);
+    }
 }
