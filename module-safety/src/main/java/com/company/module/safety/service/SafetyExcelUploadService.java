@@ -253,7 +253,10 @@ public class SafetyExcelUploadService {
                 if (photo.data() == null || photo.data().length == 0) {
                     continue;   // 미리보기 파싱 결과(사진 개수만 센 것)로는 저장하지 않는다
                 }
-                photoService.saveParsedPhoto(step, photo, createdBy);
+                // 사진이 놓여 있던 칸을 그대로 살린다 (비고 칸에 있던 사진은 비고 칸에)
+                SafetyManualColumn photoColumn = (photo.columnIndex() >= 0
+                        && photo.columnIndex() < columns.size()) ? columns.get(photo.columnIndex()) : null;
+                photoService.saveParsedPhoto(step, photoColumn, photo, createdBy);
             }
         }
     }

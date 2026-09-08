@@ -191,6 +191,7 @@ public class SafetyExcelParser {
         List<ParsedColumn> columns = new ArrayList<>();
         List<Integer> sourceColumnIndexes = new ArrayList<>();
         int noColumnIndex = -1;
+        int photoColumnPos = -1;   // 사진 전용 열이 columns 목록의 몇 번째인지
         for (int colIdx = 0; colIdx < headerRow.getLastCellNum(); colIdx++) {
             String label = flatten(cellText(headerRow.getCell(colIdx)));
             if (label.isBlank()) continue;
@@ -201,6 +202,7 @@ public class SafetyExcelParser {
             if (squeeze(label).equals(squeeze(HEADER_TITLE))) continue;   // 공정명 칸은 열이 아니다
 
             if (label.contains(HEADER_PHOTO)) {
+                if (photoColumnPos < 0) photoColumnPos = columns.size();
                 columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_PHOTO, 150));
             } else {
                 columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_TEXT, 260));
@@ -211,7 +213,8 @@ public class SafetyExcelParser {
             return ParsedSheet.rejected(sheetName, "표의 열 머리글을 읽을 수 없습니다.");
         }
 
-        Map<Integer, List<ParsedPhoto>> photosByRow = extractPhotosByRow(sheet, includePhotoData);
+        Map<Integer, List<ParsedPhoto>> photosByRow =
+                extractPhotosByRow(sheet, includePhotoData, sourceColumnIndexes, photoColumnPos);
         List<ParsedRow> rows = new ArrayList<>();
         int lastRow = sheet.getLastRowNum();
         int order = 1;
@@ -425,7 +428,9 @@ public class SafetyExcelParser {
      *
      * @param includeData false 면 개수만 세고 원본 바이트는 읽지 않는다 (미리보기용)
      */
-    private Map<Integer, List<ParsedPhoto>> extractPhotosByRow(Sheet sheet, boolean includeData) {
+    private Map<Integer, List<ParsedPhoto>> extractPhotosByRow(Sheet sheet, boolean includeData,
+                                                               List<Integer> sourceColumnIndexes,
+                                                               int photoColumnPos) {
         Map<Integer, List<ParsedPhoto>> result = new LinkedHashMap<>();
         if (!(sheet instanceof XSSFSheet xssfSheet)) {
             return result;
@@ -435,9 +440,36 @@ public class SafetyExcelParser {
 
         int[] seq = {0};
         for (XSSFShape shape : drawing.getShapes()) {
-            collectPhotos(sheet, shape, -1, result, seq, includeData);
+            collectPhotos(sheet, shape, null, result, seq, includeData, sourceColumnIndexes, photoColumnPos);
         }
         return result;
+    }
+
+    /**
+     * 그림이 걸쳐 있는 엑셀 열 범위를 보고 표의 어느 열에 넣을지 정한다.
+     *
+     * <p>그림은 칸에 딱 맞게 놓이지 않고 옆 칸까지 걸쳐 있는 경우가 많다
+     * (예: "공정명"부터 "사진"까지 걸친 그림). 그래서 걸친 범위 안에
+     * <b>사진 열이 있으면 사진 열을 먼저</b> 고르고, 없을 때만 다른 열을 본다.
+     * 비고 칸에만 놓인 그림은 범위에 사진 열이 없으므로 비고 열로 간다.
+     *
+     * @return {@link ParsedSheet#getColumns()} 기준 인덱스. 못 정하면 -1
+     */
+    private int resolvePhotoColumn(int firstCol, int lastCol,
+                                   List<Integer> sourceColumnIndexes, int photoColumnPos) {
+        if (photoColumnPos >= 0) {
+            int photoSourceCol = sourceColumnIndexes.get(photoColumnPos);
+            if (photoSourceCol >= firstCol && photoSourceCol <= lastCol) {
+                return photoColumnPos;
+            }
+        }
+        for (int pos = 0; pos < sourceColumnIndexes.size(); pos++) {
+            int sourceCol = sourceColumnIndexes.get(pos);
+            if (sourceCol >= firstCol && sourceCol <= lastCol) {
+                return pos;
+            }
+        }
+        return -1;   // No./공정명 칸에만 걸쳐 있는 그림 — 화면에서 기본 사진 열로 간다
     }
 
     /**
@@ -449,21 +481,27 @@ public class SafetyExcelParser {
      *
      * @param inheritedRow 바깥 그룹에서 물려받은 행 번호 (최상위 도형이면 -1)
      */
-    private void collectPhotos(Sheet sheet, XSSFShape shape, int inheritedRow,
-                               Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData) {
+    private void collectPhotos(Sheet sheet, XSSFShape shape, XSSFClientAnchor inherited,
+                               Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData,
+                               List<Integer> sourceColumnIndexes, int photoColumnPos) {
         if (shape instanceof XSSFShapeGroup group) {
-            int groupRow = anchorRow(group);
-            if (groupRow < 0) groupRow = inheritedRow;
+            XSSFClientAnchor groupAnchor = clientAnchor(group);
+            if (groupAnchor == null) groupAnchor = inherited;
             for (XSSFShape child : group) {
-                collectPhotos(sheet, child, groupRow, result, seq, includeData);
+                collectPhotos(sheet, child, groupAnchor, result, seq, includeData,
+                        sourceColumnIndexes, photoColumnPos);
             }
             return;
         }
         if (!(shape instanceof XSSFPicture picture)) return;
 
-        int rowIdx = anchorRow(picture);
-        if (rowIdx < 0) rowIdx = inheritedRow;
+        XSSFClientAnchor anchor = clientAnchor(picture);
+        if (anchor == null) anchor = inherited;   // 그룹 안의 그림은 자기 앵커가 없다 — 그룹 것을 쓴다
+        if (anchor == null) return;
+        int rowIdx = anchor.getRow1();
         if (rowIdx < 0) return;
+        int columnPos = resolvePhotoColumn(anchor.getCol1(), anchor.getCol2(),
+                sourceColumnIndexes, photoColumnPos);
 
         XSSFPictureData pictureData = picture.getPictureData();
         if (pictureData == null) return;
@@ -477,13 +515,13 @@ public class SafetyExcelParser {
 
         result.computeIfAbsent(rowIdx, k -> new ArrayList<>())
                 .add(new ParsedPhoto(fileName, pictureData.getMimeType(),
-                        includeData ? pictureData.getData() : null));
+                        includeData ? pictureData.getData() : null, columnPos));
     }
 
-    /** 도형이 놓인 셀의 행 번호(0-based). 그룹 안의 자식 도형처럼 시트 앵커가 없으면 -1. */
-    private int anchorRow(XSSFShape shape) {
+    /** 시트 좌표에 붙은 앵커. 그룹 안의 자식 도형은 자기 앵커가 없어 null 이다. */
+    private XSSFClientAnchor clientAnchor(XSSFShape shape) {
         XSSFAnchor anchor = shape.getAnchor();
-        return (anchor instanceof XSSFClientAnchor clientAnchor) ? clientAnchor.getRow1() : -1;
+        return (anchor instanceof XSSFClientAnchor clientAnchor) ? clientAnchor : null;
     }
 
     private String joinRow(Row row) {
@@ -670,7 +708,13 @@ public class SafetyExcelParser {
         static ParsedCell empty() { return new ParsedCell(null, false); }
     }
 
-    /** 사진 1장의 원본 바이트 (아직 디스크에 저장되지 않은 상태) */
-    public record ParsedPhoto(String fileName, String contentType, byte[] data) {
+    /**
+     * 사진 1장의 원본 바이트 (아직 디스크에 저장되지 않은 상태)
+     *
+     * @param columnIndex 이 사진이 놓인 열의 인덱스({@link ParsedSheet#getColumns()} 기준).
+     *                    사진 전용 열이면 그 열, 비고처럼 글과 함께 있는 칸이면 그 열,
+     *                    어느 열인지 못 정하면 -1 (화면에서 기본 사진 열로 간다)
+     */
+    public record ParsedPhoto(String fileName, String contentType, byte[] data, int columnIndex) {
     }
 }

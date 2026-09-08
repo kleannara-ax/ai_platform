@@ -542,7 +542,7 @@ function renderStepCell(col, step, value) {
     </div></td>`;
   }
   if (col.type === 'PHOTO') {
-    return `<td${label}>${renderPhotos(step.photos)}</td>`;
+    return `<td${label}>${renderPhotos(photosOfColumn(step, col.columnId, true))}</td>`;
   }
   if (col.type === 'CHECK') {
     const checked = value && value.checked;
@@ -554,8 +554,20 @@ function renderStepCell(col, step, value) {
         <i class="fas ${checked ? 'fa-square-check' : 'fa-square'}"></i>
       </button></td>`;
   }
+  // 글 열이라도 그 칸에 지정된 사진이 있으면 글 아래에 함께 보여준다 (예: 비고 칸의 사진)
   const text = (value && value.text) ? value.text : '';
-  return `<td style="white-space:pre-wrap"${label}>${SAFETY.escapeHtml(text)}</td>`;
+  const photos = photosOfColumn(step, col.columnId, false);
+  const photoHtml = photos.length ? `<div class="cell-photos">${renderPhotos(photos)}</div>` : '';
+  return `<td style="white-space:pre-wrap"${label}>${SAFETY.escapeHtml(text)}${photoHtml}</td>`;
+}
+
+/**
+ * 이 칸에 보여줄 사진들.
+ * columnId 가 없는(예전에 올렸거나 엑셀에서 열을 못 정한) 사진은 기본 사진 열이 떠맡는다.
+ */
+function photosOfColumn(step, columnId, isDefaultPhotoColumn) {
+  return (step.photos || []).filter(p =>
+    p.columnId === columnId || (isDefaultPhotoColumn && p.columnId == null));
 }
 
 /** 체크버튼 토글 — 관리자만, 수정 모드에서만 */
@@ -599,7 +611,11 @@ function saveStepColWeights() {
 function buildStepColLayout() {
   const detail = currentDetail || {};
   const columns = detail.columns || [];
-  const hasAnyPhoto = (detail.steps || []).some(step => (step.photos || []).length > 0);
+  // 사진 열에 실제로 들어갈 사진(열 지정이 없거나 사진 열을 가리키는 것)이 있는지 본다.
+  // 비고 칸에만 사진이 있는 매뉴얼에서 빈 사진 열이 생기지 않도록 한다.
+  const photoColumnIds = columns.filter(c => c.columnType === 'PHOTO').map(c => c.columnId);
+  const hasAnyPhoto = (detail.steps || []).some(step =>
+    (step.photos || []).some(p => p.columnId == null || photoColumnIds.includes(p.columnId)));
   const manualId = detail.manualId;
   const saved = (manualId != null && stepColWeights[manualId]) ? stepColWeights[manualId] : {};
 
@@ -1230,9 +1246,83 @@ function renderStepModalFields(step) {
     </div>`;
   }).join('');
 
-  // 사진 열이 있는 매뉴얼에서만 사진 첨부를 보여준다
-  const hasPhotoColumn = columns.some(c => c.columnType === 'PHOTO');
-  document.getElementById('step-photo-upload-wrap').style.display = hasPhotoColumn ? '' : 'none';
+  // 사진을 넣을 수 있는 칸: 사진 열 + 모든 글 열 (체크 열은 제외)
+  // 예전에는 사진 열이 있는 매뉴얼에서만 첨부가 보였는데,
+  // 비고처럼 글 칸에도 사진을 넣을 수 있어야 해서 글 열이 하나라도 있으면 보여준다.
+  const targets = photoTargetColumns();
+  document.getElementById('step-photo-upload-wrap').style.display = targets.length ? '' : 'none';
+
+  const select = document.getElementById('step-photo-column');
+  select.innerHTML = targets.map(c =>
+    `<option value="${c.columnId}">${SAFETY.escapeHtml(c.label)}</option>`).join('');
+
+  renderStepPhotoList(step);
+}
+
+/** 사진을 넣을 수 있는 열 (사진 열 먼저, 그다음 글 열) */
+function photoTargetColumns() {
+  const columns = (currentDetail && currentDetail.columns) || [];
+  return [
+    ...columns.filter(c => c.columnType === 'PHOTO'),
+    ...columns.filter(c => c.columnType === 'TEXT'),
+  ];
+}
+
+/** 이미 올라가 있는 사진 목록 — 칸을 바꾸거나 삭제할 수 있다 */
+function renderStepPhotoList(step) {
+  const holder = document.getElementById('step-photo-list');
+  const photos = (step && step.photos) || [];
+  if (!photos.length) { holder.innerHTML = ''; return; }
+
+  const targets = photoTargetColumns();
+  const defaultPhotoColumn = targets.find(c => c.columnType === 'PHOTO');
+  holder.innerHTML = photos.map(p => {
+    // columnId 가 없는 사진(예전 데이터)은 기본 사진 열에 있는 것으로 보여준다
+    const current = p.columnId != null ? p.columnId : (defaultPhotoColumn ? defaultPhotoColumn.columnId : '');
+    const options = targets.map(c =>
+      `<option value="${c.columnId}" ${c.columnId === current ? 'selected' : ''}>${
+        SAFETY.escapeHtml(c.label)}</option>`).join('');
+    return `<div class="step-photo-item">
+      <img src="${SAFETY.escapeHtml(p.url)}" alt="">
+      <span class="spi-name" title="${SAFETY.escapeHtml(p.originalName || '')}">${
+        SAFETY.escapeHtml(p.originalName || '')}</span>
+      <select onchange="moveStepPhoto(${p.photoId}, this.value)" title="이 사진을 넣을 칸">${options}</select>
+      <button type="button" class="btn btn-sm btn-outline-danger"
+              onclick="deleteStepPhoto(${p.photoId})" title="사진 삭제"><i class="fas fa-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+/** 사진을 다른 칸으로 옮긴다 */
+async function moveStepPhoto(photoId, columnId) {
+  try {
+    await SAFETY.api('/safety-api/photos/' + photoId + '/column',
+      { method: 'PUT', body: { columnId: Number(columnId) } });
+    SAFETY.toast('사진 위치를 옮겼습니다.');
+    await reloadStepModalPhotos();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 사진 삭제 */
+async function deleteStepPhoto(photoId) {
+  if (!confirm('이 사진을 삭제하시겠습니까?')) return;
+  try {
+    await SAFETY.api('/safety-api/photos/' + photoId, { method: 'DELETE' });
+    SAFETY.toast('사진을 삭제했습니다.');
+    await reloadStepModalPhotos();
+  } catch (e) {
+    SAFETY.toast(e.message, false);
+  }
+}
+
+/** 사진을 바꾼 뒤 상세와 수정 창의 목록을 함께 새로 고친다 */
+async function reloadStepModalPhotos() {
+  await loadDetail();
+  const stepId = Number(document.getElementById('step-id').value);
+  const step = (currentDetail.steps || []).find(s => s.stepId === stepId);
+  renderStepPhotoList(step);
 }
 
 async function saveStep() {
@@ -1255,9 +1345,12 @@ async function saveStep() {
       const created = await SAFETY.api('/safety-api/manuals/' + currentManualId + '/steps', { method: 'POST', body: payload });
       savedStepId = created.stepId;
     }
-    const file = document.getElementById('step-photo-file').files[0];
-    if (file && savedStepId) {
-      await SAFETY.uploadMultipart('/safety-api/steps/' + savedStepId + '/photos', { file });
+    const files = [...document.getElementById('step-photo-file').files];
+    const columnId = document.getElementById('step-photo-column').value;
+    for (const file of files) {
+      if (!savedStepId) break;
+      await SAFETY.uploadMultipart('/safety-api/steps/' + savedStepId + '/photos',
+        columnId ? { file, columnId } : { file });
     }
     bootstrap.Modal.getInstance(document.getElementById('stepModal')).hide();
     SAFETY.toast('저장되었습니다.');

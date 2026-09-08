@@ -1,6 +1,7 @@
 package com.company.module.safety.controller;
 
 import com.company.core.common.response.ApiResponse;
+import com.company.module.safety.dto.request.PhotoColumnUpdateRequest;
 import com.company.module.safety.dto.response.StepPhotoResponse;
 import com.company.module.safety.service.SafetyPhotoService;
 import com.company.module.safety.service.SafetyPhotoService.ViewFile;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,13 +35,20 @@ public class SafetyPhotoController {
 
     private final SafetyPhotoService photoService;
 
-    /** 사진 업로드 (multipart/form-data, 파트명 file) — SAFETY 관리자만 */
+    /**
+     * 사진 업로드 (multipart/form-data, 파트명 file) — SAFETY 관리자만.
+     *
+     * <p>{@code columnId} 를 주면 그 열의 칸에 들어간다. 비고처럼 글과 사진이 함께 있는 칸을
+     * 지정할 수 있고, 생략하면 예전처럼 매뉴얼의 기본 '사진' 열에 표시된다.
+     */
     @PostMapping("/safety-api/steps/{stepId}/photos")
     @PreAuthorize("@safetyPerm.isAdmin(authentication)")
     public ResponseEntity<ApiResponse<StepPhotoResponse>> upload(
-            @PathVariable Long stepId, @RequestParam("file") MultipartFile file, Authentication authentication) {
+            @PathVariable Long stepId,
+            @RequestParam(value = "columnId", required = false) Long columnId,
+            @RequestParam("file") MultipartFile file, Authentication authentication) {
         String uploadedBy = (authentication != null) ? authentication.getName() : null;
-        return ResponseEntity.ok(ApiResponse.created(photoService.upload(stepId, file, uploadedBy)));
+        return ResponseEntity.ok(ApiResponse.created(photoService.upload(stepId, columnId, file, uploadedBy)));
     }
 
     /** 사진 조회 (화면 표시용, 공개) */
@@ -51,6 +61,17 @@ public class SafetyPhotoController {
                 .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
                 .contentType(type)
                 .body(f.data());
+    }
+
+    /** 사진을 다른 칸으로 옮기기 (columnId 를 비우면 기본 사진 열로) — SAFETY 관리자만 */
+    @PutMapping("/safety-api/photos/{photoId}/column")
+    @PreAuthorize("@safetyPerm.isAdmin(authentication)")
+    public ResponseEntity<ApiResponse<StepPhotoResponse>> moveToColumn(
+            @PathVariable Long photoId, @RequestBody PhotoColumnUpdateRequest request,
+            Authentication authentication) {
+        String updatedBy = (authentication != null) ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(
+                photoService.moveToColumn(photoId, request.getColumnId(), updatedBy)));
     }
 
     /** 사진 삭제 — SAFETY 관리자만 */
