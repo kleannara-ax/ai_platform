@@ -1306,6 +1306,121 @@
         indicator.classList.add('paused');
         document.getElementById('autoRefreshLabel').textContent = '수정중 — 일시정지';
       }
+
+      // ★★ 2026-09 추가 — 표5/6 저장 전 소계/합계 실시간 미리보기
+      recomputeSafetyIncidentPreview(inputEl);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  ★★ 2026-09 추가 — 표5(발생건수)/표6(손실금액) "당월" 소계/합계
+    //  저장 전 프론트 실시간 미리보기.
+    //
+    //  백엔드 CellService.recomputeSafetyIncidentTotalIfNeeded()/
+    //  recomputeSafetyIncidentRowSubtotal()과 동일한 규칙을 브라우저에서
+    //  저장 요청 없이 미리 계산해 화면에만 반영한다(실제 저장/영속화는
+    //  여전히 서버가 담당 — 이 함수는 순수 표시 미리보기일 뿐이다).
+    //
+    //  규칙(백엔드와 동일):
+    //   (1) 방금 입력이 일어난 행(rowIndex 2~8) 자신의 소계(17=R열)
+    //       = 그 행의 기계(14)+전기(15)+생산(16)
+    //   (2) 같은 컬럼(기계/전기/생산 중 방금 바뀐 것)의 7개 기여 행
+    //       (rowIndex 2~8)을 세로합산 → 합계 행(rowIndex=9)의 같은 컬럼
+    //   (3) 합계 행 자신의 소계(R10) = O10+P10+Q10 (가로합)
+    //
+    //  소계/합계 셀은 이제 사람이 편집할 수 없는(컬럼권한 제외) 읽기전용
+    //  <div class="cell-value">로 렌더링되므로, <input> 값을 바꾸는 게
+    //  아니라 그 div의 표시 텍스트를 직접 갱신한다.
+    // ═══════════════════════════════════════════════
+    const SAFETY_INCIDENT_TABLE_CODES = new Set(['TBL_SAFETY_INCIDENT_COUNT', 'TBL_SAFETY_INCIDENT_AMOUNT']);
+    const SAFETY_INCIDENT_INPUT_COLS = [14, 15, 16]; // 기계/전기/생산
+    const SAFETY_INCIDENT_SUBTOTAL_COL = 17;         // 소계(R열)
+    const SAFETY_INCIDENT_CONTRIB_ROW_START = 2;     // 제지
+    const SAFETY_INCIDENT_CONTRIB_ROW_END = 8;       // 에너지
+    const SAFETY_INCIDENT_TOTAL_ROW = 9;             // 합 계
+
+    /** 표(table) 엘리먼트 안에서 rowIndex/colIndex와 일치하는 <td>를 찾는다 */
+    function findSafetyIncidentTd(tableEl, rowIndex, colIndex) {
+      return tableEl.querySelector(`td[data-row="${rowIndex}"][data-col="${colIndex}"]`);
+    }
+
+    /**
+     * 해당 셀의 "현재(화면상)" 값을 숫자로 읽는다.
+     * - 편집 가능한 셀(<input>)이면 사용자가 지금 타이핑 중인 값을 그대로 읽는다.
+     * - 읽기전용 셀(<div class="cell-value">)이면 화면에 표시된 텍스트를 읽는다
+     *   (다른 사용자가 이미 저장해 둔 값이거나, 시스템이 계산해 둔 이전 소계/합계).
+     */
+    function readSafetyIncidentCellNumber(tableEl, rowIndex, colIndex) {
+      const td = findSafetyIncidentTd(tableEl, rowIndex, colIndex);
+      if (!td) return 0;
+      const input = td.querySelector('.cell-input');
+      let raw;
+      if (input) {
+        raw = input.value;
+      } else {
+        const div = td.querySelector('.cell-value');
+        raw = div ? div.textContent : '';
+      }
+      const cleaned = String(raw || '').replace(/,/g, '').trim();
+      if (cleaned === '' || cleaned === '-') return 0;
+      const num = Number(cleaned);
+      return isNaN(num) ? 0 : num;
+    }
+
+    /**
+     * 해당 셀이 읽기전용(.cell-value)이면 계산된 미리보기 값으로 화면 표시만 갱신한다.
+     * 편집 가능한 셀(<input>)이면 사람이 입력 중인 값이므로 절대 건드리지 않는다
+     * (이 함수는 항상 소계/합계처럼 시스템 계산 대상 셀에만 호출되지만, 방어적으로
+     * div가 없으면 — 즉 아직 <input>인 경우 — 아무 것도 하지 않는다).
+     */
+    function writeSafetyIncidentPreview(tableEl, rowIndex, colIndex, sum, tableCode) {
+      const td = findSafetyIncidentTd(tableEl, rowIndex, colIndex);
+      if (!td) return;
+      const div = td.querySelector('.cell-value');
+      if (!div) return;
+      const formatted = formatNumber(String(sum), tableCode);
+      div.textContent = formatted || '\u00a0';
+    }
+
+    /** 지정된 행의 소계(17=R열) = 그 행의 기계(14)+전기(15)+생산(16) 재계산 후 화면 반영 */
+    function recomputeSafetyIncidentRowSubtotalPreview(tableEl, rowIndex, tableCode) {
+      let sum = 0;
+      for (const col of SAFETY_INCIDENT_INPUT_COLS) {
+        sum += readSafetyIncidentCellNumber(tableEl, rowIndex, col);
+      }
+      writeSafetyIncidentPreview(tableEl, rowIndex, SAFETY_INCIDENT_SUBTOTAL_COL, sum, tableCode);
+    }
+
+    /**
+     * 방금 입력이 발생한 <input>(기계/전기/생산 중 하나)을 기준으로
+     * 소계(그 행)/합계(세로합)/합계의 소계(가로합) 미리보기를 전부 재계산한다.
+     * 표5/6 이외의 입력, 또는 기계/전기/생산이 아닌 컬럼, 또는 기여 행(2~8)이
+     * 아닌 입력이면 아무 것도 하지 않는다(백엔드 recomputeSafetyIncidentTotalIfNeeded와
+     * 동일한 트리거 조건).
+     */
+    function recomputeSafetyIncidentPreview(inputEl) {
+      const tableCode = inputEl.dataset.tableCode;
+      if (!SAFETY_INCIDENT_TABLE_CODES.has(tableCode)) return;
+
+      const colIndex = parseInt(inputEl.dataset.col, 10);
+      const rowIndex = parseInt(inputEl.dataset.row, 10);
+      if (!SAFETY_INCIDENT_INPUT_COLS.includes(colIndex)) return;
+      if (rowIndex < SAFETY_INCIDENT_CONTRIB_ROW_START || rowIndex > SAFETY_INCIDENT_CONTRIB_ROW_END) return;
+
+      const tableEl = inputEl.closest('table');
+      if (!tableEl) return;
+
+      // (1) 방금 입력한 행 자신의 소계 재계산
+      recomputeSafetyIncidentRowSubtotalPreview(tableEl, rowIndex, tableCode);
+
+      // (2) 같은 컬럼(기계/전기/생산 중 하나)의 7개 기여 행을 세로합산 → 합계 행(9)
+      let colSum = 0;
+      for (let r = SAFETY_INCIDENT_CONTRIB_ROW_START; r <= SAFETY_INCIDENT_CONTRIB_ROW_END; r++) {
+        colSum += readSafetyIncidentCellNumber(tableEl, r, colIndex);
+      }
+      writeSafetyIncidentPreview(tableEl, SAFETY_INCIDENT_TOTAL_ROW, colIndex, colSum, tableCode);
+
+      // (3) 합계 행 자신의 소계(R10) = O10+P10+Q10 재계산
+      recomputeSafetyIncidentRowSubtotalPreview(tableEl, SAFETY_INCIDENT_TOTAL_ROW, tableCode);
     }
 
     function onCellFocus(inputEl) {
