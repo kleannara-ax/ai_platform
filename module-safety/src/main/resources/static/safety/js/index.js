@@ -79,8 +79,19 @@ function indexTree() {
   walk(tree, null);
 }
 
+/**
+ * 분류 정렬. 중분류는 표시순서 → 이름 순이다.
+ *
+ * <p><b>대분류는 서버가 준 순서(이름 가나다순)를 그대로 쓴다.</b>
+ * 브라우저의 localeCompare 는 한글을 영문보다 앞에 두는데 서버(Java Collator)는 반대라,
+ * 여기서 다시 정렬하면 화면과 API 순서가 어긋난다. 분류를 고치면 트리를 다시 받아오므로
+ * 서버 순서만 따라도 항상 최신이다.
+ */
 function sortNodes(nodes) {
-  return (nodes || []).sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.name).localeCompare(String(b.name)));
+  const list = nodes || [];
+  if (list.length && list[0].parentId == null) return list;
+  return list.sort((a, b) => (a.sortOrder - b.sortOrder)
+    || String(a.name).localeCompare(String(b.name), 'ko'));
 }
 
 function findNode(id) {
