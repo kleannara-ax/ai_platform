@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFAnchor;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
@@ -82,6 +83,9 @@ public class SafetyExcelParser {
     /** 화면(<img>)에서 그대로 보여줄 수 있는 그림 형식만 가져온다. (wmf/emf/wdp 등은 제외) */
     private static final Set<String> WEB_IMAGE_EXTENSIONS =
             Set.of("png", "jpg", "jpeg", "gif", "bmp", "webp");
+
+    /** 엑셀 그림 좌표 단위. 행 높이(포인트)를 그림 좌표(EMU)로 맞출 때 쓴다. */
+    private static final int EMU_PER_POINT = 12700;
 
     // ── 작업 위험성 평가서 서식 ──
     /** 표 머리글 첫 칸 문구 */
@@ -168,8 +172,9 @@ public class SafetyExcelParser {
             // 번호는 도형을 훑는 순서대로 매겨지므로, 같은 순서로 따라가다 그 한 장만 읽는다.
             Map<Integer, List<ParsedPhoto>> found = new LinkedHashMap<>();
             int[] seq = {0};
+            long[] rowTops = rowTopOffsets(sheet, -1);
             for (XSSFShape shape : drawing.getShapes()) {
-                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1, 0, -1);
+                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1, rowTops, 0, -1);
                 if (seq[0] > index) break;
             }
             for (List<ParsedPhoto> photos : found.values()) {
@@ -193,7 +198,7 @@ public class SafetyExcelParser {
             if (picture != null) {
                 XSSFPictureData data = picture.getPictureData();
                 return new ParsedPhoto(photo.fileName(), photo.contentType(),
-                        (data != null) ? uprightBytes(picture, data, data.suggestFileExtension()) : null,
+                        (data != null) ? uprightBytes(picture, data, webImageExtension(data)) : null,
                         photo.columnIndex(), index);
             }
         }
@@ -212,9 +217,36 @@ public class SafetyExcelParser {
         if (!(shape instanceof XSSFPicture picture)) return null;
         XSSFPictureData data = picture.getPictureData();
         if (data == null) return null;
-        String ext = data.suggestFileExtension();
-        if (ext == null || !WEB_IMAGE_EXTENSIONS.contains(ext.toLowerCase())) return null;
+        if (webImageExtension(data) == null) return null;
         return (seq[0]++ == index) ? picture : null;
+    }
+
+    /**
+     * 화면에 그대로 띄울 수 있는 그림이면 그 확장자를, 아니면 null 을 준다.
+     *
+     * <p>엑셀이 확장자를 엉뚱하게 붙여 둔 그림이 있다(예: {@code image4.tmp} 인데 알맹이는 PNG).
+     * 확장자만 믿으면 멀쩡한 사진이 통째로 빠지므로, 모르는 확장자는 앞부분 몇 바이트로 확인한다.
+     * 정말 못 쓰는 형식(EMF/WMF 같은 벡터 그림)만 걸러진다.
+     */
+    private String webImageExtension(XSSFPictureData data) {
+        String ext = data.suggestFileExtension();
+        if (ext != null && WEB_IMAGE_EXTENSIONS.contains(ext.toLowerCase())) {
+            ext = ext.toLowerCase();
+            return "jpg".equals(ext) ? "jpeg" : ext;   // MIME 타입까지 이 값으로 만든다
+        }
+        return sniffImageExtension(data.getData());
+    }
+
+    /** 파일 앞부분(매직 넘버)으로 그림 형식을 알아낸다. 모르면 null. */
+    private String sniffImageExtension(byte[] bytes) {
+        if (bytes == null || bytes.length < 12) return null;
+        if ((bytes[0] & 0xFF) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') return "png";
+        if ((bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8) return "jpeg";
+        if (bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F') return "gif";
+        if (bytes[0] == 'B' && bytes[1] == 'M') return "bmp";
+        if (bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') return "webp";
+        return null;
     }
 
     private Sheet findSheet(Workbook workbook, String sheetName) {
@@ -336,6 +368,9 @@ public class SafetyExcelParser {
             }
 
             Integer stepNo = (noColumnIndex >= 0) ? cellInt(row.getCell(noColumnIndex)) : null;
+            if (stepNo == null && noColumnIndex >= 0) {
+                stepNo = mergedNoAbove(sheet, rowIdx, noColumnIndex);
+            }
 
             List<ParsedCell> cells = new ArrayList<>();
             boolean hasContent = !photos.isEmpty();
@@ -553,6 +588,26 @@ public class SafetyExcelParser {
                 || text.contains("√") || text.equalsIgnoreCase("V") || text.equalsIgnoreCase("O");
     }
 
+    /**
+     * 세로로 병합된 번호 칸의 값을 아래 행으로 끌어온다.
+     *
+     * <p>엑셀은 병합된 칸의 값을 첫 행에만 담는다. 그래서 "1" 하나가 여섯 줄을 덮고 있어도
+     * 둘째 줄부터는 번호 칸이 비어 있고, 예전에는 그 자리에 순번을 새로 매겨
+     * 1, 2, 3, 4, 5, 6, <b>2</b>, 8, <b>3</b>, 10 처럼 뒤로 돌아가는 번호가 나왔다.
+     *
+     * @return 병합 안이 아니거나 병합 첫 칸에 번호가 없으면 null
+     */
+    private Integer mergedNoAbove(Sheet sheet, int rowIdx, int noColumnIndex) {
+        for (CellRangeAddress region : sheet.getMergedRegions()) {
+            if (region.getFirstColumn() <= noColumnIndex && noColumnIndex <= region.getLastColumn()
+                    && region.getFirstRow() < rowIdx && rowIdx <= region.getLastRow()) {
+                Row first = sheet.getRow(region.getFirstRow());
+                return (first != null) ? cellInt(first.getCell(noColumnIndex)) : null;
+            }
+        }
+        return null;
+    }
+
     /** 첫 텍스트 칸 앞의 "1." 같은 번호를 단계 번호로 쓴다. 없으면 순번을 쓴다. */
     private int leadingNumber(List<ParsedCell> cells, int fallback) {
         for (ParsedCell cell : cells) {
@@ -593,29 +648,66 @@ public class SafetyExcelParser {
         if (drawing == null) return result;
 
         int[] seq = {0};
+        long[] rowTops = rowTopOffsets(sheet, lastDataRow);
         for (XSSFShape shape : drawing.getShapes()) {
             collectPhotos(sheet, shape, null, result, seq, includeData,
-                    sourceColumnIndexes, photoColumnPos, firstDataRow, lastDataRow);
+                    sourceColumnIndexes, photoColumnPos, rowTops, firstDataRow, lastDataRow);
         }
         return result;
     }
 
     /**
-     * 그림이 놓인 행. 앵커의 <b>세로 가운데</b>를 쓴다.
+     * 0행부터 각 행의 위쪽 끝까지의 세로 거리(EMU) 표.
      *
-     * <p>맨 윗줄({@code row1})을 쓰면 여러 행에 걸친 그림이 실제로 보이는 자리보다 위로 밀린다.
-     * 예를 들어 "행1~행3" 에 걸친 그림은 눈으로는 2행 자리인데 1행으로 붙었다.
+     * <p>행 높이가 제각각이라 행 번호만으로는 그림이 실제로 놓인 자리를 알 수 없다.
+     * 이 표가 있어야 앵커의 세로 좌표를 눈에 보이는 행으로 되돌릴 수 있다.
+     */
+    private long[] rowTopOffsets(Sheet sheet, int lastDataRow) {
+        int size = Math.max(lastDataRow, sheet.getLastRowNum()) + 3;
+        long[] tops = new long[size + 1];
+        for (int r = 0; r < size; r++) {
+            Row line = sheet.getRow(r);
+            float points = (line != null) ? line.getHeightInPoints() : sheet.getDefaultRowHeightInPoints();
+            tops[r + 1] = tops[r] + Math.round(points * (double) EMU_PER_POINT);
+        }
+        return tops;
+    }
+
+    /** 앵커의 (행 번호, 행 안에서의 세로 오프셋)을 시트 맨 위에서부터의 거리(EMU)로 바꾼다. */
+    private long verticalEmu(long[] rowTops, int row, int dy) {
+        int r = Math.max(0, Math.min(row, rowTops.length - 1));
+        return rowTops[r] + Math.max(0, dy);
+    }
+
+    /**
+     * 그림이 놓인 행. 앵커의 <b>세로 가운데가 실제로 걸린 행</b>을 쓴다.
+     *
+     * <p>행 번호만으로 가운데를 잡으면(= {@code (row1 + row2) / 2}) 두 행에 걸친 그림이 늘 윗행으로 간다.
+     * 1행 바닥에서 시작해 2행을 가득 채운 그림도 1행에 붙어, 사진이 한 칸씩 위로 밀려 보였다.
+     * 행 높이와 앵커 오프셋으로 실제 좌표를 재면 엑셀에서 눈으로 보는 자리와 같아진다.
      *
      * <p>머리글 위/표 아래로 삐져나온 그림은 버리지 않고 가장 가까운 데이터 행으로 당긴다.
      * 예전에는 머리글 행(0행)에서 시작하는 그림이 통째로 사라졌다.
      */
-    private int anchorRowOf(XSSFClientAnchor anchor, int firstDataRow, int lastDataRow) {
-        int top = anchor.getRow1();
+    private int anchorRowOf(XSSFClientAnchor anchor, long[] rowTops, int firstDataRow, int lastDataRow) {
+        int top = Math.max(0, anchor.getRow1());
         int bottom = Math.max(anchor.getRow2(), top);
-        int center = top + (bottom - top) / 2;
-        if (center < firstDataRow) return firstDataRow;
-        if (lastDataRow >= firstDataRow && center > lastDataRow) return lastDataRow;
-        return center;
+        long topEmu = verticalEmu(rowTops, top, anchor.getDy1());
+        // oneCellAnchor 는 아래쪽 표시가 없어 row2/dy2 가 0 이다. 그때는 위쪽만 보고 정한다.
+        long bottomEmu = Math.max(topEmu, verticalEmu(rowTops, bottom, anchor.getDy2()));
+        long center = (topEmu + bottomEmu) / 2;
+
+        int row = top;
+        for (int r = 0; r + 1 < rowTops.length; r++) {
+            if (rowTops[r] <= center) {
+                row = r;
+            } else {
+                break;
+            }
+        }
+        if (row < firstDataRow) return firstDataRow;
+        if (lastDataRow >= firstDataRow && row > lastDataRow) return lastDataRow;
+        return row;
     }
 
     /**
@@ -670,13 +762,13 @@ public class SafetyExcelParser {
     private void collectPhotos(Sheet sheet, XSSFShape shape, XSSFClientAnchor inherited,
                                Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData,
                                List<Integer> sourceColumnIndexes, int photoColumnPos,
-                               int firstDataRow, int lastDataRow) {
+                               long[] rowTops, int firstDataRow, int lastDataRow) {
         if (shape instanceof XSSFShapeGroup group) {
             XSSFClientAnchor groupAnchor = clientAnchor(group);
             if (groupAnchor == null) groupAnchor = inherited;
             for (XSSFShape child : group) {
                 collectPhotos(sheet, child, groupAnchor, result, seq, includeData,
-                        sourceColumnIndexes, photoColumnPos, firstDataRow, lastDataRow);
+                        sourceColumnIndexes, photoColumnPos, rowTops, firstDataRow, lastDataRow);
             }
             return;
         }
@@ -686,15 +778,15 @@ public class SafetyExcelParser {
         if (anchor == null) anchor = inherited;   // 그룹 안의 그림은 자기 앵커가 없다 — 그룹 것을 쓴다
         if (anchor == null) return;
         if (anchor.getRow1() < 0) return;
-        int rowIdx = anchorRowOf(anchor, firstDataRow, lastDataRow);
+        int rowIdx = anchorRowOf(anchor, rowTops, firstDataRow, lastDataRow);
         int columnPos = resolvePhotoColumn(anchor.getCol1(), anchor.getCol2(),
                 sourceColumnIndexes, photoColumnPos);
 
         XSSFPictureData pictureData = picture.getPictureData();
         if (pictureData == null) return;
-        String ext = pictureData.suggestFileExtension();
-        // WMF/EMF/WDP 등 웹에서 바로 표시할 수 없는 포맷은 건너뛴다.
-        if (ext == null || !WEB_IMAGE_EXTENSIONS.contains(ext.toLowerCase())) {
+        // EMF/WMF/WDP 등 웹에서 바로 표시할 수 없는 포맷은 건너뛴다.
+        String ext = webImageExtension(pictureData);
+        if (ext == null) {
             return;
         }
         int seqNo = seq[0]++;
@@ -702,7 +794,7 @@ public class SafetyExcelParser {
                 + "_row" + rowIdx + "_" + seqNo + "." + ext;
 
         result.computeIfAbsent(rowIdx, k -> new ArrayList<>())
-                .add(new ParsedPhoto(fileName, pictureData.getMimeType(),
+                .add(new ParsedPhoto(fileName, "image/" + ext,
                         includeData ? uprightBytes(picture, pictureData, ext) : null, columnPos, seqNo));
     }
 
