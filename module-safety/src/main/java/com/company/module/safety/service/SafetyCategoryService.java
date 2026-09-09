@@ -13,8 +13,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -46,8 +49,24 @@ public class SafetyCategoryService {
 
         return all.stream()
                 .filter(c -> c.getParent() == null)
+                .sorted(byKoreanName())
                 .map(root -> buildNode(root, childrenByParent, directCounts))
                 .toList();
+    }
+
+    /**
+     * 대분류 정렬 기준 — 표시순서가 아니라 이름 가나다순이다.
+     *
+     * <p>대분류는 팀 이름이라 부서가 생기고 없어질 때마다 표시순서를 다시 매기기 번거롭다.
+     * 중분류는 공정 흐름대로 놓는 편이 자연스러워 표시순서를 그대로 쓴다.
+     *
+     * <p>{@link Collator} 는 스레드 안전하지 않아 부를 때마다 새로 만든다.
+     * 대분류는 많아야 수십 건이라 비용이 문제되지 않는다.
+     */
+    private static Comparator<SafetyManualCategory> byKoreanName() {
+        Collator collator = Collator.getInstance(Locale.KOREAN);
+        return Comparator.comparing(SafetyManualCategory::getName, collator)
+                .thenComparing(SafetyManualCategory::getCategoryId);
     }
 
     /** 하위 분류를 먼저 만들고 그 건수를 합산해 올린다. 대/중분류의 건수 배지는 하위 매뉴얼까지 포함한 값이다. */
@@ -71,10 +90,15 @@ public class SafetyCategoryService {
 
     /** 특정 부모의 하위 분류 목록 (대분류 선택 → 중분류 조회) */
     public List<CategoryResponse> getChildren(Long parentId) {
-        List<SafetyManualCategory> children = (parentId == null)
-                ? categoryRepository.findRootCategories()
-                : categoryRepository.findByParentId(parentId);
-        return children.stream().map(CategoryResponse::from).toList();
+        if (parentId == null) {
+            return categoryRepository.findRootCategories().stream()
+                    .sorted(byKoreanName())
+                    .map(CategoryResponse::from)
+                    .toList();
+        }
+        return categoryRepository.findByParentId(parentId).stream()
+                .map(CategoryResponse::from)
+                .toList();
     }
 
     // ================================================================
