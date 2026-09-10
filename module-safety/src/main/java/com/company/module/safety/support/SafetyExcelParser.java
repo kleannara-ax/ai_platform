@@ -87,6 +87,11 @@ public class SafetyExcelParser {
     /** 엑셀 그림 좌표 단위. 행 높이(포인트)를 그림 좌표(EMU)로 맞출 때 쓴다. */
     private static final int EMU_PER_POINT = 12700;
 
+    /** 그림이 이만큼 덮은 행이라야 "이 행에 놓인 그림" 후보로 본다. */
+    private static final double ROW_COVER_RATIO = 0.40;
+    /** 덮은 정도가 이 차이 안쪽이면 비긴 것으로 보고 위쪽 행을 고른다. */
+    private static final double COVER_TIE = 0.10;
+
     // ── 작업 위험성 평가서 서식 ──
     /** 표 머리글 첫 칸 문구 */
     private static final String RISK_HEADER_STEP = "작업 순서";
@@ -174,7 +179,8 @@ public class SafetyExcelParser {
             int[] seq = {0};
             long[] rowTops = rowTopOffsets(sheet, -1);
             for (XSSFShape shape : drawing.getShapes()) {
-                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1, rowTops, 0, -1);
+                collectPhotos(sheet, shape, null, found, seq, false, List.of(), -1,
+                        rowTops, new boolean[0], 0, -1);
                 if (seq[0] > index) break;
             }
             for (List<ParsedPhoto> photos : found.values()) {
@@ -649,9 +655,10 @@ public class SafetyExcelParser {
 
         int[] seq = {0};
         long[] rowTops = rowTopOffsets(sheet, lastDataRow);
+        boolean[] rowHasText = rowTextFlags(sheet, sourceColumnIndexes, photoColumnPos, rowTops.length);
         for (XSSFShape shape : drawing.getShapes()) {
             collectPhotos(sheet, shape, null, result, seq, includeData,
-                    sourceColumnIndexes, photoColumnPos, rowTops, firstDataRow, lastDataRow);
+                    sourceColumnIndexes, photoColumnPos, rowTops, rowHasText, firstDataRow, lastDataRow);
         }
         return result;
     }
@@ -679,35 +686,88 @@ public class SafetyExcelParser {
         return rowTops[r] + Math.max(0, dy);
     }
 
+    /** 표의 본문 칸(사진 칸 제외)에 글이 있는 행인지 미리 표시해 둔다. */
+    private boolean[] rowTextFlags(Sheet sheet, List<Integer> sourceColumnIndexes,
+                                   int photoColumnPos, int size) {
+        boolean[] flags = new boolean[Math.max(size, 1)];
+        for (int r = 0; r < flags.length; r++) {
+            Row line = sheet.getRow(r);
+            if (line == null) continue;
+            for (int pos = 0; pos < sourceColumnIndexes.size(); pos++) {
+                if (pos == photoColumnPos) continue;
+                if (!tidyText(cellText(line.getCell(sourceColumnIndexes.get(pos)))).isBlank()) {
+                    flags[r] = true;
+                    break;
+                }
+            }
+        }
+        return flags;
+    }
+
     /**
-     * 그림이 놓인 행. 앵커의 <b>세로 가운데가 실제로 걸린 행</b>을 쓴다.
+     * 그림이 놓인 행. 그림이 <b>실제로 덮은 넓이</b>를 행마다 재서 정한다.
      *
      * <p>행 번호만으로 가운데를 잡으면(= {@code (row1 + row2) / 2}) 두 행에 걸친 그림이 늘 윗행으로 간다.
      * 1행 바닥에서 시작해 2행을 가득 채운 그림도 1행에 붙어, 사진이 한 칸씩 위로 밀려 보였다.
-     * 행 높이와 앵커 오프셋으로 실제 좌표를 재면 엑셀에서 눈으로 보는 자리와 같아진다.
+     *
+     * <p>그렇다고 세로 중심만 쓰면 두 행을 반씩 덮은 그림에서 중심이 행 경계에 딱 걸려,
+     * 똑같이 생긴 사진들이 미세한 차이로 위아래 제각각 흩어진다
+     * (재단 "9카타" 시트에서 같은 모양 4장이 2·3·6·8행으로 갈렸다).
+     *
+     * <p>그래서 {@link #ROW_COVER_RATIO} 이상 덮은 행을 후보로 모으고 이 순서로 고른다.
+     * <ol>
+     *   <li><b>본문 글이 있는 행</b> — 빈 행과 걸쳤으면 글이 있는 쪽이 그 사진의 설명이다</li>
+     *   <li>더 <b>많이 덮은 행</b></li>
+     *   <li>덮은 정도가 {@link #COVER_TIE} 안쪽으로 비슷하면 <b>위쪽 행</b> — 순서가 들쭉날쭉해지지 않게</li>
+     * </ol>
+     * 어느 행도 그만큼 덮지 못한 작은 그림은 예전처럼 세로 중심이 걸린 행에 둔다.
      *
      * <p>머리글 위/표 아래로 삐져나온 그림은 버리지 않고 가장 가까운 데이터 행으로 당긴다.
      * 예전에는 머리글 행(0행)에서 시작하는 그림이 통째로 사라졌다.
      */
-    private int anchorRowOf(XSSFClientAnchor anchor, long[] rowTops, int firstDataRow, int lastDataRow) {
+    private int anchorRowOf(XSSFClientAnchor anchor, long[] rowTops, boolean[] rowHasText,
+                            int firstDataRow, int lastDataRow) {
         int top = Math.max(0, anchor.getRow1());
         int bottom = Math.max(anchor.getRow2(), top);
         long topEmu = verticalEmu(rowTops, top, anchor.getDy1());
         // oneCellAnchor 는 아래쪽 표시가 없어 row2/dy2 가 0 이다. 그때는 위쪽만 보고 정한다.
         long bottomEmu = Math.max(topEmu, verticalEmu(rowTops, bottom, anchor.getDy2()));
-        long center = (topEmu + bottomEmu) / 2;
 
-        int row = top;
+        int best = -1;
+        double bestRatio = 0;
+        boolean bestHasText = false;
         for (int r = 0; r + 1 < rowTops.length; r++) {
-            if (rowTops[r] <= center) {
-                row = r;
-            } else {
-                break;
+            long height = rowTops[r + 1] - rowTops[r];
+            if (height <= 0) continue;
+            long overlap = Math.min(bottomEmu, rowTops[r + 1]) - Math.max(topEmu, rowTops[r]);
+            if (overlap <= 0) continue;
+            double ratio = (double) overlap / height;
+            if (ratio < ROW_COVER_RATIO) continue;
+
+            boolean hasText = (r < rowHasText.length) && rowHasText[r];
+            boolean better = (best < 0)
+                    || (hasText && !bestHasText)
+                    || (hasText == bestHasText && ratio > bestRatio + COVER_TIE);
+            if (better) {
+                best = r;
+                bestRatio = ratio;
+                bestHasText = hasText;
             }
         }
-        if (row < firstDataRow) return firstDataRow;
-        if (lastDataRow >= firstDataRow && row > lastDataRow) return lastDataRow;
-        return row;
+        if (best < 0) {
+            best = top;
+            long center = (topEmu + bottomEmu) / 2;
+            for (int r = 0; r + 1 < rowTops.length; r++) {
+                if (rowTops[r] <= center) {
+                    best = r;
+                } else {
+                    break;
+                }
+            }
+        }
+        if (best < firstDataRow) return firstDataRow;
+        if (lastDataRow >= firstDataRow && best > lastDataRow) return lastDataRow;
+        return best;
     }
 
     /**
@@ -762,13 +822,15 @@ public class SafetyExcelParser {
     private void collectPhotos(Sheet sheet, XSSFShape shape, XSSFClientAnchor inherited,
                                Map<Integer, List<ParsedPhoto>> result, int[] seq, boolean includeData,
                                List<Integer> sourceColumnIndexes, int photoColumnPos,
-                               long[] rowTops, int firstDataRow, int lastDataRow) {
+                               long[] rowTops, boolean[] rowHasText,
+                               int firstDataRow, int lastDataRow) {
         if (shape instanceof XSSFShapeGroup group) {
             XSSFClientAnchor groupAnchor = clientAnchor(group);
             if (groupAnchor == null) groupAnchor = inherited;
             for (XSSFShape child : group) {
                 collectPhotos(sheet, child, groupAnchor, result, seq, includeData,
-                        sourceColumnIndexes, photoColumnPos, rowTops, firstDataRow, lastDataRow);
+                        sourceColumnIndexes, photoColumnPos, rowTops, rowHasText,
+                        firstDataRow, lastDataRow);
             }
             return;
         }
@@ -778,7 +840,7 @@ public class SafetyExcelParser {
         if (anchor == null) anchor = inherited;   // 그룹 안의 그림은 자기 앵커가 없다 — 그룹 것을 쓴다
         if (anchor == null) return;
         if (anchor.getRow1() < 0) return;
-        int rowIdx = anchorRowOf(anchor, rowTops, firstDataRow, lastDataRow);
+        int rowIdx = anchorRowOf(anchor, rowTops, rowHasText, firstDataRow, lastDataRow);
         int columnPos = resolvePhotoColumn(anchor.getCol1(), anchor.getCol2(),
                 sourceColumnIndexes, photoColumnPos);
 
