@@ -16,6 +16,9 @@ public class ExcelImportResultResponse {
     /** 생성된 매뉴얼 요약 목록 */
     private final List<ManualSummaryResponse> manuals;
 
-    /** 요청했지만 건너뛴 시트(이미 존재/인식 실패 등) 및 이유 */
+    /** 요청했지만 건너뛴 시트(인식 실패 등) 및 이유 */
     private final List<String> skipped;
+
+    /** 같은 제목이 이미 있어 덮어쓴(또는 되살려 덮어쓴) 시트 및 안내 */
+    private final List<String> overwritten;
 }

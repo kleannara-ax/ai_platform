@@ -139,6 +139,12 @@ public class SafetyPhotoService {
         return StepPhotoResponse.from(photo);
     }
 
+    /** 한 단계에 달린 사진을 모두 소프트 삭제한다. (엑셀을 다시 올려 내용을 갈아 끼울 때) */
+    @Transactional
+    public void deletePhotosOfStep(Long stepId, String deletedBy) {
+        photoRepository.findByStepIdOrderBySortOrder(stepId).forEach(photo -> photo.delete(deletedBy));
+    }
+
     // ================================================================
     // 사진 삭제 (관리자)
     // ================================================================

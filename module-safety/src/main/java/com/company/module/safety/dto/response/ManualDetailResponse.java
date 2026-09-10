@@ -20,6 +20,8 @@ public class ManualDetailResponse {
     private final String formTypeName;
     private final String sourceFileName;
     private final String sourceSheetName;
+    /** 분류 안에서의 표시 순서 — 이름만 바꿀 때 이 값을 그대로 되돌려 보내야 순서가 유지된다 */
+    private final int sortOrder;
     private final List<MetaResponse> meta;
     private final List<ColumnResponse> columns;
     private final List<StepResponse> steps;
@@ -37,6 +39,7 @@ public class ManualDetailResponse {
                 .formTypeName(entity.formType().displayName())
                 .sourceFileName(entity.getSourceFileName())
                 .sourceSheetName(entity.getSourceSheetName())
+                .sortOrder(entity.getSortOrder())
                 .meta(meta)
                 .columns(columns)
                 .steps(steps)
