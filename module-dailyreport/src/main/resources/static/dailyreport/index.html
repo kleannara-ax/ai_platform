@@ -394,16 +394,33 @@
       return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
     }
 
-    /** 저장 구간(05:00:00~08:09:59) 밖이면 "수정" 흐름(재업로드 요청 대상) */
+    /**
+     * ★★ 2026-09 변경: "수정" 흐름(재업로드 요청 대상)은 시간(저장 구간 밖) +
+     * 날짜(현재 조회 중인 일보가 디폴트 날짜=오늘 기준 전일과 동일) 두 조건을
+     * 모두 만족할 때만 활성화한다.
+     * - 화면 접속 시 디폴트로 로드되는 일보(오늘 기준 전일)만 08:10 이후 "수정"
+     *   버튼으로 전환된다.
+     * - 사용자가 날짜를 바꿔 다른 일자(오늘/그 이전 과거/미래 등)를 조회 중이면
+     *   시간과 무관하게 항상 "저장" 버튼 + 기존 저장 흐름(daily_batchjob 미참조)을
+     *   그대로 사용한다.
+     * ※ getYesterdayStr()는 호출 시점의 "오늘" 기준으로 매번 새로 계산되는 순수
+     *   함수이므로, 화면을 자정 너머로 오래 열어둔 채로 있어도 항상 최신 기준으로
+     *   재판정된다.
+     */
     function isAfterBatchJobCutoff() {
-      return !isWithinSaveWindow();
+      if (isWithinSaveWindow()) return false;
+      return currentReportDate === getYesterdayStr();
     }
 
-    /** 저장 구간 여부에 따라 저장 버튼 라벨을 "저장"/"수정"으로 전환하고, 매분 재확인한다 */
+    /**
+     * 저장/수정 버튼 라벨 전환 — isAfterBatchJobCutoff()(시간+날짜 조건)와
+     * 반드시 동일한 기준을 사용해야 한다(라벨과 실제 저장 동작이 항상 일치).
+     * 매분 재확인하여 시간 경계 또는 날짜 변경(조회) 직후에도 즉시 반영한다.
+     */
     function updateSaveButtonLabel() {
       const btn = document.getElementById('saveBtn');
       if (!btn) return;
-      btn.textContent = isWithinSaveWindow() ? '저장' : '수정';
+      btn.textContent = isAfterBatchJobCutoff() ? '수정' : '저장';
     }
 
     // ── 부모 iframe에서 전달한 파라미터 추출 ──
@@ -1234,6 +1251,9 @@
         }
 
         renderAllSections();
+        // ★★ 2026-09: 저장/수정 버튼 라벨은 시간뿐 아니라 currentReportDate(방금
+        //   갱신됨)에도 의존하므로, 날짜 조회/자동 새로고침 직후 즉시 재반영한다.
+        updateSaveButtonLabel();
         return true;
 
       } catch (err) {
