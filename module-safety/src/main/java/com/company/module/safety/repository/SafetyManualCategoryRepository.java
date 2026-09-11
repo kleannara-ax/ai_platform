@@ -14,7 +14,7 @@ public interface SafetyManualCategoryRepository extends JpaRepository<SafetyManu
     @Query("SELECT c FROM SafetyManualCategory c WHERE c.deletedYn = 'N' ORDER BY c.sortOrder ASC, c.categoryId ASC")
     List<SafetyManualCategory> findAllActive();
 
-    /** 최상위 분류만 */
+    /** 최상위 분류만. 표시 순서(이름 가나다순)는 서비스에서 맞춘다. */
     @Query("SELECT c FROM SafetyManualCategory c WHERE c.parent IS NULL AND c.deletedYn = 'N' ORDER BY c.sortOrder ASC")
     List<SafetyManualCategory> findRootCategories();
 
