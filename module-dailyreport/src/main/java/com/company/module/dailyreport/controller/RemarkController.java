@@ -24,14 +24,23 @@ public class RemarkController {
     private final DailyReportService dailyReportService;
 
     /**
-     * 특이사항 목록 조회 (사업부별 5행 고정, 담당자/편집가능여부/최종저장자 포함)
+     * 특이사항 목록 조회 (표별 카테고리 고정 행, 담당자/편집가능여부/최종저장자 포함)
      * GET /dailyreport-api/reports/{reportId}/remarks
+     * GET /dailyreport-api/reports/{reportId}/remarks?tableCode=TBL_SAFETY_AMOUNT_NOTE
+     *
+     * ★★ 2026-09: tableCode 쿼리파라미터 추가 — 사고 통계 특이사항표 2종
+     * (TBL_SAFETY_AMOUNT_NOTE, TBL_SAFETY_TREND_NOTE) 조회용. 생략 시 기존
+     * TBL_SPECIAL_NOTE로 동작하여 기존 index.html 호출부와 완전히 호환된다.
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<RemarkResponse>>> getRemarks(
             @PathVariable Long reportId,
+            @RequestParam(required = false) String tableCode,
             @AuthenticationPrincipal(expression = "userId") Long userId) {
-        return ResponseEntity.ok(ApiResponse.success(dailyReportService.getRemarksForUser(reportId, userId)));
+        List<RemarkResponse> remarks = (tableCode == null || tableCode.isBlank())
+                ? dailyReportService.getRemarksForUser(reportId, userId)
+                : dailyReportService.getRemarksForUser(reportId, userId, tableCode);
+        return ResponseEntity.ok(ApiResponse.success(remarks));
     }
 
     /**
