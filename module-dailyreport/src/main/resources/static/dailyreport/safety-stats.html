@@ -119,7 +119,7 @@
     /* ── 특이사항표 (표9/10, 2026-09 신규 — index.html 특이사항 UI 패턴 재사용) ── */
     .special-table { border-collapse:collapse; border:1px solid #000; width:100%; }
     .special-head-left, .special-head-mid, .special-head-right { height:30px; background:#fff; font-size:12px; font-weight:700; text-align:center; border:1px solid #000; }
-    .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; }
+    .special-side-label { background:#fff; text-align:center; vertical-align:middle; font-size:14px; font-weight:700; border:1px solid #000; white-space:pre-line; word-break:keep-all; line-height:1.4; padding:6px 4px; }
     .special-division-label { background:#f8fafc; text-align:center; vertical-align:middle; font-size:13px; font-weight:700; color:#0f172a; border:1px solid #000; padding:8px 6px; }
     .special-note-wrap { padding:0; background:#fff; border:1px solid #000; }
     .special-note-input { display:block; width:calc(100% - 10px); min-height:64px; resize:vertical; border:0; outline:none; padding:10px 14px; font:inherit; line-height:1.5; color:#111827; background:#fff; box-shadow:none; text-align:left; }
@@ -280,10 +280,13 @@
           { code: 'PAD',    label: '패드' },
         ],
         maxTotalNewlines: 9,
-        maxTotalChars: 804,
-        maxLineLength: 67,
+        maxTotalChars: 486,
+        maxLineLength: 78,
+        // ★★ 2026-09: 사용자 요청으로 표9/10의 섹션 폭을 위쪽 표5~8과 동일하게
+        //   (별도 좁히기/넓히기 없이 .page-wrap 전체 폭 그대로) 맞춘다 —
+        //   과거에 있던 sectionMaxWidth 커스텀 폭 지정을 제거했다.
         title: '9. 사고 금액 특이사항',
-        sideLabel: '사고 금액 특이사항',
+        sideLabel: '사고금액\n특이사항',
         sectionId: 'noteAmount',
         counterId: 'noteAmountCounter',
         remarksKey: 'amountNoteRemarks',
@@ -297,10 +300,10 @@
         ],
         hideDivisionColumns: true,
         maxTotalNewlines: 6,
-        maxTotalChars: 469,
-        maxLineLength: 67,
+        maxTotalChars: 702,
+        maxLineLength: 78,
         title: '10. 안전사고 발생추이 특이사항',
-        sideLabel: '안전사고 발생추이 특이사항',
+        sideLabel: '안전사고 발생추이\n특이사항',
         sectionId: 'noteTrend',
         counterId: 'noteTrendCounter',
         remarksKey: 'trendNoteRemarks',
@@ -349,13 +352,14 @@
       const num = Number(cleaned);
       if (isNaN(num)) return raw;
 
+      // ★★ 2026-09 요청 — 표5/6/7/8은 값이 0(없음)이면 "0"이 아니라 "-"로
+      //   표시한다(소계/합계 행 포함). 정수/소수 분기 이전에 먼저 처리한다.
+      if (num === 0) return '-';
+
       // ★ 표5/7/8(사고 금액 표 제외)는 항상 정수로만 표시
       if (tableCode && tableCode !== 'TBL_SAFETY_INCIDENT_AMOUNT') {
         return Math.round(num).toLocaleString('ko-KR');
       }
-
-      // 0은 예외적으로 그냥 "0"만 표시
-      if (num === 0) return '0';
 
       // 정수부(부호 제외) 자릿수로 소수점 표시 여부 결정
       const integerDigits = Math.trunc(Math.abs(num)).toString().length;
@@ -926,6 +930,9 @@
       const section = document.createElement('section');
       section.className = 'report-section';
       section.dataset.section = cfg.sectionId;
+      // ★★ 2026-09: 표9/10 섹션 폭은 위쪽 표5~8과 동일하게 .report-section
+      //   기본 폭(.page-wrap 전체 폭)을 그대로 사용한다 — 별도의 폭 조정 없음
+      //   (사용자 요청으로 과거의 sectionMaxWidth 커스텀 폭 지정을 제거함).
 
       const remarks = reportData?.[cfg.remarksKey] || [];
       const remarksByCategory = {};
@@ -1309,6 +1316,8 @@
 
       // ★★ 2026-09 추가 — 표5/6 저장 전 소계/합계 실시간 미리보기
       recomputeSafetyIncidentPreview(inputEl);
+      // ★★ 2026-09 추가 — 표7/8 저장 전 "총 발생건수" 실시간 미리보기
+      recomputeSafetyTrendTotalsPreview(inputEl);
     }
 
     // ═══════════════════════════════════════════════
@@ -1421,6 +1430,92 @@
 
       // (3) 합계 행 자신의 소계(R10) = O10+P10+Q10 재계산
       recomputeSafetyIncidentRowSubtotalPreview(tableEl, SAFETY_INCIDENT_TOTAL_ROW, tableCode);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  ★★ 2026-09 추가(사용자 확인 반영) — 표7(연도별 추이)/표8(월별 추이)
+    //  "총 발생건수" 및 "합계" 재해자수/사망자수 행 저장 전 프론트 실시간 미리보기.
+    //
+    //  백엔드 CellService.recomputeSafetyTrendTotalsIfNeeded()와 완전히 동일한
+    //  규칙·순서를 브라우저에서 저장 요청 없이 미리 계산해 화면에만 반영한다.
+    //
+    //  표5/6과의 차이점: "다른 행을 세로로" 합산하는 게 아니라, 같은 시점
+    //  (라이브 컬럼, 표7=col11/표8=col18) 안에서 몇 개의 다른 행을 더한다.
+    //
+    //  계산 단계(순서 중요 — 뒤 단계가 앞 단계 결과를 재료로 씀. 백엔드
+    //  SAFETY_TREND_SUM_STEPS와 동일):
+    //    [표7] ①row3=row1+row2(공장 발생건수, 신규 자동계산)
+    //          ②row6=row4+row5(협력사 발생건수, 신규 자동계산)
+    //          ③row7=row3+row6(청주공장 총발생건수 — 이제 ①②의 결과를 재료로 사용)
+    //          ④row10=row8+row9
+    //          ⑤row11=row1+row4+row8(합계 재해자수, 자동계산)
+    //          ⑥row12=row2+row5+row9(합계 사망자수, 자동계산)
+    //          ⑦row13=row11+row12
+    //    [표8] ①row4=row2+row3  ②row7=row5+row6  ③row10=row8+row9
+    //          ④row11=row2+row5+row8(합계 재해자수, 자동계산)
+    //          ⑤row12=row3+row6+row9(합계 사망자수, 자동계산)
+    //          ⑥row13=row11+row12
+    // ═══════════════════════════════════════════════
+    const SAFETY_TREND_LIVE_COL_BY_TABLE = { 'TBL_SAFETY_YEARLY_TREND': 11, 'TBL_SAFETY_MONTHLY_TREND': 18 };
+    const SAFETY_TREND_SUM_STEPS = {
+      'TBL_SAFETY_YEARLY_TREND': [
+        [3, 1, 2],
+        [6, 4, 5],
+        [7, 3, 6],
+        [10, 8, 9],
+        [11, 1, 4, 8],
+        [12, 2, 5, 9],
+        [13, 11, 12],
+      ],
+      'TBL_SAFETY_MONTHLY_TREND': [
+        [4, 2, 3],
+        [7, 5, 6],
+        [10, 8, 9],
+        [11, 2, 5, 8],
+        [12, 3, 6, 9],
+        [13, 11, 12],
+      ],
+    };
+    // 어느 계산 단계에서든 "원천 행"으로 등장하는 rowIndex 집합(표코드별) —
+    // 방금 입력이 발생한 행이 이 집합에 없으면(=결과 행 자신이거나 무관한 행)
+    // 재계산을 트리거하지 않는다. 백엔드 SAFETY_TREND_TRIGGER_ROWS와 동일.
+    const SAFETY_TREND_TRIGGER_ROWS = {
+      'TBL_SAFETY_YEARLY_TREND': new Set([1, 2, 4, 5, 8, 9]),
+      'TBL_SAFETY_MONTHLY_TREND': new Set([2, 3, 5, 6, 8, 9]),
+    };
+
+    /**
+     * 방금 입력이 발생한 <input>(표7/8의 라이브 컬럼)을 기준으로, 그 표의
+     * 전체 계산 단계(SAFETY_TREND_SUM_STEPS)를 순서대로 다시 실행해 화면에
+     * 미리보기로 반영한다. 표7/8 이외의 입력, 또는 라이브 컬럼이 아닌 입력,
+     * 또는 어떤 계산 단계의 원천 행도 아닌 입력이면 아무 것도 하지 않는다.
+     */
+    function recomputeSafetyTrendTotalsPreview(inputEl) {
+      const tableCode = inputEl.dataset.tableCode;
+      const liveCol = SAFETY_TREND_LIVE_COL_BY_TABLE[tableCode];
+      if (liveCol === undefined) return;
+
+      const colIndex = parseInt(inputEl.dataset.col, 10);
+      const rowIndex = parseInt(inputEl.dataset.row, 10);
+      if (colIndex !== liveCol) return;
+
+      const triggerRows = SAFETY_TREND_TRIGGER_ROWS[tableCode];
+      if (!triggerRows || !triggerRows.has(rowIndex)) return;
+
+      const steps = SAFETY_TREND_SUM_STEPS[tableCode];
+      if (!steps) return;
+
+      const tableEl = inputEl.closest('table');
+      if (!tableEl) return;
+
+      for (const step of steps) {
+        const resultRow = step[0];
+        let sum = 0;
+        for (let i = 1; i < step.length; i++) {
+          sum += readSafetyIncidentCellNumber(tableEl, step[i], liveCol);
+        }
+        writeSafetyIncidentPreview(tableEl, resultRow, liveCol, sum, tableCode);
+      }
     }
 
     function onCellFocus(inputEl) {

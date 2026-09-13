@@ -118,20 +118,26 @@ public class DailyReportService {
      *    확인되어 13으로 재조정했다.
      *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 → 최대 안전 줄바꿈 수 = 22-5-4=13)
      *  - 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE, 3행)/안전사고 발생추이
-     *    특이사항표(TBL_SAFETY_TREND_NOTE, 1행)는 각각 사용자가 직접 지정한
-     *    줄바꿈 한도(9회/6회)를 기준으로, 동일한 (줄바꿈+행수)×67자 공식으로
-     *    글자수 한도를 산출했다: (9+3)×67=804자, (6+1)×67=469자.
+     *    특이사항표(TBL_SAFETY_TREND_NOTE, 1행)는 줄바꿈 한도(9회/6회)는 유지한 채,
+     *    글자수 한도만 2026-09 사용자 요청에 따라 486자/702자로 재지정했다
+     *    ((줄바꿈+행수)×67자 공식에서 벗어난 별도 지정값).
+     *  - 2026-09: 사용자가 표9/10의 실제 한 줄 제한은 67자가 아니라 78자라고 정정함에
+     *    따라, 이 두 표(TBL_SAFETY_AMOUNT_NOTE/TBL_SAFETY_TREND_NOTE)만 원래 표
+     *    (TBL_SPECIAL_NOTE)와 별도로 SAFETY_NOTE_MAX_LINE_LENGTH(78)을 사용하도록
+     *    분리했다. 프론트(safety-stats.html)도 78로 맞춰 textarea 칸 폭까지 함께
+     *    좁혔다(sectionMaxWidth). TBL_SPECIAL_NOTE(index.html)는 기존 67자를 유지한다.
      *  프론트(index.html/safety-stats.html)에서도 동일한 상수로 실시간 검증을 하지만,
      *  프론트 검증은 우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
+    private static final int SAFETY_NOTE_MAX_LINE_LENGTH = 78;
     private static final Map<String, SpecialNoteSpec> SPECIAL_NOTE_SPECS = new LinkedHashMap<>();
     static {
         SPECIAL_NOTE_SPECS.put(SPECIAL_NOTE_TABLE_CODE,
                 new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 13, 1206, SPECIAL_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_AMOUNT_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 804, SPECIAL_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 486, SAFETY_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_TREND_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SAFETY_TREND_NOTE_CATEGORIES, 6, 469, SPECIAL_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SAFETY_TREND_NOTE_CATEGORIES, 6, 702, SAFETY_NOTE_MAX_LINE_LENGTH));
     }
 
     /** tableCode에 해당하는 분량 제한 스펙을 반환한다 (등록되지 않은 코드면 예외). */
