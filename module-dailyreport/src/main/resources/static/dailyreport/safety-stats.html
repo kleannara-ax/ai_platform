@@ -63,6 +63,8 @@
     /* ── 알림/범례 ── */
     .notice { width:min(1551px, calc(100vw - 32px)); margin:14px auto 0; padding:12px 14px; border-radius:14px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:13px; font-weight:700; }
     .notice small { display:block; margin-top:4px; color:#4f6fb8; font-weight:600; line-height:1.55; }
+    .notice-guide { display:block; margin-top:8px; font-size:16px; font-weight:800; line-height:1.75; color:#1d4ed8; }
+    .notice-guide .notice-emphasis { color:#dc2626; text-decoration:underline; font-weight:800; }
     .legend { width:min(1551px, calc(100vw - 32px)); margin:12px auto 0; display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#475569; }
     .legend-item { display:flex; align-items:center; gap:8px; }
     .swatch { width:18px; height:18px; border-radius:6px; border:1px solid #cbd5e1; }
@@ -167,7 +169,11 @@
       </div>
     </div>
 
-    <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small></div>
+    <div class="notice">입력 안내<small id="noticeDetail">로그인 인증 확인중...</small>
+      <span class="notice-guide">
+        1. 각 담당자는 <span class="notice-emphasis">매일 오전 7:50까지</span> 본인 담당 칸 기입 必
+      </span>
+    </div>
     <div class="legend">
       <div class="legend-item"><span class="swatch mine"></span> 파란색: 사람이 수기로 입력하는 셀 (본인 담당)</div>
       <div class="legend-item"><span class="swatch locked"></span> 잠금 또는 비담당 셀</div>
