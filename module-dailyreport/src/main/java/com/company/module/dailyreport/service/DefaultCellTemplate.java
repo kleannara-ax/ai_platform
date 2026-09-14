@@ -347,7 +347,7 @@ public final class DefaultCellTemplate {
         ro(t, 3, 0, "B8",  "초지5 생산량(톤/日)", 1, 3);
         ro(t, 3, 3, "E8",  "85");
         ro(t, 3, 4, "F8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear2, fb8, "83.8"));
-        ro(t, 3, 5, "G8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear1, fb8, "76"));
+        ro(t, 3, 5, "G8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear1, fb8, "80.7"));
         addHistoricalRollingRow(t, 3, 6, coordsForRow(histCols, 8), rolling, tableCode, liveCol, lookup, fb8);
         d(t,  3,13, "O8",  null, null);
         d(t,  3,14, "P8",  "daily", "매일");

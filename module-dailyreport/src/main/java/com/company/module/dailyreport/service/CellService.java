@@ -401,25 +401,30 @@ public class CellService {
                 // 영향받을 수 있는 좁은 범위만 훑으므로 데이터가 아무리 많아져도 느려지지 않는다.)
                 propagateRollingHeadersForward(report.getReportDate(), table.getTableCode(),
                         cell.getColIndex());
-
-                // ★★ 2026-09 추가 — 표5/6 "당월" 소계/합계 자동 계산: 방금 저장한 셀이
-                // 7개 기여 행(제지~에너지) 중 하나의 "당월" 입력 컬럼(기계/전기/생산)
-                // 이면, (1) 그 행 자신의 소계(R열=가로합 기계+전기+생산)를 재계산하고,
-                // (2) 같은 표·같은 컬럼의 합계 행(합 계, rowIndex=9)을 재계산한 뒤,
-                // (3) 합계 행 자신의 소계(R10=가로합 O10+P10+Q10)도 재계산한다.
-                // 소계/합계 행 모두 사람이 직접 입력하지 않으므로 여기서만 갱신된다.
-                recomputeSafetyIncidentTotalIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
-
-                // ★★ 2026-09 추가 — 표7(연도별 추이)/표8(월별 추이) "총 발생건수"
-                // 행 자동 계산: 방금 저장한 셀이 각 표의 라이브(당해년도/당월) 컬럼
-                // (표7=col11, 표8=col18)이면, 그 열(같은 연/월)에 대해 계층적으로
-                // "총 발생건수" 행들을 재계산한다. 표5/6과 달리 세로합이 아니라
-                // 같은 컬럼(같은 시점) 내 몇 개 행을 가로로 더하는 구조다.
-                recomputeSafetyTrendTotalsIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
             }
-            // 값이 바뀌지 않았다면 위 두 동작(도장 찍기/전파) 모두 건너뛴다 —
+            // 값이 바뀌지 않았다면 위 두 동작(도장 찍기/전파)은 건너뛴다 —
             // 이 셀은 여전히 "이어받기 상태"로 남아, 향후 더 이전 날짜에서의
             // 실제 수정이 이 셀까지 정상적으로 전파될 수 있다.
+
+            // ★★ 2026-09 추가, ★★★ 2026-09 버그 수정(운영 반영 후 발견) — 표5/6
+            // "당월" 소계/합계 및 표7/8 "총 발생건수" 자동 계산은 valueChanged와
+            // 무관하게 "저장 요청에 포함된 입력 컬럼 셀"마다 항상 재시도한다.
+            //
+            // [버그였던 이유] 기존에는 이 두 호출이 위 if(valueChanged) 블록 안에
+            // 있었다 — 그런데 프론트가 "저장" 시 화면에 보이는 편집 가능한 셀을
+            // (실제로 값을 고쳤는지와 무관하게) 항상 통째로 다시 전송하므로,
+            // 사용자가 이어받은/기존 값을 "그대로" 다시 저장하면 valueChanged=false가
+            // 되어 재계산 자체가 스킵됐다. 그 결과 프론트의 저장 전 실시간
+            // 미리보기(recomputeSafetyIncidentPreview 등, 화면 표시만 담당하고
+            // 서버에 저장하지 않음)만 계산되어 화면엔 정상으로 보이지만, 새로고침
+            // 하면(=서버에 저장된, 재계산이 스킵된 값이 다시 조회되어) 소계/합계가
+            // 사라진 것처럼 보이는 문제가 있었다.
+            //
+            // 두 메서드 모두 내부적으로 "새 계산값이 기존 저장값과 다를 때만"
+            // carryOverValue를 호출하므로(멱등적), valueChanged와 무관하게 항상
+            // 호출해도 안전하며 불필요한 갱신이나 무한 루프를 유발하지 않는다.
+            recomputeSafetyIncidentTotalIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
+            recomputeSafetyTrendTotalsIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
 
             savedCells.add(CellResponse.from(cell));
         }
