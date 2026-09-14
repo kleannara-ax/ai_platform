@@ -42,6 +42,10 @@ public class FireSprinklerInspection {
     @Column(name = "INSPECTION_STATUS", nullable = false, length = 30)
     private String inspectionStatus;
 
+    /** 점검표 유형: STANDARD / PARKING_TOWER / STATUS_ONLY (SprinklerChecklist 참고) */
+    @Column(name = "CHECKLIST_TYPE", length = 30)
+    private String checklistType;
+
     @Lob
     @Column(name = "CHECKLIST_JSON", columnDefinition = "LONGTEXT")
     private String checklistJson;
@@ -86,7 +90,7 @@ public class FireSprinklerInspection {
 
     @Builder
     public FireSprinklerInspection(FireSprinkler sprinkler, LocalDate inspectionDate, LocalTime inspectionTime,
-                                   String inspectionStatus, String checklistJson, String note,
+                                   String inspectionStatus, String checklistType, String checklistJson, String note,
                                    String pipeDamageStatus, String pipeConnectionStatus, String pipeSupportStatus,
                                    String drainValveStatus, String drainPipeSealingStatus,
                                    String headReflectorStatus, String productClearanceStatus,
@@ -95,6 +99,7 @@ public class FireSprinklerInspection {
         this.inspectionDate = inspectionDate;
         this.inspectionTime = inspectionTime;
         this.inspectionStatus = inspectionStatus;
+        this.checklistType = checklistType;
         this.checklistJson = checklistJson;
         this.note = note;
         this.pipeDamageStatus = pipeDamageStatus;
@@ -109,13 +114,14 @@ public class FireSprinklerInspection {
     }
 
     public void updateInspection(LocalDate inspectionDate, LocalTime inspectionTime, String inspectionStatus,
-                                 String checklistJson, String note, String inspectedByName,
+                                 String checklistType, String checklistJson, String note, String inspectedByName,
                                  String pipeDamageStatus, String pipeConnectionStatus, String pipeSupportStatus,
                                  String drainValveStatus, String drainPipeSealingStatus,
                                  String headReflectorStatus, String productClearanceStatus) {
         this.inspectionDate = inspectionDate;
         this.inspectionTime = inspectionTime;
         this.inspectionStatus = inspectionStatus;
+        this.checklistType = checklistType;
         this.checklistJson = checklistJson;
         this.note = note;
         this.pipeDamageStatus = pipeDamageStatus;
