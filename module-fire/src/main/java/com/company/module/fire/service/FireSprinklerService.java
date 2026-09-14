@@ -48,15 +48,7 @@ public class FireSprinklerService {
     private static final int MAX_INSPECTION_HISTORY = 12;
     private static final int INSPECTION_REQUIRED_DAYS = 90;
 
-    private static final List<InspectionWorkbookExporter.ItemColumn> SPRINKLER_EXPORT_COLUMNS = List.of(
-            new InspectionWorkbookExporter.ItemColumn("pipe_damage", "배관 파손여부 확인(휘거나 찌그러짐) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("pipe_connection", "배관 연결부 상태 확인(플랜지, 나사부, 엘보 등) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("pipe_support", "배관 지지대 상태 확인(고정 및 풀림 확인) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("drain_valve", "드레인 벨브 누수 상태 확인(벨브 파손 및 잠금상태) [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("drain_pipe_sealing", "드레인 배관 실리콘 마감상태 확인 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("head_reflector", "헤드 반사판 탈락여부 확인 [점검결과]"),
-            new InspectionWorkbookExporter.ItemColumn("product_clearance", "헤드로부터 제품 이격거리 60cm 이격거리 확보 여부 [점검결과]")
-    );
+    private static final String EXPORT_STATUS_KEY = "inspection_status";
 
     private final FireSprinklerRepository fireSprinklerRepository;
     private final FireSprinklerInspectionRepository fireSprinklerInspectionRepository;
@@ -95,6 +87,7 @@ public class FireSprinklerService {
                 .orElseThrow(() -> new EntityNotFoundException("FireSprinkler", sprinklerId));
 
         FireSprinklerResponse response = FireSprinklerResponse.from(sprinkler);
+        response.includeChecklistGroups();
         Pageable pageable = PageRequest.of(0, MAX_INSPECTION_HISTORY,
                 Sort.by("inspectionDate").descending().and(Sort.by("inspectionId").descending()));
         List<FireSprinklerInspection> history = fireSprinklerInspectionRepository
@@ -191,9 +184,12 @@ public class FireSprinklerService {
             throw new BusinessException("해당 날짜의 점검 이력이 이미 존재합니다.");
         }
 
-        String checklistJson = writeChecklist(request.getItems());
-        String inspectionStatus = resolveInspectionStatus(request.getItems());
-        Map<String, String> statusMap = toStatusMap(request.getItems());
+        // 이력을 수정하면 현재 스프링클러에 적용되는 점검표 기준으로 다시 저장한다.
+        String checklistType = SprinklerChecklist.currentType(inspection.getSprinkler());
+        List<SprinklerChecklist.CheckedItem> checked = SprinklerChecklist.normalize(checklistType, toResultMap(request.getItems()));
+        String checklistJson = writeChecklist(checked);
+        String inspectionStatus = SprinklerChecklist.resolveStatus(checked);
+        Map<String, String> statusMap = toStatusMap(checked);
         String inspectorName = trimToNull(request.getInspectorName());
         if (inspectorName == null) {
             inspectorName = inspection.getInspectedByName();
@@ -202,6 +198,7 @@ public class FireSprinklerService {
                 request.getInspectionDate(),
                 request.getInspectionTime(),
                 inspectionStatus,
+                checklistType,
                 checklistJson,
                 trimToNull(request.getNote()),
                 inspectorName,
@@ -250,7 +247,8 @@ public class FireSprinklerService {
         List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
                 .map(inspection -> toWorkbookRow(sprinkler, inspection))
                 .toList();
-        return InspectionWorkbookExporter.export("스프링클러 점검보고서", SPRINKLER_EXPORT_COLUMNS, rows, imagePath -> java.util.Optional.empty());
+        return InspectionWorkbookExporter.export("스프링클러 점검보고서",
+                exportColumns(List.of(SprinklerChecklist.currentType(sprinkler))), rows, imagePath -> java.util.Optional.empty());
     }
 
     public byte[] exportAllInspectionWorkbook(LocalDate fromDate, LocalDate toDate) {
@@ -260,20 +258,39 @@ public class FireSprinklerService {
         List<InspectionWorkbookExporter.RowData> rows = inspections.stream()
                 .map(inspection -> toWorkbookRow(inspection.getSprinkler(), inspection))
                 .toList();
-        return InspectionWorkbookExporter.export("스프링클러 점검보고서", SPRINKLER_EXPORT_COLUMNS, rows, imagePath -> java.util.Optional.empty());
+        return InspectionWorkbookExporter.export("스프링클러 점검보고서",
+                exportColumns(List.of(SprinklerChecklist.TYPE_STANDARD, SprinklerChecklist.TYPE_PARKING_TOWER)),
+                rows, imagePath -> java.util.Optional.empty());
+    }
+
+    /** 점검표 항목 열 + 종합 결과 열 (정상/비정상만 남은 이력은 종합 결과만 채워진다) */
+    private List<InspectionWorkbookExporter.ItemColumn> exportColumns(List<String> checklistTypes) {
+        List<InspectionWorkbookExporter.ItemColumn> columns = new ArrayList<>();
+        for (String checklistType : checklistTypes) {
+            String suffix = SprinklerChecklist.TYPE_PARKING_TOWER.equals(checklistType) && checklistTypes.size() > 1
+                    ? " [주차타워 점검결과]" : " [점검결과]";
+            for (SprinklerChecklist.Item item : SprinklerChecklist.items(checklistType)) {
+                columns.add(new InspectionWorkbookExporter.ItemColumn(item.key(), item.label() + suffix));
+            }
+        }
+        columns.add(new InspectionWorkbookExporter.ItemColumn(EXPORT_STATUS_KEY, "종합 점검결과"));
+        return columns;
     }
 
     private FireSprinklerInspection buildInspection(FireSprinkler sprinkler, LocalDate date, LocalTime time,
                                                     List<EquipmentInspectionItemRequest> items, String note,
                                                     Long userId, String inspectorName) {
-        String checklistJson = writeChecklist(items);
-        String inspectionStatus = resolveInspectionStatus(items);
-        Map<String, String> statusMap = toStatusMap(items);
+        String checklistType = SprinklerChecklist.currentType(sprinkler);
+        List<SprinklerChecklist.CheckedItem> checked = SprinklerChecklist.normalize(checklistType, toResultMap(items));
+        String checklistJson = writeChecklist(checked);
+        String inspectionStatus = SprinklerChecklist.resolveStatus(checked);
+        Map<String, String> statusMap = toStatusMap(checked);
         return FireSprinklerInspection.builder()
                 .sprinkler(sprinkler)
                 .inspectionDate(date)
                 .inspectionTime(time)
                 .inspectionStatus(inspectionStatus)
+                .checklistType(checklistType)
                 .checklistJson(checklistJson)
                 .note(trimToNull(note))
                 .pipeDamageStatus(statusMap.get("pipe_damage"))
@@ -325,76 +342,74 @@ public class FireSprinklerService {
         return key;
     }
 
-    private String resolveInspectionStatus(List<EquipmentInspectionItemRequest> items) {
+    private Map<String, String> toResultMap(List<EquipmentInspectionItemRequest> items) {
+        Map<String, String> results = new LinkedHashMap<>();
+        if (items == null) {
+            return results;
+        }
         for (EquipmentInspectionItemRequest item : items) {
-            String result = normalizeResult(item.getResult());
-            if ("FAULTY".equals(result)) {
-                return "FAULTY";
-            }
-            if (!"NORMAL".equals(result)) {
-                throw new BusinessException("점검 결과는 양호 또는 불량만 가능합니다.");
+            String key = trimToNull(item.getItemKey());
+            if (key != null) {
+                results.put(key, item.getResult());
             }
         }
-        return "NORMAL";
+        return results;
     }
 
-    private String normalizeResult(String result) {
-        String normalized = trimToNull(result);
-        if (normalized == null) {
-            return "";
-        }
-        return switch (normalized.toUpperCase(Locale.ROOT)) {
-            case "양호", "정상", "GOOD", "NORMAL" -> "NORMAL";
-            case "불량", "FAULTY" -> "FAULTY";
-            default -> normalized.toUpperCase(Locale.ROOT);
-        };
-    }
-
-    private String writeChecklist(List<EquipmentInspectionItemRequest> items) {
+    private String writeChecklist(List<SprinklerChecklist.CheckedItem> items) {
         try {
-            List<FireSprinklerResponse.InspectionChecklistItem> mapped = items.stream()
-                    .map(item -> new FireSprinklerResponse.InspectionChecklistItem(
-                            trimToNull(item.getItemKey()),
-                            trimToNull(item.getItemLabel()),
-                            normalizeResult(item.getResult())))
-                    .toList();
-            return objectMapper.writeValueAsString(mapped);
+            return objectMapper.writeValueAsString(items);
         } catch (JsonProcessingException ex) {
             throw new BusinessException("점검 항목 저장에 실패했습니다.");
         }
     }
 
-    private Map<String, String> toStatusMap(List<EquipmentInspectionItemRequest> items) {
+    private Map<String, String> toStatusMap(List<SprinklerChecklist.CheckedItem> items) {
         Map<String, String> statusMap = new LinkedHashMap<>();
-        for (EquipmentInspectionItemRequest item : items) {
-            String key = trimToNull(item.getItemKey());
-            if (key != null) {
-                statusMap.put(key, normalizeResult(item.getResult()));
-            }
+        for (SprinklerChecklist.CheckedItem item : items) {
+            statusMap.put(item.itemKey(), item.result());
         }
         return statusMap;
     }
 
+    /**
+     * 이력의 점검표 유형별 항목 결과.
+     * STATUS_ONLY(점검표 교체 이전 이력, 주차타워 제외)는 항목 없이 정상/비정상 결과만 남긴다.
+     */
     private List<FireSprinklerResponse.InspectionChecklistItem> parseChecklist(FireSprinklerInspection inspection) {
-        List<FireSprinklerResponse.InspectionChecklistItem> fromColumns = buildChecklistFromColumns(inspection);
-        if (!fromColumns.isEmpty()) {
-            return fromColumns;
+        String checklistType = SprinklerChecklist.effectiveType(inspection);
+        if (SprinklerChecklist.TYPE_STATUS_ONLY.equals(checklistType)) {
+            return List.of();
         }
+        if (SprinklerChecklist.TYPE_PARKING_TOWER.equals(checklistType)) {
+            List<FireSprinklerResponse.InspectionChecklistItem> fromColumns = buildChecklistFromColumns(inspection);
+            if (!fromColumns.isEmpty()) {
+                return fromColumns;
+            }
+        }
+        return buildChecklistFromJson(inspection, checklistType);
+    }
+
+    private List<FireSprinklerResponse.InspectionChecklistItem> buildChecklistFromJson(FireSprinklerInspection inspection, String checklistType) {
         String checklistJson = trimToNull(inspection.getChecklistJson());
         if (checklistJson == null) {
             return List.of();
         }
         try {
-            List<EquipmentInspectionItemRequest> items = objectMapper.readValue(
-                    checklistJson,
-                    new TypeReference<List<EquipmentInspectionItemRequest>>() {}
-            );
-            return items.stream()
-                    .map(item -> new FireSprinklerResponse.InspectionChecklistItem(
-                            trimToNull(item.getItemKey()),
-                            trimToNull(item.getItemLabel()),
-                            normalizeResult(item.getResult())))
-                    .toList();
+            List<Map<String, Object>> rawItems = objectMapper.readValue(checklistJson, new TypeReference<List<Map<String, Object>>>() {});
+            Map<String, String> resultsByKey = new LinkedHashMap<>();
+            for (Map<String, Object> raw : rawItems) {
+                String key = trimToNull(stringValue(raw.get("itemKey") != null ? raw.get("itemKey") : raw.get("key")));
+                String result = trimToNull(stringValue(raw.get("result")));
+                if (key != null && result != null) {
+                    resultsByKey.put(key, result.toUpperCase(Locale.ROOT));
+                }
+            }
+            List<FireSprinklerResponse.InspectionChecklistItem> items = new ArrayList<>();
+            for (SprinklerChecklist.Item item : SprinklerChecklist.items(checklistType)) {
+                addChecklistItem(items, item.key(), item.label(), resultsByKey.get(item.key()));
+            }
+            return items;
         } catch (JsonProcessingException ex) {
             log.warn("Failed to parse sprinkler inspection checklist: inspectionId={}", inspection.getInspectionId(), ex);
             return List.of();
@@ -402,14 +417,18 @@ public class FireSprinklerService {
     }
 
     private List<FireSprinklerResponse.InspectionChecklistItem> buildChecklistFromColumns(FireSprinklerInspection inspection) {
+        Map<String, String> columnValues = new LinkedHashMap<>();
+        columnValues.put("pipe_damage", inspection.getPipeDamageStatus());
+        columnValues.put("pipe_connection", inspection.getPipeConnectionStatus());
+        columnValues.put("pipe_support", inspection.getPipeSupportStatus());
+        columnValues.put("drain_valve", inspection.getDrainValveStatus());
+        columnValues.put("drain_pipe_sealing", inspection.getDrainPipeSealingStatus());
+        columnValues.put("head_reflector", inspection.getHeadReflectorStatus());
+        columnValues.put("product_clearance", inspection.getProductClearanceStatus());
         List<FireSprinklerResponse.InspectionChecklistItem> items = new ArrayList<>();
-        addChecklistItem(items, "pipe_damage", "배관 파손여부 확인(휘거나 찌그러짐)", inspection.getPipeDamageStatus());
-        addChecklistItem(items, "pipe_connection", "배관 연결부 상태 확인(플랜지, 나사부, 엘보 등)", inspection.getPipeConnectionStatus());
-        addChecklistItem(items, "pipe_support", "배관 지지대 상태 확인(고정 및 풀림 확인)", inspection.getPipeSupportStatus());
-        addChecklistItem(items, "drain_valve", "드레인 벨브 누수 상태 확인(벨브 파손 및 잠금상태)", inspection.getDrainValveStatus());
-        addChecklistItem(items, "drain_pipe_sealing", "드레인 배관 실리콘 마감상태 확인", inspection.getDrainPipeSealingStatus());
-        addChecklistItem(items, "head_reflector", "헤드 반사판 탈락여부 확인", inspection.getHeadReflectorStatus());
-        addChecklistItem(items, "product_clearance", "헤드로부터 제품 이격거리 60cm 이격거리 확보 여부", inspection.getProductClearanceStatus());
+        for (SprinklerChecklist.Item item : SprinklerChecklist.items(SprinklerChecklist.TYPE_PARKING_TOWER)) {
+            addChecklistItem(items, item.key(), item.label(), columnValues.get(item.key()));
+        }
         return items;
     }
 
@@ -418,6 +437,10 @@ public class FireSprinklerService {
         if (normalized != null) {
             items.add(new FireSprinklerResponse.InspectionChecklistItem(itemKey, itemLabel, normalized));
         }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private String buildFaultReason(List<FireSprinklerResponse.InspectionChecklistItem> items) {
@@ -443,17 +466,16 @@ public class FireSprinklerService {
                 inspection.getInspectionDate(),
                 inspection.getInspectionTime(),
                 inspection.getInspectedByName(),
-                toItemResultMap(parseChecklist(inspection)),
+                toItemResultMap(inspection),
                 null,
                 inspection.getNote()
         );
     }
 
-    private Map<String, String> toItemResultMap(List<FireSprinklerResponse.InspectionChecklistItem> items) {
+    private Map<String, String> toItemResultMap(FireSprinklerInspection inspection) {
         Map<String, String> result = new LinkedHashMap<>();
-        if (items == null) {
-            return result;
-        }
+        result.put(EXPORT_STATUS_KEY, inspection.getInspectionStatus());
+        List<FireSprinklerResponse.InspectionChecklistItem> items = parseChecklist(inspection);
         for (FireSprinklerResponse.InspectionChecklistItem item : items) {
             String key = trimToNull(item.getItemKey());
             if (key != null) {
