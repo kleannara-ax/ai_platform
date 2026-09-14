@@ -49,32 +49,58 @@ public final class DefaultCellTemplate {
     }
 
     /**
+     * ★ 표7(연도별 추이) 전용 롤링 실측값 조회 콜백 — 위 {@link HistoricalValueLookup}과
+     *   원리는 같지만 조회 단위가 "연도"이다 (표7의 각 컬럼은 1개월이 아니라 1개 연도를
+     *   대표하는 값이므로, 그 연도 전체 기간(1/1~12/31) 안에서 가장 최근 값을 찾는다).
+     *
+     * @return 해당 (표코드, 행, 실측(라이브) 열, 대상 연도)의 연말 대표값(연간 누적값).
+     *         실측 데이터가 아직 없으면 null.
+     */
+    @FunctionalInterface
+    public interface HistoricalYearlyValueLookup {
+        String find(String tableCode, int rowIndex, int liveColIndex, int targetYear);
+    }
+
+    /**
      * 테이블 코드에 맞는 기본 셀을 생성하여 table 엔티티에 추가한다.
      * @param table 대상 테이블 엔티티
-     * @param reportDate 일보 날짜 (헤더 롤링 월 계산용)
+     * @param reportDate 일보 날짜 (헤더 롤링 월/연도 계산용)
      * @param lookup 과거 달의 실측(월말 대표값) 조회 콜백 — null이면 항상
      *               하드코딩 샘플/"일보 없음"만 사용 (실측 조회 시도 안 함)
+     * @param yearlyLookup 표7(연도별 추이) 전용 — 과거 연도의 실측(연말 대표값)
+     *               조회 콜백. null이면 항상 "-"만 사용 (실측 조회 시도 안 함)
      */
     public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate,
-                                             HistoricalValueLookup lookup) {
+                                             HistoricalValueLookup lookup,
+                                             HistoricalYearlyValueLookup yearlyLookup) {
         String code = table.getTableCode();
         switch (code) {
             case "TBL_PRODUCTION_INDEX" -> addProductionIndexCells(table, reportDate, lookup);
             case "TBL_INVENTORY"        -> addInventoryCells(table, reportDate, lookup);
             case "TBL_ENERGY"           -> addEnergyCells(table, reportDate);
             case "TBL_BOILER"           -> addBoilerCells(table, reportDate, lookup);
+            case "TBL_SAFETY_INCIDENT_COUNT"  -> addSafetyIncidentCountCells(table, reportDate, lookup);
+            case "TBL_SAFETY_INCIDENT_AMOUNT" -> addSafetyIncidentAmountCells(table, reportDate, lookup);
+            case "TBL_SAFETY_YEARLY_TREND"    -> addSafetyYearlyTrendCells(table, reportDate, yearlyLookup);
+            case "TBL_SAFETY_MONTHLY_TREND"   -> addSafetyMonthlyTrendCells(table, reportDate, lookup);
             default -> { /* unknown table code — skip */ }
         }
     }
 
+    /** 하위 호환용 (yearlyLookup 없이 호출 시 표7 실측 조회 없이 "-"만 사용) */
+    public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate,
+                                             HistoricalValueLookup lookup) {
+        populateDefaultCells(table, reportDate, lookup, null);
+    }
+
     /** 하위 호환용 (lookup 없이 호출 시 실측 조회 없이 하드코딩 샘플/"일보 없음"만 사용) */
     public static void populateDefaultCells(DailyReportTable table, LocalDate reportDate) {
-        populateDefaultCells(table, reportDate, null);
+        populateDefaultCells(table, reportDate, null, null);
     }
 
     /** 하위 호환용 (reportDate/lookup 없이 호출 시 오늘 날짜 기준, 실측 조회 없음) */
     public static void populateDefaultCells(DailyReportTable table) {
-        populateDefaultCells(table, LocalDate.now(), null);
+        populateDefaultCells(table, LocalDate.now(), null, null);
     }
 
     /**
@@ -115,11 +141,32 @@ public final class DefaultCellTemplate {
 
     /** 특정 currentMonth 기준 직근 8개월 목록 계산 (index 0=current-7 ~ index 7=current) */
     private static List<YearMonth> rollingMonths(YearMonth current) {
+        return rollingMonths(current, 8);
+    }
+
+    /**
+     * ★ 윈도우 크기를 파라미터화한 롤링 개월 목록 계산 (표8=16개월 전용으로 추가, 2026-09).
+     * index 0 = current-(windowSize-1) (가장 오래된 달) ~ index windowSize-1 = current(라이브)
+     */
+    private static List<YearMonth> rollingMonths(YearMonth current, int windowSize) {
         List<YearMonth> rolling = new ArrayList<>();
-        for (int i = 7; i >= 0; i--) {
+        for (int i = windowSize - 1; i >= 0; i--) {
             rolling.add(current.minusMonths(i));
         }
         return rolling;
+    }
+
+    /**
+     * ★ 연도 단위 롤링 목록 계산 (표7 전용, 2026-09 추가) — 위 rollingMonths와 동일한
+     * 원리를 "연도" 단위로 적용한다. index 0 = currentYear-(windowSize-1) (가장 오래된 연도)
+     * ~ index windowSize-1 = currentYear(라이브).
+     */
+    private static List<Integer> rollingYears(int currentYear, int windowSize) {
+        List<Integer> years = new ArrayList<>();
+        for (int i = windowSize - 1; i >= 0; i--) {
+            years.add(currentYear - i);
+        }
+        return years;
     }
 
     /**
@@ -650,6 +697,445 @@ public final class DefaultCellTemplate {
         ro(t, 6, 4, "N40", rollingValue(lookup, tableCode, 6, liveCol, mMinus1, fbTotal));
         d(t,  6, 5, "O40", "daily", "매일");
         d(t,  6, 6, "P40", "daily",   "매일");
+    }
+
+    // ═══════════════════════════════════════════════
+    //  5/6. 안전사고 발생건수/손실금액  (공용 헬퍼 + 10행 × 18열 × 2)
+    //  구조: 구분(col0-1 병합) | '22~'25년 월평균(col2-5, 정적 시드) |
+    //        당월-2(col6-9: 기계/전기/생산/소계, READONLY 롤링) |
+    //        당월-1(col10-13) | 당월(col14-17, DATA×4, 라이브 입력)
+    //  ※ "당월" 4개 컬럼의 판단 기준은 월롤링과 동일 — reportDate 기준
+    //    직전 2개월/당월을 매번 다시 계산한다 (요구사항 5).
+    //  ※ 과거 2개월(당월-2/당월-1) 값은 PPT 실측값을 anchor 시드로 사용하고,
+    //    커트오프 이후에는 실측 조회(lookup)를 우선한다 (요구사항 7).
+    // ═══════════════════════════════════════════════
+
+    /** 안전사고 표(5/6) 전용 anchor 기준월 — PPT 캡처 시점(2026년 8월)과 동일 */
+    private static final YearMonth SAFETY_ANCHOR_MONTH = YearMonth.of(2026, 8);
+
+    /** 안전사고 표의 "당월" 4개 서브컬럼(기계/전기/생산/소계)의 라이브 colIndex 고정값 */
+    private static final int[] SAFETY_LIVE_COLS = {14, 15, 16, 17};
+
+    /** 안전사고 표 행 1개 데이터 정의 (구분 라벨 + 연도평균 4개 + 당월-2/당월-1 폴백 4×2개) */
+    private record SafetyIncidentRowDef(
+            String label0, String label1, boolean mergeLabel,
+            String[] yearAvg4, String[] m2Fallback4, String[] m1Fallback4) {
+    }
+
+    private static void addSafetyIncidentTable(DailyReportTable t, LocalDate reportDate,
+                                                HistoricalValueLookup lookup,
+                                                SafetyIncidentRowDef[] rows) {
+        final String tableCode = t.getTableCode();
+        YearMonth current = YearMonth.from(reportDate);
+        YearMonth mMinus2 = current.minusMonths(2);
+        YearMonth mMinus1 = current.minusMonths(1);
+        // ★★ 2026-09 버그 수정: m2Fallback4/m1Fallback4 하드코딩 시드는
+        // "조회 시점의 상대월(mMinus2/mMinus1)"이 아니라 "SAFETY_ANCHOR_MONTH(2026-08)
+        // 기준 고정 캘린더월(2026-06/2026-07)"에 귀속된 값이다. 표1/2/7/8과 동일하게
+        // anchor 기준 고정 연월에 매핑해야, 조회 날짜(reportDate)가 달마다 바뀌어도
+        // 실제로 그 값이 속했던 달에만 정확히 표시되고 다른 달에는 실측조회/"-"로
+        // 대체된다. (수정 전에는 매번 mMinus2/mMinus1 키로 매핑해버려서, 조회월이
+        // anchor월(2026-08)이 아닌 순간 하드코딩 값이 엉뚱한 달로 밀려 표시되었다 —
+        // 예: 9월 조회 시 mMinus1=8월인데 원래 7월 값이었던 시드가 8월 값으로 나타남.)
+        YearMonth anchorM2 = SAFETY_ANCHOR_MONTH.minusMonths(2);
+        YearMonth anchorM1 = SAFETY_ANCHOR_MONTH.minusMonths(1);
+
+        // ── Row 0: 대 헤더 ──
+        h(t, 0, 0, coord(1, 0), "구 분", 2, 2);
+        h(t, 0, 2, coord(1, 2), "'22년\n월평균", 2, 1);
+        h(t, 0, 3, coord(1, 3), "'23년\n월평균", 2, 1);
+        h(t, 0, 4, coord(1, 4), "'24년\n월평균", 2, 1);
+        h(t, 0, 5, coord(1, 5), "'25년\n월평균", 2, 1);
+        h(t, 0, 6, coord(1, 6), monthGroupLabel(mMinus2), 1, 4);
+        h(t, 0, 10, coord(1, 10), monthGroupLabel(mMinus1), 1, 4);
+        h(t, 0, 14, coord(1, 14), monthGroupLabel(current), 1, 4);
+
+        // ── Row 1: 소 헤더 (기계/전기/생산/소계 × 3그룹) ──
+        String[] subHeaders = {"기계", "전기", "생산", "소계"};
+        for (int g = 0; g < 3; g++) {
+            int startCol = 6 + g * 4;
+            for (int i = 0; i < 4; i++) {
+                h(t, 1, startCol + i, coord(2, startCol + i), subHeaders[i], 1, 1);
+            }
+        }
+
+        // ── Row 2~9: 사업부/설비별 데이터 ──
+        for (int r = 0; r < rows.length; r++) {
+            int row = 2 + r;
+            int excelRow = 3 + r;
+            SafetyIncidentRowDef def = rows[r];
+
+            if (def.mergeLabel()) {
+                ro(t, row, 0, coord(excelRow, 0), def.label0(), 1, 2);
+            } else {
+                ro(t, row, 0, coord(excelRow, 0), def.label0() == null ? "" : def.label0());
+                ro(t, row, 1, coord(excelRow, 1), def.label1());
+            }
+
+            for (int i = 0; i < 4; i++) {
+                ro(t, row, 2 + i, coord(excelRow, 2 + i), def.yearAvg4()[i]);
+            }
+
+            for (int i = 0; i < 4; i++) {
+                Map<YearMonth, String> fb = new LinkedHashMap<>();
+                fb.put(anchorM2, def.m2Fallback4()[i]);
+                fb.put(anchorM1, def.m1Fallback4()[i]);
+                int liveCol = SAFETY_LIVE_COLS[i];
+                ro(t, row, 6 + i, coord(excelRow, 6 + i),
+                        rollingValueSafety(lookup, tableCode, row, liveCol, mMinus2, fb));
+                ro(t, row, 10 + i, coord(excelRow, 10 + i),
+                        rollingValueSafety(lookup, tableCode, row, liveCol, mMinus1, fb));
+            }
+
+            for (int i = 0; i < 4; i++) {
+                d(t, row, 14 + i, coord(excelRow, 14 + i), "event", "발생 시");
+            }
+        }
+    }
+
+    /**
+     * 안전사고 표 전용 롤링 실측값 해석 — 표1/표2와 동일한 원리이나 anchor 기준월이
+     * {@link #SAFETY_ANCHOR_MONTH}(2026-08)로 다르므로 별도 커트오프 없이
+     * (안전사고 표는 신규 기능이라 과거 커트오프 개념이 필요 없음) 항상 lookup을
+     * 우선 시도하고, 없으면 PPT 실측값 시드(fallbackMap)를 사용한다.
+     */
+    private static String rollingValueSafety(HistoricalValueLookup lookup, String tableCode,
+                                              int rowIndex, int liveColIndex, YearMonth targetMonth,
+                                              Map<YearMonth, String> fallbackMap) {
+        if (lookup != null) {
+            String realValue = lookup.find(tableCode, rowIndex, liveColIndex, targetMonth);
+            if (realValue != null && !realValue.isBlank()) {
+                return realValue;
+            }
+        }
+        String fallback = fallbackMap.get(targetMonth);
+        return fallback != null ? fallback : "-";
+    }
+
+    /** "'26년 08월" 형태의 월 그룹 헤더 라벨 생성 */
+    private static String monthGroupLabel(YearMonth ym) {
+        return String.format("'%02d년 %02d월", ym.getYear() % 100, ym.getMonthValue());
+    }
+
+    /** 안전사고/트렌드 표 전용 좌표 생성 — col은 A~Z 알파벳 순서로 직접 매핑(오프셋 없음) */
+    private static String coord(int excelRow, int col) {
+        return String.valueOf(EXCEL_COLS.charAt(col)) + excelRow;
+    }
+
+    // ═══════════════════════════════════════════════
+    //  5. 안전사고 발생건수  (10행 × 18열)
+    // ═══════════════════════════════════════════════
+    private static void addSafetyIncidentCountCells(DailyReportTable t, LocalDate reportDate,
+                                                      HistoricalValueLookup lookup) {
+        SafetyIncidentRowDef[] rows = {
+                new SafetyIncidentRowDef("제지", null, true,
+                        new String[]{"11", "6", "6", "5"},
+                        new String[]{"-", "1", "4", "5"}, new String[]{"2", "-", "5", "7"}),
+                new SafetyIncidentRowDef("화장지초지", null, true,
+                        new String[]{"1", "1", "0", "1"},
+                        new String[]{"2", "-", "-", "2"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("화장지가공", null, true,
+                        new String[]{"1", "1", "1", "1"},
+                        new String[]{"1", "-", "-", "1"}, new String[]{"-", "1", "-", "1"}),
+                new SafetyIncidentRowDef("생리대", null, true,
+                        new String[]{"0", "0", "0", "0"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("기저귀", null, true,
+                        new String[]{"0", "0", "0", "-"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("", "6호기", false,
+                        new String[]{"0", "0", "0", "0"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("에너지", null, true,
+                        new String[]{"1", "2", "1", "2"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("합 계", null, true,
+                        new String[]{"13", "10", "9", "9"},
+                        new String[]{"3", "1", "4", "8"}, new String[]{"2", "1", "5", "8"}),
+        };
+        addSafetyIncidentTable(t, reportDate, lookup, rows);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  6. 안전사고 손실금액  (10행 × 18열)
+    // ═══════════════════════════════════════════════
+    private static void addSafetyIncidentAmountCells(DailyReportTable t, LocalDate reportDate,
+                                                       HistoricalValueLookup lookup) {
+        SafetyIncidentRowDef[] rows = {
+                new SafetyIncidentRowDef("제지", null, true,
+                        new String[]{"73.1", "113.9", "69.4", "62.7"},
+                        new String[]{"-", "7.0", "30.5", "37.5"}, new String[]{"22.9", "-", "42.2", "65.1"}),
+                new SafetyIncidentRowDef("화장지초지", null, true,
+                        new String[]{"4.7", "14.7", "2.0", "14.5"},
+                        new String[]{"13.6", "-", "-", "13.6"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("화장지가공", null, true,
+                        new String[]{"3.3", "1.1", "1.2", "1.8"},
+                        new String[]{"1.7", "-", "-", "1.7"}, new String[]{"-", "4.3", "-", "4.3"}),
+                new SafetyIncidentRowDef("생리대", null, true,
+                        new String[]{"35.1", "1.7", "2.1", "1.2"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("기저귀", null, true,
+                        new String[]{"0.2", "0", "0", "-"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("", "6호기", false,
+                        new String[]{"0", "0", "0.5", "2.5"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("에너지", null, true,
+                        new String[]{"21.2", "55.7", "70.2", "77.4"},
+                        new String[]{"-", "-", "-", "-"}, new String[]{"-", "-", "-", "-"}),
+                new SafetyIncidentRowDef("합 계", null, true,
+                        new String[]{"137.6", "187.0", "145.5", "159.9"},
+                        new String[]{"15.3", "7.0", "30.5", "52.8"}, new String[]{"22.9", "4.3", "42.2", "69.4"}),
+        };
+        addSafetyIncidentTable(t, reportDate, lookup, rows);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  7/8 전용 롤링 헬퍼 (2026-09 추가) — 표1/표2와 동일한 "실측값 우선,
+    //  없으면 anchor 하드코딩 시드로 폴백" 패턴을 연도/월 단위로 재사용한다.
+    //  표5/6과 마찬가지로 신규 기능이라 FEATURE_CUTOFF_DATE 커트오프는 두지
+    //  않고, 항상 실측 조회를 먼저 시도한다.
+    // ═══════════════════════════════════════════════
+
+    /**
+     * ★ 표7 하드코딩 시드가 처음 작성되었을 때 가정한 "기준연도(anchor year)" — 2026년.
+     * 표7의 과거 8개 컬럼 하드코딩 리터럴 값은 이 기준연도의 직전 8개년
+     * (2018~2025)에 대응한다. 기준연도(2026) 자체는 항상 라이브(DATA) 컬럼이므로
+     * 폴백 맵에 포함하지 않는다 — 라이브였던 시점에 사용자가 실제로 입력한 값이
+     * 이미 DB에 쌓여 있을 것이므로, 윈도우가 굴러가 2026년이 과거 컬럼이 될
+     * 즈음엔 실측 조회(lookup)만으로 충분하다.
+     */
+    private static final int ANCHOR_YEAR = 2026;
+
+    /**
+     * anchor 기준 과거 8개년(oldest→newest 순)에 하드코딩 값 8개를 매핑해
+     * "연도 → 폴백값" 맵을 만든다. (표1/표2의 anchorFallbackMap과 동일한 원리)
+     */
+    private static Map<Integer, String> yearlyAnchorFallbackMap(String... valuesOldestToNewest8) {
+        List<Integer> anchorRolling = rollingYears(ANCHOR_YEAR, 9);
+        Map<Integer, String> map = new LinkedHashMap<>();
+        for (int i = 0; i < 8 && i < valuesOldestToNewest8.length; i++) {
+            map.put(anchorRolling.get(i), valuesOldestToNewest8[i]);
+        }
+        return map;
+    }
+
+    /**
+     * 표7 전용 롤링 실측값 해석 — {@link #rollingValueSafety}와 동일한 원리를
+     * "연도" 단위로 적용한다. 커트오프 없이 항상 실측 조회를 우선 시도하고,
+     * 없으면 anchor 하드코딩 시드(fallbackMap)를 사용한다.
+     */
+    private static String rollingValueYearly(HistoricalYearlyValueLookup yearlyLookup, String tableCode,
+                                              int rowIndex, int liveColIndex, int targetYear,
+                                              Map<Integer, String> fallbackMap) {
+        if (yearlyLookup != null) {
+            String realValue = yearlyLookup.find(tableCode, rowIndex, liveColIndex, targetYear);
+            if (realValue != null && !realValue.isBlank()) {
+                return realValue;
+            }
+        }
+        String fallback = fallbackMap.get(targetYear);
+        return fallback != null ? fallback : "-";
+    }
+
+    /**
+     * ★ 표8 하드코딩 시드가 처음 작성되었을 때 가정한 "기준월" — 표5/6과 동일한
+     * {@link #SAFETY_ANCHOR_MONTH}(2026년 8월)를 재사용한다. 표8의 과거 15개
+     * 컬럼 하드코딩 리터럴 값은 이 기준월의 직전 15개월(2025-05~2026-07)에
+     * 대응한다. 기준월(2026-08) 자체는 항상 라이브(DATA) 컬럼이라 폴백 맵에
+     * 포함하지 않는다 — 표7의 ANCHOR_YEAR와 동일한 이유.
+     */
+    private static Map<YearMonth, String> monthlyTrendAnchorFallbackMap(String... valuesOldestToNewest15) {
+        List<YearMonth> anchorRolling = rollingMonths(SAFETY_ANCHOR_MONTH, 16);
+        Map<YearMonth, String> map = new LinkedHashMap<>();
+        for (int i = 0; i < 15 && i < valuesOldestToNewest15.length; i++) {
+            map.put(anchorRolling.get(i), valuesOldestToNewest15[i]);
+        }
+        return map;
+    }
+
+    // ═══════════════════════════════════════════════
+    //  7. 안전사고 연도별 추이  (14행 × 12열, 9년 롤링 윈도우)
+    //  구조: 구분(col0-2, 계층형 병합) | 롤링 9개 연도(col3-11)
+    //  마지막 컬럼(col11=당해년도)만 DATA(라이브 입력), 그 외는 실측 우선/
+    //  anchor 시드 폴백(요구사항: 표1/표2와 동일한 "실제 입력값 우선" 방식).
+    // ═══════════════════════════════════════════════
+    private static void addSafetyYearlyTrendCells(DailyReportTable t, LocalDate reportDate,
+                                                    HistoricalYearlyValueLookup yearlyLookup) {
+        final String tableCode = t.getTableCode();
+        final int liveCol = 11; // 표7의 라이브(실측 입력) 컬럼은 항상 col11 (윈도우 크기 9 고정)
+        int currentYear = YearMonth.from(reportDate).getYear();
+        List<Integer> rolling = rollingYears(currentYear, 9);
+
+        // ── Row 0: 헤더 (롤링 9개 연도) ──
+        h(t, 0, 0, coord(1, 0), "구분", 1, 3);
+        for (int i = 0; i < rolling.size(); i++) {
+            h(t, 0, 3 + i, coord(1, 3 + i), rolling.get(i) + "년", 1, 1);
+        }
+
+        // ── 데이터 행 (row1~13, excelRow 2~14) ──
+        // 각 행의 값은 anchor(2026년) 기준 과거 8개년(2018~2025) 하드코딩 시드이며,
+        // 실측 데이터가 있으면 항상 실측값이 우선한다 (rollingValueYearly).
+        Map<Integer, String> fb1 = yearlyAnchorFallbackMap("5", "5", "6", "6", "7", "6", "7", "7");   // 공장 재해자수
+        Map<Integer, String> fb2 = yearlyAnchorFallbackMap("0", "0", "0", "0", "0", "-", "-", "-");  // 공장 사망자수
+        Map<Integer, String> fb3 = yearlyAnchorFallbackMap("5", "5", "6", "6", "7", "-", "7", "7");   // 공장 발생건수
+        Map<Integer, String> fb4 = yearlyAnchorFallbackMap("1", "2", "1", "0", "4", "1", "1", "3");   // 협력사 재해자수
+        Map<Integer, String> fb5 = yearlyAnchorFallbackMap("0", "0", "0", "0", "0", "-", "-", "-");  // 협력사 사망자수
+        Map<Integer, String> fb6 = yearlyAnchorFallbackMap("1", "2", "1", "0", "4", "1", "1", "3");   // 협력사 발생건수
+        Map<Integer, String> fb7 = yearlyAnchorFallbackMap("6", "7", "7", "6", "11", "7", "8", "10"); // 청주공장 총 발생건수
+        Map<Integer, String> fb8 = yearlyAnchorFallbackMap("8", "2", "2", "5", "3", "-", "-", "-");  // 자회사 재해자수
+        Map<Integer, String> fb9 = yearlyAnchorFallbackMap("0", "0", "0", "0", "0", "-", "-", "-");  // 자회사 사망자수
+        Map<Integer, String> fb10 = yearlyAnchorFallbackMap("8", "2", "2", "5", "3", "-", "-", "-"); // 자회사 총 발생건수
+        Map<Integer, String> fb11 = yearlyAnchorFallbackMap("14", "9", "9", "11", "14", "7", "8", "10"); // 합계 재해자수
+        Map<Integer, String> fb12 = yearlyAnchorFallbackMap("0", "0", "0", "0", "0", "-", "-", "-"); // 합계 사망자수
+        Map<Integer, String> fb13 = yearlyAnchorFallbackMap("14", "9", "9", "11", "14", "7", "8", "10"); // 합계 총 발생건수
+
+        // 청주공장(rowSpan7) — 공장(rowSpan3)
+        ro(t, 1, 0, coord(2, 0), "청주\n공장", 7, 1);
+        ro(t, 1, 1, coord(2, 1), "공장", 3, 1);
+        addYearlyTrendRow(t, 1, 2, "재해자수", rolling, fb1, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 2, 2, "사망자수", rolling, fb2, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 3, 2, "발생건수", rolling, fb3, tableCode, liveCol, yearlyLookup);
+        // 협력사(rowSpan3)
+        ro(t, 4, 1, coord(5, 1), "협력사", 3, 1);
+        addYearlyTrendRow(t, 4, 2, "재해자수", rolling, fb4, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 5, 2, "사망자수", rolling, fb5, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 6, 2, "발생건수", rolling, fb6, tableCode, liveCol, yearlyLookup);
+        // 청주공장 총 발생건수 (col1은 병합 없는 단독 빈 셀)
+        ro(t, 7, 1, coord(8, 1), "");
+        addYearlyTrendRow(t, 7, 2, "총 발생건수", rolling, fb7, tableCode, liveCol, yearlyLookup);
+        // 자회사(rowSpan3, colSpan2 — col0-1 병합)
+        ro(t, 8, 0, coord(9, 0), "자회사", 3, 2);
+        addYearlyTrendRow(t, 8, 2, "재해자수", rolling, fb8, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 9, 2, "사망자수", rolling, fb9, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 10, 2, "총 발생건수", rolling, fb10, tableCode, liveCol, yearlyLookup);
+        // 합계(rowSpan3, colSpan2)
+        ro(t, 11, 0, coord(12, 0), "합계", 3, 2);
+        addYearlyTrendRow(t, 11, 2, "재해자수", rolling, fb11, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 12, 2, "사망자수", rolling, fb12, tableCode, liveCol, yearlyLookup);
+        addYearlyTrendRow(t, 13, 2, "총 발생건수", rolling, fb13, tableCode, liveCol, yearlyLookup);
+    }
+
+    /**
+     * 표7(연도별) 한 행의 지표명 + 9개 연도값(마지막 컬럼=라이브 당해년도=DATA) 채우기.
+     * 과거 8개 컬럼은 실측 우선/anchor 시드 폴백({@link #rollingValueYearly})으로 결정된다.
+     */
+    private static void addYearlyTrendRow(DailyReportTable t, int row, int col2, String label,
+                                            List<Integer> rolling, Map<Integer, String> fallbackMap,
+                                            String tableCode, int liveCol,
+                                            HistoricalYearlyValueLookup yearlyLookup) {
+        int excelRow = row + 1;
+        ro(t, row, col2, coord(excelRow, col2), label);
+        for (int i = 0; i < rolling.size() - 1; i++) {
+            int yr = rolling.get(i);
+            String value = rollingValueYearly(yearlyLookup, tableCode, row, liveCol, yr, fallbackMap);
+            ro(t, row, 3 + i, coord(excelRow, 3 + i), value);
+        }
+        d(t, row, liveCol, coord(excelRow, liveCol), "event", "발생 시");
+    }
+
+    // ═══════════════════════════════════════════════
+    //  8. 안전사고 월별 추이  (14행 × 19열, 16개월 롤링 윈도우)
+    //  구조: 구분(col0-2, 계층형 병합) | 롤링 16개월(col3-18), 연도경계에서
+    //  대헤더('25년/'26년 등)가 동적으로 colspan 분할됨 (표1/표2의 yearGroups와 동일 원리).
+    //  마지막 컬럼(col18=당월)만 DATA(라이브 입력), 그 외는 실측 우선/anchor 시드 폴백.
+    // ═══════════════════════════════════════════════
+    private static void addSafetyMonthlyTrendCells(DailyReportTable t, LocalDate reportDate,
+                                                      HistoricalValueLookup lookup) {
+        final String tableCode = t.getTableCode();
+        final int liveCol = 18; // 표8의 라이브(실측 입력) 컬럼은 항상 col18 (윈도우 크기 16 고정)
+        YearMonth current = YearMonth.from(reportDate);
+        List<YearMonth> rolling = rollingMonths(current, 16);
+
+        // 연도별 그룹핑 (Row 0 대 헤더의 colspan 계산용) — colIdx 3~18(16개월) 대상
+        Map<Integer, int[]> yearGroups = new LinkedHashMap<>(); // year → [startCol, count]
+        for (int i = 0; i < rolling.size(); i++) {
+            int yr = rolling.get(i).getYear();
+            final int col = 3 + i;
+            yearGroups.computeIfAbsent(yr, k -> new int[]{col, 0});
+            yearGroups.get(yr)[1]++;
+        }
+
+        // ── Row 0: 대 헤더 ──
+        h(t, 0, 0, coord(1, 0), "구분", 2, 3);
+        for (Map.Entry<Integer, int[]> entry : yearGroups.entrySet()) {
+            int yr = entry.getKey();
+            int startCol = entry.getValue()[0];
+            int count = entry.getValue()[1];
+            h(t, 0, startCol, coord(1, startCol), "'" + String.valueOf(yr).substring(2) + "년", 1, count);
+        }
+
+        // ── Row 1: 월 소 헤더 (롤링 16개월) ──
+        for (int i = 0; i < rolling.size(); i++) {
+            int colIdx = 3 + i;
+            h(t, 1, colIdx, coord(2, colIdx), rolling.get(i).getMonthValue() + "월", 1, 1);
+        }
+
+        // ── 데이터 행 (row2~13, excelRow 3~14) ──
+        // 각 행의 값은 anchor(2026년 8월) 기준 과거 15개월(2025-05~2026-07) 하드코딩 시드이며,
+        // 실측 데이터가 있으면 항상 실측값이 우선한다 (rollingValueSafety 재사용).
+        Map<YearMonth, String> fb2  = monthlyTrendAnchorFallbackMap(
+                "-", "-", "1", "-", "2", "-", "-", "1", "1", "1", "1", "2", "1", "-", "-"); // 공장 재해자수
+        Map<YearMonth, String> fb3  = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 공장 사망자수
+        Map<YearMonth, String> fb4  = fb2;                                                                 // 공장 총 발생건수 (동일값)
+        Map<YearMonth, String> fb5  = monthlyTrendAnchorFallbackMap(
+                "-", "-", "-", "-", "-", "-", "1", "-", "-", "-", "-", "-", "-", "1", "-"); // 협력사 재해자수
+        Map<YearMonth, String> fb6  = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 협력사 사망자수
+        Map<YearMonth, String> fb7  = fb5;                                                                 // 협력사 총 발생건수
+        Map<YearMonth, String> fb8  = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 자회사 재해자수
+        Map<YearMonth, String> fb9  = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 자회사 사망자수
+        Map<YearMonth, String> fb10 = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 자회사 총 발생건수
+        Map<YearMonth, String> fb11 = monthlyTrendAnchorFallbackMap(
+                "-", "-", "1", "-", "2", "-", "1", "1", "1", "1", "1", "2", "1", "1", "-"); // 합계 재해자수
+        Map<YearMonth, String> fb12 = monthlyTrendAnchorFallbackMap(zeros16Dash());                       // 합계 사망자수
+        Map<YearMonth, String> fb13 = fb11;                                                                // 합계 총 발생건수
+
+        // 청주공장(rowSpan6) — 공장(rowSpan3)
+        ro(t, 2, 0, coord(3, 0), "청주\n공장", 6, 1);
+        ro(t, 2, 1, coord(3, 1), "공장", 3, 1);
+        addMonthlyTrendRow(t, 2, 2, "재해자수", rolling, fb2, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 3, 2, "사망자수", rolling, fb3, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 4, 2, "총 발생건수", rolling, fb4, tableCode, liveCol, lookup);
+        // 협력사(rowSpan3)
+        ro(t, 5, 1, coord(6, 1), "협력사", 3, 1);
+        addMonthlyTrendRow(t, 5, 2, "재해자수", rolling, fb5, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 6, 2, "사망자수", rolling, fb6, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 7, 2, "총 발생건수", rolling, fb7, tableCode, liveCol, lookup);
+        // 자회사(rowSpan3, colSpan2)
+        ro(t, 8, 0, coord(9, 0), "자회사", 3, 2);
+        addMonthlyTrendRow(t, 8, 2, "재해자수", rolling, fb8, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 9, 2, "사망자수", rolling, fb9, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 10, 2, "총 발생건수", rolling, fb10, tableCode, liveCol, lookup);
+        // 합계(rowSpan3, colSpan2)
+        ro(t, 11, 0, coord(12, 0), "합계", 3, 2);
+        addMonthlyTrendRow(t, 11, 2, "재해자수", rolling, fb11, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 12, 2, "사망자수", rolling, fb12, tableCode, liveCol, lookup);
+        addMonthlyTrendRow(t, 13, 2, "총 발생건수", rolling, fb13, tableCode, liveCol, lookup);
+    }
+
+    /** "-"로 채운 16개월치 배열 (전부 미발생) — anchor 폴백맵 시드로도 재사용 */
+    private static String[] zeros16Dash() {
+        String[] arr = new String[16];
+        java.util.Arrays.fill(arr, "-");
+        return arr;
+    }
+
+    /**
+     * 표8(월별) 한 행의 지표명 + 16개월값(마지막 컬럼=라이브 당월=DATA) 채우기.
+     * 과거 15개 컬럼은 실측 우선/anchor 시드 폴백({@link #rollingValueSafety})으로 결정된다.
+     */
+    private static void addMonthlyTrendRow(DailyReportTable t, int row, int col2, String label,
+                                              List<YearMonth> rolling, Map<YearMonth, String> fallbackMap,
+                                              String tableCode, int liveCol,
+                                              HistoricalValueLookup lookup) {
+        int excelRow = row + 1;
+        ro(t, row, col2, coord(excelRow, col2), label);
+        for (int i = 0; i < rolling.size() - 1; i++) {
+            YearMonth ym = rolling.get(i);
+            String value = rollingValueSafety(lookup, tableCode, row, liveCol, ym, fallbackMap);
+            ro(t, row, 3 + i, coord(excelRow, 3 + i), value);
+        }
+        d(t, row, liveCol, coord(excelRow, liveCol), "event", "발생 시");
     }
 
     // ═══════════════════════════════════════════════

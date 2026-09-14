@@ -106,6 +106,31 @@ th,td,label,span,div,p,h1,h2,h3,h4,h5,h6{font-family:inherit;}
 .fire-iframe{width:100%;height:100%;border:none;display:block;opacity:0;transition:opacity .15s ease;}
 .fire-iframe.loaded{opacity:1;}
 
+/* ── 세부공장일보 미러 툴바 (원래 iframe 내부에 있던 툴바를 상단 topbarActions로 이동) ── */
+#topbarActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.dr-date-picker-wrap{display:flex;align-items:center;gap:8px;}
+.dr-date-picker-wrap input[type="date"]{padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px;font-weight:700;background:#fff;outline:none;color:var(--text);}
+.dr-date-picker-wrap input[type="date"]:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light);}
+.dr-user-chip{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700;}
+.dr-date-chip{border:1px solid var(--border2);background:#fff;color:var(--text2);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;}
+.dr-save-chip.idle{background:#fff;color:var(--text2);border-color:var(--border2);}
+.dr-save-chip.dirty{background:var(--orange-light);color:#9a3412;border-color:#fdba74;}
+.dr-save-chip.saved{background:var(--green-light);color:#166534;border-color:#86efac;}
+.dr-toolbar-btn{border:1px solid var(--border2);background:#fff;color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s;}
+.dr-toolbar-btn:hover{background:var(--surface2);}
+.dr-toolbar-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+.dr-toolbar-btn.primary:hover{background:var(--primary-hover);}
+.dr-toolbar-btn.refresh{background:var(--green-light);color:#166534;border-color:#86efac;}
+.dr-toolbar-btn.refresh:hover{background:#c8f7d6;}
+.dr-toolbar-btn.ppt-capture{background:var(--orange-light);color:#9a3412;border-color:#fdba74;}
+.dr-toolbar-btn.ppt-capture:hover{background:#ffe0bd;}
+.dr-toolbar-btn:disabled{opacity:.6;cursor:wait;}
+.dr-btn-spinner{display:inline-block;width:11px;height:11px;margin-right:5px;border:2px solid rgba(15,23,42,.25);border-top-color:currentColor;border-radius:50%;vertical-align:middle;animation:dr-btn-spin .6s linear infinite;}
+@keyframes dr-btn-spin{to{transform:rotate(360deg);}}
+.dr-auto-refresh-indicator{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;}
+.dr-auto-refresh-indicator .dot{width:6px;height:6px;border-radius:50%;background:#86efac;display:inline-block;}
+.dr-auto-refresh-indicator.paused .dot{background:#fbbf24;}
+
 .card{background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:20px;}
 .card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .card-header h3{font-size:15px;font-weight:700;}
@@ -518,6 +543,7 @@ const menuIcons = {
   'DAILY_REPORT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>',
   'DAILY_REPORT_INPUT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
   'DAILY_REPORT_AUTH': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
+  'DAILY_REPORT_SAFETY_STATS': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   'PS_INSP_MGMT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/></svg>',
   '_DEFAULT': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'
 };
@@ -545,6 +571,7 @@ const menuCodeToPage = {
   'PS_INSP_MGMT': 'ps_insp',
   'DAILY_REPORT': 'dailyreport',
   'DAILY_REPORT_INPUT': 'dailyreport_input',
+  'DAILY_REPORT_SAFETY_STATS': 'dailyreport_safety_stats',
   'DAILY_REPORT_AUTH': 'dailyreport_auth',
 };
 function normalizeMenuCode(code){
@@ -779,11 +806,13 @@ function navigate(page, el) {
     navigateToSafetyPage(safetyUrl);
     return;
   }
-  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',other_qr:'QR코드',ps_insp:'PS 지분 검사',dailyreport:'세부공장일보',dailyreport_input:'세부공장일보 입력',dailyreport_auth:'세부공장일보 컬럼관리'};
-  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_sprinkler:'모듈 > 설비관리시스템 > 소방설비 > 스프링클러 목록',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',other_qr:'모듈 > 설비관리시스템 > 기타설비 > QR코드',ps_insp:'모듈 > PS 지분 검사',dailyreport:'모듈 > 세부공장일보',dailyreport_input:'모듈 > 세부공장일보 > 입력',dailyreport_auth:'모듈 > 세부공장일보 > 컬럼관리'};
+  const titles={dashboard:'대시보드',users:'사용자 관리',menus:'메뉴 관리',permissions:'접근 권한',codes:'공통코드 관리',fire:'설비관리시스템',fire_map:'도면 (메인)',fire_equipment_group:'소방설비',fire_extinguisher:'소화기 목록',fire_sprinkler:'스프링클러 목록',fire_hydrant:'소화전 목록',fire_receiver:'수신기 목록',fire_pump:'소방펌프 목록',fire_floor:'층별 도면',fire_qr:'QR코드',other_equipment_group:'기타설비',other_aircon:'에어컨 관리',other_water_purifier:'정수기 관리',other_qr:'QR코드',ps_insp:'PS 지분 검사',dailyreport:'세부공장일보',dailyreport_input:'세부공장일보 입력',dailyreport_safety_stats:'세부공장일보 사고 통계',dailyreport_auth:'세부공장일보 컬럼관리'};
+  const crumbs={dashboard:'홈 > 대시보드',users:'코어 > 사용자 관리',menus:'코어 > 메뉴 관리',permissions:'코어 > 접근 권한',codes:'모듈 > 공통코드 관리',fire:'모듈 > 설비관리시스템',fire_map:'모듈 > 설비관리시스템 > 도면',fire_equipment_group:'모듈 > 설비관리시스템 > 소방설비',fire_extinguisher:'모듈 > 설비관리시스템 > 소방설비 > 소화기',fire_sprinkler:'모듈 > 설비관리시스템 > 소방설비 > 스프링클러 목록',fire_hydrant:'모듈 > 설비관리시스템 > 소방설비 > 소화전',fire_receiver:'모듈 > 설비관리시스템 > 소방설비 > 수신기',fire_pump:'모듈 > 설비관리시스템 > 소방설비 > 소방펌프',fire_floor:'모듈 > 설비관리시스템 > 층별 도면',fire_qr:'모듈 > 설비관리시스템 > QR코드',other_equipment_group:'모듈 > 설비관리시스템 > 기타설비',other_aircon:'모듈 > 설비관리시스템 > 기타설비 > 에어컨',other_water_purifier:'모듈 > 설비관리시스템 > 기타설비 > 정수기',other_qr:'모듈 > 설비관리시스템 > 기타설비 > QR코드',ps_insp:'모듈 > PS 지분 검사',dailyreport:'모듈 > 세부공장일보',dailyreport_input:'모듈 > 세부공장일보 > 입력',dailyreport_safety_stats:'모듈 > 세부공장일보 > 사고 통계',dailyreport_auth:'모듈 > 세부공장일보 > 컬럼관리'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('breadcrumb').textContent=crumbs[page]||'';
   document.getElementById('topbarActions').innerHTML='';
+  // 세부공장일보 미러 툴바 폴링 정리 (다른 페이지로 이동 시)
+  stopDailyReportToolbar();
   // iframe 모드 해제 (소방/PS-INSP/일보 외 페이지 전환 시)
   var pc=document.getElementById('pageContent');
   if((!page.startsWith('fire_') && !page.startsWith('other_') && page!=='ps_insp' && !page.startsWith('dailyreport')) || page==='fire' || page==='fire_equipment_group' || page==='other_equipment_group') { pc.className='page'; }
@@ -807,7 +836,8 @@ function navigate(page, el) {
   else if(page==='other_water_purifier')navigateToFirePage('/facility/water-purifiers');
   else if(page==='other_qr')navigateToFirePage('/facility/qr');
   else if(page==='ps_insp')navigateToPsInspPage('/ps-insp/page');
-  else if(page==='dailyreport_input')navigateToDailyReportPage('/dailyreport/page');
+  else if(page==='dailyreport_input'){navigateToDailyReportPage('/dailyreport/page');renderDailyReportToolbar('dailyreport_input');}
+  else if(page==='dailyreport_safety_stats'){navigateToDailyReportPage('/dailyreport/page/safety-stats');renderDailyReportToolbar('dailyreport_safety_stats');}
   else if(page==='dailyreport_auth')navigateToDailyReportPage('/dailyreport/page/column-mgmt');
 }
 
@@ -1978,6 +2008,146 @@ function navigateToDailyReportPage(path) {
   iframe.src = path + sep + '_loginId=' + encodeURIComponent(loginId) + '&_t=' + encodeURIComponent(token);
   el.innerHTML = '';
   el.appendChild(iframe);
+}
+
+// ══ 세부공장일보 — 미러 툴바 (원래 iframe 내부 topbar를 상단 topbarActions로 이동) ══
+// iframe 내부 topbar는 CSS display:none으로 숨겨져 있고, id/로직은 그대로 살아있다.
+// 부모(App Shell)의 topbarActions에 동일한 UI를 그려서 클릭 시 iframe.contentWindow의
+// 실제 함수를 호출하고, setInterval로 iframe.contentDocument의 상태를 읽어와 동기화한다.
+var dailyReportToolbarPage = null;
+var dailyReportToolbarPollTimer = null;
+
+function getDailyReportIframe() {
+  return document.getElementById('dailyReportIframe');
+}
+
+function renderDailyReportToolbar(page) {
+  dailyReportToolbarPage = page;
+  var showPptCapture = (page === 'dailyreport_input');
+  var html = '' +
+    '<div class="dr-date-picker-wrap">' +
+      '<input type="date" id="drReportDateInput" />' +
+      '<button class="dr-toolbar-btn" type="button" id="drLoadReportBtn" onclick="drLoadReportByDate()">조회</button>' +
+    '</div>' +
+    '<div class="dr-user-chip" id="drUserChip">인증 확인중...</div>' +
+    '<div class="dr-date-chip dr-save-chip idle" id="drSaveChip">저장 전</div>' +
+    '<button class="dr-toolbar-btn refresh" type="button" onclick="drRefreshData()" title="다른 사용자가 입력한 값을 최신으로 갱신합니다">&#8635; 새로고침</button>' +
+    '<button class="dr-toolbar-btn primary" type="button" id="drSaveBtn" onclick="drSaveInputs()">저장</button>' +
+    (showPptCapture ? '<button class="dr-toolbar-btn ppt-capture" type="button" id="drPptCaptureBtn" onclick="drCapturePptSlide()" title="표 1~4를 PPT 16:9 슬라이드 폭(1920px)에 맞춰 캡처하고 클립보드에 복사합니다">&#128247; 화면 캡처</button>' : '') +
+    '<div class="dr-auto-refresh-indicator" id="drAutoRefreshIndicator" style="display:none">' +
+      '<span class="dot"></span>' +
+      '<span id="drAutoRefreshLabel">자동 갱신 3분</span>' +
+    '</div>';
+  document.getElementById('topbarActions').innerHTML = html;
+
+  // 날짜 입력 변경 시 child의 날짜 입력에도 동기화 (조회 클릭 시 child 값을 사용하므로 미리 맞춰둔다)
+  document.getElementById('drReportDateInput').addEventListener('change', function() {
+    var iframe = getDailyReportIframe();
+    try {
+      if (iframe && iframe.contentDocument) {
+        var childInput = iframe.contentDocument.getElementById('reportDateInput');
+        if (childInput) childInput.value = this.value;
+      }
+    } catch (e) { /* cross-doc 접근 실패 시 무시 */ }
+  });
+
+  if (dailyReportToolbarPollTimer) clearInterval(dailyReportToolbarPollTimer);
+  dailyReportToolbarPollTimer = setInterval(syncDailyReportToolbarState, 500);
+  syncDailyReportToolbarState();
+}
+
+function stopDailyReportToolbar() {
+  if (dailyReportToolbarPollTimer) { clearInterval(dailyReportToolbarPollTimer); dailyReportToolbarPollTimer = null; }
+  dailyReportToolbarPage = null;
+}
+
+// child(iframe) DOM 상태를 읽어 부모 미러 툴바에 반영
+function syncDailyReportToolbarState() {
+  if (!dailyReportToolbarPage) return;
+  var iframe = getDailyReportIframe();
+  if (!iframe) return;
+  var doc;
+  try { doc = iframe.contentDocument; } catch (e) { return; }
+  if (!doc) return;
+
+  var drDateInput = document.getElementById('drReportDateInput');
+  var childDateInput = doc.getElementById('reportDateInput');
+  if (drDateInput && childDateInput && document.activeElement !== drDateInput && childDateInput.value) {
+    if (drDateInput.value !== childDateInput.value) drDateInput.value = childDateInput.value;
+  }
+
+  var drUserChip = document.getElementById('drUserChip');
+  var childUserChip = doc.getElementById('userChip');
+  if (drUserChip && childUserChip) drUserChip.textContent = childUserChip.textContent;
+
+  var drSaveChip = document.getElementById('drSaveChip');
+  var childSaveChip = doc.getElementById('saveChip');
+  if (drSaveChip && childSaveChip) {
+    drSaveChip.textContent = childSaveChip.textContent;
+    drSaveChip.classList.remove('idle', 'dirty', 'saved');
+    if (childSaveChip.classList.contains('dirty')) drSaveChip.classList.add('dirty');
+    else if (childSaveChip.classList.contains('saved')) drSaveChip.classList.add('saved');
+    else drSaveChip.classList.add('idle');
+  }
+
+  var drSaveBtn = document.getElementById('drSaveBtn');
+  var childSaveBtn = doc.getElementById('saveBtn');
+  if (drSaveBtn && childSaveBtn && !drSaveBtn.disabled) drSaveBtn.textContent = childSaveBtn.textContent;
+
+  var drIndicator = document.getElementById('drAutoRefreshIndicator');
+  var childIndicator = doc.getElementById('autoRefreshIndicator');
+  if (drIndicator && childIndicator) {
+    drIndicator.style.display = childIndicator.style.display;
+    drIndicator.classList.toggle('paused', childIndicator.classList.contains('paused'));
+    var drLabel = document.getElementById('drAutoRefreshLabel');
+    var childLabel = doc.getElementById('autoRefreshLabel');
+    if (drLabel && childLabel) drLabel.textContent = childLabel.textContent;
+  }
+
+  var drLoadBtn = document.getElementById('drLoadReportBtn');
+  var childLoadBtn = doc.getElementById('loadReportBtn');
+  if (drLoadBtn && childLoadBtn) drLoadBtn.disabled = childLoadBtn.disabled;
+}
+
+function drLoadReportByDate() {
+  var iframe = getDailyReportIframe();
+  if (!iframe || !iframe.contentWindow) return;
+  var drDateInput = document.getElementById('drReportDateInput');
+  try {
+    var childInput = iframe.contentDocument.getElementById('reportDateInput');
+    if (childInput && drDateInput && drDateInput.value) childInput.value = drDateInput.value;
+  } catch (e) { /* ignore */ }
+  var btn = document.getElementById('drLoadReportBtn');
+  var originalHtml = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="dr-btn-spinner"></span>조회 중...'; }
+  try {
+    var result = iframe.contentWindow.loadReportByDate();
+    if (result && typeof result.finally === 'function') {
+      result.finally(function() { if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; } });
+    } else {
+      setTimeout(function() { if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; } }, 1200);
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}
+
+function drRefreshData() {
+  var iframe = getDailyReportIframe();
+  if (!iframe || !iframe.contentWindow) return;
+  try { iframe.contentWindow.refreshData(); } catch (e) { /* ignore */ }
+}
+
+function drSaveInputs() {
+  var iframe = getDailyReportIframe();
+  if (!iframe || !iframe.contentWindow) return;
+  try { iframe.contentWindow.saveInputs(); } catch (e) { /* ignore */ }
+}
+
+function drCapturePptSlide() {
+  var iframe = getDailyReportIframe();
+  if (!iframe || !iframe.contentWindow) return;
+  try { iframe.contentWindow.capturePptSlide(); } catch (e) { /* ignore */ }
 }
 
 // ══ PS 지분 검사 모듈 ══

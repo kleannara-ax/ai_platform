@@ -58,8 +58,146 @@ public class CellService {
     private static final Map<String, Integer> ROLLING_LIVE_COL_BY_TABLE = Map.of(
             "TBL_PRODUCTION_INDEX", 13,
             "TBL_INVENTORY", 11,
-            "TBL_BOILER", 6
+            "TBL_BOILER", 6,
+            // ★ 표5/6(안전사고 발생건수/손실금액): "당월" 4개 서브컬럼(기계/전기/생산/소계)
+            //   중 대표(소계, col17) 1개만 등록 — 저장 시 헤더("'26년 08월" 등) 재계산을
+            //   트리거하는 용도일 뿐, 편집 가능 여부는 CellAuth로 4개 컬럼 각각 독립 판단됨
+            "TBL_SAFETY_INCIDENT_COUNT", 17,
+            "TBL_SAFETY_INCIDENT_AMOUNT", 17
+            // ★ 표7/8(연도별/월별 추이)은 헤더가 고정 시드(정적)이므로 롤링 재계산 대상 아님
     );
+
+    /**
+     * ★★★★★★ 사고통계 페이지(표5/6/7/8) 데이터표 코드 — 2026-09 "과거/현재/미래
+     * 전부 수정 가능" 정책 적용 대상.
+     * 이 표코드에 속한 셀은 {@link #isCellEditableForUser}의 날짜(어제 이후 +
+     * 매월 말일) 제한을 받지 않는다. 일반 일보(표1~4)는 기존 정책을 그대로 유지한다.
+     */
+    private static final Set<String> SAFETY_STATS_DATE_UNRESTRICTED_TABLE_CODES = Set.of(
+            "TBL_SAFETY_INCIDENT_COUNT",
+            "TBL_SAFETY_INCIDENT_AMOUNT",
+            "TBL_SAFETY_YEARLY_TREND",
+            "TBL_SAFETY_MONTHLY_TREND"
+    );
+
+    /**
+     * ★★ 2026-09 추가 — 표5(발생건수)/표6(손실금액) "당월" 합계 자동 계산 대상 표코드.
+     * 이 표들의 rowIndex=9(엑셀 10행, "합 계")의 col14~17("당월" 기계/전기/생산/소계)은
+     * rowIndex 2~8(제지/화장지초지/화장지가공/생리대/기저귀/6호기/에너지, 7개 행)의
+     * 같은 컬럼 값을 합산한 결과를 저장 시점마다 자동 갱신한다 — 사람이 직접 입력하지
+     * 않는다 (컬럼권한 관리 페이지에서도 이 4개 좌표는 더 이상 부여 대상에서 제외됨).
+     */
+    private static final Set<String> SAFETY_INCIDENT_AUTOSUM_TABLE_CODES = Set.of(
+            "TBL_SAFETY_INCIDENT_COUNT",
+            "TBL_SAFETY_INCIDENT_AMOUNT"
+    );
+
+    /**
+     * ★★ 2026-09 추가 — 사람이 직접 입력하는 "당월" 입력 컬럼(14=기계, 15=전기, 16=생산).
+     * 소계(17)는 더 이상 이 저장-트리거 집합에 포함되지 않는다 — 소계 자체가 이제
+     * 100% 시스템 계산값(가로합 = 기계+전기+생산)이라 인간 저장으로 발생하지 않기 때문.
+     */
+    private static final Set<Integer> SAFETY_INCIDENT_INPUT_COLS = Set.of(14, 15, 16);
+
+    /** 소계 컬럼(17, R열) — 같은 행의 기계(14)+전기(15)+생산(16) 가로합 */
+    private static final int SAFETY_INCIDENT_SUBTOTAL_COL = 17;
+
+    /** 합계 자동계산의 재료가 되는 7개 기여 행(rowIndex 2~8, 제지~에너지) */
+    private static final int SAFETY_INCIDENT_CONTRIB_ROW_START = 2;
+    private static final int SAFETY_INCIDENT_CONTRIB_ROW_END = 8; // inclusive
+
+    /** 합계가 저장되는 행(rowIndex=9, 엑셀 10행 "합 계") */
+    private static final int SAFETY_INCIDENT_TOTAL_ROW = 9;
+
+    /**
+     * ★★ 2026-09 추가 — 표7(TBL_SAFETY_YEARLY_TREND)/표8(TBL_SAFETY_MONTHLY_TREND)
+     * "총 발생건수" 행 자동 계산 대상 표코드 + 각 표의 라이브(실측 입력) 컬럼.
+     * {@link DefaultCellTemplate}의 liveCol 상수(표7=11, 표8=18)와 반드시 동일해야 한다.
+     * 이 컬럼이 아닌 다른(과거 롤링/anchor 시드) 컬럼은 READONLY이므로 사람이
+     * 저장할 수 없어 대상에서 자동 제외된다.
+     */
+    private static final Map<String, Integer> SAFETY_TREND_LIVE_COL_BY_TABLE = Map.of(
+            "TBL_SAFETY_YEARLY_TREND", 11,
+            "TBL_SAFETY_MONTHLY_TREND", 18
+    );
+
+    /**
+     * ★★ 2026-09 추가(사용자 확인 반영, 2차 수정) — 표7/표8 "발생건수/총 발생건수"
+     * 및 "합계" 재해자수/사망자수 행의 계층적 합산 규칙(계산 순서 중요 — 뒤 단계가
+     * 앞 단계의 결과값을 재료로 쓰므로 이 순서 그대로 계산해야 한다).
+     *
+     * 각 항목은 {계산 대상 행, 원천 행1, 원천 행2, ...} 형태이며, 한 표코드
+     * 안에서는 리스트 순서대로(위→아래) 실행한다.
+     *
+     * [표7] 14행 구조(rowIndex 0~13):
+     *   ① row3  = row1(공장 재해자수) + row2(공장 사망자수)
+     *             ※ 2026-09 2차 수정 — "공장 발생건수" 행 자체가 이제 자동 계산됨
+     *               (기존엔 사람이 직접 입력했으나, 같은 그룹의 재해자수+사망자수 합산).
+     *   ② row6  = row4(협력사 재해자수) + row5(협력사 사망자수)
+     *             ※ 2026-09 2차 수정 — "협력사 발생건수" 행도 동일하게 자동 계산.
+     *   ③ row7  = row3(공장 발생건수) + row6(협력사 발생건수)
+     *             ※ 2026-09 2차 수정 — "청주공장 총 발생건수"는 이제 위에서 방금
+     *               계산된 공장/협력사 "발생건수" 2개 행만 더한다(값은 기존
+     *               row1+2+4+5와 동일하지만, ①②에서 계산된 결과를 재료로 쓰는
+     *               구조로 변경 — 순서 의존적이라 ①②가 반드시 먼저 실행되어야 함).
+     *   ④ row10 = row8(자회사 재해자수) + row9(자회사 사망자수)
+     *   ⑤ row11 = row1(공장 재해자수) + row4(협력사 재해자수) + row8(자회사 재해자수)
+     *             ※ 2026-09 — "합계" 재해자수 행 자동 계산(재해자수인 행 3개를 합산).
+     *   ⑥ row12 = row2(공장 사망자수) + row5(협력사 사망자수) + row9(자회사 사망자수)
+     *             ※ 2026-09 — "합계" 사망자수 행도 동일하게 자동 계산.
+     *   ⑦ row13 = row11(합계 재해자수) + row12(합계 사망자수)
+     *             ※ ⑤⑥에서 방금 계산된 값을 그대로 재료로 사용(순서 의존).
+     *
+     * [표8] 14행 구조(rowIndex 0~13, 데이터는 row2부터):
+     *   ① row4  = row2(공장 재해자수)  + row3(공장 사망자수)
+     *   ② row7  = row5(협력사 재해자수) + row6(협력사 사망자수)
+     *   ③ row10 = row8(자회사 재해자수) + row9(자회사 사망자수)
+     *   ④ row11 = row2(공장 재해자수) + row5(협력사 재해자수) + row8(자회사 재해자수)
+     *             ※ 2026-09 — "합계" 재해자수 행 자동 계산.
+     *   ⑤ row12 = row3(공장 사망자수) + row6(협력사 사망자수) + row9(자회사 사망자수)
+     *             ※ 2026-09 — "합계" 사망자수 행 자동 계산.
+     *   ⑥ row13 = row11(합계 재해자수) + row12(합계 사망자수)
+     *             ※ ④⑤ 결과를 그대로 재료로 사용(순서 의존).
+     *             ※ 표8은 표7과 달리 그룹별 "발생건수" 단독 행이 없고(재해자수/
+     *               사망자수/총발생건수 3행 구조뿐), 이미 row4/row7/row10 자체가
+     *               표7의 row3/row6과 동일한 역할을 하므로 추가 변경 없음.
+     *
+     * 트리거 조건: 저장된 셀이 라이브 컬럼(표7=col11/표8=col18)이고, 위 규칙에
+     * 한 번이라도 "원천 행"으로 등장하는 행(표7: 1,2,4,5,8,9 / 표8: 2,3,5,6,8,9)
+     * 중 하나이면, 그 표의 전체 계산 단계를 순서대로 다시 실행한다(사람이 어느
+     * 원천 행을 고쳤는지에 따라 부분만 골라 계산하는 대신, 표 전체를 매번
+     * 처음부터 다시 계산 — 표가 작아 비용이 미미하고, 누락/순서 실수를 방지).
+     */
+    private static final Map<String, int[][]> SAFETY_TREND_SUM_STEPS = Map.of(
+            "TBL_SAFETY_YEARLY_TREND", new int[][]{
+                    {3, 1, 2},
+                    {6, 4, 5},
+                    {7, 3, 6},
+                    {10, 8, 9},
+                    {11, 1, 4, 8},
+                    {12, 2, 5, 9},
+                    {13, 11, 12}
+            },
+            "TBL_SAFETY_MONTHLY_TREND", new int[][]{
+                    {4, 2, 3},
+                    {7, 5, 6},
+                    {10, 8, 9},
+                    {11, 2, 5, 8},
+                    {12, 3, 6, 9},
+                    {13, 11, 12}
+            }
+    );
+
+    /**
+     * ★★ 2026-09 추가 — 위 SAFETY_TREND_SUM_STEPS 중 어느 규칙에라도 "원천 행"
+     * 으로 등장하는 rowIndex 집합(표코드별). 저장된 행이 이 집합에 없으면(즉
+     * 헤더/계산 결과 행 자신이면) 재계산을 트리거하지 않는다.
+     */
+    private static final Map<String, Set<Integer>> SAFETY_TREND_TRIGGER_ROWS = Map.of(
+            "TBL_SAFETY_YEARLY_TREND", Set.of(1, 2, 4, 5, 8, 9),
+            "TBL_SAFETY_MONTHLY_TREND", Set.of(2, 3, 5, 6, 8, 9)
+    );
+
 
     /**
      * 사용자 기준 표 데이터 조회 (편집 가능 여부 포함)
@@ -263,6 +401,21 @@ public class CellService {
                 // 영향받을 수 있는 좁은 범위만 훑으므로 데이터가 아무리 많아져도 느려지지 않는다.)
                 propagateRollingHeadersForward(report.getReportDate(), table.getTableCode(),
                         cell.getColIndex());
+
+                // ★★ 2026-09 추가 — 표5/6 "당월" 소계/합계 자동 계산: 방금 저장한 셀이
+                // 7개 기여 행(제지~에너지) 중 하나의 "당월" 입력 컬럼(기계/전기/생산)
+                // 이면, (1) 그 행 자신의 소계(R열=가로합 기계+전기+생산)를 재계산하고,
+                // (2) 같은 표·같은 컬럼의 합계 행(합 계, rowIndex=9)을 재계산한 뒤,
+                // (3) 합계 행 자신의 소계(R10=가로합 O10+P10+Q10)도 재계산한다.
+                // 소계/합계 행 모두 사람이 직접 입력하지 않으므로 여기서만 갱신된다.
+                recomputeSafetyIncidentTotalIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
+
+                // ★★ 2026-09 추가 — 표7(연도별 추이)/표8(월별 추이) "총 발생건수"
+                // 행 자동 계산: 방금 저장한 셀이 각 표의 라이브(당해년도/당월) 컬럼
+                // (표7=col11, 표8=col18)이면, 그 열(같은 연/월)에 대해 계층적으로
+                // "총 발생건수" 행들을 재계산한다. 표5/6과 달리 세로합이 아니라
+                // 같은 컬럼(같은 시점) 내 몇 개 행을 가로로 더하는 구조다.
+                recomputeSafetyTrendTotalsIfNeeded(table, cell.getRowIndex(), cell.getColIndex());
             }
             // 값이 바뀌지 않았다면 위 두 동작(도장 찍기/전파) 모두 건너뛴다 —
             // 이 셀은 여전히 "이어받기 상태"로 남아, 향후 더 이전 날짜에서의
@@ -272,6 +425,198 @@ public class CellService {
         }
 
         return savedCells;
+    }
+
+    /**
+     * ★★ 2026-09 추가 — 표5(TBL_SAFETY_INCIDENT_COUNT)/표6(TBL_SAFETY_INCIDENT_AMOUNT)
+     * "당월" 소계(R열, 가로합)와 합계(rowIndex=9, 엑셀 10행, 세로합) 자동 계산.
+     *
+     * 방금 저장된 셀이 이 두 표 중 하나이면서, 합계 재료가 되는 7개 기여 행
+     * (rowIndex 2~8: 제지/화장지초지/화장지가공/생리대/기저귀/6호기/에너지) 중
+     * 하나의 "당월" 입력 컬럼(14=기계/15=전기/16=생산) 중 하나라면:
+     *   (1) 그 행 자신의 소계(17=R열) = 그 행의 기계+전기+생산 (가로합)을 재계산하고,
+     *   (2) 같은 표·같은 컬럼(기계/전기/생산 중 방금 바뀐 것)의 7개 기여 행 값을
+     *       전부 합산하여 합계 행(rowIndex=9)의 같은 컬럼에 반영하고,
+     *   (3) 합계 행 자신의 소계(R10) = O10+P10+Q10 (가로합)도 재계산한다.
+     *
+     * ※ 소계/합계 행 자체가 저장된 경우(이론상 프론트에서 편집 불가라 발생하지
+     *   않지만 방어적으로)는 대상에서 제외한다 — 무한 재계산 방지 및 "사람이
+     *   직접 입력하는 셀이 아니다"라는 의미를 명확히 하기 위함.
+     * ※ {@link DailyReportCell#carryOverValue}를 사용해 LAST_EDITOR_ID를 찍지 않는다
+     *   — 소계/합계는 시스템이 계산한 값이지 사람이 입력한 값이 아니기 때문이다.
+     */
+    private void recomputeSafetyIncidentTotalIfNeeded(DailyReportTable table, int rowIndex, int colIndex) {
+        String tableCode = table.getTableCode();
+        if (!SAFETY_INCIDENT_AUTOSUM_TABLE_CODES.contains(tableCode)) {
+            return;
+        }
+        if (!SAFETY_INCIDENT_INPUT_COLS.contains(colIndex)) {
+            return;
+        }
+        if (rowIndex < SAFETY_INCIDENT_CONTRIB_ROW_START || rowIndex > SAFETY_INCIDENT_CONTRIB_ROW_END) {
+            return; // 기여 행이 아님(=합계 행 자신이거나 범위 밖) — 대상 아님
+        }
+
+        // (1) 방금 저장된 행 자신의 소계(가로합: 기계+전기+생산) 재계산
+        recomputeSafetyIncidentRowSubtotal(table, rowIndex);
+
+        // (2) 같은 컬럼(기계/전기/생산 중 하나)의 7개 기여 행 값을 세로로 합산하여
+        //     합계 행(rowIndex=9)의 같은 컬럼에 반영
+        double sum = 0;
+        for (DailyReportCell c : table.getCells()) {
+            if (c.getColIndex() != null && c.getColIndex() == colIndex
+                    && c.getRowIndex() != null
+                    && c.getRowIndex() >= SAFETY_INCIDENT_CONTRIB_ROW_START
+                    && c.getRowIndex() <= SAFETY_INCIDENT_CONTRIB_ROW_END) {
+                sum += parseSafetyIncidentNumberOrZero(c.getCellValue());
+            }
+        }
+
+        DailyReportCell totalCell = findSafetyIncidentCell(table, SAFETY_INCIDENT_TOTAL_ROW, colIndex);
+        if (totalCell == null) {
+            return;
+        }
+
+        String newTotal = formatSafetyIncidentSum(sum);
+        if (!Objects.equals(totalCell.getCellValue(), newTotal)) {
+            totalCell.carryOverValue(newTotal);
+        }
+
+        // (3) 합계 행 자신의 소계(R10) = O10+P10+Q10 (가로합) 재계산
+        recomputeSafetyIncidentRowSubtotal(table, SAFETY_INCIDENT_TOTAL_ROW);
+    }
+
+    /**
+     * ★★ 2026-09 추가 — 지정된 행의 소계(17=R열) = 그 행의 기계(14)+전기(15)+생산(16)
+     * 값을 가로로 합산해 반영한다. 표5/6의 모든 행(기여 행 2~8, 합계 행 9)에
+     * 공통으로 적용되는 헬퍼.
+     */
+    private void recomputeSafetyIncidentRowSubtotal(DailyReportTable table, int targetRowIndex) {
+        double sum = 0;
+        for (int col : SAFETY_INCIDENT_INPUT_COLS) {
+            DailyReportCell c = findSafetyIncidentCell(table, targetRowIndex, col);
+            if (c != null) {
+                sum += parseSafetyIncidentNumberOrZero(c.getCellValue());
+            }
+        }
+
+        DailyReportCell subtotalCell = findSafetyIncidentCell(table, targetRowIndex, SAFETY_INCIDENT_SUBTOTAL_COL);
+        if (subtotalCell == null) {
+            return;
+        }
+
+        String newSubtotal = formatSafetyIncidentSum(sum);
+        if (!Objects.equals(subtotalCell.getCellValue(), newSubtotal)) {
+            subtotalCell.carryOverValue(newSubtotal);
+        }
+    }
+
+    /** table.getCells() 중 지정된 rowIndex/colIndex와 일치하는 셀을 찾는다(없으면 null). */
+    private DailyReportCell findSafetyIncidentCell(DailyReportTable table, int rowIndex, int colIndex) {
+        return table.getCells().stream()
+                .filter(c -> c.getRowIndex() != null && c.getRowIndex() == rowIndex
+                        && c.getColIndex() != null && c.getColIndex() == colIndex)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** 숫자로 해석 불가능하거나(빈 값, "-", null 등) 데이터가 없는 경우 0으로 간주 */
+    private double parseSafetyIncidentNumberOrZero(String raw) {
+        if (raw == null) {
+            return 0;
+        }
+        String cleaned = raw.replace(",", "").trim();
+        if (cleaned.isEmpty() || "-".equals(cleaned)) {
+            return 0;
+        }
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 합계 표시 형식 — 표5(발생건수)는 정수 표시가 기본이지만 원본 데이터가
+     * 소수(예: 손실금액 표6)일 수 있으므로 소수점 1자리까지 계산한 뒤,
+     * ".0"으로 끝나면 정수 표기로 정리한다(기존 DefaultCellTemplate의
+     * formatOneDecimal과 동일한 규칙 — 프론트 formatNumber()가 최종 표시
+     * 형식은 다시 한번 표코드별로 정리하므로 여기서는 값 정합성만 보장하면 된다).
+     */
+    private String formatSafetyIncidentSum(double sum) {
+        java.math.BigDecimal bd = java.math.BigDecimal.valueOf(sum)
+                .setScale(1, java.math.RoundingMode.HALF_UP);
+        String s = bd.toPlainString();
+        String trimmed = s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
+        // ★★ 2026-09 요청 — 소계/합계 값이 0이면 "0"이 아니라 "-"로 저장한다
+        // (프론트 formatNumber()도 동일하게 0→"-" 표시하므로 저장값 자체를
+        // 맞춰 일관성을 유지한다).
+        if ("0".equals(trimmed) || "-0".equals(trimmed)) {
+            return "-";
+        }
+        return trimmed;
+    }
+
+    /**
+     * ★★ 2026-09 추가(사용자 확인 반영) — 표7(연도별 추이)/표8(월별 추이)의
+     * "총 발생건수"/"합계" 재해자수/사망자수 행 자동 계산.
+     *
+     * 방금 저장된 셀이 이 두 표 중 하나이면서, 그 표의 라이브(실측 입력) 컬럼
+     * ({@link #SAFETY_TREND_LIVE_COL_BY_TABLE}, 표7=col11/표8=col18)에 속하고,
+     * {@link #SAFETY_TREND_TRIGGER_ROWS}에 등록된(=어느 계산 단계에서든 원천
+     * 행으로 쓰이는) 행이면, {@link #SAFETY_TREND_SUM_STEPS}에 정의된 모든
+     * 계산 단계를 위→아래 순서 그대로 다시 실행한다.
+     *
+     * 표5/6과의 차이점: 표5/6은 "다른 행(7개 기여 행)을 세로로" 합산하지만,
+     * 표7/8은 "같은 시점(같은 라이브 컬럼) 안에서 몇 개의 다른 행을 가로/그룹으로"
+     * 합산한다 — 합산 대상이 (표, 결과행)마다 다르므로 규칙을 맵으로 관리한다.
+     *
+     * ※ 순서가 중요하다 — 표7/8 모두 마지막 단계(row13=row11+row12)가 바로
+     *   앞 단계에서 새로 계산된 row11/row12 값을 재료로 쓰기 때문에, 항상
+     *   SAFETY_TREND_SUM_STEPS에 정의된 순서대로(리스트 순회) 실행해야 한다.
+     * ※ 결과 행(row7/10/11/12/13 등) 자신이 저장된 경우는 대상에서 제외한다
+     *   (프론트에서 편집 불가라 발생하지 않지만 방어적으로) — 무한 재계산 방지.
+     * ※ {@link DailyReportCell#carryOverValue}를 사용해 LAST_EDITOR_ID를 찍지 않는다
+     *   — 이 행들은 시스템이 계산한 값이지 사람이 입력한 값이 아니기 때문이다.
+     */
+    private void recomputeSafetyTrendTotalsIfNeeded(DailyReportTable table, int rowIndex, int colIndex) {
+        String tableCode = table.getTableCode();
+        Integer liveCol = SAFETY_TREND_LIVE_COL_BY_TABLE.get(tableCode);
+        if (liveCol == null || colIndex != liveCol) {
+            return;
+        }
+
+        Set<Integer> triggerRows = SAFETY_TREND_TRIGGER_ROWS.get(tableCode);
+        if (triggerRows == null || !triggerRows.contains(rowIndex)) {
+            return; // 어떤 계산 단계의 원천 행도 아님(=결과 행 자신이거나 무관한 행)
+        }
+
+        int[][] steps = SAFETY_TREND_SUM_STEPS.get(tableCode);
+        if (steps == null) {
+            return;
+        }
+
+        for (int[] step : steps) {
+            int resultRow = step[0];
+
+            double sum = 0;
+            for (int i = 1; i < step.length; i++) {
+                DailyReportCell c = findSafetyIncidentCell(table, step[i], liveCol);
+                if (c != null) {
+                    sum += parseSafetyIncidentNumberOrZero(c.getCellValue());
+                }
+            }
+
+            DailyReportCell resultCell = findSafetyIncidentCell(table, resultRow, liveCol);
+            if (resultCell == null) {
+                continue;
+            }
+
+            String newTotal = formatSafetyIncidentSum(sum);
+            if (!Objects.equals(resultCell.getCellValue(), newTotal)) {
+                resultCell.carryOverValue(newTotal);
+            }
+        }
     }
 
     /**
@@ -388,6 +733,8 @@ public class CellService {
             case "TBL_PRODUCTION_INDEX" -> 36;
             case "TBL_INVENTORY" -> 8;
             case "TBL_BOILER" -> 3;
+            // 표5/6: 과거 2개월(당월-2/당월-1) 컬럼만 롤링되므로 +2개월까지 확인
+            case "TBL_SAFETY_INCIDENT_COUNT", "TBL_SAFETY_INCIDENT_AMOUNT" -> 2;
             default -> 0;
         };
         if (maxHorizonMonths <= 0) {
@@ -488,7 +835,13 @@ public class CellService {
         if (reportDate == null) {
             return false;
         }
-        if (reportDate.isBefore(yesterday) && !isLastDayOfMonth(reportDate)) {
+        // ★★★★★★ 2026-09: 사고통계 페이지(표5/6/7/8)는 과거/현재/미래 구분 없이
+        // 항상 편집 가능 — 날짜 제한을 완전히 건너뛴다. 일반 일보(표1~4)는
+        // 아래 기존 정책을 그대로 유지한다.
+        String tableCode = cell.getReportTable() != null ? cell.getReportTable().getTableCode() : null;
+        boolean dateRestrictionExempt = SAFETY_STATS_DATE_UNRESTRICTED_TABLE_CODES.contains(tableCode);
+        if (!dateRestrictionExempt
+                && reportDate.isBefore(yesterday) && !isLastDayOfMonth(reportDate)) {
             return false;
         }
 
