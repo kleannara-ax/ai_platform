@@ -37,6 +37,7 @@
 | `V38__migrate_other_permission_to_user_codes.sql` | OTHER_PERM 레거시 CSV 권한을 사용자별 코드값으로 전환 |
 | `V39__add_facility_water_consumption.sql` | 정수기 QR 물통 사용/보급 이력 테이블 추가 |
 | `V40__fix_co2_extinguisher_replacement_cycle.sql` | 이산화탄소소화기 교체주기 99년 고정 (기존 데이터 보정, 반영구적 사용) |
+| `V41__replace_sprinkler_inspection_checklist.sql` | 스프링클러 점검표 교체: 점검 이력 `CHECKLIST_TYPE` 추가. 주차타워는 기존 점검표 유지(`PARKING_TOWER`), 그 외 기존 이력은 정상/비정상만 표시(`STATUS_ONLY`), 이후 점검부터 표준 점검표(`STANDARD`) |
 
 ## 실행 순서
 
@@ -72,6 +73,7 @@
 29. V38__migrate_other_permission_to_user_codes.sql -- 기타시설관리 권한 사용자 코드 전환
 30. V39__add_facility_water_consumption.sql -- 정수기 QR 물통 사용/보급 이력 테이블 추가
 31. V40__fix_co2_extinguisher_replacement_cycle.sql -- 이산화탄소소화기 교체주기 99년 고정 (기존 데이터 보정)
+32. V41__replace_sprinkler_inspection_checklist.sql -- 스프링클러 점검표 교체 (점검표 유형 컬럼 + 기존 이력 분류)
 ```
 
 ## 사전 조건
@@ -121,6 +123,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V38__migrate_other_permission_to_user_codes.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V39__add_facility_water_consumption.sql
 mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V40__fix_co2_extinguisher_replacement_cycle.sql
+mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-fire/V41__replace_sprinkler_inspection_checklist.sql
 ```
 
 ## 테이블 구조
@@ -139,6 +142,8 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 | `fire_receiver_inspection` | 수신기 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
 | `fire_pump` | 소방펌프 | - |
 | `fire_pump_inspection` | 소방펌프 점검 이력 | INSPECTION_STATUS + 개별 상태 컬럼 |
+| `fire_sprinkler` | 스프링클러 | - |
+| `fire_sprinkler_inspection` | 스프링클러 점검 이력 | INSPECTION_STATUS + CHECKLIST_TYPE + CHECKLIST_JSON (주차타워는 개별 상태 컬럼 병행) |
 | `facility_equipment` | 기타설비(에어컨/정수기) 마스터. `EQUIPMENT_CODE`는 에어컨 `AC-000001` 형식 자동 ID이며 현장 식별 No.(`SERIAL_NUMBER`)와 별도로 관리합니다. 정수기는 별도 `EQUIPMENT_CODE`를 사용하지 않고 기존 `SERIAL_NUMBER`의 `WP-000001` 형식 순번 ID를 자동 생성합니다. 미등록 QR 등록 시 QR_KEY를 스캔된 키로 저장 | - |
 | `facility_equipment_inspection` | 기타설비 점검 이력 | IS_FAULTY + FAULT_REASON |
 | `facility_aircon_fault_report` | 에어컨 점검 요청/모바일 QR 점검 이력 | PC: 접수자 이름 + 소속 + 고장내용 / 모바일 QR: 점검자 이름 + 정상·비정상 |
@@ -148,6 +153,7 @@ mysql --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/modu
 
 - **소화기/소화전**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(불량 사유)
 - **수신기/소방펌프**: `INSPECTION_STATUS`(NORMAL/ABNORMAL) + 개별 항목별 상태 컬럼 + `NOTE`(비고)
+- **스프링클러**: 점검표는 `SprinklerChecklist`에서 정의하고 PC/모바일 화면은 API로 받아 표시합니다. 주차타워 건물은 기존 점검표(배관 5·헤드 반사판 1·제품 1, `PARKING_TOWER`), 그 외 건물은 표준 점검표(스프링클러 배관 4·제품 1, `STANDARD`)를 따릅니다. 점검표 교체 이전 이력(주차타워 제외)은 `STATUS_ONLY`로 항목 없이 정상/비정상 결과만 표시합니다.
 - **기타설비(정수기)**: `IS_FAULTY`(0=정상, 1=비정상) + `FAULT_REASON`(고장 사유), 최근 12건 이력 유지
 - **기타설비(에어컨)**: 목록/상세에서 최종 점검일·점검자와 점검 이력 입력을 표시하지 않고, PC `점검 요청`은 `facility_aircon_fault_report`에 접수자 이름·소속·고장내용을 저장합니다. 모바일 QR 점검은 외부 업체용으로 점검자 이름과 정상/비정상만 저장하며 사진 업로드를 받지 않습니다.
 - **기타설비(정수기 모바일 QR)**: 외부 업체용 QR 점검은 점검자 이름과 완료/미완료만 저장하며 사진 업로드를 받지 않습니다. 등록/수정 대표사진 업로드는 유지합니다.

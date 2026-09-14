@@ -2,6 +2,7 @@ package com.company.module.fire.dto;
 
 import com.company.module.fire.entity.FireSprinkler;
 import com.company.module.fire.entity.FireSprinklerInspection;
+import com.company.module.fire.service.SprinklerChecklist;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -33,6 +34,13 @@ public class FireSprinklerResponse {
     private final boolean isActive;
     private final LocalDateTime createdAt;
 
+    /** 지금 점검할 때 적용되는 점검표 유형 (STANDARD / PARKING_TOWER) */
+    private final String checklistType;
+
+    /** 지금 점검할 때 적용되는 점검표 항목 — 상세 조회에서만 채운다 */
+    @Builder.Default
+    private List<SprinklerChecklist.Group> checklistGroups = List.of();
+
     private LocalDate lastInspectionDate;
     private LocalTime lastInspectionTime;
     private String lastInspectorName;
@@ -60,6 +68,7 @@ public class FireSprinklerResponse {
                 .imagePath(sprinkler.getImagePath())
                 .isActive(sprinkler.isActive())
                 .createdAt(sprinkler.getCreatedAt())
+                .checklistType(SprinklerChecklist.currentType(sprinkler))
                 .build();
     }
 
@@ -78,6 +87,10 @@ public class FireSprinklerResponse {
         this.lastIsFaulty = "FAULTY".equalsIgnoreCase(inspection.getInspectionStatus());
         this.lastFaultReason = this.lastIsFaulty ? faultReason : null;
         this.lastInspectionNote = inspection.getNote();
+    }
+
+    public void includeChecklistGroups() {
+        this.checklistGroups = SprinklerChecklist.groups(this.checklistType);
     }
 
     public void setInspectionRequired(boolean inspectionRequired) {
@@ -102,6 +115,7 @@ public class FireSprinklerResponse {
                             "FAULTY".equalsIgnoreCase(inspection.getInspectionStatus()),
                             faultReason.isBlank() ? null : faultReason,
                             inspection.getNote(),
+                            SprinklerChecklist.effectiveType(inspection),
                             items
                     );
                 })
@@ -118,11 +132,13 @@ public class FireSprinklerResponse {
         private final boolean isFaulty;
         private final String faultReason;
         private final String note;
+        /** 이력의 점검표 유형 — STATUS_ONLY 는 항목 없이 정상/비정상만 표시 */
+        private final String checklistType;
         private final List<InspectionChecklistItem> checklistItems;
 
         public InspectionRow(Long inspectionId, LocalDate inspectionDate, LocalTime inspectionTime, String inspectorName,
                              String inspectionStatus, boolean isFaulty, String faultReason, String note,
-                             List<InspectionChecklistItem> checklistItems) {
+                             String checklistType, List<InspectionChecklistItem> checklistItems) {
             this.inspectionId = inspectionId;
             this.inspectionDate = inspectionDate;
             this.inspectionTime = inspectionTime;
@@ -131,6 +147,7 @@ public class FireSprinklerResponse {
             this.isFaulty = isFaulty;
             this.faultReason = faultReason;
             this.note = note;
+            this.checklistType = checklistType;
             this.checklistItems = checklistItems;
         }
     }
