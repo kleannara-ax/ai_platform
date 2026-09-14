@@ -173,18 +173,8 @@ const API = (() => {
   return { req, getUser, canManage };
 })();
 
-const checklistGroups = [
-  { title:'스프링클러 배관', items:[
-    { key:'pipe_damage', label:'배관 파손여부 확인(휘거나 찌그러짐)' },
-    { key:'pipe_connection', label:'배관 연결부 상태 확인(플랜지, 나사부, 엘보 등)' },
-    { key:'pipe_support', label:'배관 지지대 상태 확인(고정 및 풀림 확인)' },
-    { key:'drain_valve', label:'드레인 벨브 누수 상태 확인(벨브 파손 및 잠금상태)' },
-    { key:'drain_pipe_sealing', label:'드레인 배관 실리콘 마감상태 확인' }
-  ]},
-  { title:'스프링클러 헤드 반사판', items:[{ key:'head_reflector', label:'헤드 반사판 탈락여부 확인' }] },
-  { title:'제품', items:[{ key:'product_clearance', label:'헤드로부터 제품 이격거리 60cm 이격거리 확보 여부' }] }
-];
-const flatChecklist = checklistGroups.flatMap(g => g.items);
+// 점검표는 서버(SprinklerChecklist)가 스프링클러별로 내려준다. 주차타워는 기존 점검표, 그 외는 표준 점검표.
+let currentChecklistGroups = [];
 let allItems = [], filteredItems = [], optionBuildings = [], optionFloors = [], buildingFloorMap = {}, currentStatusType = null, currentInspectId = null, currentDetailId = null;
 let canEdit = API.canManage();
 let spkSelectedImageObjectUrl = '';
@@ -301,14 +291,14 @@ function renderTable() {
     </tr>`).join('') || `<tr><td colspan="11" class="text-center text-muted py-5">등록된 스프링클러가 없습니다.</td></tr>`;
   document.getElementById('mainTableWrap').innerHTML = `<div class="table-responsive fw-list-scroll"><table class="table mb-0"><thead class="table-dark"><tr><th style="width:70px" class="text-center">번호</th><th style="width:125px">ID</th><th>건물</th><th>층</th><th style="width:115px">좌표</th><th style="width:145px">최종점검일</th><th style="width:110px">점검자</th><th style="width:95px">고장유무</th><th>고장사유</th><th>비고</th><th style="width:170px">관리</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-function checklistHtml(prefix, values = {}) {
-  return checklistGroups.map(group => `<section class="check-section"><div class="check-section-title">${esc(group.title)}</div>${group.items.map(item => {
+function checklistHtml(prefix, groups, values = {}) {
+  return groups.map(group => `<section class="check-section"><div class="check-section-title">${esc(group.title)}</div>${group.items.map(item => {
     const v = String(values[item.key] || '').toUpperCase();
     return `<div class="check-item"><div class="fw-semibold">${esc(item.label)}</div><div class="check-radio"><label><input type="radio" name="${prefix}_${item.key}" value="NORMAL" ${v === 'NORMAL' ? 'checked' : ''}> 양호</label><label><input type="radio" name="${prefix}_${item.key}" value="FAULTY" ${v === 'FAULTY' ? 'checked' : ''}> 불량</label></div></div>`;
   }).join('')}</section>`).join('');
 }
 function collectChecklist(prefix) {
-  return flatChecklist.map(item => {
+  return currentChecklistGroups.flatMap(g => g.items || []).map(item => {
     const checked = document.querySelector(`input[name="${prefix}_${item.key}"]:checked`);
     if (!checked) throw new Error(`'${item.label}' 결과를 선택해 주세요.`);
     return { itemKey:item.key, itemLabel:item.label, result:checked.value };
@@ -372,7 +362,11 @@ async function openDetail(id) {
   } catch(e) { showToast(e.message, 'danger'); }
 }
 function renderHistoryRow(row) {
-  const resultBadge = row?.inspectionId ? (row.isFaulty ? '<span class="fw-status fw-bad">불량</span>' : '<span class="fw-status fw-ok">양호</span>') : '<span class="fw-status fw-muted">-</span>';
+  // STATUS_ONLY: 점검표 교체 이전 이력(주차타워 제외) — 항목 없이 정상/비정상만 표시
+  const statusOnly = row?.checklistType === 'STATUS_ONLY';
+  const resultBadge = row?.inspectionId
+    ? (row.isFaulty ? `<span class="fw-status fw-bad">${statusOnly ? '비정상' : '불량'}</span>` : `<span class="fw-status fw-ok">${statusOnly ? '정상' : '양호'}</span>`)
+    : '<span class="fw-status fw-muted">-</span>';
   return `<tr data-inspection-id="${esc(row.inspectionId || '')}"><td>${fmtDate(row.inspectionDate)}</td><td>${val(row.inspectionTime ? String(row.inspectionTime).slice(0,5) : '')}</td><td>${val(row.inspectorName)}</td><td>${resultBadge}</td><td class="small text-danger">${val(row.faultReason)}</td><td>${val(row.note)}</td></tr>`;
 }
 function setSpkImagePreview(src) {
@@ -423,7 +417,17 @@ async function uploadSprinklerImage(sprinklerId) {
   fd.append('file', file);
   return jsonOrThrow(await API.req(`/fire-api/sprinklers/${encodeURIComponent(sprinklerId)}/image`, { method:'POST', body:fd }));
 }
-function openInspect(id) { currentInspectId = id; document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect'); document.getElementById('inspectNote').value = ''; bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show(); }
+async function openInspect(id) {
+  try {
+    const d = await jsonOrThrow(await API.req('/fire-api/sprinklers/' + encodeURIComponent(id)));
+    currentChecklistGroups = Array.isArray(d?.checklistGroups) ? d.checklistGroups : [];
+    if (!currentChecklistGroups.length) throw new Error('적용할 점검표를 불러오지 못했습니다.');
+    currentInspectId = id;
+    document.getElementById('inspectChecklist').innerHTML = checklistHtml('inspect', currentChecklistGroups);
+    document.getElementById('inspectNote').value = '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).show();
+  } catch(e) { showToast(e.message, 'danger'); }
+}
 async function confirmInspect() {
   try { const body = { items:collectChecklist('inspect'), note:document.getElementById('inspectNote').value.trim() }; await jsonOrThrow(await API.req(`/fire-api/sprinklers/${currentInspectId}/inspect`, { method:'POST', body })); postFloorMessage('fireweb:floor-action-saved'); bootstrap.Modal.getOrCreateInstance(document.getElementById('spkInspectModal')).hide(); showToast('점검이 완료되었습니다.'); await loadSprinklers(); } catch(e) { showToast(e.message, 'danger'); }
 }

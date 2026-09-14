@@ -7,6 +7,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.module.fire.entity.*;
 import com.company.module.fire.repository.*;
 import com.company.module.fire.service.InspectorNameResolver;
+import com.company.module.fire.service.SprinklerChecklist;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -1120,6 +1121,9 @@ public class MobileInspectionController {
         result.put("x", sprinkler.getX());
         result.put("y", sprinkler.getY());
         result.put("imagePath", sprinkler.getImagePath());
+        String checklistType = SprinklerChecklist.currentType(sprinkler);
+        result.put("checklistType", checklistType);
+        result.put("checklistGroups", SprinklerChecklist.groups(checklistType));
 
         sprinklerInspectionRepository
                 .findTopBySprinkler_SprinklerIdOrderByInspectionDateDescInspectionIdDesc(sprinkler.getSprinklerId())
@@ -1147,21 +1151,34 @@ public class MobileInspectionController {
             throw new BusinessException("이미 오늘 점검이 등록된 스프링클러입니다.");
         }
 
-        List<Map<String, String>> items = extractChecklistItems(body.get("items"));
+        String checklistType = SprinklerChecklist.currentType(sprinkler);
+        Map<String, String> resultsByKey = new LinkedHashMap<>();
+        for (Map<String, String> item : extractChecklistItems(body.get("items"))) {
+            resultsByKey.put(item.get("key"), item.get("result"));
+        }
+        List<SprinklerChecklist.CheckedItem> checked = SprinklerChecklist.normalize(checklistType, resultsByKey);
         String inspectorName = trimToNull(getString(body, "inspectorName"));
         if (inspectorName == null) {
             inspectorName = resolveInspectorName();
         }
         String note = trimToNull(getString(body, "note"));
-        Map<String, String> statusMap = toStatusMap(items);
-        String inspectionStatus = resolveInspectionStatus(items);
+        Map<String, String> statusMap = new LinkedHashMap<>();
+        checked.forEach(item -> statusMap.put(item.itemKey(), item.result()));
+        String inspectionStatus = SprinklerChecklist.resolveStatus(checked);
+        String checklistJson;
+        try {
+            checklistJson = objectMapper.writeValueAsString(checked);
+        } catch (JsonProcessingException ex) {
+            throw new BusinessException("점검 체크리스트 저장에 실패했습니다.");
+        }
 
         FireSprinklerInspection inspection = FireSprinklerInspection.builder()
                 .sprinkler(sprinkler)
                 .inspectionDate(LocalDate.now())
                 .inspectionTime(LocalTime.now().withSecond(0).withNano(0))
                 .inspectionStatus(inspectionStatus)
-                .checklistJson(writeChecklistJson(items))
+                .checklistType(checklistType)
+                .checklistJson(checklistJson)
                 .note(note)
                 .pipeDamageStatus(statusMap.get("pipe_damage"))
                 .pipeConnectionStatus(statusMap.get("pipe_connection"))
