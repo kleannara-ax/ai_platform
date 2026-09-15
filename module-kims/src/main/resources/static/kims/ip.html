@@ -1003,13 +1003,16 @@
       paintSelection();
       ensureVisible(r, c);
     }
+    // 페이지 세로 이동은 즉시 이동으로 — Bootstrap 기본 CSS(:root scroll-behavior: smooth) 때문에
+    // scrollBy 를 연속 호출하면 매번 부드러운 스크롤 애니메이션이 새로 시작돼 거의 움직이지 않는다
+    const pageScrollBy = (dy) => window.scrollBy({ top: dy, left: 0, behavior: 'instant' });
     // 칸이 고정 머리글·화면 밖에 가려져 있으면 페이지(세로)·상단 보조 스크롤바(가로)를 움직여 보이게 한다
     function ensureVisible(r, c) {
       const td = tdOf(r, c); if (!td) return;
       const rc = td.getBoundingClientRect();
       const headBottom = Math.max(0, document.getElementById('list-head').getBoundingClientRect().bottom);
-      if (rc.top < headBottom) window.scrollBy(0, rc.top - headBottom - 2);
-      else if (rc.bottom > window.innerHeight - 4) window.scrollBy(0, rc.bottom - window.innerHeight + 4);
+      if (rc.top < headBottom) pageScrollBy(rc.top - headBottom - 2);
+      else if (rc.bottom > window.innerHeight - 4) pageScrollBy(rc.bottom - window.innerHeight + 4);
       const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
       const top = document.getElementById('list-top-scroll');
       if (rc.left < cont.left) top.scrollLeft -= (cont.left - rc.left) + 2;
@@ -1115,8 +1118,8 @@
         const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
         const top = document.getElementById('list-top-scroll');
         let moved = false;
-        if (e.clientY > window.innerHeight - 30) { window.scrollBy(0, 24); moved = true; }
-        else if (e.clientY < headBottom + 16 && window.scrollY > 0) { window.scrollBy(0, -24); moved = true; }
+        if (e.clientY > window.innerHeight - 30) { pageScrollBy(24); moved = true; }
+        else if (e.clientY < headBottom + 16 && window.scrollY > 0) { pageScrollBy(-24); moved = true; }
         if (e.clientX > cont.right - 28) { top.scrollLeft += 24; moved = true; }
         else if (e.clientX < cont.left + 28) { top.scrollLeft -= 24; moved = true; }
         if (moved) {
@@ -1379,8 +1382,11 @@
       const panStep = () => {
         if (!pan) return;
         const vx = panSpeed(pan.cx - pan.x), vy = panSpeed(pan.cy - pan.y);
-        if (vx) top.scrollLeft += vx;
-        if (vy) window.scrollBy(0, vy);
+        // 1px 미만 이동량은 버려지므로 누적했다가 정수만큼 이동 (느린 속도에서도 멈추지 않게)
+        pan.ax += vx; pan.ay += vy;
+        const sx = Math.trunc(pan.ax), sy = Math.trunc(pan.ay);
+        if (sx) { top.scrollLeft += sx; pan.ax -= sx; }
+        if (sy) { pageScrollBy(sy); pan.ay -= sy; }
         const dir = (vy < 0 ? 'n' : vy > 0 ? 's' : '') + (vx < 0 ? 'w' : vx > 0 ? 'e' : '');
         document.documentElement.style.cursor = dir ? dir + '-resize' : 'all-scroll';
         pan.raf = requestAnimationFrame(panStep);
@@ -1389,7 +1395,7 @@
         if (e.button !== 1) return;
         e.preventDefault();   // 브라우저 기본(세로만) 자동 스크롤 막기
         if (pan) { stopPan(); return; }
-        pan = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, moved: false, t: Date.now() };
+        pan = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, ax: 0, ay: 0, moved: false, t: Date.now() };
         panIcon.style.left = e.clientX + 'px'; panIcon.style.top = e.clientY + 'px'; panIcon.hidden = false;
         pan.raf = requestAnimationFrame(panStep);
       }));
