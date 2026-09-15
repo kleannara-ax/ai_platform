@@ -349,6 +349,40 @@ public class IpAddressService {
         return toJson(snaps, java.util.List.of());
     }
 
+    /**
+     * [반납/회수] 대상 PC(ipId)를 업무요청 완료 시 자동으로 반납 또는 회수 처리한다.
+     * <ul>
+     *   <li>반납(isReturn=true): 사용자·장치·스펙·자산 모두 비우고 부서를 returnDepartment 로 갱신(예: "{부서}보관")</li>
+     *   <li>회수(isReturn=false): PC 정보는 유지하고 IP만 회수 처리, 부서는 공란 처리</li>
+     * </ul>
+     * @return 원복용 스냅샷 JSON
+     */
+    @Transactional
+    public String applyReturn(Long ipId, boolean isReturn, String returnDepartment, String changedBy, Long requestId) {
+        IpAddress ip = findIp(ipId);
+        List<com.company.module.kims.entity.IpRowSnapshot> snaps = new ArrayList<>();
+        snaps.add(ip.toSnapshot());
+        String beforeUser = ip.getUserName();
+        String content;
+        IpChangeType type;
+        if (isReturn) {
+            ip.applyReturn(returnDepartment);
+            content = "업무요청 반납" + (returnDepartment != null && !returnDepartment.isBlank() ? " (보관: " + returnDepartment + ")" : "");
+            type = IpChangeType.RETURNED;
+        } else {
+            ip.applyReclaim();
+            content = "업무요청 회수";
+            type = IpChangeType.RECLAIMED;
+        }
+        ipHistoryRepository.save(IpHistory.builder()
+                .ipAddress(ip).serviceRequest(findRequestOrNull(requestId))
+                .changeType(type)
+                .content(content)
+                .approved(true).changedBy(changedBy)
+                .beforeUser(beforeUser).afterUser(ip.getUserName()).build());
+        return toJson(snaps, List.of());
+    }
+
     /** 완료된 요청의 자동 반영을 취소 시 원복 */
     @Transactional
     public void revertApplied(String snapshotJson, String changedBy) {

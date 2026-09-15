@@ -81,6 +81,7 @@ public class ServiceRequestService {
                 .requestType(request.getRequestType())
                 .issueType(request.getIssueType())
                 .ipKind(request.getIpKind())
+                .returnType(request.getReturnType())
                 .changerName(request.getChangerName())
                 .content(request.getContent())
                 .urgent(request.isUrgent())
@@ -269,6 +270,15 @@ public class ServiceRequestService {
                             "PC변경 완료: 대상 PC와 변경할 항목을 지정해야 합니다.");
                 }
                 snapshot = ipAddressService.applyPcChange(scr.getTargetIpId(), scr.getPcFields(), by, rid);
+            }
+            case PC_RETURN -> {
+                if (scr.getTargetIpId() == null || req.getReturnType() == null) {
+                    throw new com.company.core.common.exception.BusinessException(
+                            com.company.core.common.exception.ErrorCode.INVALID_INPUT_VALUE,
+                            "반납 완료: 대상 PC와 반납유형을 지정해야 합니다.");
+                }
+                boolean isReturn = req.getReturnType() == com.company.module.kims.entity.enums.IpReturnType.RETURN;
+                snapshot = ipAddressService.applyReturn(scr.getTargetIpId(), isReturn, scr.getReturnDepartment(), by, rid);
             }
             case ETC -> { /* 기타 변경: 자동 반영 없음 (수기 처리) */ }
         }

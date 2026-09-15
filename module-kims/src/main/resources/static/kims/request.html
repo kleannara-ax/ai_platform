@@ -103,10 +103,19 @@
             <option value="IP_CHANGE">IP변경</option>
             <option value="IP_NEW">IP신규생성</option>
             <option value="PC_CHANGE">PC변경</option>
+            <option value="PC_RETURN">반납</option>
             <option value="ETC">기타 변경</option>
           </select></div>
         <div class="col" id="c-changer-col"><label class="form-label small mb-0" id="c-changer-label">변경자 *</label>
           <input id="c-changer" class="form-control form-control-sm" placeholder="변경 대상 사용자명"></div>
+      </div>
+      <!-- 반납: 반납유형(반납/회수) 선택 (요청목록=PC_RETURN 일 때만 표시) -->
+      <div id="c-returntype-block" class="row g-2 mt-0" style="display:none">
+        <div class="col"><label class="form-label small mb-0">반납유형 *</label>
+          <select id="c-returntype" class="form-select form-select-sm">
+            <option value="RETURN">반납</option>
+            <option value="RECLAIM">회수</option>
+          </select></div>
       </div>
       <div class="mb-2 mt-1"><label class="form-label small mb-0" id="c-content-label">상세 요청내용 *</label><textarea id="c-content" class="form-control form-control-sm" rows="3"></textarea></div>
       <div class="mb-2"><label class="form-label small mb-0">첨부파일 등록</label>
@@ -426,6 +435,7 @@
       const issueSel = document.getElementById('c-issue'); if (issueSel) issueSel.value = '';
       document.getElementById('c-ipkind').value = 'IP_CHANGE';
       document.getElementById('c-changer').value = '';
+      document.getElementById('c-returntype').value = 'RETURN';
       onCreateTypeChange();      // 유형에 맞춰 폼 구성(기본 SUPPLY → 품목/수량)
       createModal.show();
     }
@@ -451,14 +461,19 @@
         }
       }
     }
-    // 요청목록에 따라 변경자/생성자 입력칸 라벨 전환 (기타 변경은 숨김)
+    // 요청목록에 따라 변경자/생성자 입력칸 라벨 전환 (기타 변경은 숨김) + 반납유형 서브옵션 노출
     function onIpKindChange() {
       const k = document.getElementById('c-ipkind').value;
       const col = document.getElementById('c-changer-col');
+      const rtBlock = document.getElementById('c-returntype-block');
+      rtBlock.style.display = (k === 'PC_RETURN') ? '' : 'none';
+      if (k === 'PC_RETURN') document.getElementById('c-returntype').value = 'RETURN';
       if (k === 'ETC') { col.style.display = 'none'; return; }
       col.style.display = '';
-      document.getElementById('c-changer-label').textContent = (k === 'IP_NEW') ? '생성자 *' : '변경자 *';
-      document.getElementById('c-changer').placeholder = (k === 'IP_NEW') ? '신규 IP 부여 대상 사용자명' : '변경 대상 사용자명';
+      document.getElementById('c-changer-label').textContent =
+        (k === 'IP_NEW') ? '생성자 *' : (k === 'PC_RETURN') ? '반납자 *' : '변경자 *';
+      document.getElementById('c-changer').placeholder =
+        (k === 'IP_NEW') ? '신규 IP 부여 대상 사용자명' : (k === 'PC_RETURN') ? '반납/회수 대상 사용자명' : '변경 대상 사용자명';
     }
     async function loadCreateItems() {
       const sel = document.getElementById('c-item');
@@ -474,7 +489,7 @@
       const requesterName = document.getElementById('c-requester').value.trim();
       const type = document.getElementById('c-type').value;
       let content = document.getElementById('c-content').value.trim();
-      let issueType = null, ipKind = null, changerName = null;
+      let issueType = null, ipKind = null, changerName = null, returnType = null;
       if (!requesterName) { KIMS.toast('요청자명은 필수입니다.', false); return; }
 
       // 전산소모품 지급: 품목/수량을 필수로 받아 요청내용을 자동 구성
@@ -497,7 +512,10 @@
         ipKind = document.getElementById('c-ipkind').value;
         if (ipKind !== 'ETC') {
           changerName = document.getElementById('c-changer').value.trim();
-          if (!changerName) { KIMS.toast((ipKind === 'IP_NEW' ? '생성자' : '변경자') + '를 입력하세요.', false); return; }
+          if (!changerName) { KIMS.toast((ipKind === 'IP_NEW' ? '생성자' : ipKind === 'PC_RETURN' ? '반납자' : '변경자') + '를 입력하세요.', false); return; }
+        }
+        if (ipKind === 'PC_RETURN') {
+          returnType = document.getElementById('c-returntype').value;
         }
         if (!content) { KIMS.toast('상세 요청내용은 필수입니다.', false); return; }
       } else if (!content) {
@@ -510,7 +528,7 @@
         contact: document.getElementById('c-contact').value.trim(),
         location: document.getElementById('c-loc').value.trim(),
         requestType: type,
-        issueType, ipKind, changerName,
+        issueType, ipKind, changerName, returnType,
         receivedChannel: document.getElementById('c-channel').value,
         urgent: document.getElementById('c-urgent').checked,
       };
@@ -565,7 +583,7 @@
                 <tr><th>연락처</th><td>${E(d.contact)}</td><th>위치</th><td>${E(d.location)}</td></tr>
                 <tr><th>유형</th><td>${E(d.requestTypeLabel)}</td><th>긴급</th><td>${d.urgent?'<span class="text-danger">긴급</span>':'일반'}</td></tr>
                 ${d.issueTypeLabel ? `<tr><th>불편유형</th><td colspan="3">${E(d.issueTypeLabel)}</td></tr>` : ''}
-                ${d.ipKindLabel ? `<tr><th>요청목록</th><td>${E(d.ipKindLabel)}</td><th>${d.ipKind==='IP_NEW'?'생성자':'변경자'}</th><td>${E(d.changerName)}</td></tr>` : ''}
+                ${d.ipKindLabel ? `<tr><th>요청목록</th><td>${E(d.ipKindLabel)}${d.returnTypeLabel?(' / '+E(d.returnTypeLabel)):''}</td><th>${d.ipKind==='IP_NEW'?'생성자':d.ipKind==='PC_RETURN'?'반납자':'변경자'}</th><td>${E(d.changerName)}</td></tr>` : ''}
                 <tr><th>접수채널</th><td>${E(d.receivedChannelLabel)}</td><th>담당자</th><td>${E(d.assignee)}</td></tr>
                 <tr><th>완료일</th><td colspan="3">${E(d.completedAt)}</td></tr>
                 <tr><th>요청내용</th><td colspan="3" style="white-space:pre-wrap">${E(d.content)}</td></tr>
@@ -665,7 +683,11 @@
         return;
       }
       const opts = pcs.map(p => `<option value="${p.ipId}" data-ip="${E(p.ipAddress)}">${E(p.ipAddress)}${p.serialNo?(' / '+E(p.serialNo)):''}${p.department?(' / '+E(p.department)):''}</option>`).join('');
-      let inner = `<label class="form-label small mb-0">대상 PC (현재 IP) *</label>
+      let inner;
+      const targetLabel = (kind === 'PC_RETURN')
+        ? (d.returnType === 'RETURN' ? '반납대상 IP 및 사용자 *' : '회수대상 IP 및 사용자 *')
+        : '대상 PC (현재 IP) *';
+      inner = `<label class="form-label small mb-0">${targetLabel}</label>
         <select id="d-targetip" class="form-select form-select-sm">${opts}</select>`;
       if (kind === 'IP_CHANGE') {
         inner += `<label class="form-label small mb-0 mt-1">변경할 새 IP *</label>
@@ -679,6 +701,19 @@
               <input id="pcv-${k}" class="form-control form-control-sm py-0" placeholder="새 값">
             </div>`).join('')
           + `</div></div>`;
+      } else if (kind === 'PC_RETURN') {
+        // 반납: 요청자 부서를 기반으로 "{부서}보관" 자동 채움(수정 가능) / 회수: 자동 공란 처리
+        const isReturn = d.returnType === 'RETURN';
+        const autoValue = isReturn ? ((d.department || '').trim() + '보관') : '';
+        const sectionTitle = isReturn ? '반납 처리' : '회수 처리';
+        const fieldLabel = isReturn ? '보관 부서 (수정 가능)' : '비고 (공란 자동 처리)';
+        inner += `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
+          <label class="form-label small mb-0">${fieldLabel}</label>
+          <input id="d-return-dept" class="form-control form-control-sm" value="${E(autoValue)}"
+            ${isReturn ? '' : 'placeholder="공란 처리됩니다"'}>
+          <div class="form-text">${isReturn
+            ? '요청자 부서(' + E(d.department || '') + ') 기준으로 자동 입력되며, 필요 시 직접 수정할 수 있습니다.'
+            : '회수 처리이므로 부서란은 자동으로 공란 처리됩니다.'}</div>`;
       }
       box.innerHTML = inner;
     }
@@ -807,6 +842,18 @@
         const names = Object.keys(fields).map(k => PC_CHANGE_FIELDS[k]).join(', ');
         if (!confirm(`${curIp} (${d.changerName}) 의 다음 항목을 변경합니다:\n${names}\n진행하시겠습니까?`)) return false;
         payload.targetIpId = targetIpId; payload.pcFields = fields;
+        return true;
+      }
+      if (d.ipKind === 'PC_RETURN') {
+        const isReturn = d.returnType === 'RETURN';
+        const returnDept = (document.getElementById('d-return-dept')||{}).value?.trim() || '';
+        const label = isReturn ? '반납' : '회수';
+        const msg = isReturn
+          ? `${curIp} (${d.changerName}) 을(를) 반납 처리합니다.\n보관 부서: ${returnDept || '(없음)'}\n사용자·장치·PC 스펙 정보가 모두 비워집니다.\n진행하시겠습니까?`
+          : `${curIp} (${d.changerName}) 을(를) 회수 처리합니다. (IP만 미사용, PC 정보는 유지)\n진행하시겠습니까?`;
+        if (!confirm(msg)) return false;
+        payload.targetIpId = targetIpId;
+        payload.returnDepartment = isReturn ? returnDept : '';
         return true;
       }
       return true;
