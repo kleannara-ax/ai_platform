@@ -195,6 +195,12 @@ public class IpAddress extends BaseTimeEntity {
         this.monitorAssetNo = monitorAssetNo;
     }
 
+    /** 상주/임시 구분·구입일 갱신. null 인 항목은 그대로 두고, 빈 문자열은 값을 비운다. */
+    public void updateUsageAndPurchase(String usageType, String purchaseDate) {
+        if (usageType != null) this.usageType = usageType.isBlank() ? null : usageType.trim();
+        if (purchaseDate != null) this.purchaseDate = purchaseDate.isBlank() ? null : purchaseDate.trim();
+    }
+
     /**
      * PC+IP 반납 처리. PC/장비가 함께 반납되므로 사용자·장치·PC 스펙·자산정보를 모두 비운다.
      * <p>회수(IP만)와 달리 PC 관련 정보를 남기지 않는다. 상태는 회수(RECLAIMED)로 둔다.

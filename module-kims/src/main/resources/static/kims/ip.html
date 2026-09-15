@@ -26,6 +26,41 @@
       position: sticky; top: 0; z-index: 15; background: #f8f9fa;
       border-bottom: 1px solid #e2e8f0; }
     .table-top-scroll > div { height: 1px; }
+
+    /* ── PC 목록: 상단(버튼·검색바·편집 툴바·보조 스크롤바) 고정 ── */
+    #list-sticky { position: sticky; top: 0; z-index: 30; background: #f1f5f9;
+      padding-top: 10px; margin-top: -10px; }
+    #list-sticky .table-top-scroll { position: static; border-bottom: 0; background: transparent; }
+    #list-sticky .card { margin-bottom: .6rem !important; }
+    /* 좁은 화면에서는 검색바가 세로로 길어져 표를 가리므로 고정 해제 */
+    @media (max-width: 767.98px) { #list-sticky { position: static; } }
+    .grid-toolbar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: .45rem .6rem .45rem .9rem; }
+    .grid-toolbar kbd { font-size: .72rem; }
+    .dirty-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: #bae6fd;
+      border: 1px solid #38bdf8; margin-right: 6px; vertical-align: -1px; }
+    #grid-dirty-info:not(.text-muted) { color: #0369a1; font-weight: 500; }
+
+    /* ── PC 목록 표: 표 안에서 스크롤 + 머리글 고정 ── */
+    #list-table-scroll { overflow: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: .6rem; }
+    #list-table { margin-bottom: 0; }
+    #list-table thead th { position: sticky; top: 0; z-index: 3; background: #f8fafc;
+      box-shadow: inset 0 -1px 0 #cbd5e1; border-top: 0; }
+
+    /* ── 엑셀식 편집 셀 ── */
+    #grid-clip { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+    .kims-grid td.gc { cursor: cell; user-select: none; -webkit-user-select: none; }
+    .kims-grid td.gc.ro { color: #475569; }
+    .kims-grid tbody tr:hover > td { background-color: #f8fafc; }
+    .kims-grid td.gc.dirty { background-color: #bae6fd !important; }          /* 수정됨(저장 전) = 하늘색 */
+    .kims-grid td.gc.sel { background-color: #dbeafe !important; }
+    .kims-grid td.gc.sel.dirty { background-color: #93d3f7 !important; }
+    .kims-grid td.gc.cur { box-shadow: inset 0 0 0 2px #2563eb !important; }
+    .kims-grid td.gc.err { box-shadow: inset 0 0 0 2px #ef4444 !important; }
+    .kims-grid td.gc.editing { padding: 0 !important; box-shadow: none !important; background: #fff !important; }
+    #list-table td.gc.editing.remark-cell { max-width: none; overflow: visible; }
+    .grid-editor { display: block; width: 100%; min-width: 100%; height: 100%; min-height: 30px;
+      border: 2px solid #2563eb; border-radius: 0; padding: .3rem .45rem; font: inherit; color: #0f172a;
+      outline: none; background: #fff; box-shadow: 0 4px 14px rgba(37,99,235,.18); }
     /* 사용 흐름 플로우차트 */
     .flow-node { border: 1px solid #93c5fd; border-radius: 8px; padding: 4px 10px; background: #eff6ff;
                  text-align: center; white-space: nowrap; min-width: 90px; }
@@ -59,6 +94,8 @@
       <div id="sep-hint" class="alert alert-info py-2 mb-2" style="display:none">
         <b>별도관리</b> — IP 대역이 없거나(사외 시설·협력업체 설치 등) 미배정 상태로 별도 관리하는 장비 목록입니다.
       </div>
+      <!-- 스크롤을 내려도 항상 보이는 영역: 상단 버튼 · 검색바 · 표 편집 툴바 · 상단 보조 스크롤바 -->
+      <div id="list-sticky">
       <div class="d-flex justify-content-end gap-1 mb-2">
         <button class="btn btn-outline-warning btn-sm" onclick="showUnapproved()">미품의 변경 내역</button>
         <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
@@ -92,9 +129,20 @@
             <button class="btn btn-light btn-sm" onclick="resetFilter()">초기화</button></div>
         </div>
       </div></div>
+      <!-- 표 직접 편집 툴바: 수정한 칸(하늘색)은 [변경사항 저장] 을 눌러야 저장된다 -->
+      <div class="grid-toolbar d-flex flex-wrap align-items-center gap-2 mb-2">
+        <div class="small text-muted me-auto">
+          <b class="text-body">칸 클릭</b> 즉시 수정 · <b class="text-body">드래그</b> 범위 선택 ·
+          <b class="text-body">Ctrl+C / Ctrl+V</b> 복사·붙여넣기(엑셀 호환) · <b class="text-body">Delete</b> 지우기 · <b class="text-body">Esc</b> 입력 취소
+        </div>
+        <span id="grid-dirty-info" class="small text-muted">수정된 칸 없음</span>
+        <button id="grid-revert-btn" class="btn btn-outline-secondary btn-sm" onclick="gridRevertAll()" disabled>변경 취소</button>
+        <button id="grid-save-btn" class="btn btn-primary btn-sm" onclick="gridSave()" disabled>변경사항 저장</button>
+      </div>
       <div class="table-top-scroll" id="list-top-scroll"><div id="list-top-scroll-inner">&nbsp;</div></div>
+      </div><!-- /#list-sticky -->
       <div class="table-responsive" id="list-table-scroll">
-        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+        <table class="table table-sm table-bordered bg-white align-middle kims-grid" id="list-table">
           <thead class="table-light"><tr>
             <th>IP그룹</th><th>IP주소</th><th>상태</th><th>상주/임시</th><th>부서</th><th>장치구분</th><th>사용자</th><th>렌탈사</th><th>PC자산번호</th><th>모니터자산번호</th>
             <th>모델</th><th>제조번호</th><th>구입업체</th><th>구입일</th>
@@ -370,6 +418,9 @@
       utilLoaded = true; loadUtil(); loadIpRequests();
       loadGroups();
       setupTopScroll();
+      setupGrid();
+      window.addEventListener('resize', fitListGrid);
+      if (window.ResizeObserver) new ResizeObserver(fitListGrid).observe(document.getElementById('list-sticky'));
     });
 
     // ---- PC 목록 표 상단 보조 스크롤바 (하단 스크롤바와 상호 동기화) ----
@@ -410,6 +461,9 @@
 
     // ---- 하위 탭 전환 ----
     function showTab(t) {
+      // PC 목록/별도관리는 다시 불러오므로, 저장 안 한 표 수정이 있으면 먼저 확인
+      if ((t === 'list' || t === 'sep') && !confirmDiscardGrid()) return;
+      if (t === 'list' || t === 'sep') grid.edits.clear();
       const paneOf = { list:'list', sep:'list', dash:'dash', current:'current', monthly:'monthly', histmgmt:'histmgmt' };
       ['list','dash','current','monthly','histmgmt'].forEach(x => {
         document.getElementById('pane-' + x).style.display = (paneOf[t] === x) ? '' : 'none';
@@ -420,6 +474,7 @@
         sepMode = (t === 'sep');
         document.getElementById('sep-hint').style.display = sepMode ? '' : 'none';
         page = 0; load();
+        fitListGrid();
       }
       if (t === 'dash') { loadUtil(); loadIpRequests(); }
       if (t === 'current' && !curLoaded) { curLoaded = true; loadCurMonth(); }
@@ -637,6 +692,7 @@
     }
 
     async function load() {
+      if (!confirmDiscardGrid()) return;
       try {
         const p = filters(); p.set('page', page); p.set('size', size); p.set('site', SITE);
         if (sepMode) {
@@ -668,21 +724,71 @@
       return i >= 0 ? ip.substring(i + 1) : ip;
     }
 
+    // =====================================================================
+    // PC 목록 표 — 엑셀식 직접 편집
+    //  · 칸 클릭 = 즉시 수정, 드래그 = 범위 선택, Ctrl+C/V = 복사·붙여넣기(엑셀과 TSV 호환)
+    //  · 수정한 칸은 하늘색으로 표시만 하고, [변경사항 저장] 을 눌러야 행 단위 PATCH 로 저장된다
+    //  · 저장은 기존 변경 API(/kims-api/ips/{id})를 그대로 쓰므로 변경 이력·사업장 권한 검사도 동일하게 적용
+    // =====================================================================
+    // 표 컬럼 정의 (순서 = 화면 열 순서). editable=false 는 복사만 가능
+    const GRID_COLS = [
+      { key: 'ipGroup',        label: 'IP그룹',        editable: false },
+      { key: 'ipAddress',      label: 'IP주소',        editable: false, html: r => `<b>${E(octet(r.ipAddress))}</b>` },
+      { key: 'status',         label: '상태',          editable: false, html: r => statusBadge(r.status), text: r => r.statusLabel || r.status || '' },
+      { key: 'usageType',      label: '상주/임시',     editable: true },
+      { key: 'department',     label: '부서',          editable: true },
+      { key: 'device',         label: '장치구분',      editable: true },
+      { key: 'userName',       label: '사용자',        editable: true },
+      { key: 'rentalCompany',  label: '렌탈사',        editable: true, html: (r, v) => rentalBadge(v) },
+      { key: 'pcAssetNo',      label: 'PC자산번호',    editable: true },
+      { key: 'monitorAssetNo', label: '모니터자산번호', editable: true },
+      { key: 'model',          label: '모델',          editable: true },
+      { key: 'serialNo',       label: '제조번호',      editable: true },
+      { key: 'vendor',         label: '구입업체',      editable: true },
+      { key: 'purchaseDate',   label: '구입일',        editable: true },
+      { key: 'osVersion',      label: 'OS버전',        editable: true },
+      { key: 'osSerial',       label: 'OS시리얼',      editable: true },
+      { key: 'officeVersion',  label: 'OFFICE버전',    editable: true },
+      { key: 'officeSerial',   label: 'OFFICE시리얼',  editable: true },
+      { key: 'hangulVersion',  label: '한글버전',      editable: true },
+      { key: 'hangulSerial',   label: '한글시리얼',    editable: true },
+      { key: 'remark',         label: '비고',          editable: true, cls: 'remark-cell' },
+    ];
+    const grid = {
+      rows: [],            // 현재 표에 표시된 PC 데이터(서버 원본)
+      edits: new Map(),    // "r:c" → 수정값 (원본과 다른 칸만)
+      errors: new Set(),   // 저장 실패한 칸 "r:c"
+      anchor: null, focus: null,   // 선택 범위 {r,c}
+      dragging: false, dragMoved: false,
+      editing: null,       // { r, c, input }
+      undo: [],            // [[{key, had, val}]] 배치 단위
+      saving: false,
+    };
+    const gKey = (r, c) => r + ':' + c;
+    const origVal = (r, c) => { const v = grid.rows[r]?.[GRID_COLS[c].key]; return v == null ? '' : String(v); };
+    const cellVal = (r, c) => grid.edits.has(gKey(r, c)) ? grid.edits.get(gKey(r, c)) : origVal(r, c);
+    const cellText = (r, c) => {   // 복사용 텍스트
+      const col = GRID_COLS[c];
+      if (col.key === 'ipAddress') return grid.rows[r].ipAddress || '';
+      if (col.text) return col.text(grid.rows[r]);
+      return cellVal(r, c);
+    };
+    const tdOf = (r, c) => document.querySelector(`#rows td[data-r="${r}"][data-c="${c}"]`);
+    const selRect = () => {
+      if (!grid.anchor || !grid.focus) return null;
+      return { r1: Math.min(grid.anchor.r, grid.focus.r), r2: Math.max(grid.anchor.r, grid.focus.r),
+               c1: Math.min(grid.anchor.c, grid.focus.c), c2: Math.max(grid.anchor.c, grid.focus.c) };
+    };
+
     function renderRows(list) {
       const tb = document.getElementById('rows');
-      if (!list || !list.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
-      tb.innerHTML = list.map(r => `
+      grid.rows = list || []; grid.edits.clear(); grid.errors.clear(); grid.undo = [];
+      grid.anchor = grid.focus = null; grid.editing = null;
+      gridUpdateToolbar();
+      if (!grid.rows.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; fitListGrid(); return; }
+      tb.innerHTML = grid.rows.map((r, ri) => `
         <tr>
-          <td>${E(r.ipGroup)}</td>
-          <td><b>${E(octet(r.ipAddress))}</b></td>
-          <td>${statusBadge(r.status)}</td>
-          <td>${E(r.usageType)}</td>
-          <td>${E(r.department)}</td><td>${E(r.device)}</td><td>${E(r.userName)}</td>
-          <td>${rentalBadge(r.rentalCompany)}</td>
-          <td>${E(r.pcAssetNo)}</td><td>${E(r.monitorAssetNo)}</td>
-          <td>${E(r.model)}</td><td>${E(r.serialNo)}</td><td>${E(r.vendor)}</td><td>${E(r.purchaseDate)}</td>
-          <td>${E(r.osVersion)}</td><td>${E(r.osSerial)}</td><td>${E(r.officeVersion)}</td><td>${E(r.officeSerial)}</td><td>${E(r.hangulVersion)}</td><td>${E(r.hangulSerial)}</td>
-          <td class="remark-cell" title="${E(r.remark)}">${E(r.remark)}</td>
+          ${GRID_COLS.map((col, ci) => `<td data-r="${ri}" data-c="${ci}" class="gc ${col.editable ? '' : 'ro'} ${col.cls || ''}">${cellHtml(ri, ci)}</td>`).join('')}
           <td class="text-nowrap">
             <button class="btn btn-outline-secondary btn-sm py-0" onclick="detail(${r.ipId})">상세</button>
             <button class="btn btn-outline-primary btn-sm py-0" onclick="openEdit(${r.ipId})">변경</button>
@@ -690,6 +796,341 @@
             <button class="btn btn-outline-danger btn-sm py-0" onclick="returnPc(${r.ipId},'${E(r.ipAddress)}')">반납</button>
           </td>
         </tr>`).join('');
+      grid.rows.forEach((r, ri) => { const td = tdOf(ri, GRID_COLS.length - 1); if (td) td.title = r.remark || ''; });
+      fitListGrid();
+    }
+    function cellHtml(r, c) {
+      const col = GRID_COLS[c], v = cellVal(r, c);
+      return col.html ? col.html(grid.rows[r], v) : E(v);
+    }
+    // 한 칸 다시 그리기 (값 + 수정/오류/선택 표시)
+    function paintCell(r, c) {
+      const td = tdOf(r, c); if (!td) return;
+      const k = gKey(r, c);
+      if (!(grid.editing && grid.editing.r === r && grid.editing.c === c)) td.innerHTML = cellHtml(r, c);
+      td.classList.toggle('dirty', grid.edits.has(k));
+      td.classList.toggle('err', grid.errors.has(k));
+      if (GRID_COLS[c].key === 'remark') td.title = cellVal(r, c);
+    }
+    function paintSelection() {
+      document.querySelectorAll('#rows td.sel, #rows td.cur').forEach(td => td.classList.remove('sel', 'cur'));
+      const s = selRect(); if (!s) return;
+      for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) tdOf(r, c)?.classList.add('sel');
+      tdOf(grid.focus.r, grid.focus.c)?.classList.add('cur');
+    }
+    function gridUpdateToolbar() {
+      const n = grid.edits.size;
+      const rowsN = new Set([...grid.edits.keys()].map(k => k.split(':')[0])).size;
+      const info = document.getElementById('grid-dirty-info');
+      const save = document.getElementById('grid-save-btn');
+      const revert = document.getElementById('grid-revert-btn');
+      if (!info) return;
+      info.innerHTML = n ? `<span class="dirty-dot"></span>수정 <b>${n}</b>칸 (${rowsN}행) — 저장 전` : '수정된 칸 없음';
+      info.classList.toggle('text-muted', !n);
+      save.disabled = !n || grid.saving; revert.disabled = !n || grid.saving;
+      if (!grid.saving) save.textContent = n ? `변경사항 저장 (${rowsN}행)` : '변경사항 저장';
+    }
+
+    // 값 설정 (원본과 같아지면 수정 표시 해제). batch 에 되돌리기 정보 기록
+    function setCell(r, c, value, batch) {
+      if (!GRID_COLS[c]?.editable || !grid.rows[r]) return;
+      const k = gKey(r, c);
+      const v = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+      if (v === cellVal(r, c)) return;
+      if (batch) batch.push({ k, had: grid.edits.has(k), val: grid.edits.get(k) });
+      if (v === origVal(r, c)) grid.edits.delete(k); else grid.edits.set(k, v);
+      grid.errors.delete(k);
+      paintCell(r, c);
+    }
+    function pushUndo(batch) { if (batch.length) { grid.undo.push(batch); if (grid.undo.length > 100) grid.undo.shift(); } gridUpdateToolbar(); }
+    function gridUndo() {
+      const batch = grid.undo.pop(); if (!batch) return;
+      batch.reverse().forEach(({ k, had, val }) => {
+        if (had) grid.edits.set(k, val); else grid.edits.delete(k);
+        const [r, c] = k.split(':').map(Number); paintCell(r, c);
+      });
+      gridUpdateToolbar();
+    }
+    function gridRevertAll() {
+      if (!grid.edits.size) return;
+      if (!confirm(`수정한 ${grid.edits.size}칸을 모두 원래 값으로 되돌릴까요?`)) return;
+      const keys = [...grid.edits.keys()];
+      grid.edits.clear(); grid.errors.clear(); grid.undo = [];
+      keys.forEach(k => { const [r, c] = k.split(':').map(Number); paintCell(r, c); });
+      gridUpdateToolbar();
+    }
+    // 저장하지 않은 수정이 있으면 목록을 다시 불러오기 전에 확인
+    function confirmDiscardGrid() {
+      return !grid.edits.size || confirm(`저장하지 않은 수정 ${grid.edits.size}칸이 있습니다.\n저장하지 않고 목록을 새로 불러올까요? (수정 내용은 사라집니다)`);
+    }
+
+    // ---- 셀 편집기 ----
+    function startEdit(r, c, initial) {
+      if (!GRID_COLS[c]?.editable || grid.saving) return;
+      finishEdit(true);
+      const td = tdOf(r, c); if (!td) return;
+      grid.anchor = grid.focus = { r, c }; paintSelection();
+      const input = document.createElement('input');
+      input.className = 'grid-editor';
+      input.value = initial != null ? initial : cellVal(r, c);
+      td.style.minWidth = Math.max(td.offsetWidth, 90) + 'px';
+      td.classList.add('editing');
+      td.innerHTML = ''; td.appendChild(input);
+      grid.editing = { r, c, input };
+      // 한글 조합 중 Enter/Tab: 조합이 끝난 직후(compositionend) 확정·이동 → 엑셀처럼 한 번에 입력 완료
+      let afterCompose = null;
+      input.addEventListener('compositionend', () => {
+        if (!afterCompose) return;
+        const [dr, dc] = afterCompose; afterCompose = null;
+        setTimeout(() => { if (grid.editing && grid.editing.input === input) { finishEdit(true); moveFocus(dr, dc, false); } }, 0);
+      });
+      input.addEventListener('keydown', e => {
+        if (e.isComposing || e.keyCode === 229) {
+          if (e.key === 'Enter') afterCompose = [1, 0];
+          else if (e.key === 'Tab') { e.preventDefault(); afterCompose = [0, e.shiftKey ? -1 : 1]; }
+          e.stopPropagation();
+          return;
+        }
+        if (e.key === 'Enter') { e.preventDefault(); finishEdit(true); moveFocus(1, 0, false); }
+        else if (e.key === 'Tab') { e.preventDefault(); finishEdit(true); moveFocus(0, e.shiftKey ? -1 : 1, false); }
+        else if (e.key === 'Escape') { e.preventDefault(); finishEdit(false); }
+        e.stopPropagation();
+      });
+      input.addEventListener('blur', () => { if (grid.editing && grid.editing.input === input) finishEdit(true, true); });
+      input.addEventListener('mousedown', e => e.stopPropagation());
+      input.focus({ preventScroll: true });
+      if (initial == null) input.select();
+      else input.setSelectionRange(input.value.length, input.value.length);
+    }
+    function finishEdit(commit, fromBlur) {
+      const ed = grid.editing; if (!ed) return;
+      grid.editing = null;
+      const td = tdOf(ed.r, ed.c);
+      if (td) { td.classList.remove('editing'); td.style.minWidth = ''; }
+      if (commit) { const b = []; setCell(ed.r, ed.c, ed.input.value, b); pushUndo(b); }
+      paintCell(ed.r, ed.c);
+      if (!fromBlur) focusClip();
+    }
+
+    // ---- 키보드·클립보드: 숨은 textarea 에 포커스를 두고 복사/붙여넣기 이벤트를 받는다 ----
+    function focusClip() { document.getElementById('grid-clip')?.focus({ preventScroll: true }); }
+    function moveFocus(dr, dc, extend) {
+      if (!grid.focus || !grid.rows.length) return;
+      const r = Math.min(grid.rows.length - 1, Math.max(0, grid.focus.r + dr));
+      const c = Math.min(GRID_COLS.length - 1, Math.max(0, grid.focus.c + dc));
+      grid.focus = { r, c }; if (!extend) grid.anchor = { r, c };
+      paintSelection();
+      tdOf(r, c)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    const tsvQuote = (s) => /[\t\n\r"]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    function selectionTsv() {
+      const s = selRect(); if (!s) return '';
+      const lines = [];
+      for (let r = s.r1; r <= s.r2; r++) {
+        const cells = [];
+        for (let c = s.c1; c <= s.c2; c++) cells.push(tsvQuote(cellText(r, c)));
+        lines.push(cells.join('\t'));
+      }
+      return lines.join('\r\n');
+    }
+    // 엑셀 클립보드(TSV, 따옴표로 감싼 줄바꿈 포함) 파싱
+    function parseTsv(text) {
+      const rows = []; let row = [], cur = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (q) {
+          if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+          else cur += ch;
+        } else if (ch === '"' && cur === '') q = true;
+        else if (ch === '\t') { row.push(cur); cur = ''; }
+        else if (ch === '\n' || ch === '\r') {
+          if (ch === '\r' && text[i + 1] === '\n') i++;
+          row.push(cur); rows.push(row); row = []; cur = '';
+        } else cur += ch;
+      }
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows;
+    }
+    function pasteText(text) {
+      const s = selRect(); if (!s || grid.saving) return;
+      const data = parseTsv(text); if (!data.length) return;
+      const batch = [];
+      if (data.length === 1 && data[0].length === 1) {
+        // 값 하나 → 선택 범위 전체 채우기
+        for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) setCell(r, c, data[0][0], batch);
+      } else {
+        // 여러 칸 → 선택 범위 왼쪽 위부터 붙여넣기 (표 밖은 버림, 읽기전용 열은 건너뜀)
+        let maxR = s.r1, maxC = s.c1;
+        data.forEach((line, i) => line.forEach((v, j) => {
+          const r = s.r1 + i, c = s.c1 + j;
+          if (r >= grid.rows.length || c >= GRID_COLS.length) return;
+          setCell(r, c, v, batch); maxR = Math.max(maxR, r); maxC = Math.max(maxC, c);
+        }));
+        grid.anchor = { r: s.r1, c: s.c1 }; grid.focus = { r: maxR, c: maxC }; paintSelection();
+      }
+      pushUndo(batch);
+      const skipped = data.flat().length > 1 && batch.length === 0;
+      if (skipped) KIMS.toast('붙여넣을 수 있는 칸이 없습니다. (IP그룹·IP주소·상태 열은 수정할 수 없습니다)', false);
+    }
+
+    function setupGrid() {
+      const tb = document.getElementById('rows');
+      const scroller = document.getElementById('list-table-scroll');
+      const clip = document.createElement('textarea');
+      clip.id = 'grid-clip'; clip.setAttribute('aria-hidden', 'true'); clip.tabIndex = -1;
+      document.body.appendChild(clip);
+
+      const cellFromEvent = (e) => {
+        const td = e.target.closest ? e.target.closest('td.gc') : null;
+        return td && tb.contains(td) ? { r: +td.dataset.r, c: +td.dataset.c } : null;
+      };
+      tb.addEventListener('mousedown', e => {
+        if (e.button !== 0 || grid.saving) return;
+        const cell = cellFromEvent(e); if (!cell) return;
+        if (grid.editing) finishEdit(true, true);
+        e.preventDefault();
+        if (e.shiftKey && grid.anchor) grid.focus = cell;
+        else { grid.anchor = grid.focus = cell; }
+        grid.dragging = true; grid.dragMoved = !!e.shiftKey;
+        paintSelection(); focusClip();
+      });
+      tb.addEventListener('mouseover', e => {
+        if (!grid.dragging) return;
+        const cell = cellFromEvent(e); if (!cell) return;
+        if (cell.r !== grid.focus.r || cell.c !== grid.focus.c) {
+          grid.focus = cell; grid.dragMoved = true; paintSelection();
+        }
+      });
+      // 드래그 중 표 가장자리에 가까우면 자동 스크롤
+      document.addEventListener('mousemove', e => {
+        if (!grid.dragging) return;
+        const rc = scroller.getBoundingClientRect(), edge = 28, step = 24;
+        if (e.clientY > rc.bottom - edge) scroller.scrollTop += step;
+        else if (e.clientY < rc.top + edge) scroller.scrollTop -= step;
+        if (e.clientX > rc.right - edge) scroller.scrollLeft += step;
+        else if (e.clientX < rc.left + edge) scroller.scrollLeft -= step;
+      });
+      document.addEventListener('mouseup', e => {
+        if (!grid.dragging) return;
+        grid.dragging = false;
+        // 드래그 없이 한 칸 클릭 → 바로 수정
+        if (!grid.dragMoved && grid.focus && e.button === 0) {
+          const { r, c } = grid.focus;
+          if (GRID_COLS[c].editable) startEdit(r, c);
+        }
+      });
+
+      clip.addEventListener('keydown', e => {
+        if (!grid.focus || grid.saving || e.isComposing) return;
+        const mod = e.ctrlKey || e.metaKey;
+        const k = e.key;
+        if (mod && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+          clip.value = selectionTsv(); clip.select();   // 기본 복사 동작이 이 값을 클립보드로 보낸다
+          return;
+        }
+        if (mod && (k === 'v' || k === 'V')) { clip.value = ''; return; }  // paste 이벤트에서 처리
+        if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); gridUndo(); return; }
+        if (mod && (k === 'a' || k === 'A')) {
+          e.preventDefault(); grid.anchor = { r: 0, c: 0 };
+          grid.focus = { r: grid.rows.length - 1, c: GRID_COLS.length - 1 }; paintSelection(); return;
+        }
+        if (mod && (k === 's' || k === 'S')) { e.preventDefault(); gridSave(); return; }
+        const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+        if (arrows[k]) { e.preventDefault(); moveFocus(...arrows[k], e.shiftKey); return; }
+        if (k === 'Tab') { e.preventDefault(); moveFocus(0, e.shiftKey ? -1 : 1, false); return; }
+        if (k === 'Enter' || k === 'F2') { e.preventDefault(); startEdit(grid.focus.r, grid.focus.c); return; }
+        if (k === 'Escape') { grid.anchor = grid.focus = null; paintSelection(); return; }
+        if (k === 'Delete' || k === 'Backspace') {
+          e.preventDefault();
+          const s = selRect(), batch = [];
+          for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) setCell(r, c, '', batch);
+          pushUndo(batch); return;
+        }
+        // 글자 입력 → 그 칸을 새 값으로 수정 시작 (엑셀처럼 덮어쓰기)
+        if (!mod && !e.altKey && (k.length === 1 || k === 'Process')) {
+          if (GRID_COLS[grid.focus.c].editable) startEdit(grid.focus.r, grid.focus.c, '');
+        }
+      });
+      clip.addEventListener('paste', e => {
+        e.preventDefault();
+        pasteText((e.clipboardData || window.clipboardData).getData('text'));
+        clip.value = '';
+      });
+      clip.addEventListener('copy', () => setTimeout(() => { clip.value = ''; }, 0));
+
+      window.addEventListener('beforeunload', e => {
+        if (grid.edits.size) { e.preventDefault(); e.returnValue = ''; }
+      });
+    }
+
+    // ---- 저장: 수정된 행마다 기존 PATCH API 호출 ----
+    const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    async function gridSave() {
+      if (grid.editing) finishEdit(true, true);
+      if (!grid.edits.size || grid.saving) return;
+      // 행별로 수정 칸 묶기
+      const byRow = new Map();
+      grid.edits.forEach((v, k) => {
+        const [r, c] = k.split(':').map(Number);
+        if (!byRow.has(r)) byRow.set(r, new Map());
+        byRow.get(r).set(GRID_COLS[c].key, v);
+      });
+      grid.saving = true;
+      const saveBtn = document.getElementById('grid-save-btn');
+      gridUpdateToolbar();
+      const nv = (v) => (v == null || v === '') ? null : v;
+      let ok = 0; const fails = [];
+      let i = 0;
+      for (const [r, changes] of byRow) {
+        i++; saveBtn.textContent = `저장 중... ${i}/${byRow.size}`;
+        const row = grid.rows[r];
+        const pick = (key) => changes.has(key) ? nv(changes.get(key)) : row[key];
+        const payload = {
+          userName: pick('userName'), department: pick('department'), location: row.location,
+          device: pick('device'), approved: !!row.approved, approvalNo: row.approvalNo,
+          remark: pick('remark'), noteDate: changes.has('remark') ? todayStr() : row.noteDate,
+          model: pick('model'), serialNo: pick('serialNo'), vendor: pick('vendor'),
+          osVersion: pick('osVersion'), osSerial: pick('osSerial'),
+          officeVersion: pick('officeVersion'), officeSerial: pick('officeSerial'),
+          hangulVersion: pick('hangulVersion'), hangulSerial: pick('hangulSerial'),
+          rentalCompany: pick('rentalCompany'), pcAssetNo: pick('pcAssetNo'), monitorAssetNo: pick('monitorAssetNo'),
+          changedBy: KIMS.getUser() || 'admin',
+          reason: '표 직접 수정: ' + [...changes.keys()].map(k => GRID_COLS.find(c => c.key === k).label).join(', '),
+        };
+        // 상주/임시·구입일은 바꾼 경우에만 보낸다 (안 보내면 서버에서 그대로 유지)
+        if (changes.has('usageType')) payload.usageType = changes.get('usageType');
+        if (changes.has('purchaseDate')) payload.purchaseDate = changes.get('purchaseDate');
+        try {
+          const updated = await KIMS.api('/kims-api/ips/' + row.ipId, { method: 'PATCH', body: payload });
+          grid.rows[r] = Object.assign({}, row, updated || {});
+          GRID_COLS.forEach((col, c) => { grid.edits.delete(gKey(r, c)); grid.errors.delete(gKey(r, c)); paintCell(r, c); });
+          ok++;
+        } catch (e) {
+          GRID_COLS.forEach((col, c) => { if (grid.edits.has(gKey(r, c))) { grid.errors.add(gKey(r, c)); paintCell(r, c); } });
+          fails.push(`${E(row.ipAddress)} — ${E(e.message)}`);
+        }
+      }
+      grid.saving = false;
+      grid.undo = [];
+      gridUpdateToolbar();
+      if (fails.length) {
+        KIMS.alertModal(`저장 실패 ${fails.length}행 (성공 ${ok}행)`,
+          '빨간 테두리 칸은 저장되지 않았습니다. 값을 확인한 뒤 다시 저장하세요.<br><ul class="mt-2 mb-0 small">' +
+          fails.map(f => `<li>${f}</li>`).join('') + '</ul>');
+      } else {
+        KIMS.toast(`${ok}행이 저장되었습니다.`);
+      }
+    }
+
+    // 표 영역 높이를 화면에 맞춘다 → 표 안에서 스크롤, 검색바·머리글은 항상 보임
+    function fitListGrid() {
+      const sc = document.getElementById('list-table-scroll');
+      if (!sc || sc.offsetParent === null) return;
+      const pager = document.getElementById('pager');
+      const docTop = sc.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - docTop - (pager ? pager.offsetHeight : 0) - 20;
+      const minH = window.innerHeight - document.getElementById('list-sticky').offsetHeight - (pager ? pager.offsetHeight : 0) - 20;
+      sc.style.maxHeight = Math.max(260, avail, Math.min(minH, 420)) + 'px';
     }
 
     function renderPager(d) {

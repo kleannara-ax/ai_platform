@@ -122,6 +122,7 @@ public class IpAddressService {
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
                 req.getHangulVersion(), req.getHangulSerial(), req.getRentalCompany(), req.getPcAssetNo(), req.getMonitorAssetNo());
+        ip.updateUsageAndPurchase(req.getUsageType(), req.getPurchaseDate());
         String afterUser = ip.getUserName();
 
         String content = (req.getReason() != null && !req.getReason().isBlank())
