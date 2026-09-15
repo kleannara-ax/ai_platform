@@ -702,18 +702,19 @@
             </div>`).join('')
           + `</div></div>`;
       } else if (kind === 'PC_RETURN') {
-        // 반납: 요청자 부서를 기반으로 "{부서}보관" 자동 채움(수정 가능) / 회수: 자동 공란 처리
+        // 반납: 요청자 부서를 기반으로 "{부서}보관" 값을 "사용자" 항목에 자동 채움(수정 가능). 부서/장치/스펙 등은 그대로 유지.
+        // 회수: 사용자·부서·장치·PC 스펙 정보를 모두 비움(수정 항목 없음).
         const isReturn = d.returnType === 'RETURN';
         const autoValue = isReturn ? ((d.department || '').trim() + '보관') : '';
         const sectionTitle = isReturn ? '반납 처리' : '회수 처리';
-        const fieldLabel = isReturn ? '보관 부서 (수정 가능)' : '비고 (공란 자동 처리)';
-        inner += `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
+        const fieldLabel = '사용자 항목에 표시할 보관 값 (수정 가능)';
+        inner += isReturn
+          ? `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
           <label class="form-label small mb-0">${fieldLabel}</label>
-          <input id="d-return-dept" class="form-control form-control-sm" value="${E(autoValue)}"
-            ${isReturn ? '' : 'placeholder="공란 처리됩니다"'}>
-          <div class="form-text">${isReturn
-            ? '요청자 부서(' + E(d.department || '') + ') 기준으로 자동 입력되며, 필요 시 직접 수정할 수 있습니다.'
-            : '회수 처리이므로 부서란은 자동으로 공란 처리됩니다.'}</div>`;
+          <input id="d-return-dept" class="form-control form-control-sm" value="${E(autoValue)}">
+          <div class="form-text">요청자 부서(${E(d.department || '')}) 기준으로 "사용자" 항목이 위 값으로 자동 변경되며, 필요 시 직접 수정할 수 있습니다. 부서·장치·PC 스펙 등 나머지 정보는 그대로 유지됩니다.</div>`
+          : `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
+          <div class="form-text text-danger">⚠ 회수 처리이므로 사용자·부서·장치·PC 스펙 정보가 모두 비워집니다(공란 처리).</div>`;
       }
       box.innerHTML = inner;
     }
@@ -847,10 +848,9 @@
       if (d.ipKind === 'PC_RETURN') {
         const isReturn = d.returnType === 'RETURN';
         const returnDept = (document.getElementById('d-return-dept')||{}).value?.trim() || '';
-        const label = isReturn ? '반납' : '회수';
         const msg = isReturn
-          ? `${curIp} (${d.changerName}) 을(를) 반납 처리합니다.\n보관 부서: ${returnDept || '(없음)'}\n사용자·장치·PC 스펙 정보가 모두 비워집니다.\n진행하시겠습니까?`
-          : `${curIp} (${d.changerName}) 을(를) 회수 처리합니다. (IP만 미사용, PC 정보는 유지)\n진행하시겠습니까?`;
+          ? `${curIp} (${d.changerName}) 을(를) 반납 처리합니다.\n사용자: ${d.changerName} → ${returnDept || '(없음)'}\n부서·장치·PC 스펙 정보는 그대로 유지됩니다.\n진행하시겠습니까?`
+          : `${curIp} (${d.changerName}) 을(를) 회수 처리합니다.\n사용자·부서·장치·PC 스펙 정보가 모두 비워집니다.\n진행하시겠습니까?`;
         if (!confirm(msg)) return false;
         payload.targetIpId = targetIpId;
         payload.returnDepartment = isReturn ? returnDept : '';

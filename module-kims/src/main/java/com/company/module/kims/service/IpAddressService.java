@@ -352,8 +352,8 @@ public class IpAddressService {
     /**
      * [반납/회수] 대상 PC(ipId)를 업무요청 완료 시 자동으로 반납 또는 회수 처리한다.
      * <ul>
-     *   <li>반납(isReturn=true): 사용자·장치·스펙·자산 모두 비우고 부서를 returnDepartment 로 갱신(예: "{부서}보관")</li>
-     *   <li>회수(isReturn=false): PC 정보는 유지하고 IP만 회수 처리, 부서는 공란 처리</li>
+     *   <li>반납(isReturn=true): 사용자(userName) 항목만 보관 표시값(returnDepartment, 예: "{부서}보관")으로 갱신. 부서·장치·스펙 등 나머지는 그대로 유지</li>
+     *   <li>회수(isReturn=false): 사용자·부서·장치·스펙·자산 정보를 모두 비움</li>
      * </ul>
      * @return 원복용 스냅샷 JSON
      */
@@ -371,7 +371,7 @@ public class IpAddressService {
             type = IpChangeType.RETURNED;
         } else {
             ip.applyReclaim();
-            content = "업무요청 회수";
+            content = "업무요청 회수 (사용자·부서·장치·스펙 모두 비움)";
             type = IpChangeType.RECLAIMED;
         }
         ipHistoryRepository.save(IpHistory.builder()

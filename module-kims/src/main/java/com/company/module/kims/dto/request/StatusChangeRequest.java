@@ -36,10 +36,11 @@ public class StatusChangeRequest {
     private java.util.Map<String, String> pcFields;
 
     /**
-     * 반납(PC_RETURN) 완료 처리 시 부서 값.
+     * 반납(PC_RETURN) 완료 처리 시 "사용자" 항목에 채울 보관 표시값.
      * <ul>
-     *   <li>반납유형=반납(RETURN): "{부서}보관" 형태 값(관리자가 화면에서 수정 가능)</li>
-     *   <li>반납유형=회수(RECLAIM): 공란(null/빈값)</li>
+     *   <li>반납유형=반납(RETURN): "{부서}보관" 형태 값(관리자가 화면에서 수정 가능). 이 값이 사용자(userName) 항목에 기록되고,
+     *       부서·장치·PC 스펙 등 나머지 정보는 그대로 유지된다.</li>
+     *   <li>반납유형=회수(RECLAIM): 무시됨. 사용자·부서·장치·PC 스펙 정보가 모두 비워진다.</li>
      * </ul>
      */
     private String returnDepartment;

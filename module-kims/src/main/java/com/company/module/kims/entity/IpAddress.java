@@ -230,23 +230,23 @@ public class IpAddress extends BaseTimeEntity {
     }
 
     /**
-     * 업무요청 완료 처리 - 반납: PC/장비까지 함께 반납(사용자·장치·스펙·자산 모두 비움)하고,
-     * 부서는 지정한 값(예: "{원래 부서}보관")으로 갱신한다. department 가 null/공백이면 비운다.
+     * 업무요청 완료 처리 - 반납: 사용자(userName) 항목만 지정한 보관 표시값(예: "{부서}보관")으로 갱신한다.
+     * 부서·장치·PC 스펙·자산 등 나머지 정보는 그대로 유지한다. storageLabel 이 null/공백이면 사용자 항목을 비운다.
      */
-    public void applyReturn(String department) {
-        this.userName = null;
-        this.device = null;
-        clearSpec();
-        this.department = (department == null || department.isBlank()) ? null : department;
+    public void applyReturn(String storageLabel) {
+        this.userName = (storageLabel == null || storageLabel.isBlank()) ? null : storageLabel;
         this.status = IpStatus.RECLAIMED;
         this.reclaimedAt = LocalDate.now();
     }
 
     /**
-     * 업무요청 완료 처리 - 회수: IP만 미사용 처리(PC 정보는 그대로 유지)하고 부서는 공란 처리한다.
+     * 업무요청 완료 처리 - 회수: 사용자·부서·장치·PC 스펙·자산 정보를 모두 비운다.
      */
     public void applyReclaim() {
+        this.userName = null;
         this.department = null;
+        this.device = null;
+        clearSpec();
         this.status = IpStatus.RECLAIMED;
         this.reclaimedAt = LocalDate.now();
     }
