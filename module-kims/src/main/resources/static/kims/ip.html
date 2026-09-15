@@ -39,13 +39,18 @@
     #grid-dirty-info:not(.text-muted) { color: #0369a1; font-weight: 500; }
     .grid-help { cursor: help; border-bottom: 1px dotted #94a3b8; }
 
-    /* ── PC 목록 표 틀고정: 페이지 스크롤 하나 + 머리글은 검색 카드 바로 아래 고정 ──
-       가로 스크롤 컨테이너는 sticky 머리글을 깨뜨리므로 가로는 잘라두고(clip) 상단 보조 스크롤바로 표를 옮긴다 */
+    /* ── PC 목록 표 틀고정: 페이지 스크롤 하나 + 머리글은 불투명한 고정 영역(#list-sticky) 안에 복제해서 표시 ──
+       표 본문 머리글은 열 너비 계산용으로만 남기고(높이 0) 보이는 머리글(#list-head)과 너비를 맞춘다.
+       → 고정 영역 뒤로 표 내용이 비치지 않는다. 가로는 잘라두고(clip) 상단 보조 스크롤바로 두 표를 함께 옮긴다 */
+    #list-head-wrap { overflow-x: clip; background: #fff; border: 1px solid #e2e8f0; border-bottom: 0;
+      border-radius: 10px 10px 0 0; }
+    #list-head { margin-bottom: 0; table-layout: fixed; }
+    #list-head th { background: #f8fafc; box-shadow: inset 0 -1px 0 #cbd5e1; border-top: 0; overflow: hidden; }
     #list-table-scroll { overflow-x: clip; overflow-y: visible; background: #fff; border: 1px solid #e2e8f0;
-      border-radius: 10px; margin-bottom: .6rem; }
+      border-top: 0; border-radius: 0 0 10px 10px; margin-bottom: .6rem; }
     #list-table { margin-bottom: 0; }
-    #list-table thead th { position: sticky; top: var(--grid-head-top, 0px); z-index: 3; background: #f8fafc;
-      box-shadow: inset 0 -1px 0 #cbd5e1; border-top: 0; }
+    #list-table > thead > tr > th { height: 0; padding-top: 0 !important; padding-bottom: 0 !important;
+      line-height: 0; border-top-width: 0; border-bottom-width: 0; visibility: hidden; }
 
     /* ── 엑셀식 편집 셀 ── */
     .kims-grid td.gc { cursor: cell; user-select: none; -webkit-user-select: none; position: relative; }
@@ -144,6 +149,7 @@
         </div>
       </div></div>
       <div class="table-top-scroll" id="list-top-scroll"><div id="list-top-scroll-inner">&nbsp;</div></div>
+      <div id="list-head-wrap"><table class="table table-sm table-bordered align-middle" id="list-head"><colgroup></colgroup><thead class="table-light"></thead></table></div>
       </div><!-- /#list-sticky -->
       <div id="list-table-scroll">
         <table class="table table-sm table-bordered bg-white align-middle kims-grid" id="list-table">
@@ -920,7 +926,7 @@
     function ensureVisible(r, c) {
       const td = tdOf(r, c); if (!td) return;
       const rc = td.getBoundingClientRect();
-      const headBottom = document.querySelector('#list-table thead').getBoundingClientRect().bottom;
+      const headBottom = Math.max(0, document.getElementById('list-head').getBoundingClientRect().bottom);
       if (rc.top < headBottom) window.scrollBy(0, rc.top - headBottom - 2);
       else if (rc.bottom > window.innerHeight - 4) window.scrollBy(0, rc.bottom - window.innerHeight + 4);
       const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
@@ -1018,7 +1024,7 @@
       // 드래그 중 화면·표 가장자리에 가까우면 자동 스크롤
       document.addEventListener('mousemove', e => {
         if (!grid.dragging) return;
-        const headBottom = document.querySelector('#list-table thead').getBoundingClientRect().bottom;
+        const headBottom = Math.max(0, document.getElementById('list-head').getBoundingClientRect().bottom);
         const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
         const top = document.getElementById('list-top-scroll');
         let moved = false;
@@ -1153,7 +1159,12 @@
           hangulVersion: pick('hangulVersion'), hangulSerial: pick('hangulSerial'),
           rentalCompany: pick('rentalCompany'), pcAssetNo: pick('pcAssetNo'), monitorAssetNo: pick('monitorAssetNo'),
           changedBy: KIMS.getUser() || 'admin',
-          reason: '표 직접 수정: ' + [...changes.keys()].map(k => GRID_COLS.find(c => c.key === k).label).join(', '),
+          // 이력 내용: "표 직접 수정 — 부서: 환경팀 → 환경안전팀, 사용자: (없음) → 홍길동"
+          reason: '표 직접 수정 — ' + [...changes].map(([k, v]) => {
+            const col = GRID_COLS.find(c => c.key === k);
+            const before = row[k] == null || row[k] === '' ? '(없음)' : String(row[k]);
+            return `${col.label}: ${before} → ${v === '' ? '(없음)' : v}`;
+          }).join(', '),
         };
         // 상주/임시·구입일은 바꾼 경우에만 보낸다 (안 보내면 서버에서 그대로 유지)
         if (changes.has('usageType')) payload.usageType = changes.get('usageType');
@@ -1180,25 +1191,41 @@
       }
     }
 
-    // ---- 틀고정: 페이지 스크롤 하나로 움직이고, 머리글은 고정된 검색 카드 바로 아래에 붙인다 ----
-    // 가로 스크롤 컨테이너(overflow:auto)는 sticky 머리글을 깨뜨리므로 표 영역은 가로로 잘라두고(overflow-x:clip)
-    // 상단 보조 스크롤바 위치만큼 표를 옮긴다(translateX).
+    // ---- 틀고정: 페이지 스크롤 하나로 움직이고, 머리글은 고정 영역(#list-sticky) 안의 복제본으로 보여준다 ----
+    // 가로 스크롤 컨테이너(overflow:auto)는 고정 머리글을 깨뜨리므로 표 영역은 가로로 잘라두고(overflow-x:clip)
+    // 상단 보조 스크롤바 위치만큼 머리글·본문 표를 함께 옮긴다(translateX).
     function setupListFreeze() {
       const sticky = document.getElementById('list-sticky');
       const top = document.getElementById('list-top-scroll');
       const topInner = document.getElementById('list-top-scroll-inner');
       const cont = document.getElementById('list-table-scroll');
       const table = document.getElementById('list-table');
-      if (!sticky || !top || !cont || !table) return;
-      const apply = () => { table.style.transform = top.scrollLeft ? `translateX(${-top.scrollLeft}px)` : ''; };
+      const head = document.getElementById('list-head');
+      if (!sticky || !top || !cont || !table || !head) return;
+      // 본문 표의 머리글 행을 복제해 고정 영역에 넣는다
+      const srcRow = table.querySelector('thead tr');
+      head.querySelector('thead').appendChild(srcRow.cloneNode(true));
+      head.querySelector('colgroup').innerHTML = [...srcRow.children].map(() => '<col>').join('');
+      const cols = head.querySelectorAll('col');
+      const apply = () => {
+        const t = top.scrollLeft ? `translateX(${-top.scrollLeft}px)` : '';
+        table.style.transform = t; head.style.transform = t;
+      };
       const sync = () => {
+        // 보이는 머리글 열 너비 = 본문 표(데이터 기준) 열 너비
+        [...srcRow.children].forEach((th, i) => { if (cols[i]) cols[i].style.width = th.getBoundingClientRect().width + 'px'; });
+        head.style.width = table.getBoundingClientRect().width + 'px';
         // 보조 스크롤바 폭 = 표 전체 폭 + (스크롤바 영역과 표 영역의 폭 차이)
         topInner.style.width = (table.offsetWidth + (top.clientWidth - cont.clientWidth)) + 'px';
         top.style.visibility = table.offsetWidth > cont.clientWidth + 1 ? '' : 'hidden';
         apply();
-        const pinned = getComputedStyle(sticky).position === 'sticky';
-        table.style.setProperty('--grid-head-top', (pinned ? sticky.offsetHeight : 0) + 'px');
       };
+      // 보이는 머리글 위에서도 Shift+휠 가로 이동
+      document.getElementById('list-head-wrap').addEventListener('wheel', e => {
+        const dx = e.shiftKey ? (e.deltaY || e.deltaX) : (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0);
+        if (!dx) return;
+        e.preventDefault(); top.scrollLeft += dx;
+      }, { passive: false });
       top.addEventListener('scroll', apply);
       // 표 위에서 Shift+휠 / 가로 휠 → 가로 이동
       cont.addEventListener('wheel', e => {
@@ -1209,7 +1236,7 @@
       window.addEventListener('resize', sync);
       if (window.ResizeObserver) {
         const ro = new ResizeObserver(sync);
-        ro.observe(sticky); ro.observe(cont); ro.observe(table);
+        ro.observe(cont); ro.observe(table);
       }
       new MutationObserver(sync).observe(document.getElementById('rows'), { childList: true });
       sync();
