@@ -4,6 +4,13 @@
  *  - 데이터는 항상 /kims-api/** (JWT 보호) 에서 가져온다
  * ========================================================================= */
 const KIMS = (() => {
+  // Chart.js 를 쓰는 화면(대시보드·소모품·PC 관리)은 kims.js 보다 먼저 로드하므로 여기서 기본 폰트/색을 테마에 맞춘다
+  if (window.Chart && Chart.defaults) {
+    Chart.defaults.font.family = "'Pretendard Variable', Pretendard, -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif";
+    Chart.defaults.color = '#475569';
+    Chart.defaults.borderColor = '#e2e8f0';
+  }
+
   const TOKEN_KEY = 'kims_token';
   const USER_KEY = 'kims_user';
   const ROLES_KEY = 'kims_roles';
@@ -189,22 +196,23 @@ const KIMS = (() => {
     const css = `<style id="kims-nav-style">
       body { padding-left: 220px; }
       .kims-sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
-        background: #0f172a; color: #cbd5e1; display: flex; flex-direction: column;
+        background: #1e293b; color: #94a3b8; display: flex; flex-direction: column;
         z-index: 1030; overflow-y: auto; }
-      .kims-brand { padding: 18px 20px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .kims-brand .b1 { font-weight: 700; font-size: 1.15rem; color: #fff; letter-spacing: .5px; }
-      .kims-brand .b2 { font-size: 11px; color: #64748b; }
-      .kims-user { display: flex; gap: 10px; align-items: center; padding: 14px 20px;
-        border-bottom: 1px solid rgba(255,255,255,.08); }
-      .kims-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563eb; color: #fff;
-        display: flex; align-items: center; justify-content: center; font-weight: 600; flex: 0 0 auto; }
-      .kims-user .u1 { font-weight: 600; font-size: 13px; color: #e2e8f0; }
-      .kims-user .u2 { font-size: 11px; color: #64748b; }
-      .kims-nav { display: flex; flex-direction: column; padding: 10px 0; flex: 1 1 auto; }
-      .kims-navlink { display: flex; align-items: center; gap: 10px; padding: 10px 20px;
-        color: #cbd5e1; text-decoration: none; font-size: 14px; border-left: 3px solid transparent; }
-      .kims-navlink:hover { background: rgba(255,255,255,.06); color: #fff; }
-      .kims-navlink.active { background: rgba(37,99,235,.18); color: #fff; border-left-color: #3b82f6; font-weight: 600; }
+      .kims-brand { padding: 20px 22px 16px; border-bottom: 1px solid #334155; }
+      .kims-brand .b1 { font-weight: 800; font-size: 1.15rem; color: #fff; letter-spacing: .02em; }
+      .kims-brand .b2 { font-size: 11px; color: #94a3b8; }
+      .kims-user { display: flex; gap: 10px; align-items: center; padding: 14px 22px;
+        border-bottom: 1px solid #334155; }
+      .kims-avatar { width: 36px; height: 36px; border-radius: 50%; background: #3b82f6; color: #fff;
+        display: flex; align-items: center; justify-content: center; font-weight: 700; flex: 0 0 auto; }
+      .kims-user .u1 { font-weight: 600; font-size: 13px; color: #fff; }
+      .kims-user .u2 { font-size: 11px; color: #94a3b8; }
+      .kims-nav { display: flex; flex-direction: column; padding: 12px 0; flex: 1 1 auto; }
+      .kims-navlink { display: flex; align-items: center; gap: 10px; padding: 10px 22px;
+        color: #94a3b8; text-decoration: none; font-size: 13.5px; border-left: 3px solid transparent;
+        transition: background .15s, color .15s; }
+      .kims-navlink:hover { background: #334155; color: #e2e8f0; }
+      .kims-navlink.active { background: #334155; color: #fff; border-left-color: #3b82f6; font-weight: 600; }
       .kims-navicon { width: 18px; text-align: center; }
       .kims-navparent { cursor: pointer; user-select: none; }
       .kims-caret { margin-left: auto; font-size: 11px; transition: transform .15s; color: #64748b; }
@@ -249,15 +257,15 @@ const KIMS = (() => {
   const alertModal = (title, bodyHtml, variant = 'danger') => {
     const id = 'kims-alert-overlay';
     const prev = document.getElementById(id); if (prev) prev.remove();
-    const color = variant === 'danger' ? '#dc3545' : '#0d6efd';
+    const color = variant === 'danger' ? '#dc2626' : '#3b82f6';
     const ov = document.createElement('div');
     ov.id = id;
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20000;display:flex;align-items:center;justify-content:center;';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:20000;display:flex;align-items:center;justify-content:center;';
     ov.innerHTML =
-      '<div style="background:#fff;border-radius:10px;max-width:440px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,.35);overflow:hidden">' +
-        '<div style="padding:14px 18px;border-top:5px solid ' + color + ';font-weight:700;font-size:1.05rem">' + title + '</div>' +
-        '<div style="padding:6px 18px 18px;line-height:1.6">' + bodyHtml + '</div>' +
-        '<div style="padding:12px 18px;text-align:right;border-top:1px solid #eee">' +
+      '<div style="background:#fff;border-radius:14px;max-width:440px;width:90%;box-shadow:0 20px 50px rgba(15,23,42,.25);overflow:hidden">' +
+        '<div style="padding:16px 20px 8px;border-top:4px solid ' + color + ';font-weight:700;font-size:1.05rem;color:#0f172a">' + title + '</div>' +
+        '<div style="padding:4px 20px 18px;line-height:1.6;color:#334155">' + bodyHtml + '</div>' +
+        '<div style="padding:12px 20px;text-align:right;border-top:1px solid #e2e8f0;background:#f8fafc">' +
           '<button type="button" class="btn btn-primary btn-sm" id="kims-alert-ok">확인</button></div>' +
       '</div>';
     document.body.appendChild(ov);
