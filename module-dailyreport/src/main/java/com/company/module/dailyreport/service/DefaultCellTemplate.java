@@ -343,11 +343,13 @@ public final class DefaultCellTemplate {
         d(t,  2,14, "P7",  "daily", "매일");
 
         // ── Row 3: 초지5 생산량 ──
-        Map<YearMonth, String> fb8 = anchorFallbackMap("83.5", "80.4", "85.6", "79.9", "83.6", "83", "79.5");
+        // ★★★ 2026-09 정정 — 2월 실적(anchor 기준 2026-02) 85.6 → 80.7,
+        //     '25년 월평균(G8) 80.7 → 82.2 (개발서버 테스트 중 발견된 오기입 수정)
+        Map<YearMonth, String> fb8 = anchorFallbackMap("83.5", "80.4", "80.7", "79.9", "83.6", "83", "79.5");
         ro(t, 3, 0, "B8",  "초지5 생산량(톤/日)", 1, 3);
         ro(t, 3, 3, "E8",  "85");
         ro(t, 3, 4, "F8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear2, fb8, "83.8"));
-        ro(t, 3, 5, "G8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear1, fb8, "76"));
+        ro(t, 3, 5, "G8",  yearlyAverage(lookup, tableCode, 3, liveCol, prevYear1, fb8, "82.2"));
         addHistoricalRollingRow(t, 3, 6, coordsForRow(histCols, 8), rolling, tableCode, liveCol, lookup, fb8);
         d(t,  3,13, "O8",  null, null);
         d(t,  3,14, "P8",  "daily", "매일");
