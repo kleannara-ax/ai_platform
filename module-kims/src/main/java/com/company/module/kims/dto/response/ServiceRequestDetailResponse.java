@@ -29,8 +29,10 @@ public class ServiceRequestDetailResponse {
     private final String requestTypeLabel;
     private final String issueType;          // 세부 불편유형 코드 (없으면 null)
     private final String issueTypeLabel;     // 세부 불편유형 한글명 (없으면 null)
-    private final String ipKind;             // 요청목록 코드 (IP_CHANGE/IP_NEW/PC_CHANGE/ETC)
+    private final String ipKind;             // 요청목록 코드 (IP_CHANGE/IP_NEW/PC_CHANGE/PC_RETURN/ETC)
     private final String ipKindLabel;        // 요청목록 한글명
+    private final String returnType;         // 반납유형 코드 (RETURN/RECLAIM) — 요청목록이 반납(PC_RETURN)일 때만
+    private final String returnTypeLabel;    // 반납유형 한글명
     private final String changerName;        // 변경자/생성자
 
     private final String content;       // 상세 요청내용
@@ -74,6 +76,8 @@ public class ServiceRequestDetailResponse {
                 .issueTypeLabel(entity.getIssueType() == null ? null : entity.getIssueType().getLabel())
                 .ipKind(entity.getIpKind() == null ? null : entity.getIpKind().name())
                 .ipKindLabel(entity.getIpKind() == null ? null : entity.getIpKind().getLabel())
+                .returnType(entity.getReturnType() == null ? null : entity.getReturnType().name())
+                .returnTypeLabel(entity.getReturnType() == null ? null : entity.getReturnType().getLabel())
                 .changerName(entity.getChangerName())
                 .content(entity.getContent())
                 .urgent(entity.isUrgent())
