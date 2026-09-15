@@ -35,8 +35,11 @@ public class ServiceRequestCreateRequest {
     /** 세부 불편유형 (요청유형이 PC관련 불편사항 조치일 때만 사용, 그 외 null) */
     private IssueType issueType;
 
-    /** 요청목록 (요청유형 IP 일 때: IP변경/IP신규생성/PC변경/기타변경) */
+    /** 요청목록 (요청유형 IP 일 때: IP변경/IP신규생성/PC변경/반납/기타변경) */
     private com.company.module.kims.entity.enums.IpRequestKind ipKind;
+
+    /** 반납유형 (요청목록이 반납(PC_RETURN)일 때만: 반납/회수) */
+    private com.company.module.kims.entity.enums.IpReturnType returnType;
 
     /** 변경자/생성자 (자동 반영 대상 사용자명) */
     private String changerName;

@@ -64,10 +64,15 @@ public class ServiceRequest extends BaseTimeEntity {
     @Column(name = "ISSUE_TYPE", length = 30)
     private IssueType issueType;
 
-    /** 요청목록 (요청유형 IP 일 때: IP변경/IP신규생성/PC변경/기타변경) */
+    /** 요청목록 (요청유형 IP 일 때: IP변경/IP신규생성/PC변경/반납/기타변경) */
     @Enumerated(EnumType.STRING)
     @Column(name = "IP_KIND", length = 20)
     private com.company.module.kims.entity.enums.IpRequestKind ipKind;
+
+    /** 반납유형 (요청목록이 반납(PC_RETURN)일 때만: 반납/회수) */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "RETURN_TYPE", length = 20)
+    private com.company.module.kims.entity.enums.IpReturnType returnType;
 
     /** 변경자/생성자 (자동 반영 대상 사용자명) */
     @Column(name = "CHANGER_NAME", length = 100)
@@ -110,6 +115,7 @@ public class ServiceRequest extends BaseTimeEntity {
     private ServiceRequest(String requestNo, String requesterName, String department,
                            String contact, String location, RequestType requestType,
                            IssueType issueType, com.company.module.kims.entity.enums.IpRequestKind ipKind,
+                           com.company.module.kims.entity.enums.IpReturnType returnType,
                            String changerName, String content, boolean urgent,
                            ReceivedChannel receivedChannel) {
         this.requestNo = requestNo;
@@ -120,6 +126,7 @@ public class ServiceRequest extends BaseTimeEntity {
         this.requestType = requestType;
         this.issueType = issueType;
         this.ipKind = ipKind;
+        this.returnType = returnType;
         this.changerName = changerName;
         this.content = content;
         this.urgent = urgent;

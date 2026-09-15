@@ -34,4 +34,13 @@ public class StatusChangeRequest {
 
     /** PC변경 시 수정할 항목 값 (필드명 → 새 값). 선택된 항목만 포함 */
     private java.util.Map<String, String> pcFields;
+
+    /**
+     * 반납(PC_RETURN) 완료 처리 시 부서 값.
+     * <ul>
+     *   <li>반납유형=반납(RETURN): "{부서}보관" 형태 값(관리자가 화면에서 수정 가능)</li>
+     *   <li>반납유형=회수(RECLAIM): 공란(null/빈값)</li>
+     * </ul>
+     */
+    private String returnDepartment;
 }
