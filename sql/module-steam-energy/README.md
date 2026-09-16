@@ -4,30 +4,45 @@
 
 ## 실행 순서
 
+파일 번호 순서대로 실행하면 된다(01 → 10). 번호가 곧 실행 순서다.
+
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | 신규 JPA 테이블 (steam_equipment, steam_price, steam_daily_usage) |
-| 2 | `02_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플) |
-| 3 | `03_menu_data.sql` | 플랫폼 메뉴 등록 (STEAM_ENERGY_MGMT 상위 그룹, URL 없음) + 역할 권한 |
-| 4 | `04_legacy_schema.sql` | 이관된 레거시 대시보드 테이블 (table_cell_value, unit_usage, unit_usage_raw) |
-| 5 | `05_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
-| 6 | `06_roles.sql` | 역할 정의 |
-| 7 | `07_cell_conventions.sql` | `table_cell_value` 네임스페이스 / col_index 규약 (주석 + 점검 쿼리, 스키마 변경 없음) |
-| 8 | `08_audit_columns.sql` | 업무 테이블 공통 컬럼(감사·소프트 삭제) 추가 — 기존 DB 용 마이그레이션 |
-| 9 | `09_waste_unit_split.sql` | 폐합성소각로 단가를 1·2호기로 분리 (옛 waste_* 코드 → waste1_*) |
-| 10 | `10_remove_fixed_cost_items.sql` | 단가 입력의 (추가) 고정비용 항목 제거 (폐합성 1·2호기·유동상 — 각 페이지에서 계산) |
+| 1 | `01_schema.sql` | 신규 JPA 테이블 (steam_equipment·steam_price·steam_daily_usage) |
+| 2 | `02_legacy_schema.sql` | 이관 대시보드 테이블 (table_cell_value·unit_usage·unit_usage_raw) |
+| 3 | `03_audit_columns.sql` | 업무 표 공통 컬럼(감사·소프트 삭제) 보강 — 기존 DB 용, 신규 설치는 무해 |
+| 4 | `04_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플) |
+| 5 | `05_price_code_split.sql` | 폐합성소각로 단가를 1·2호기로 분리 (옛 waste_* → waste1_*) |
+| 6 | `06_remove_fixed_cost_items.sql` | 단가 입력의 (추가) 고정비용 항목 제거 |
+| 7 | `07_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
+| 8 | `08_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
+| 9 | `09_roles.sql` | 스팀 전용 역할 3종을 공통코드 ROLE 그룹에 등록 |
+| 10 | `10_cell_conventions.sql` | table_cell_value 네임스페이스 / col_index 규약 (주석·점검 쿼리, 실행 선택) |
 
 ```bash
 mysql -u {user} -p {database} < 01_schema.sql
-mysql -u {user} -p {database} < 02_seed_data.sql
-mysql -u {user} -p {database} < 03_menu_data.sql
-mysql -u {user} -p {database} < 04_legacy_schema.sql
-mysql -u {user} -p {database} < 05_submenus.sql
-mysql -u {user} -p {database} < 06_roles.sql
+mysql -u {user} -p {database} < 02_legacy_schema.sql
+mysql -u {user} -p {database} < 03_audit_columns.sql
+mysql -u {user} -p {database} < 04_seed_data.sql
+mysql -u {user} -p {database} < 05_price_code_split.sql
+mysql -u {user} -p {database} < 06_remove_fixed_cost_items.sql
+mysql -u {user} -p {database} < 07_menu_data.sql
+mysql -u {user} -p {database} < 08_submenus.sql
+mysql -u {user} -p {database} < 09_roles.sql
+mysql -u {user} -p {database} < 10_cell_conventions.sql
 ```
 
-> `04_legacy_schema.sql` 은 이관된 스팀 대시보드가 사용하는 범용 `table_cell_value` 기반 테이블이다.
-> 대시보드 화면(`/steam/**`)이 실제 데이터를 읽고 쓰려면 반드시 실행해야 한다.
+표를 만든 뒤(01~03) 데이터를 넣고, 그다음 메뉴·권한(07~09)을 등록하는 순서다.
+모든 파일은 재실행해도 안전하다. `10_cell_conventions.sql` 은 주석과 점검 쿼리만 있어 실행하지 않아도 된다.
+
+### 운영 데이터를 함께 옮길 때
+
+로컬에서 뽑은 데이터 파일(`steam-data-YYYYMMDD.sql`, REPLACE INTO)이 있으면
+**위 01~10 을 모두 실행한 뒤 마지막에** 넣는다.
+
+```bash
+mysql -u {user} -p {database} < steam-data-YYYYMMDD.sql
+```
 
 ## 테이블
 

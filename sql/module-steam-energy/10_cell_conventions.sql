@@ -1,7 +1,7 @@
 -- ============================================================
 --  module-steam-energy: table_cell_value 네임스페이스 / col_index 규약
 --  실행해도 스키마를 바꾸지 않는다(주석 + 점검 쿼리).
---  현장 입력 페이지는 모두 04_legacy_schema.sql 의 table_cell_value 하나만 쓴다.
+--  현장 입력 페이지는 모두 02_legacy_schema.sql 의 table_cell_value 하나만 쓴다.
 --      (month, table_name, row_key, col_index) 가 유일키.
 --  col_index 는 화면 항목의 "고정 번호" 이므로 절대 재배치하지 말 것.
 --  ※ 항목이 추가/변경될 때마다 이 파일도 함께 갱신할 것.
