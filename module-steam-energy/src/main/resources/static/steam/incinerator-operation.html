@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>소각로 위탁운영 - 계획대비 가동실적</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="incinerator-op"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="incinerator-op"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="incinerator-op"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="incinerator-op"] .landing-canvas-table { overflow:visible !important; }
+    .inc-table-wrap { overflow:visible !important; }
+    .inc-table th, .inc-table td { text-align:center; }
+    .inc-table .col-month { background:var(--inc-bg-header); font-weight:700; text-align:center; color:var(--inc-text-strong); }
+
+    /* 폐합성(가동시간) 표: 월 + 1호기[계획/실적/달성율] + 2호기[동일] = 7컬럼 */
+    table[data-form="hours"] colgroup col.c-month { width:8%; }
+    table[data-form="hours"] colgroup col.c-data  { width:15.3%; }
+
+    /* 스팀~운영비용 표: 월 + (스팀생산량 + 운영단가 + 위탁운영비용) × (계획/실적/증감) = 10컬럼 */
+    table[data-form="metric"] colgroup col.c-month { width:7%; }
+    table[data-form="metric"] colgroup col.c-data  { width:10.3%; }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="incinerator-op">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>5. 소각로 가동계획대비 실적</h1>
+          <p>폐합성(가동시간) / 스팀~운영비용 (1호기·2호기·합계)</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="inc-tabs" role="tablist">
+        <button type="button" class="inc-tab active" data-target="hours">폐합성 (가동시간)</button>
+        <button type="button" class="inc-tab" data-target="metric">스팀~운영비용</button>
+      </div>
+
+      <!-- 폐합성 가동시간 -->
+      <section class="inc-section active" data-section="hours">
+        <div class="inc-card">
+          <h3 class="inc-section-title">폐합성 소각로 가동시간 (Hr)</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="hours">
+              <colgroup>
+                <col class="c-month">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th rowspan="2">월</th>
+                  <th colspan="3">폐합성 1호기</th>
+                  <th colspan="3">폐합성 2호기</th>
+                </tr>
+                <tr>
+                  <th>가동계획(hr)</th><th>가동실적(hr)</th><th>달성율(%)</th>
+                  <th>가동계획(hr)</th><th>가동실적(hr)</th><th>달성율(%)</th>
+                </tr>
+              </thead>
+              <tbody id="hoursBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 스팀~운영비용 -->
+      <section class="inc-section" data-section="metric">
+        <div class="inc-card">
+          <h3 class="inc-section-title">스팀생산량 / 운영단가(위탁) / 위탁운영비용</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="metric">
+              <colgroup>
+                <col class="c-month">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th rowspan="2">월</th>
+                  <th colspan="3">스팀생산량 (톤)</th>
+                  <th colspan="3">운영단가(위탁) (원/톤)</th>
+                  <th colspan="3">위탁운영비용 (천원)</th>
+                </tr>
+                <tr>
+                  <th>계획</th><th>실적</th><th>증감</th>
+                  <th>계획</th><th>실적</th><th>증감</th>
+                  <th>계획</th><th>실적</th><th>증감</th>
+                </tr>
+              </thead>
+              <tbody id="metricBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* 계획대비 가동실적
+       - hours: 월 × [1호기/2호기 각 가동계획/가동실적/달성율(%)] — 달성율 자동
+       - metric: 월 × [1호기/2호기/합계 각 (스팀량/단가/비용) × (계획/실적/증감)] — 증감 자동
+       모든 입력은 blur 시 DB 저장. 연도별 조회. */
+    const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
+    const METRICS = ["steam", "rate", "cost"]; // 스팀생산량, 단가, 위탁운영비용
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    /* 탭 전환 */
+    const tabs = document.querySelectorAll(".inc-tab");
+    const sections = document.querySelectorAll(".inc-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.target;
+        tabs.forEach((x) => x.classList.toggle("active", x === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
+      });
+    });
+
+    /* 폐합성 가동시간 표 */
+    function buildHoursTable() {
+      const tbody = document.getElementById("hoursBody");
+      const rows = MONTHS.map((m) => `<tr>
+        <th class="col-month">${m}월</th>
+        <td class="input-cell"><input data-section="hours" data-month="${m}" data-field="u1-plan" /></td>
+        <td class="input-cell"><input data-section="hours" data-month="${m}" data-field="u1-actual" /></td>
+        <td class="computed" data-section="hours" data-month="${m}" data-field="u1-rate">—</td>
+        <td class="input-cell"><input data-section="hours" data-month="${m}" data-field="u2-plan" /></td>
+        <td class="input-cell"><input data-section="hours" data-month="${m}" data-field="u2-actual" /></td>
+        <td class="computed" data-section="hours" data-month="${m}" data-field="u2-rate">—</td>
+      </tr>`).join("");
+      const totalRow = `<tr class="summary-row"><th class="col-month">합계</th>
+        ${["u1-plan","u1-actual","u1-rate","u2-plan","u2-actual","u2-rate"].map(f => `<td class="computed" data-section="hours" data-field="${f}-sum">—</td>`).join("")}</tr>`;
+      tbody.innerHTML = rows + totalRow;
+    }
+
+    /* 스팀~운영비용 표 — 3개 항목 (스팀생산량/단가/비용) × 계획/실적/증감(자동) */
+    function buildMetricTable() {
+      const tbody = document.getElementById("metricBody");
+      const rows = MONTHS.map((m) => {
+        const cells = METRICS.flatMap((metric) => [
+          `<td class="input-cell"><input data-section="metric" data-month="${m}" data-field="${metric}-plan" /></td>`,
+          `<td class="input-cell"><input data-section="metric" data-month="${m}" data-field="${metric}-actual" /></td>`,
+          `<td class="computed" data-section="metric" data-month="${m}" data-field="${metric}-diff">—</td>`,
+        ]).join("");
+        return `<tr><th class="col-month">${m}월</th>${cells}</tr>`;
+      }).join("");
+      const totalCells = METRICS.flatMap((metric) => [
+        `<td class="computed" data-section="metric" data-field="${metric}-plan-sum">—</td>`,
+        `<td class="computed" data-section="metric" data-field="${metric}-actual-sum">—</td>`,
+        `<td class="computed" data-section="metric" data-field="${metric}-diff-sum">—</td>`,
+      ]).join("");
+      const totalRow = `<tr class="summary-row"><th class="col-month">합계</th>${totalCells}</tr>`;
+      tbody.innerHTML = rows + totalRow;
+    }
+
+    buildHoursTable();
+    buildMetricTable();
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      // 운영단가(rate) 등 표기를 반올림한 입력은 dataset.raw(전체 정밀도)를 우선 사용.
+      const src = (input.dataset && input.dataset.raw != null) ? input.dataset.raw : input.value;
+      const v = String(src || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtPct(n) { return Number.isFinite(n) ? n.toFixed(1) + "%" : "—"; }
+    // 운영단가(위탁) 는 소숫점 한자리까지 표기 (계산/DB 는 전체 정밀도 유지)
+    function fmt1(n) { return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"; }
+    function round1Str(raw) { const n = Number(String(raw ?? "").replace(/[,\s]/g, "")); return Number.isFinite(n) ? n.toFixed(1) : String(raw ?? ""); }
+    function isRateInput(field) { return field === "rate-plan" || field === "rate-actual"; }
+
+    function recomputeHours() {
+      const sums = { "u1-plan":0, "u1-actual":0, "u2-plan":0, "u2-actual":0 };
+      const counts = { "u1-plan":0, "u1-actual":0, "u2-plan":0, "u2-actual":0 };
+      MONTHS.forEach((m) => {
+        ["u1", "u2"].forEach((u) => {
+          const plan = parseNum(document.querySelector(`input[data-section="hours"][data-month="${m}"][data-field="${u}-plan"]`));
+          const actual = parseNum(document.querySelector(`input[data-section="hours"][data-month="${m}"][data-field="${u}-actual"]`));
+          const rate = (Number.isFinite(plan) && plan > 0 && Number.isFinite(actual)) ? actual / plan * 100 : NaN;
+          document.querySelector(`[data-section="hours"][data-month="${m}"][data-field="${u}-rate"]`).textContent = fmtPct(rate);
+          if (Number.isFinite(plan)) { sums[`${u}-plan`] += plan; counts[`${u}-plan`]++; }
+          if (Number.isFinite(actual)) { sums[`${u}-actual`] += actual; counts[`${u}-actual`]++; }
+        });
+      });
+      ["u1", "u2"].forEach((u) => {
+        document.querySelector(`[data-section="hours"][data-field="${u}-plan-sum"]`).textContent = counts[`${u}-plan`] ? fmt(sums[`${u}-plan`]) : "—";
+        document.querySelector(`[data-section="hours"][data-field="${u}-actual-sum"]`).textContent = counts[`${u}-actual`] ? fmt(sums[`${u}-actual`]) : "—";
+        const ps = sums[`${u}-plan`], as = sums[`${u}-actual`];
+        document.querySelector(`[data-section="hours"][data-field="${u}-rate-sum"]`).textContent = (ps > 0) ? fmtPct(as / ps * 100) : "—";
+      });
+    }
+
+    function recomputeMetric() {
+      const sums = {}; const counts = {};
+      METRICS.forEach((m) => ["plan","actual","diff"].forEach((k) => { sums[`${m}-${k}`]=0; counts[`${m}-${k}`]=0; }));
+      MONTHS.forEach((mm) => {
+        METRICS.forEach((metric) => {
+          const plan = parseNum(document.querySelector(`input[data-section="metric"][data-month="${mm}"][data-field="${metric}-plan"]`));
+          const actual = parseNum(document.querySelector(`input[data-section="metric"][data-month="${mm}"][data-field="${metric}-actual"]`));
+          const diff = Number.isFinite(plan) && Number.isFinite(actual) ? actual - plan : NaN;
+          document.querySelector(`[data-section="metric"][data-month="${mm}"][data-field="${metric}-diff"]`).textContent = (metric === "rate" ? fmt1(diff) : fmt(diff));
+          if (Number.isFinite(plan)) { sums[`${metric}-plan`] += plan; counts[`${metric}-plan`]++; }
+          if (Number.isFinite(actual)) { sums[`${metric}-actual`] += actual; counts[`${metric}-actual`]++; }
+          if (Number.isFinite(diff)) { sums[`${metric}-diff`] += diff; counts[`${metric}-diff`]++; }
+        });
+      });
+      METRICS.forEach((m) => ["plan","actual","diff"].forEach((k) => {
+        const val = m === "rate" ? fmt1(sums[`${m}-${k}`]) : fmt(sums[`${m}-${k}`]);
+        document.querySelector(`[data-section="metric"][data-field="${m}-${k}-sum"]`).textContent = counts[`${m}-${k}`] ? val : "—";
+      }));
+    }
+
+    function recomputeAll() { recomputeHours(); recomputeMetric(); }
+    document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
+
+    /* DB */
+    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_operation";
+    function monthKey() { return String(currentYear); }
+    const storedRows = new Map();
+    function rowKeyFor(section, month, field) { return `${section}|${month}|${field}`; }
+    function eachInput(cb) {
+      document.querySelectorAll('table.inc-table input[data-section]').forEach((i) =>
+        cb(i, i.dataset.section, Number(i.dataset.month), i.dataset.field));
+    }
+    async function load() {
+      storedRows.clear();
+      eachInput((i) => { i.value = ""; delete i.dataset.raw; });
+      recomputeAll();
+      try {
+        const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`);
+        if (!res.ok) return;
+        (await res.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
+        eachInput((i, s, m, f) => {
+          const stored = storedRows.get(rowKeyFor(s, m, f));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            if (isRateInput(f)) { i.dataset.raw = stored.cell_value; i.value = round1Str(stored.cell_value); }
+            else i.value = stored.cell_value;
+          }
+        });
+        recomputeAll();
+      } catch (e) {}
+    }
+    async function save(input, section, month, field) {
+      const key = rowKeyFor(section, month, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = { month: monthKey(), year_no: currentYear, month_no: month, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        if (res.ok) storedRows.set(key, await res.json());
+      } catch (e) {}
+    }
+    eachInput((i, s, m, f) => i.addEventListener("blur", () => save(i, s, m, f)));
+    // 운영단가(rate) 입력: 표기는 1자리 반올림, 편집 시엔 전체 정밀도 노출. dataset.raw 가 source of truth.
+    eachInput((i, s, m, f) => {
+      if (!isRateInput(f)) return;
+      i.addEventListener("focus", () => { if (i.dataset.raw != null) i.value = i.dataset.raw; });
+      i.addEventListener("input", () => { i.dataset.raw = i.value; });
+      i.addEventListener("blur", () => { i.dataset.raw = i.value; i.value = round1Str(i.value); });
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: prev.month || "01" }));
+      } catch (e) {}
+      load();
+    });
+    load();
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20260522-incinerator-xlsx4-monthsync"></script>
+</body>
+</html>

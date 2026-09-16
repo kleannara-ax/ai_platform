@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>호기별 요약</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260723-stickycard" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body machine-summary-page" data-page-kind="unit-machine">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>호기별 요약</h1>
+          <p>월별 일지의 5, 6, 7번 표를 기준으로 참조 데이터만 한 화면에 모아 보여줍니다.</p>
+        </div>
+        <div class="landing-filter-box">
+          <span class="landing-filter-title">조회월</span>
+          <select id="filterYear"></select>
+          <span class="landing-filter-dot">.</span>
+          <select id="filterMonth"></select>
+          <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+        </div>
+      </div>
+
+      <section class="table-stack">
+        <article class="table-card">
+          <h3>5. 호기별 스팀생산량 배분 (누계)</h3>
+          <div class="table-wrap">
+            <table class="data-table summary-ref-table" data-summary-table="steam-allocation">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>단위</th>
+                  <th>제지2</th>
+                  <th>제지3</th>
+                  <th>화장지3</th>
+                  <th>화장지4</th>
+                  <th>화장지5</th>
+                  <th>누계</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="table-card">
+          <h3>6. 호기별 연료비용 배분 (누계)</h3>
+          <div class="table-wrap">
+            <table class="data-table summary-ref-table" data-summary-table="fuel-allocation">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>단위</th>
+                  <th>제지2</th>
+                  <th>제지3</th>
+                  <th>화장지3</th>
+                  <th>화장지4</th>
+                  <th>화장지5</th>
+                  <th>누계</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="table-card">
+          <h3>7. 호기별 연료 사용비용 (일별)</h3>
+          <div class="table-wrap">
+            <table class="data-table summary-ref-table" data-summary-table="fuel-daily">
+              <thead>
+                <tr>
+                  <th>일자</th>
+                  <th>제지2</th>
+                  <th>제지3</th>
+                  <th>화장지3</th>
+                  <th>화장지4</th>
+                  <th>화장지5</th>
+                  <th>합계(백만원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/unit-pages.js?v=20260723-stickyrows3"></script>
+  <script src="js/unit-machine-summary-pages.js?v=20260513-index1"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>유동상/소각로/외부/복합 일일 사용량</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260723-stickycard" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="unit-flow-daily">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>유동상/소각로/외부/복합 일일 사용량</h1>
+          <p>일별 설비 사용량을 월단위 기준으로 관리하는 화면입니다.</p>
+        </div>
+        <div class="landing-filter-box">
+          <span class="landing-filter-title">조회월</span>
+          <select id="filterYear"></select>
+          <span class="landing-filter-dot">.</span>
+          <select id="filterMonth"></select>
+          <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+          <button type="button" class="landing-filter-action" id="applyPriceBtn" title="등록된 이번 달 단가를 전체 일자에 적용">단가 적용</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar" role="tablist" aria-label="기간 구분">
+        <button type="button" class="period-tab-button" data-period-target="monthly">월단위</button>
+        <button type="button" class="period-tab-button" data-period-target="yearly" hidden aria-hidden="true" tabindex="-1">연단위</button>
+        <button type="button" class="period-tab-button" data-period-target="summary">종합</button>
+      </div>
+
+      <section class="period-panel" data-period-panel="monthly">
+        <div class="machine-tab-bar" role="tablist" aria-label="설비 분류">
+          <button type="button" class="machine-tab-button" data-machine-target="fluid-incinerator">유동상/폐합성소각로</button>
+          <button type="button" class="machine-tab-button" data-machine-target="combined">복합보일러</button>
+          <button type="button" class="machine-tab-button" data-machine-target="boiler">외부보일러</button>
+          <button type="button" class="machine-tab-button" data-machine-target="summary">총합</button>
+        </div>
+
+        <section class="machine-panel" data-machine-panel="fluid-incinerator">
+          <article class="table-card">
+            <h3>유동상/폐합성소각로 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table flow-table" data-cell-table="flow_m_fluid_incinerator" data-row-mode="daily">
+                <thead><tr><th>일자</th><th>유동상(톤)</th><th>단가(원/톤)</th><th>비용(백만원)</th><th>폐합성소각로 스팀생산량(톤)</th><th>단가(원/톤)</th><th>비용(백만원)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="combined">
+          <article class="table-card">
+            <h3>복합보일러 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table flow-table" data-cell-table="flow_m_combined" data-row-mode="daily">
+                <thead><tr><th>일자</th><th>스팀생산량(톤)</th><th>단가(원/톤)</th><th>비용(백만원)</th><th>차감비(백만원)</th><th>스팀구매비(백만원)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="boiler">
+          <article class="table-card">
+            <h3>외부보일러 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table flow-table" data-cell-table="flow_m_boiler" data-row-mode="daily">
+                <thead><tr><th>일자</th><th>스팀생산량(톤)</th><th>단가(원/톤)</th><th>비용(백만원)</th><th>차감비(백만원)</th><th>스팀구매비(백만원)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="summary">
+          <article class="table-card">
+            <h3>총합 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table flow-table" data-cell-table="flow_m_summary" data-row-mode="daily">
+                <thead><tr><th>일자</th><th>유동상 비용(백만원)</th><th>폐합성소각로 비용(백만원)</th><th>복합보일러 비용(백만원)</th><th>외부보일러 비용(백만원)</th><th>총 연료비(백만원)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="period-panel" data-period-panel="yearly">
+        <article class="table-card">
+          <h3>연단위 일일 사용량 집계</h3>
+          <div class="table-wrap">
+            <table class="data-table flow-table">
+              <thead><tr><th>항목</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="period-panel" data-period-panel="summary">
+        <article class="table-card">
+          <h3>종합 집계</h3>
+          <div class="table-wrap">
+            <table class="data-table flow-table">
+              <thead><tr><th>구분</th><th>단위</th><th>누계</th><th>비고</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/unit-pages.js?v=20260723-stickyrows3"></script>
+  <script src="js/unit-flow-pages.js?v=20260716-priceedit"></script>
+  <script src="/steam/js/unit-price-common.js?v=20260716-unitprice"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+  <script>window.UnitPrice && window.UnitPrice.wireApplyButton("applyPriceBtn", ["flow_m_fluid_incinerator", "flow_m_combined", "flow_m_boiler"]);</script>
+</body>
+</html>

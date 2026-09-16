@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>소각로 위탁운영 - 총 운영비용</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="incinerator-tc"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="incinerator-tc"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="incinerator-tc"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="incinerator-tc"] .landing-canvas-table { overflow:visible !important; }
+    .inc-table-wrap { overflow:visible !important; }
+
+    /* 하위 탭 — 페이지 고유 */
+    .inc-subtabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; padding-left:8px; }
+    .inc-subtab {
+      border:1px solid #c7d6f3; background:#fff; color:var(--inc-primary); border-radius:8px;
+      padding:6px 12px;
+      font:600 12px Inter,"Apple SD Gothic Neo",sans-serif; cursor:pointer;
+      transition: all var(--inc-transition);
+    }
+    .inc-subtab:hover { background:#f0f5ff; }
+    .inc-subtab.active { background:var(--inc-primary-light); color:#fff; border-color:var(--inc-primary-light); }
+    .inc-subsection { display:none; }
+    .inc-subsection.active { display:block; }
+
+    .inc-table th, .inc-table td { text-align:center; }
+    .inc-table .col-month { background:var(--inc-bg-header); font-weight:700; text-align:center; color:var(--inc-text-strong); }
+    .inc-table th.linked-source-header {
+      text-decoration: underline dotted rgba(31, 75, 153, 0.6);
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="incinerator-tc">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>6. #1, #2 폐합성소각로 운영내역 및 비용 관리</h1>
+          <p>운영내역 / 자체 운영비용 / 소모품 사용내역 · 도급내역 입력값이 운영내역 표에 자동 합산됩니다</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="inc-tabs" role="tablist">
+        <button type="button" class="inc-tab active" data-target="operation">폐합성소각로 운영내역</button>
+        <button type="button" class="inc-tab" data-target="self">자체 운영비용</button>
+        <button type="button" class="inc-tab" data-target="material">소모품 사용내역</button>
+      </div>
+
+      <!-- =================== 1. 폐합성소각로 운영내역 =================== -->
+      <section class="inc-section active" data-section="operation">
+        <div class="inc-subtabs">
+          <button type="button" class="inc-subtab active" data-sub="op-burn">소각량·가동시간·스팀</button>
+          <button type="button" class="inc-subtab" data-sub="op-cost">위탁운영비용</button>
+        </div>
+
+        <div class="inc-subsection active" data-sub="op-burn">
+          <div class="inc-card">
+            <h3 class="inc-section-title">폐기물 실소각량 / 가동시간 / 운휴시간 / 스팀생산량 / 원단위</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="op-burn">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="3">폐기물 실소각량(톤)</th>
+                    <th colspan="2" class="linked-source-header" title="‘계획대비 가동실적’ 페이지에 입력한 1·2호기 가동실적 시간을 월별로 자동으로 가져옵니다.">가동시간(Hr)</th>
+                    <th colspan="2" class="linked-source-header" title="‘도급내역’ 페이지에 일별로 입력한 1·2호기 운휴시간을 한 달치 모두 더해서 보여줍니다.">운휴시간(Hr)</th>
+                    <th colspan="3" class="linked-source-header" title="‘도급내역’ 페이지에 일별로 입력한 1·2호기 스팀량을 한 달치 모두 더해서 보여줍니다.">스팀생산량(톤)</th>
+                    <th colspan="2">스팀생산원단위</th>
+                  </tr>
+                  <tr>
+                    <th>1호기</th><th>2호기</th><th>합계</th>
+                    <th>1호기</th><th>2호기</th>
+                    <th>1호기</th><th>2호기</th>
+                    <th>1호기</th><th>2호기</th><th>합계</th>
+                    <th>1호기</th><th>2호기</th>
+                  </tr>
+                </thead>
+                <tbody id="opBurnBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="inc-subsection" data-sub="op-cost">
+          <div class="inc-card">
+            <h3 class="inc-section-title">위탁운영비용 (1호기 · 2호기 · 차감 · 합계)</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="op-cost">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th rowspan="2">위탁계약단가<br>(원/톤)</th>
+                    <th colspan="4" class="linked-source-header" title="‘도급내역’ 페이지에 일별로 입력한 1호기의 스팀량·운영비용·운휴비용을 한 달치 모두 더해서 보여줍니다. (금액은 원→천원으로 환산)">1호기</th>
+                    <th colspan="4" class="linked-source-header" title="‘도급내역’ 페이지에 일별로 입력한 2호기의 스팀량·운영비용·운휴비용을 한 달치 모두 더해서 보여줍니다. (금액은 원→천원으로 환산)">2호기</th>
+                    <th rowspan="2">차감비<br>(천원)</th>
+                    <th rowspan="2">비용합계<br>(천원)</th>
+                  </tr>
+                  <tr>
+                    <th>스팀량(톤)</th><th>운영비용<br>(천원)</th><th>운휴비용<br>(천원)</th><th>소계<br>(천원)</th>
+                    <th>스팀량(톤)</th><th>운영비용<br>(천원)</th><th>운휴비용<br>(천원)</th><th>소계<br>(천원)</th>
+                  </tr>
+                </thead>
+                <tbody id="opCostBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================== 2. 자체 운영비용 =================== -->
+      <section class="inc-section" data-section="self">
+        <div class="inc-subtabs">
+          <button type="button" class="inc-subtab active" data-sub="self-srf">SRF 수익·폐기물처리</button>
+          <button type="button" class="inc-subtab" data-sub="self-util">전력·가성소다·기타</button>
+          <button type="button" class="inc-subtab" data-sub="self-total">비용합계·원단위</button>
+        </div>
+
+        <div class="inc-subsection active" data-sub="self-srf">
+          <div class="inc-card">
+            <h3 class="inc-section-title">외부 폐합성수지 수익금 / 폐기물 처리량 · 처리비용</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="self-srf">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="2">외부 폐합성수지 수익금</th>
+                    <th colspan="3">바닥재 처리량(톤)</th>
+                    <th colspan="3">비산재 처리량(톤)</th>
+                    <th colspan="3">폐기물 처리비용(천원)</th>
+                  </tr>
+                  <tr>
+                    <th>입고량(톤)</th><th>수익비용(천원)</th>
+                    <th>재활용</th><th>매립</th><th>소계</th>
+                    <th>고형화</th><th>매립</th><th>소계</th>
+                    <th>바닥재</th><th>비산재</th><th>기타(내화물 등)</th>
+                  </tr>
+                </thead>
+                <tbody id="selfSrfBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="inc-subsection" data-sub="self-util">
+          <div class="inc-card">
+            <h3 class="inc-section-title">전력비용 / 가성소다 / 기타 운영비용</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="self-util">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="4">전력비용(Kw, 천원)</th>
+                    <th colspan="3">가성소다(Kg, 천원)</th>
+                    <th colspan="3">기타 운영비용(천원)</th>
+                  </tr>
+                  <tr>
+                    <th>1호기 사용량</th><th>2호기 사용량</th><th>전력단가</th><th>비용소계</th>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                    <th>용수사용비</th><th>폐기물처분부담금</th><th>기타</th>
+                  </tr>
+                </thead>
+                <tbody id="selfUtilBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="inc-subsection" data-sub="self-total">
+          <div class="inc-card">
+            <h3 class="inc-section-title">비용합계 / 원단위</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="self-total">
+                <thead>
+                  <tr>
+                    <th>월</th>
+                    <th>비용합계(천원)</th>
+                    <th>처리량당 비용</th>
+                    <th>스팀톤당 비용</th>
+                  </tr>
+                </thead>
+                <tbody id="selfTotalBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================== 3. 소모품 사용내역 =================== -->
+      <section class="inc-section" data-section="material">
+        <div class="inc-subtabs">
+          <button type="button" class="inc-subtab active" data-sub="mat-oil">부생유·청관제</button>
+          <button type="button" class="inc-subtab" data-sub="mat-chem">요소수·소금</button>
+          <button type="button" class="inc-subtab" data-sub="mat-misc">활성탄·크링커·합계</button>
+        </div>
+
+        <div class="inc-subsection active" data-sub="mat-oil">
+          <div class="inc-card">
+            <h3 class="inc-section-title">부생유 / 청관제</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="mat-oil">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="5">부생유 사용량</th>
+                    <th colspan="3">청관제</th>
+                  </tr>
+                  <tr>
+                    <th>#1 폐합성</th><th>#2 폐합성</th><th>사용량 소계</th><th>단가</th><th>비용</th>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                  </tr>
+                </thead>
+                <tbody id="matOilBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="inc-subsection" data-sub="mat-chem">
+          <div class="inc-card">
+            <h3 class="inc-section-title">요소수 / 소금</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="mat-chem">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="3">요소수</th>
+                    <th colspan="3">소금</th>
+                  </tr>
+                  <tr>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                  </tr>
+                </thead>
+                <tbody id="matChemBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="inc-subsection" data-sub="mat-misc">
+          <div class="inc-card">
+            <h3 class="inc-section-title">분말활성탄 / 크링커제거제 / 합계</h3>
+            <div class="inc-table-wrap">
+              <table class="data-table inc-table" data-form="mat-misc">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="3">분말활성탄</th>
+                    <th colspan="3">크링커제거제</th>
+                    <th>합계(사용비용)</th>
+                  </tr>
+                  <tr>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                    <th>구입량</th><th>단가</th><th>구입비용</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="matMiscBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* 총 운영비용 — 상위 3 탭 × 하위 2~3 탭 = 총 8 시트.
+       각 시트 12개월 행. 합계 행 자동. 입력 셀은 빈 칸, 일부 자동 계산. */
+    const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+    function monthKey() { return String(currentYear); }
+
+    /* 상위 탭 전환 */
+    const tabs = document.querySelectorAll(".inc-tab");
+    const sections = document.querySelectorAll(".inc-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.target;
+        tabs.forEach((x) => x.classList.toggle("active", x === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
+      });
+    });
+    /* 하위 탭 전환 (탭 영역 안에서만) */
+    document.querySelectorAll(".inc-section").forEach((sec) => {
+      const subtabs = sec.querySelectorAll(".inc-subtab");
+      const subsecs = sec.querySelectorAll(".inc-subsection");
+      subtabs.forEach((st) => {
+        st.addEventListener("click", () => {
+          const s = st.dataset.sub;
+          subtabs.forEach((x) => x.classList.toggle("active", x === st));
+          subsecs.forEach((ss) => ss.classList.toggle("active", ss.dataset.sub === s));
+        });
+      });
+    });
+
+    /* 표 구조 정의 — { tbody, sectionId, autoCalc?, calcCols?, inputCols } */
+    const TABLES = [
+      // op-burn: 가동시간은 계획대비 가동에서, 운휴시간/스팀량은 도급내역에서 자동
+      { sec: "op-burn", body: "opBurnBody",
+        inputCols: ["burn-1","burn-2","rate-1","rate-2"],
+        autoCols: ["burn-sum","steam-sum","steam-1","steam-2","stop-1","stop-2","runtime-1","runtime-2"],
+        order: ["burn-1","burn-2","burn-sum","runtime-1","runtime-2","stop-1","stop-2","steam-1","steam-2","steam-sum","rate-1","rate-2"],
+        compute(values) {
+          values["burn-sum"] = (Number.isFinite(values["burn-1"]) || Number.isFinite(values["burn-2"])) ? (values["burn-1"]||0)+(values["burn-2"]||0) : NaN;
+          values["steam-sum"] = (Number.isFinite(values["steam-1"]) || Number.isFinite(values["steam-2"])) ? (values["steam-1"]||0)+(values["steam-2"]||0) : NaN;
+        }
+      },
+      // op-cost: 스팀량/운영비용/운휴비용은 도급내역에서 자동
+      { sec: "op-cost", body: "opCostBody",
+        inputCols: ["unit","deduct"],
+        autoCols: ["u1-steam","u1-op","u1-stop","u1-sub","u2-steam","u2-op","u2-stop","u2-sub","total"],
+        order: ["unit","u1-steam","u1-op","u1-stop","u1-sub","u2-steam","u2-op","u2-stop","u2-sub","deduct","total"],
+        compute(values) {
+          const u1any = ["u1-op","u1-stop"].some((k) => Number.isFinite(values[k]));
+          values["u1-sub"] = u1any ? (values["u1-op"]||0)+(values["u1-stop"]||0) : NaN;
+          const u2any = ["u2-op","u2-stop"].some((k) => Number.isFinite(values[k]));
+          values["u2-sub"] = u2any ? (values["u2-op"]||0)+(values["u2-stop"]||0) : NaN;
+          const tany = ["u1-sub","u2-sub","deduct"].some((k) => Number.isFinite(values[k]));
+          values["total"] = tany ? (values["u1-sub"]||0)+(values["u2-sub"]||0)-(values["deduct"]||0) : NaN;
+        }
+      },
+      { sec: "self-srf", body: "selfSrfBody",
+        inputCols: ["in-qty","in-rev","floor-recycle","floor-bury","fly-solid","fly-bury","cost-floor","cost-fly","cost-misc"],
+        autoCols: ["floor-sub","fly-sub"],
+        order: ["in-qty","in-rev","floor-recycle","floor-bury","floor-sub","fly-solid","fly-bury","fly-sub","cost-floor","cost-fly","cost-misc"],
+        compute(values) {
+          values["floor-sub"] = (Number.isFinite(values["floor-recycle"]) || Number.isFinite(values["floor-bury"])) ? (values["floor-recycle"]||0)+(values["floor-bury"]||0) : NaN;
+          values["fly-sub"] = (Number.isFinite(values["fly-solid"]) || Number.isFinite(values["fly-bury"])) ? (values["fly-solid"]||0)+(values["fly-bury"]||0) : NaN;
+        }
+      },
+      { sec: "self-util", body: "selfUtilBody",
+        inputCols: ["p1","p2","prate","naoh-qty","naoh-unit","water","waste-charge","etc"],
+        autoCols: ["psub","naoh-cost"],
+        order: ["p1","p2","prate","psub","naoh-qty","naoh-unit","naoh-cost","water","waste-charge","etc"],
+        compute(values) {
+          const psum = (Number.isFinite(values["p1"]) ? values["p1"] : 0) + (Number.isFinite(values["p2"]) ? values["p2"] : 0);
+          values["psub"] = (Number.isFinite(values["p1"]) || Number.isFinite(values["p2"])) && Number.isFinite(values["prate"]) ? psum * values["prate"] : NaN;
+          values["naoh-cost"] = Number.isFinite(values["naoh-qty"]) && Number.isFinite(values["naoh-unit"]) ? values["naoh-qty"] * values["naoh-unit"] : NaN;
+        }
+      },
+      { sec: "self-total", body: "selfTotalBody",
+        inputCols: ["total","burn-rate","steam-rate"], autoCols: [],
+        order: ["total","burn-rate","steam-rate"], compute() {}
+      },
+      { sec: "mat-oil", body: "matOilBody",
+        inputCols: ["u1","u2","unit","ck-qty","ck-unit"],
+        autoCols: ["sub","cost","ck-cost"],
+        order: ["u1","u2","sub","unit","cost","ck-qty","ck-unit","ck-cost"],
+        compute(values) {
+          values["sub"] = (Number.isFinite(values["u1"]) || Number.isFinite(values["u2"])) ? (values["u1"]||0)+(values["u2"]||0) : NaN;
+          values["cost"] = Number.isFinite(values["sub"]) && Number.isFinite(values["unit"]) ? values["sub"] * values["unit"] : NaN;
+          values["ck-cost"] = Number.isFinite(values["ck-qty"]) && Number.isFinite(values["ck-unit"]) ? values["ck-qty"] * values["ck-unit"] : NaN;
+        }
+      },
+      { sec: "mat-chem", body: "matChemBody",
+        inputCols: ["u-qty","u-unit","s-qty","s-unit"], autoCols: ["u-cost","s-cost"],
+        order: ["u-qty","u-unit","u-cost","s-qty","s-unit","s-cost"],
+        compute(values) {
+          values["u-cost"] = Number.isFinite(values["u-qty"]) && Number.isFinite(values["u-unit"]) ? values["u-qty"]*values["u-unit"] : NaN;
+          values["s-cost"] = Number.isFinite(values["s-qty"]) && Number.isFinite(values["s-unit"]) ? values["s-qty"]*values["s-unit"] : NaN;
+        }
+      },
+      { sec: "mat-misc", body: "matMiscBody",
+        inputCols: ["a-qty","a-unit","k-qty","k-unit"], autoCols: ["a-cost","k-cost","total"],
+        order: ["a-qty","a-unit","a-cost","k-qty","k-unit","k-cost","total"],
+        compute(values) {
+          values["a-cost"] = Number.isFinite(values["a-qty"]) && Number.isFinite(values["a-unit"]) ? values["a-qty"]*values["a-unit"] : NaN;
+          values["k-cost"] = Number.isFinite(values["k-qty"]) && Number.isFinite(values["k-unit"]) ? values["k-qty"]*values["k-unit"] : NaN;
+          const any = ["a-cost","k-cost"].some((k) => Number.isFinite(values[k]));
+          values["total"] = any ? (values["a-cost"]||0)+(values["k-cost"]||0) : NaN;
+        }
+      },
+    ];
+
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtDec(n, d=1) { return Number.isFinite(n) ? n.toLocaleString("en-US", {maximumFractionDigits: d}) : "—"; }
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function buildTable(t) {
+      const tbody = document.getElementById(t.body);
+      const rows = MONTHS.map((m) => {
+        const cells = t.order.map((col) => t.inputCols.includes(col)
+          ? `<td class="input-cell"><input data-section="${t.sec}" data-month="${m}" data-field="${col}" /></td>`
+          : `<td class="computed" data-section="${t.sec}" data-month="${m}" data-field="${col}">—</td>`
+        ).join("");
+        return `<tr><th class="col-month">${m}월</th>${cells}</tr>`;
+      }).join("");
+      const totalCells = t.order.map((col) => `<td class="computed" data-section="${t.sec}" data-field="${col}-sum">—</td>`).join("");
+      const totalRow = `<tr class="summary-row"><th class="col-month">합계</th>${totalCells}</tr>`;
+      tbody.innerHTML = rows + totalRow;
+    }
+    TABLES.forEach(buildTable);
+
+    /* 도급내역 (incinerator_contract) 12개월 집계 — 연동 소스 */
+    const CONTRACT_NAME = "incinerator_contract";
+    const OPERATION_NAME = "incinerator_operation";
+    const contractByMonth = {}; // { 1..12: { unit1:{steam,oper,stop,runtime}, unit2:{...} } }
+    const operationByMonth = {}; // { 1..12: { u1Actual, u2Actual } } 가동실적(hr)
+    function emptyContract() { return { unit1:{steam:0,oper:0,stop:0,runtime:0}, unit2:{steam:0,oper:0,stop:0,runtime:0}, real:{"steam-1":0,"steam-2":0} }; }
+    async function loadOperation() {
+      for (let m = 1; m <= 12; m++) operationByMonth[m] = { u1Actual: NaN, u2Actual: NaN };
+      try {
+        const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(String(currentYear))}&tableNames=${encodeURIComponent(OPERATION_NAME)}`);
+        if (!res.ok) return;
+        const j = await res.json();
+        (j.data || []).forEach((row) => {
+          if (row.table_name !== OPERATION_NAME) return;
+          const parts = String(row.row_key || "").split("|");
+          if (parts.length < 3) return;
+          const [sec, mo, field] = parts;
+          if (sec !== "hours") return;
+          const m = Number(mo);
+          if (!(m >= 1 && m <= 12)) return;
+          const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+          if (!Number.isFinite(v)) return;
+          if (field === "u1-actual") operationByMonth[m].u1Actual = v;
+          else if (field === "u2-actual") operationByMonth[m].u2Actual = v;
+        });
+      } catch (e) {}
+    }
+    async function loadContract() {
+      for (let m = 1; m <= 12; m++) contractByMonth[m] = emptyContract();
+      const tasks = [];
+      for (let m = 1; m <= 12; m++) {
+        const mk = `${currentYear}-${String(m).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              const s = emptyContract();
+              (j.data || []).forEach(row => {
+                if (row.table_name !== CONTRACT_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 3) return;
+                const [sec, , field] = parts;
+                if (!(sec in s) || !(field in s[sec])) return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v)) s[sec][field] += v;
+              });
+              contractByMonth[m] = s;
+            })
+            .catch(() => {})
+        );
+      }
+      await Promise.all(tasks);
+    }
+
+    function recomputeTable(t) {
+      const sums = {}; const counts = {};
+      t.order.forEach((c) => { sums[c] = 0; counts[c] = 0; });
+      MONTHS.forEach((m) => {
+        const values = {};
+        t.inputCols.forEach((col) => {
+          values[col] = parseNum(document.querySelector(`input[data-section="${t.sec}"][data-month="${m}"][data-field="${col}"]`));
+        });
+        /* 도급내역 자동 연동 — op-burn / op-cost */
+        const c = contractByMonth[m];
+        if (c) {
+          if (t.sec === "op-burn") {
+            // 스팀생산량: Excel 총비용 J/I 컬럼은 도급내역의 real 섹션(실 사용량) 합계 사용
+            values["steam-1"] = (c.real?.["steam-1"]) || NaN;
+            values["steam-2"] = (c.real?.["steam-2"]) || NaN;
+            values["stop-1"] = c.unit1.runtime || NaN;
+            values["stop-2"] = c.unit2.runtime || NaN;
+            const op = operationByMonth[m] || {};
+            values["runtime-1"] = Number.isFinite(op.u1Actual) ? op.u1Actual : NaN;
+            values["runtime-2"] = Number.isFinite(op.u2Actual) ? op.u2Actual : NaN;
+          } else if (t.sec === "op-cost") {
+            // op-cost 의 스팀량 = 결산 기준 (위탁운영비용 = 결산 steam × 단가 + 운휴 고정비)
+            values["u1-steam"] = c.unit1.steam || NaN;
+            values["u2-steam"] = c.unit2.steam || NaN;
+            values["u1-op"]   = c.unit1.oper ? c.unit1.oper / 1000 : NaN;
+            values["u2-op"]   = c.unit2.oper ? c.unit2.oper / 1000 : NaN;
+            values["u1-stop"] = c.unit1.stop ? c.unit1.stop / 1000 : NaN;
+            values["u2-stop"] = c.unit2.stop ? c.unit2.stop / 1000 : NaN;
+          }
+        }
+        t.compute(values);
+        t.autoCols.forEach((col) => {
+          const el = document.querySelector(`[data-section="${t.sec}"][data-month="${m}"][data-field="${col}"]`);
+          if (el) el.textContent = fmt(values[col]);
+        });
+        t.order.forEach((col) => { if (Number.isFinite(values[col])) { sums[col] += values[col]; counts[col]++; } });
+      });
+      t.order.forEach((col) => {
+        const el = document.querySelector(`[data-section="${t.sec}"][data-field="${col}-sum"]`);
+        if (el) el.textContent = counts[col] ? fmt(sums[col]) : "—";
+      });
+    }
+    function recomputeAll() { TABLES.forEach(recomputeTable); }
+    document.querySelectorAll("table.inc-table").forEach((tbl) => tbl.addEventListener("input", recomputeAll));
+
+    /* DB */
+    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_total_cost";
+    const storedRows = new Map();
+    function rowKeyFor(section, month, field) { return `${section}|${month}|${field}`; }
+    function eachInput(cb) {
+      document.querySelectorAll('table.inc-table input[data-section]').forEach((i) =>
+        cb(i, i.dataset.section, Number(i.dataset.month), i.dataset.field));
+    }
+    async function load() {
+      storedRows.clear();
+      eachInput((i) => { i.value = ""; });
+      recomputeAll();
+      try {
+        const [selfRes] = await Promise.all([
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`),
+          loadContract(),
+          loadOperation(),
+        ]);
+        if (selfRes.ok) {
+          (await selfRes.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
+          eachInput((i, s, m, f) => {
+            const stored = storedRows.get(rowKeyFor(s, m, f));
+            if (stored && stored.cell_value != null && stored.cell_value !== "") i.value = stored.cell_value;
+          });
+        }
+        recomputeAll();
+      } catch (e) {}
+    }
+    async function save(input, section, month, field) {
+      const key = rowKeyFor(section, month, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = { month: monthKey(), year_no: currentYear, month_no: month, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        if (res.ok) storedRows.set(key, await res.json());
+      } catch (e) {}
+    }
+    eachInput((i, s, m, f) => i.addEventListener("blur", () => save(i, s, m, f)));
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: prev.month || "01" }));
+      } catch (e) {}
+      load();
+    });
+    load();
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20260522-incinerator-xlsx4-monthsync"></script>
+</body>
+</html>

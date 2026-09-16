@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>복합보일러 운휴 시간</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />  <link rel="stylesheet" href="css/page-combo.css?v=20260608-sticky3" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="combo-boiler">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table combo-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy"><h1 id="comboPageTitle"></h1><p id="comboPageSubtitle"></p></div>
+        <div class="landing-filter-box"><span class="landing-filter-title">조회</span><select id="filterYear"></select><span class="landing-filter-dot">.</span><select id="filterMonth"></select><button type="button" class="landing-filter-action" id="filterSubmit">조회</button></div>
+      </div>
+      <div class="combo-tabs" role="tablist">
+        <a class="period-tab-button" data-combo-page="production" href="combo-boiler-steam-production.html">스팀생산실적</a>
+        <a class="period-tab-button" data-combo-page="downtime" href="combo-boiler-downtime.html">복합보일러 운휴 시간</a>
+        <a class="period-tab-button" data-combo-page="recovery" href="combo-boiler-recovery-loss.html">스팀 회수량 감소 요인</a>
+        <a class="period-tab-button" data-combo-page="etc" href="combo-boiler-etc.html">기타</a>
+      </div>
+      <div class="combo-table-wrap" id="comboTableWrap"></div>
+    </div>
+  </main>
+  <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
+  <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/combo-boiler-pages.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260608-sticky3"></script>
+</body>
+</html>

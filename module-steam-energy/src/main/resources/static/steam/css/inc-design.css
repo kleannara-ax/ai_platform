@@ -1,0 +1,1533 @@
+/* ============================================================
+   inc-design.css — 공통 디자인 시스템
+   기준: html/incinerator-contract.html (커밋 c42c8c4 이후)
+   적용 페이지: 소각로 / 유동상 / SRF Invoice / 콤보 보일러 / 기타
+   ============================================================ */
+
+/* === 디자인 토큰 === */
+:root {
+  --inc-primary: #1f4f82;
+  --inc-primary-hover: #173f6b;
+  --inc-primary-light: #2e6bb0;
+  --inc-text: #172033;
+  --inc-text-dim: #64748b;
+  --inc-text-strong: #173a54;
+  --inc-border: #d7e0ea;
+  --inc-border-card: rgba(120, 181, 217, .28);
+  --inc-bg-card: #ffffff;
+  --inc-bg-page: #f6f9fc;
+  --inc-bg-computed: #eef2ff;
+  --inc-bg-summary: linear-gradient(180deg, #fffbe5 0%, #fff5cc 100%);
+  --inc-bg-header: #f3f6ff;
+  --inc-bg-row-hover: #f8fafd;
+  --inc-shadow-card: 0 8px 24px rgba(23, 65, 95, .07);
+  --inc-shadow-hover: 0 12px 32px rgba(23, 65, 95, .12);
+  --inc-radius-card: 14px;
+  --inc-radius-control: 10px;
+  --inc-radius-pill: 12px;
+  --inc-transition: 160ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* === Page body baseline ===
+   참고: data-page-kind 별 page-level CSS 가 padding 등을 또 지정하는 경우가 있으므로
+   여기서는 기본값을 부드럽게 잡고, 각 페이지에서 필요 시 override. */
+body.landing-body.inc-page {
+  height: auto;
+  min-height: 100vh;
+  align-items: stretch;
+  overflow: visible;
+  background: var(--inc-bg-page);
+  font-family: "Inter", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  color: var(--inc-text);
+}
+body.landing-body.inc-page .landing-main {
+  padding: 28px 24px 24px 30px;
+  overflow: visible;
+  height: auto;
+  min-height: 100vh;
+}
+body.landing-body.inc-page .landing-canvas {
+  padding: 0;
+  min-width: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* === Header === */
+.inc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding-left: 14px;
+  position: relative;
+}
+.inc-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--inc-primary-light) 0%, var(--inc-primary) 100%);
+}
+.inc-header-title h1 {
+  margin: 0;
+  color: var(--inc-text);
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.inc-header-title p {
+  margin: 6px 0 0;
+  color: var(--inc-text-dim);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* === Toolbar === */
+.inc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.inc-toolbar select,
+.inc-toolbar input[type="text"],
+.inc-toolbar input[type="number"],
+.inc-toolbar input[type="date"] {
+  height: 38px;
+  border: 1px solid var(--inc-border);
+  border-radius: var(--inc-radius-control);
+  background: #fff;
+  color: #1f2a44;
+  font: 600 13px Inter, sans-serif;
+  padding: 0 13px;
+  transition: border-color var(--inc-transition), box-shadow var(--inc-transition);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.inc-toolbar select:hover { border-color: var(--inc-primary-light); }
+.inc-toolbar select:focus,
+.inc-toolbar input:focus {
+  outline: none;
+  border-color: var(--inc-primary);
+  box-shadow: 0 0 0 3px rgba(31, 79, 130, .12);
+}
+.inc-toolbar button {
+  height: 38px;
+  border: 1px solid var(--inc-primary);
+  border-radius: var(--inc-radius-control);
+  background: var(--inc-primary);
+  color: #fff;
+  font: 600 13px Inter, sans-serif;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+}
+.inc-toolbar button:hover {
+  background: var(--inc-primary-hover);
+  border-color: var(--inc-primary-hover);
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .25);
+  transform: translateY(-1px);
+}
+.inc-toolbar button.btn-secondary {
+  background: #fff;
+  color: var(--inc-primary);
+}
+.inc-toolbar button.btn-secondary:hover {
+  background: #eff5fb;
+  color: var(--inc-primary-hover);
+}
+
+/* === Tabs === */
+.inc-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 4px;
+  background: #eef3f9;
+  border-radius: 14px;
+  width: fit-content;
+}
+.inc-tab {
+  border: 0;
+  background: transparent;
+  color: var(--inc-text-strong);
+  border-radius: var(--inc-radius-pill);
+  padding: 9px 18px;
+  font: 600 13px Inter, "Apple SD Gothic Neo", sans-serif;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+}
+.inc-tab:hover {
+  background: rgba(255, 255, 255, .6);
+  color: var(--inc-primary);
+}
+.inc-tab.active {
+  background: var(--inc-primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .25);
+}
+
+/* === Sections / Cards === */
+.inc-section { display: none; }
+.inc-section.active { display: block; animation: incFadeIn 200ms ease; }
+@keyframes incFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.inc-card {
+  border: 1px solid var(--inc-border-card);
+  border-radius: var(--inc-radius-card);
+  background: var(--inc-bg-card);
+  box-shadow: var(--inc-shadow-card);
+  overflow: hidden;
+  transition: box-shadow var(--inc-transition);
+}
+.inc-card:hover { box-shadow: var(--inc-shadow-hover); }
+.inc-section-title {
+  margin: 0;
+  padding: 20px 22px 14px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--inc-text-strong);
+  letter-spacing: -0.005em;
+  border-bottom: 1px solid rgba(120, 181, 217, .16);
+}
+.inc-table-wrap { padding: 0; overflow: visible; }
+
+/* === Table — 반응형 (컨테이너 폭 100%, 컬럼 비율 분배) === */
+.inc-table {
+  table-layout: fixed;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.inc-table colgroup col.c-day { width: 7%; }
+.inc-table colgroup col.c-eq { width: auto; }
+.inc-table th,
+.inc-table td {
+  font: 500 12.5px Inter, sans-serif;
+  color: var(--inc-text);
+  padding: 8px 8px;
+  border-bottom: 1px solid #eef2f6;
+  transition: background-color var(--inc-transition);
+  word-break: keep-all;
+  line-height: 1.3;
+}
+.inc-table thead th {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+  color: var(--inc-text-strong);
+  font-weight: 700;
+  font-size: 12px;
+  white-space: normal;
+  padding: 10px 8px;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.inc-table tbody tr:hover td:not(.computed):not(.col-day) {
+  background: var(--inc-bg-row-hover);
+}
+.inc-table .col-day,
+.inc-table th.col-label,
+.inc-table .col-label {
+  background: var(--inc-bg-header);
+  font-weight: 700;
+  text-align: center;
+  color: var(--inc-text-strong);
+}
+.inc-table th.col-label,
+.inc-table .col-label { text-align: left; }
+.inc-table .input-cell {
+  padding: 0 !important;
+  background: #fff !important;
+}
+.inc-table .input-cell input,
+.inc-table .input-cell textarea {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  padding: 7px 9px;
+  font: 500 12.5px Inter, sans-serif;
+  color: var(--inc-text);
+  text-align: right;
+  transition: background-color var(--inc-transition), box-shadow var(--inc-transition);
+}
+.inc-table .input-cell textarea {
+  text-align: left;
+  resize: vertical;
+  min-height: 42px;
+  line-height: 1.4;
+}
+.inc-table .input-cell:hover input,
+.inc-table .input-cell:hover textarea { background: #fafcff; }
+.inc-table .input-cell input:focus,
+.inc-table .input-cell textarea:focus {
+  box-shadow: inset 0 0 0 2px var(--inc-primary);
+  background: #fff;
+}
+.inc-table td.computed {
+  background: var(--inc-bg-computed) !important;
+  font-weight: 600;
+  text-align: right;
+  color: var(--inc-text-strong);
+}
+.inc-table tbody tr.summary-row td,
+.inc-table tbody tr.summary-row th {
+  background: var(--inc-bg-summary) !important;
+  font-weight: 800;
+  color: #7c5a00;
+  border-bottom: 1.5px solid #f0d674;
+}
+.inc-table tbody tr:last-child td { border-bottom: none; }
+
+/* === Print === */
+@media print {
+  .inc-toolbar,
+  .inc-tabs { display: none; }
+  .inc-section { display: block !important; }
+  .inc-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    page-break-inside: avoid;
+    margin-bottom: 16px;
+  }
+  body.landing-body.inc-page { background: #fff; }
+}
+
+/* ============================================================
+   === Page-Specific Skin (cascading) ===
+   소각로 페이지(incinerator-*)는 inc-* 전용 클래스를 직접 사용하므로
+   여기서는 다루지 않는다. 아래 룰은 자체 클래스 시스템을 가진
+   다른 페이지(유동상 / 콤보 보일러 / SRF Invoice / 원단위 / 기타)에서
+   inc-design 토큰이 실제 적용되도록 cascading 시킨다.
+   ⚠️ 제외:
+     - srf-invoice           (Summary VK)
+     - srf-invoice-bsc       (BSC)
+     - srf-invoice-adj       (Adjustment Factor)
+     - incinerator-*         (이미 inc-* 클래스로 직접 적용)
+   ============================================================ */
+
+/* 적용 대상 페이지의 공통 attribute 셀렉터 alias —
+   섬세한 specificity 유지 위해 매 룰마다 명시. */
+
+/* ---------- 페이지 배경 / 폰트 (skinned pages) ---------- */
+body.landing-body[data-page-kind="combo-boiler"],
+body.landing-body[data-page-kind="fluidized-accident"],
+body.landing-body[data-page-kind="fluidized-improvement"],
+body.landing-body[data-page-kind="fluidized-monthly"],
+body.landing-body[data-page-kind="fluidized-srf-inbound"],
+body.landing-body[data-page-kind="fluidized-detail"],
+body.landing-body[data-page-kind="srf-invoice-operation"],
+body.landing-body[data-page-kind="srf-invoice-monthly"],
+body.landing-body[data-page-kind="srf-invoice-acc"],
+body.landing-body[data-page-kind="srf-invoice-client"],
+body.landing-body[data-page-kind="unit"],
+body.landing-body[data-page-kind="today-entry"],
+body.landing-body[data-page-kind="daily"],
+body.landing-body[data-page-kind="unit-flow-daily"],
+body.landing-body[data-page-kind="unit-log"],
+body.landing-body[data-page-kind="unit-machine"] {
+  background: var(--inc-bg-page);
+  font-family: "Inter", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  color: var(--inc-text);
+}
+
+/* fluidized-detail 은 transparent 배경의 wide-scroll 페이지 — body 만 토큰 */
+body.landing-body[data-page-kind="fluidized-detail"] {
+  background: var(--inc-bg-page) !important;
+}
+
+/* ---------- 페이지 헤더 (좌측 4px 그라데이션 막대 + 타이포) ---------- */
+body.landing-body[data-page-kind="combo-boiler"] .landing-page-header,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-page-header,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-header,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-page-header,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-page-header,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-page-header,
+body.landing-body[data-page-kind="unit"] .landing-page-header,
+body.landing-body[data-page-kind="today-entry"] .landing-page-header,
+body.landing-body[data-page-kind="daily"] .landing-page-header,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-page-header,
+body.landing-body[data-page-kind="unit-log"] .landing-page-header,
+body.landing-body[data-page-kind="unit-machine"] .landing-page-header {
+  position: relative;
+  padding-left: 14px;
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-page-header::before,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-page-header::before,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-header::before,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-page-header::before,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-page-header::before,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-page-header::before,
+body.landing-body[data-page-kind="unit"] .landing-page-header::before,
+body.landing-body[data-page-kind="today-entry"] .landing-page-header::before,
+body.landing-body[data-page-kind="daily"] .landing-page-header::before,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-page-header::before,
+body.landing-body[data-page-kind="unit-log"] .landing-page-header::before,
+body.landing-body[data-page-kind="unit-machine"] .landing-page-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--inc-primary-light) 0%, var(--inc-primary) 100%);
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-page-header h1,
+body.landing-body[data-page-kind="combo-boiler"] .landing-page-copy h1,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-page-header h1,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-page-copy h1,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-header h1,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-copy h1,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-page-header h1,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-page-copy h1,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-page-header h1,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-page-copy h1,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-page-header h1,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-page-copy h1,
+body.landing-body[data-page-kind="unit"] .landing-page-header h1,
+body.landing-body[data-page-kind="unit"] .landing-page-copy h1,
+body.landing-body[data-page-kind="today-entry"] .landing-page-header h1,
+body.landing-body[data-page-kind="today-entry"] .landing-page-copy h1,
+body.landing-body[data-page-kind="daily"] .landing-page-header h1,
+body.landing-body[data-page-kind="daily"] .landing-page-copy h1,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-page-header h1,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-page-copy h1,
+body.landing-body[data-page-kind="unit-log"] .landing-page-header h1,
+body.landing-body[data-page-kind="unit-log"] .landing-page-copy h1,
+body.landing-body[data-page-kind="unit-machine"] .landing-page-header h1,
+body.landing-body[data-page-kind="unit-machine"] .landing-page-copy h1 {
+  color: var(--inc-text);
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-page-copy p,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-page-copy p,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-copy p,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-page-copy p,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-page-copy p,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-page-copy p,
+body.landing-body[data-page-kind="unit"] .landing-page-copy p,
+body.landing-body[data-page-kind="today-entry"] .landing-page-copy p,
+body.landing-body[data-page-kind="daily"] .landing-page-copy p,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-page-copy p,
+body.landing-body[data-page-kind="unit-log"] .landing-page-copy p,
+body.landing-body[data-page-kind="unit-machine"] .landing-page-copy p {
+  color: var(--inc-text-dim);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ---------- 툴바 / 필터 ---------- */
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-box,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-box,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-box,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-box,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-box,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-box,
+body.landing-body[data-page-kind="unit"] .landing-filter-box,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-box,
+body.landing-body[data-page-kind="daily"] .landing-filter-box,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-box,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-box,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-box select,
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-box input,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-box select,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-box input,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-box select,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-box input,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-box select,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-box input,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-box select,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-box input,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-box select,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-box input,
+body.landing-body[data-page-kind="unit"] .landing-filter-box select,
+body.landing-body[data-page-kind="unit"] .landing-filter-box input,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-box select,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-box input,
+body.landing-body[data-page-kind="daily"] .landing-filter-box select,
+body.landing-body[data-page-kind="daily"] .landing-filter-box input,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-box select,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-box input,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-box select,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-box input,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-box select,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-box input {
+  height: 42px;
+  border: 1px solid var(--inc-border);
+  border-radius: var(--inc-radius-control);
+  background: #fff;
+  color: #1f2a44;
+  font: 600 13.5px Inter, "Apple SD Gothic Neo", sans-serif;
+  padding: 0 14px;
+  transition: border-color var(--inc-transition), box-shadow var(--inc-transition);
+  box-sizing: border-box;
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="unit"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="unit"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="daily"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="daily"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-box input:focus,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-box select:focus,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-box input:focus {
+  outline: none;
+  border-color: var(--inc-primary);
+  box-shadow: 0 0 0 3px rgba(31, 79, 130, .12);
+}
+
+/* 필터 action 버튼 (조회/저장 등) — navy 솔리드 */
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-action,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-action,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-action,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-action,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-action,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-action,
+body.landing-body[data-page-kind="unit"] .landing-filter-action,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-action,
+body.landing-body[data-page-kind="daily"] .landing-filter-action,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-action,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-action,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-action {
+  height: 42px;
+  border: 1px solid var(--inc-primary);
+  border-radius: var(--inc-radius-control);
+  background: var(--inc-primary);
+  color: #fff;
+  font: 600 13.5px Inter, "Apple SD Gothic Neo", sans-serif;
+  padding: 0 18px;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+  box-sizing: border-box;
+}
+body.landing-body[data-page-kind="combo-boiler"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="unit"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="today-entry"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="daily"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="unit-flow-daily"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="unit-log"] .landing-filter-action:hover,
+body.landing-body[data-page-kind="unit-machine"] .landing-filter-action:hover {
+  background: var(--inc-primary-hover);
+  border-color: var(--inc-primary-hover);
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .25);
+  transform: translateY(-1px);
+}
+
+/* ---------- 뷰 전환 pill 그룹 (Excel-grid 페이지 — fluidized-detail) ---------- */
+body.landing-body[data-page-kind="fluidized-detail"] .detail-view-toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  background: #eef3f9;
+  border-radius: 14px;
+  border: 0;
+}
+body.landing-body[data-page-kind="fluidized-detail"] .detail-view-button {
+  border: 0;
+  background: transparent;
+  color: var(--inc-text-strong);
+  border-radius: var(--inc-radius-pill);
+  padding: 10px 18px;
+  font: 600 13px Inter, "Apple SD Gothic Neo", sans-serif;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+}
+body.landing-body[data-page-kind="fluidized-detail"] .detail-view-button:hover {
+  background: rgba(255, 255, 255, .7);
+  color: var(--inc-primary);
+}
+body.landing-body[data-page-kind="fluidized-detail"] .detail-view-button.is-active {
+  background: var(--inc-primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .25);
+}
+
+/* ---------- Excel-grid 표 skin (유동상 detail + combo steam-production) ---------- */
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table,
+body.landing-body[data-page-kind="combo-boiler"] .excel-table {
+  font-family: "Inter", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+}
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table thead th,
+body.landing-body[data-page-kind="combo-boiler"] .excel-table thead th {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+  color: var(--inc-text-strong);
+  font-weight: 700;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4);
+}
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table tbody tr:hover td:not(.excel-head):not(.excel-readonly-cell):not(.excel-section-head),
+body.landing-body[data-page-kind="combo-boiler"] .excel-table tbody tr:hover td:not(.excel-head):not(.excel-readonly-cell):not(.excel-section-head) {
+  background: var(--inc-bg-row-hover);
+}
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table .excel-readonly-cell,
+body.landing-body[data-page-kind="combo-boiler"] .excel-table .excel-readonly-cell {
+  background: var(--inc-bg-computed);
+  color: var(--inc-text-strong);
+  font-weight: 600;
+}
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table .excel-head,
+body.landing-body[data-page-kind="combo-boiler"] .excel-table .excel-head {
+  background: var(--inc-bg-header);
+  color: var(--inc-text-strong);
+  font-weight: 700;
+}
+body.landing-body[data-page-kind="fluidized-detail"] .excel-table input:focus,
+body.landing-body[data-page-kind="combo-boiler"] .excel-table input:focus {
+  box-shadow: inset 0 0 0 2px var(--inc-primary);
+  outline: 0;
+}
+
+/* ---------- SRF Invoice 페이지 skin (Summary/BSC/Adjustment 제외!) ---------- */
+body.landing-body[data-page-kind="srf-invoice-operation"],
+body.landing-body[data-page-kind="srf-invoice-monthly"],
+body.landing-body[data-page-kind="srf-invoice-acc"],
+body.landing-body[data-page-kind="srf-invoice-client"] {
+  background: var(--inc-bg-page) !important;
+  font-family: "Inter", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  color: var(--inc-text);
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-canvas,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-canvas,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-canvas,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-canvas {
+  border: 1px solid var(--inc-border-card);
+  border-radius: var(--inc-radius-card);
+  background: var(--inc-bg-card);
+  box-shadow: var(--inc-shadow-card);
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-title h1,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-title h1,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-title h1,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-title h1 {
+  color: var(--inc-text);
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-title p,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-title p,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-title p,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-title p {
+  color: var(--inc-text-dim);
+  font-size: 13px;
+  font-weight: 500;
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar select,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar input,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar select,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar input,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar select,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar input,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar select,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar input {
+  height: 42px;
+  border: 1px solid var(--inc-border);
+  border-radius: var(--inc-radius-control);
+  background: #fff;
+  color: #1f2a44;
+  font: 600 13.5px Inter, "Apple SD Gothic Neo", sans-serif;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar select:focus,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar input:focus,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar select:focus,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar input:focus,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar select:focus,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar input:focus,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar select:focus,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar input:focus {
+  outline: none;
+  border-color: var(--inc-primary);
+  box-shadow: 0 0 0 3px rgba(31, 79, 130, .12);
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar button,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar button,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar button,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar button {
+  height: 42px;
+  border: 1px solid var(--inc-primary);
+  border-radius: var(--inc-radius-control);
+  background: var(--inc-primary);
+  color: #fff;
+  font: 600 13.5px Inter, "Apple SD Gothic Neo", sans-serif;
+  padding: 0 18px;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+  box-sizing: border-box;
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-toolbar button:hover,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-toolbar button:hover,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-toolbar button:hover,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-toolbar button:hover {
+  background: var(--inc-primary-hover);
+  border-color: var(--inc-primary-hover);
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .25);
+  transform: translateY(-1px);
+}
+/* Invoice 표 — header 행 / 합계 행 톤 */
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-table tbody tr:nth-child(1) td,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-table tbody tr:nth-child(2) td {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%) !important;
+  color: var(--inc-text-strong) !important;
+  font-weight: 700 !important;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4);
+}
+
+/* ---------- data-table / yearly-table 톤 (원단위 / 기타 페이지) ---------- */
+body.landing-body[data-page-kind="today-entry"] .data-table thead th,
+body.landing-body[data-page-kind="daily"] .data-table thead th,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table thead th,
+body.landing-body[data-page-kind="unit-log"] .data-table thead th,
+body.landing-body[data-page-kind="unit-machine"] .data-table thead th,
+body.landing-body[data-page-kind="unit"] .data-table thead th,
+body.landing-body[data-page-kind="today-entry"] .yearly-table thead th,
+body.landing-body[data-page-kind="daily"] .yearly-table thead th,
+body.landing-body[data-page-kind="unit-flow-daily"] .yearly-table thead th,
+body.landing-body[data-page-kind="unit-log"] .yearly-table thead th,
+body.landing-body[data-page-kind="unit-machine"] .yearly-table thead th,
+body.landing-body[data-page-kind="unit"] .yearly-table thead th {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+  color: var(--inc-text-strong);
+  font-weight: 700;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4);
+}
+body.landing-body[data-page-kind="today-entry"] .data-table tbody tr:hover td,
+body.landing-body[data-page-kind="daily"] .data-table tbody tr:hover td,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table tbody tr:hover td,
+body.landing-body[data-page-kind="unit-log"] .data-table tbody tr:hover td,
+body.landing-body[data-page-kind="unit-machine"] .data-table tbody tr:hover td,
+body.landing-body[data-page-kind="unit"] .data-table tbody tr:hover td {
+  background: var(--inc-bg-row-hover);
+}
+
+/* === data-table / yearly-table 세로 크기 확장 ===
+   page-unit.css 등의 7px 패딩을 덮어 .inc-table 과 동일한 높이감을 부여. */
+body.landing-body[data-page-kind="unit"] .data-table th,
+body.landing-body[data-page-kind="unit"] .data-table td,
+body.landing-body[data-page-kind="unit"] .unit-table th,
+body.landing-body[data-page-kind="unit"] .unit-table td,
+body.landing-body[data-page-kind="unit"] .yearly-table th,
+body.landing-body[data-page-kind="unit"] .yearly-table td,
+body.landing-body[data-page-kind="today-entry"] .data-table th,
+body.landing-body[data-page-kind="today-entry"] .data-table td,
+body.landing-body[data-page-kind="daily"] .data-table th,
+body.landing-body[data-page-kind="daily"] .data-table td,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table th,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table td,
+body.landing-body[data-page-kind="unit-log"] .data-table th,
+body.landing-body[data-page-kind="unit-log"] .data-table td,
+body.landing-body[data-page-kind="unit-machine"] .data-table th,
+body.landing-body[data-page-kind="unit-machine"] .data-table td {
+  padding: 8px 8px !important;
+  font-size: 12.5px !important;
+  line-height: 1.3 !important;
+}
+body.landing-body[data-page-kind="unit"] .data-table thead th,
+body.landing-body[data-page-kind="unit"] .unit-table thead th,
+body.landing-body[data-page-kind="unit"] .yearly-table thead th,
+body.landing-body[data-page-kind="today-entry"] .data-table thead th,
+body.landing-body[data-page-kind="daily"] .data-table thead th,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table thead th,
+body.landing-body[data-page-kind="unit-log"] .data-table thead th,
+body.landing-body[data-page-kind="unit-machine"] .data-table thead th {
+  padding: 10px 8px !important;
+  font-size: 12px !important;
+}
+body.landing-body[data-page-kind="unit"] .data-table input,
+body.landing-body[data-page-kind="unit"] .unit-table input,
+body.landing-body[data-page-kind="unit"] .yearly-table input,
+body.landing-body[data-page-kind="unit"] .data-table .table-edit-input,
+body.landing-body[data-page-kind="today-entry"] .data-table input,
+body.landing-body[data-page-kind="daily"] .data-table input,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table input,
+body.landing-body[data-page-kind="unit-log"] .data-table input,
+body.landing-body[data-page-kind="unit-machine"] .data-table input {
+  min-height: 34px !important;
+  padding: 7px 9px !important;
+  font-size: 12.5px !important;
+  box-sizing: border-box;
+}
+
+/* === 표 반응형 — 컨테이너 폭 꽉 채우고 의미없는 스크롤 제거 ===
+   예외: .excel-table (fluidized-detail), srf-invoice summary/bsc/adjustment 의 invoice-table
+   은 컬럼이 매우 많아 가로 스크롤 필요. 그 외 모든 일반 표는 width:100% + table-layout:fixed. */
+body.landing-body[data-page-kind="unit"] .table-wrap,
+body.landing-body[data-page-kind="today-entry"] .table-wrap,
+body.landing-body[data-page-kind="daily"] .table-wrap,
+body.landing-body[data-page-kind="unit-flow-daily"] .table-wrap,
+body.landing-body[data-page-kind="unit-log"] .table-wrap,
+body.landing-body[data-page-kind="unit-machine"] .table-wrap,
+body.landing-body[data-page-kind="fluidized-summary"] .table-wrap,
+body.landing-body[data-page-kind="fluidized-monthly"] .table-wrap,
+body.landing-body[data-page-kind="fluidized-improvement"] .table-wrap,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .table-wrap,
+body.landing-body[data-page-kind="combo-boiler"] .table-wrap,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-table-shell,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-table-shell,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-table-shell,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-table-shell {
+  overflow: visible !important;
+  min-width: 0 !important;
+}
+body.landing-body[data-page-kind="unit"] .data-table,
+body.landing-body[data-page-kind="unit"] .unit-table,
+body.landing-body[data-page-kind="unit"] .yearly-table,
+body.landing-body[data-page-kind="today-entry"] .data-table,
+body.landing-body[data-page-kind="daily"] .data-table,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table,
+body.landing-body[data-page-kind="unit-log"] .data-table,
+body.landing-body[data-page-kind="unit-machine"] .data-table,
+body.landing-body[data-page-kind="fluidized-summary"] .data-table,
+body.landing-body[data-page-kind="fluidized-monthly"] .data-table,
+body.landing-body[data-page-kind="fluidized-improvement"] .data-table,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .data-table,
+body.landing-body[data-page-kind="combo-boiler"] .data-table {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+/* 예외: 유동상 운영실적(fluidized-summary) 페이지는 자체 CSS 가 표 사이즈를 정확히 조정 — override 무력화.
+   각 컬럼의 min-width 는 페이지 자체 CSS 가 컬럼별로 다르게 지정하므로 inc-design 의 min-width:0 reset 을 unset 으로 풀어준다. */
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace .data-table,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace .fluidized-compare-table {
+  width: auto !important;
+  min-width: 100% !important;
+  table-layout: auto !important;
+}
+/* fluidized-summary 의 페이지 자체 min-width(150px 등) 유지 — 별도 reset 없음 */
+/* 의미없는 가로 스크롤 제거 — wrap 폭이 충분하면 자연히 사라지지만, 강제로 visible 처리 */
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #costTableWrap,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #contractTableWrap,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #noteTableWrap,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #compareTableWrap {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #costTableWrap .data-table,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #contractTableWrap .data-table,
+body.landing-body[data-page-kind="unit"] .fluidized-summary-workspace #noteTableWrap .data-table {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+/* 개별 셀 min-width 는 페이지 자체 CSS 가 컬럼별로 정해두므로 글로벌로 0 처리하지 않는다.
+   (fluidized-summary 의 구분 컬럼 min-width:150px 등이 보존되어야 숫자가 정상 표시) */
+/* body 자체의 가로 스크롤 방지 (사이드바 + 큰 페이지 chrome 조합으로 발생할 수 있음) */
+body.landing-body[data-page-kind="unit"],
+body.landing-body[data-page-kind="today-entry"],
+body.landing-body[data-page-kind="daily"],
+body.landing-body[data-page-kind="unit-flow-daily"],
+body.landing-body[data-page-kind="unit-log"],
+body.landing-body[data-page-kind="unit-machine"] {
+  overflow-x: hidden;
+}
+
+/* === 페이지 chrome 버튼/필터 통일 (landing-filter-action, detail-view-button, invoice-toolbar 등) === */
+.landing-filter-action,
+.landing-filter-box select,
+.landing-filter-box input[type="text"],
+.landing-filter-box input[type="number"],
+.landing-filter-box input[type="date"],
+.detail-view-button,
+.invoice-toolbar select,
+.invoice-toolbar button,
+.invoice-toolbar input {
+  height: 38px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: var(--inc-radius-control) !important;
+  padding: 0 14px !important;
+  box-sizing: border-box !important;
+}
+
+/* === 원단위 페이지: .machine-tab-bar 를 별도 행으로 — 이전 -46px 음수마진은 좁은 화면에서 table-toolbar 와 겹치는 문제 발생 === */
+body.landing-body[data-page-kind="unit"] .table-toolbar {
+  position: relative;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+body.landing-body[data-page-kind="unit"] .period-panel > .machine-tab-bar,
+body.landing-body[data-page-kind="unit"] .period-panel .machine-tab-bar,
+body.landing-body[data-page-kind="unit"] .yearly-machine-panel .machine-tab-bar,
+body.landing-body[data-page-kind="unit"] [data-period-panel] .machine-tab-bar {
+  float: none !important;
+  clear: none !important;
+  margin: 0 0 14px 0 !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+}
+body.landing-body[data-page-kind="unit"] .period-panel::after,
+body.landing-body[data-page-kind="unit"] .yearly-machine-panel::after {
+  content: none !important;
+}
+
+/* === 원단위 페이지: 표 폭 강제 100% === */
+body.landing-body[data-page-kind="unit"] .landing-canvas-table,
+body.landing-body[data-page-kind="unit"] .table-wrap,
+body.landing-body[data-page-kind="unit"] .table-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+}
+body.landing-body[data-page-kind="unit"] .table-wrap > table,
+body.landing-body[data-page-kind="unit"] .table-wrap .data-table,
+body.landing-body[data-page-kind="unit"] .table-wrap .unit-table,
+body.landing-body[data-page-kind="unit"] .table-wrap .yearly-unit-table,
+body.landing-body[data-page-kind="unit"] .table-wrap .runtime-table {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  table-layout: auto !important;
+}
+body.landing-body[data-page-kind="unit"] .table-wrap .data-table th,
+body.landing-body[data-page-kind="unit"] .table-wrap .data-table td,
+body.landing-body[data-page-kind="unit"] .table-wrap .unit-table th,
+body.landing-body[data-page-kind="unit"] .table-wrap .unit-table td,
+body.landing-body[data-page-kind="unit"] .table-wrap .yearly-unit-table th,
+body.landing-body[data-page-kind="unit"] .table-wrap .yearly-unit-table td {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+/* === 사고이력 페이지 항목 추가 버튼 — outline 스타일 (navy 활성 탭과 시각적 구분) === */
+.accident-button {
+  background: #fff !important;
+  color: var(--inc-primary) !important;
+  border: 1.5px solid var(--inc-primary) !important;
+  border-radius: var(--inc-radius-control) !important;
+  font: 600 13px Inter, "Apple SD Gothic Neo", sans-serif !important;
+  padding: 0 16px !important;
+  height: 38px !important;
+  cursor: pointer;
+  transition: all var(--inc-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.accident-button:hover {
+  background: #eff5fb !important;
+  color: var(--inc-primary-hover) !important;
+  border-color: var(--inc-primary-hover) !important;
+  box-shadow: 0 4px 12px rgba(31, 79, 130, .15);
+  transform: translateY(-1px);
+}
+.accident-button::before {
+  content: "+";
+  font-size: 16px;
+  font-weight: 800;
+  margin-right: 2px;
+}
+
+/* === period-tab-button / machine-tab-button / chart-tab-button — 전역 navy 톤 통일 === */
+.period-tab-button,
+.machine-tab-button,
+.chart-tab-button {
+  background: #fff !important;
+  color: var(--inc-text-strong) !important;
+  border: 1px solid var(--inc-border) !important;
+  border-radius: var(--inc-radius-control) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 0 16px !important;
+  height: 38px !important;
+  transition: all var(--inc-transition);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.period-tab-button:hover,
+.machine-tab-button:hover,
+.chart-tab-button:hover {
+  background: #eff5fb !important;
+  color: var(--inc-primary) !important;
+  border-color: var(--inc-primary-light) !important;
+}
+.period-tab-button.active,
+.machine-tab-button.active,
+.chart-tab-button.active {
+  background: var(--inc-primary) !important;
+  color: #fff !important;
+  border-color: var(--inc-primary) !important;
+  box-shadow: 0 6px 16px rgba(31, 79, 130, .35), inset 0 1px 0 rgba(255,255,255,.18);
+  font-weight: 700 !important;
+  position: relative;
+}
+.period-tab-button.active::after,
+.machine-tab-button.active::after,
+.chart-tab-button.active::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--inc-primary);
+}
+
+/* === 페이지별 비표준 테이블 클래스 — inc-design 톤 강제 적용 ===
+   여러 페이지가 .data-table 가 아닌 자체 클래스를 사용한다.
+   thead bg gradient + border + 셀 폰트를 동일하게 통일. */
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .srf-workbook-table thead th,
+body.landing-body[data-page-kind="fluidized-improvement"] .improvement-table thead th,
+body.landing-body[data-page-kind="fluidized-accident"] .accident-table thead th,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table thead th,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .mon-table thead th,
+body.landing-body[data-page-kind="srf-invoice-client"] .cli-table thead th {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%) !important;
+  color: var(--inc-text-strong) !important;
+  font-weight: 700 !important;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4) !important;
+}
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .srf-workbook-table tbody tr:hover td,
+body.landing-body[data-page-kind="fluidized-improvement"] .improvement-table tbody tr:hover td,
+body.landing-body[data-page-kind="fluidized-accident"] .accident-table tbody tr:hover td,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table tbody tr:hover td,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .mon-table tbody tr:hover td,
+body.landing-body[data-page-kind="srf-invoice-client"] .cli-table tbody tr:hover td {
+  background-color: var(--inc-bg-row-hover) !important;
+}
+
+/* === 의미없는 가로 스크롤 제거 — improvement 표는 폭 100% 채우기 ===
+   srf-inbound / accident 표는 컬럼이 많아 자연스러운 스크롤 — auto 유지. */
+body.landing-body[data-page-kind="fluidized-improvement"] #improvementTableWrap {
+  overflow-x: visible !important;
+  min-width: 0 !important;
+}
+body.landing-body[data-page-kind="fluidized-improvement"] .improvement-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: auto;
+}
+body.landing-body[data-page-kind="fluidized-srf-inbound"] #srfInboundTableWrap,
+body.landing-body[data-page-kind="fluidized-accident"] #accidentTableWrap {
+  overflow-x: auto;
+  min-width: 0 !important;
+}
+
+/* === 콤보보일러 기타 페이지 (.etc) 표 반응형 — 18 컬럼이 3,475px 까지 늘어나던 것을 wrap 폭에 맞춤 === */
+body.landing-body[data-page-kind="combo-boiler"] .combo-table-wrap {
+  overflow: visible !important;
+  min-width: 0 !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  table-layout: fixed !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table th,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table td {
+  padding: 6px 4px !important;
+  font-size: clamp(10px, 0.78vw, 12px) !important;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 일자 컬럼은 좁게 (모든 콤보보일러 표 공통) */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table th:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table td:first-child {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 100px !important;
+  text-align: center;
+  font-weight: 700;
+  background: var(--inc-bg-header);
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table input {
+  font-size: clamp(10px, 0.78vw, 12px) !important;
+  padding: 4px 6px !important;
+  min-height: 28px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* === 콤보보일러 상단 헤더행 고정 (sticky) ===
+   .combo-table-wrap 등 모든 중간 컨테이너가 overflow:visible 이므로 (임베디드 시)
+   body 가 단일 스크롤 컨테이너 → thead 의 sticky(top) 가 body 기준으로 동작.
+   - 생산표(.combo-production-*): 헤더 3행(섹션명/그룹/필드) 중 마지막(필드 헤더)만 고정.
+     상단 2행은 함께 스크롤되어 사라짐 (요청 사항).
+   - 회수손실표(.combo-recovery-table): 헤더 2행 모두 고정.
+   - 그 외(운휴 등 단일 헤더행): 헤더행 고정. */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table thead th {
+  position: sticky;
+  z-index: 6;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table thead tr:last-child th {
+  top: 0;
+}
+/* 회수손실표: 1행 top:0, 2행은 1행 높이만큼 내려서 둘 다 고정 */
+body.landing-body[data-page-kind="combo-boiler"] .combo-recovery-table thead tr:first-child th {
+  top: 0;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-recovery-table thead tr:last-child th {
+  top: 31px;
+}
+/* 셸 iframe(/steam/...): compat.js 가 body overflow:auto 만 주고 높이를 안 줘서
+   body 가 콘텐츠만큼 커지고 html 이 스크롤됨 → thead sticky 의 컨테이닝 블록(body)이
+   스크롤하지 않아 고정 안 됨. body 에 고정 높이를 줘 단일 스크롤 컨테이너로 만든다. */
+body.platform-embedded[data-page-kind="combo-boiler"] {
+  height: 100vh !important;
+  overflow: auto !important;
+}
+
+/* === SRF Invoice — 헤더 좌측 그라데이션 막대 === */
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-header,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-header,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-header,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-header,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-title,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-title,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-title,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-title,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .mon-header,
+body.landing-body[data-page-kind="srf-invoice-client"] .cli-header {
+  position: relative;
+  padding-left: 14px;
+}
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-header::before,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-header::before,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-header::before,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-header::before,
+body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-title::before,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .invoice-title::before,
+body.landing-body[data-page-kind="srf-invoice-acc"] .invoice-title::before,
+body.landing-body[data-page-kind="srf-invoice-client"] .invoice-title::before,
+body.landing-body[data-page-kind="srf-invoice-monthly"] .mon-header::before,
+body.landing-body[data-page-kind="srf-invoice-client"] .cli-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--inc-primary-light) 0%, var(--inc-primary) 100%);
+}
+
+/* === SRF Invoice monthly/client select 높이 38 통일 (현재 34) === */
+body.landing-body[data-page-kind="srf-invoice-monthly"] select,
+body.landing-body[data-page-kind="srf-invoice-client"] select {
+  height: 38px !important;
+  font: 600 13px Inter, "Apple SD Gothic Neo", sans-serif !important;
+  padding: 0 13px !important;
+  border-radius: var(--inc-radius-control) !important;
+  border: 1px solid var(--inc-border) !important;
+  box-sizing: border-box !important;
+}
+
+/* === Sticky 첫 컬럼 — solid 배경 + 시각적 구분선 ===
+   가로 스크롤 시 sticky 셀 뒤로 다른 셀 내용이 비치지 않도록 강제 solid bg + box-shadow.
+   대상: 모든 skinned 페이지의 .data-table sticky 첫 칸. */
+body.landing-body[data-page-kind="unit"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="unit"] .fluidized-compare-table thead th:first-child,
+body.landing-body[data-page-kind="today-entry"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="daily"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="unit-machine"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="fluidized-monthly"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="fluidized-improvement"] .data-table thead th:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .data-table thead th:first-child {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%) !important;
+  background-color: #f3f6ff !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
+  z-index: 4 !important;
+}
+body.landing-body[data-page-kind="unit"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="unit"] .fluidized-compare-table tbody td:first-child,
+body.landing-body[data-page-kind="today-entry"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="daily"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="unit-machine"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="fluidized-monthly"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="fluidized-improvement"] .data-table tbody td:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .data-table tbody td:first-child {
+  background-color: #ffffff !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
+  z-index: 3 !important;
+}
+/* summary 행 / 첫컬럼 우선 */
+body.landing-body[data-page-kind="unit"] .data-table tbody tr.summary-row td:first-child,
+body.landing-body[data-page-kind="unit"] .data-table tbody tr.total-row td:first-child,
+body.landing-body[data-page-kind="unit"] .data-table tbody tr.is-summary td:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .data-table tbody tr.summary-row td:first-child {
+  background-color: #fff5cc !important;
+}
+/* row hover 시 sticky 칸도 함께 강조 */
+body.landing-body[data-page-kind="unit"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="today-entry"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="daily"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="unit-flow-daily"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="unit-machine"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="fluidized-monthly"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="fluidized-improvement"] .data-table tbody tr:hover td:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .data-table tbody tr:hover td:first-child {
+  background-color: #f8fafd !important;
+}
+
+/* ---------- Embedded mode 보호 — sidebar 페이지 chrome 변경 시 안전망 ----------
+   embedded(platform-embedded) 페이지는 상위 컨테이너 padding/box-shadow 를 해제하므로
+   여기서 추가한 토큰이 padding 을 끼우지 않도록 안전 reset. */
+body.platform-embedded[data-page-kind="srf-invoice-operation"] .invoice-canvas,
+body.platform-embedded[data-page-kind="srf-invoice-monthly"] .invoice-canvas,
+body.platform-embedded[data-page-kind="srf-invoice-acc"] .invoice-canvas,
+body.platform-embedded[data-page-kind="srf-invoice-client"] .invoice-canvas {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ---------- 세로 구분선 (column divider) ----------
+   표 셀 사이 구분이 어렵다는 피드백 → 모든 표 종류에 우측 1px divider 추가.
+   마지막 컬럼은 제거하여 외곽 라인과 겹치지 않게 한다. */
+.inc-table th,
+.inc-table td,
+.data-table th,
+.data-table td,
+.excel-table th,
+.excel-table td,
+.invoice-table th,
+.invoice-table td,
+.combo-excel-table th,
+.combo-excel-table td,
+.srf-workbook-table th,
+.srf-workbook-table td,
+.improvement-table th,
+.improvement-table td,
+.accident-table th,
+.accident-table td {
+  border-right: 1px solid #e6ecf2;
+}
+.inc-table th:last-child,
+.inc-table td:last-child,
+.data-table th:last-child,
+.data-table td:last-child,
+.excel-table th:last-child,
+.excel-table td:last-child,
+.invoice-table th:last-child,
+.invoice-table td:last-child,
+.combo-excel-table th:last-child,
+.combo-excel-table td:last-child,
+.srf-workbook-table th:last-child,
+.srf-workbook-table td:last-child,
+.improvement-table th:last-child,
+.improvement-table td:last-child,
+.accident-table th:last-child,
+.accident-table td:last-child {
+  border-right: 0;
+}
+.inc-table thead th,
+.data-table thead th,
+.excel-table thead th,
+.invoice-table thead th,
+.combo-excel-table thead th,
+.srf-workbook-table thead th,
+.improvement-table thead th,
+.accident-table thead th {
+  border-right-color: rgba(120, 181, 217, .35);
+}
+
+/* ============================================================
+   에너지 회계비용 페이지 — 공통 sub-tab 바 / 가로 스크롤 표
+   (energy-fuel-summary / energy-month-compare / energy-fuel-ratio
+    / energy-fuel-plan / energy-accounting-plan 통일)
+   ============================================================ */
+.energy-tab-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 12px 0;
+}
+.energy-tab {
+  appearance: none;
+  border: 1px solid var(--inc-border);
+  background: #fff;
+  color: var(--inc-text-strong);
+  font: 600 12.5px Inter, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  padding: 7px 14px;
+  border-radius: var(--inc-radius-control);
+  cursor: pointer;
+  transition: all var(--inc-transition);
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+}
+.energy-tab:hover {
+  background: #eff5fb;
+  color: var(--inc-primary);
+  border-color: var(--inc-primary-light);
+}
+.energy-tab[aria-pressed="true"] {
+  background: var(--inc-primary);
+  color: #fff;
+  border-color: var(--inc-primary);
+  box-shadow: 0 4px 10px rgba(31, 79, 130, .25);
+  font-weight: 700;
+}
+
+.energy-panel { display: none; }
+.energy-panel.active { display: block; }
+
+.energy-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  border: 1px solid rgba(120, 181, 217, 0.24);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(23, 65, 95, 0.06);
+  box-sizing: border-box;
+  margin-bottom: 14px;
+}
+.energy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 11.5px Inter, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  line-height: 1.35;
+  color: var(--inc-text);
+  table-layout: fixed;
+}
+.energy-table th,
+.energy-table td {
+  border: 1px solid #dde6ee;
+  padding: 5px 6px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.energy-table thead th {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+  font-weight: 700;
+  color: var(--inc-text-strong);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom: 1.5px solid rgba(120, 181, 217, .4);
+}
+.energy-table td.label-cell,
+.energy-table th.label-cell {
+  text-align: left;
+  background: var(--inc-bg-header);
+  font-weight: 600;
+  color: var(--inc-text-strong);
+}
+.energy-table tr.subtotal td {
+  background: var(--inc-bg-summary, #fff8e3);
+  font-weight: 700;
+  color: #7c5a00;
+}
+.energy-table tr.total td {
+  background: #e7f3ff;
+  font-weight: 800;
+  color: var(--inc-text-strong);
+}
+.energy-table .col-cat-sub {
+  background: #eef3f8;
+  font-weight: 700;
+  color: var(--inc-text-strong);
+}
+.energy-table td.note-cell {
+  text-align: left;
+  white-space: normal;
+  color: var(--inc-text-muted, #475569);
+  font-size: 11px;
+}
+.energy-table td.basis,
+.energy-table td.unit,
+.energy-table td.method {
+  text-align: left;
+  background: #fafbfd;
+  color: var(--inc-text-muted, #475569);
+  white-space: normal;
+  font-size: 11px;
+}
+
+/* ============================================================
+   스크롤 단순화 — 페이지 세로 스크롤 1개 + 표가 정말 안 들어갈 때만
+   카드 내부에서 가로 스크롤 1개. 그 외 모든 중첩/세로 스크롤 제거.
+   ============================================================ */
+body.landing-body[data-page-kind="unit"] .table-wrap,
+body.landing-body[data-page-kind="unit-flow-daily"] .table-wrap,
+body.landing-body[data-page-kind="unit-machine"] .table-wrap,
+body.landing-body[data-page-kind="unit-log"] .table-wrap,
+body.landing-body[data-page-kind="today-entry"] .table-wrap,
+body.landing-body[data-page-kind="daily"] .table-wrap {
+  /* 표가 진짜로 가로로 넘칠 때만 가로 스크롤. 세로 스크롤은 만들지 않음. */
+  max-height: none;
+  overflow-y: visible !important;
+  overflow-x: auto;
+}
+
+/* ============================================================
+   반응형 + 스크롤바 정리 (2026-05-26)
+   - html/body 의 중복 스크롤 제거 (.landing-main 한 곳만 세로 스크롤)
+   - overflow-x:auto + overflow-y:visible 조합은 브라우저가 y 도 auto 로
+     자동 승격시키므로 모두 overflow-y:hidden 으로 명시
+   - 헤더 액션 바의 overflow-x:auto 를 flex-wrap:wrap 으로 대체
+   - 카드/표 wrap 이 좁은 화면에서 잘리지 않도록 min-width:0 보강
+   ============================================================ */
+
+/* 1) 페이지 본문은 .landing-main 한 곳만 스크롤 — html/body 중복 차단 */
+html,
+body.landing-body[data-page-kind="fluidized-accident"],
+body.landing-body[data-page-kind="fluidized-srf-inbound"],
+body.landing-body[data-page-kind="fluidized-improvement"],
+body.landing-body[data-page-kind="fluidized-detail"],
+body.landing-body[data-page-kind="fluidized-monthly"],
+body.landing-body[data-page-kind="fluidized-summary"] {
+  overflow-x: hidden !important;
+}
+body.landing-body[data-page-kind="fluidized-accident"],
+body.landing-body[data-page-kind="fluidized-srf-inbound"],
+body.landing-body[data-page-kind="fluidized-improvement"] {
+  overflow-y: hidden !important;
+}
+
+/* 2) 사고이력/SRF 입고/개선/디테일 카드: overflow-y 를 명시적으로 hidden 처리
+      (auto + visible 조합은 둘 다 auto 로 승격됨) */
+.accident-card,
+.srf-table-card,
+.improvement-card,
+.detail-card {
+  overflow-y: hidden !important;
+}
+
+/* 3) 헤더 액션 바 — 좁은 화면에서 가로 스크롤 대신 줄바꿈 */
+.accident-header-actions,
+.srf-header-actions,
+.improvement-header-actions,
+.detail-header-actions,
+.monthly-header-actions {
+  flex-wrap: wrap !important;
+  overflow-x: visible !important;
+  white-space: normal !important;
+}
+
+/* 4) 카드/패널의 max-width 폭주 방지 — 본문 컨테이너에 맞게 늘어나도록 */
+body.landing-body .inc-card,
+body.landing-body .accident-card,
+body.landing-body .srf-table-card,
+body.landing-body .improvement-card,
+body.landing-body .energy-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 5) 매우 넓은 표(28+ 컬럼)의 첫 컬럼 sticky 고정 — 가로 스크롤 시 레이블 유지.
+      이미 .sticky-col / .sticky-col-2 클래스가 정의된 페이지(사고이력)에 추가로
+      .accident-table .date-col, .srf-workbook-table 의 일자 컬럼도 자동 sticky 처리. */
+.srf-workbook-table thead th:first-child,
+.srf-workbook-table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #eef8ff;
+}
+.srf-workbook-table thead th:first-child { z-index: 6; background: #dff2ff; }
+
+/* 6) 에너지 표 wrap — 세로 스크롤 차단 (전체 페이지 스크롤이 우선) */
+.energy-table-wrap {
+  overflow-y: hidden !important;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 7) common.css 의 .landing-canvas-table { overflow-x:auto } 가 페이지 전체에 강제됨.
+      그 안의 진짜 wrap 이 가로 스크롤을 처리하므로, 캔버스 자체는 visible 로 환원.
+      (단, 명시적으로 가로가 필요한 페이지는 페이지별 CSS 가 다시 auto 로 덮어쓰면 됨.) */
+body.landing-body[data-page-kind="energy-fuel-summary"] .landing-canvas-table,
+body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas-table,
+body.landing-body[data-page-kind="energy-fuel-ratio"] .landing-canvas-table,
+body.landing-body[data-page-kind="energy-fuel-plan"] .landing-canvas-table,
+body.landing-body[data-page-kind="energy-accounting-plan"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-accident"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-srf-inbound"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-improvement"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-detail"] .landing-canvas-table,
+body.landing-body[data-page-kind="fluidized-summary"] .landing-canvas-table {
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+}
+
+/* 8) 월별 운영내역 — 모든 컨테이너 overflow 강제 정리 (가짜 스크롤바 차단) */
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-main,
+body.landing-body[data-page-kind="fluidized-monthly"] .landing-canvas,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-workspace,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-canvas,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-frame-wrap,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-content-root,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-sheet-shell,
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-table-stack {
+  overflow: visible !important;
+}
+/* 카드는 모서리 둥글게 유지를 위해 hidden 만 허용 (scrollbar 아님) */
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-table-card {
+  overflow: hidden !important;
+}
+/* 표 스크롤 wrap — 가로는 표가 컨테이너보다 넓을 때만 자동, 세로는 차단(자동 승격 방지) */
+body.landing-body[data-page-kind="fluidized-monthly"] .monthly-table-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}

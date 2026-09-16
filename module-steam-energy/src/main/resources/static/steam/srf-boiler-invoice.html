@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="srf-invoice"] { display:block; height:auto; min-height:100vh; overflow:visible; background:#f5f7fb; }
+    .invoice-workspace { min-height:100vh; padding:24px 26px; overflow:visible; }
+    .invoice-canvas { min-height:calc(100vh - 48px); padding:16px; background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; box-shadow:0 18px 45px rgba(15,23,42,.08); }
+    .invoice-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }
+    .invoice-title h1 { margin:0; color:#172033; font-size:22px; font-weight:800; letter-spacing:-.02em; }
+    .invoice-title p { margin:4px 0 0; color:#64748b; font-size:12px; }
+    .invoice-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .invoice-toolbar select,
+    .invoice-toolbar button { height:34px; border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44; font:600 12px Inter, "Apple SD Gothic Neo", sans-serif; padding:0 10px; }
+    .invoice-toolbar button { background:#1f4f82; color:#fff; border-color:#1f4f82; cursor:pointer; }
+    /* 다른 페이지 .data-table 외관과 동일화 */
+    .invoice-table-shell { overflow:auto; border:1px solid rgba(120, 181, 217, 0.28); border-radius:6px; background:rgba(255, 255, 255, 0.78); max-width:100%; }
+    .invoice-table {
+      width:641px; max-width:100%;
+      border-collapse:collapse; table-layout:fixed;
+      color:#1b1f2a;
+      background:#fff;
+      font-family:"Inter", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size:12px;
+    }
+    .invoice-table td {
+      min-width:36px;
+      padding:6px 8px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      /* Summary 는 엑셀 그리드 형태가 아니므로 셀 외곽선 숨김.
+         입력칸/계산칸은 box-shadow 로 따로 표시. (인쇄 시에만 회색 외곽선 적용) */
+      border:1px solid transparent;
+      line-height:1.3;
+    }
+    /* 표 색상은 Excel 원본 (서버가 cell.style 에 inline background 로 emit) 을 그대로 사용.
+       class 의 background 는 Excel 셀에 색이 없을 때만 적용되는 fallback. (!important 사용 금지) */
+    /* 입력/계산 셀 외곽선은 JS 가 inline border 로 부여. (box-shadow 중복 제거 → 두께 절반) */
+    .invoice-table td.invoice-wide-title { overflow:hidden; text-overflow:clip; white-space:nowrap; }
+    /* 셀 배경색은 JS (EXCEL_FILL_MAP) 가 Excel 원본과 동일하게 inline 으로 부여.
+       padding 만 클래스로 조정. 배경에는 절대 색을 입히지 말 것. */
+    .invoice-table td.editable-cell { padding:0 !important; }
+    .invoice-table td.formula-cell { color:#1e293b; font-weight:600; }
+    .invoice-table td.linked-cell { color:#1e293b; font-weight:600; }
+    /* 모든 셀 배경색은 JS 가 inline 으로 부여. CSS 에서는 건드리지 않음. */
+    .invoice-cell-input { width:100%; height:100%; min-height:20px; border:0; background:transparent; color:#173a54; font:inherit; text-align:inherit; padding:6px 8px; outline:0; }
+    .invoice-cell-input:focus { box-shadow:inset 0 0 0 2px #2563eb; background:#fff; }
+    .invoice-empty { padding:34px 16px; text-align:center; color:#64748b; font-size:13px; }
+    body.platform-embedded[data-page-kind="srf-invoice"] { background:transparent; min-height:auto; }
+    body.platform-embedded[data-page-kind="srf-invoice"] .invoice-workspace { min-height:auto; padding:0; }
+    body.platform-embedded[data-page-kind="srf-invoice"] .invoice-canvas { min-height:auto; box-shadow:none; }
+    @media (max-width: 900px) {
+      .invoice-workspace { padding:14px; }
+      .invoice-header { display:block; }
+      .invoice-toolbar { justify-content:flex-start; margin-top:12px; }
+    }
+    /* ─────────────────────────────────────────────────────────────────
+       인쇄: A4 한 페이지에 모든 내용. 표 격자/배경 제거 → 깔끔한 문서 톤.
+       ───────────────────────────────────────────────────────────────── */
+    @media print {
+      /* 여백 최소화: A4 가용 영역 ~204mm × 291mm */
+      @page { size: A4 portrait; margin: 6mm; }
+      html, body { background: #fff !important; }
+      body { margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      /* 무관 요소 숨김 */
+      .sidebar-shell, .landing-page-header, .invoice-header, .invoice-toolbar,
+      .invoice-empty,
+      .col-resize-handle, .row-resize-handle { display: none !important; }
+      .invoice-workspace { padding: 0 !important; min-height: 0 !important; }
+      .invoice-canvas {
+        padding: 0 !important; margin: 0 !important;
+        border: 0 !important; background: #fff !important;
+        box-shadow: none !important;
+        /* 표를 페이지 세로 가운데 정렬 */
+        min-height: 285mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+      }
+      .invoice-table-shell {
+        overflow: visible !important;
+        border: 0 !important;
+        background: transparent !important;
+        max-width: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+      }
+      /* 표 격자만 제거 (셀 배경색은 유지 — 라벤더/흰색 구분 인쇄에 살림) */
+      .invoice-table {
+        width: auto !important; max-width: none !important;
+        margin: 0 auto !important; /* 가운데 정렬 */
+        font-size: 9px !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        border: 0 !important;
+        border-collapse: collapse !important;
+        border-spacing: 0 !important;
+      }
+      .invoice-table td {
+        padding: 1px 2px !important;
+        line-height: 1.1 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        /* 기본은 테두리 없음, 입력/계산/날짜 셀만 아래에서 다시 부여 */
+        border: 0;
+        box-shadow: none !important;
+        color: #000 !important;
+        font-weight: normal !important;
+      }
+      /* 입력/계산/날짜 셀 테두리는 인쇄에도 살림 (JS 인라인 border 가 적용됨) */
+      .invoice-table td.editable-cell,
+      .invoice-table td.formula-cell,
+      .invoice-table td.linked-cell,
+      .invoice-table td.auto-date-cell {
+        border: 0.7px solid #000 !important;
+      }
+      /* 인쇄 시에도 JS inline 배경색이 그대로 적용됨. CSS 에서는 건드리지 않음. */
+      /* 입력/계산 셀은 인쇄에도 검정 테두리 유지 (JS 인라인 border 가 적용) */
+      .invoice-table td.formula-cell,
+      .invoice-table td.editable-cell,
+      .invoice-table td.linked-cell {
+        box-shadow: none !important;
+      }
+      /* (배경색 강제 규칙 제거 — JS inline 색상이 인쇄에서도 그대로 적용) */
+      /* 입력 input 평문화하되 부모 배경색이 비치도록 transparent */
+      .invoice-cell-input {
+        padding: 1px 2px !important;
+        font-size: 9px !important;
+        line-height: 1.1 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        color: #000 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      /* 잘림 방지 */
+      .invoice-table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }
+      /* 인쇄 시 각 행을 원래 높이의 70% (JS 가 --print-row-h 변수 emit) */
+      .invoice-table tbody tr { height: var(--print-row-h) !important; }
+      /* 인쇄 시 col 너비 축소. table-layout:fixed 라서 colgroup 의 width 가 결정적임.
+         E 열 (5번째) 만 대폭 축소. */
+      .invoice-table > colgroup > col:nth-child(5) { width: 50px !important; }
+      .invoice-table > colgroup > col:nth-child(2) { width: 50px !important; }
+      .invoice-table > colgroup > col:nth-child(1),
+      .invoice-table > colgroup > col:nth-child(3),
+      .invoice-table > colgroup > col:nth-child(4),
+      .invoice-table > colgroup > col:nth-child(6),
+      .invoice-table > colgroup > col:nth-child(7) { width: auto !important; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice">
+  <main class="invoice-workspace">
+    <section class="invoice-canvas">
+      <div class="invoice-header">
+        <div class="invoice-title">
+          <h1>KleanNara SRF Boiler AOT invoice</h1>
+          <p id="invoiceSheetLabel">Summary(VK)</p>
+        </div>
+        <div class="invoice-toolbar">
+          <select id="invoiceYear" aria-label="&#xC870;&#xD68C; &#xC5F0;&#xB3C4;"></select>
+          <select id="invoiceMonth" aria-label="&#xC870;&#xD68C; &#xC6D4;"></select>
+          <button type="button" id="invoiceSearch">&#xC870;&#xD68C;</button>
+          <button type="button" id="invoicePrint" title="A4 한 페이지 인쇄">인쇄</button>
+        </div>
+      </div>
+      <div class="invoice-table-shell" id="invoiceTableShell">
+        <div class="invoice-empty">&#xB85C;&#xB529; &#xC911;</div>
+      </div>
+    </section>
+  </main>
+  <script src="/steam/js/srf-boiler-invoice-pages.js?v=20260519-h70"></script>
+</body>
+</html>

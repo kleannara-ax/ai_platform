@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - Accumulated steam volume</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    html, body { height:100%; }
+    body.landing-body[data-page-kind="srf-invoice-acc"] {
+      display:block; height:100vh; min-height:0; overflow:hidden; background:#f5f7fb;
+    }
+    .invoice-workspace {
+      height:100vh; min-height:0; overflow:hidden;
+      padding: clamp(12px, 2.4vh, 32px) clamp(14px, 2.4vw, 36px);
+      display:flex;
+    }
+    .invoice-canvas {
+      flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0;
+      padding: clamp(20px, 3vh, 40px) clamp(24px, 3vw, 48px);
+      background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; box-shadow:0 18px 45px rgba(15,23,42,.08);
+    }
+    .invoice-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: clamp(12px, 2vh, 24px); }
+    .invoice-title h1 { margin:0; color:#172033; font-size: clamp(20px, 2.8vh, 28px); font-weight:800; letter-spacing:-.02em; }
+    .invoice-title p { margin:6px 0 0; color:#64748b; font-size: clamp(12px, 1.5vh, 15px); }
+    .invoice-toolbar { display:flex; gap:8px; align-items:center; }
+    .invoice-toolbar select {
+      height: clamp(32px, 4vh, 40px);
+      border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44;
+      font:600 clamp(12px, 1.5vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 10px;
+    }
+    .invoice-toolbar button {
+      height: clamp(32px, 4vh, 40px);
+      border:1px solid #1f4f82; border-radius:10px; background:#1f4f82; color:#fff;
+      font:600 clamp(12px, 1.5vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 14px; cursor:pointer;
+    }
+    .invoice-toolbar button.btn-secondary { background:#fff; color:#1f4f82; }
+
+    .acc-tabs { display:flex; gap:6px; margin-bottom: clamp(8px, 1.4vh, 16px); flex-wrap:wrap; }
+    .acc-tab {
+      border:1px solid #c7d6f3; background:#fff; color:#1f4f82; border-radius:8px;
+      padding: clamp(8px, 1.2vh, 12px) clamp(12px, 1.5vw, 18px);
+      font:600 clamp(12px, 1.45vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif;
+      cursor:pointer; transition:background .15s;
+    }
+    .acc-tab:hover { background:#f0f5ff; }
+    .acc-tab.active { background:#1f4f82; color:#fff; border-color:#1f4f82; }
+
+    .acc-section { flex:1; min-height:0; overflow:hidden; display:none; flex-direction:column; gap: clamp(6px, 1vh, 12px); }
+    .acc-section.active { display:flex; }
+    .acc-section h2 { margin:0; font-size: clamp(15px, 1.9vh, 20px); font-weight:800; color:#0f172a; }
+
+    table.acc-table {
+      width:100%; flex:1; min-height:0;
+      border-collapse:collapse; table-layout:fixed;
+      font-family:"Inter", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: clamp(11px, 1.4vh, 14px); background:#fff;
+    }
+    table.acc-table thead th {
+      background:#1f4f82; color:#fff; font-weight:700;
+      padding: clamp(4px, 0.8vh, 10px) clamp(4px, 0.6vw, 10px);
+      text-align:center; border:1px solid #1f4f82; vertical-align:middle;
+    }
+    table.acc-table thead tr:nth-child(2) th { background:#2e6bb0; border-color:#2e6bb0; font-size: clamp(10px, 1.25vh, 13px); font-weight:600; }
+    table.acc-table tbody td {
+      padding: clamp(2px, 0.5vh, 8px) clamp(4px, 0.6vw, 10px);
+      border:1px solid #d8dee9; text-align:right; vertical-align:middle; color:#0f172a;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    table.acc-table tbody td.col-year,
+    table.acc-table tbody td.col-month {
+      text-align:center; font-weight:700; background:#f8fafc;
+    }
+    table.acc-table tbody td.input-cell { padding:0; background:#fff; }
+    table.acc-table tbody td.computed { background:#eef2ff; font-weight:600; }
+    table.acc-table tbody tr.total-row td,
+    table.acc-table tbody tr.avg-row td { background:#fffbe5; font-weight:700; }
+
+    .acc-input {
+      width:100%; height:100%; box-sizing:border-box; min-height:0;
+      border:0; background:transparent; outline:0;
+      padding: clamp(2px, 0.5vh, 8px) clamp(4px, 0.6vw, 10px);
+      font:inherit; color:#173a54; text-align:right;
+    }
+    .acc-input:focus { box-shadow: inset 0 0 0 2px #2563eb; background:#fff; }
+
+    body.platform-embedded[data-page-kind="srf-invoice-acc"] { background:transparent; min-height:auto; }
+    body.platform-embedded[data-page-kind="srf-invoice-acc"] .invoice-workspace { min-height:auto; padding:0; }
+    body.platform-embedded[data-page-kind="srf-invoice-acc"] .invoice-canvas { min-height:auto; box-shadow:none; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      body { background:#fff !important; height:auto !important; overflow:visible !important; }
+      .invoice-workspace, .invoice-canvas { height:auto !important; overflow:visible !important; padding:0 !important; border:0 !important; box-shadow:none !important; }
+      .invoice-toolbar, .acc-tabs { display:none !important; }
+      .acc-section { display:flex !important; page-break-after:always; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-acc">
+  <main class="invoice-workspace">
+    <section class="invoice-canvas">
+      <div class="invoice-header">
+        <div class="invoice-title">
+          <h1>Accumulated steam quantity</h1>
+          <p>KleanNara SRF Boiler PJT</p>
+        </div>
+        <div class="invoice-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <section class="acc-section active" data-section="current">
+        <h2 id="accSectionTitle">선택 연도 — Contract Supply / Steam Supply Volume / Accumulated</h2>
+        <table class="acc-table" data-form="current">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:9%">YEAR</th>
+              <th rowspan="2" style="width:9%">MONTH</th>
+              <th rowspan="2" style="width:14%">Contract<br>Supply Volume</th>
+              <th colspan="4">STEAM SUPPLY VOLUME</th>
+              <th rowspan="2" style="width:14%">ACCUMULATED<br>VOLUME</th>
+            </tr>
+            <tr>
+              <th>BSC</th>
+              <th>ASC</th>
+              <th>Total</th>
+              <th>Inc / Dec</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 12 month rows: Jun-May contract year -->
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    /* Accumulated steam volume 페이지
+       - 4개 탭: 현재 / 2021~22 / 2019~20 / 2018~19
+       - 계약 연도는 Jun ~ May (12개월)
+       - 입력 가능 (사용자 입력) :
+           current 탭: Year, Contract Supply, BSC, ASC  (각 월별)
+           history 탭: Year, Steam Supply, BSC Volume, ASC Volume
+       - 자동 계산 :
+           current : Total = BSC + ASC
+                     Inc/Dec = Total - Contract Supply
+                     Accumulated = 이번달까지 Total 누적
+                     TOTAL/AVERAGE 행 = 12개월 합/평균
+           history : Accumulated = 이번달까지 Steam Supply 누적
+                     TOTAL/AVERAGE 행 = 12개월 합/평균
+       - 기본 데이터 없음 — 입력 칸은 빈 칸으로 시작
+       - 저장 : table_cell_value 에 row_key = "{section}|{month_index}|{field}" 로
+                month = "static" 고정 키. */
+
+    /* 계약 연도는 JUN 시작. 선택연도 X 이면 X년 JUN ~ (X+1)년 MAY */
+    const MONTHS_CONTRACT = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
+
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}'); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    const sectionTitle = document.getElementById("accSectionTitle");
+
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    function yearFor(monthIndex) {
+      // 회계연도 규칙 — JUN(0) ~ DEC(6) 은 선택 연도, JAN(7) ~ MAY(11) 은 선택 연도 + 1
+      // 원본 엑셀 'Accumulated steam volume' 시트와 동일: 2025 JUN~DEC / 2026 JAN~MAY.
+      return monthIndex <= 6 ? currentYear : currentYear + 1;
+    }
+
+    function makeRows() {
+      const tbody = document.querySelector('table.acc-table[data-form="current"] tbody');
+      const rows = MONTHS_CONTRACT.map((m, i) => `
+        <tr data-row="${i}">
+          <td class="col-year" data-field="year">${yearFor(i)}</td>
+          <td class="col-month">${m}</td>
+          <td class="input-cell"><input class="acc-input" data-field="contract" /></td>
+          <td class="input-cell"><input class="acc-input" data-field="bsc" /></td>
+          <td class="input-cell"><input class="acc-input" data-field="asc" /></td>
+          <td class="computed" data-field="total">—</td>
+          <td class="computed" data-field="incdec">—</td>
+          <td class="computed" data-field="acc">—</td>
+        </tr>
+      `).join("");
+      const totals = `
+        <tr class="total-row" data-row="total">
+          <td colspan="2">TOTAL</td>
+          <td class="computed" data-field="contract-sum">—</td>
+          <td class="computed" data-field="bsc-sum">—</td>
+          <td class="computed" data-field="asc-sum">—</td>
+          <td class="computed" data-field="total-sum">—</td>
+          <td class="computed" data-field="incdec-sum">—</td>
+          <td>—</td>
+        </tr>
+        <tr class="avg-row" data-row="avg">
+          <td colspan="2">AVERAGE</td>
+          <td class="computed" data-field="contract-avg">—</td>
+          <td class="computed" data-field="bsc-avg">—</td>
+          <td class="computed" data-field="asc-avg">—</td>
+          <td class="computed" data-field="total-avg">—</td>
+          <td class="computed" data-field="incdec-avg">—</td>
+          <td>—</td>
+        </tr>
+      `;
+      tbody.innerHTML = rows + totals;
+    }
+
+    function refreshYearLabels() {
+      // 회계연도 표시: "2025년 6월 ~ 2026년 5월" 같은 형태
+      sectionTitle.textContent = `${currentYear}년 6월 ~ ${currentYear + 1}년 5월 — Contract Supply / Steam Supply Volume / Accumulated`;
+      document.querySelectorAll('td.col-year[data-field="year"]').forEach((td, i) => {
+        td.textContent = String(yearFor(i));
+      });
+    }
+
+    makeRows();
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) {
+      if (!Number.isFinite(n)) return "—";
+      return Math.round(n).toLocaleString("en-US");
+    }
+    function fmtAvg(n) {
+      if (!Number.isFinite(n)) return "—";
+      return n.toLocaleString("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 0 });
+    }
+
+    function recomputeCurrent() {
+      const table = document.querySelector('table.acc-table[data-form="current"]');
+      const rows = table.querySelectorAll('tbody tr[data-row]');
+      let accumulated = 0;
+      let sumContract = 0, sumBsc = 0, sumAsc = 0, sumTotal = 0, sumInc = 0;
+      let cntContract = 0, cntBsc = 0, cntAsc = 0, cntTotal = 0, cntInc = 0;
+
+      rows.forEach((row) => {
+        if (row.dataset.row === "total" || row.dataset.row === "avg") return;
+        const contract = parseNum(row.querySelector('input[data-field="contract"]'));
+        const bsc = parseNum(row.querySelector('input[data-field="bsc"]'));
+        const asc = parseNum(row.querySelector('input[data-field="asc"]'));
+
+        // Total / Inc-Dec / Accumulated
+        let total = NaN;
+        if (Number.isFinite(bsc) || Number.isFinite(asc)) {
+          total = (Number.isFinite(bsc) ? bsc : 0) + (Number.isFinite(asc) ? asc : 0);
+        }
+        const incdec = Number.isFinite(total) && Number.isFinite(contract) ? total - contract : NaN;
+        if (Number.isFinite(total)) accumulated += total;
+
+        row.querySelector('[data-field="total"]').textContent = fmt(total);
+        row.querySelector('[data-field="incdec"]').textContent = fmt(incdec);
+        row.querySelector('[data-field="acc"]').textContent = accumulated > 0 || Number.isFinite(total) ? fmt(accumulated) : "—";
+
+        if (Number.isFinite(contract)) { sumContract += contract; cntContract++; }
+        if (Number.isFinite(bsc))      { sumBsc += bsc; cntBsc++; }
+        if (Number.isFinite(asc))      { sumAsc += asc; cntAsc++; }
+        if (Number.isFinite(total))    { sumTotal += total; cntTotal++; }
+        if (Number.isFinite(incdec))   { sumInc += incdec; cntInc++; }
+      });
+
+      // TOTAL row
+      table.querySelector('tr.total-row [data-field="contract-sum"]').textContent = cntContract ? fmt(sumContract) : "—";
+      table.querySelector('tr.total-row [data-field="bsc-sum"]').textContent = cntBsc ? fmt(sumBsc) : "—";
+      table.querySelector('tr.total-row [data-field="asc-sum"]').textContent = cntAsc ? fmt(sumAsc) : "—";
+      table.querySelector('tr.total-row [data-field="total-sum"]').textContent = cntTotal ? fmt(sumTotal) : "—";
+      table.querySelector('tr.total-row [data-field="incdec-sum"]').textContent = cntInc ? fmt(sumInc) : "—";
+
+      // AVERAGE row
+      table.querySelector('tr.avg-row [data-field="contract-avg"]').textContent = cntContract ? fmtAvg(sumContract / cntContract) : "—";
+      table.querySelector('tr.avg-row [data-field="bsc-avg"]').textContent = cntBsc ? fmtAvg(sumBsc / cntBsc) : "—";
+      table.querySelector('tr.avg-row [data-field="asc-avg"]').textContent = cntAsc ? fmtAvg(sumAsc / cntAsc) : "—";
+      table.querySelector('tr.avg-row [data-field="total-avg"]').textContent = cntTotal ? fmtAvg(sumTotal / cntTotal) : "—";
+      table.querySelector('tr.avg-row [data-field="incdec-avg"]').textContent = cntInc ? fmtAvg(sumInc / cntInc) : "—";
+    }
+
+    function recomputeAll() { recomputeCurrent(); }
+
+    document.querySelector("table.acc-table").addEventListener("input", () => recomputeAll());
+
+    /* ───────── DB 저장 / 로딩 (연도별 키) ───────── */
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const ACC_TABLE_NAME = "srf_boiler_invoice_accumulated";
+    function accMonthKey() { return String(currentYear); }
+    const storedRows = new Map();
+
+    function rowKeyFor(monthIndex, field) {
+      return `${monthIndex}|${field}`;
+    }
+
+    function eachInput(callback) {
+      document.querySelectorAll('table.acc-table tbody tr[data-row]').forEach((tr) => {
+        const rowId = tr.dataset.row;
+        if (rowId === "total" || rowId === "avg") return;
+        tr.querySelectorAll('input[data-field]').forEach((input) => {
+          callback(input, Number(rowId), input.dataset.field);
+        });
+      });
+    }
+
+    async function loadAcc() {
+      // 다른 연도 전환 시 빈 값으로 초기화
+      storedRows.clear();
+      eachInput((input) => { input.value = ""; });
+      refreshYearLabels();
+      recomputeAll();
+      try {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(accMonthKey())}`, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        rows.forEach((row) => {
+          if (row.table_name !== ACC_TABLE_NAME) return;
+          storedRows.set(row.row_key, row);
+        });
+        eachInput((input, rowId, field) => {
+          const stored = storedRows.get(rowKeyFor(rowId, field));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            input.value = stored.cell_value;
+          }
+        });
+        recomputeAll();
+      } catch (e) {}
+    }
+
+    async function saveCell(input, rowId, field) {
+      const key = rowKeyFor(rowId, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = {
+        month: accMonthKey(), year_no: currentYear, month_no: 0,
+        table_name: ACC_TABLE_NAME, row_key: key, col_index: 1,
+        cell_value: raw,
+      };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const response = await fetch(url, {
+          method: existing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) return;
+        const saved = await response.json();
+        storedRows.set(key, saved);
+      } catch (e) {}
+    }
+
+    eachInput((input, rowId, field) => {
+      input.addEventListener("blur", () => saveCell(input, rowId, field));
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}');
+        localStorage.setItem('steamlog:shared-period', JSON.stringify({ year: currentYear, month: prev.month || '01' }));
+      } catch (e) {}
+      loadAcc();
+    });
+
+    refreshYearLabels();
+    recomputeAll();
+    loadAcc();
+
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+</body>
+</html>

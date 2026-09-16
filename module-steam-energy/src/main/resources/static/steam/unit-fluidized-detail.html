@@ -1,0 +1,1024 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>세부 운영내역</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/steam/css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="/steam/css/page-fluidized.css?v=20260522-inc-design-unified" />
+
+  <link rel="stylesheet" href="/steam/css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    html {
+      overflow-x: auto;
+      overflow-y: auto;
+      scrollbar-gutter: stable both-edges;
+    }
+    html:has(body.detailframe-page) {
+      scrollbar-gutter: auto;
+    }
+    body.landing-body.detail-page-scroll {
+      display: block !important;
+      width: auto !important;
+      min-width: 100vw !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: visible !important;
+    }
+    .detail-page-shell {
+      display: flex;
+      width: max-content;
+      min-width: 100vw;
+      min-height: 100vh;
+    }
+    .detail-page-scroll .sidebar-shell {
+      flex: 0 0 308px;
+      position: sticky;
+      top: 0;
+      left: 0;
+      align-self: flex-start;
+    }
+    .detail-page-scroll .landing-main {
+      width: max-content !important;
+      min-width: max-content !important;
+      max-width: none !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: visible !important;
+      flex: 0 0 auto !important;
+      padding: 0 !important;
+      background: transparent !important;
+    }
+    .detail-page-scroll .landing-canvas-table,
+    .detail-page-scroll .landing-canvas {
+      width: max-content;
+      min-width: max-content;
+      overflow: visible !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+    }
+    .detail-page-scroll .landing-canvas {
+      min-height: 100vh;
+      padding: 18px 18px 24px;
+    }
+    .detail-page-scroll .landing-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 10px;
+      padding: 0 0 4px;
+    }
+    .detail-table-wrap + .detail-table-wrap {
+      margin-top: 14px;
+    }
+    .detail-view-toolbar {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      margin: 0;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      white-space: nowrap;
+    }
+    .detail-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      white-space: nowrap;
+    }
+    .detail-view-button {
+      border: 1px solid rgba(120, 181, 217, 0.34);
+      background: rgba(255, 255, 255, 0.9);
+      color: #173a54;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .detail-view-button:hover {
+      background: #f5fbff;
+      border-color: rgba(111, 191, 245, 0.45);
+    }
+    .detail-view-button.is-active {
+      background: #6fbff5;
+      border-color: #6fbff5;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(44, 130, 201, 0.2);
+    }
+    .detail-view-caption {
+      display: none;
+      margin: 0 0 8px;
+      color: #476176;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .detailframe-table-stage > .detail-view-toolbar {
+      display: none !important;
+    }
+    .detail-table-wrap.table-wrap {
+      overflow: visible;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 0;
+    }
+    .excel-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: transparent;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #173a54;
+    }
+    .excel-table td {
+      min-width: 24px;
+      padding: 4px 3px;
+      border: 1px solid rgba(159, 190, 212, 0.72);
+      vertical-align: middle;
+      white-space: pre-line;
+      text-align: center;
+    }
+    .excel-table .excel-cell-col-a {
+      width: 52px;
+      min-width: 52px;
+      max-width: 52px;
+      font-weight: 700;
+    }
+    .excel-table .excel-cell-col-b {
+      width: 74px;
+      min-width: 74px;
+      max-width: 74px;
+    }
+    .excel-table .excel-day-col {
+      width: 84px;
+      min-width: 84px;
+      max-width: 84px;
+      padding-left: 3px;
+      padding-right: 3px;
+    }
+    .excel-table .excel-sticky-col-a,
+    .excel-table .excel-sticky-col-b {
+      position: sticky;
+      z-index: 8;
+      background-clip: padding-box;
+      background: #eef8ff;
+    }
+    .excel-table .excel-sticky-col-a {
+      left: 0;
+    }
+    .excel-table .excel-sticky-col-b {
+      left: 52px;
+      z-index: 9;
+    }
+    .excel-table .excel-title.excel-sticky-col-a,
+    .excel-table .excel-title.excel-sticky-col-b {
+      z-index: 12;
+      background: linear-gradient(180deg, #eff9ff, #dff2ff);
+    }
+    .excel-table .excel-head.excel-sticky-col-a,
+    .excel-table .excel-head.excel-sticky-col-b,
+    .excel-table .excel-section.excel-sticky-col-a,
+    .excel-table .excel-section.excel-sticky-col-b,
+    .excel-table .excel-subtotal.excel-sticky-col-a,
+    .excel-table .excel-subtotal.excel-sticky-col-b,
+    .excel-table .excel-grand-total.excel-sticky-col-a,
+    .excel-table .excel-grand-total.excel-sticky-col-b {
+      z-index: 10;
+    }
+    .excel-table .excel-head.excel-sticky-col-a,
+    .excel-table .excel-head.excel-sticky-col-b {
+      background: #dff2ff;
+    }
+    .excel-table .excel-section.excel-sticky-col-a,
+    .excel-table .excel-section.excel-sticky-col-b {
+      background: #edf7ff;
+    }
+    .excel-table .excel-subtotal.excel-sticky-col-a,
+    .excel-table .excel-subtotal.excel-sticky-col-b {
+      background: #fff7d9;
+    }
+    .excel-table .excel-grand-total.excel-sticky-col-a,
+    .excel-table .excel-grand-total.excel-sticky-col-b {
+      background: #ffe9c7;
+    }
+    .excel-table .excel-editable-cell.excel-sticky-col-a,
+    .excel-table .excel-editable-cell.excel-sticky-col-b {
+      background: #eef8ff;
+    }
+    .excel-table .excel-title {
+      position: static;
+      box-shadow: none;
+    }
+    .excel-table .excel-head {
+      position: static;
+      top: auto;
+      z-index: auto;
+      box-shadow: none;
+      font-weight: 800;
+      background: #dff2ff;
+    }
+    .excel-table-fluidized_detail_main .excel-head {
+      position: sticky;
+      top: var(--detailframe-sticky-top, 76px);
+      z-index: 40;
+      box-shadow: 0 1px 0 rgba(159, 190, 212, 0.72);
+      background: #dff2ff;
+    }
+    .excel-table-fluidized_detail_main .excel-head.excel-sticky-col-a,
+    .excel-table-fluidized_detail_main .excel-head.excel-sticky-col-b {
+      z-index: 46;
+    }
+    .excel-table .excel-editable-cell {
+      padding: 1px;
+      background: transparent;
+    }
+    .excel-table .excel-cell-col-ah,
+    .excel-table .excel-cell-col-ai,
+    .excel-table .excel-cell-col-aj,
+    .excel-table .excel-cell-col-ak {
+      width: 116px;
+      min-width: 116px;
+      max-width: 116px;
+      background: #f5fbff;
+      font-weight: 600;
+    }
+    .excel-table .excel-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #163f5d;
+      background: linear-gradient(180deg, #eff9ff, #dff2ff);
+    }
+    .excel-table .excel-section {
+      font-weight: 800;
+      background: #edf7ff;
+    }
+    .excel-table .excel-subtotal {
+      font-weight: 800;
+      background: #fff7d9;
+    }
+    .excel-table .excel-grand-total {
+      font-weight: 800;
+      background: #ffe9c7;
+    }
+    .excel-table .excel-note {
+      text-align: left;
+      padding-left: 12px;
+    }
+    .detail-cell-input {
+      width: 100%;
+      min-width: 0;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid rgba(120, 181, 217, 0.35);
+      outline: 0;
+      background: #ffffff;
+      color: inherit;
+      font: inherit;
+      text-align: right;
+      box-shadow: none;
+      border-radius: 6px;
+    }
+    .excel-day-col .detail-cell-input {
+      height: 30px;
+      padding: 0 4px;
+    }
+    .excel-note .detail-cell-input {
+      text-align: center;
+    }
+    .excel-table .excel-align-text,
+    .excel-table .excel-align-text .detail-cell-input {
+      text-align: center !important;
+    }
+    .excel-table .excel-align-number,
+    .excel-table .excel-align-number .detail-cell-input {
+      text-align: right !important;
+    }
+    .detail-extra-cost-cell {
+      text-align: left !important;
+      padding: 4px 8px !important;
+    }
+    .detail-extra-cost-label {
+      display: inline-block;
+      min-width: 96px;
+      margin-right: 10px;
+      font-weight: 800;
+      color: #173a54;
+      vertical-align: middle;
+    }
+    .detail-extra-cost-cell .detail-cell-input {
+      display: inline-block;
+      width: 160px;
+      text-align: right;
+      vertical-align: middle;
+    }
+    .detail-cell-input:focus {
+      background: rgba(111, 191, 245, 0.08);
+      border-color: rgba(111, 191, 245, 0.65);
+    }
+    .excel-table .excel-readonly-cell {
+      background: #eef2ff;
+      color: #1e293b;
+      font-weight: 600;
+    }
+    /* 유동상 운전일지에서 입력하는 연동 셀 */
+    .excel-table .excel-log-linked-cell {
+      background: #fdf2e3 !important;
+      color: #7c4a12;
+      font-weight: 600;
+    }
+    .excel-table .excel-readonly-cell.excel-sticky-col-a,
+    .excel-table .excel-readonly-cell.excel-sticky-col-b {
+      background: #eef2ff;
+    }
+    body.landing-body.detail-page-scroll.embedded-mode {
+      min-width: 0 !important;
+      background: transparent !important;
+    }
+    .detail-page-scroll.embedded-mode .detail-page-shell {
+      display: block !important;
+      width: max-content !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+    }
+    .detail-page-scroll.embedded-mode .landing-main {
+      display: block !important;
+      width: max-content !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .detail-page-scroll.embedded-mode .landing-canvas,
+    .detail-page-scroll.embedded-mode .landing-canvas-table {
+      display: block !important;
+      width: max-content !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      background: transparent !important;
+    }
+    .detail-page-scroll.embedded-mode .detail-table-wrap {
+      margin-top: 0;
+    }
+    .detail-page-scroll.embedded-mode .detail-table-wrap + .detail-table-wrap {
+      margin-top: 8px;
+    }
+    .detail-page-scroll.embedded-mode .sidebar-shell,
+    .detail-page-scroll.embedded-mode .landing-page-header,
+    .detail-page-scroll.embedded-mode .landing-filter-stack,
+    .detail-page-scroll.embedded-mode .landing-filter-box {
+      display: none !important;
+    }
+    .detail-page-scroll.embedded-mode,
+    .detail-page-scroll.embedded-mode .detail-page-shell,
+    .detail-page-scroll.embedded-mode .landing-main,
+    .detail-page-scroll.embedded-mode .landing-canvas,
+    .detail-page-scroll.embedded-mode .landing-canvas-table,
+    .detail-page-scroll.embedded-mode .detail-table-wrap,
+    .detail-page-scroll.embedded-mode .excel-table {
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      background-image: none !important;
+    }
+    .detail-page-scroll.embedded-mode .detail-table-wrap,
+    .detail-page-scroll.embedded-mode .excel-table {
+      border: 0 !important;
+    }
+    .detailframe-page {
+      display: block !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: auto !important;
+      background:
+        radial-gradient(circle at top right, rgba(142, 208, 251, 0.32), transparent 28%),
+        linear-gradient(135deg, #eef9ff 0%, #f7fbff 48%, #f1f9ff 100%) !important;
+    }
+    .detailframe-page .sidebar-collapse-toggle {
+      display: none !important;
+    }
+    .detailframe-page .sidebar-shell > .sidebar-nav:not(.detailframe-sidebar-nav) {
+      display: none !important;
+    }
+    .detailframe-page-shell {
+      display: block !important;
+      width: auto !important;
+      min-width: calc(308px + 24px) !important;
+      min-height: 100vh !important;
+    }
+    .detailframe-page .sidebar-shell {
+      position: fixed !important;
+      top: 0;
+      left: 0 !important;
+      bottom: 0;
+      width: 308px !important;
+      min-width: 308px !important;
+      height: 100vh !important;
+      min-height: 100vh !important;
+      margin: 0 !important;
+      margin-left: 0 !important;
+      padding: 28px 20px !important;
+      box-sizing: border-box;
+      z-index: 1000;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      border-right: 1px solid rgba(255, 255, 255, 0.45) !important;
+      background: linear-gradient(180deg, #8fd3ff 0%, #6fbff5 100%) !important;
+      box-shadow: 10px 0 24px rgba(23, 65, 95, 0.12);
+      transform: none !important;
+    }
+    .detailframe-main {
+      display: block !important;
+      width: max-content !important;
+      min-width: calc(100vw - 308px) !important;
+      max-width: none !important;
+      min-height: 100vh !important;
+      margin: 0 0 0 308px !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      background: transparent !important;
+    }
+    .detailframe-canvas {
+      display: block !important;
+      width: max-content !important;
+      min-width: calc(100vw - 308px) !important;
+      min-height: 100vh !important;
+      padding: 12px 16px 20px !important;
+      overflow: visible !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-sizing: border-box;
+    }
+    .detailframe-page .landing-page-header {
+      position: sticky;
+      top: 0;
+      z-index: 300;
+      display: flex !important;
+      width: calc(100vw - 308px) !important;
+      max-width: calc(100vw - 308px) !important;
+      margin: -12px -16px 10px !important;
+      padding: 10px 16px 12px !important;
+      background: #eef9ff !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      border-bottom: 1px solid rgba(120, 181, 217, 0.28) !important;
+      border-radius: 0 !important;
+    }
+    .detailframe-page .landing-page-header::before {
+      content: none;
+    }
+    .detailframe-page .landing-page-copy,
+    .detailframe-page .landing-page-copy h1 {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .detailframe-page .landing-page-copy {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .detailframe-page .landing-page-copy h1 {
+      font-size: 24px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .detailframe-page .landing-page-header {
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+    .detailframe-page .landing-filter-stack {
+      display: flex !important;
+      align-items: center;
+      margin-left: auto;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+    }
+    .detailframe-page .landing-filter-box {
+      display: inline-flex !important;
+      white-space: nowrap;
+      padding: 8px 10px;
+    }
+    .detailframe-table-stage {
+      display: inline-block;
+      position: relative;
+      isolation: isolate;
+      min-width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(120, 181, 217, 0.22);
+      box-shadow: 0 16px 36px rgba(23, 65, 95, 0.08);
+      box-sizing: border-box;
+    }
+    .detailframe-table-wrap {
+      overflow: visible !important;
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+    }
+    .detailframe-table-wrap + .detailframe-table-wrap {
+      margin-top: 10px !important;
+    }
+    .detailframe-page .excel-table .excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-sticky-col-b {
+      box-shadow: 1px 0 0 rgba(159, 190, 212, 0.72);
+    }
+    .detailframe-page .excel-table .excel-sticky-col-a {
+      z-index: 30;
+    }
+    .detailframe-page .excel-table .excel-sticky-col-b {
+      z-index: 31;
+    }
+    .detailframe-page .excel-table .excel-cell-col-a.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-cell-col-b.excel-sticky-col-b,
+    .detailframe-page .excel-table .excel-section.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-section.excel-sticky-col-b,
+    .detailframe-page .excel-table .excel-subtotal.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-subtotal.excel-sticky-col-b,
+    .detailframe-page .excel-table .excel-grand-total.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-grand-total.excel-sticky-col-b {
+      color: #173a54;
+    }
+    .detailframe-page .excel-table .excel-cell-col-a.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-cell-col-b.excel-sticky-col-b {
+      background: #f8fcff;
+    }
+    .detailframe-page .detailframe-table-stage::before {
+      content: "";
+      position: sticky;
+      top: var(--detailframe-header-offset, 76px);
+      display: block;
+      height: 38px;
+      margin-bottom: -38px;
+      background: #dff2ff;
+      border-bottom: 1px solid rgba(159, 190, 212, 0.72);
+      z-index: 35;
+      pointer-events: none;
+    }
+    .detailframe-page .excel-table .excel-head::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: #dff2ff;
+      z-index: -1;
+    }
+    .detailframe-page .excel-table .excel-sticky-col-a::after,
+    .detailframe-page .excel-table .excel-sticky-col-b::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: inherit;
+      z-index: -1;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main {
+      position: relative;
+      isolation: isolate;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-head {
+      overflow: visible;
+      background-clip: padding-box;
+      background: transparent;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-head::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -1px;
+      bottom: -1px;
+      background: #dff2ff;
+      z-index: -2;
+    }
+    .detailframe-page {
+      --detailframe-sidebar-width: 308px;
+      --detailframe-page-bg: #edf3f7;
+      --detailframe-bar-bg: rgba(237, 243, 247, 0.96);
+      --detailframe-sticky-bg: #f3f8fb;
+      --detailframe-table-bg: #ffffff;
+      --detailframe-grid: rgba(120, 181, 217, 0.28);
+      --detailframe-header-offset: 112px;
+      --detailframe-header-height: 76px;
+      --detailframe-sticky-top: 82px;
+      background: var(--detailframe-page-bg) !important;
+      background-image: none !important;
+    }
+    .detailframe-page::after {
+      content: "";
+      position: fixed;
+      left: var(--detailframe-sidebar-width);
+      right: 0;
+      top: var(--detailframe-header-height);
+      height: calc(var(--detailframe-sticky-top) - var(--detailframe-header-height));
+      background: var(--detailframe-page-bg);
+      z-index: 258;
+      pointer-events: none;
+    }
+    .detailframe-page .sidebar-shell {
+      z-index: 500;
+      box-shadow: 10px 0 24px rgba(23, 65, 95, 0.12);
+    }
+    .detailframe-page .detailframe-main {
+      margin-left: var(--detailframe-sidebar-width) !important;
+      min-width: calc(100vw - var(--detailframe-sidebar-width)) !important;
+      background: var(--detailframe-page-bg) !important;
+    }
+    .detailframe-page .detailframe-canvas {
+      width: max-content !important;
+      min-width: calc(100vw - var(--detailframe-sidebar-width)) !important;
+      padding: 112px 20px 24px !important;
+      background: var(--detailframe-page-bg) !important;
+    }
+    .detailframe-page .landing-page-header {
+      position: fixed !important;
+      top: 0;
+      left: var(--detailframe-sidebar-width);
+      z-index: 420;
+      display: flex !important;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: nowrap;
+      width: calc(100vw - var(--detailframe-sidebar-width)) !important;
+      min-width: calc(100vw - var(--detailframe-sidebar-width)) !important;
+      max-width: calc(100vw - var(--detailframe-sidebar-width)) !important;
+      margin: 0 !important;
+      padding: 12px 20px !important;
+      background: var(--detailframe-bar-bg) !important;
+      border: 0 !important;
+      border-bottom: 1px solid var(--detailframe-grid) !important;
+      border-radius: 0 !important;
+      box-shadow: 0 6px 18px rgba(23, 65, 95, 0.06) !important;
+      box-sizing: border-box !important;
+      backdrop-filter: blur(8px);
+    }
+    .detailframe-page .landing-page-header::before,
+    .detailframe-page .detailframe-table-stage::before,
+    .detailframe-page .excel-table .excel-head::before,
+    .detailframe-page .excel-table .excel-head::after,
+    .detailframe-page .excel-table .excel-sticky-col-a::after,
+    .detailframe-page .excel-table .excel-sticky-col-b::after {
+      content: none !important;
+    }
+    .detailframe-page .landing-page-copy,
+    .detailframe-page .landing-page-copy h1 {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .detailframe-page .landing-page-copy h1 {
+      font-size: 24px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .detailframe-page .landing-filter-stack {
+      display: flex !important;
+      align-items: center;
+      justify-content: flex-end;
+      margin-left: auto;
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .detailframe-page .detail-view-toolbar {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: calc(100vw - var(--detailframe-sidebar-width) - 520px);
+    }
+    .detailframe-page .detail-view-button {
+      flex: 0 0 auto;
+    }
+    .detailframe-page .landing-filter-box {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px !important;
+      background: rgba(255, 255, 255, 0.88) !important;
+      border: 1px solid rgba(120, 181, 217, 0.34) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 20px rgba(23, 65, 95, 0.08) !important;
+      white-space: nowrap;
+    }
+    .detailframe-page .detailframe-table-stage {
+      display: inline-block;
+      min-width: 100%;
+      margin-top: 0;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(120, 181, 217, 0.24);
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(23, 65, 95, 0.08);
+      isolation: isolate;
+    }
+    .detailframe-page .detailframe-table-wrap {
+      overflow: visible !important;
+    }
+    .detail-loading {
+      min-width: 320px;
+      padding: 18px 20px;
+      color: #173a54;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(120, 181, 217, 0.24);
+      border-radius: 12px;
+    }
+    .detailframe-page .excel-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--detailframe-table-bg);
+    }
+    .detailframe-page .excel-table td {
+      background: var(--detailframe-table-bg);
+      background-clip: padding-box;
+      border-color: var(--detailframe-grid);
+    }
+    .detailframe-page .excel-table .excel-title,
+    .detailframe-page .excel-table .excel-head,
+    .detailframe-page .excel-table .excel-section,
+    .detailframe-page .excel-table .excel-subtotal,
+    .detailframe-page .excel-table .excel-grand-total {
+      background: var(--detailframe-sticky-bg) !important;
+    }
+    .detailframe-page .excel-table .excel-readonly-cell,
+    .detailframe-page .excel-table .excel-readonly-cell.excel-sticky-col-a,
+    .detailframe-page .excel-table .excel-readonly-cell.excel-sticky-col-b,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell.excel-sticky-col-a,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell.excel-sticky-col-b {
+      background: #eef2ff !important;
+      color: #1e293b !important;
+    }
+    /* 유동상 운전일지 연동 셀은 위 readonly 색상보다 뒤에서 덮어써야 한다 */
+    .detailframe-page .excel-table .excel-log-linked-cell,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-log-linked-cell,
+    .excel-table .excel-log-linked-cell {
+      background: #fdf2e3 !important;
+      color: #7c4a12 !important;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main {
+      position: relative;
+      isolation: isolate;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-head {
+      position: sticky !important;
+      top: var(--detailframe-sticky-top) !important;
+      z-index: 260 !important;
+      background: var(--detailframe-sticky-bg) !important;
+      box-shadow: 0 1px 0 rgba(120, 181, 217, 0.28) !important;
+      min-height: 34px;
+      line-height: 1.35;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-a,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-b {
+      position: sticky;
+      background: var(--detailframe-sticky-bg) !important;
+      color: #173a54 !important;
+      box-shadow: 1px 0 0 var(--detailframe-grid);
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-a {
+      left: var(--detailframe-sidebar-width);
+      z-index: 220 !important;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-b {
+      left: calc(var(--detailframe-sidebar-width) + 52px);
+      z-index: 221 !important;
+    }
+    .detailframe-page .excel-table-fluidized_detail_main .excel-head.excel-sticky-col-a,
+    .detailframe-page .excel-table-fluidized_detail_main .excel-head.excel-sticky-col-b {
+      background: var(--detailframe-sticky-bg) !important;
+      z-index: 280 !important;
+    }
+    body.platform-embedded.detailframe-page {
+      --detailframe-sidebar-width: 0px;
+      /* 임베드 시 detail-page-scroll 의 body{overflow:visible} 가 compat 의 overflow:auto 를
+         특이도로 이겨 가로/세로 스크롤 컨테이너가 사라짐 → body 를 단일 스크롤 컨테이너로
+         복원 (combo-boiler 와 동일 패턴). 헤더는 position:fixed 라 그대로 상단 고정. */
+      height: 100vh !important;
+      overflow: auto !important;
+    }
+    body.platform-embedded.detailframe-page .detailframe-main {
+      margin-left: 0 !important;
+      min-width: 100vw !important;
+    }
+    body.platform-embedded.detailframe-page .detailframe-canvas {
+      min-width: 100vw !important;
+      padding-top: var(--detailframe-header-offset) !important;
+    }
+    body.platform-embedded.detailframe-page .landing-page-header {
+      left: 0 !important;
+      width: 100vw !important;
+      min-width: 100vw !important;
+      max-width: 100vw !important;
+    }
+    body.platform-embedded.detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-a {
+      left: 0 !important;
+    }
+    body.platform-embedded.detailframe-page .excel-table-fluidized_detail_main .excel-sticky-col-b {
+      left: 52px !important;
+    }
+    /* 사용자 정의 추가 행 — 인라인 삽입 & 선택 모드 */
+    .detail-add-row-mode .excel-table-fluidized_detail_main tr.detail-row-addable-active {
+      cursor: pointer;
+    }
+    .detail-add-row-mode .excel-table-fluidized_detail_main tr.detail-row-addable-active > td {
+      border-bottom: 3px dashed #2480c9 !important;
+      box-shadow: inset 0 -3px 0 rgba(36, 128, 201, 0.18);
+    }
+    .detail-add-row-mode .excel-table-fluidized_detail_main tr.detail-row-addable-active:hover > td {
+      background: rgba(111, 191, 245, 0.18) !important;
+      border-bottom-color: #1166aa !important;
+    }
+    tr.detail-custom-row > td {
+      background: #f6fbff !important;
+    }
+    /* 추가 행의 B 컬럼(항목명) 보라색 강조 — 좌측 띠 없이 옅은 배경만 */
+    tr.detail-custom-row > td.detail-custom-label-cell {
+      background: #f3e8ff !important;
+    }
+    tr.detail-custom-row > td.detail-custom-label-cell input.custom-row-label {
+      background: transparent;
+      color: #000;
+    }
+    tr.detail-custom-row > td.detail-custom-label-cell input.custom-row-label::placeholder {
+      color: #94a3b8;
+    }
+    tr.detail-custom-row .detail-custom-delete {
+      width: 100%;
+      padding: 4px 6px;
+      font: 600 11px Inter, "Apple SD Gothic Neo", sans-serif;
+      border-radius: 6px;
+      border: 1px solid rgba(200, 80, 80, 0.6);
+      background: #fff;
+      color: #b03434;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease;
+    }
+    tr.detail-custom-row .detail-custom-delete:hover {
+      background: #b03434;
+      color: #fff;
+    }
+    tr.detail-custom-row .custom-row-label {
+      font-weight: 600;
+      color: #173a54;
+    }
+    tr.detail-custom-row .custom-row-label::placeholder {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .detail-add-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 6000;
+      background: rgba(20, 50, 75, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .detail-add-modal {
+      min-width: 320px;
+      max-width: 420px;
+      padding: 20px 24px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(23, 65, 95, 0.35);
+      color: #173a54;
+    }
+    .detail-add-modal h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .detail-add-modal p {
+      margin: 0 0 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #476176;
+    }
+    .detail-add-modal .detail-add-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .detail-add-modal button {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(120, 181, 217, 0.4);
+      background: #f5fbff;
+      color: #173a54;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .detail-add-modal button.is-primary {
+      background: #6fbff5;
+      border-color: #6fbff5;
+      color: #fff;
+    }
+    /* 선택 모드 부동 배너 — 모달 닫혀도 표시 */
+    .detail-add-select-banner {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1500;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #1f4f82;
+      color: #fff;
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(31,79,130,0.25);
+      font: 600 13px Inter, "Apple SD Gothic Neo", sans-serif;
+      animation: detailAddBannerIn 200ms ease;
+    }
+    @keyframes detailAddBannerIn {
+      from { opacity: 0; transform: translate(-50%, -8px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .detail-add-select-banner .detail-add-select-cancel {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font: 600 12px Inter, sans-serif;
+      cursor: pointer;
+      transition: background 150ms ease;
+    }
+    .detail-add-select-banner .detail-add-select-cancel:hover {
+      background: rgba(255,255,255,0.32);
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body detail-page-scroll detailframe-page" data-page-kind="fluidized-detail">
+  <div class="detail-page-shell detailframe-page-shell">
+  <main class="landing-main detailframe-main">
+    <div class="landing-canvas landing-canvas-table detailframe-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>세부 운영내역</h1>
+        </div>
+        <div class="detail-view-toolbar" id="detailViewToolbar" aria-label="detail view switch">
+          <button type="button" class="detail-view-button is-active" data-detail-view="operation">가동</button>
+          <button type="button" class="detail-view-button" data-detail-view="consumables">소모품</button>
+          <button type="button" class="detail-view-button" data-detail-view="srf">SRF 소각재</button>
+          <button type="button" class="detail-view-button" data-detail-view="power-water">전력/용수</button>
+          <button type="button" class="detail-view-button" data-detail-view="other">기타</button>
+          <button type="button" class="detail-view-button" data-detail-view="all">전체 표 조회</button>
+        </div>
+        <div class="landing-filter-stack">
+          <button type="button" class="landing-filter-action" id="detailAddRowButton" style="margin-right:8px;">+ 항목 추가</button>
+          <div class="landing-filter-box" aria-label="조회 필터">
+            <span class="landing-filter-title">조회</span>
+            <select id="filterYear"></select>
+            <span class="landing-filter-dot">.</span>
+            <select id="filterMonth"></select>
+            <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+          </div>
+        </div>
+      </div>
+      <div class="detailframe-table-stage">
+        <div class="detail-view-toolbar" id="detailViewToolbar" aria-label="세부 운영내역 보기 전환">
+          <button type="button" class="detail-view-button is-active" data-detail-view="operation">가동</button>
+          <button type="button" class="detail-view-button" data-detail-view="consumables">소모품</button>
+          <button type="button" class="detail-view-button" data-detail-view="srf">SRF 소각재</button>
+          <button type="button" class="detail-view-button" data-detail-view="power-water">전력/용수</button>
+          <button type="button" class="detail-view-button" data-detail-view="other">기타</button>
+          <button type="button" class="detail-view-button" data-detail-view="all">전체 표 조회</button>
+        </div>
+        <p class="detail-view-caption" id="detailViewCaption">가동시간부터 KNE 지급비용까지 표시 중입니다.</p>
+        <div class="table-wrap detail-table-wrap detailframe-table-wrap" id="detailMainWrap"></div>
+        <div class="table-wrap detail-table-wrap detailframe-table-wrap" id="detailSummaryWrap"></div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
+  <script defer src="/steam/js/unit-pages.js?v=20260507-common-sidebar1"></script>
+  <script defer src="/steam/js/unit-fluidized-detail-pages.js?v=20260819-linked1"></script>
+  <script defer src="/steam/js/fluidized-excel-controls.js?v=20260507-fluidized-excel1"></script>
+  <script defer src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

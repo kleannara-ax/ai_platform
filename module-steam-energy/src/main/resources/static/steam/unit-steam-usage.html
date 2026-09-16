@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>스팀 사용량</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260723-stickycard" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="unit">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>스팀 사용량</h1>
+          <p>호기별 월간 및 연간 기준으로 스팀 사용량을 확인합니다.</p>
+        </div>
+        <div class="landing-filter-box">
+          <span class="landing-filter-title">조회</span>
+          <select id="filterYear"></select>
+          <span class="landing-filter-dot">.</span>
+          <select id="filterMonth"></select>
+          <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar" role="tablist" aria-label="기간 전환">
+        <button type="button" class="period-tab-button" data-period-target="monthly">월단위</button>
+        <button type="button" class="period-tab-button" data-period-target="yearly">연단위</button>
+      </div>
+
+      <section class="period-panel" data-period-panel="monthly">
+        <div class="machine-tab-bar" role="tablist" aria-label="월단위 설비 탭">
+          <button type="button" class="machine-tab-button" data-machine-target="pm2">PM-2</button>
+          <button type="button" class="machine-tab-button" data-machine-target="pm3">PM-3</button>
+          <button type="button" class="machine-tab-button" data-machine-target="tm">TM</button>
+          <button type="button" class="machine-tab-button" data-machine-target="total">총합</button>
+        </div>
+
+        <section class="machine-panel" data-machine-panel="pm2">
+          <article class="table-card">
+            <h3>PM-2 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table" data-cell-table="usage_m_pm2" data-row-mode="daily">
+                <thead><tr><th>일</th><th>스팀량</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>비고</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="pm3">
+          <article class="table-card">
+            <h3>PM-3 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table pm3-merged-table" data-merged-table="usage_pm3" data-row-mode="daily">
+                <thead><tr><th>일</th><th>스팀량(M+C)</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>비고</th><th>디스퍼져</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>Ventilation</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="tm">
+          <article class="table-card">
+            <h3>TM 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table" data-cell-table="usage_m_tm" data-row-mode="daily">
+                <thead><tr><th>일</th><th>TM-3</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>TM-4</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>TM-5</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>화장지 총합</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="total">
+          <article class="table-card">
+            <h3>총합 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table" data-merged-table="usage_total" data-row-mode="daily">
+                <thead>
+                  <tr>
+                    <th>일</th>
+                    <th>제지 스팀량</th><th>제지 평균 가동시간</th><th>제지 원단위(톤/hr)</th>
+                    <th>화장지 스팀량</th><th>화장지 가동시간</th><th>화장지 원단위(톤/hr)</th>
+                    <th>총 스팀량</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="period-panel" data-period-panel="yearly">
+        <div class="machine-tab-bar" role="tablist" aria-label="연단위 설비 탭">
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="pm2">PM-2</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="pm3">PM-3</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="tm">TM</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="total">총합</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="ratio">스팀 사용량 비율</button>
+        </div>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="pm2">
+          <article class="table-card">
+            <h3>PM-2 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table yearly-unit-table" data-cell-table="usage_y_pm2" data-row-mode="yearly">
+                <thead><tr><th>월</th><th>스팀량</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>비고</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="pm3">
+          <article class="table-card">
+            <h3>PM-3 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table yearly-unit-table pm3-merged-table" data-merged-table="usage_pm3" data-row-mode="yearly">
+                <thead><tr><th>월</th><th>스팀량(M+C)</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>비고</th><th>디스퍼져</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>Ventilation</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="tm">
+          <article class="table-card">
+            <h3>TM 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table yearly-unit-table" data-cell-table="usage_y_tm" data-row-mode="yearly">
+                <thead><tr><th>월</th><th>TM-3</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>TM-4</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>TM-5</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th><th>화장지 총합</th><th>가동시간(hr)</th><th>원단위(톤/hr)</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="total">
+          <article class="table-card">
+            <h3>총합 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table yearly-unit-table" data-merged-table="usage_total" data-row-mode="yearly">
+                <thead>
+                  <tr>
+                    <th>월</th>
+                    <th>제지 스팀량</th><th>제지 평균 가동시간</th><th>제지 원단위(톤/hr)</th>
+                    <th>화장지 스팀량</th><th>화장지 가동시간</th><th>화장지 원단위(톤/hr)</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="ratio">
+          <article class="table-card">
+            <h3>연단위 스팀 사용량 비율(%)</h3>
+            <div class="table-wrap">
+              <table class="data-table runtime-table yearly-unit-table yearly-ratio-table" data-yearly-ratio-table="summary">
+                <thead><tr><th>월</th><th>제지2</th><th>제지3</th><th>화장지3</th><th>화장지4</th><th>화장지5</th><th>누계</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+    </div>
+  </main>
+  <script src="js/unit-pages.js?v=20260723-stickyrows3"></script>
+  <script src="js/unit-generic-db-pages.js?v=20260723-total-merge2"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

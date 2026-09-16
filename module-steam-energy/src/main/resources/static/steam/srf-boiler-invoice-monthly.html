@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - 월별 운영내역</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="srf-invoice-monthly"] { height:auto; min-height:100vh; align-items:stretch; overflow:visible; }
+    body.landing-body[data-page-kind="srf-invoice-monthly"] .landing-main { padding:24px 18px 18px 26px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="srf-invoice-monthly"] .landing-canvas { padding:14px; min-width:0; overflow:visible; }
+
+    .mon-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+    .mon-header-title h1 { margin:0; color:#172033; font-size:22px; font-weight:800; letter-spacing:-.02em; }
+    .mon-header-title p { margin:4px 0 0; color:#64748b; font-size:12px; }
+
+    .mon-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .mon-toolbar select { height:34px; border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44; font:600 12px Inter,"Apple SD Gothic Neo",sans-serif; padding:0 10px; }
+    .mon-toolbar button { height:34px; border:1px solid #1f4f82; border-radius:10px; background:#1f4f82; color:#fff; font:600 12px Inter,"Apple SD Gothic Neo",sans-serif; padding:0 12px; cursor:pointer; }
+    .mon-toolbar button.btn-secondary { background:#fff; color:#1f4f82; }
+
+    .mon-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .mon-tab {
+      border:1px solid rgba(72,126,161,.22); background:linear-gradient(180deg,#f7fbff 0%,#e8f3fb 100%);
+      color:#173a54; border-radius:10px; padding:9px 16px;
+      font:600 13px Inter,"Apple SD Gothic Neo",sans-serif; cursor:pointer;
+    }
+    .mon-tab:hover { background:#dfeefc; }
+    .mon-tab.active { background:#1f4f82; color:#fff; border-color:#1f4f82; }
+
+    .mon-card {
+      border:1px solid rgba(120,181,217,.24); border-radius:14px;
+      background:rgba(255,255,255,.96); box-shadow:0 10px 24px rgba(23,65,95,.08);
+      overflow-x:auto; overflow-y:hidden; padding:0;
+    }
+    .mon-section { display:none; }
+    .mon-section.active { display:block; }
+    .mon-section-title { margin:0; padding:14px 16px 6px; font-size:15px; font-weight:800; color:#173a54; }
+    .mon-table-wrap { padding:0 0 12px; }
+
+    .mon-table .input-cell { padding:0 !important; background:#fff !important; }
+    .mon-table .input-cell input {
+      width:100%; height:100%; min-height:30px; box-sizing:border-box;
+      border:0; background:transparent; outline:0;
+      padding:8px 10px; font:inherit; color:#173a54; text-align:right;
+    }
+    .mon-table .input-cell input:focus { box-shadow:inset 0 0 0 2px #2563eb; background:#fff; }
+    .mon-table td.computed { background:#eef2ff !important; color:#1e293b; font-weight:600; text-align:right; }
+    .mon-table tbody tr.summary-row td,
+    .mon-table tbody tr.summary-row th { background:#fffbe5 !important; font-weight:800; }
+    /* table-layout: fixed + <colgroup> 으로 컬럼 폭을 정확히 고정. */
+    .mon-table { table-layout:fixed; width:100%; min-width:100%; }
+    .mon-table colgroup col.c-month { width:64px; }
+    .mon-table colgroup col.c-input { width:80px; }
+    .mon-table colgroup col.c-amount { width:150px; }
+    /* 컬럼이 많은 운영비용 탭만 가로 스크롤 허용 (가독성을 위해 min-width 부여). */
+    .mon-section[data-section="ops"] .mon-table { width:max-content; }
+    .mon-section[data-section="ops"] .mon-card { overflow-x:auto; }
+    /* 나머지 3개 탭은 가로 스크롤 제거 (테이블이 컨테이너 폭에 맞춰 분배). */
+    .mon-section[data-section="steam"] .mon-card,
+    .mon-section[data-section="etc"] .mon-card,
+    .mon-section[data-section="total"] .mon-card { overflow-x:hidden; }
+    .mon-table .col-month { background:#f3f6ff; font-weight:700; text-align:center; white-space:nowrap; }
+    .mon-table td.input-cell input { padding:8px 6px; }
+    .mon-table td.computed { padding-right:12px; }
+
+    @media print {
+      .mon-toolbar, .mon-tabs { display:none !important; }
+      .mon-section { display:block !important; page-break-after:always; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-monthly">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="mon-header">
+        <div class="mon-header-title">
+          <h1>월별 운영내역</h1>
+          <p>3. 베올리아 보일러 운영비용 — 회계연도 (6월 ~ 익년 5월)</p>
+        </div>
+        <div class="mon-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="mon-tabs" role="tablist">
+        <button type="button" class="mon-tab active" data-target="steam">스팀/전력/LNG</button>
+        <button type="button" class="mon-tab" data-target="ops">운영비용</button>
+        <button type="button" class="mon-tab" data-target="etc">기타비용</button>
+        <button type="button" class="mon-tab" data-target="total">총지급내역</button>
+      </div>
+
+      <!-- ────────── 1. 스팀 / 전력 / LNG ────────── -->
+      <section class="mon-section active" data-section="steam">
+        <div class="mon-card">
+          <h3 class="mon-section-title">스팀 / 전력 / LNG</h3>
+          <div class="mon-table-wrap">
+            <table class="data-table mon-table" data-form="steam">
+              <thead>
+                <tr>
+                  <th rowspan="2">월</th>
+                  <th colspan="3">스팀</th>
+                  <th colspan="3">전력</th>
+                  <th colspan="3">LNG</th>
+                </tr>
+                <tr>
+                  <th>구매량<br>(ton)</th><th>단가<br>(원/ton)</th><th class="col-amount">지급액<br>(원)</th>
+                  <th>사용량<br>(kwh)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                  <th>사용량<br>(Nm3)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────── 2. 운영비용 (용수만) ────────── -->
+      <section class="mon-section" data-section="ops">
+        <div class="mon-card">
+          <h3 class="mon-section-title">운영비용 (용수)</h3>
+          <div class="mon-table-wrap">
+            <table class="data-table mon-table" data-form="ops">
+              <thead>
+                <tr>
+                  <th rowspan="2">월</th>
+                  <th colspan="3">공정수</th>
+                  <th colspan="3">청수</th>
+                  <th colspan="3">연수</th>
+                  <th colspan="3">생활용수</th>
+                  <th rowspan="2" class="col-amount">총 계<br>(원)</th>
+                </tr>
+                <tr>
+                  <th>사용량<br>(m3)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                  <th>사용량<br>(m3)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                  <th>사용량<br>(m3)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                  <th>사용량<br>(m3)</th><th>단가<br>(원)</th><th class="col-amount">비용<br>(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────── 3. 기타비용 ────────── -->
+      <section class="mon-section" data-section="etc">
+        <div class="mon-card">
+          <h3 class="mon-section-title">기타비용 (지급금 / 차감금)</h3>
+          <div class="mon-table-wrap">
+            <table class="data-table mon-table" data-form="etc">
+              <thead>
+                <tr>
+                  <th>월</th>
+                  <th>특약 미달금액<br>(지급금)</th>
+                  <th>7차연도 BSC물량 정산금<br>(지급금)</th>
+                  <th>SRF이익 분배금<br>(차감금)</th>
+                  <th>보일러 검사수수료<br>(차감금)</th>
+                  <th>7차연도 단가 초과 지급분<br>(차감금)</th>
+                  <th>대기초과배출부과금<br>(차감금)</th>
+                  <th>폐기물 처분부담금<br>(차감금)</th>
+                  <th>합계<br>(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────── 4. 총지급내역 ────────── -->
+      <section class="mon-section" data-section="total">
+        <div class="mon-card">
+          <h3 class="mon-section-title">총 지급내역</h3>
+          <div class="mon-table-wrap">
+            <table class="data-table mon-table" data-form="total">
+              <thead>
+                <tr>
+                  <th>월</th>
+                  <th>스팀 구매비용<br>(원)</th>
+                  <th>운영비용<br>(원)</th>
+                  <th>기타비용<br>(원)</th>
+                  <th>총 지급내역<br>(원)</th>
+                  <th>스팀 운영단가<br>(원/ton)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* 월별 운영내역 — 엑셀 "월별 운영내역" 시트 (SRF Invoice xls) 기반.
+       회계연도 (6월 ~ 익년 5월). 선택연도 X → 6월 X년 ~ 5월 (X+1)년.
+
+       탭/컬럼 매핑 :
+         [스팀 구매비용] 스팀구매량 / 스팀단가 → 지급액 = 구매량 × 단가
+         [운영비용] 6가지 유틸리티 (전력/LNG/공정수/청수/연수/생활용수)
+                    각각 사용량 × 단가 = 비용. 총계 = 6개 비용 합.
+         [기타비용] 7개 항목. 지급금(+) / 차감금(−) 부호 적용.
+                    합계 = 특약미달 + BSC정산금 − SRF분배 − 검사수수료 − 단가초과 − 대기부과금 − 폐기물처분
+         [총지급내역] 스팀구매 + 운영 + 기타. 스팀운영단가 = 총지급 / 스팀구매량
+
+       저장 : table_cell_value(month="YYYY", table_name="srf_boiler_invoice_monthly",
+                              row_key="{section}|{monthIdx}|{field}", col_index=1) */
+
+    // 회계연도 12개월: 6월, 7월, ..., 12월, 1월, ..., 5월
+    const MONTHS = ["6월","7월","8월","9월","10월","11월","12월","1월","2월","3월","4월","5월"];
+
+    // 스팀/전력/LNG 탭: 3개 항목 각각 사용량(qty)/단가(unit) → 비용 자동
+    const STEAM_UTILS = [
+      { id: "steam", label: "스팀", qtyLabel: "구매량", costLabel: "지급액" },
+      { id: "power", label: "전력", qtyLabel: "사용량", costLabel: "비용" },
+      { id: "lng",   label: "LNG",  qtyLabel: "사용량", costLabel: "비용" },
+    ];
+    // 운영비용 탭: 용수 4종
+    const OPS_UTILS = [
+      { id: "process",   label: "공정수" },
+      { id: "soft",      label: "청수" },
+      { id: "soften",    label: "연수" },
+      { id: "life",      label: "생활용수" },
+    ];
+    const ETC_INPUTS = [
+      { id: "special",  label: "특약 미달금액",            sign:  1 },
+      { id: "bsc7",     label: "7차연도 BSC정산금",         sign:  1 },
+      { id: "srfShare", label: "SRF이익 분배금",            sign: -1 },
+      { id: "inspect",  label: "보일러 검사수수료",         sign: -1 },
+      { id: "over7",    label: "7차연도 단가 초과 지급분",  sign: -1 },
+      { id: "airOver",  label: "대기초과배출부과금",        sign: -1 },
+      { id: "waste",    label: "폐기물 처분부담금",         sign: -1 },
+    ];
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    // 페이지 간 공유 연/월 (localStorage) 우선 사용.
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+
+    (function initYears() {
+      for (let y = currentYear - 5; y <= currentYear + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년도 (${y}.6~${y+1}.5)`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    function monthKey() { return String(currentYear); }
+    function yearLabel(monthIdx) {
+      // 6월(0)~12월(6): currentYear, 1월(7)~5월(11): currentYear+1
+      const y = monthIdx <= 6 ? currentYear : currentYear + 1;
+      return monthIdx === 7 ? `${y}년 ${MONTHS[monthIdx]}` : MONTHS[monthIdx];
+    }
+
+    function tdInput(section, idx, field) {
+      return `<td class="input-cell"><input data-section="${section}" data-idx="${idx}" data-field="${field}" /></td>`;
+    }
+    function tdCalc(section, idx, field) {
+      return `<td class="computed" data-section="${section}" data-idx="${idx}" data-field="${field}">—</td>`;
+    }
+    function tdSum(section, field) {
+      return `<td class="computed" data-section="${section}" data-field="${field}">—</td>`;
+    }
+
+    function injectColgroup(form, cols) {
+      // cols 배열은 'month'|'input'|'amount' 의 문자열 시퀀스
+      const table = document.querySelector(`table[data-form="${form}"]`);
+      if (!table) return;
+      // 이미 있으면 제거 후 재삽입
+      const existing = table.querySelector("colgroup");
+      if (existing) existing.remove();
+      const cg = document.createElement("colgroup");
+      cols.forEach((kind) => {
+        const c = document.createElement("col");
+        c.className = `c-${kind}`;
+        cg.appendChild(c);
+      });
+      table.insertBefore(cg, table.firstChild);
+    }
+
+    function buildSteam() {
+      // 컬럼 구성: month + (input, input, amount) × 3
+      injectColgroup("steam", ["month", ...STEAM_UTILS.flatMap(() => ["input","input","amount"])]);
+      const tbody = document.querySelector('table[data-form="steam"] tbody');
+      const rows = MONTHS.map((_, i) => {
+        const cells = STEAM_UTILS.map((u) =>
+          `${tdInput("steam", i, `${u.id}-qty`)}${tdInput("steam", i, `${u.id}-unit`)}${tdCalc("steam", i, `${u.id}-cost`)}`
+        ).join("");
+        return `<tr data-row="${i}">
+          <th class="col-month">${yearLabel(i)}</th>
+          ${cells}
+        </tr>`;
+      }).join("");
+      const totalCells = STEAM_UTILS.map((u) =>
+        `${tdSum("steam", `${u.id}-qty-sum`)}<td>—</td>${tdSum("steam", `${u.id}-cost-sum`)}`
+      ).join("");
+      const total = `<tr class="summary-row"><th class="col-month">합계</th>${totalCells}</tr>`;
+      tbody.innerHTML = rows + total;
+    }
+
+    function buildOps() {
+      // 컬럼: month + (input, input, amount) × 4 (용수 4종) + amount (총계)
+      injectColgroup("ops", ["month", ...OPS_UTILS.flatMap(() => ["input","input","amount"]), "amount"]);
+      const tbody = document.querySelector('table[data-form="ops"] tbody');
+      const rows = MONTHS.map((_, i) => {
+        const cells = OPS_UTILS.map((u) =>
+          `${tdInput("ops", i, `${u.id}-qty`)}${tdInput("ops", i, `${u.id}-unit`)}${tdCalc("ops", i, `${u.id}-cost`)}`
+        ).join("");
+        return `<tr data-row="${i}">
+          <th class="col-month">${yearLabel(i)}</th>
+          ${cells}
+          ${tdCalc("ops", i, "total")}
+        </tr>`;
+      }).join("");
+      const totalCells = OPS_UTILS.map((u) =>
+        `${tdSum("ops", `${u.id}-qty-sum`)}<td>—</td>${tdSum("ops", `${u.id}-cost-sum`)}`
+      ).join("");
+      const total = `<tr class="summary-row"><th class="col-month">합계</th>
+        ${totalCells}${tdSum("ops","total-sum")}</tr>`;
+      tbody.innerHTML = rows + total;
+    }
+
+    function buildEtc() {
+      // 컬럼: month + 7개 input + amount(합계)
+      injectColgroup("etc", ["month", ...ETC_INPUTS.map(() => "input"), "amount"]);
+      const tbody = document.querySelector('table[data-form="etc"] tbody');
+      const rows = MONTHS.map((_, i) => `<tr data-row="${i}">
+        <th class="col-month">${yearLabel(i)}</th>
+        ${ETC_INPUTS.map((it) => tdInput("etc", i, it.id)).join("")}
+        ${tdCalc("etc", i, "total")}
+      </tr>`).join("");
+      const total = `<tr class="summary-row"><th class="col-month">합계</th>
+        ${ETC_INPUTS.map((it) => tdSum("etc", `${it.id}-sum`)).join("")}
+        ${tdSum("etc","total-sum")}</tr>`;
+      tbody.innerHTML = rows + total;
+    }
+
+    function buildTotal() {
+      // 컬럼: month + 5개 amount (스팀구매/운영/기타/총지급/스팀운영단가)
+      injectColgroup("total", ["month", "amount", "amount", "amount", "amount", "amount"]);
+      const tbody = document.querySelector('table[data-form="total"] tbody');
+      const rows = MONTHS.map((_, i) => `<tr data-row="${i}">
+        <th class="col-month">${yearLabel(i)}</th>
+        ${tdCalc("total", i, "steam")}${tdCalc("total", i, "ops")}${tdCalc("total", i, "etc")}
+        ${tdCalc("total", i, "grand")}${tdCalc("total", i, "unitPrice")}
+      </tr>`).join("");
+      const total = `<tr class="summary-row"><th class="col-month">합계</th>
+        ${tdSum("total","steam-sum")}${tdSum("total","ops-sum")}${tdSum("total","etc-sum")}
+        ${tdSum("total","grand-sum")}<td>—</td></tr>`;
+      tbody.innerHTML = rows + total;
+    }
+
+    /* 탭 전환 */
+    const tabs = document.querySelectorAll(".mon-tab");
+    const sections = document.querySelectorAll(".mon-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.target;
+        tabs.forEach((x) => x.classList.toggle("active", x === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
+      });
+    });
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function readNum(sel) {
+      const el = document.querySelector(sel);
+      if (!el) return NaN;
+      const text = (el.textContent || "").replace(/[,\s]/g, "");
+      if (text === "—" || text === "") return NaN;
+      const n = Number(text);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtDec(n, d = 2) { return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—"; }
+
+    function recomputeSteam() {
+      const utilSums = {};
+      STEAM_UTILS.forEach((u) => { utilSums[`${u.id}-qty`] = 0; utilSums[`${u.id}-cost`] = 0; });
+      MONTHS.forEach((_, i) => {
+        STEAM_UTILS.forEach((u) => {
+          const qty = parseNum(document.querySelector(`input[data-section="steam"][data-idx="${i}"][data-field="${u.id}-qty"]`));
+          const unit = parseNum(document.querySelector(`input[data-section="steam"][data-idx="${i}"][data-field="${u.id}-unit"]`));
+          const cost = Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : NaN;
+          document.querySelector(`[data-section="steam"][data-idx="${i}"][data-field="${u.id}-cost"]`).textContent = fmt(cost);
+          if (Number.isFinite(qty)) utilSums[`${u.id}-qty`] += qty;
+          if (Number.isFinite(cost)) utilSums[`${u.id}-cost`] += cost;
+        });
+      });
+      STEAM_UTILS.forEach((u) => {
+        document.querySelector(`[data-section="steam"][data-field="${u.id}-qty-sum"]`).textContent = fmt(utilSums[`${u.id}-qty`]);
+        document.querySelector(`[data-section="steam"][data-field="${u.id}-cost-sum"]`).textContent = fmt(utilSums[`${u.id}-cost`]);
+      });
+    }
+
+    function recomputeOps() {
+      let tSum = 0;
+      const utilSums = {};
+      OPS_UTILS.forEach((u) => { utilSums[`${u.id}-qty`] = 0; utilSums[`${u.id}-cost`] = 0; });
+      MONTHS.forEach((_, i) => {
+        let monthTotal = 0;
+        let monthAny = false;
+        OPS_UTILS.forEach((u) => {
+          const qty = parseNum(document.querySelector(`input[data-section="ops"][data-idx="${i}"][data-field="${u.id}-qty"]`));
+          const unit = parseNum(document.querySelector(`input[data-section="ops"][data-idx="${i}"][data-field="${u.id}-unit"]`));
+          const cost = Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : NaN;
+          document.querySelector(`[data-section="ops"][data-idx="${i}"][data-field="${u.id}-cost"]`).textContent = fmt(cost);
+          if (Number.isFinite(qty)) utilSums[`${u.id}-qty`] += qty;
+          if (Number.isFinite(cost)) { utilSums[`${u.id}-cost`] += cost; monthTotal += cost; monthAny = true; }
+        });
+        document.querySelector(`[data-section="ops"][data-idx="${i}"][data-field="total"]`).textContent = monthAny ? fmt(monthTotal) : "—";
+        if (monthAny) tSum += monthTotal;
+      });
+      OPS_UTILS.forEach((u) => {
+        document.querySelector(`[data-section="ops"][data-field="${u.id}-qty-sum"]`).textContent = fmt(utilSums[`${u.id}-qty`]);
+        document.querySelector(`[data-section="ops"][data-field="${u.id}-cost-sum"]`).textContent = fmt(utilSums[`${u.id}-cost`]);
+      });
+      document.querySelector(`[data-section="ops"][data-field="total-sum"]`).textContent = fmt(tSum);
+    }
+
+    function recomputeEtc() {
+      let tSum = 0;
+      const sums = {};
+      ETC_INPUTS.forEach((it) => { sums[it.id] = 0; });
+      MONTHS.forEach((_, i) => {
+        let monthTotal = 0; let monthAny = false;
+        ETC_INPUTS.forEach((it) => {
+          const v = parseNum(document.querySelector(`input[data-section="etc"][data-idx="${i}"][data-field="${it.id}"]`));
+          if (Number.isFinite(v)) { sums[it.id] += v; monthTotal += v * it.sign; monthAny = true; }
+        });
+        document.querySelector(`[data-section="etc"][data-idx="${i}"][data-field="total"]`).textContent = monthAny ? fmt(monthTotal) : "—";
+        if (monthAny) tSum += monthTotal;
+      });
+      ETC_INPUTS.forEach((it) => {
+        document.querySelector(`[data-section="etc"][data-field="${it.id}-sum"]`).textContent = fmt(sums[it.id]);
+      });
+      document.querySelector(`[data-section="etc"][data-field="total-sum"]`).textContent = fmt(tSum);
+    }
+
+    function recomputeTotal() {
+      let sSum = 0, oSum = 0, eSum = 0, gSum = 0;
+      MONTHS.forEach((_, i) => {
+        // 스팀/전력/LNG 탭의 세 항목 비용을 합산
+        const steamCost = readNum(`[data-section="steam"][data-idx="${i}"][data-field="steam-cost"]`);
+        const powerCost = readNum(`[data-section="steam"][data-idx="${i}"][data-field="power-cost"]`);
+        const lngCost = readNum(`[data-section="steam"][data-idx="${i}"][data-field="lng-cost"]`);
+        const anySteam = [steamCost, powerCost, lngCost].some(Number.isFinite);
+        const steam = anySteam ? (Number.isFinite(steamCost) ? steamCost : 0) + (Number.isFinite(powerCost) ? powerCost : 0) + (Number.isFinite(lngCost) ? lngCost : 0) : NaN;
+
+        const ops = readNum(`[data-section="ops"][data-idx="${i}"][data-field="total"]`);
+        const etc = readNum(`[data-section="etc"][data-idx="${i}"][data-field="total"]`);
+        const any = [steam, ops, etc].some(Number.isFinite);
+        // 엑셀 '월별 운영내역' 총지급내역 = 스팀지급 − 운영비용총계 (운영비는 차감). 기타(etc)는 항목별 부호 유지.
+        const grand = any ? (Number.isFinite(steam) ? steam : 0) - (Number.isFinite(ops) ? ops : 0) + (Number.isFinite(etc) ? etc : 0) : NaN;
+        // 스팀 운영단가 = 총지급 / 스팀구매량 (steam-qty 입력값 사용)
+        const steamQty = parseNum(document.querySelector(`input[data-section="steam"][data-idx="${i}"][data-field="steam-qty"]`));
+        const unitPrice = Number.isFinite(grand) && Number.isFinite(steamQty) && steamQty > 0 ? grand / steamQty : NaN;
+        document.querySelector(`[data-section="total"][data-idx="${i}"][data-field="steam"]`).textContent = fmt(steam);
+        document.querySelector(`[data-section="total"][data-idx="${i}"][data-field="ops"]`).textContent = fmt(ops);
+        document.querySelector(`[data-section="total"][data-idx="${i}"][data-field="etc"]`).textContent = fmt(etc);
+        document.querySelector(`[data-section="total"][data-idx="${i}"][data-field="grand"]`).textContent = fmt(grand);
+        document.querySelector(`[data-section="total"][data-idx="${i}"][data-field="unitPrice"]`).textContent = fmtDec(unitPrice, 2);
+        if (Number.isFinite(steam)) sSum += steam;
+        if (Number.isFinite(ops)) oSum += ops;
+        if (Number.isFinite(etc)) eSum += etc;
+        if (Number.isFinite(grand)) gSum += grand;
+      });
+      document.querySelector(`[data-section="total"][data-field="steam-sum"]`).textContent = fmt(sSum);
+      document.querySelector(`[data-section="total"][data-field="ops-sum"]`).textContent = fmt(oSum);
+      document.querySelector(`[data-section="total"][data-field="etc-sum"]`).textContent = fmt(eSum);
+      document.querySelector(`[data-section="total"][data-field="grand-sum"]`).textContent = fmt(gSum);
+    }
+
+    function recomputeAll() {
+      recomputeSteam();
+      recomputeOps();
+      recomputeEtc();
+      recomputeTotal();
+    }
+
+    /* DB 저장 / 로딩 */
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const MON_TABLE_NAME = "srf_boiler_invoice_monthly";
+    const storedRows = new Map();
+
+    function rowKeyFor(sectionId, idx, field) { return `${sectionId}|${idx}|${field}`; }
+
+    function eachInput(callback) {
+      document.querySelectorAll('table.mon-table input[data-section]').forEach((input) => {
+        callback(input, input.dataset.section, Number(input.dataset.idx), input.dataset.field);
+      });
+    }
+
+    async function loadMonthly() {
+      storedRows.clear();
+      eachInput((input) => { input.value = ""; });
+      recomputeAll();
+      try {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        rows.forEach((row) => {
+          if (row.table_name !== MON_TABLE_NAME) return;
+          storedRows.set(row.row_key, row);
+        });
+        eachInput((input, sectionId, idx, field) => {
+          const stored = storedRows.get(rowKeyFor(sectionId, idx, field));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            input.value = stored.cell_value;
+          }
+        });
+        recomputeAll();
+      } catch (e) {}
+    }
+
+    async function saveCell(input, sectionId, idx, field) {
+      const key = rowKeyFor(sectionId, idx, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = {
+        month: monthKey(), year_no: currentYear, month_no: 0,
+        table_name: MON_TABLE_NAME, row_key: key, col_index: 1,
+        cell_value: raw,
+      };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const response = await fetch(url, {
+          method: existing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) return;
+        const saved = await response.json();
+        storedRows.set(key, saved);
+      } catch (e) {}
+    }
+
+    buildSteam();
+    buildOps();
+    buildEtc();
+    buildTotal();
+    recomputeAll();
+
+    document.querySelectorAll('table.mon-table').forEach((table) => {
+      table.addEventListener("input", () => recomputeAll());
+    });
+
+    eachInput((input, sectionId, idx, field) => {
+      input.addEventListener("blur", () => saveCell(input, sectionId, idx, field));
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: prev.month || "01" }));
+      } catch (e) {}
+      loadMonthly();
+    });
+
+    loadMonthly();
+
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+</body>
+</html>

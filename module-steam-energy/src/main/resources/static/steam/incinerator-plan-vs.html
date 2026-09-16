@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>소각로 위탁운영 - 사업계획대비</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* 페이지 고유 baseline */
+    body.landing-body[data-page-kind="incinerator-plan"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="incinerator-plan"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="incinerator-plan"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="incinerator-plan"] .landing-canvas-table { overflow:visible !important; }
+    .inc-table-wrap { overflow:visible !important; }
+    .inc-card { margin-bottom:18px; }
+    .inc-table th.linked-source-header {
+      text-decoration: underline dotted rgba(31, 75, 153, 0.6);
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+
+    /* 본 표 (cost) — 화면 폭에 꽉 차게 (부모 컨테이너 100%). */
+    table[data-form="cost"] {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      table-layout: fixed;
+    }
+    /* colgroup 의 col 폭은 percentage 로 — 표 width 변화에 비례 분배 */
+    table[data-form="cost"] colgroup col.c-label { width: 9%; }
+    table[data-form="cost"] colgroup col.c-sub   { width: 7%; }
+    table[data-form="cost"] colgroup col.c-month { width: 6%; }
+    table[data-form="cost"] colgroup col.c-total { width: 8%; }
+    table[data-form="cost"] th, table[data-form="cost"] td {
+      padding: clamp(4px, 0.5vw, 8px) clamp(3px, 0.4vw, 6px) !important;
+      font-size: clamp(11px, 0.95vw, 13px) !important;
+      line-height: 1.3;
+    }
+    table[data-form="cost"] .input-cell input {
+      padding: clamp(4px, 0.5vw, 7px) clamp(3px, 0.4vw, 5px);
+      font-size: clamp(11px, 0.95vw, 13px);
+      min-height: 0;
+    }
+
+    /* 구분 표 반응형 — 한 화면에 11컬럼 모두 들어오도록 비례 분배 */
+    table[data-form="break"] {
+      width: 100% !important;
+      min-width: 0 !important;
+      table-layout: fixed;
+    }
+    table[data-form="break"] th, table[data-form="break"] td {
+      padding: clamp(4px, 0.7vw, 8px) clamp(3px, 0.5vw, 6px) !important;
+      font-size: clamp(10px, 0.9vw, 13px) !important;
+      line-height: 1.25;
+      word-break: keep-all;
+      white-space: normal;
+    }
+    table[data-form="break"] th { text-align: center; }
+    /* 컬럼 폭 비율: 구분(라벨) 큰 폭, 데이터셀 동일 좁은 폭, 비고 큰 폭 */
+    table[data-form="break"] colgroup col.c-label { width: 11%; }
+    table[data-form="break"] colgroup col.c-data  { width: 7%; }
+    table[data-form="break"] colgroup col.c-note  { width: 13%; }
+    table[data-form="break"] .input-cell input {
+      width: 100%; min-height: 0;
+      padding: clamp(4px, 0.6vw, 7px) clamp(3px, 0.4vw, 5px);
+      font-size: clamp(10px, 0.9vw, 13px);
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="incinerator-plan">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>2. 소각로 위탁운영비용 사업계획대비 실적</h1>
+          <p>단위: 천원 / 백만원</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <select id="invoiceMonth" aria-label="조회 월"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="inc-tabs" role="tablist">
+        <button type="button" class="inc-tab active" data-target="main">폐합성소각로</button>
+        <button type="button" class="inc-tab" data-target="note">비고</button>
+      </div>
+
+      <!-- 폐합성소각로 탭 -->
+      <section class="inc-section active" data-section="main">
+        <!-- 1) 본 표: 인건비 / 운영비 / 합계 × (계획/실적/달성율/증감) -->
+        <div class="inc-card">
+          <h3 class="inc-section-title">1) 폐합성소각로 (천원)</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="cost">
+              <colgroup>
+                <col class="c-label">
+                <col class="c-sub">
+                <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+                <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+                <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+                <col class="c-total">
+              </colgroup>
+              <thead>
+                <tr><th class="col-label">구 분</th><th>구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th></tr>
+              </thead>
+              <tbody id="planBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2) 구분 표: 위탁운영비 (백만원) — 선택 월 기준 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" id="brkTitle">구  분 (단위: 백만원)</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="break">
+              <colgroup>
+                <col class="c-label">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+                <col class="c-data"><col class="c-data"><col class="c-data">
+                <col class="c-data">
+                <col class="c-data"><col class="c-data">
+                <col class="c-note">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th class="col-label" rowspan="2">구  분</th>
+                  <th colspan="3" id="brkH1">`25년 10월</th>
+                  <th colspan="3">`25년 누계</th>
+                  <th id="brkH2">`25년 9월</th>
+                  <th colspan="2">전월 대비</th>
+                  <th rowspan="2">비   고</th>
+                </tr>
+                <tr>
+                  <th>계 획</th><th>실  적</th><th>증 감</th>
+                  <th>계 획</th><th>실  적</th><th>증 감</th>
+                  <th>실  적</th>
+                  <th>증 감</th><th>증감률(%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th class="col-label">위탁운영비<br>(백만원)</th>
+                  <td class="input-cell"><input data-section="break" data-field="m-plan" /></td>
+                  <td class="input-cell"><input data-section="break" data-field="m-actual" /></td>
+                  <td class="computed" data-section="break" data-field="m-diff">—</td>
+                  <td class="input-cell"><input data-section="break" data-field="y-plan" /></td>
+                  <td class="input-cell"><input data-section="break" data-field="y-actual" /></td>
+                  <td class="computed" data-section="break" data-field="y-diff">—</td>
+                  <td class="input-cell"><input data-section="break" data-field="prev-actual" /></td>
+                  <td class="computed" data-section="break" data-field="prev-diff">—</td>
+                  <td class="computed" data-section="break" data-field="prev-rate">—</td>
+                  <td class="input-cell"><input class="text" data-section="break" data-field="note" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 비고 탭 -->
+      <section class="inc-section" data-section="note">
+        <div class="inc-card">
+          <h3 class="inc-section-title">비   고 — 월별 #1 / #2 폐합성수지소각로</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="notes">
+              <thead>
+                <tr>
+                  <th class="col-label" style="width:60px;">월</th>
+                  <th class="col-label" style="width:160px;">호기</th>
+                  <th>비고</th>
+                </tr>
+              </thead>
+              <tbody id="notesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* 사업계획대비 — 폐합성소각로 탭: 인건비/운영비/합계 × (계획/실적/달성율/증감)
+                                          + 구분(위탁운영비 백만원: 월/누계/전월 대비)
+                       비고 탭: 12개월 × #1/#2 폐합성수지소각로 비고 자유 텍스트 */
+    const MONTHS = Array.from({length: 12}, (_, i) => `m${i+1}`);
+    const GROUPS = [
+      { id: "labor",     label: "인건비", rows: ["plan", "actual"] },
+      { id: "operation", label: "운영비", rows: ["plan", "actual"],
+        sourceHint: "운영비의 ‘실적’ 값은 ‘도급내역’ 페이지에 일별로 입력한 1·2호기 운영비용을 한 달치 모두 더한 뒤 천원 단위로 자동 표시됩니다." },
+      { id: "total",     label: "합계", rows: ["plan", "actual", "rate", "diff"],
+        sourceHint: "합계의 ‘실적’ 값은 위의 인건비 실적과 운영비 실적을 더해 자동으로 계산됩니다." },
+    ];
+    const ROW_LABEL = { plan: "계획", actual: "실적", rate: "달성율(%)", diff: "증감" };
+    /* 어느 셀이 자동 계산(읽기 전용)인지 표시 — buildPlanTable 에서 사용 */
+    function isAutoCell(gid, rk) {
+      if (rk === "rate" || rk === "diff") return true;
+      if (gid === "operation" && rk === "actual") return true; // 도급내역 합
+      if (gid === "total" && rk === "actual") return true;     // labor.actual + operation.actual
+      return false;
+    }
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const monthSelect = document.getElementById("invoiceMonth");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    const now = new Date();
+    let currentYear = Number(__sharedPeriod.year) || now.getFullYear();
+    let currentMonth = /^(0[1-9]|1[0-2])$/.test(String(__sharedPeriod.month || "")) ? Number(__sharedPeriod.month) : (now.getMonth() + 1);
+    (function initPeriod() {
+      const y = now.getFullYear();
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        yearSelect.appendChild(opt);
+      }
+      for (let mm = 1; mm <= 12; mm += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(mm).padStart(2, "0"); opt.textContent = `${mm}월`;
+        monthSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+      monthSelect.value = String(currentMonth).padStart(2, "0");
+    })();
+    function monthKey() { return `${currentYear}-${String(currentMonth).padStart(2,"0")}`; }
+
+    /* 탭 */
+    const tabs = document.querySelectorAll(".inc-tab");
+    const sections = document.querySelectorAll(".inc-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.target;
+        tabs.forEach((x) => x.classList.toggle("active", x === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
+      });
+    });
+
+    /* 본 표 빌드 */
+    function buildPlanTable() {
+      const tbody = document.getElementById("planBody");
+      tbody.innerHTML = GROUPS.map((g) => g.rows.map((rk, i) => {
+        const hintAttr = g.sourceHint ? ` class="col-label linked-source-header" title="${g.sourceHint.replace(/"/g, '&quot;')}"` : ` class="col-label"`;
+        const groupCell = i === 0 ? `<th${hintAttr} rowspan="${g.rows.length}">${g.label}</th>` : "";
+        const cells = MONTHS.map((m) => {
+          const auto = isAutoCell(g.id, rk);
+          return auto
+            ? `<td class="computed" data-section="${g.id}" data-field="${rk}-${m}">—</td>`
+            : `<td class="input-cell"><input data-section="${g.id}" data-field="${rk}-${m}" /></td>`;
+        }).join("");
+        const total = `<td class="computed" data-section="${g.id}" data-field="${rk}-total">—</td>`;
+        return `<tr>${groupCell}<th class="col-label">${ROW_LABEL[rk]}</th>${cells}${total}</tr>`;
+      }).join("")).join("");
+    }
+
+    /* 비고 표 빌드 (1~12월 × #1/#2) */
+    function buildNotesTable() {
+      const tbody = document.getElementById("notesBody");
+      const rows = [];
+      for (let m = 1; m <= 12; m += 1) {
+        rows.push(`<tr>
+          <th class="col-label" rowspan="2">${m}월</th>
+          <th class="col-label">#1 폐합성수지소각로</th>
+          <td class="input-cell"><textarea rows="2" data-section="notes" data-field="m${m}-u1"></textarea></td>
+        </tr>
+        <tr>
+          <th class="col-label">#2 폐합성수지소각로</th>
+          <td class="input-cell"><textarea rows="2" data-section="notes" data-field="m${m}-u2"></textarea></td>
+        </tr>`);
+      }
+      tbody.innerHTML = rows.join("");
+    }
+
+    buildPlanTable();
+    buildNotesTable();
+
+    /* 구분 표 헤더(월) 동적 — 선택 월/전월 */
+    function refreshBreakHeader() {
+      const m = currentMonth;
+      const pm = m === 1 ? 12 : m - 1;
+      const py = m === 1 ? currentYear - 1 : currentYear;
+      document.getElementById("brkH1").textContent = `'${String(currentYear).slice(-2)}년 ${m}월`;
+      document.getElementById("brkH2").textContent = `'${String(py).slice(-2)}년 ${pm}월`;
+    }
+    refreshBreakHeader();
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtDec(n, d = 2) { return Number.isFinite(n) ? n.toLocaleString("en-US", {maximumFractionDigits: d}) : "—"; }
+    function fmtPct(n) { return Number.isFinite(n) ? n.toFixed(2) + "%" : "—"; }
+
+    /* 자동 셀 값 조회 — input 이면 value, computed 이면 textContent 의 숫자 */
+    function getCellValue(gid, rk, m) {
+      if (isAutoCell(gid, rk)) {
+        const el = document.querySelector(`[data-section="${gid}"][data-field="${rk}-${m}"]`);
+        if (!el) return NaN;
+        const v = String(el.textContent || "").replace(/[,\s]/g, "");
+        if (!v || v === "—") return NaN;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : NaN;
+      }
+      return parseNum(document.querySelector(`input[data-section="${gid}"][data-field="${rk}-${m}"]`));
+    }
+    function setComputed(gid, field, text) {
+      const el = document.querySelector(`[data-section="${gid}"][data-field="${field}"]`);
+      if (el) el.textContent = text;
+    }
+
+    /* 본 표 자동 계산 — operation.actual ← (도급내역 총 비용 − 인건비 실적); total.actual = labor.actual + operation.actual
+       Excel 도급내역!K43=L43-J43 공식과 동일 (운영비 = 총금액 - 인건비)
+       도급내역 데이터가 없는 월은 DB 에 저장된 operation.actual 값(엑셀 직접 입력값) 을 그대로 표시. */
+    function recomputePlan() {
+      // 1) operation.actual = (unit1.sub + unit2.sub 합계 / 1000) - labor.actual (천원)
+      MONTHS.forEach((m) => {
+        const mn = Number(String(m).slice(1));
+        const c = contractByMonth[mn];
+        const totalKw = c ? ((c.unit1.oper||0) + (c.unit1.stop||0) + (c.unit2.oper||0) + (c.unit2.stop||0)) / 1000 : NaN;
+        const la = parseNum(document.querySelector(`input[data-section="labor"][data-field="actual-${m}"]`));
+        let opActual = (Number.isFinite(totalKw) && totalKw > 0 && Number.isFinite(la)) ? (totalKw - la) : NaN;
+        // 컴퓨트 불가 시 DB stored 값 fallback
+        if (!Number.isFinite(opActual)) {
+          const stored = storedRows.get(rowKeyFor("operation", `actual-${m}`));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            const n = Number(String(stored.cell_value).replace(/,/g, ""));
+            if (Number.isFinite(n)) opActual = n;
+          }
+        }
+        setComputed("operation", `actual-${m}`, Number.isFinite(opActual) ? fmt(opActual) : "—");
+      });
+      // 2) total.actual = labor.actual + operation.actual
+      MONTHS.forEach((m) => {
+        const la = parseNum(document.querySelector(`input[data-section="labor"][data-field="actual-${m}"]`));
+        const op = getCellValue("operation", "actual", m);
+        const sum = (Number.isFinite(la) || Number.isFinite(op)) ? (la || 0) + (op || 0) : NaN;
+        setComputed("total", `actual-${m}`, Number.isFinite(sum) ? fmt(sum) : "—");
+      });
+      // 3) 그룹별 합계 / 달성율 / 증감
+      GROUPS.forEach((g) => {
+        let planSum = 0, planCnt = 0, actualSum = 0, actualCnt = 0, diffSum = 0;
+        MONTHS.forEach((m) => {
+          const plan = parseNum(document.querySelector(`input[data-section="${g.id}"][data-field="plan-${m}"]`));
+          const actual = getCellValue(g.id, "actual", m);
+          if (Number.isFinite(plan)) { planSum += plan; planCnt++; }
+          if (Number.isFinite(actual)) { actualSum += actual; actualCnt++; }
+          if (g.rows.includes("rate")) {
+            setComputed(g.id, `rate-${m}`, (Number.isFinite(plan) && Number.isFinite(actual) && plan !== 0) ? (actual / plan * 100).toFixed(1) + "%" : "—");
+          }
+          if (g.rows.includes("diff")) {
+            const diff = Number.isFinite(plan) && Number.isFinite(actual) ? actual - plan : NaN;
+            setComputed(g.id, `diff-${m}`, fmt(diff));
+            if (Number.isFinite(diff)) diffSum += diff;
+          }
+        });
+        setComputed(g.id, "plan-total", planCnt ? fmt(planSum) : "—");
+        setComputed(g.id, "actual-total", actualCnt ? fmt(actualSum) : "—");
+        if (g.rows.includes("rate")) {
+          setComputed(g.id, "rate-total", (planSum > 0) ? (actualSum / planSum * 100).toFixed(1) + "%" : "—");
+        }
+        if (g.rows.includes("diff")) {
+          setComputed(g.id, "diff-total", (planCnt || actualCnt) ? fmt(diffSum) : "—");
+        }
+      });
+    }
+
+    /* 구분 표 자동 계산 */
+    function recomputeBreak() {
+      const mPlan = parseNum(document.querySelector(`input[data-section="break"][data-field="m-plan"]`));
+      const mActual = parseNum(document.querySelector(`input[data-section="break"][data-field="m-actual"]`));
+      const yPlan = parseNum(document.querySelector(`input[data-section="break"][data-field="y-plan"]`));
+      const yActual = parseNum(document.querySelector(`input[data-section="break"][data-field="y-actual"]`));
+      const prevActual = parseNum(document.querySelector(`input[data-section="break"][data-field="prev-actual"]`));
+      const mDiff = Number.isFinite(mPlan) && Number.isFinite(mActual) ? mActual - mPlan : NaN;
+      const yDiff = Number.isFinite(yPlan) && Number.isFinite(yActual) ? yActual - yPlan : NaN;
+      const prevDiff = Number.isFinite(prevActual) && Number.isFinite(mActual) ? mActual - prevActual : NaN;
+      const prevRate = Number.isFinite(prevActual) && prevActual !== 0 && Number.isFinite(prevDiff) ? (prevDiff / prevActual * 100) : NaN;
+      document.querySelector(`[data-section="break"][data-field="m-diff"]`).textContent = fmtDec(mDiff, 2);
+      document.querySelector(`[data-section="break"][data-field="y-diff"]`).textContent = fmtDec(yDiff, 2);
+      document.querySelector(`[data-section="break"][data-field="prev-diff"]`).textContent = fmtDec(prevDiff, 2);
+      document.querySelector(`[data-section="break"][data-field="prev-rate"]`).textContent = fmtPct(prevRate);
+    }
+
+    function recomputeAll() { recomputePlan(); recomputeBreak(); }
+    document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
+
+    /* DB */
+    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_plan_vs";
+    const CONTRACT_NAME = "incinerator_contract";
+    const contractByMonth = {}; // 1..12: {unit1:{oper,...}, unit2:{oper,...}}
+    function emptyContract() { return { unit1:{steam:0,oper:0,stop:0,runtime:0}, unit2:{steam:0,oper:0,stop:0,runtime:0} }; }
+    async function loadContract() {
+      for (let m = 1; m <= 12; m++) contractByMonth[m] = emptyContract();
+      const tasks = [];
+      for (let m = 1; m <= 12; m++) {
+        const mk = `${currentYear}-${String(m).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              const s = emptyContract();
+              (j.data || []).forEach(row => {
+                if (row.table_name !== CONTRACT_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 3) return;
+                const [sec, , field] = parts;
+                if (!(sec in s) || !(field in s[sec])) return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v)) s[sec][field] += v;
+              });
+              contractByMonth[m] = s;
+            })
+            .catch(() => {})
+        );
+      }
+      await Promise.all(tasks);
+    }
+    const storedRows = new Map();
+    function rowKeyFor(section, field) { return `${section}|${field}`; }
+    function eachInput(cb) {
+      document.querySelectorAll('table.inc-table [data-section]').forEach((el) => {
+        if (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA") return;
+        cb(el, el.dataset.section, el.dataset.field);
+      });
+    }
+    async function load() {
+      storedRows.clear();
+      eachInput((el) => { el.value = ""; });
+      recomputeAll();
+      try {
+        const [res] = await Promise.all([
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`),
+          loadContract(),
+        ]);
+        if (res.ok) {
+          (await res.json()).data?.forEach((row) => {
+            if (row.table_name === T_NAME) storedRows.set(row.row_key, row);
+          });
+          eachInput((el, s, f) => {
+            const stored = storedRows.get(rowKeyFor(s, f));
+            if (stored && stored.cell_value != null && stored.cell_value !== "") el.value = stored.cell_value;
+          });
+        }
+        recomputeAll();
+      } catch (e) {}
+    }
+    async function save(el, section, field) {
+      const key = rowKeyFor(section, field);
+      const existing = storedRows.get(key);
+      // 비고는 문자열, 숫자 입력은 콤마 제거 후 저장
+      const isText = el.tagName === "TEXTAREA" || el.classList.contains("text");
+      const raw = isText ? String(el.value || "") : String(el.value || "").replace(/[,\s]/g, "");
+      const payload = { month: monthKey(), year_no: currentYear, month_no: currentMonth, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error(await res.text());
+        storedRows.set(key, await res.json());
+      } catch (e) { console.error(e); }
+    }
+    eachInput((el, s, f) => {
+      const handler = () => save(el, s, f);
+      el.addEventListener("blur", handler);
+      el.addEventListener("change", handler);
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      currentMonth = Number(monthSelect.value) || (new Date().getMonth() + 1);
+      try {
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: String(currentMonth).padStart(2,"0") }));
+      } catch (e) {}
+      refreshBreakHeader();
+      load();
+    });
+    load();
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20260522-incinerator-xlsx4-monthsync"></script>
+</body>
+</html>

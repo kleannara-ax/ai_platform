@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - BSC</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* 화면 크기와 무관하게 스크롤 없도록 viewport 단위로 사이즈 결정.
+       모든 padding/font-size 를 clamp(min, vh-기반, max) 로 묶어서
+       작은 모니터에선 작게, 큰 모니터에선 크게 — 그러나 항상 한 화면. */
+    html, body { height:100%; }
+    body.landing-body[data-page-kind="srf-invoice-bsc"] {
+      display:block; height:100vh; min-height:0; overflow:hidden; background:#f5f7fb;
+    }
+    .invoice-workspace {
+      height:100vh; min-height:0; overflow:hidden;
+      padding: clamp(12px, 2.4vh, 32px) clamp(14px, 2.4vw, 36px);
+      display:flex;
+    }
+    .invoice-canvas {
+      flex:1; display:flex; flex-direction:column; overflow:hidden;
+      min-height:0;
+      padding: clamp(20px, 4vh, 56px) clamp(24px, 3.5vw, 60px);
+      background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; box-shadow:0 18px 45px rgba(15,23,42,.08);
+    }
+    .invoice-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: clamp(14px, 3vh, 40px); }
+    .invoice-title h1 { margin:0; color:#172033; font-size: clamp(22px, 3.4vh, 36px); font-weight:800; letter-spacing:-.02em; }
+    .invoice-title p { margin:8px 0 0; color:#64748b; font-size: clamp(13px, 1.7vh, 18px); }
+    .invoice-toolbar { display:flex; align-items:center; gap:8px; }
+    .invoice-toolbar select {
+      height: clamp(34px, 4.2vh, 44px);
+      border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44;
+      font:600 clamp(13px, 1.6vh, 16px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 10px;
+    }
+    .invoice-toolbar button {
+      height: clamp(34px, 4.2vh, 44px);
+      border:1px solid #1f4f82; border-radius:10px; background:#1f4f82; color:#fff;
+      font:600 clamp(13px, 1.6vh, 16px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 18px; cursor:pointer;
+    }
+    .invoice-toolbar button.btn-secondary { background:#fff; color:#1f4f82; }
+
+    .bsc-section { width:100%; flex:1; min-height:0; display:flex; flex-direction:column; }
+    .bsc-section h2 { margin:0 0 clamp(14px, 2.4vh, 32px); font-size: clamp(20px, 2.8vh, 30px); font-weight:800; color:#0f172a; letter-spacing:-.01em; }
+    .bsc-paragraph {
+      margin:0 0 clamp(14px, 2.4vh, 32px);
+      padding: clamp(16px, 2.6vh, 32px) clamp(18px, 2vw, 32px);
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px;
+      color:#1f2a44; font-size: clamp(14px, 1.85vh, 19px); line-height:1.75; white-space:pre-line;
+    }
+    .bsc-callout {
+      margin:0 0 clamp(16px, 2.8vh, 36px);
+      padding: clamp(16px, 2.6vh, 32px) clamp(18px, 2vw, 32px);
+      background:#eef4ff; border:1px solid #c7d6f3; border-radius:12px;
+      color:#1e3a8a; font-size: clamp(17px, 2.2vh, 24px); font-weight:700; text-align:center;
+    }
+
+    table.bsc-table { width:100%; border-collapse:collapse; font-family:"Inter", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: clamp(14px, 1.85vh, 19px); background:#fff; }
+    table.bsc-table thead th {
+      background:#1f4f82; color:#fff; font-weight:700;
+      padding: clamp(12px, 1.8vh, 22px) clamp(10px, 1vw, 18px);
+      text-align:center; border:1px solid #1f4f82; vertical-align:middle;
+    }
+    table.bsc-table thead tr:nth-child(2) th { background:#2e6bb0; border-color:#2e6bb0; font-size: clamp(13px, 1.65vh, 17px); font-weight:600; }
+    table.bsc-table tbody td {
+      padding: clamp(14px, 2vh, 24px) clamp(10px, 1vw, 18px);
+      border:1px solid #d8dee9; text-align:right; vertical-align:middle; color:#0f172a;
+    }
+    table.bsc-table tbody td.col-desc { text-align:left; font-weight:600; background:#f8fafc; }
+    table.bsc-table tbody td.computed { background:#eef2ff; color:#1e293b; font-weight:600; }
+    /* 입력 칸 — 다른 페이지와 동일하게 흰색 + 검정 테두리 */
+    table.bsc-table tbody td.input-cell { padding:0; background:#fff; }
+    .bsc-input {
+      width:100%; height:100%; min-height: clamp(40px, 5vh, 56px);
+      border:0; background:transparent; outline:0;
+      padding: clamp(14px, 2vh, 24px) clamp(10px, 1vw, 18px);
+      font: inherit; color:#173a54; text-align:right;
+    }
+    .bsc-input:focus { box-shadow: inset 0 0 0 2px #2563eb; background:#fff; }
+
+    body.platform-embedded[data-page-kind="srf-invoice-bsc"] { background:transparent; min-height:auto; }
+    body.platform-embedded[data-page-kind="srf-invoice-bsc"] .invoice-workspace { min-height:auto; padding:0; }
+    body.platform-embedded[data-page-kind="srf-invoice-bsc"] .invoice-canvas { min-height:auto; box-shadow:none; }
+    @media (max-width: 900px) {
+      .invoice-workspace { padding:14px; }
+      .invoice-canvas { padding:22px; }
+      .invoice-header { display:block; }
+      .invoice-toolbar { margin-top:12px; }
+      .bsc-paragraph, .bsc-callout { font-size:14px; }
+      table.bsc-table { font-size:13px; }
+      table.bsc-table thead th, table.bsc-table tbody td { padding:10px; }
+    }
+    @media print {
+      @page { size: A4 portrait; margin: 14mm; }
+      html, body { background:#fff !important; }
+      body { margin:0; padding:0; color:#000; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .sidebar-shell, .landing-page-header, .invoice-toolbar { display:none !important; }
+      .invoice-workspace { padding:0 !important; min-height:0 !important; }
+      .invoice-canvas { padding:0 !important; margin:0 !important; border:0 !important; background:#fff !important; box-shadow:none !important; min-height:0 !important; }
+      table.bsc-table { font-size:11px; }
+      table.bsc-table thead th, table.bsc-table tbody td { padding:6px 8px; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-bsc">
+  <main class="invoice-workspace">
+    <section class="invoice-canvas">
+      <div class="invoice-header">
+        <div class="invoice-title">
+          <h1>KleanNara SRF Boiler AOT invoice</h1>
+          <p>BSC &middot; Base Service Charge</p>
+        </div>
+        <div class="invoice-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint" title="A4 인쇄">인쇄</button>
+        </div>
+      </div>
+
+      <section class="bsc-section">
+        <h2>I. BASE SERVICE CHARGE</h2>
+
+        <p class="bsc-paragraph">The Minimum Volumes, as stated in Appendix 4(Minimum Volumes and Maximum Guaranteed Volumes), shall be the basis used for the calculation of the Base Service Charge.
+
+A monthly charge (the Base Service Charge) shall be payable in respect of each month of the Contracted Service Period in the amount stated in the following table. The Base Service Charge incorporates the cost of steam supplying such Minimum Volumes as stated in Appendix 4 (Minimum Volumes and Maximum Guaranteed Volumes).</p>
+
+        <div class="bsc-callout">
+          BSC = <span id="bscYearly">&mdash;</span> Won per year from Year 2018 to Year 2032
+        </div>
+
+        <table class="bsc-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:30%">Description</th>
+              <th colspan="3">Year 2018 to Year 2032</th>
+            </tr>
+            <tr>
+              <th>Base Service Charge Rate<br>(Won/ton)</th>
+              <th>Guaranted Volume<br>(Steam ton/year)</th>
+              <th>Base Service Charge Rate<br>(Won/year)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="col-desc">DP.1 Steam</td>
+              <td class="input-cell">
+                <input type="text" class="bsc-input" id="bscRate" inputmode="decimal" placeholder="" autocomplete="off" />
+              </td>
+              <td class="computed" id="bscVolume">475,200</td>
+              <td class="computed" id="bscWonYear">&mdash;</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+  <script>
+    /* BSC 계산:
+       - Base Service Charge Rate (Won/ton) : 사용자가 직접 입력
+       - Guaranteed Volume (Steam ton/year) : 계약 고정값 (475,200 ton/year)
+       - Base Service Charge Rate (Won/year) : Rate × Volume 자동 계산
+       - 콜아웃의 연간 BSC 액수도 동일 (Rate × Volume)
+       Rate 가 비어 있으면 모든 계산 결과는 '—' 로 표시.
+
+       저장/로딩:
+       BSC 는 월별 데이터가 아닌 계약 단가이므로 month="static" 으로 고정 키 저장.
+       table_cell_value 의 (table_name=srf_boiler_invoice_bsc, row_key=rate, col_index=1) 로 식별. */
+    const VOLUME = 475200;
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const BSC_TABLE = "srf_boiler_invoice_bsc";
+    const BSC_ROW_KEY = "rate";
+    const BSC_COL_INDEX = 1;
+
+    const rateInput = document.getElementById("bscRate");
+    const wonYearCell = document.getElementById("bscWonYear");
+    const yearlyCallout = document.getElementById("bscYearly");
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    let storedRow = null;
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}'); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+
+    // 연도 드롭다운 초기화
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    function bscMonthKey() { return String(currentYear); }
+
+    function format(n) {
+      if (!Number.isFinite(n)) return "—";
+      return Math.round(n).toLocaleString("en-US");
+    }
+
+    function recompute() {
+      const raw = String(rateInput.value || "").replace(/[,\s]/g, "");
+      const rate = Number(raw);
+      if (!raw || Number.isNaN(rate) || rate <= 0) {
+        wonYearCell.textContent = "—";
+        yearlyCallout.textContent = "—";
+        return;
+      }
+      const wonYear = rate * VOLUME;
+      wonYearCell.textContent = format(wonYear);
+      yearlyCallout.textContent = format(wonYear);
+    }
+
+    async function loadStored() {
+      storedRow = null;
+      rateInput.value = "";
+      recompute();
+      try {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=200&month=${encodeURIComponent(bscMonthKey())}`, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        storedRow = rows.find((row) =>
+          row.table_name === BSC_TABLE &&
+          row.row_key === BSC_ROW_KEY &&
+          Number(row.col_index) === BSC_COL_INDEX
+        ) || null;
+        if (storedRow && storedRow.cell_value != null && storedRow.cell_value !== "") {
+          const raw = String(storedRow.cell_value).replace(/[,\s]/g, "");
+          const n = Number(raw);
+          rateInput.value = Number.isFinite(n) && n > 0 ? n.toLocaleString("en-US") : storedRow.cell_value;
+          recompute();
+        }
+      } catch (e) { /* 무시 */ }
+    }
+
+    async function saveRate() {
+      const raw = String(rateInput.value || "").replace(/[,\s]/g, "");
+      const payload = {
+        month: bscMonthKey(),
+        year_no: currentYear,
+        month_no: 0,
+        table_name: BSC_TABLE,
+        row_key: BSC_ROW_KEY,
+        col_index: BSC_COL_INDEX,
+        cell_value: raw,
+      };
+      try {
+        const url = storedRow ? `${TABLES_BASE}/${CELL_TABLE}/${storedRow.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const response = await fetch(url, {
+          method: storedRow ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) return;
+        storedRow = await response.json();
+      } catch (e) {
+        // 저장 실패는 조용히 무시 — 다음 입력시 재시도
+      }
+    }
+
+    rateInput?.addEventListener("input", recompute);
+    rateInput?.addEventListener("blur", () => {
+      // 천 단위 콤마 포맷 적용 후 저장
+      const raw = String(rateInput.value || "").replace(/[,\s]/g, "");
+      const n = Number(raw);
+      if (raw && Number.isFinite(n) && n > 0) rateInput.value = n.toLocaleString("en-US");
+      recompute();
+      saveRate();
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}');
+        localStorage.setItem('steamlog:shared-period', JSON.stringify({ year: currentYear, month: prev.month || '01' }));
+      } catch (e) {}
+      loadStored();
+    });
+
+    loadStored();
+
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+</body>
+</html>

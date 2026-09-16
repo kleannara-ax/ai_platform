@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>단가 입력</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260716-unitprice" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260716-unitprice" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="unit-price"] {
+      background: var(--inc-bg-page); font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif; color: var(--inc-text);
+    }
+    body.landing-body[data-page-kind="unit-price"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:auto; }
+    body.landing-body[data-page-kind="unit-price"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.platform-embedded[data-page-kind="unit-price"] { height:100vh !important; overflow:auto !important; }
+    html.platform-embedded { overflow:hidden !important; }
+
+    /* 스크롤바 제거: 표를 화면 폭에 맞춰 고정 레이아웃으로 채운다. */
+    .up-table-wrap { overflow:visible; }
+    table.up-table { border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; font-size:12px; }
+    .up-table col.c-item { width:22%; }
+    .up-table col.c-bulk { width:6.5%; }
+    .up-table col.c-month { width:6.04%; }
+    .up-table th, .up-table td { border:1px solid rgba(120,181,217,.32); padding:4px 4px; text-align:center; white-space:nowrap; }
+    .up-table thead th {
+      position:sticky; top:0; z-index:5; background:linear-gradient(180deg,#fafcff 0%,#eef3f9 100%);
+      font-weight:700; color:var(--inc-text-strong); font-size:11.5px;
+    }
+    /* 시설 그룹 구분 행 */
+    .up-table tr.group-row td.group-cell {
+      text-align:left; font-weight:800; letter-spacing:.2px; color:#0f3555;
+      background:linear-gradient(90deg,#e5f0fa 0%,#eef5fb 100%);
+      border-left:3px solid var(--inc-primary,#2f6fb3); padding:6px 10px; font-size:12.5px;
+    }
+    .grp-badge {
+      margin-left:8px; font-size:10.5px; font-weight:700; color:#92400e;
+      background:#fef3c7; border:1px solid #fcd34d; border-radius:999px; padding:1px 7px; vertical-align:middle;
+    }
+    /* 항목명 열 */
+    .up-table th.item-col {
+      text-align:left; font-weight:600; color:var(--inc-text-strong); background:#f4f8fc; padding:4px 8px;
+    }
+    .item-label { font-weight:600; }
+    .mtd { display:inline-block; font-size:9.5px; font-weight:700; border-radius:4px; padding:1px 5px; vertical-align:middle; }
+    .mtd-direct { color:#1d4ed8; background:#e0edff; border:1px solid #bcd4ff; }
+    .mtd-auto { color:#6b7280; background:#eef1f5; border:1px solid #d6dbe2; }
+    .mtd-link { color:#b45309; background:#fdf2e3; border:1px solid #f0d3a6; }
+    .auto-note { margin-top:2px; font-size:10px; color:#94a3b8; font-weight:500; white-space:normal; line-height:1.25; }
+    .up-table td.bulk-col { background:#fff8e8; }
+    .up-table input {
+      width:100%; box-sizing:border-box; border:1px solid rgba(120,181,217,.5); border-radius:5px;
+      padding:3px 4px; text-align:right; font:inherit; font-size:11px; color:#173a54; background:#fbfdff; outline:none;
+    }
+    .up-table input:hover { border-color:#66b7e7; background:#f0f8ff; }
+    .up-table input:focus { background:#fff; border-color:var(--inc-primary,#2f6fb3); box-shadow:0 0 0 2px rgba(47,111,179,.15); }
+    .up-table td.bulk-col input { background:#fffdf3; border-color:#e6d9a8; }
+    /* 자동계산 행: 입력 비활성(회색) */
+    .up-table tr.auto-row th.item-col { background:#f6f7f9; }
+    .up-table input:disabled { background:#eef1f4; border-color:#dfe4ea; color:#9aa4b1; cursor:not-allowed; }
+    .up-unit { color:#8296a8; font-weight:500; font-size:10.5px; }
+    .up-hint { margin:10px 2px 0; font-size:12px; color:#64748b; }
+    .up-hint b { color:#334155; }
+    .up-msg { min-height:16px; margin-left:10px; font-size:12px; font-weight:600; }
+    .up-msg.ok { color:#16a34a; } .up-msg.err { color:#dc2626; }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="unit-price">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>시설별 계약 및 구매단가 입력 <span class="up-unit">(관리자)</span></h1>
+          <p>시설별 세부 단가를 연/월(1~12월)로 등록합니다. <b>직접</b>은 직접 입력, <b>자동</b> 항목은 계산식으로 산출되어 여기서는 입력하지 않습니다. 입력 시 자동 저장됩니다.</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="priceYear" aria-label="조회 연도"></select>
+          <button type="button" id="priceReload" class="btn-secondary">조회</button>
+          <span class="up-msg" id="priceMsg"></span>
+        </div>
+      </div>
+
+      <div class="inc-card">
+        <h3 class="inc-section-title">시설별 단가 (연/월별)</h3>
+        <div class="up-table-wrap">
+          <table class="up-table" id="priceTable">
+            <colgroup>
+              <col class="c-item" />
+              <col class="c-bulk" />
+              <col class="c-month" /><col class="c-month" /><col class="c-month" /><col class="c-month" />
+              <col class="c-month" /><col class="c-month" /><col class="c-month" /><col class="c-month" />
+              <col class="c-month" /><col class="c-month" /><col class="c-month" /><col class="c-month" />
+            </colgroup>
+            <thead>
+              <tr id="priceHeadRow">
+                <th class="item-col">항목</th>
+                <th class="bulk-col">일괄<br><span class="up-unit">전체 월</span></th>
+              </tr>
+            </thead>
+            <tbody id="priceBody"></tbody>
+          </table>
+        </div>
+        <p class="up-hint"><b>일괄</b> 칸에 값을 넣으면 해당 항목의 1~12월이 모두 그 값으로 채워집니다. 개별 월은 따로 수정 가능합니다. · <b>신설소각로</b>는 항목만 준비된 상태로 아직 다른 페이지와 연결되지 않습니다.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/steam/js/unit-price-common.js?v=20260911-nofix1"></script>
+  <script src="/steam/js/unit-price-pages.js?v=20260911-nofix1"></script>
+</body>
+</html>

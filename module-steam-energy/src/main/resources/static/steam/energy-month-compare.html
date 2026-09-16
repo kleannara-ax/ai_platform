@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>에너지 회계비용 - 회계비용 마감과 실마감 비교</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky4" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky4" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* body 자체를 세로 스크롤 컨테이너로 → page 스크롤 시 위 컨텐츠(제목/탭) 가 위로
+       올라가 가려지고, thead 가 viewport 상단(= 부모 iframe 의 흰색 topbar 바로 아래)
+       에 sticky 됨. 내부 wrap 에는 overflow 를 두지 않아야 sticky 가 body 까지 올라감. */
+    body.landing-body[data-page-kind="energy-month-compare"] {
+      background: var(--inc-bg-page);
+      font-family: "Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color: var(--inc-text);
+    }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:auto; }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas-table { overflow:visible; min-width:0; }
+    body.landing-body[data-page-kind="energy-month-compare"] .inc-card { overflow:visible; }
+    /* inc-design.css 의 .energy-table-wrap{overflow-y:hidden!important} 가 sticky 를
+       가로채므로, 이 페이지에서 !important 로 visible 로 환원 (body 가 스크롤 컨테이너). */
+    body.landing-body[data-page-kind="energy-month-compare"] .energy-table-wrap { overflow:visible !important; }
+    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead(제목 행) sticky 동작 */
+    body.platform-embedded[data-page-kind="energy-month-compare"] { height:100vh !important; overflow:auto !important; }
+    html.platform-embedded { overflow:hidden !important; }
+
+    .emc-input {
+      width:100%; min-width:0; border:1px solid #b7d7ef; border-radius:5px;
+      background:#eef8ff; padding:3px 4px; text-align:right; color:#173a54;
+      font:600 11.5px Inter, sans-serif; box-sizing:border-box;
+    }
+    .emc-input:hover { background:#dff0fb; }
+    .emc-input:focus { outline:2px solid rgba(86,167,226,.26); border-color:#66b7e7; background:#fff; }
+    .emc-note { width:100%; border:1px solid #d6e2ec; border-radius:5px; background:#fafdff; padding:4px 6px; font:500 11px Inter,sans-serif; resize:vertical; min-height:32px; box-sizing:border-box; }
+    .emc-calc { display:block; font-weight:700; color:#1f3b57; overflow:hidden; text-overflow:ellipsis; }
+    .emc-calc.neg { color:#c0392b; }
+    .emc-calc.imported { color:#0a7a5f; background:#e8f7f1; border-radius:4px; padding:1px 3px; }
+    .emc-import-badge {
+      display:inline-block; margin-left:6px; padding:1px 6px;
+      background:#0a7a5f; color:#fff; font-size:10px; font-weight:700;
+      border-radius:10px; vertical-align:middle;
+    }
+
+    /* 표 폭/셀 폭 ─ 라벨은 줄바꿈 허용, 숫자/달셀은 충분히 넓게 */
+    .energy-table { min-width: 1620px; table-layout: fixed; }
+    .energy-table colgroup col.c-cat   { width: 96px; }
+    .energy-table colgroup col.c-label { width: 200px; }
+    .energy-table colgroup col.c-month { width: 88px; }
+    .energy-table colgroup col.c-sum   { width: 92px; }
+    .energy-table colgroup col.c-avg   { width: 86px; }
+    .energy-table colgroup col.c-note  { width: 220px; }
+    .energy-table th, .energy-table td {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .energy-table th.label-cell, .energy-table td.label-cell {
+      white-space: normal;          /* 긴 라벨은 줄바꿈 허용 */
+      word-break: keep-all;
+      line-height: 1.25;
+    }
+    .energy-table td.note-cell { white-space: normal; overflow: visible; }
+    .energy-table td.num { text-align:right; padding-right:6px; }
+    .energy-table td.num .emc-calc { font-size: 11px; }
+
+    /* ── 행/열 고정 (sticky) ─────────────────────────────────────────
+       body 가 세로 스크롤 컨테이너이므로 thead 의 sticky top:0 은 body 의 가장자리
+       (= 부모 iframe 의 topbar 바로 아래) 에 고정됨.
+       wrap 에는 overflow 를 주지 않아 sticky 컨테이닝 블록이 wrap 이 아닌 body 가 됨.
+       ────────────────────────────────────────────────────────────── */
+    .energy-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+      box-shadow: inset 0 -1px 0 rgba(120, 181, 217, .45);
+    }
+    .energy-table th.col-cat-sub,
+    .energy-table td.col-cat-sub {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      background: #eef3f8;
+    }
+    .energy-table th.label-cell,
+    .energy-table td.label-cell {
+      position: sticky;
+      left: 96px;
+      z-index: 4;
+      background: var(--inc-bg-header, #f3f7fa);
+    }
+    .energy-table thead th.col-cat-sub,
+    .energy-table thead th.label-cell {
+      z-index: 6;
+      background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+    }
+    .energy-table thead th[colspan="2"].label-cell {
+      left: 0;
+      z-index: 7;
+    }
+
+    /* === 차트 === */
+    .emc-chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 16px;
+    }
+    .emc-chart-card {
+      background: #fff;
+      border: 1px solid rgba(120,181,217,.24);
+      border-radius: 12px;
+      box-shadow: 0 8px 18px rgba(23,65,95,.06);
+      padding: 14px 16px;
+    }
+    .emc-chart-title {
+      font: 700 13px Inter, "Apple SD Gothic Neo", sans-serif;
+      color: #1f3b57;
+      margin: 0 0 6px 0;
+    }
+    .emc-chart-legend {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px;
+      font: 500 11.5px Inter, sans-serif; color: #475569;
+    }
+    .emc-chart-legend .dot {
+      display:inline-block; width:10px; height:10px; border-radius:3px;
+      margin-right:4px; vertical-align:middle;
+    }
+    .emc-chart-svg { width: 100%; height: 220px; display: block; }
+    .emc-chart-empty {
+      display:flex; align-items:center; justify-content:center;
+      height:200px; color:#9ca3af; font-size:13px;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="energy-month-compare">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>2. 회계비용 마감과 실마감 비교</h1>
+          <p id="emcSubtitle">— 월별 회계비용 마감 vs 실마감 차이 (연료비 / 전력비 / 에너지 합산)</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="emcYear" aria-label="조회 연도"></select>
+          <button type="button" id="emcReload" class="btn-secondary">조회</button>
+          <button type="button" id="emcReset" class="btn-secondary" title="현재 연도 데이터 초기화">초기화</button>
+          <button type="button" id="emcExcelDownload" class="btn-secondary">엑셀 다운로드</button>
+          <button type="button" id="emcExcelUpload" class="btn-secondary">엑셀 업로드</button>
+          <input type="file" id="emcExcelFileInput" accept=".xls,.xlsx,.xlsm" hidden />
+        </div>
+      </div>
+
+      <div class="energy-tab-bar" role="tablist" id="emcTabs">
+        <button type="button" class="energy-tab" data-target="fuel"  aria-pressed="true">1. 연료비</button>
+        <button type="button" class="energy-tab" data-target="power" aria-pressed="false">2. 전력비</button>
+        <button type="button" class="energy-tab" data-target="total" aria-pressed="false">3. 에너지 합산 / 손익</button>
+        <button type="button" class="energy-tab" data-target="charts" aria-pressed="false">4. 차트</button>
+      </div>
+
+      <section class="energy-panel active" data-panel="fuel">
+        <div class="inc-card">
+          <h3 class="inc-section-title">1. 연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+          <div class="energy-table-wrap">
+            <table class="energy-table" data-section="fuel">
+              <colgroup id="emcFuelCols"></colgroup>
+              <thead><tr id="emcFuelHeader"></tr></thead>
+              <tbody id="emcFuelBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="energy-panel" data-panel="power">
+        <div class="inc-card">
+          <h3 class="inc-section-title">2. 전력비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+          <div class="energy-table-wrap">
+            <table class="energy-table" data-section="power">
+              <colgroup id="emcPowerCols"></colgroup>
+              <thead><tr id="emcPowerHeader"></tr></thead>
+              <tbody id="emcPowerBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="energy-panel" data-panel="total">
+        <div class="inc-card">
+          <h3 class="inc-section-title">3. 에너지 합산 / 손익 (연료비 + 전력비)</h3>
+          <div class="energy-table-wrap">
+            <table class="energy-table" data-section="total">
+              <colgroup id="emcTotalCols"></colgroup>
+              <thead><tr id="emcTotalHeader"></tr></thead>
+              <tbody id="emcTotalBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="energy-panel" data-panel="charts">
+        <div class="inc-card">
+          <h3 class="inc-section-title">4. 차트 — 제품톤당 에너지</h3>
+          <div class="emc-chart-grid" id="emcChartGrid"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
+    const PAGE_TABLE_NAME = "energy_month_compare";
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+
+    const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
+    const sumArr = (arr) => arr.reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
+    const avgArr = (arr) => {
+      const xs = arr.filter((v) => Number.isFinite(v));
+      return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null;
+    };
+
+    // === 외부 페이지에서 가져오기 ===
+    // unit-fluidized-monthly 의 도급비용 (contractCost = 가동시간 운영비 + 운휴 고정비 + 설비개선비 - 차감비 + 추가지급분)
+    //   원본 단위: 천원 → 백만원으로 변환
+    // 저장소: DB table_cell_value (table_name=fluidized_monthly_cache, row_key=contractCost, col_index=1..12)
+    const __fmcCache = { year: null, data: null };
+    async function fetchFluidizedContract(year) {
+      if (__fmcCache.year === year && __fmcCache.data) return __fmcCache.data;
+      try {
+        const params = new URLSearchParams({
+          month: String(year), tableNames: "fluidized_monthly_cache", limit: "1000",
+        });
+        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        if (!resp.ok) { __fmcCache.year = year; __fmcCache.data = {}; return {}; }
+        const payload = await resp.json();
+        const out = {};
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== "fluidized_monthly_cache") return;
+          if (row.row_key !== "contractCost") return;
+          const m = Number(row.col_index);
+          if (!Number.isFinite(m) || m < 1 || m > 12) return;
+          const v = Number(row.cell_value);
+          if (Number.isFinite(v) && v !== 0) out[m] = v / 1000; // 천원 → 백만원
+        });
+        __fmcCache.year = year; __fmcCache.data = out;
+        return out;
+      } catch (e) {
+        console.error("[emc fetchFluidizedContract]", e);
+        return {};
+      }
+    }
+    function importFluidizedContract(year) {
+      // 동기 호출용 — 캐시된 데이터 반환 (loadAndRender 에서 사전 fetch).
+      return (__fmcCache.year === year && __fmcCache.data) ? __fmcCache.data : {};
+    }
+
+    // 외부 import 디스패치 — row.importSource 에 따라 호출
+    // energy_fuel_ratio DB 캐시 — 한 번만 fetch
+    const __efrDataCache = { year: null, data: null };
+    async function fetchFuelRatio(year) {
+      if (__efrDataCache.year === year && __efrDataCache.data) return __efrDataCache.data;
+      try {
+        const params = new URLSearchParams({
+          month: String(year), tableNames: "energy_fuel_ratio", limit: "10000",
+        });
+        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        if (!resp.ok) return null;
+        const payload = await resp.json();
+        const map = new Map();
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== "energy_fuel_ratio") return;
+          map.set(`${row.row_key}|${row.col_index}`, Number(row.cell_value));
+        });
+        __efrDataCache.year = year;
+        __efrDataCache.data = map;
+        return map;
+      } catch (e) { return null; }
+    }
+    function getEfrSync(rowKey, col) {
+      if (!__efrDataCache.data) return null;
+      const v = __efrDataCache.data.get(`${rowKey}|${col}`);
+      return (typeof v === "number" && Number.isFinite(v)) ? v : null;
+    }
+    function importFuelRatioRow(year, rowKey) {
+      // rowKey 예: "t04|r03" (호기별 연료비배분 / 제지 소계)
+      // 결과: { 1: value, ..., 12: value }
+      // col_index 매핑: efr col 1 = 24.12월, 2 = 1월, ..., 13 = 12월
+      // emc month 1 = 1월 → efr col 2
+      // → col = month + 1
+      const out = {};
+      for (let m = 1; m <= 12; m++) {
+        const v = getEfrSync(rowKey, m + 1);
+        if (v !== null) out[m] = v;
+      }
+      return out;
+    }
+
+    function importValues(importSource, year) {
+      if (importSource === "fluidized-monthly") return importFluidizedContract(year);
+      if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
+      if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
+      if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
+      return {};
+    }
+
+    // 각 row 정의:
+    //   key: 데이터 식별자 (저장 키)
+    //   label: 표시 라벨
+    //   cat: 좌측 카테고리 라벨 (rowspan으로 묶음)
+    //   kind: 'input' | 'sum' | 'formula'
+    //   srcKeys: sum 일 때 합산 대상 키
+    //   formula: formula 일 때 (rows, m) => 값
+    //   cls: 'subtotal' | 'total'
+    //   note: 비고 표시 여부 (기본 true). 비고는 같은 카테고리의 첫 row 에서만 rowspan
+    const FUEL_ROWS = [
+      { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"input" },
+      { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input" },
+      { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
+      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"input" },
+      { key:"fluidSteam",      label:"유동상소각로 스팀구매",        cat:"연료비",    kind:"imported",
+        importSource:"fluidized-monthly", importLabel:"유동상 운영내역 → 도급비용" },
+      { key:"fuelMonthlySum",  label:"연료비 월별 (소계)",           cat:"연료비",    kind:"sum",
+        srcKeys:["compositeSteam","zescoSteam","lngBuy","pyhsynSteam","fluidSteam"], cls:"subtotal" },
+
+      { key:"zescoOffset",     label:"제스코 상계비 (유틸리티)",     cat:"차감비",    kind:"input" },
+      { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input" },
+      { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"input" },
+      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"input" },
+      { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"input" },
+      { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"input" },
+      { key:"deductSum",       label:"차감비 소계",                  cat:"차감비",    kind:"sum",
+        srcKeys:["zescoOffset","zescoPenalty","compositeLngEtc","compositeInvest","compositeIncome","landLease"], cls:"subtotal" },
+
+      { key:"fuelActual",      label:"연료비(회계비용) 실적",        cat:"실적",      kind:"formula", cls:"total",
+        formula:(r,m) => (r.fuelMonthlySum[m] ?? 0) - (r.deductSum[m] ?? 0) },
+      { key:"paperFuel",       label:"제지 연료비(스팀사용비율)",    cat:"스팀사용비율", kind:"imported",
+        importSource:"fuel-ratio-paper", importLabel:"연료비 배분비율 → 호기별 연료비배분 / 제지 소계" },
+      { key:"livingFuel",      label:"생활 연료비(스팀사용비율)",    cat:"스팀사용비율", kind:"imported",
+        importSource:"fuel-ratio-tissue", importLabel:"연료비 배분비율 → 호기별 연료비배분 / 화장지 소계" },
+
+      { key:"fuelPlan",        label:"연료비(회계비용) SG 계획금액", cat:"계획",      kind:"input" },
+      { key:"fuelVsPlan",      label:"회계비용 대비 증감",           cat:"계획",      kind:"formula",
+        formula:(r,m) => (r.fuelActual[m] ?? null) === null ? null : r.fuelActual[m] - (r.fuelPlan[m] ?? 0) },
+      { key:"fuelVsPrev",      label:"전월대비 증감",                cat:"계획",      kind:"formula",
+        formula:(r,m) => m > 0 && Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.fuelActual[m-1]) ? r.fuelActual[m] - r.fuelActual[m-1] : null },
+
+      { key:"prodTotal",       label:"생산량",                       cat:"생산량",    kind:"formula",
+        formula:(r,m) => (r.paperProd[m] ?? 0) + (r.tissueProd[m] ?? 0) },
+      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"input" },
+      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"input" },
+
+      { key:"totalUnit",       label:"총 원단위 (연료비/생산량)",    cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.prodTotal[m] ?? 0) },
+      { key:"paperUnit",       label:"제지 원단위 (연료비/생산량)",  cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.paperFuel[m] ?? 0) * 1000, r.paperProd[m] ?? 0) },
+      { key:"livingUnit",      label:"생활 원단위 (연료비/생산량)",  cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.livingFuel[m] ?? 0) * 1000, r.tissueProd[m] ?? 0) },
+
+      { key:"profitDelta",     label:"전월대비 손익증감",            cat:"손익",      kind:"formula",
+        formula:(r,m) => m > 0 && Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.fuelActual[m-1]) ? -(r.fuelActual[m] - r.fuelActual[m-1]) : null },
+      { key:"paperProfit",     label:"제지손익",                     cat:"손익",      kind:"input" },
+      { key:"livingProfit",    label:"생활손익",                     cat:"손익",      kind:"input" },
+      { key:"profitSum",       label:"손익합계 (제지+생활)",         cat:"손익",      kind:"sum",
+        srcKeys:["paperProfit","livingProfit"], cls:"subtotal" },
+
+      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"input" },
+      { key:"lngBurner",       label:"LNG 직버너 사용 비용",         cat:"보조 분석", kind:"imported",
+        importSource:"fuel-ratio-lng-burner", importLabel:"연료비 배분비율 → 버너 LNG 비용 / 합계" },
+      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"input" },
+      { key:"boilerSteamUnit", label:"스팀톤당 보일러 연료비 (천원/톤)", cat:"보조 분석", kind:"formula",
+        formula:(r,m) => safeDiv((r.boilerFuel[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
+      { key:"fuelSteamUnit",   label:"스팀톤당 연료비 (천원/톤)",    cat:"보조 분석", kind:"formula",
+        formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
+    ];
+
+    const POWER_ROWS = [
+      { key:"powerMonthly",    label:"전력비 월별 (백만원)",         cat:"전력비",    kind:"input" },
+      { key:"energyKSettle",   label:"에너지K 정산 지급비용 (AJ)",   cat:"전력비",    kind:"input" },
+      { key:"essSettle",       label:"ESS 정산 지급비용",            cat:"전력비",    kind:"input" },
+      { key:"kepcoBill",       label:"한전 청구비용 (백만원)",       cat:"전력비",    kind:"input" },
+      { key:"dongjinWh",       label:"동진창고",                     cat:"전력비",    kind:"input" },
+      { key:"eumseongFct",     label:"음성공장",                     cat:"전력비",    kind:"input" },
+      { key:"logisticsWh",     label:"물류창고",                     cat:"전력비",    kind:"input" },
+
+      { key:"drRefund",        label:"신뢰성수요반응 환급 (별도)",   cat:"차감비",    kind:"input" },
+      { key:"compositePower",  label:"복합보일러 전력비",            cat:"차감비",    kind:"input" },
+      { key:"powerSettle",     label:"전력비 정산 (AJ, SDI 환급)",   cat:"차감비",    kind:"input" },
+      { key:"powerDeductSum",  label:"차감비 소계",                  cat:"차감비",    kind:"sum",
+        srcKeys:["drRefund","compositePower","powerSettle"], cls:"subtotal" },
+
+      { key:"powerActualCj",   label:"전력비(회계비용) 실적 : 청주공장만 해당", cat:"실적", kind:"formula", cls:"total",
+        formula:(r,m) => (r.powerMonthly[m] ?? 0) - (r.powerDeductSum[m] ?? 0) },
+      { key:"powerActualAll",  label:"전력비(회계비용) 실적 : 청주+음성+물류",  cat:"실적", kind:"formula", cls:"total",
+        formula:(r,m) => (r.powerActualCj[m] ?? 0) + (r.eumseongFct[m] ?? 0) + (r.logisticsWh[m] ?? 0) },
+
+      { key:"paperPower",      label:"제지 전력비 (전표비용 확인)",  cat:"전력비용",  kind:"input" },
+      { key:"tissuePower",     label:"화장지 전력비",                cat:"전력비용",  kind:"input" },
+      { key:"padPower",        label:"PAD 전력비",                  cat:"전력비용",  kind:"input" },
+
+      { key:"powerPlan",       label:"전력비(회계비용) SG 계획금액", cat:"계획",      kind:"input" },
+      { key:"powerVsPlan",     label:"회계비용 대비 증감",           cat:"계획",      kind:"formula",
+        formula:(r,m) => (r.powerActualAll[m] ?? null) === null ? null : r.powerActualAll[m] - (r.powerPlan[m] ?? 0) },
+
+      { key:"powerProdTotal",  label:"생산량",                       cat:"생산량",    kind:"formula",
+        formula:(r,m) => (r.powerPaperProd[m] ?? 0) + (r.powerTissueProd[m] ?? 0) + (r.padProd[m] ?? 0) },
+      { key:"powerPaperProd",  label:"제지 제품생산량",              cat:"제품생산량", kind:"input" },
+      { key:"powerTissueProd", label:"화장지 제품생산량",            cat:"제품생산량", kind:"input" },
+      { key:"padProd",         label:"PAD 제품생산량 (천EA)",        cat:"제품생산량", kind:"input" },
+
+      { key:"powerTotalUnit",  label:"전력비 / 생산량 (천원/톤·제품)", cat:"원단위", kind:"formula",
+        formula:(r,m) => safeDiv((r.powerActualAll[m] ?? 0) * 1000, (r.powerPaperProd[m] ?? 0) + (r.powerTissueProd[m] ?? 0)) },
+      { key:"paperPowerUnit",  label:"제지 원단위 (전력비/생산량)",  cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.paperPower[m] ?? 0) * 1000, r.powerPaperProd[m] ?? 0) },
+      { key:"tissuePowerUnit", label:"화장지 원단위 (전력비/생산량)", cat:"원단위",   kind:"formula",
+        formula:(r,m) => safeDiv((r.tissuePower[m] ?? 0) * 1000, r.powerTissueProd[m] ?? 0) },
+      { key:"padPowerUnit",    label:"PAD 원단위 (전력비/생산량)",   cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.padPower[m] ?? 0) * 1000, r.padProd[m] ?? 0) },
+
+      { key:"powerProfitDelta", label:"전월대비 손익증감",           cat:"손익",      kind:"formula",
+        formula:(r,m) => m > 0 && Number.isFinite(r.powerActualAll[m]) && Number.isFinite(r.powerActualAll[m-1]) ? -(r.powerActualAll[m] - r.powerActualAll[m-1]) : null },
+      { key:"paperPowerProfit", label:"제지손익",                    cat:"손익",      kind:"input" },
+      { key:"tissuePowerProfit",label:"화장지손익",                  cat:"손익",      kind:"input" },
+      { key:"padPowerProfit",   label:"PAD 손익",                   cat:"손익",      kind:"input" },
+      { key:"powerProfitSum",   label:"손익합계 (제지+생활+PAD)",    cat:"손익",      kind:"sum",
+        srcKeys:["paperPowerProfit","tissuePowerProfit","padPowerProfit"], cls:"subtotal" },
+
+      { key:"powerUsageMw",     label:"전력사용량 (MW)",             cat:"보조 분석", kind:"input" },
+      { key:"powerRateWon",     label:"전력단가 (원/Kw)",            cat:"보조 분석", kind:"formula",
+        formula:(r,m) => safeDiv((r.powerActualAll[m] ?? 0) * 1000000, (r.powerUsageMw[m] ?? 0) * 1000) },
+    ];
+
+    const TOTAL_ROWS = [
+      { key:"energyCostSum",   label:"에너지비용 합계 (백만원)",     cat:"에너지 합산", kind:"formula", cls:"total",
+        formula:(r,m,xr) => (xr.fuel.fuelActual[m] ?? 0) + (xr.power.powerActualAll[m] ?? 0) },
+      { key:"energyPerProd",   label:"1톤 생산량당 에너지비용 (천원/톤)", cat:"에너지 합산", kind:"formula",
+        formula:(r,m,xr) => safeDiv(r.energyCostSum[m] * 1000, (xr.fuel.prodTotal[m] ?? 0)) },
+      { key:"energyProfitDelta", label:"전월대비 손익증감",          cat:"에너지 합산", kind:"formula",
+        formula:(r,m) => m > 0 && Number.isFinite(r.energyCostSum[m]) && Number.isFinite(r.energyCostSum[m-1]) ? -(r.energyCostSum[m] - r.energyCostSum[m-1]) : null },
+      { key:"energySplitDelta", label:"전월대비 손익증감 (제지·생활 분리 적용시)", cat:"에너지 합산", kind:"formula",
+        formula:(r,m,xr) => (xr.fuel.profitSum[m] ?? 0) + (xr.power.powerProfitSum[m] ?? 0) },
+
+      { key:"paperProfitSum",    label:"제지손익",                  cat:"에너지비용 손익 (백만원)", kind:"formula",
+        formula:(r,m,xr) => (xr.fuel.paperProfit[m] ?? 0) + (xr.power.paperPowerProfit[m] ?? 0) },
+      { key:"tissueProfitSum",   label:"화장지손익",                cat:"에너지비용 손익 (백만원)", kind:"formula",
+        formula:(r,m,xr) => (xr.fuel.livingProfit[m] ?? 0) + (xr.power.tissuePowerProfit[m] ?? 0) },
+      { key:"padProfitSum",      label:"PAD 손익",                  cat:"에너지비용 손익 (백만원)", kind:"formula",
+        formula:(r,m,xr) => (xr.power.padPowerProfit[m] ?? 0) },
+      { key:"profitSumTotal",    label:"합계",                      cat:"에너지비용 손익 (백만원)", kind:"sum",
+        srcKeys:["paperProfitSum","tissueProfitSum","padProfitSum"], cls:"subtotal" },
+
+      { key:"paperEnergy",       label:"제지",                      cat:"에너지비용", kind:"formula",
+        formula:(r,m,xr) => (xr.fuel.paperFuel[m] ?? 0) + (xr.power.paperPower[m] ?? 0) },
+      { key:"tissueEnergy",      label:"화장지",                    cat:"에너지비용", kind:"formula",
+        formula:(r,m,xr) => (xr.fuel.livingFuel[m] ?? 0) + (xr.power.tissuePower[m] ?? 0) },
+      { key:"padEnergy",         label:"PAD",                       cat:"에너지비용", kind:"formula",
+        formula:(r,m,xr) => (xr.power.padPower[m] ?? 0) },
+      { key:"energySumMW",       label:"합계 (백만원)",             cat:"에너지비용", kind:"sum",
+        srcKeys:["paperEnergy","tissueEnergy","padEnergy"], cls:"subtotal" },
+
+      { key:"paperTonCost",      label:"제지",                      cat:"톤당비용", kind:"formula",
+        formula:(r,m,xr) => safeDiv(r.paperEnergy[m] * 1000, xr.fuel.paperProd[m] ?? 0) },
+      { key:"tissueTonCost",     label:"생활",                      cat:"톤당비용", kind:"formula",
+        formula:(r,m,xr) => safeDiv(r.tissueEnergy[m] * 1000, xr.fuel.tissueProd[m] ?? 0) },
+      { key:"padTonCost",        label:"PAD",                       cat:"톤당비용", kind:"formula",
+        formula:(r,m,xr) => safeDiv(r.padEnergy[m] * 1000, xr.power.padProd[m] ?? 0) },
+      { key:"totalTonCost",      label:"에너지 총비용",             cat:"톤당비용", kind:"formula",
+        formula:(r,m,xr) => safeDiv(r.energyCostSum[m] * 1000, (xr.fuel.paperProd[m] ?? 0) + (xr.fuel.tissueProd[m] ?? 0)) },
+    ];
+
+    const SECTION_DEFS = {
+      fuel:  { rows: FUEL_ROWS,  headerId: "emcFuelHeader",  bodyId: "emcFuelBody",  colId: "emcFuelCols",  hasNote: true },
+      power: { rows: POWER_ROWS, headerId: "emcPowerHeader", bodyId: "emcPowerBody", colId: "emcPowerCols", hasNote: true },
+      total: { rows: TOTAL_ROWS, headerId: "emcTotalHeader", bodyId: "emcTotalBody", colId: "emcTotalCols", hasNote: false },
+    };
+
+    let currentYear = String(new Date().getFullYear());
+    let store = {}; // DB 캐시 — loadStoreFromDB() 로 채움
+    let computed = { fuel:{}, power:{}, total:{} };
+    let notes = {}; // notes[section][rowKey]
+
+    /* ── DB 저장소 (table_cell_value / table_name=energy_month_compare) ─
+     *  row_key 형식:
+     *    데이터: `${section}|${rowKey}`  예: "fuel|compositeSteam"
+     *    비고  : `note|${section}|${cat}` 예: "note|fuel|연료비"
+     *  col_index: 0=전년12월, 1~12=1~12월, 13=다음해1월 / 비고는 0
+     */
+    async function loadStoreFromDB(year) {
+      const yearStr = String(year);
+      try {
+        const params = new URLSearchParams({ month: yearStr, tableNames: PAGE_TABLE_NAME, limit: "10000" });
+        const resp = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        store[yearStr] = { fuel:{}, power:{}, total:{}, notes:{ fuel:{}, power:{}, total:{} } };
+        const yd = store[yearStr];
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== PAGE_TABLE_NAME) return;
+          const rk = String(row.row_key);
+          const ci = Number(row.col_index);
+          const val = row.cell_value;
+          if (rk.startsWith("note|")) {
+            const parts = rk.split("|");
+            const sec = parts[1], cat = parts.slice(2).join("|");
+            if (yd.notes[sec]) yd.notes[sec][cat] = String(val == null ? "" : val);
+          } else {
+            const idx = rk.indexOf("|");
+            if (idx < 0) return;
+            const sec = rk.substring(0, idx), rowK = rk.substring(idx + 1);
+            if (!yd[sec]) return;
+            if (!yd[sec][rowK]) yd[sec][rowK] = {};
+            const num = Number(val);
+            yd[sec][rowK][ci] = Number.isFinite(num) ? num : null;
+          }
+        });
+      } catch (e) { console.error("[emc loadStoreFromDB]", e); }
+    }
+    async function upsertCellToDB(section, rowKey, monthIdx, value) {
+      const payload = {
+        month: String(currentYear), year_no: Number(currentYear), month_no: 0,
+        table_name: PAGE_TABLE_NAME,
+        row_key: `${section}|${rowKey}`, col_index: monthIdx,
+        cell_value: (value === null || value === undefined || value === "") ? null : String(value),
+      };
+      try {
+        await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+      } catch (e) { console.error("[emc upsertCell]", e); }
+    }
+    async function upsertNoteToDB(section, cat, text) {
+      const payload = {
+        month: String(currentYear), year_no: Number(currentYear), month_no: 0,
+        table_name: PAGE_TABLE_NAME,
+        row_key: `note|${section}|${cat}`, col_index: 0,
+        cell_value: String(text || ""),
+      };
+      try {
+        await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+      } catch (e) { console.error("[emc upsertNote]", e); }
+    }
+    async function deleteYearFromDB(year) {
+      try {
+        const params = new URLSearchParams({ month: String(year), tableName: PAGE_TABLE_NAME });
+        await fetch(`${TABLES_BASE}/${CELL_TABLE}/by-table?${params.toString()}`, { method: "DELETE" });
+      } catch (e) { console.error("[emc deleteYear]", e); }
+    }
+    function getYearState() {
+      if (!store[currentYear]) store[currentYear] = { fuel:{}, power:{}, total:{}, notes:{} };
+      const s = store[currentYear];
+      ["fuel","power","total"].forEach((sec) => { if (!s[sec]) s[sec] = {}; });
+      if (!s.notes) s.notes = {};
+      ["fuel","power","total"].forEach((sec) => { if (!s.notes[sec]) s.notes[sec] = {}; });
+      return s;
+    }
+
+    function buildHeader(section) {
+      const def = SECTION_DEFS[section];
+      const hasNote = def.hasNote;
+      // colgroup
+      const colHtml = [
+        `<col class="c-cat">`,
+        `<col class="c-label">`,
+        `<col class="c-month">`,           // prev year Dec
+        ...MONTHS.map(() => `<col class="c-month">`),
+        `<col class="c-month">`,           // next year Jan
+        `<col class="c-sum">`,
+        `<col class="c-avg">`,
+      ];
+      if (hasNote) colHtml.push(`<col class="c-note">`);
+      document.getElementById(def.colId).innerHTML = colHtml.join("");
+
+      // header row
+      const prevYear = String(Number(currentYear) - 1).slice(-2);
+      const nextYear = String(Number(currentYear) + 1).slice(-2);
+      const cols = [
+        `<th colspan="2" class="label-cell">구분</th>`,
+        `<th>${prevYear}.12월</th>`,
+        ...MONTHS.map((m) => `<th>${m}월</th>`),
+        `<th>${nextYear}.1월</th>`,
+        `<th>합계</th>`,
+        `<th>평균</th>`,
+      ];
+      if (hasNote) cols.push(`<th>비고</th>`);
+      document.getElementById(def.headerId).innerHTML = cols.join("");
+    }
+
+    function fmt(v, digits) {
+      if (v === null || v === undefined || Number.isNaN(v) || !Number.isFinite(v)) return "—";
+      const d = digits ?? 1;
+      const s = v.toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+      return s;
+    }
+
+    /** 표시용 1자리 반올림 (DB 저장값과 분리). 입력 시 raw 비교는 displayDigits 적용 후 수행 */
+    function roundDisplay(value) {
+      if (value === null || value === undefined || value === "") return "";
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value);
+      // 정수면 그대로, 소수면 한자리 반올림
+      return Number.isInteger(n) ? String(n) : (Math.round(n * 10) / 10).toString();
+    }
+    function inputHtml(section, rowKey, monthIdx, value) {
+      const display = roundDisplay(value);
+      const raw = (value === null || value === undefined) ? "" : String(value);
+      // data-raw-value: 원본 DB 값 (full precision) — 사용자가 변경 안 했을 때 저장 skip 비교용
+      return `<input class="emc-input" data-section="${section}" data-row="${rowKey}" data-month="${monthIdx}" type="text" value="${display}" data-raw-value="${raw}" inputmode="decimal">`;
+    }
+
+    function noteHtml(section, rowKey, rowspan, value) {
+      return `<td class="note-cell" rowspan="${rowspan}"><textarea class="emc-note" data-section="${section}" data-note="${rowKey}" placeholder="실적 대비 분석 메모">${value || ""}</textarea></td>`;
+    }
+
+    function getRowMonth(section, rowKey, monthIdx) {
+      // monthIdx: 0=prev year Dec, 1..12 = 1월~12월, 13=next year Jan
+      const sec = (computed[section] && computed[section][rowKey]) || {};
+      return sec[monthIdx];
+    }
+
+    function renderSection(section) {
+      const def = SECTION_DEFS[section];
+      const body = document.getElementById(def.bodyId);
+      const ys = getYearState();
+      const secStore = ys[section];
+
+      // 데이터 배열 초기화 (input 의 raw 값을 computed[section] 에도 저장 — 계산식이 참조)
+      def.rows.forEach((row) => {
+        if (!computed[section][row.key]) computed[section][row.key] = {};
+        if (row.kind === "input") {
+          // 0..13 (prev/12개월/next)
+          for (let m = 0; m <= 13; m++) {
+            const v = secStore[row.key]?.[m];
+            computed[section][row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+          }
+        } else if (row.kind === "imported") {
+          // 외부 페이지에서 자동 가져오기 (1월~12월만 — prev/next 는 null)
+          const imported = importValues(row.importSource, currentYear);
+          for (let m = 0; m <= 13; m++) {
+            computed[section][row.key][m] = (m >= 1 && m <= 12 && imported[m] !== undefined) ? imported[m] : null;
+          }
+        }
+      });
+
+      // compute sum/formula in order
+      def.rows.forEach((row) => {
+        if (row.kind === "sum") {
+          for (let m = 0; m <= 13; m++) {
+            const vals = row.srcKeys.map((k) => computed[section][k]?.[m]).filter(Number.isFinite);
+            computed[section][row.key][m] = vals.length ? vals.reduce((s, v) => s + v, 0) : null;
+          }
+        } else if (row.kind === "formula") {
+          for (let m = 0; m <= 13; m++) {
+            try {
+              const v = row.formula(computed[section], m, computed);
+              computed[section][row.key][m] = (v === null || !Number.isFinite(v)) ? null : v;
+            } catch (e) { computed[section][row.key][m] = null; }
+          }
+        }
+      });
+
+      // group rows by cat for rowspan
+      const catGroups = [];
+      let curCat = null, curGroup = null;
+      def.rows.forEach((row) => {
+        if (row.cat !== curCat) {
+          curCat = row.cat;
+          curGroup = { cat: curCat, rows: [] };
+          catGroups.push(curGroup);
+        }
+        curGroup.rows.push(row);
+      });
+
+      const html = [];
+      catGroups.forEach((group) => {
+        group.rows.forEach((row, idx) => {
+          const tr = [];
+          tr.push(`<tr${row.cls ? ` class="${row.cls}"` : ""}>`);
+          if (idx === 0) {
+            tr.push(`<th rowspan="${group.rows.length}" class="col-cat-sub">${escapeHtml(group.cat)}</th>`);
+          }
+          // 라벨 셀 — imported row 면 출처 배지 추가
+          const labelExtra = row.kind === "imported"
+            ? `<span class="emc-import-badge" title="${escapeHtml(row.importLabel || row.importSource)}">🔗 자동</span>`
+            : "";
+          tr.push(`<td class="label-cell">${escapeHtml(row.label)}${labelExtra}</td>`);
+
+          // 0..13 monthly cells + 합계 + 평균
+          for (let m = 0; m <= 13; m++) {
+            if (row.kind === "input") {
+              const v = secStore[row.key]?.[m] ?? "";
+              tr.push(`<td>${inputHtml(section, row.key, m, v)}</td>`);
+            } else {
+              const v = computed[section][row.key][m];
+              const extraCls = row.kind === "imported" ? " imported" : "";
+              tr.push(`<td class="num"><span class="emc-calc${v !== null && v < 0 ? " neg" : ""}${extraCls}">${fmt(v, 1)}</span></td>`);
+            }
+          }
+          // 합계 (1..12)
+          const monthVals = [];
+          for (let m = 1; m <= 12; m++) {
+            const v = (row.kind === "input")
+              ? (secStore[row.key]?.[m] !== undefined && secStore[row.key][m] !== "" ? Number(secStore[row.key][m]) : null)
+              : computed[section][row.key][m];
+            monthVals.push(v);
+          }
+          const sumV = sumArr(monthVals);
+          const avgV = avgArr(monthVals);
+          tr.push(`<td class="num"><span class="emc-calc${sumV < 0 ? " neg" : ""}">${fmt(sumV, 1)}</span></td>`);
+          tr.push(`<td class="num"><span class="emc-calc${avgV !== null && avgV < 0 ? " neg" : ""}">${fmt(avgV, 1)}</span></td>`);
+
+          // 비고 (카테고리당 첫 row 에만 rowspan)
+          if (def.hasNote && idx === 0) {
+            const noteVal = ys.notes[section]?.[group.cat] || "";
+            tr.push(noteHtml(section, group.cat, group.rows.length, noteVal));
+          }
+          tr.push(`</tr>`);
+          html.push(tr.join(""));
+        });
+      });
+      body.innerHTML = html.join("");
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    // 마지막으로 포커스됐던 emc-input 좌표 추적 — change 시점에 activeElement 가
+    // 잠시 body 로 빠질 때 fallback 으로 사용.
+    let __lastFocusCoord = null;
+    document.addEventListener("focusin", (e) => {
+      const t = e.target;
+      if (t && t.classList && t.classList.contains("emc-input")) {
+        __lastFocusCoord = {
+          section: t.dataset.section, row: t.dataset.row, month: t.dataset.month,
+          selStart: t.selectionStart, selEnd: t.selectionEnd,
+        };
+      }
+    }, true);
+
+    function renderAll() {
+      const active = document.activeElement;
+      let focusCoord = null;
+      if (active && active.classList && active.classList.contains("emc-input")) {
+        focusCoord = {
+          section: active.dataset.section, row: active.dataset.row, month: active.dataset.month,
+          selStart: active.selectionStart, selEnd: active.selectionEnd,
+        };
+      } else if (__lastFocusCoord) {
+        focusCoord = { ...__lastFocusCoord };
+      }
+      buildHeader("fuel");
+      buildHeader("power");
+      buildHeader("total");
+      renderSection("fuel");
+      renderSection("power");
+      renderSection("total");
+      renderCharts();
+      if (focusCoord) {
+        const sel = `.emc-input[data-section="${focusCoord.section}"][data-row="${focusCoord.row}"][data-month="${focusCoord.month}"]`;
+        const next = document.querySelector(sel);
+        if (next) {
+          next.focus();
+          try {
+            if (Number.isFinite(focusCoord.selStart) && Number.isFinite(focusCoord.selEnd)) {
+              next.setSelectionRange(focusCoord.selStart, focusCoord.selEnd);
+            } else {
+              const len = next.value.length;
+              next.setSelectionRange(len, len);
+            }
+          } catch (e) {}
+          // 다음 frame 에서 한 번 더 — grid-arrow-nav 가 focus 를 가로채는 경우 대비
+          requestAnimationFrame(() => {
+            if (document.activeElement !== next && document.contains(next)) {
+              next.focus();
+            }
+          });
+        }
+      }
+    }
+
+    // ====== 차트 ======
+    function getSeries(section, rowKey) {
+      // 1..12월 값 배열
+      const arr = [];
+      for (let m = 1; m <= 12; m++) {
+        const v = computed[section]?.[rowKey]?.[m];
+        arr.push(Number.isFinite(v) ? v : null);
+      }
+      return arr;
+    }
+
+    function hasAnyData(seriesList) {
+      return seriesList.some((s) => s.values.some((v) => Number.isFinite(v) && v !== 0));
+    }
+
+    function renderLineBarChart({ title, series, type = "line", unit = "" }) {
+      const w = 480, h = 220, pad = { l: 44, r: 14, t: 10, b: 28 };
+      const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
+      if (!hasAnyData(series)) {
+        return `
+          <div class="emc-chart-card">
+            <div class="emc-chart-title">${escapeHtml(title)}</div>
+            <div class="emc-chart-empty">데이터를 입력하면 차트가 표시됩니다</div>
+          </div>`;
+      }
+      // y range
+      const allVals = series.flatMap((s) => s.values).filter(Number.isFinite);
+      let yMin = Math.min(0, ...allVals);
+      let yMax = Math.max(0, ...allVals);
+      if (yMin === yMax) yMax = yMin + 1;
+      const yPad = (yMax - yMin) * 0.08;
+      yMin -= yPad; yMax += yPad;
+      const xScale = (i) => pad.l + ((i + 0.5) / 12) * innerW;
+      const yScale = (v) => pad.t + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+      const y0 = yScale(0);
+
+      // y축 grid (4 ticks)
+      const ticks = [];
+      for (let k = 0; k <= 4; k++) {
+        const y = pad.t + (innerH * k / 4);
+        const val = yMax - (yMax - yMin) * k / 4;
+        ticks.push(`<line x1="${pad.l}" x2="${w - pad.r}" y1="${y}" y2="${y}" stroke="#e6ecf2" stroke-width="1"/>`);
+        ticks.push(`<text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#64748b">${fmtAxis(val)}</text>`);
+      }
+      // x축 라벨 (월)
+      const xLabels = [];
+      for (let m = 1; m <= 12; m++) {
+        xLabels.push(`<text x="${xScale(m - 1)}" y="${h - pad.b + 14}" text-anchor="middle" font-size="10" fill="#64748b">${m}월</text>`);
+      }
+
+      // 시리즈 렌더
+      const seriesSvg = series.map((s, sIdx) => {
+        if (type === "bar") {
+          const barW = innerW / 12 * 0.7 / series.length;
+          const offset = (sIdx - (series.length - 1) / 2) * barW;
+          return s.values.map((v, i) => {
+            if (!Number.isFinite(v)) return "";
+            const x = xScale(i) - barW / 2 + offset;
+            const y = v >= 0 ? yScale(v) : y0;
+            const ht = Math.abs(yScale(v) - y0);
+            return `<rect x="${x}" y="${y}" width="${barW * 0.92}" height="${ht}" fill="${s.color}" opacity="0.85"/>`;
+          }).join("");
+        }
+        // line
+        const pts = s.values.map((v, i) => Number.isFinite(v) ? `${xScale(i)},${yScale(v)}` : null);
+        const segs = [];
+        let cur = [];
+        pts.forEach((p) => {
+          if (p) cur.push(p);
+          else { if (cur.length) segs.push(cur); cur = []; }
+        });
+        if (cur.length) segs.push(cur);
+        const polylines = segs.map((seg) =>
+          `<polyline points="${seg.join(" ")}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join("");
+        const dots = s.values.map((v, i) => Number.isFinite(v)
+          ? `<circle cx="${xScale(i)}" cy="${yScale(v)}" r="3" fill="${s.color}"/>` : "").join("");
+        return polylines + dots;
+      }).join("");
+
+      // 범례
+      const legend = series.map((s) =>
+        `<span><span class="dot" style="background:${s.color};"></span>${escapeHtml(s.label)}</span>`).join("");
+
+      return `
+        <div class="emc-chart-card">
+          <div class="emc-chart-title">${escapeHtml(title)}${unit ? ` <span style="color:#94a3b8;font-weight:500;">(${escapeHtml(unit)})</span>` : ""}</div>
+          <div class="emc-chart-legend">${legend}</div>
+          <svg class="emc-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+            ${ticks.join("")}
+            <line x1="${pad.l}" x2="${w - pad.r}" y1="${y0}" y2="${y0}" stroke="#94a3b8" stroke-width="1"/>
+            ${seriesSvg}
+            ${xLabels.join("")}
+          </svg>
+        </div>`;
+    }
+
+    function fmtAxis(v) {
+      if (!Number.isFinite(v)) return "";
+      if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
+      return v.toFixed(0);
+    }
+
+    function renderCharts() {
+      const grid = document.getElementById("emcChartGrid");
+      if (!grid) return;
+      const charts = [];
+
+      // 엑셀 회계비용 마감비교 시트의 유일한 차트: "제품톤당 에너지" (line, 3계열)
+      //   제지 톤당비용 / 생활 톤당비용 / 에너지 총비용(톤당)
+      charts.push(renderLineBarChart({
+        title: "제품톤당 에너지",
+        unit: "천원/톤",
+        type: "line",
+        series: [
+          { label: "제지",          color: "#1f4f82", values: getSeries("total", "paperTonCost") },
+          { label: "생활",          color: "#e07b3a", values: getSeries("total", "tissueTonCost") },
+          { label: "에너지 총비용",  color: "#5b6cb1", values: getSeries("total", "totalTonCost") },
+        ],
+      }));
+
+      grid.innerHTML = charts.join("");
+    }
+
+    // 이벤트
+    function bind() {
+      // 입력 변경 → DB 저장 + 메모리 캐시 갱신 + 재계산
+      document.body.addEventListener("change", (e) => {
+        const t = e.target;
+        if (t.classList.contains("emc-input")) {
+          const sec = t.dataset.section, rowKey = t.dataset.row, m = Number(t.dataset.month);
+          const typed = t.value.replace(/,/g, "").trim();
+          // 사용자가 변경하지 않았다면 (typed == 표시값) skip — DB 의 full precision 보존
+          const rawDb = String(t.dataset.rawValue || "");
+          if (typed === roundDisplay(rawDb)) return;
+          const ys = getYearState();
+          if (!ys[sec][rowKey]) ys[sec][rowKey] = {};
+          let dbValue = null;
+          if (typed === "") {
+            delete ys[sec][rowKey][m];
+          } else if (!isNaN(Number(typed))) {
+            ys[sec][rowKey][m] = Number(typed);
+            dbValue = Number(typed);
+          }
+          upsertCellToDB(sec, rowKey, m, dbValue);
+          // 새 raw 갱신 (다음 비교용)
+          t.dataset.rawValue = dbValue == null ? "" : String(dbValue);
+          setTimeout(renderAll, 0);
+        } else if (t.classList.contains("emc-note")) {
+          const sec = t.dataset.section, cat = t.dataset.note;
+          const ys = getYearState();
+          ys.notes[sec][cat] = t.value;
+          upsertNoteToDB(sec, cat, t.value);
+        }
+      });
+
+      // 탭
+      document.getElementById("emcTabs").addEventListener("click", (e) => {
+        const btn = e.target.closest(".energy-tab");
+        if (!btn) return;
+        document.querySelectorAll(".energy-tab").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+        document.querySelectorAll(".energy-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === btn.dataset.target));
+      });
+
+      // 연도 / 조회 / 초기화
+      const yearSel = document.getElementById("emcYear");
+      yearSel.addEventListener("change", () => {
+        currentYear = yearSel.value;
+        saveYearToShared();
+        updateSubtitle();
+      });
+      document.getElementById("emcReload").addEventListener("click", loadAndRender);
+      // 도급비용은 DB 기반이라 storage 이벤트 불필요. 다른 탭에서 갱신된 값을 보려면 [조회] 클릭.
+      document.getElementById("emcReset").addEventListener("click", async () => {
+        if (!confirm(`${currentYear}년 데이터를 초기화할까요?`)) return;
+        await deleteYearFromDB(currentYear);
+        delete store[currentYear];
+        renderAll();
+      });
+    }
+
+    const SHARED_PERIOD_KEY = "steamlog:shared-period";
+    function initYearSelect() {
+      const sel = document.getElementById("emcYear");
+      const y = new Date().getFullYear();
+      // 다른 페이지와 공유하는 조회 연/월 (steamlog:shared-period) 또는 자체 저장값 사용
+      let targetYear = null;
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        if (shared.year) targetYear = String(shared.year);
+      } catch (e) {}
+      if (!targetYear) targetYear = String(y);
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        if (String(yy) === targetYear) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      // 만일 targetYear 가 옵션 범위 밖이면 동적 추가
+      if (sel.value !== targetYear) {
+        const opt = document.createElement("option");
+        opt.value = targetYear; opt.textContent = `${targetYear}년`;
+        opt.selected = true;
+        sel.appendChild(opt);
+      }
+      currentYear = sel.value;
+    }
+    function saveYearToShared() {
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        shared.year = currentYear;
+        localStorage.setItem(SHARED_PERIOD_KEY, JSON.stringify(shared));
+      } catch (e) {}
+    }
+
+    function updateSubtitle() {
+      document.getElementById("emcSubtitle").textContent =
+        `${currentYear}년 월별 회계비용 마감 vs 실마감 차이 (연료비 / 전력비 / 에너지 합산)`;
+    }
+
+    async function loadAndRender() {
+      // 캐시 무효화 후 새 연도 fetch (병렬)
+      __fmcCache.year = null; __fmcCache.data = null;
+      await Promise.all([
+        loadStoreFromDB(currentYear).catch(() => {}),
+        fetchFuelRatio(currentYear).catch(() => {}),
+        fetchFluidizedContract(currentYear).catch(() => {}),
+      ]);
+      renderAll();
+    }
+
+    initYearSelect();
+    updateSubtitle();
+    bind();
+    loadAndRender();
+  })();
+  </script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260608-sticky4"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20260608-sticky4"></script>
+</body>
+</html>

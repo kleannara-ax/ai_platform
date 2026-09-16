@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - Adjustment Factor</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    html, body { height:100%; }
+    body.landing-body[data-page-kind="srf-invoice-adj"] {
+      display:block; height:100vh; min-height:0; overflow:hidden; background:#f5f7fb;
+    }
+    .invoice-workspace {
+      height:100vh; min-height:0; overflow:hidden;
+      padding: clamp(12px, 2.4vh, 32px) clamp(14px, 2.4vw, 36px);
+      display:flex;
+    }
+    .invoice-canvas {
+      flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0;
+      padding: clamp(20px, 3vh, 40px) clamp(24px, 3vw, 48px);
+      background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; box-shadow:0 18px 45px rgba(15,23,42,.08);
+    }
+    .invoice-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: clamp(12px, 2vh, 24px); }
+    .invoice-title h1 { margin:0; color:#172033; font-size: clamp(20px, 2.8vh, 28px); font-weight:800; letter-spacing:-.02em; }
+    .invoice-title p { margin:6px 0 0; color:#64748b; font-size: clamp(12px, 1.5vh, 15px); }
+    .invoice-toolbar { display:flex; gap:8px; align-items:center; }
+    .invoice-toolbar select {
+      height: clamp(32px, 4vh, 40px);
+      border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44;
+      font:600 clamp(12px, 1.5vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 10px;
+    }
+    .invoice-toolbar button {
+      height: clamp(32px, 4vh, 40px);
+      border:1px solid #1f4f82; border-radius:10px; background:#1f4f82; color:#fff;
+      font:600 clamp(12px, 1.5vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif; padding:0 14px; cursor:pointer;
+    }
+    .invoice-toolbar button.btn-secondary { background:#fff; color:#1f4f82; }
+
+    /* 섹션 탭 버튼 */
+    .adj-tabs { display:flex; gap:6px; margin-bottom: clamp(10px, 1.6vh, 18px); flex-wrap:wrap; }
+    .adj-tab {
+      border:1px solid #c7d6f3; background:#fff; color:#1f4f82; border-radius:8px;
+      padding: clamp(8px, 1.2vh, 12px) clamp(12px, 1.5vw, 18px);
+      font:600 clamp(12px, 1.45vh, 14px) Inter, "Apple SD Gothic Neo", sans-serif;
+      cursor:pointer; transition:background .15s;
+    }
+    .adj-tab:hover { background:#f0f5ff; }
+    .adj-tab.active { background:#1f4f82; color:#fff; border-color:#1f4f82; }
+
+    /* 섹션 자체는 스크롤 없이 viewport 안에 꽉 차도록. 행 수가 많아도 행 높이로 맞춤. */
+    .adj-section { flex:1; min-height:0; overflow:hidden; display:none; flex-direction:column; gap: clamp(6px, 1vh, 14px); }
+    .adj-section.active { display:flex; }
+
+    .adj-section h2 { margin:0; font-size: clamp(15px, 1.9vh, 20px); font-weight:800; color:#0f172a; }
+    .adj-formula {
+      padding: clamp(6px, 1vh, 12px) clamp(10px, 1.2vw, 18px);
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+      color:#1f2a44; font-size: clamp(11px, 1.35vh, 14px); line-height:1.4; white-space:pre-line;
+    }
+    .adj-formula .label { font-weight:700; color:#334155; margin-right:8px; }
+
+    /* 표는 남는 세로 공간을 모두 점유 → 행 높이가 자연스럽게 확장되어 스크롤 불필요 */
+    table.adj-table {
+      width:100%; flex:1; min-height:0;
+      border-collapse:collapse;
+      font-family:"Inter", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: clamp(11px, 1.4vh, 14px); background:#fff;
+      table-layout:fixed;
+    }
+    table.adj-table thead th {
+      background:#1f4f82; color:#fff; font-weight:700;
+      padding: clamp(4px, 0.8vh, 10px) clamp(6px, 0.8vw, 12px);
+      text-align:center; border:1px solid #1f4f82; vertical-align:middle;
+    }
+    table.adj-table thead tr:nth-child(2) th { background:#2e6bb0; border-color:#2e6bb0; font-size: clamp(10px, 1.25vh, 13px); font-weight:600; }
+    table.adj-table tbody td {
+      padding: clamp(2px, 0.5vh, 8px) clamp(6px, 0.8vw, 12px);
+      border:1px solid #d8dee9; text-align:right; vertical-align:middle; color:#0f172a;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    table.adj-table tbody td.col-item { text-align:center; font-weight:700; background:#f8fafc; width:42px; }
+    table.adj-table tbody td.col-def { text-align:left; background:#f8fafc; white-space:normal; }
+    table.adj-table tbody td.input-cell { padding:0; background:#fff; }
+    table.adj-table tbody td.computed { background:#eef2ff; font-weight:600; }
+    table.adj-table tbody tr.total-row td { background:#fffbe5; font-weight:700; }
+
+    .adj-input {
+      width:100%; height:100%; box-sizing:border-box;
+      min-height:0;
+      border:0; background:transparent; outline:0;
+      padding: clamp(2px, 0.5vh, 8px) clamp(6px, 0.8vw, 12px);
+      font:inherit; color:#173a54; text-align:right;
+    }
+    .adj-input:focus { box-shadow: inset 0 0 0 2px #2563eb; background:#fff; }
+
+    body.platform-embedded[data-page-kind="srf-invoice-adj"] { background:transparent; min-height:auto; }
+    body.platform-embedded[data-page-kind="srf-invoice-adj"] .invoice-workspace { min-height:auto; padding:0; }
+    body.platform-embedded[data-page-kind="srf-invoice-adj"] .invoice-canvas { min-height:auto; box-shadow:none; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      body { background:#fff !important; height:auto !important; overflow:visible !important; }
+      .invoice-workspace, .invoice-canvas { height:auto !important; overflow:visible !important; padding:0 !important; border:0 !important; box-shadow:none !important; }
+      .invoice-toolbar, .adj-tabs { display:none !important; }
+      .adj-section { display:flex !important; page-break-after:always; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-adj">
+  <main class="invoice-workspace">
+    <section class="invoice-canvas">
+      <div class="invoice-header">
+        <div class="invoice-title">
+          <h1>Ⅲ. PRICE ADJUSTMENT FACTOR</h1>
+          <p>KleanNara SRF Boiler PJT</p>
+        </div>
+        <div class="invoice-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="adj-tabs" role="tablist">
+        <button type="button" class="adj-tab active" data-target="general">1. General</button>
+        <button type="button" class="adj-tab" data-target="afbsc">2. AFBSC</button>
+        <button type="button" class="adj-tab" data-target="afbsc-rebase">2-1. AFBSC (rebasing)</button>
+        <button type="button" class="adj-tab" data-target="afasc">3. AFASC</button>
+      </div>
+
+      <!-- ────────── 1. General ────────── -->
+      <section class="adj-section active" data-section="general">
+        <h2>1. General</h2>
+        <div class="adj-formula">The actual Base Service Charge(ABSC) payable in any period (p) of year (y) during the Contracted Service Period shall be calculated by multiplying the relevant Base Service Charge, as stated in the Appendix 8, by an adjustment factor (AFBSCpy) calculated in accordance with the provisions of parapgraph 8.2 in this Appendix 8. Hence: </div>
+        <div class="adj-formula" style="text-align:center; font-weight:700;">ABSCpy = BSC × AFBSCpy</div>
+      </section>
+
+      <!-- ────────── 2. AFBSC ────────── -->
+      <section class="adj-section" data-section="afbsc">
+        <h2>2. Adjustment Factor for the Base Service Charge (AFBSC)</h2>
+        <div class="adj-formula">
+          <span class="label">Formula</span>AFBSCpy = a + b × POWERpy/POWERo + c × LNGpy/LNGo + d × WATERpy/WATERo + e × WDpy/WDo + f × LABORpy/LABORo + g × CPIpy/CPIo
+          <br><span class="label">Where</span>a + b + c + d + e + f + g = 1
+        </div>
+        <table class="adj-table" data-form="afbsc">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:50px">Item</th>
+              <th rowspan="2" style="width:28%">Definition</th>
+              <th colspan="4">Value of KleanNara</th>
+            </tr>
+            <tr>
+              <th>Coefficient</th>
+              <th>Base</th>
+              <th>Present</th>
+              <th>Δ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-row="a">
+              <td class="col-item">a</td>
+              <td class="col-def">Fixed coefficient</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="b">
+              <td class="col-item">b</td>
+              <td class="col-def">Energy (Power) costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="c">
+              <td class="col-item">c</td>
+              <td class="col-def">LNG costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="d">
+              <td class="col-item">d</td>
+              <td class="col-def">Water</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e">
+              <td class="col-item">e</td>
+              <td class="col-def">Waste disposal</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e-bottom">
+              <td class="col-item">e</td>
+              <td class="col-def">Waste disposal &mdash; Bottom ash</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e-fly">
+              <td class="col-item">e</td>
+              <td class="col-def">Waste disposal &mdash; Fly ash</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="f">
+              <td class="col-item">f</td>
+              <td class="col-def">Labor</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="g">
+              <td class="col-item">g</td>
+              <td class="col-def">Others</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr class="total-row" data-row="total">
+              <td class="col-item" colspan="2">AFBSCpy</td>
+              <td class="computed" data-field="coef-sum">—</td>
+              <td>—</td>
+              <td class="computed" data-field="afbsc">—</td>
+              <td>—</td>
+            </tr>
+            <tr class="total-row" data-row="total-rebase">
+              <td class="col-item" colspan="2">AFBSCpy (rebasing case only)</td>
+              <td class="computed" data-field="coef-sum-rebase">—</td>
+              <td>—</td>
+              <td class="computed" data-field="afbsc-rebase">—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ────────── 2-1. AFBSC (rebasing) ────────── -->
+      <section class="adj-section" data-section="afbsc-rebase">
+        <h2>2-1. AFBSC (rebasing case only)</h2>
+        <div class="adj-formula">
+          <span class="label">Formula</span>AFBSCr = AFBSCpy + [(h × SRFo/SRFpy) − h]
+        </div>
+        <table class="adj-table" data-form="afbsc-rebase">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:50px">Item</th>
+              <th rowspan="2" style="width:28%">Definition</th>
+              <th colspan="4">Value of KleanNara</th>
+            </tr>
+            <tr>
+              <th>Coefficient</th>
+              <th>Base</th>
+              <th>Present</th>
+              <th>Δ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-row="a">
+              <td class="col-item">a</td><td class="col-def">Fixed coefficient</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="b">
+              <td class="col-item">b</td><td class="col-def">Energy (Power) costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="c">
+              <td class="col-item">c</td><td class="col-def">LNG costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="d">
+              <td class="col-item">d</td><td class="col-def">Water</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e-bottom">
+              <td class="col-item">e</td><td class="col-def">Waste disposal &mdash; Bottom ash</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e-fly">
+              <td class="col-item">e</td><td class="col-def">Waste disposal &mdash; Fly ash</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="f">
+              <td class="col-item">f</td><td class="col-def">Labor</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="g">
+              <td class="col-item">g</td><td class="col-def">Others</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="h">
+              <td class="col-item">h</td><td class="col-def">SRF fluff tipping</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr class="total-row" data-row="total">
+              <td class="col-item" colspan="2">AFBSCpy</td>
+              <td class="computed" data-field="coef-sum">—</td>
+              <td>—</td>
+              <td class="computed" data-field="afbsc">—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ────────── 3. AFASC ────────── -->
+      <section class="adj-section" data-section="afasc">
+        <h2>3. Adjustment Factor for the Additional Service Charge (AFASC)</h2>
+        <div class="adj-formula">
+          <span class="label">Formula</span>AFASCpy = b × POWERp/POWERo + c × LNGp/LNGo + d × WATERp/WATERo + e × WDp/WDo + f × LABORp/LABORo + g × CPIp/CPIo
+          <br><span class="label">Where</span>b + c + d + e + f + g = 1
+        </div>
+        <table class="adj-table" data-form="afasc">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:50px">Item</th>
+              <th rowspan="2" style="width:28%">Definition</th>
+              <th colspan="4">Value of KleanNara</th>
+            </tr>
+            <tr>
+              <th>Coefficient</th>
+              <th>Base</th>
+              <th>Present</th>
+              <th>Δ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-row="b">
+              <td class="col-item">b</td><td class="col-def">Energy (Power) costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="c">
+              <td class="col-item">c</td><td class="col-def">LNG costs</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="d">
+              <td class="col-item">d</td><td class="col-def">Water</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="e">
+              <td class="col-item">e</td><td class="col-def">Waste disposal</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="f">
+              <td class="col-item">f</td><td class="col-def">Labor</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr data-row="g">
+              <td class="col-item">g</td><td class="col-def">Others</td>
+              <td class="input-cell"><input class="adj-input" data-field="coef" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="base" /></td>
+              <td class="input-cell"><input class="adj-input" data-field="present" /></td>
+              <td class="computed" data-field="delta">—</td>
+            </tr>
+            <tr class="total-row" data-row="total">
+              <td class="col-item" colspan="2">AFASCpy</td>
+              <td class="computed" data-field="coef-sum">—</td>
+              <td>—</td>
+              <td class="computed" data-field="afbsc">—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    /* Adjustment Factor 페이지 계산 로직.
+       - Coefficient / Base / Present : 사용자 입력 (기본 데이터 없음)
+       - Δ : (Present / Base) - 1
+       - 총합 행 :
+         * Coefficient 합계 : 모든 coef 입력값의 합 (1.0 에 가까울 것)
+         * AFBSCpy / AFASCpy : section 별 공식에 따라 자동 계산
+           - afbsc : a + Σ(coef_i × Present_i/Base_i)  for i ∈ {b..g + e-bottom, e-fly}
+                     (a 행은 coef 만 있고 Δ 없음 → coef 그대로 더함)
+                     (e-bottom, e-fly 는 별도 행으로 분리되어 있음 → 똑같이 coef×ratio 로 더함)
+                     단, 표 가독성을 위해 e 그룹은 사용자가 어떤 행에 값을 채우든 더해짐.
+           - afbsc-rebase : 동일하게 모든 행 coef×ratio 합 (a 는 coef 그대로)
+           - afasc : Σ(coef_i × Present_i/Base_i)  for i ∈ {b..g} (a 없음)
+       - 빈 칸이 하나라도 있는 행은 계산에서 제외 (Δ만 — 로 표시).
+       - 모든 결과는 4자리 정밀도 (소수 4째자리). */
+
+    const tabs = document.querySelectorAll(".adj-tab");
+    const sections = document.querySelectorAll(".adj-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.target;
+        tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === target));
+      });
+    });
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function formatRatio(n) {
+      if (!Number.isFinite(n)) return "—";
+      return n.toFixed(4);
+    }
+    function formatPercent(n) {
+      if (!Number.isFinite(n)) return "—";
+      return (n * 100).toFixed(2) + "%";
+    }
+
+    function recomputeTable(table) {
+      const rows = table.querySelectorAll("tbody tr[data-row]");
+
+      // 일반 AFBSC (section 2 의 첫 합계행) : 'e' 사용, 'e-bottom'/'e-fly' 제외
+      // 리베이싱 AFBSC (section 2 의 두번째 합계행) : 'e' 제외, 'e-bottom'/'e-fly' 사용
+      // 그 외 행은 두 합계 모두에 포함됨.
+      let coefSum = 0, total = 0, sumValid = true, totalValid = true;
+      let coefSumR = 0, totalR = 0, sumRValid = true, totalRValid = true;
+
+      function addToSums(value, isFiniteFlag, regularInclude, rebaseInclude, target) {
+        if (regularInclude) {
+          if (isFiniteFlag) target.total += value; else target.totalValid = false;
+        }
+        if (rebaseInclude) {
+          if (isFiniteFlag) target.totalR += value; else target.totalRValid = false;
+        }
+      }
+
+      rows.forEach((row) => {
+        const key = row.dataset.row;
+        if (key === "total" || key === "total-rebase") return;
+
+        const coefIn = row.querySelector('input[data-field="coef"]');
+        const baseIn = row.querySelector('input[data-field="base"]');
+        const presIn = row.querySelector('input[data-field="present"]');
+        const deltaCell = row.querySelector('[data-field="delta"]');
+
+        const coef = parseNum(coefIn);
+        const base = parseNum(baseIn);
+        const pres = parseNum(presIn);
+
+        const isFixed = key === "a";
+        // 'e' 와 'e-bottom'/'e-fly' 의 그룹 처리
+        const isEMain = key === "e";
+        const isEDetail = key === "e-bottom" || key === "e-fly";
+        const inRegular = !isEDetail;     // 일반 AFBSC : detail 제외
+        const inRebase = !isEMain;        // 리베이싱 AFBSC : main 'e' 제외
+
+        // Coefficient 합계 — 'e' 와 detail 의 중복을 막기 위해 그룹별 포함 여부 적용
+        if (Number.isFinite(coef)) {
+          if (inRegular) coefSum += coef; else sumValid = sumValid; // unchanged
+          if (inRebase) coefSumR += coef;
+        } else {
+          if (inRegular) sumValid = false;
+          if (inRebase) sumRValid = false;
+        }
+
+        // Δ 계산 (행별 자동) — 'a' 행도 Base/Present 가 채워지면 Δ 표시
+        if (deltaCell) {
+          if (Number.isFinite(base) && Number.isFinite(pres) && base !== 0) {
+            deltaCell.textContent = formatPercent(pres / base - 1);
+          } else {
+            deltaCell.textContent = "—";
+          }
+        }
+
+        if (isFixed) {
+          // 공식상 'a' 는 비율 보정 없이 coef 그대로 가산 (양쪽 합계 모두)
+          if (Number.isFinite(coef)) { total += coef; totalR += coef; }
+          else { totalValid = false; totalRValid = false; }
+          return;
+        }
+
+        // AFBSC 항 = coef × (Present / Base)
+        const validRow = Number.isFinite(coef) && Number.isFinite(base) && Number.isFinite(pres) && base !== 0;
+        const contrib = validRow ? coef * (pres / base) : 0;
+        if (inRegular) {
+          if (validRow) total += contrib; else totalValid = false;
+        }
+        if (inRebase) {
+          if (validRow) totalR += contrib; else totalRValid = false;
+        }
+      });
+
+      const sumCell = table.querySelector('tr.total-row [data-field="coef-sum"]');
+      const afCell = table.querySelector('tr.total-row [data-field="afbsc"]');
+      if (sumCell) sumCell.textContent = sumValid ? formatRatio(coefSum) : "—";
+      if (afCell) afCell.textContent = totalValid ? formatRatio(total) : "—";
+
+      const sumCellR = table.querySelector('tr.total-row [data-field="coef-sum-rebase"]');
+      const afCellR = table.querySelector('tr.total-row [data-field="afbsc-rebase"]');
+      if (sumCellR) sumCellR.textContent = sumRValid ? formatRatio(coefSumR) : "—";
+      if (afCellR) afCellR.textContent = totalRValid ? formatRatio(totalR) : "—";
+    }
+
+    /* ───────────── DB 저장 / 로딩 ─────────────
+       Adjustment Factor 페이지는 월별 데이터가 아니라 계약/현황 단가이므로
+       month="static" 으로 고정 키 사용. 각 입력 셀을 다음 키로 식별:
+         table_name = srf_boiler_invoice_adjustment
+         row_key    = `${section}|${rowId}|${field}` 예: "afbsc|b|coef"
+         col_index  = 1 (사용 안 함, 단일 슬롯)
+       입력 blur 시점에 PATCH/POST 저장. 로딩 시 한 번 GET 으로 일괄 적용. */
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const ADJ_TABLE_NAME = "srf_boiler_invoice_adjustment";
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}'); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+    function adjMonthKey() { return String(currentYear); }
+    const storedRows = new Map(); // row_key → server row (id 포함)
+
+    // 연도 드롭다운 초기화
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    function rowKeyFor(section, rowId, field) {
+      return `${section}|${rowId}|${field}`;
+    }
+
+    function eachInput(callback) {
+      document.querySelectorAll("section.adj-section").forEach((section) => {
+        const sectionId = section.dataset.section;
+        section.querySelectorAll("tr[data-row]").forEach((tr) => {
+          const rowId = tr.dataset.row;
+          if (rowId === "total" || rowId === "total-rebase") return;
+          tr.querySelectorAll('input[data-field]').forEach((input) => {
+            callback(input, sectionId, rowId, input.dataset.field);
+          });
+        });
+      });
+    }
+
+    async function loadAdj() {
+      // 기존 상태 초기화 (다른 연도로 전환시 빈 값으로 시작)
+      storedRows.clear();
+      eachInput((input) => { input.value = ""; });
+      document.querySelectorAll("table.adj-table").forEach((table) => recomputeTable(table));
+      try {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(adjMonthKey())}`, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        rows.forEach((row) => {
+          if (row.table_name !== ADJ_TABLE_NAME) return;
+          storedRows.set(row.row_key, row);
+        });
+        eachInput((input, sectionId, rowId, field) => {
+          const stored = storedRows.get(rowKeyFor(sectionId, rowId, field));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            input.value = stored.cell_value;
+          }
+        });
+        document.querySelectorAll("table.adj-table").forEach((table) => recomputeTable(table));
+      } catch (e) { /* 무시 */ }
+    }
+
+    async function saveCell(input, sectionId, rowId, field) {
+      const key = rowKeyFor(sectionId, rowId, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = {
+        month: adjMonthKey(),
+        year_no: currentYear,
+        month_no: 0,
+        table_name: ADJ_TABLE_NAME,
+        row_key: key,
+        col_index: 1,
+        cell_value: raw,
+      };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const response = await fetch(url, {
+          method: existing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) return;
+        const saved = await response.json();
+        storedRows.set(key, saved);
+      } catch (e) {
+        // 무시 — 다음 입력 시 재시도
+      }
+    }
+
+    document.querySelectorAll("table.adj-table").forEach((table) => {
+      table.addEventListener("input", () => recomputeTable(table));
+      recomputeTable(table);
+    });
+
+    eachInput((input, sectionId, rowId, field) => {
+      input.addEventListener("blur", () => saveCell(input, sectionId, rowId, field));
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}');
+        localStorage.setItem('steamlog:shared-period', JSON.stringify({ year: currentYear, month: prev.month || '01' }));
+      } catch (e) {}
+      loadAdj();
+    });
+
+    loadAdj();
+
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+</body>
+</html>

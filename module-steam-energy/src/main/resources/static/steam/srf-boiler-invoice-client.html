@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - Client Invoice</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* Client Invoice — 다른 unit/fluidized 페이지와 동일한 톤. */
+    body.landing-body[data-page-kind="srf-invoice-client"] { height:auto; min-height:100vh; align-items:stretch; overflow:visible; }
+    body.landing-body[data-page-kind="srf-invoice-client"] .landing-main { padding:24px 18px 18px 26px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="srf-invoice-client"] .landing-canvas { padding:14px; min-width:0; overflow:visible; }
+
+    .cli-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+    .cli-header-title h1 { margin:0; color:#172033; font-size:22px; font-weight:800; letter-spacing:-.02em; }
+    .cli-header-title p { margin:4px 0 0; color:#64748b; font-size:12px; }
+
+    .cli-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .cli-toolbar select { height:34px; border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44; font:600 12px Inter,"Apple SD Gothic Neo",sans-serif; padding:0 10px; }
+    .cli-toolbar button { height:34px; border:1px solid #1f4f82; border-radius:10px; background:#1f4f82; color:#fff; font:600 12px Inter,"Apple SD Gothic Neo",sans-serif; padding:0 12px; cursor:pointer; }
+    .cli-toolbar button.btn-secondary { background:#fff; color:#1f4f82; }
+
+    /* 청구 기간 / 발행일 / 총 청구액 — 위쪽 메타 영역 */
+    .cli-meta {
+      display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+      padding:10px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+      font-size:12px; color:#1f2a44; margin-bottom:10px;
+    }
+    .cli-meta strong { color:#0f172a; margin-right:6px; }
+    .cli-meta .unit { color:#64748b; margin-left:auto; }
+
+    .cli-total-callout {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:12px 18px; background:#fffbe5; border:1px solid #f0c952; border-radius:10px;
+      margin-bottom:12px;
+    }
+    .cli-total-callout .label { font-size:14px; font-weight:700; color:#7c5e10; }
+    .cli-total-callout .value { font-size:18px; font-weight:800; color:#172033; }
+
+    /* 표 영역 — 기존 .data-table 디자인 그대로 */
+    .cli-card {
+      border:1px solid rgba(120,181,217,.24); border-radius:14px;
+      background:rgba(255,255,255,.96); box-shadow:0 10px 24px rgba(23,65,95,.08);
+      overflow-x:auto; overflow-y:hidden;
+    }
+    .cli-table-wrap { padding:0 0 12px; }
+    .cli-table .input-cell { padding:0 !important; background:#fff !important; }
+    .cli-table .input-cell input {
+      width:100%; height:100%; min-height:30px; box-sizing:border-box;
+      border:0; background:transparent; outline:0;
+      padding:8px 10px; font:inherit; color:#173a54; text-align:right;
+    }
+    .cli-table .input-cell input.text { text-align:left; }
+    .cli-table .input-cell input:focus { box-shadow:inset 0 0 0 2px #2563eb; background:#fff; }
+    .cli-table td.computed { background:#eef2ff !important; color:#1e293b; font-weight:600; text-align:right; }
+    .cli-table tbody tr.subtotal-row td,
+    .cli-table tbody tr.subtotal-row th { background:#fffbe5 !important; font-weight:800; }
+    .cli-table td.col-section { background:#e8f0ff; font-weight:700; color:#173a54; text-align:left; white-space:pre-line; line-height:1.45; vertical-align:middle; }
+    .cli-table td.col-label { text-align:left; }
+    .cli-table td.col-unit { text-align:center; }
+    .cli-table td.col-note { text-align:left; }
+
+    @media print {
+      .cli-toolbar { display:none !important; }
+      .cli-card { overflow:visible !important; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-client">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="cli-header">
+        <div class="cli-header-title">
+          <h1>깨끗한 나라(KleanNara) Client Invoice</h1>
+          <p>월별 청구서</p>
+        </div>
+        <div class="cli-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <select id="invoiceMonth" aria-label="조회 월"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="cli-meta">
+        <div><strong>INVOICE</strong><span id="metaPeriod">—</span></div>
+        <div><strong>Date of Invoice</strong><span id="metaInvoiceDate">—</span></div>
+        <div class="unit">단위: 원</div>
+      </div>
+
+      <div class="cli-total-callout">
+        <div class="label">총 청구 금액</div>
+        <div class="value"><span id="grandTotal">—</span> <span style="font-size:13px;">원</span></div>
+      </div>
+
+      <section class="cli-card">
+        <div class="cli-table-wrap">
+          <table class="data-table cli-table" data-form="client">
+            <thead>
+              <tr>
+                <th style="width:18%">구 분</th>
+                <th style="width:24%">세부 항목</th>
+                <th style="width:7%">단위</th>
+                <th style="width:11%">양</th>
+                <th style="width:11%">단 가</th>
+                <th style="width:14%">청구금액</th>
+                <th style="width:15%">비 고</th>
+              </tr>
+            </thead>
+            <tbody id="clientBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* Client Invoice — 기존 데이터 표 디자인(.data-table)으로 통일.
+       3개 섹션 (Utilities / Other Charge KN→V / Other Charge KN←V),
+       각 행 청구금액 = 양 × 단가, Sub total + 총 청구액 자동 계산. */
+
+    const SECTIONS = [
+      {
+        id: "utilities",
+        title: "1. Utilities\n깨끗한 나라 → 베올리아 (비용 청구)",
+        items: [
+          { label: "· Electricity (전력)",        unit: "kwh" },
+          { label: "· LNG (도시가스)",             unit: "Nm3" },
+          { label: "· 보충수 (순수)",              unit: "m3"  },
+          { label: "· Process Water (공정수)",     unit: "m3"  },
+          { label: "· 약품희석수",                  unit: "m3"  },
+          { label: "· Water (생활용수)",            unit: "m3"  },
+          { label: "· Process Water (공정수)",     unit: "m3"  },
+          { label: "· 1st Soft Water (보충수)",    unit: "m3"  },
+          { label: "· 2nd Soften Water (청수/연수)", unit: "m3" },
+          { label: "· Water (생활용수)",            unit: "m3"  },
+        ],
+        labelEditable: false,
+      },
+      {
+        id: "other-out",
+        title: "2. Other Charge\n깨끗한 나라 → 베올리아 (비용 청구)",
+        items: [
+          { label: "", unit: "원" },
+          { label: "", unit: "원" },
+          { label: "", unit: "원" },
+        ],
+        labelEditable: true,
+      },
+      {
+        id: "other-in",
+        title: "3. Other Charge\n깨끗한 나라 ← 베올리아 (비용 청구)",
+        items: [
+          { label: "", unit: "원" },
+          { label: "", unit: "원" },
+          { label: "", unit: "원" },
+        ],
+        labelEditable: true,
+      },
+    ];
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const monthSelect = document.getElementById("invoiceMonth");
+    const searchButton = document.getElementById("invoiceSearch");
+    const tbody = document.getElementById("clientBody");
+    const metaPeriodEl = document.getElementById("metaPeriod");
+    const metaInvoiceEl = document.getElementById("metaInvoiceDate");
+    const grandTotalEl = document.getElementById("grandTotal");
+
+    const now = new Date();
+    // 페이지 간 공유 연/월 (localStorage) 우선 사용.
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}'); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || now.getFullYear();
+    let currentMonth = /^(0[1-9]|1[0-2])$/.test(String(__sharedPeriod.month || '')) ? Number(__sharedPeriod.month) : (now.getMonth() + 1);
+
+    (function initPeriod() {
+      const y = now.getFullYear();
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        yearSelect.appendChild(opt);
+      }
+      for (let mm = 1; mm <= 12; mm += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(mm).padStart(2, "0"); opt.textContent = `${mm}월`;
+        monthSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+      monthSelect.value = String(currentMonth).padStart(2, "0");
+    })();
+
+    function monthKey() { return `${currentYear}-${String(currentMonth).padStart(2, "0")}`; }
+
+    function refreshMeta() {
+      const last = new Date(currentYear, currentMonth, 0).getDate();
+      const invoice = new Date(currentYear, currentMonth - 1, last);
+      invoice.setDate(invoice.getDate() + 5);
+      const fmtDate = (y, m, d) => `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      metaPeriodEl.textContent = ` ${fmtDate(currentYear, currentMonth, 1)} ~ ${fmtDate(currentYear, currentMonth, last)}`;
+      metaInvoiceEl.textContent = ` ${fmtDate(invoice.getFullYear(), invoice.getMonth()+1, invoice.getDate())}`;
+    }
+
+    function buildTable() {
+      const rows = [];
+      SECTIONS.forEach((section) => {
+        section.items.forEach((item, i) => {
+          const first = (i === 0);
+          const sectionCell = first
+            ? `<td class="col-section" rowspan="${section.items.length + 1}">${escapeHtml(section.title)}</td>`
+            : "";
+          const labelHtml = section.labelEditable
+            ? `<td class="input-cell"><input class="text" data-section="${section.id}" data-idx="${i}" data-field="label" /></td>`
+            : `<td class="col-label">${escapeHtml(item.label)}</td>`;
+          const unitHtml = section.labelEditable
+            ? `<td class="input-cell"><input class="text" data-section="${section.id}" data-idx="${i}" data-field="unit" /></td>`
+            : `<td class="col-unit">${escapeHtml(item.unit)}</td>`;
+          rows.push(`
+            <tr data-section="${section.id}" data-idx="${i}">
+              ${sectionCell}
+              ${labelHtml}
+              ${unitHtml}
+              <td class="input-cell"><input data-section="${section.id}" data-idx="${i}" data-field="qty" /></td>
+              <td class="input-cell"><input data-section="${section.id}" data-idx="${i}" data-field="price" /></td>
+              <td class="computed" data-section="${section.id}" data-idx="${i}" data-field="amount">—</td>
+              <td class="input-cell col-note"><input class="text" data-section="${section.id}" data-idx="${i}" data-field="note" /></td>
+            </tr>
+          `);
+        });
+        rows.push(`
+          <tr class="subtotal-row" data-section="${section.id}" data-row="subtotal">
+            <td colspan="4" style="text-align:left">Sub total</td>
+            <td>—</td>
+            <td class="computed" data-section="${section.id}" data-field="subtotal">—</td>
+            <td>—</td>
+          </tr>
+        `);
+      });
+      tbody.innerHTML = rows.join("");
+    }
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) {
+      if (!Number.isFinite(n)) return "—";
+      return Math.round(n).toLocaleString("en-US");
+    }
+
+    function recompute() {
+      const subtotals = {};
+      SECTIONS.forEach((section) => {
+        let sum = 0; let anyValid = false;
+        section.items.forEach((_, i) => {
+          const qty = parseNum(document.querySelector(`input[data-section="${section.id}"][data-idx="${i}"][data-field="qty"]`));
+          const price = parseNum(document.querySelector(`input[data-section="${section.id}"][data-idx="${i}"][data-field="price"]`));
+          const amountCell = document.querySelector(`td.computed[data-section="${section.id}"][data-idx="${i}"][data-field="amount"]`);
+          if (Number.isFinite(qty) && Number.isFinite(price)) {
+            const amount = qty * price;
+            amountCell.textContent = fmt(amount);
+            sum += amount; anyValid = true;
+          } else {
+            amountCell.textContent = "—";
+          }
+        });
+        subtotals[section.id] = anyValid ? sum : null;
+        const subCell = document.querySelector(`td.computed[data-section="${section.id}"][data-field="subtotal"]`);
+        if (subCell) subCell.textContent = anyValid ? fmt(sum) : "—";
+      });
+      const a = subtotals["utilities"];
+      const b = subtotals["other-out"];
+      const c = subtotals["other-in"];
+      if (a == null && b == null && c == null) {
+        grandTotalEl.textContent = "—";
+      } else {
+        const total = (a || 0) + (b || 0) - (c || 0);
+        grandTotalEl.textContent = fmt(total);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    /* ───────── DB 저장 / 로딩 ───────── */
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const CLIENT_TABLE_NAME = "srf_boiler_invoice_client";
+    const storedRows = new Map();
+
+    function rowKeyFor(sectionId, idx, field) { return `${sectionId}|${idx}|${field}`; }
+
+    function eachInput(callback) {
+      tbody.querySelectorAll('input[data-section]').forEach((input) => {
+        callback(input, input.dataset.section, Number(input.dataset.idx), input.dataset.field);
+      });
+    }
+
+    async function loadClient() {
+      storedRows.clear();
+      eachInput((input) => { input.value = ""; });
+      refreshMeta();
+      recompute();
+      try {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        rows.forEach((row) => {
+          if (row.table_name !== CLIENT_TABLE_NAME) return;
+          storedRows.set(row.row_key, row);
+        });
+        eachInput((input, sectionId, idx, field) => {
+          const stored = storedRows.get(rowKeyFor(sectionId, idx, field));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            input.value = stored.cell_value;
+          }
+        });
+        recompute();
+      } catch (e) {}
+    }
+
+    async function saveCell(input, sectionId, idx, field) {
+      const key = rowKeyFor(sectionId, idx, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "");
+      const payload = {
+        month: monthKey(), year_no: currentYear, month_no: currentMonth,
+        table_name: CLIENT_TABLE_NAME, row_key: key, col_index: 1,
+        cell_value: raw,
+      };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const response = await fetch(url, {
+          method: existing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) return;
+        const saved = await response.json();
+        storedRows.set(key, saved);
+      } catch (e) {}
+    }
+
+    buildTable();
+    refreshMeta();
+    recompute();
+
+    document.querySelector("table.cli-table").addEventListener("input", () => recompute());
+
+    eachInput((input, sectionId, idx, field) => {
+      input.addEventListener("blur", () => saveCell(input, sectionId, idx, field));
+    });
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      currentMonth = Number(monthSelect.value) || (new Date().getMonth() + 1);
+      try { localStorage.setItem('steamlog:shared-period', JSON.stringify({ year: currentYear, month: String(currentMonth).padStart(2,'0') })); } catch (e) {}
+      loadClient();
+    });
+
+    loadClient();
+
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+</body>
+</html>

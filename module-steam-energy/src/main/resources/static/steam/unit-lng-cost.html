@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LNG 연료 사용 비용</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260723-stickycard" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="unit">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>LNG 연료 사용 비용</h1>
+          <p>엑셀 일지의 LNG 연료 사용 비용 표 기준으로 월단위와 연단위 데이터를 관리합니다.</p>
+        </div>
+        <div class="landing-filter-box">
+          <span class="landing-filter-title">조회</span>
+          <select id="filterYear"></select>
+          <span class="landing-filter-dot">.</span>
+          <select id="filterMonth"></select>
+          <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar" role="tablist" aria-label="표 보기">
+        <button type="button" class="period-tab-button" data-period-target="monthly">월단위</button>
+        <button type="button" class="period-tab-button" data-period-target="yearly">연단위</button>
+        <button type="button" class="period-tab-button chart-tab-button" data-chart-toggle="lng-chart">차트</button>
+      </div>
+
+      <section class="period-panel" data-period-panel="monthly">
+        <div class="machine-tab-bar" role="tablist" aria-label="월단위 LNG 표">
+          <button type="button" class="machine-tab-button" data-machine-target="boiler">보일러 LNG 사용량</button>
+          <button type="button" class="machine-tab-button" data-machine-target="burner">버너 LNG 사용량</button>
+        </div>
+
+        <section class="machine-panel" data-machine-panel="boiler">
+          <article class="table-card">
+            <h3>보일러 LNG 사용량</h3>
+            <div class="table-wrap">
+              <table class="data-table lpg-table" data-cell-table="lng_m_boiler" data-row-mode="daily">
+                <thead>
+                  <tr>
+                    <th>일자</th>
+                    <th>LNG (20톤-1)</th>
+                    <th>LNG (20톤-2)</th>
+                    <th>LNG (50톤)</th>
+                    <th>LNG (60톤)</th>
+                    <th>LNG 사용합계</th>
+                    <th>단가</th>
+                    <th>비용</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="burner">
+          <article class="table-card">
+            <h3>버너 LNG 사용량</h3>
+            <div class="table-wrap">
+              <table class="data-table lpg-table" data-cell-table="lng_m_burner" data-row-mode="daily">
+                <thead>
+                  <tr>
+                    <th rowspan="2">일자</th>
+                    <th colspan="1">제지</th>
+                    <th colspan="4">화장지</th>
+                    <th rowspan="2">제지+화장지 합계</th>
+                    <th rowspan="2">단가</th>
+                    <th rowspan="2">비용</th>
+                    <th rowspan="2">총비용</th>
+                  </tr>
+                  <tr>
+                    <th>PM-3</th>
+                    <th>TM-3</th>
+                    <th>TM-4</th>
+                    <th>TM-5</th>
+                    <th>화장지 계</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+      </section>
+
+      <section class="period-panel" data-period-panel="yearly">
+        <div class="machine-tab-bar" role="tablist" aria-label="연단위 LNG 표">
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="boiler">보일러 LNG 사용량</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="burner">버너 LNG 사용량</button>
+        </div>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="boiler">
+          <article class="table-card">
+            <h3>연단위 보일러 LNG 사용량</h3>
+            <div class="table-wrap">
+              <table class="data-table lpg-table yearly-unit-table" data-cell-table="lng_y_boiler" data-row-mode="yearly">
+                <thead>
+                  <tr>
+                    <th>월</th>
+                    <th>LNG (20톤-1)</th>
+                    <th>LNG (20톤-2)</th>
+                    <th>LNG (50톤)</th>
+                    <th>LNG (60톤)</th>
+                    <th>LNG 사용합계</th>
+                    <th>단가</th>
+                    <th>비용</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="burner">
+          <article class="table-card">
+            <h3>연단위 버너 LNG 사용량</h3>
+            <div class="table-wrap">
+              <table class="data-table lpg-table yearly-unit-table" data-cell-table="lng_y_burner" data-row-mode="yearly">
+                <thead>
+                  <tr>
+                    <th rowspan="2">월</th>
+                    <th colspan="1">제지</th>
+                    <th colspan="4">화장지</th>
+                    <th rowspan="2">제지+화장지 합계</th>
+                    <th rowspan="2">단가</th>
+                    <th rowspan="2">비용</th>
+                    <th rowspan="2">총비용</th>
+                  </tr>
+                  <tr>
+                    <th>PM-3</th>
+                    <th>TM-3</th>
+                    <th>TM-4</th>
+                    <th>TM-5</th>
+                    <th>화장지 계</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+      </section>
+
+      <section class="chart-panel" data-chart-panel="lng-chart">
+        <section class="chart-period-panel" data-chart-period-panel="monthly">
+          <div class="chart-grid">
+            <article class="table-card chart-card">
+              <h3>월단위 PM-3 LNG 차트</h3>
+              <div class="chart-wrap" data-chart-wrap="monthly-lng-paper"></div>
+            </article>
+            <article class="table-card chart-card">
+              <h3>월단위 TM-3,4,5 LNG 차트</h3>
+              <div class="chart-wrap" data-chart-wrap="monthly-lng-tissue"></div>
+            </article>
+          </div>
+        </section>
+        <section class="chart-period-panel" data-chart-period-panel="yearly">
+          <div class="chart-grid">
+            <article class="table-card chart-card">
+              <h3>연단위 PM-3 LNG 차트</h3>
+              <div class="chart-wrap" data-chart-wrap="yearly-lng-paper"></div>
+            </article>
+            <article class="table-card chart-card">
+              <h3>연단위 TM-3,4,5 LNG 차트</h3>
+              <div class="chart-wrap" data-chart-wrap="yearly-lng-tissue"></div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+  <script src="js/unit-pages.js?v=20260803-lng-grouped1"></script>
+  <script src="js/unit-generic-db-pages.js?v=20260803-lng-grouped1"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

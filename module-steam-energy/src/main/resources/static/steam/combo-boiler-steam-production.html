@@ -1,0 +1,79 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>스팀생산실적</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />  <link rel="stylesheet" href="css/page-combo.css?v=20260608-sticky3" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="combo-boiler"] { height:auto; min-height:100vh; align-items:stretch; overflow:visible; }
+    body.landing-body[data-page-kind="combo-boiler"] .sidebar-shell { position:sticky; top:0; align-self:flex-start; height:100vh; min-height:100vh; }
+    body.landing-body[data-page-kind="combo-boiler"] .landing-main { padding:24px 18px 18px 26px; overflow:visible; height:auto; min-height:100vh; }
+    .combo-canvas { padding:14px; overflow:visible; }
+    .combo-tabs { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
+    /* 부모 .landing-canvas-table 의 overflow-x:auto 가 overflow-y 까지 auto 로 승격시키는
+       CSS 스펙 동작 때문에 세로 스크롤이 생기던 것을 무력화. combo 페이지는 페이지 자체 스크롤만 사용. */
+    body.landing-body[data-page-kind="combo-boiler"] .landing-canvas-table { overflow:visible !important; }
+    .combo-table-wrap { overflow:visible; border:1px solid rgba(120,181,217,.24); border-radius:14px; background:#fff; }
+    /* 폭이 넓은 표 (width:max-content) 만 가로 스크롤 필요 — wrap 안에 추가 inner 컨테이너로 처리 */
+    .combo-table-wrap:not(:has(.combo-production-table)) { overflow-x:auto; overflow-y:hidden; }
+    .combo-excel-table { width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:15px; color:#173a54; }
+    .combo-excel-table th, .combo-excel-table td { border:1px solid rgba(159,190,212,.72); padding:5px 6px; text-align:center; vertical-align:middle; white-space:nowrap; }
+    .combo-excel-table thead th { background:#eaf6ff; font-weight:800; }
+    .combo-excel-table tbody th { background:#f5fbff; font-weight:800; }
+    .combo-input { width:100%; min-width:78px; border:0; background:#fffdf3; padding:4px 5px; text-align:right; font:inherit; color:#173a54; }
+    .combo-readonly { min-width:78px; background:#f1f6fa; color:#6a7d8d; }
+    .combo-summary-row th, .combo-summary-row td { background:#edf8f2; font-weight:800; }
+    .combo-grid { display:grid; gap:14px; }
+    .combo-card { overflow:visible; border:1px solid rgba(120,181,217,.24); border-radius:14px; background:#fff; padding:12px; }
+    .combo-card h3 { margin:0 0 10px; color:#173a54; }
+    body.embedded-mode[data-page-kind="combo-boiler"] { display:block; min-height:auto; background:transparent; }
+    body.embedded-mode[data-page-kind="combo-boiler"] .sidebar-shell, body.embedded-mode[data-page-kind="combo-boiler"] .landing-page-copy { display:none !important; }
+    body.embedded-mode[data-page-kind="combo-boiler"] .landing-main, body.embedded-mode[data-page-kind="combo-boiler"] .combo-canvas { padding:0; min-height:auto; box-shadow:none; background:transparent; }
+    .combo-excel-table.combo-production-table { width:100%; min-width:0; table-layout:fixed; }
+    .combo-excel-table.combo-production-table .combo-input, .combo-excel-table.combo-production-table .combo-readonly { min-width:0; width:100%; }
+    .combo-excel-table.combo-production-table .combo-day-col { width:clamp(30px,3.4vw,44px); }
+    .combo-excel-table.combo-production-table th:first-child, .combo-excel-table.combo-production-table td:first-child { width:clamp(30px,3.4vw,44px); }
+    .combo-excel-table.combo-production-table thead th { white-space:normal; line-height:1.2; word-break:keep-all; }
+    .combo-excel-table.combo-production-combo .combo-field-comboSteam,
+    .combo-excel-table.combo-production-combo .combo-field-comboSteamHour,
+    .combo-excel-table.combo-production-external .combo-field-externalSteamHour,
+    .combo-excel-table.combo-production-waste .combo-field-wasteSteam1,
+    .combo-excel-table.combo-production-waste .combo-field-wasteSteam1Hour,
+    .combo-excel-table.combo-production-waste .combo-field-wasteSteam2,
+    .combo-excel-table.combo-production-waste .combo-field-wasteSteam2Hour,
+    .combo-excel-table.combo-production-total .combo-field-totalSteam,
+    .combo-excel-table.combo-production-total .combo-field-totalSteamHour { width:clamp(58px,7vw,88px) !important; }
+    .combo-excel-table.combo-production-external .combo-field-externalSteam { width:clamp(120px,14vw,200px) !important; }
+    .combo-excel-table.combo-production-external .combo-field-externalSteamHour { width:clamp(120px,14vw,200px) !important; }
+
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="combo-boiler">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table combo-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy"><h1 id="comboPageTitle"></h1><p id="comboPageSubtitle"></p></div>
+        <div class="landing-filter-box"><span class="landing-filter-title">조회</span><select id="filterYear"></select><span class="landing-filter-dot">.</span><select id="filterMonth"></select><button type="button" class="landing-filter-action" id="filterSubmit">조회</button></div>
+      </div>
+      <div class="combo-tabs" role="tablist">
+        <a class="period-tab-button" data-combo-page="production" href="combo-boiler-steam-production.html">스팀생산실적</a>
+        <a class="period-tab-button" data-combo-page="downtime" href="combo-boiler-downtime.html">복합보일러 운휴 시간</a>
+        <a class="period-tab-button" data-combo-page="recovery" href="combo-boiler-recovery-loss.html">스팀 회수량 감소 요인</a>
+        <a class="period-tab-button" data-combo-page="etc" href="combo-boiler-etc.html">기타</a>
+      </div>
+      <div class="combo-table-wrap" id="comboTableWrap"></div>
+    </div>
+  </main>
+  <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
+  <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/combo-boiler-pages.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260608-sticky3"></script>
+</body>
+</html>
