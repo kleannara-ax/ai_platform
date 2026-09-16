@@ -377,7 +377,9 @@ public final class DefaultCellTemplate {
         d(t,  5,14, "P10", "daily", "매일");
 
         // ── Row 6: 수율 - 화장지 ──
-        Map<YearMonth, String> fb11 = anchorFallbackMap("61.1", "63.3", "63.6", "63.6", "69.6", "74.6", "74.4");
+        // ★★★ 2026-09-16 정정 — 3월실적(anchor 기준 2026-03) 63.6 → 63.1,
+        //     4월실적(anchor 기준 2026-04) 69.6 → 66.6 (사용자 요청 값 정정)
+        Map<YearMonth, String> fb11 = anchorFallbackMap("61.1", "63.3", "63.6", "63.1", "66.6", "74.6", "74.4");
         ro(t, 6, 1, "C11", "화장지", 1, 2);
         ro(t, 6, 3, "E11", "63.5");
         ro(t, 6, 4, "F11", yearlyAverage(lookup, tableCode, 6, liveCol, prevYear2, fb11, "63.5"));

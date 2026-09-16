@@ -286,11 +286,12 @@
           { code: 'PAD',    label: '패드' },
         ],
         maxTotalNewlines: 9,
-        maxTotalChars: 486,
-        maxLineLength: 78,
+        maxTotalChars: 1170,
+        maxLineLength: 130,
         // ★★ 2026-09: 사용자 요청으로 표9/10의 섹션 폭을 위쪽 표5~8과 동일하게
         //   (별도 좁히기/넓히기 없이 .page-wrap 전체 폭 그대로) 맞춘다 —
         //   과거에 있던 sectionMaxWidth 커스텀 폭 지정을 제거했다.
+        // ★★ 2026-09-16: 한 줄 제한 78→130자, 전체 글자수 한도 486→1170자로 재조정
         title: '9. 사고 금액 특이사항',
         sideLabel: '사고금액\n특이사항',
         sectionId: 'noteAmount',
@@ -306,8 +307,9 @@
         ],
         hideDivisionColumns: true,
         maxTotalNewlines: 6,
-        maxTotalChars: 702,
-        maxLineLength: 78,
+        maxTotalChars: 780,
+        maxLineLength: 130,
+        // ★★ 2026-09-16: 한 줄 제한 78→130자, 전체 글자수 한도 702→780자로 재조정
         title: '10. 안전사고 발생추이 특이사항',
         sideLabel: '안전사고 발생추이\n특이사항',
         sectionId: 'noteTrend',
