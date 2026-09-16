@@ -126,18 +126,21 @@ public class DailyReportService {
      *    (TBL_SPECIAL_NOTE)와 별도로 SAFETY_NOTE_MAX_LINE_LENGTH(78)을 사용하도록
      *    분리했다. 프론트(safety-stats.html)도 78로 맞춰 textarea 칸 폭까지 함께
      *    좁혔다(sectionMaxWidth). TBL_SPECIAL_NOTE(index.html)는 기존 67자를 유지한다.
+     *  - 2026-09-16: 표9/10 한 줄 제한을 78→130자로, 전체 글자수 한도를
+     *    표9(TBL_SAFETY_AMOUNT_NOTE) 486→1170자, 표10(TBL_SAFETY_TREND_NOTE)
+     *    702→780자로 재조정(사용자 요청). 줄바꿈 총량(9회/6회)은 변경 없음.
      *  프론트(index.html/safety-stats.html)에서도 동일한 상수로 실시간 검증을 하지만,
      *  프론트 검증은 우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
-    private static final int SAFETY_NOTE_MAX_LINE_LENGTH = 78;
+    private static final int SAFETY_NOTE_MAX_LINE_LENGTH = 130;
     private static final Map<String, SpecialNoteSpec> SPECIAL_NOTE_SPECS = new LinkedHashMap<>();
     static {
         SPECIAL_NOTE_SPECS.put(SPECIAL_NOTE_TABLE_CODE,
                 new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 13, 1206, SPECIAL_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_AMOUNT_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 486, SAFETY_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 1170, SAFETY_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_TREND_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SAFETY_TREND_NOTE_CATEGORIES, 6, 702, SAFETY_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SAFETY_TREND_NOTE_CATEGORIES, 6, 780, SAFETY_NOTE_MAX_LINE_LENGTH));
     }
 
     /** tableCode에 해당하는 분량 제한 스펙을 반환한다 (등록되지 않은 코드면 예외). */

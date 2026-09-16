@@ -568,10 +568,9 @@
       'D41', 'E41', 'F41', 'G41', // 연료 - 화)초지5
     ]);
 
-    // ── 3.에너지 원단위 "전력 - 제지" 행 좌표 목록 (2026-09 요청) ──
-    // 목표/전월실적/계획/실적 4열 모두 항상 "실수값"(소수점 1자리)으로 표시한다.
-    // 기존 formatNumber()의 "정수부 4자리 이상은 정수로 반올림", "값이 0이면 정수 0"
-    // 예외 규칙을 이 좌표들에는 적용하지 않는다(항상 소수점 1자리 유지).
+    // ── 3.에너지 원단위 "전력 - 제지" 행 좌표 목록 (2026-09 요청, 09-16 정정) ──
+    // 목표/전월실적/계획/실적 4열 모두 항상 "정수값"(소수점 없음)으로 표시한다.
+    // (2026-09-15 실수값(소수점 1자리) 요청 → 09-16 정수값 표시로 재정정)
     const ELECTRIC_PAPER_ROW_COORDS = new Set(['D36', 'E36', 'F36', 'G36']);
 
     /**
@@ -611,6 +610,8 @@
      *   무관하게 항상 소수점 없이 정수로만 표시 (2026-08 요청)
      * - coord가 표1 "제지3 평균선속" 행(엑셀행 7)에 해당하면, 위 규칙과 무관하게
      *   항상 소수점 없이 정수로만 표시 (2026-08 요청)
+     * - coord가 ELECTRIC_PAPER_ROW_COORDS(에너지 원단위 표의 "전력 - 제지" 행)에
+     *   해당하면, 위 규칙과 무관하게 항상 소수점 없이 정수로만 표시 (2026-09-16 정정)
      */
     function formatNumber(v, coord) {
       if (v === null || v === undefined) return v;
@@ -637,10 +638,10 @@
         return num.toLocaleString('ko-KR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
       }
 
-      // 에너지 원단위 "전력 - 제지" 행 예외 (2026-09 요청): 항상 실수값(소수점 1자리)으로
+      // 에너지 원단위 "전력 - 제지" 행 예외 (2026-09-16 정정): 항상 정수값(소수점 없음)으로
       // 표시 — 정수부 4자리 이상/0 예외 규칙(아래)을 건너뛰고 이 규칙을 항상 우선 적용
       if (coord && ELECTRIC_PAPER_ROW_COORDS.has(coord)) {
-        return num.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        return Math.round(num).toLocaleString('ko-KR');
       }
 
       // 0은 예외적으로 그냥 "0"만 표시
