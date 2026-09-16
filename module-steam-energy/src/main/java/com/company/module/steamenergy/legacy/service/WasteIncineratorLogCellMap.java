@@ -10,7 +10,7 @@ import java.util.List;
  * 하루가 열(또는 행) 하나이므로, 시트마다 "일자 시작 위치 + 항목 줄" 로 정의한다.
  *
  * <p>저장 위치는 모두 {@code waste_incin_log} (row_key = 일, col_index = 항목 고정번호).
- * col_index 규약은 sql/module-steam-energy/10_cell_conventions.sql 과 같다.
+ * col_index 규약은 sql/module-steam-energy/CELL_CONVENTIONS.md 과 같다.
  *
  * <p>계산 칸(합계·재고 2일 이후·적산량·누계·투입비)은 화면에서 계산하므로 매핑하지 않는다.
  * 재고 행은 1일(기초재고)만 읽고, 2일부터는 전일재고+반입-사용 으로 화면이 계산한다.

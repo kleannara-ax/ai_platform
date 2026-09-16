@@ -4,7 +4,7 @@
 
 ## 실행 순서
 
-파일 번호 순서대로 실행하면 된다(01 → 10). 번호가 곧 실행 순서다.
+파일 번호 순서대로 실행하면 된다(01 → 09). 번호가 곧 실행 순서다.
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
@@ -17,7 +17,6 @@
 | 7 | `07_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
 | 8 | `08_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
 | 9 | `09_roles.sql` | 스팀 전용 역할 3종을 공통코드 ROLE 그룹에 등록 |
-| 10 | `10_cell_conventions.sql` | table_cell_value 네임스페이스 / col_index 규약 (주석·점검 쿼리, 실행 선택) |
 
 ```bash
 mysql -u {user} -p {database} < 01_schema.sql
@@ -29,11 +28,13 @@ mysql -u {user} -p {database} < 06_remove_fixed_cost_items.sql
 mysql -u {user} -p {database} < 07_menu_data.sql
 mysql -u {user} -p {database} < 08_submenus.sql
 mysql -u {user} -p {database} < 09_roles.sql
-mysql -u {user} -p {database} < 10_cell_conventions.sql
 ```
 
 표를 만든 뒤(01~03) 데이터를 넣고, 그다음 메뉴·권한(07~09)을 등록하는 순서다.
-모든 파일은 재실행해도 안전하다. `10_cell_conventions.sql` 은 주석과 점검 쿼리만 있어 실행하지 않아도 된다.
+모든 파일은 재실행해도 안전하다.
+
+`table_cell_value` 를 화면별로 어떻게 나눠 쓰는지(네임스페이스·col_index)는
+실행 대상이 아니라 문서다 — [CELL_CONVENTIONS.md](CELL_CONVENTIONS.md) 참고.
 
 ### 운영 데이터를 함께 옮길 때
 
