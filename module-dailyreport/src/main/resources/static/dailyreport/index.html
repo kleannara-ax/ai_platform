@@ -568,6 +568,12 @@
       'D41', 'E41', 'F41', 'G41', // 연료 - 화)초지5
     ]);
 
+    // ── 3.에너지 원단위 "전력 - 제지" 행 좌표 목록 (2026-09 요청) ──
+    // 목표/전월실적/계획/실적 4열 모두 항상 "실수값"(소수점 1자리)으로 표시한다.
+    // 기존 formatNumber()의 "정수부 4자리 이상은 정수로 반올림", "값이 0이면 정수 0"
+    // 예외 규칙을 이 좌표들에는 적용하지 않는다(항상 소수점 1자리 유지).
+    const ELECTRIC_PAPER_ROW_COORDS = new Set(['D36', 'E36', 'F36', 'G36']);
+
     /**
      * 좌표(excelCoord)가 "2.제지 재공품 및 야적현황"(표2, 엑셀행 19~28) 범위에
      * 속하는지 판별한다 (2026-08 요청: 표2는 소수점 없이 항상 정수로만 표시).
@@ -629,6 +635,12 @@
       // 에너지 원단위 "연료" 행 예외: 항상 소수점 3자리
       if (coord && FUEL_ROW_COORDS.has(coord)) {
         return num.toLocaleString('ko-KR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+      }
+
+      // 에너지 원단위 "전력 - 제지" 행 예외 (2026-09 요청): 항상 실수값(소수점 1자리)으로
+      // 표시 — 정수부 4자리 이상/0 예외 규칙(아래)을 건너뛰고 이 규칙을 항상 우선 적용
+      if (coord && ELECTRIC_PAPER_ROW_COORDS.has(coord)) {
+        return num.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       }
 
       // 0은 예외적으로 그냥 "0"만 표시
@@ -1316,7 +1328,21 @@
 
       // 비고(textarea) 열은 렌더링 직후에도 기존 저장값(여러 줄)이 전부 보이도록
       // 초기 높이를 내용에 맞춰 자동으로 늘려준다.
-      stack.querySelectorAll('.cell-input-remark').forEach(autoGrowTextarea);
+      stack.querySelectorAll('.cell-input-remark').forEach((ta) => {
+        autoGrowTextarea(ta);
+        // ★★ 표4(보일러) 비고 칸의 줄바꿈 10회 제한은 IME(한글) 조합 중에는
+        // 검사하지 않고 조합 완료 시점에만 검사한다(조합 자체가 깨지는 것 방지).
+        if (ta.dataset.tableCode === 'TBL_BOILER') {
+          ta.addEventListener('compositionstart', () => { ta.dataset.composing = '1'; });
+          ta.addEventListener('compositionend', () => {
+            ta.dataset.composing = '0';
+            if (enforceBoilerRemarkNewlineLimit(ta)) {
+              autoGrowTextarea(ta);
+              showLimitAlert(`비고 칸은 최대 ${BOILER_REMARK_MAX_NEWLINES + 1}줄(줄바꿈 ${BOILER_REMARK_MAX_NEWLINES}회)까지 입력할 수 있습니다.`);
+            }
+          });
+        }
+      });
     }
 
     // ── 표 섹션 생성 ──
@@ -1636,6 +1662,30 @@
       return ownerIds.split(/\s+/).some(id => id.toLowerCase() === loginId.toLowerCase());
     }
 
+    // ★★ 2026-09 요청 — 표4(보일러 운영 현황) "비고"(Q36) 칸은 11줄(=줄바꿈 10회)로
+    // 제한한다. 다른 표(표1/표2)의 비고 칸은 이 제한과 무관(그대로 자유 입력).
+    const BOILER_REMARK_MAX_NEWLINES = 10;
+
+    /**
+     * 표4 비고 textarea가 줄바꿈 제한(10회)을 넘겼으면, 초과분만 줄바꿈 없이
+     * 이어붙여 내용 손실을 최소화하며 되돌린다(특이사항 trimToSpecialNoteBudget과
+     * 동일한 원리). 초과해서 잘라냈으면 true를 반환한다.
+     */
+    function enforceBoilerRemarkNewlineLimit(textarea) {
+      const raw = textarea.value;
+      const parts = raw.split('\n');
+      if (parts.length - 1 <= BOILER_REMARK_MAX_NEWLINES) return false;
+
+      const caretAtEnd = textarea.selectionStart === raw.length;
+      const head = parts.slice(0, BOILER_REMARK_MAX_NEWLINES + 1).join('\n');
+      const tail = parts.slice(BOILER_REMARK_MAX_NEWLINES + 1).join('');
+      textarea.value = head + tail;
+      if (caretAtEnd) {
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      }
+      return true;
+    }
+
     // ── 셀 입력 이벤트 ──
     function onCellInput(inputEl) {
       const coord = inputEl.dataset.coord;
@@ -1645,6 +1695,13 @@
       // 비고(textarea) 열은 줄바꿈이 늘어나는 만큼 자동으로 높이를 늘려서
       // 스크롤 없이 입력한 내용이 전부 보이도록 한다.
       if (inputEl.classList && inputEl.classList.contains('cell-input-remark')) {
+        // ★★ 표4(보일러) 비고 칸만 11줄(줄바꿈 10회) 하드 제한 — 초과분은 잘라내고 안내
+        if (inputEl.dataset.tableCode === 'TBL_BOILER') {
+          const isComposing = inputEl.dataset.composing === '1';
+          if (!isComposing && enforceBoilerRemarkNewlineLimit(inputEl)) {
+            showLimitAlert(`비고 칸은 최대 ${BOILER_REMARK_MAX_NEWLINES + 1}줄(줄바꿈 ${BOILER_REMARK_MAX_NEWLINES}회)까지 입력할 수 있습니다.`);
+          }
+        }
         autoGrowTextarea(inputEl);
       }
 
