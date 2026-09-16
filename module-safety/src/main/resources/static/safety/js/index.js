@@ -873,8 +873,8 @@ function renderDetailTools() {
   const resetBtn = `<button class="btn-modern btn-outline-modern" onclick="resetStepColWidths()"
       title="열 너비를 기본값으로"><i class="fas fa-table-columns"></i>열 너비 초기화</button>`;
   // 인쇄는 수정 권한과 무관하게 누구나 — 현장에서 종이로 들고 보는 일이 많다
-  const printBtn = `<button class="btn-modern btn-outline-modern" onclick="printManual()"
-      title="이 매뉴얼을 인쇄합니다 (기본 가로 방향)"><i class="fas fa-print"></i>인쇄</button>`;
+  const printBtn = `<button class="btn-modern btn-outline-modern" onclick="openPrintPreview()"
+      title="미리보기에서 가로/세로를 고른 뒤 인쇄합니다"><i class="fas fa-print"></i>인쇄</button>`;
   const commonBtns = resetBtn + printBtn;
   if (!isAdminUser) { el.innerHTML = commonBtns; return; }
   el.innerHTML = commonBtns + `
@@ -1182,52 +1182,147 @@ function resetStepColWidths() {
 }
 
 // ================================================================
-// 인쇄 (권한 없이 누구나)
+// 인쇄 미리보기 / 인쇄 (권한 없이 누구나)
 // ================================================================
 
+/** 미리보기에서 고른 용지 방향 */
+let printOrientation = 'landscape';
+
 /**
- * 지금 열려 있는 매뉴얼을 인쇄한다.
+ * 인쇄 미리보기를 연다.
  *
- * <p>화면용 열 폭은 px 고정이라 종이 폭과 맞지 않는다. 인쇄하는 동안만 폭을 비율(%)로 바꿔
- * 가로로 뽑든 세로로 뽑든 표가 종이에 꽉 맞게 들어가도록 한다.
- * 사진이 다 내려오기 전에 인쇄창을 띄우면 빈칸으로 찍히므로 받아질 때까지 기다린다.
+ * <p>바로 인쇄창을 띄우면 종이에 어떻게 나올지 모른 채 뽑게 된다. 표가 넓은 안전작업 매뉴얼은
+ * 가로가, 칸이 좁은 공무팀 위험성 평가서는 세로가 어울려서, 방향을 골라 확인한 뒤 뽑도록 했다.
+ * 기본값은 안전작업 매뉴얼 = 가로, 위험성 평가서 = 세로.
  */
-async function printManual() {
-  const table = document.querySelector('#detailModal .step-table');
-  if (!currentDetail || !table) return;
+function openPrintPreview() {
+  if (!currentDetail) return;
+  const risk = currentDetail.formType === 'RISK_ASSESSMENT';
+  const hint = document.getElementById('pvHint');
+  if (hint) {
+    hint.textContent = risk ? '위험성 평가서는 세로가 기본입니다.' : '안전작업 매뉴얼은 가로가 기본입니다.';
+  }
+  buildPrintSheet();
+  setPrintOrientation(risk ? 'portrait' : 'landscape');
+  // 모달이 열리기 전에는 미리보기 영역 폭을 알 수 없다 — 열린 뒤 한 번 더 맞춘다
+  const modalEl = document.getElementById('printPreviewModal');
+  modalEl.addEventListener('shown.bs.modal', fitPrintSheet, { once: true });
+  new bootstrap.Modal(modalEl).show();
+}
 
-  // 분류 경로는 바로 위 .detail-path 에 이미 찍히므로 여기엔 날짜만 남긴다
-  const stamp = document.getElementById('printStamp');
-  if (stamp) stamp.textContent = '출력 ' + new Date().toLocaleDateString('ko-KR');
+/** 용지 방향 변경 — 미리보기 종이 폭과 실제 인쇄 규칙이 함께 바뀐다 */
+function setPrintOrientation(orientation) {
+  printOrientation = (orientation === 'portrait') ? 'portrait' : 'landscape';
+  const sheet = document.getElementById('printSheet');
+  if (sheet) sheet.classList.toggle('portrait', printOrientation === 'portrait');
+  [['pvLandscape', 'landscape'], ['pvPortrait', 'portrait']].forEach(([id, value]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const on = (value === printOrientation);
+    btn.classList.toggle('btn-secondary', on);
+    btn.classList.toggle('btn-outline-secondary', !on);
+  });
+  applyPrintPageRule();
+  fitPrintSheet();
+}
 
-  const wasStacked = table.classList.contains('stacked');   // 좁은 화면에선 카드형으로 바뀌어 있다
-  table.classList.remove('stacked');
-  paintStepColsForPrint();
-  document.body.classList.add('printing-manual');
-  try {
-    await waitForStepPhotos();
-    window.print();
-  } finally {
-    document.body.classList.remove('printing-manual');
-    if (wasStacked) table.classList.add('stacked');
-    applyStepColWidths();     // 화면용 px 폭으로 되돌린다
+/**
+ * 미리보기 창이 종이보다 좁으면 종이를 줄여서 한 장이 통째로 보이게 한다.
+ * (가로 스크롤을 밀어 가며 확인하게 하지 않으려는 것 — 인쇄할 때는 이 배율을 풀고 원래 크기로 찍는다)
+ */
+function fitPrintSheet() {
+  const area = document.querySelector('#printPreviewModal .print-preview-area');
+  const sheet = document.getElementById('printSheet');
+  if (!area || !sheet) return;
+  sheet.style.transform = '';
+  sheet.style.marginBottom = '';
+  const available = area.clientWidth - 32;                 // 좌우 여백
+  const scale = available > 0 ? Math.min(1, available / sheet.offsetWidth) : 1;
+  if (scale < 1) {
+    sheet.style.transform = `scale(${scale.toFixed(3)})`;
+    // 줄인 만큼 아래에 빈 공간이 남는다 — 그만큼 당겨 올린다
+    sheet.style.marginBottom = `${-Math.round(sheet.offsetHeight * (1 - scale))}px`;
   }
 }
 
-/** 인쇄용 열 폭 — 화면에서 쓰던 비중을 그대로 백분율로 옮긴다. 관리 열은 종이에 넣지 않는다. */
-function paintStepColsForPrint() {
-  const printed = stepColLayout.filter(col => col.type !== 'MANAGE');
-  const total = printed.reduce((sum, col) => sum + col.weight, 0) || 1;
-  document.getElementById('stepCols').innerHTML = stepColLayout.map(col => col.type === 'MANAGE'
-    ? '<col style="width:0">'
-    : `<col style="width:${(col.weight / total * 100).toFixed(2)}%">`).join('');
-  const table = document.querySelector('#detailModal .step-table');
-  if (table) table.style.width = '100%';
+/** 용지 방향은 @page 로만 정할 수 있고 CSS 선택자로는 못 바꾼다 — 규칙을 직접 끼워 넣는다 */
+function applyPrintPageRule() {
+  let style = document.getElementById('printPageRule');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'printPageRule';
+    document.head.appendChild(style);
+  }
+  style.textContent = `@media print{@page{size:A4 ${printOrientation}; margin:9mm}}`;
 }
 
-/** 표 안의 사진이 다 받아질 때까지 기다린다. 한 장이 끝내 안 와도 인쇄는 되게 한다. */
-function waitForStepPhotos() {
-  const pending = [...document.querySelectorAll('#stepRows img.step-photo')].filter(img => !img.complete);
+/**
+ * 미리보기 종이를 만든다 — 화면의 표를 복사해 종이에 필요 없는 것을 걷어낸다.
+ * (조작 버튼, 폭 조절 손잡이, 관리 열, 편집용 속성)
+ */
+function buildPrintSheet() {
+  const sheet = document.getElementById('printSheet');
+  const table = document.querySelector('#detailModal .step-table');
+  if (!sheet || !table) return;
+
+  const title = (document.getElementById('detailTitle') || {}).textContent || '';
+  const path = (document.getElementById('detailPath') || {}).textContent || '';
+  sheet.innerHTML = `<div class="ps-head">
+      <div class="ps-title">${SAFETY.escapeHtml(title)}</div>
+      ${path ? `<div class="ps-path">${SAFETY.escapeHtml(path)}</div>` : ''}
+      <div class="ps-stamp">출력 ${new Date().toLocaleDateString('ko-KR')}</div>
+    </div>`;
+
+  const meta = document.getElementById('detailMetaBox');
+  if (meta && meta.textContent.trim()) sheet.appendChild(meta.cloneNode(true));
+
+  const clone = table.cloneNode(true);
+  clone.classList.remove('stacked');          // 좁은 화면에서 카드형으로 보고 있어도 종이에는 표로
+  clone.removeAttribute('style');
+  clone.querySelectorAll('.col-resizer, .col-tools, .photo-del, .cell-photo-hint, .step-manage')
+    .forEach(el => el.remove());
+
+  // 관리 열은 종이에 넣지 않는다 (맨 끝 열이라 지워도 앞의 칸이 밀리지 않는다)
+  const manageAt = stepColLayout.findIndex(col => col.type === 'MANAGE');
+  if (manageAt >= 0) {
+    clone.querySelectorAll('tr').forEach(tr => {
+      const cell = tr.children[manageAt];
+      if (cell) cell.remove();
+    });
+  }
+
+  // 편집용 속성은 종이에 의미가 없다
+  clone.querySelectorAll('*').forEach(el => {
+    ['contenteditable', 'draggable', 'tabindex', 'title', 'onclick', 'onpaste',
+      'ondragstart', 'ondragend', 'ondragover', 'ondragleave', 'ondrop'].forEach(a => el.removeAttribute(a));
+  });
+  clone.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+
+  // 열 폭은 화면에서 쓰던 비중을 그대로 백분율로 옮긴다 — 방향이 바뀌어도 비율은 유지된다
+  const printed = stepColLayout.filter(col => col.type !== 'MANAGE');
+  const total = printed.reduce((sum, col) => sum + col.weight, 0) || 1;
+  const group = clone.querySelector('colgroup');
+  if (group) {
+    group.innerHTML = printed
+      .map(col => `<col style="width:${(col.weight / total * 100).toFixed(2)}%">`).join('');
+  }
+  sheet.appendChild(clone);
+}
+
+/** 미리보기에 보이는 종이를 그대로 인쇄한다 */
+async function printPreviewNow() {
+  document.body.classList.add('printing-manual');
+  try {
+    await waitForSheetPhotos();
+    window.print();
+  } finally {
+    document.body.classList.remove('printing-manual');
+  }
+}
+
+/** 종이 안의 사진이 다 받아질 때까지 기다린다. 한 장이 끝내 안 와도 인쇄는 되게 한다. */
+function waitForSheetPhotos() {
+  const pending = [...document.querySelectorAll('#printSheet img')].filter(img => !img.complete);
   if (!pending.length) return Promise.resolve();
   return Promise.all(pending.map(img => new Promise(done => {
     img.addEventListener('load', done, { once: true });

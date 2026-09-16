@@ -515,86 +515,76 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
 }
 .step-photo:hover{border-color:var(--brand); box-shadow:var(--shadow-md)}
 
-/* ================= 인쇄 =================
- * 기본은 가로(A4 landscape). 표가 넓어 세로로는 글자가 잘게 접힌다.
- * 다만 세로로 뽑아도 어색하지 않도록 열 폭을 비율로 두고(js 의 paintStepColsForPrint),
- * 세로일 때만 글자와 사진을 한 단계 줄인다.
- * 인쇄 중에는 body 에 .printing-manual 이 붙고, 매뉴얼 모달만 남기고 모두 감춘다.
+/* ================= 인쇄 미리보기 / 인쇄 =================
+ * 인쇄 버튼을 누르면 바로 인쇄창을 띄우지 않고, 종이에 나올 모습을 그대로 그려 보여준 뒤
+ * 가로/세로를 고르게 한다. 미리보기에 보이는 그 종이(.print-sheet)를 그대로 인쇄하므로
+ * 보이는 대로 나온다.
+ * 용지 방향(@page size)은 CSS 선택자로 바꿀 수 없어 js 가 규칙을 끼워 넣는다(applyPrintPageRule).
  */
-.print-stamp{display:none}
+.print-preview-bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 12px; background:#f4f6fb; border-bottom:1px solid var(--line);
+}
+.print-preview-bar .pv-label{font-size:.85rem; font-weight:700; color:var(--muted)}
+.print-preview-bar .pv-hint{font-size:.78rem; color:var(--muted)}
+.print-preview-area{background:#e9ecf3; padding:16px; overflow:auto}
+
+/* 종이 한 장. 폭이 A4 에서 여백을 뺀 실제 크기라 미리보기가 인쇄물과 같은 비율로 보인다. */
+.print-sheet{
+  width:279mm; margin:0 auto; background:#fff; color:#111;
+  box-shadow:0 2px 14px rgba(0,0,0,.18);
+  transform-origin:top center;   /* 창보다 넓으면 js(fitPrintSheet)가 줄여서 한눈에 보이게 한다 */
+}
+.print-sheet.portrait{width:192mm}
+.print-sheet .ps-head{border-bottom:1px solid #888; padding-bottom:6px; margin-bottom:8px}
+.print-sheet .ps-title{font-size:15pt; font-weight:700; margin:0}
+.print-sheet .ps-path,
+.print-sheet .ps-stamp{font-size:8.5pt; color:#444; margin-top:2px}
+.print-sheet table{width:100%; table-layout:fixed; border-collapse:collapse}
+.print-sheet th,
+.print-sheet td{
+  border:1px solid #9aa0ae; padding:4px 6px; font-size:9.5pt; line-height:1.35;
+  vertical-align:top; text-align:left; white-space:normal; word-break:break-word; background:#fff;
+}
+.print-sheet th{
+  background:#eceef5; color:#111; text-align:center; font-weight:700;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+.print-sheet td.text-center{text-align:center}
+.print-sheet img{
+  width:100%; height:auto; max-height:46mm; object-fit:contain; display:block;
+  margin:0 auto 3px; border:1px solid #bbb;
+}
+.print-sheet .step-no-badge{background:none; color:#111; font-weight:700; padding:0}
+.print-sheet .check-btn{border:0; background:none; color:#111; padding:0}
+/* 세로는 칸이 좁다 — 글자와 사진을 한 단계 줄여 접히는 줄을 줄인다 */
+.print-sheet.portrait th,
+.print-sheet.portrait td{font-size:8.5pt; padding:3px 4px}
+.print-sheet.portrait img{max-height:34mm}
 
 @media print{
-  @page{size:A4 landscape; margin:9mm}
+  @page{margin:9mm}          /* 용지 방향은 js 가 넣는 규칙이 정한다 */
 
   body.printing-manual{background:#fff !important}
   body.printing-manual > *{display:none !important}
-  body.printing-manual > #detailModal{
+  body.printing-manual > #printPreviewModal{
     display:block !important; position:static !important; overflow:visible !important;
     background:#fff !important; padding:0 !important;
   }
-  body.printing-manual #detailModal .modal-dialog{max-width:none !important; width:auto !important; margin:0 !important}
-  body.printing-manual #detailModal .modal-content{
-    border:0 !important; box-shadow:none !important; max-height:none !important; overflow:visible !important;
+  body.printing-manual #printPreviewModal .modal-dialog{max-width:none !important; width:auto !important; margin:0 !important}
+  body.printing-manual #printPreviewModal .modal-content{border:0 !important; box-shadow:none !important}
+  body.printing-manual #printPreviewModal .modal-header,
+  body.printing-manual #printPreviewModal .print-preview-bar{display:none !important}
+  body.printing-manual #printPreviewModal .modal-body{padding:0 !important; overflow:visible !important; max-height:none !important}
+  body.printing-manual .print-preview-area{background:#fff !important; padding:0 !important; overflow:visible !important}
+  /* 종이에 찍을 때는 화면에서 줄여 놓은 배율을 풀고 용지 폭을 그대로 쓴다 */
+  body.printing-manual .print-sheet{
+    width:auto !important; box-shadow:none !important;
+    transform:none !important; margin:0 !important;
   }
-  body.printing-manual #detailModal .modal-header{padding:0 0 6px !important; border-bottom:1px solid #888}
-  body.printing-manual #detailModal .modal-body{padding:8px 0 0 !important; overflow:visible !important; max-height:none !important}
-  body.printing-manual #detailModal .table-responsive{overflow:visible !important}
-
-  /* 화면에서만 쓰는 조작 장치는 종이에 넣지 않는다 */
-  body.printing-manual .detail-tools,
-  body.printing-manual .btn-close,
-  body.printing-manual .col-resizer,
-  body.printing-manual .col-tools,
-  body.printing-manual .photo-del,
-  body.printing-manual .cell-photo-hint,
-  body.printing-manual #columnAdmin,
-  body.printing-manual .step-table th[data-col="manage"],
-  body.printing-manual .step-table td[data-label="관리"]{display:none !important}
-
-  body.printing-manual #detailTitle{font-size:15pt; font-weight:700}
-  body.printing-manual .detail-path{font-size:8.5pt; color:#444}
-  body.printing-manual .print-stamp{display:block; font-size:8.5pt; color:#444; margin-top:2px}
-
-  body.printing-manual .step-table{
-    width:100% !important; table-layout:fixed !important; border-collapse:collapse !important;
-  }
-  body.printing-manual .step-table th,
-  body.printing-manual .step-table td{
-    border:1px solid #9aa0ae !important; padding:4px 6px !important;
-    font-size:9.5pt !important; line-height:1.35 !important; vertical-align:top !important;
-    white-space:normal !important; overflow:visible !important; text-overflow:clip !important;
-    word-break:break-word; background:#fff !important;
-  }
-  body.printing-manual .step-table th{
-    background:#eceef5 !important; color:#111 !important; text-align:center !important;
-    -webkit-print-color-adjust:exact; print-color-adjust:exact;
-  }
-  /* 화면이 좁아 카드형(.stacked)으로 바뀌어 있어도 종이에는 표 그대로 찍는다 */
-  body.printing-manual .step-table.stacked{display:table !important}
-  body.printing-manual .step-table.stacked tbody{display:table-row-group !important}
-  body.printing-manual .step-table.stacked tr{
-    display:table-row !important; border:0 !important; border-radius:0 !important;
-    padding:0 !important; margin:0 !important; background:transparent !important;
-  }
-  body.printing-manual .step-table.stacked td{display:table-cell !important; width:auto !important}
-  body.printing-manual .step-table.stacked td::before{display:none !important}
-  body.printing-manual .step-table.stacked td.text-center{text-align:center !important}
-
-  body.printing-manual .step-table thead,
-  body.printing-manual .step-table.stacked thead{display:table-header-group !important}   /* 쪽마다 머리글 반복 */
-  body.printing-manual .step-table tr{break-inside:avoid; page-break-inside:avoid}
-  body.printing-manual .step-photo{
-    width:100% !important; height:auto !important; max-height:46mm !important;
-    object-fit:contain !important; margin:0 auto 3px !important;
-    border:1px solid #bbb !important; cursor:default !important; break-inside:avoid;
-  }
-
-  /* 세로로 뽑으면 칸이 좁아진다 — 글자와 사진을 한 단계 줄여 접히는 줄을 줄인다 */
-  @media (orientation:portrait){
-    body.printing-manual .step-table th,
-    body.printing-manual .step-table td{font-size:8.5pt !important; padding:3px 4px !important}
-    body.printing-manual .step-photo{max-height:34mm !important}
-  }
+  body.printing-manual .print-sheet thead{display:table-header-group}   /* 쪽마다 머리글 반복 */
+  body.printing-manual .print-sheet tr{break-inside:avoid; page-break-inside:avoid}
+  body.printing-manual .print-sheet img{break-inside:avoid}
 }
 
 /* ================= 이미지 확대 뷰어(라이트박스) ================= */
@@ -779,7 +769,6 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
       <div style="min-width:0">
         <h5 class="modal-title" id="detailTitle">매뉴얼</h5>
         <div class="detail-path" id="detailPath"></div>
-        <div class="print-stamp" id="printStamp"></div>
       </div>
       <div class="d-flex align-items-center gap-2">
         <div class="detail-tools" id="detailTools"></div>
@@ -801,6 +790,32 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
 </div></div></div>
 
 <!-- 엑셀 시트 미리보기 — 확정 전에 등록될 표를 그대로 보여준다 (업로드 창 위에 겹쳐 뜬다) -->
+<!-- 인쇄 미리보기 — 종이에 나올 모습 그대로 보여주고 방향을 고른다 -->
+<div class="modal fade" id="printPreviewModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header">
+    <h5 class="modal-title">인쇄 미리보기</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  </div>
+  <div class="print-preview-bar">
+    <span class="pv-label">용지 방향</span>
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary" id="pvLandscape"
+              onclick="setPrintOrientation('landscape')">가로</button>
+      <button type="button" class="btn btn-outline-secondary" id="pvPortrait"
+              onclick="setPrintOrientation('portrait')">세로</button>
+    </div>
+    <span class="pv-hint" id="pvHint"></span>
+    <div class="ms-auto d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="printPreviewNow()">
+        <i class="fas fa-print"></i> 인쇄</button>
+    </div>
+  </div>
+  <div class="modal-body print-preview-area">
+    <div class="print-sheet" id="printSheet"></div>
+  </div>
+</div></div></div>
+
 <div class="modal fade" id="sheetPreviewModal" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
     <div class="modal-header">
