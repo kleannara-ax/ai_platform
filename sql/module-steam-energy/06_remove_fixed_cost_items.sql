@@ -17,7 +17,7 @@ DELETE FROM table_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('waste1_fixed_cost', 'waste2_fixed_cost', 'fluid_fixed_cost', 'waste_fixed_cost');
 
--- 2) steam_price 샘플 행 (02_seed_data.sql 에서도 뺐다)
+-- 2) steam_price 샘플 행 (04_seed_data.sql 에서도 뺐다)
 DELETE FROM steam_price
  WHERE ITEM_CODE IN ('waste1_fixed_cost', 'waste2_fixed_cost', 'fluid_fixed_cost', 'waste_fixed_cost');
 

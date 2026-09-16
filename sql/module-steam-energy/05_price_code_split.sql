@@ -30,7 +30,7 @@ DELETE FROM table_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('waste_steam', 'waste_fixed_hr', 'waste_fixed_cost');
 
--- 3) steam_price 샘플 행의 옛 코드 정리 (02_seed_data.sql 이 호기별 행을 새로 넣는다)
+-- 3) steam_price 샘플 행의 옛 코드 정리 (04_seed_data.sql 이 호기별 행을 새로 넣는다)
 DELETE FROM steam_price
  WHERE ITEM_CODE IN ('waste_steam', 'waste_fixed_hr', 'waste_fixed_cost');
 
