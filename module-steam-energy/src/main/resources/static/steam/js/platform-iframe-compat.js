@@ -15,6 +15,17 @@
     }
   })();
 
+  // 플랫폼 로그인 세션이 없거나 만료되면 데이터 API 가 401 을 준다.
+  // 이때 화면을 빈 채로 두면 "페이지가 안 열린다" 로 보이므로 로그인 화면으로 보낸다.
+  // (iframe 안이면 최상위 창을 옮긴다)
+  var movingToLogin = false;
+  function goToLogin() {
+    if (movingToLogin) return;
+    movingToLogin = true;
+    var target = window.top || window;
+    try { target.location.href = "/"; } catch (error) { window.location.href = "/"; }
+  }
+
   function withAuth(init) {
     if (!platformToken) return init;
     var next = init ? Object.assign({}, init) : {};
@@ -47,7 +58,12 @@
         input = new Request("/steam/api" + url.pathname + url.search, input);
       }
     }
-    return nativeFetch(input, init);
+    var response = nativeFetch(input, init);
+    if (!needsAuth) return response;
+    return response.then(function (res) {
+      if (res.status === 401 || res.status === 403) goToLogin();
+      return res;
+    });
   };
 
   function rewriteLocalLink(value) {
