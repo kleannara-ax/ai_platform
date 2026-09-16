@@ -1185,40 +1185,38 @@ function resetStepColWidths() {
 // 인쇄 미리보기 / 인쇄 (권한 없이 누구나)
 // ================================================================
 
+/** 한 쪽 분량이 이 배수 안쪽으로 넘치면 다음 쪽으로 넘기지 않고 그 쪽을 줄여서 담는다 */
+const PRINT_SHRINK_LIMIT = 1.18;
+
 /** 미리보기에서 고른 용지 방향 */
 let printOrientation = 'landscape';
+/** 방향 안내 문구 (쪽수는 쪽을 나눈 뒤에 덧붙인다) */
+let printHintBase = '';
 
 /**
  * 인쇄 미리보기를 연다.
  *
- * <p>바로 인쇄창을 띄우면 종이에 어떻게 나올지 모른 채 뽑게 된다. 표가 넓은 안전작업 매뉴얼은
- * 가로가, 칸이 좁은 공무팀 위험성 평가서는 세로가 어울려서, 방향을 골라 확인한 뒤 뽑도록 했다.
- * 기본값은 안전작업 매뉴얼 = 가로, 위험성 평가서 = 세로.
+ * <p>바로 인쇄창을 띄우면 종이에 어떻게 나올지 모른 채 뽑게 된다. 그래서 실제 인쇄물처럼
+ * A4 한 장씩 나눠 보여주고 방향을 고르게 했다. 표가 넓은 안전작업 매뉴얼은 가로가,
+ * 칸이 좁은 공무팀 위험성 평가서는 세로가 어울려 기본값을 서식에 맞춰 둔다.
  */
 function openPrintPreview() {
   if (!currentDetail) return;
   const risk = currentDetail.formType === 'RISK_ASSESSMENT';
-  const hint = document.getElementById('pvHint');
-  if (hint) {
-    hint.textContent = (risk ? '위험성 평가서는 세로가 기본입니다.' : '안전작업 매뉴얼은 가로가 기본입니다.')
-      + ' 빨간 점선이 쪽이 나뉘는 자리입니다.';
-  }
-  buildPrintSheet();
+  printHintBase = risk ? '위험성 평가서는 세로가 기본입니다.' : '안전작업 매뉴얼은 가로가 기본입니다.';
   setPrintOrientation(risk ? 'portrait' : 'landscape');
-  // 모달이 열리기 전에는 폭도 높이도 잴 수 없다 — 열린 뒤에 경계 표시와 배율을 다시 잡는다
+  // 미리보기 영역 폭은 모달이 열린 뒤에야 알 수 있다 — 그때 배율을 맞춘다
   const modalEl = document.getElementById('printPreviewModal');
   modalEl.addEventListener('shown.bs.modal', () => {
-    paintPageBreaks();
-    fitPrintSheet();
+    refitPrintPages();      // 화면에 올라온 뒤라야 실제 높이를 잴 수 있다
+    fitPrintPages();
   }, { once: true });
   new bootstrap.Modal(modalEl).show();
 }
 
-/** 용지 방향 변경 — 미리보기 종이 폭과 실제 인쇄 규칙이 함께 바뀐다 */
+/** 용지 방향 변경 — 종이 크기가 달라지므로 쪽도 다시 나눈다 */
 function setPrintOrientation(orientation) {
   printOrientation = (orientation === 'portrait') ? 'portrait' : 'landscape';
-  const sheet = document.getElementById('printSheet');
-  if (sheet) sheet.classList.toggle('portrait', printOrientation === 'portrait');
   [['pvLandscape', 'landscape'], ['pvPortrait', 'portrait']].forEach(([id, value]) => {
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -1227,77 +1225,8 @@ function setPrintOrientation(orientation) {
     btn.classList.toggle('btn-outline-secondary', !on);
   });
   applyPrintPageRule();
-  paintPageBreaks();
-  fitPrintSheet();
-}
-
-/** 1mm 가 화면에서 몇 px 인지 — 종이 크기(mm)를 미리보기 좌표로 옮길 때 쓴다 */
-function pxPerMm() {
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:absolute; visibility:hidden; width:100mm';
-  document.body.appendChild(probe);
-  const px = probe.offsetWidth / 100;
-  probe.remove();
-  return px || 3.78;
-}
-
-/**
- * 미리보기에 쪽이 나뉘는 자리를 점선으로 표시한다.
- *
- * <p>인쇄할 때 한 행이 쪽 경계에 걸치면 통째로 다음 쪽으로 넘어가므로(break-inside:avoid),
- * 자로 잰 듯 일정한 간격이 아니라 그 규칙을 따라가며 자리를 잡는다.
- * 둘째 쪽부터는 표 머리글이 다시 찍히므로 그만큼 쓸 수 있는 높이가 줄어든다.
- */
-function paintPageBreaks() {
-  const sheet = document.getElementById('printSheet');
-  if (!sheet) return;
-  sheet.querySelectorAll('.page-break-mark').forEach(el => el.remove());
-
-  const scaled = sheet.style.transform;
-  sheet.style.transform = '';                       // 줄여 놓은 상태에서는 높이를 잴 수 없다
-
-  // A4 에서 위아래 여백(9mm x 2)을 뺀 실제로 쓸 수 있는 높이
-  const pageHeight = pxPerMm() * ((printOrientation === 'portrait' ? 297 : 210) - 18);
-  const head = sheet.querySelector('thead');
-  const headHeight = head ? head.getBoundingClientRect().height : 0;
-  const sheetTop = sheet.getBoundingClientRect().top;
-
-  let limit = pageHeight;
-  let page = 1;
-  sheet.querySelectorAll('tbody tr').forEach(row => {
-    const box = row.getBoundingClientRect();
-    const top = box.top - sheetTop;
-    if (box.bottom - sheetTop > limit && top > 0) {
-      page++;
-      const mark = document.createElement('div');
-      mark.className = 'page-break-mark';
-      mark.style.top = `${Math.round(top)}px`;
-      mark.innerHTML = `<span>${page}쪽 시작</span>`;
-      sheet.appendChild(mark);
-      limit = top + pageHeight - headHeight;        // 다음 쪽은 머리글이 다시 찍힌다
-    }
-  });
-
-  sheet.style.transform = scaled;
-}
-
-/**
- * 미리보기 창이 종이보다 좁으면 종이를 줄여서 한 장이 통째로 보이게 한다.
- * (가로 스크롤을 밀어 가며 확인하게 하지 않으려는 것 — 인쇄할 때는 이 배율을 풀고 원래 크기로 찍는다)
- */
-function fitPrintSheet() {
-  const area = document.querySelector('#printPreviewModal .print-preview-area');
-  const sheet = document.getElementById('printSheet');
-  if (!area || !sheet) return;
-  sheet.style.transform = '';
-  sheet.style.marginBottom = '';
-  const available = area.clientWidth - 32;                 // 좌우 여백
-  const scale = available > 0 ? Math.min(1, available / sheet.offsetWidth) : 1;
-  if (scale < 1) {
-    sheet.style.transform = `scale(${scale.toFixed(3)})`;
-    // 줄인 만큼 아래에 빈 공간이 남는다 — 그만큼 당겨 올린다
-    sheet.style.marginBottom = `${-Math.round(sheet.offsetHeight * (1 - scale))}px`;
-  }
+  buildPrintPages();
+  fitPrintPages();
 }
 
 /** 용지 방향은 @page 로만 정할 수 있고 CSS 선택자로는 못 바꾼다 — 규칙을 직접 끼워 넣는다 */
@@ -1311,24 +1240,21 @@ function applyPrintPageRule() {
   style.textContent = `@media print{@page{size:A4 ${printOrientation}; margin:9mm}}`;
 }
 
+/** 1mm 가 화면에서 몇 px 인지 — 용지 크기(mm)를 화면 좌표로 옮길 때 쓴다 */
+function pxPerMm() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute; visibility:hidden; width:100mm';
+  document.body.appendChild(probe);
+  const px = probe.offsetWidth / 100;
+  probe.remove();
+  return px || 3.78;
+}
+
 /**
- * 미리보기 종이를 만든다 — 화면의 표를 복사해 종이에 필요 없는 것을 걷어낸다.
+ * 인쇄용 표를 만든다 — 화면의 표를 복사해 종이에 필요 없는 것을 걷어낸다.
  * (조작 버튼, 폭 조절 손잡이, 관리 열, 편집용 속성)
  */
-function buildPrintSheet() {
-  const sheet = document.getElementById('printSheet');
-  const table = document.querySelector('#detailModal .step-table');
-  if (!sheet || !table) return;
-
-  // 종이 맨 위에는 제목만 둔다 (분류 경로·출력일은 종이에서 자리만 차지한다)
-  const title = (document.getElementById('detailTitle') || {}).textContent || '';
-  sheet.innerHTML = `<div class="ps-head">
-      <div class="ps-title">${SAFETY.escapeHtml(title)}</div>
-    </div>`;
-
-  const meta = document.getElementById('detailMetaBox');
-  if (meta && meta.textContent.trim()) sheet.appendChild(meta.cloneNode(true));
-
+function makePrintTable(table) {
   const clone = table.cloneNode(true);
   clone.classList.remove('stacked');          // 좁은 화면에서 카드형으로 보고 있어도 종이에는 표로
   clone.removeAttribute('style');
@@ -1359,7 +1285,170 @@ function buildPrintSheet() {
     group.innerHTML = printed
       .map(col => `<col style="width:${(col.weight / total * 100).toFixed(2)}%">`).join('');
   }
-  sheet.appendChild(clone);
+  return clone;
+}
+
+/** 종이 맨 위 제목 블록 (첫 쪽에만 들어간다) */
+function printHeadHtml() {
+  const title = (document.getElementById('detailTitle') || {}).textContent || '';
+  return `<div class="ps-head"><div class="ps-title">${SAFETY.escapeHtml(title)}</div></div>`;
+}
+
+/**
+ * 미리보기를 실제 인쇄물처럼 <b>A4 한 장씩</b> 나눠 그린다.
+ *
+ * <p>먼저 표를 화면 밖에 한 번 그려 행마다 높이를 잰 뒤, 한 쪽에 들어갈 만큼씩 끊어 담는다.
+ * 행은 중간에서 잘리지 않고(넘치면 통째로 다음 쪽), 둘째 쪽부터는 표 머리글이 다시 들어가
+ * 그만큼 쓸 수 있는 높이가 줄어든다 — 실제 인쇄 규칙과 같게 맞춘 것이다.
+ */
+function buildPrintPages() {
+  const holder = document.getElementById('printPages');
+  const table = document.querySelector('#detailModal .step-table');
+  if (!holder || !table) return;
+  const portrait = (printOrientation === 'portrait');
+
+  const meta = document.getElementById('detailMetaBox');
+  const metaSource = (meta && meta.textContent.trim()) ? meta : null;
+  const cloneMeta = () => {
+    const copy = metaSource.cloneNode(true);
+    copy.removeAttribute('id');              // 같은 id 가 두 개가 되지 않게
+    return copy;
+  };
+
+  // ── 1) 화면 밖 종이에 한 번 그려서 높이를 잰다 ──
+  const probe = document.createElement('div');
+  probe.className = 'print-page' + (portrait ? ' portrait' : '');
+  probe.style.cssText = 'position:absolute; left:-10000px; top:0; height:auto; overflow:visible; visibility:hidden';
+  probe.innerHTML = printHeadHtml();
+  if (metaSource) probe.appendChild(cloneMeta());
+  const measured = makePrintTable(table);
+  probe.appendChild(measured);
+  document.body.appendChild(probe);
+
+  const usable = pxPerMm() * ((portrait ? 297 : 210) - 18);      // 위아래 여백 9mm 씩 뺀 높이
+  const headHeight = probe.querySelector('.ps-head').getBoundingClientRect().height + 8;
+  const metaHeight = metaSource ? probe.children[1].getBoundingClientRect().height : 0;
+  const thead = measured.querySelector('thead');
+  const theadHeight = thead ? thead.getBoundingClientRect().height : 0;
+  const rowHeights = [...measured.querySelectorAll('tbody tr')]
+    .map(row => row.getBoundingClientRect().height);
+  probe.remove();
+
+  // ── 2) 쪽마다 담을 행을 정한다 ──
+  // 조금 넘치는 정도라면 다음 쪽으로 넘기지 않고 그 쪽만 살짝 줄인다.
+  // (실제 프린터의 "용지에 맞춰 축소"와 같은 방식 — 한 줄 때문에 거의 빈 쪽이 생기지 않게 한다)
+  const plans = [{ rows: [], used: headHeight + metaHeight + theadHeight }];
+  rowHeights.forEach((height, index) => {
+    const current = plans[plans.length - 1];
+    if (current.rows.length && current.used + height > usable * PRINT_SHRINK_LIMIT) {
+      plans.push({ rows: [], used: theadHeight });   // 새 쪽은 머리글부터 다시 시작한다
+    }
+    const target = plans[plans.length - 1];
+    target.rows.push(index);
+    target.used += height;
+  });
+
+  // ── 3) 종이를 한 장씩 만든다 ──
+  holder.innerHTML = '';
+  plans.forEach((plan, pageNo) => {
+    const box = document.createElement('div');
+    box.className = 'print-page-box';
+
+    const paper = document.createElement('div');
+    paper.className = 'print-page' + (portrait ? ' portrait' : '');
+
+    // 내용을 상자에 담아 두면, 넘칠 때 이 상자만 줄여서 잘리지 않게 할 수 있다
+    const fit = document.createElement('div');
+    fit.className = 'print-page-fit';
+    if (pageNo === 0) {
+      fit.innerHTML = printHeadHtml();
+      if (metaSource) fit.appendChild(cloneMeta());
+    }
+    const pageTable = makePrintTable(table);
+    const keep = new Set(plan.rows);
+    [...pageTable.querySelectorAll('tbody tr')].forEach((row, index) => {
+      if (!keep.has(index)) row.remove();
+    });
+    fit.appendChild(pageTable);
+
+    paper.appendChild(fit);
+    box.appendChild(paper);
+
+    const label = document.createElement('div');
+    label.className = 'print-page-label';
+    label.dataset.base = `${pageNo + 1} / ${plans.length}`;
+    label.textContent = label.dataset.base;
+    box.appendChild(label);
+    holder.appendChild(box);
+  });
+
+  refitPrintPages();
+}
+
+/**
+ * 쪽마다 <b>실제로 그려진 높이</b>를 재서 종이에 딱 맞도록 배율을 보정한다.
+ *
+ * <p>쪽을 나눌 때 쓴 높이는 행을 하나씩 더한 어림값이라 실제와 조금 어긋난다.
+ * 그 차이 때문에 내용이 종이 밖으로 밀려 잘리지 않도록, 그려진 뒤 한 번 더 재서 맞춘다.
+ * 폭을 {@code 100/배율 %} 로 넓혀 두면 줄인 뒤에도 종이 폭을 꽉 채운다(글이 더 접히지 않는다).
+ */
+function refitPrintPages() {
+  const papers = [...document.querySelectorAll('#printPages .print-page')];
+  if (!papers.length || !papers[0].offsetHeight) return;   // 아직 화면에 없으면 잴 수 없다
+
+  let shrunk = 0;
+  papers.forEach(paper => {
+    const fit = paper.querySelector('.print-page-fit');
+    const label = paper.parentElement.querySelector('.print-page-label');
+    if (!fit) return;
+
+    fit.style.transform = '';
+    fit.style.width = '';
+    const style = getComputedStyle(paper);
+    const inner = paper.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+
+    // 폭을 넓히면 글이 덜 접혀 높이도 달라진다 — 몇 번 되재며 맞춘다
+    let scale = 1;
+    for (let pass = 0; pass < 4; pass++) {
+      const height = fit.offsetHeight * scale;
+      if (height <= inner + 0.5) break;
+      scale *= inner / height;
+      fit.style.transform = `scale(${scale.toFixed(4)})`;
+      fit.style.width = `${(100 / scale).toFixed(3)}%`;
+    }
+    if (scale < 1) shrunk++;
+    if (label) {
+      label.textContent = label.dataset.base
+        + (scale < 1 ? ` · ${Math.round(scale * 100)}%로 맞춤` : '');
+    }
+  });
+
+  const hint = document.getElementById('pvHint');
+  const total = papers.length;
+  if (hint) {
+    hint.textContent = `${printHintBase} 모두 ${total}쪽입니다.`
+      + (shrunk ? ` (${shrunk}쪽은 잘리지 않게 조금 줄였습니다)` : '');
+  }
+}
+
+/**
+ * 미리보기 창이 종이보다 좁으면 종이를 줄여서 한 장이 통째로 보이게 한다.
+ * (인쇄할 때는 이 배율을 풀고 용지 크기 그대로 찍는다)
+ */
+function fitPrintPages() {
+  const area = document.querySelector('#printPreviewModal .print-preview-area');
+  const pages = document.getElementById('printPages');
+  const first = pages ? pages.querySelector('.print-page') : null;
+  if (!area || !pages || !first) return;
+  pages.style.transform = '';
+  pages.style.marginBottom = '';
+  const available = area.clientWidth - 32;                 // 좌우 여백
+  const scale = available > 0 ? Math.min(1, available / first.offsetWidth) : 1;
+  if (scale < 1) {
+    pages.style.transform = `scale(${scale.toFixed(3)})`;
+    // 줄인 만큼 아래에 빈 공간이 남는다 — 그만큼 당겨 올린다
+    pages.style.marginBottom = `${-Math.round(pages.offsetHeight * (1 - scale))}px`;
+  }
 }
 
 /** 미리보기에 보이는 종이를 그대로 인쇄한다 */
@@ -1375,7 +1464,7 @@ async function printPreviewNow() {
 
 /** 종이 안의 사진이 다 받아질 때까지 기다린다. 한 장이 끝내 안 와도 인쇄는 되게 한다. */
 function waitForSheetPhotos() {
-  const pending = [...document.querySelectorAll('#printSheet img')].filter(img => !img.complete);
+  const pending = [...document.querySelectorAll('#printPages img')].filter(img => !img.complete);
   if (!pending.length) return Promise.resolve();
   return Promise.all(pending.map(img => new Promise(done => {
     img.addEventListener('load', done, { once: true });
