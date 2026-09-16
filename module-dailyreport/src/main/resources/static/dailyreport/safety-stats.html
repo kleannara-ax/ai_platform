@@ -286,11 +286,12 @@
           { code: 'PAD',    label: '패드' },
         ],
         maxTotalNewlines: 9,
-        maxTotalChars: 486,
-        maxLineLength: 78,
+        maxTotalChars: 1170,
+        maxLineLength: 130,
         // ★★ 2026-09: 사용자 요청으로 표9/10의 섹션 폭을 위쪽 표5~8과 동일하게
         //   (별도 좁히기/넓히기 없이 .page-wrap 전체 폭 그대로) 맞춘다 —
         //   과거에 있던 sectionMaxWidth 커스텀 폭 지정을 제거했다.
+        // ★★ 2026-09-16: 한 줄 제한 78→130자, 전체 글자수 한도 486→1170자로 재조정
         title: '9. 사고 금액 특이사항',
         sideLabel: '사고금액\n특이사항',
         sectionId: 'noteAmount',
@@ -306,8 +307,9 @@
         ],
         hideDivisionColumns: true,
         maxTotalNewlines: 6,
-        maxTotalChars: 702,
-        maxLineLength: 78,
+        maxTotalChars: 780,
+        maxLineLength: 130,
+        // ★★ 2026-09-16: 한 줄 제한 78→130자, 전체 글자수 한도 702→780자로 재조정
         title: '10. 안전사고 발생추이 특이사항',
         sideLabel: '안전사고 발생추이\n특이사항',
         sectionId: 'noteTrend',
@@ -1073,11 +1075,12 @@
       const stack = document.getElementById('sectionsStack');
       stack.innerHTML = '';
 
+      // ★★ 2026-09 요청 — 표5/6/7/8 표시 이름 변경 (화면 타이틀만, tableCode/DB는 불변)
       const tableConfig = [
-        { code: 'TBL_SAFETY_INCIDENT_COUNT',  title: '5. 안전사고 발생건수', id: 'table5' },
-        { code: 'TBL_SAFETY_INCIDENT_AMOUNT', title: '6. 안전사고 손실금액', id: 'table6' },
-        { code: 'TBL_SAFETY_YEARLY_TREND',    title: '7. 안전사고 연도별 추이', id: 'table7' },
-        { code: 'TBL_SAFETY_MONTHLY_TREND',   title: '8. 안전사고 월별 추이', id: 'table8' },
+        { code: 'TBL_SAFETY_INCIDENT_COUNT',  title: '5. 사고/절지 횟수', id: 'table5' },
+        { code: 'TBL_SAFETY_INCIDENT_AMOUNT', title: '6. 사고 금액', id: 'table6' },
+        { code: 'TBL_SAFETY_YEARLY_TREND',    title: '7. 안전사고 발생 추이(9개년 누적)', id: 'table7' },
+        { code: 'TBL_SAFETY_MONTHLY_TREND',   title: '8. 월별 안전사고 발생 추이', id: 'table8' },
       ];
 
       const tables = reportData?.tables || {};
@@ -1239,13 +1242,13 @@
 
       let fontSize = '12.0pt';
       let cellPadding = '6px 8px';
+      // ★★ 2026-09 요청 — 표5/6/7/8은 숫자 셀(당월 소계/합계 등 우측정렬되던 셀
+      // 포함)을 전부 중앙정렬로 통일한다. (index.html의 표1~4는 이 정책과 무관하므로
+      // 그대로 유지 — 이 파일은 사고통계 표(표5~8) 전용 렌더러이다.)
       let textAlign = 'center';
 
       if (isDataLike) {
         fontWeight = '500';
-        if (!isAssignable) {
-          textAlign = 'right';
-        }
       }
 
       const forceNoWrap = false;
