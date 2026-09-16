@@ -16,6 +16,7 @@
 | 8 | `08_flexible_columns.sql` | 서식 구분(`FORM_TYPE`) + 상세 표의 열을 데이터로 빼는 구조(머리말/열 정의/행x열 값) + 기존 고정 컬럼 값 백필 |
 | 9 | `09_two_level_categories.sql` | 예전 3단계 DB 정리: 소분류에 붙어 있던 매뉴얼을 부모 중분류로 옮기고 소분류를 소프트 삭제. **신규 DB에서는 대상이 없어 아무 것도 하지 않는다** |
 | 10 | `10_step_photo_column.sql` | 사진이 표의 **어느 칸**에 들어가는지 기록하는 `COLUMN_ID` 추가. 비고 칸처럼 글과 사진이 함께 있는 칸을 지원한다. 기존 행은 `NULL`(기본 사진 열)이라 적용 전과 동작이 같다 |
+| 11 | `11_column_width_defaults.sql` | 표 열 기본 폭 조정 — **비고 260→190, 위험요인 260→330**. 아직 기본값(260)인 칸만 바꾸므로 관리자가 손댄 폭은 그대로다. 열 개수·데이터는 변하지 않는다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 01_schema.sql
@@ -27,6 +28,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < 07_notice.s
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 08_flexible_columns.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 09_two_level_categories.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < 10_step_photo_column.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < 11_column_width_defaults.sql
 ```
 
 > 신규 DB에 이 순서대로 올리면 **대분류 12건만 있는 2단계 구조**가 만들어진다.

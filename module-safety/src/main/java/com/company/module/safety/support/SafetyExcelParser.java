@@ -80,6 +80,15 @@ public class SafetyExcelParser {
     /** 사진이 들어가는 칸 */
     private static final String HEADER_PHOTO = "사진";
 
+    // ── 표 열 기본 폭(비중) ──
+    // 화면도 인쇄도 이 비중대로 칸을 나눈다. 합계는 그대로 두고 비고에서 덜어 위험요인에 준다.
+    private static final int PHOTO_WIDTH = 150;
+    private static final int TEXT_WIDTH = 260;
+    /** 비고는 한두 줄짜리 메모가 대부분이라 좁게 */
+    private static final int REMARK_WIDTH = 190;
+    /** 위험요인/작업 내용은 문장이 길어 넓게 */
+    private static final int HAZARD_WIDTH = 330;
+
     /** 화면(<img>)에서 그대로 보여줄 수 있는 그림 형식만 가져온다. (wmf/emf/wdp 등은 제외) */
     private static final Set<String> WEB_IMAGE_EXTENSIONS =
             Set.of("png", "jpg", "jpeg", "gif", "bmp", "webp");
@@ -350,9 +359,9 @@ public class SafetyExcelParser {
 
             if (label.contains(HEADER_PHOTO)) {
                 if (photoColumnPos < 0) photoColumnPos = columns.size();
-                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_PHOTO, 150));
+                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_PHOTO, PHOTO_WIDTH));
             } else {
-                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_TEXT, 260));
+                columns.add(new ParsedColumn(label, SafetyManualColumn.TYPE_TEXT, defaultTextWidth(label)));
             }
             sourceColumnIndexes.add(colIdx);
         }
@@ -612,6 +621,18 @@ public class SafetyExcelParser {
             }
         }
         return null;
+    }
+
+    /**
+     * 글 칸의 기본 폭. 칸마다 들어가는 글 길이가 크게 달라 같은 폭으로 두면 한쪽만 계속 접힌다.
+     *
+     * <p>비고에는 한두 줄짜리 메모가, 위험요인/작업 내용에는 여러 문장이 들어간다.
+     * 그래서 비고에서 덜어내 위험요인 쪽에 준다(합계는 그대로라 다른 칸 폭은 변하지 않는다).
+     */
+    private int defaultTextWidth(String label) {
+        if (label.contains("비고")) return REMARK_WIDTH;
+        if (label.contains("위험요인")) return HAZARD_WIDTH;
+        return TEXT_WIDTH;
     }
 
     /** 첫 텍스트 칸 앞의 "1." 같은 번호를 단계 번호로 쓴다. 없으면 순번을 쓴다. */

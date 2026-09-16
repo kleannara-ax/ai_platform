@@ -515,6 +515,88 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
 }
 .step-photo:hover{border-color:var(--brand); box-shadow:var(--shadow-md)}
 
+/* ================= 인쇄 =================
+ * 기본은 가로(A4 landscape). 표가 넓어 세로로는 글자가 잘게 접힌다.
+ * 다만 세로로 뽑아도 어색하지 않도록 열 폭을 비율로 두고(js 의 paintStepColsForPrint),
+ * 세로일 때만 글자와 사진을 한 단계 줄인다.
+ * 인쇄 중에는 body 에 .printing-manual 이 붙고, 매뉴얼 모달만 남기고 모두 감춘다.
+ */
+.print-stamp{display:none}
+
+@media print{
+  @page{size:A4 landscape; margin:9mm}
+
+  body.printing-manual{background:#fff !important}
+  body.printing-manual > *{display:none !important}
+  body.printing-manual > #detailModal{
+    display:block !important; position:static !important; overflow:visible !important;
+    background:#fff !important; padding:0 !important;
+  }
+  body.printing-manual #detailModal .modal-dialog{max-width:none !important; width:auto !important; margin:0 !important}
+  body.printing-manual #detailModal .modal-content{
+    border:0 !important; box-shadow:none !important; max-height:none !important; overflow:visible !important;
+  }
+  body.printing-manual #detailModal .modal-header{padding:0 0 6px !important; border-bottom:1px solid #888}
+  body.printing-manual #detailModal .modal-body{padding:8px 0 0 !important; overflow:visible !important; max-height:none !important}
+  body.printing-manual #detailModal .table-responsive{overflow:visible !important}
+
+  /* 화면에서만 쓰는 조작 장치는 종이에 넣지 않는다 */
+  body.printing-manual .detail-tools,
+  body.printing-manual .btn-close,
+  body.printing-manual .col-resizer,
+  body.printing-manual .col-tools,
+  body.printing-manual .photo-del,
+  body.printing-manual .cell-photo-hint,
+  body.printing-manual #columnAdmin,
+  body.printing-manual .step-table th[data-col="manage"],
+  body.printing-manual .step-table td[data-label="관리"]{display:none !important}
+
+  body.printing-manual #detailTitle{font-size:15pt; font-weight:700}
+  body.printing-manual .detail-path{font-size:8.5pt; color:#444}
+  body.printing-manual .print-stamp{display:block; font-size:8.5pt; color:#444; margin-top:2px}
+
+  body.printing-manual .step-table{
+    width:100% !important; table-layout:fixed !important; border-collapse:collapse !important;
+  }
+  body.printing-manual .step-table th,
+  body.printing-manual .step-table td{
+    border:1px solid #9aa0ae !important; padding:4px 6px !important;
+    font-size:9.5pt !important; line-height:1.35 !important; vertical-align:top !important;
+    white-space:normal !important; overflow:visible !important; text-overflow:clip !important;
+    word-break:break-word; background:#fff !important;
+  }
+  body.printing-manual .step-table th{
+    background:#eceef5 !important; color:#111 !important; text-align:center !important;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  /* 화면이 좁아 카드형(.stacked)으로 바뀌어 있어도 종이에는 표 그대로 찍는다 */
+  body.printing-manual .step-table.stacked{display:table !important}
+  body.printing-manual .step-table.stacked tbody{display:table-row-group !important}
+  body.printing-manual .step-table.stacked tr{
+    display:table-row !important; border:0 !important; border-radius:0 !important;
+    padding:0 !important; margin:0 !important; background:transparent !important;
+  }
+  body.printing-manual .step-table.stacked td{display:table-cell !important; width:auto !important}
+  body.printing-manual .step-table.stacked td::before{display:none !important}
+  body.printing-manual .step-table.stacked td.text-center{text-align:center !important}
+
+  body.printing-manual .step-table thead,
+  body.printing-manual .step-table.stacked thead{display:table-header-group !important}   /* 쪽마다 머리글 반복 */
+  body.printing-manual .step-table tr{break-inside:avoid; page-break-inside:avoid}
+  body.printing-manual .step-photo{
+    width:100% !important; height:auto !important; max-height:46mm !important;
+    object-fit:contain !important; margin:0 auto 3px !important;
+    border:1px solid #bbb !important; cursor:default !important; break-inside:avoid;
+  }
+
+  /* 세로로 뽑으면 칸이 좁아진다 — 글자와 사진을 한 단계 줄여 접히는 줄을 줄인다 */
+  @media (orientation:portrait){
+    body.printing-manual .step-table th,
+    body.printing-manual .step-table td{font-size:8.5pt !important; padding:3px 4px !important}
+    body.printing-manual .step-photo{max-height:34mm !important}
+  }
+}
+
 /* ================= 이미지 확대 뷰어(라이트박스) ================= */
 .lightbox{
   position:fixed; inset:0; z-index:20000; background:rgba(9,11,20,.92);
@@ -697,6 +779,7 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
       <div style="min-width:0">
         <h5 class="modal-title" id="detailTitle">매뉴얼</h5>
         <div class="detail-path" id="detailPath"></div>
+        <div class="print-stamp" id="printStamp"></div>
       </div>
       <div class="d-flex align-items-center gap-2">
         <div class="detail-tools" id="detailTools"></div>

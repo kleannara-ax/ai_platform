@@ -872,8 +872,12 @@ function renderDetailTools() {
   const el = document.getElementById('detailTools');
   const resetBtn = `<button class="btn-modern btn-outline-modern" onclick="resetStepColWidths()"
       title="열 너비를 기본값으로"><i class="fas fa-table-columns"></i>열 너비 초기화</button>`;
-  if (!isAdminUser) { el.innerHTML = resetBtn; return; }
-  el.innerHTML = resetBtn + `
+  // 인쇄는 수정 권한과 무관하게 누구나 — 현장에서 종이로 들고 보는 일이 많다
+  const printBtn = `<button class="btn-modern btn-outline-modern" onclick="printManual()"
+      title="이 매뉴얼을 인쇄합니다 (기본 가로 방향)"><i class="fas fa-print"></i>인쇄</button>`;
+  const commonBtns = resetBtn + printBtn;
+  if (!isAdminUser) { el.innerHTML = commonBtns; return; }
+  el.innerHTML = commonBtns + `
     <button class="btn-modern btn-edit-toggle ${editMode ? 'on' : ''}" onclick="toggleEditMode()">
       <i class="fas fa-pen"></i>${editMode ? '수정 종료' : '수정'}</button>
     ${editMode ? `
@@ -1175,6 +1179,61 @@ function resetStepColWidths() {
   stepColLayout = buildStepColLayout();
   applyStepColWidths();
   SAFETY.toast('열 너비를 기본 비율로 되돌렸습니다.');
+}
+
+// ================================================================
+// 인쇄 (권한 없이 누구나)
+// ================================================================
+
+/**
+ * 지금 열려 있는 매뉴얼을 인쇄한다.
+ *
+ * <p>화면용 열 폭은 px 고정이라 종이 폭과 맞지 않는다. 인쇄하는 동안만 폭을 비율(%)로 바꿔
+ * 가로로 뽑든 세로로 뽑든 표가 종이에 꽉 맞게 들어가도록 한다.
+ * 사진이 다 내려오기 전에 인쇄창을 띄우면 빈칸으로 찍히므로 받아질 때까지 기다린다.
+ */
+async function printManual() {
+  const table = document.querySelector('#detailModal .step-table');
+  if (!currentDetail || !table) return;
+
+  // 분류 경로는 바로 위 .detail-path 에 이미 찍히므로 여기엔 날짜만 남긴다
+  const stamp = document.getElementById('printStamp');
+  if (stamp) stamp.textContent = '출력 ' + new Date().toLocaleDateString('ko-KR');
+
+  const wasStacked = table.classList.contains('stacked');   // 좁은 화면에선 카드형으로 바뀌어 있다
+  table.classList.remove('stacked');
+  paintStepColsForPrint();
+  document.body.classList.add('printing-manual');
+  try {
+    await waitForStepPhotos();
+    window.print();
+  } finally {
+    document.body.classList.remove('printing-manual');
+    if (wasStacked) table.classList.add('stacked');
+    applyStepColWidths();     // 화면용 px 폭으로 되돌린다
+  }
+}
+
+/** 인쇄용 열 폭 — 화면에서 쓰던 비중을 그대로 백분율로 옮긴다. 관리 열은 종이에 넣지 않는다. */
+function paintStepColsForPrint() {
+  const printed = stepColLayout.filter(col => col.type !== 'MANAGE');
+  const total = printed.reduce((sum, col) => sum + col.weight, 0) || 1;
+  document.getElementById('stepCols').innerHTML = stepColLayout.map(col => col.type === 'MANAGE'
+    ? '<col style="width:0">'
+    : `<col style="width:${(col.weight / total * 100).toFixed(2)}%">`).join('');
+  const table = document.querySelector('#detailModal .step-table');
+  if (table) table.style.width = '100%';
+}
+
+/** 표 안의 사진이 다 받아질 때까지 기다린다. 한 장이 끝내 안 와도 인쇄는 되게 한다. */
+function waitForStepPhotos() {
+  const pending = [...document.querySelectorAll('#stepRows img.step-photo')].filter(img => !img.complete);
+  if (!pending.length) return Promise.resolve();
+  return Promise.all(pending.map(img => new Promise(done => {
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+    setTimeout(done, 5000);
+  })));
 }
 
 function renderPhotos(photos, draggable) {
