@@ -1200,13 +1200,17 @@ function openPrintPreview() {
   const risk = currentDetail.formType === 'RISK_ASSESSMENT';
   const hint = document.getElementById('pvHint');
   if (hint) {
-    hint.textContent = risk ? '위험성 평가서는 세로가 기본입니다.' : '안전작업 매뉴얼은 가로가 기본입니다.';
+    hint.textContent = (risk ? '위험성 평가서는 세로가 기본입니다.' : '안전작업 매뉴얼은 가로가 기본입니다.')
+      + ' 빨간 점선이 쪽이 나뉘는 자리입니다.';
   }
   buildPrintSheet();
   setPrintOrientation(risk ? 'portrait' : 'landscape');
-  // 모달이 열리기 전에는 미리보기 영역 폭을 알 수 없다 — 열린 뒤 한 번 더 맞춘다
+  // 모달이 열리기 전에는 폭도 높이도 잴 수 없다 — 열린 뒤에 경계 표시와 배율을 다시 잡는다
   const modalEl = document.getElementById('printPreviewModal');
-  modalEl.addEventListener('shown.bs.modal', fitPrintSheet, { once: true });
+  modalEl.addEventListener('shown.bs.modal', () => {
+    paintPageBreaks();
+    fitPrintSheet();
+  }, { once: true });
   new bootstrap.Modal(modalEl).show();
 }
 
@@ -1223,7 +1227,58 @@ function setPrintOrientation(orientation) {
     btn.classList.toggle('btn-outline-secondary', !on);
   });
   applyPrintPageRule();
+  paintPageBreaks();
   fitPrintSheet();
+}
+
+/** 1mm 가 화면에서 몇 px 인지 — 종이 크기(mm)를 미리보기 좌표로 옮길 때 쓴다 */
+function pxPerMm() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute; visibility:hidden; width:100mm';
+  document.body.appendChild(probe);
+  const px = probe.offsetWidth / 100;
+  probe.remove();
+  return px || 3.78;
+}
+
+/**
+ * 미리보기에 쪽이 나뉘는 자리를 점선으로 표시한다.
+ *
+ * <p>인쇄할 때 한 행이 쪽 경계에 걸치면 통째로 다음 쪽으로 넘어가므로(break-inside:avoid),
+ * 자로 잰 듯 일정한 간격이 아니라 그 규칙을 따라가며 자리를 잡는다.
+ * 둘째 쪽부터는 표 머리글이 다시 찍히므로 그만큼 쓸 수 있는 높이가 줄어든다.
+ */
+function paintPageBreaks() {
+  const sheet = document.getElementById('printSheet');
+  if (!sheet) return;
+  sheet.querySelectorAll('.page-break-mark').forEach(el => el.remove());
+
+  const scaled = sheet.style.transform;
+  sheet.style.transform = '';                       // 줄여 놓은 상태에서는 높이를 잴 수 없다
+
+  // A4 에서 위아래 여백(9mm x 2)을 뺀 실제로 쓸 수 있는 높이
+  const pageHeight = pxPerMm() * ((printOrientation === 'portrait' ? 297 : 210) - 18);
+  const head = sheet.querySelector('thead');
+  const headHeight = head ? head.getBoundingClientRect().height : 0;
+  const sheetTop = sheet.getBoundingClientRect().top;
+
+  let limit = pageHeight;
+  let page = 1;
+  sheet.querySelectorAll('tbody tr').forEach(row => {
+    const box = row.getBoundingClientRect();
+    const top = box.top - sheetTop;
+    if (box.bottom - sheetTop > limit && top > 0) {
+      page++;
+      const mark = document.createElement('div');
+      mark.className = 'page-break-mark';
+      mark.style.top = `${Math.round(top)}px`;
+      mark.innerHTML = `<span>${page}쪽 시작</span>`;
+      sheet.appendChild(mark);
+      limit = top + pageHeight - headHeight;        // 다음 쪽은 머리글이 다시 찍힌다
+    }
+  });
+
+  sheet.style.transform = scaled;
 }
 
 /**
@@ -1265,12 +1320,10 @@ function buildPrintSheet() {
   const table = document.querySelector('#detailModal .step-table');
   if (!sheet || !table) return;
 
+  // 종이 맨 위에는 제목만 둔다 (분류 경로·출력일은 종이에서 자리만 차지한다)
   const title = (document.getElementById('detailTitle') || {}).textContent || '';
-  const path = (document.getElementById('detailPath') || {}).textContent || '';
   sheet.innerHTML = `<div class="ps-head">
       <div class="ps-title">${SAFETY.escapeHtml(title)}</div>
-      ${path ? `<div class="ps-path">${SAFETY.escapeHtml(path)}</div>` : ''}
-      <div class="ps-stamp">출력 ${new Date().toLocaleDateString('ko-KR')}</div>
     </div>`;
 
   const meta = document.getElementById('detailMetaBox');

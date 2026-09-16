@@ -531,6 +531,7 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
 
 /* 종이 한 장. 폭이 A4 에서 여백을 뺀 실제 크기라 미리보기가 인쇄물과 같은 비율로 보인다. */
 .print-sheet{
+  position:relative;             /* 쪽 경계 표시(.page-break-mark)를 얹는 기준 */
   width:279mm; margin:0 auto; background:#fff; color:#111;
   box-shadow:0 2px 14px rgba(0,0,0,.18);
   transform-origin:top center;   /* 창보다 넓으면 js(fitPrintSheet)가 줄여서 한눈에 보이게 한다 */
@@ -538,8 +539,18 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
 .print-sheet.portrait{width:192mm}
 .print-sheet .ps-head{border-bottom:1px solid #888; padding-bottom:6px; margin-bottom:8px}
 .print-sheet .ps-title{font-size:15pt; font-weight:700; margin:0}
-.print-sheet .ps-path,
-.print-sheet .ps-stamp{font-size:8.5pt; color:#444; margin-top:2px}
+
+/* 어디서 쪽이 나뉘는지 — 미리보기에만 보이고 종이에는 찍히지 않는다.
+   한 행이 쪽 경계에 걸치면 통째로 다음 쪽으로 넘어가므로, 그 규칙까지 반영해 자리를 잡는다. */
+.page-break-mark{
+  position:absolute; left:0; right:0; pointer-events:none;
+  border-top:2px dashed #d23; z-index:2;   /* 미리보기를 줄여 봐도 보이도록 굵게 */
+}
+.page-break-mark span{
+  position:absolute; right:0; top:-15px;
+  background:#d23; color:#fff; font-size:7.5pt; font-weight:700;
+  padding:1px 7px; border-radius:7px 7px 0 0; white-space:nowrap;
+}
 .print-sheet table{width:100%; table-layout:fixed; border-collapse:collapse}
 .print-sheet th,
 .print-sheet td{
@@ -582,6 +593,7 @@ body.col-resizing, body.col-resizing *{cursor:col-resize !important; user-select
     width:auto !important; box-shadow:none !important;
     transform:none !important; margin:0 !important;
   }
+  body.printing-manual .page-break-mark{display:none !important}        /* 경계 표시는 화면에서만 */
   body.printing-manual .print-sheet thead{display:table-header-group}   /* 쪽마다 머리글 반복 */
   body.printing-manual .print-sheet tr{break-inside:avoid; page-break-inside:avoid}
   body.printing-manual .print-sheet img{break-inside:avoid}
