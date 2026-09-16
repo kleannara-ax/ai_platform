@@ -1,0 +1,254 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>스팀사용 원단위</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260723-stickycard" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* === 셀 구분(다른 페이지와 통일): 자동계산 = 앱 표준 calc 색 #eef2ff, 직접입력 = 흰색 박스 === */
+    body[data-page-kind="unit"] .unit-table tbody tr:not(.summary-row) td { background:#eef2ff; }
+    /* 일자(첫 열) 및 직접입력 셀 = 흰색 */
+    body[data-page-kind="unit"] .unit-table tbody tr:not(.summary-row) td:first-child { background:#ffffff; }
+    body[data-page-kind="unit"] .unit-table tbody tr td:has(> .table-edit-input:not([readonly])) { background:#ffffff; }
+    /* 자동계산 값 텍스트 = calc-input 과 동일 톤 */
+    body[data-page-kind="unit"] .unit-table tbody td > span { color:#1e293b; font-weight:600; }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="unit">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>스팀사용 원단위</h1>
+          <p>설비별 스팀 사용량과 생산량 기준 원단위를 월단위, 연단위, 차트 기준으로 확인합니다.</p>
+        </div>
+        <div class="landing-filter-stack">
+          <div class="landing-filter-box">
+            <span class="landing-filter-title">조회</span>
+            <select id="filterYear"></select>
+            <span class="landing-filter-dot">.</span>
+            <select id="filterMonth"></select>
+            <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+          </div>
+          <div class="landing-filter-box landing-upload-box">
+            <span class="landing-filter-title">업로드</span>
+            <select id="uploadYear"></select>
+            <button type="button" class="landing-filter-action" id="unitExcelUploadButton">엑셀 업로드</button>
+            <input type="file" id="unitExcelFileInput" accept=".xls,.xlsx" hidden />
+          </div>
+        </div>
+      </div>
+
+      <div class="table-toolbar" role="tablist" aria-label="표 보기">
+        <button type="button" class="period-tab-button" data-period-target="monthly">월단위</button>
+        <button type="button" class="period-tab-button" data-period-target="yearly">연단위</button>
+        <button type="button" class="period-tab-button chart-tab-button" data-chart-toggle="unit-chart">차트</button>
+      </div>
+
+      <section class="period-panel" data-period-panel="monthly">
+        <div class="machine-tab-bar" role="tablist" aria-label="설비 보기">
+          <button type="button" class="machine-tab-button" data-machine-target="pm2">PM-2</button>
+          <button type="button" class="machine-tab-button" data-machine-target="pm3">PM-3</button>
+          <button type="button" class="machine-tab-button" data-machine-target="tm">화장지(TM)</button>
+          <button type="button" class="machine-tab-button" data-machine-target="paper-total">제지 총합</button>
+          <button type="button" class="machine-tab-button" data-machine-target="tissue-total">화장지 총합</button>
+          <button type="button" class="machine-tab-button" data-machine-target="other-total">전체 총합</button>
+        </div>
+
+        <section class="machine-panel" data-machine-panel="pm2">
+          <article class="table-card">
+            <h3>PM-2 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table" data-unit-monthly="pm2">
+                <thead>
+                  <tr><th>일자</th><th>Main 스팀</th><th>Coater 스팀</th><th>스팀 합계</th><th>생산량(kg)</th><th>원단위</th><th>생산지종</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="pm3">
+          <article class="table-card">
+            <h3>PM-3 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table" data-unit-monthly="pm3">
+                <thead>
+                  <tr><th>일자</th><th>Main 스팀</th><th>Coater 스팀</th><th>분산조 스팀</th><th></th><th>스팀 합계</th><th>생산량(kg)</th><th>원단위</th><th>생산지종</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="tm">
+          <article class="table-card">
+            <h3>화장지(TM) 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table" data-unit-monthly="tm">
+                <thead>
+                  <tr><th>일자</th><th>TM-3 스팀</th><th>TM-3 생산량</th><th>TM-3 원단위</th><th>TM-4 스팀</th><th>TM-4 생산량</th><th>TM-4 원단위</th><th>TM-5 스팀</th><th>TM-5 생산량</th><th>TM-5 원단위</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="paper-total">
+          <article class="table-card">
+            <h3>제지 총합 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table">
+                <thead>
+                  <tr><th>일자</th><th>제지 스팀량</th><th>제지 생산량</th><th>제지 원단위</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="tissue-total">
+          <article class="table-card">
+            <h3>화장지 총합 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table">
+                <thead>
+                  <tr><th>일자</th><th>화장지 스팀량</th><th>화장지 생산량</th><th>화장지 원단위</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="machine-panel" data-machine-panel="other-total">
+          <article class="table-card">
+            <h3>전체 총합 월단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table">
+                <thead>
+                  <tr><th>일자</th><th>총 스팀량</th><th>총 생산량</th><th>총 원단위</th><th>디스퍼져 총량</th><th>TOC 스팀량</th><th>PICA-121 Vent</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="period-panel" data-period-panel="yearly">
+        <div class="machine-tab-bar" role="tablist" aria-label="연단위 설비 보기">
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="pm2">PM-2</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="pm3">PM-3</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="tm">화장지(TM)</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="paper-total">제지 총합</button>
+          <button type="button" class="machine-tab-button yearly-machine-tab-button" data-yearly-machine-target="tissue-total">화장지 총합</button>
+        </div>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="pm2">
+          <article class="table-card">
+            <h3>PM-2 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table yearly-unit-table" data-yearly-table="pm2">
+                <thead><tr><th>월</th><th>Main 스팀량</th><th>Coater 스팀량</th><th>스팀사용합계(톤)</th><th>생산량(kg)</th><th>원단위</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="pm3">
+          <article class="table-card">
+            <h3>PM-3 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table yearly-unit-table" data-yearly-table="pm3">
+                <thead><tr><th>월</th><th>Main 스팀량</th><th>Coater 스팀량</th><th>분산조 스팀량</th><th>Vent 스팀량</th><th>스팀사용합계(톤)</th><th>생산량(kg)</th><th>원단위</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="tm">
+          <article class="table-card">
+            <h3>화장지(TM) 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table yearly-unit-table" data-yearly-table="tm">
+                <thead><tr><th>월</th><th>TM-3 스팀량</th><th>TM-3 생산량(kg)</th><th>TM-3 원단위</th><th>TM-4 스팀량</th><th>TM-4 생산량(kg)</th><th>TM-4 원단위</th><th>TM-5 스팀량</th><th>TM-5 생산량(kg)</th><th>TM-5 원단위</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="paper-total">
+          <article class="table-card">
+            <h3>제지 총합 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table yearly-unit-table" data-yearly-table="paper-total">
+                <thead><tr><th>월</th><th>스팀량</th><th>생산량</th><th>제지 원단위</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="yearly-machine-panel" data-yearly-machine-panel="tissue-total">
+          <article class="table-card">
+            <h3>화장지 총합 연단위</h3>
+            <div class="table-wrap">
+              <table class="data-table unit-table yearly-unit-table" data-yearly-table="tissue-total">
+                <thead><tr><th>월</th><th>스팀량</th><th>생산량</th><th>화장지 원단위</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="chart-panel" data-chart-panel="unit-chart">
+        <section class="chart-period-panel" data-chart-period-panel="monthly">
+          <div class="chart-grid">
+            <article class="table-card chart-card">
+              <h3>월단위 제지 공정별 스팀량(톤)</h3>
+              <div class="chart-wrap" data-chart-wrap="monthly-paper"></div>
+            </article>
+            <article class="table-card chart-card">
+              <h3>월단위 화장지 공정별 스팀량(톤)</h3>
+              <div class="chart-wrap" data-chart-wrap="monthly-tissue"></div>
+            </article>
+          </div>
+        </section>
+        <section class="chart-period-panel" data-chart-period-panel="yearly">
+          <div class="chart-grid">
+            <article class="table-card chart-card">
+              <h3>연단위 제지 공정별 스팀량(톤)</h3>
+              <div class="chart-wrap" data-chart-wrap="yearly-paper"></div>
+            </article>
+            <article class="table-card chart-card">
+              <h3>연단위 화장지 공정별 스팀량(톤)</h3>
+              <div class="chart-wrap" data-chart-wrap="yearly-tissue"></div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
+  <script src="js/unit-pages.js?v=20260723-stickyrows3"></script>
+  <script src="js/unit-db-pages.js?v=20260522-unit-ratio1"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

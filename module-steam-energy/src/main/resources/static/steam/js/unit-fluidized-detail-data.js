@@ -1,0 +1,1 @@
+﻿window.FLUIDIZED_DETAIL_DATA = ;

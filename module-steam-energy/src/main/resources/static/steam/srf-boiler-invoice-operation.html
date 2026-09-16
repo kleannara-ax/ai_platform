@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KleanNara SRF Boiler AOT invoice - 운영내역</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="srf-invoice-operation"] { display:block; height:auto; min-height:100vh; overflow:visible; background:#f5f7fb; }
+    .invoice-workspace { min-height:100vh; padding:24px 26px; overflow:visible; }
+    .invoice-canvas { min-height:calc(100vh - 48px); padding:16px; background:#fff; border:1px solid rgba(148,163,184,.24); border-radius:18px; box-shadow:0 18px 45px rgba(15,23,42,.08); }
+    .invoice-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }
+    .invoice-title h1 { margin:0; color:#172033; font-size:22px; font-weight:800; letter-spacing:-.02em; }
+    .invoice-title p { margin:4px 0 0; color:#64748b; font-size:12px; }
+    .invoice-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .invoice-toolbar select,
+    .invoice-toolbar button { height:34px; border:1px solid #d7e0ea; border-radius:10px; background:#fff; color:#1f2a44; font:600 12px Inter, "Apple SD Gothic Neo", sans-serif; padding:0 10px; }
+    .invoice-toolbar button { background:#1f4f82; color:#fff; border-color:#1f4f82; cursor:pointer; }
+    /* 운영내역 표를 엑셀스러운 격자/색상이 아닌 일반 데이터 표처럼 표시. */
+    .invoice-table-shell { overflow:auto; border:1px solid rgba(120, 181, 217, 0.28); border-radius:6px; background:rgba(255, 255, 255, 0.78); max-width:100%; }
+    .invoice-table {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      border-collapse:collapse; table-layout:fixed;
+      color:#1b1f2a;
+      background:#fff;
+      font-family:"Inter", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size:12px;
+    }
+    .invoice-table td {
+      padding:6px 8px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      border:1px solid #e5e7eb;
+      background:#ffffff;
+      color:#1b1f2a;
+      font-weight:normal;
+      line-height:1.3;
+      vertical-align:middle;
+    }
+    /* 헤더 영역: 첫 두 행 (원본 row 2 = 항목명, row 3 = 단위) — data-table thead 톤 */
+    .invoice-table tbody tr:nth-child(1) td,
+    .invoice-table tbody tr:nth-child(2) td {
+      background:#f3f6ff;
+      font-weight:600;
+      text-align:center !important;
+      color:#173a54;
+      position:sticky;
+      z-index:6;
+    }
+    /* 상단 헤더 2행 고정 — 1행 top:0, 2행은 1행 높이만큼 내려서 둘 다 보이게.
+       임베디드 시 body 가 스크롤 컨테이너이므로 shell overflow 를 visible 로 해제. */
+    .invoice-table tbody tr:nth-child(1) td { top:0; z-index:7; }
+    .invoice-table tbody tr:nth-child(2) td { top:29px; }
+    /* 다른 페이지에서 값을 가져오는 헤더는 점선 밑줄로 표시 (호버 시 출처 안내 tooltip) */
+    .invoice-table td.linked-source-header {
+      text-decoration: underline dotted rgba(31, 75, 153, 0.55);
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+    /* 누계/약품희석수 합계 행 (원본 row 35, 36 → 제목/빈행 제거 후 nth-child 34, 35) */
+    .invoice-table tbody tr:nth-child(34) td,
+    .invoice-table tbody tr:nth-child(35) td {
+      background:#f5f7ff;
+      font-weight:600;
+    }
+    /* 입력/계산/연결 셀 색상 — 다른 페이지와 통일 (편집=흰색, 자동채움=라벤더). */
+    .invoice-table td.formula-cell,
+    .invoice-table td.editable-cell,
+    .invoice-table td.linked-cell {
+      border-color:rgba(120, 181, 217, 0.45) !important;
+    }
+    .invoice-table td.editable-cell { background:#ffffff !important; padding:0 !important; }
+    .invoice-table td.formula-cell,
+    .invoice-table td.linked-cell { background:#eef2ff !important; color:#1e293b !important; font-weight:600 !important; }
+    .invoice-cell-input { width:100%; height:100%; min-height:22px; border:0; background:transparent; color:#173a54; font:inherit; text-align:inherit; padding:6px 8px; outline:0; }
+    .invoice-cell-input:focus { box-shadow:inset 0 0 0 2px #2563eb; background:#fff; }
+    .invoice-empty { padding:34px 16px; text-align:center; color:#64748b; font-size:13px; }
+    body.platform-embedded[data-page-kind="srf-invoice-operation"] { background:transparent; min-height:auto; }
+    body.platform-embedded[data-page-kind="srf-invoice-operation"] .invoice-workspace { min-height:auto; padding:0; }
+    body.platform-embedded[data-page-kind="srf-invoice-operation"] .invoice-canvas { min-height:auto; box-shadow:none; }
+    /* shell 내부 스크롤 해제 → body 단일 스크롤 → tbody 헤더행 sticky 동작.
+       (표는 width:100% 고정폭이라 가로 스크롤 불필요) */
+    body.landing-body[data-page-kind="srf-invoice-operation"] .invoice-table-shell { overflow:visible !important; }
+    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → 헤더행 sticky 동작 */
+    body.platform-embedded[data-page-kind="srf-invoice-operation"] {
+      height:100vh !important; overflow:auto !important;
+    }
+    body.platform-embedded[data-page-kind="srf-invoice-operation"] .invoice-workspace { height:auto; min-height:0; }
+    html.platform-embedded { overflow:hidden !important; }
+    @media (max-width: 900px) {
+      .invoice-workspace { padding:14px; }
+      .invoice-header { display:block; }
+      .invoice-toolbar { justify-content:flex-start; margin-top:12px; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="srf-invoice-operation">
+  <main class="invoice-workspace">
+    <section class="invoice-canvas">
+      <div class="invoice-header">
+        <div class="invoice-title">
+          <h1>KleanNara SRF Boiler AOT invoice</h1>
+          <p id="invoiceSheetLabel">운영내역</p>
+        </div>
+        <div class="invoice-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <select id="invoiceMonth" aria-label="조회 월"></select>
+          <button type="button" id="invoiceSearch">조회</button>
+        </div>
+      </div>
+      <div class="invoice-table-shell" id="invoiceTableShell">
+        <div class="invoice-empty">로딩 중</div>
+      </div>
+    </section>
+  </main>
+  <script src="/steam/js/srf-boiler-invoice-operation-pages.js?v=20260608-sticky3"></script>
+</body>
+</html>

@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>에너지 회계비용 - 연료비 요약</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260528-efs-noP3" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260528-efs-noP3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="energy-fuel-summary"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="energy-fuel-summary"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="energy-fuel-summary"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="energy-fuel-summary"] .inc-table th,
+    body.landing-body[data-page-kind="energy-fuel-summary"] .inc-table td { white-space:nowrap; }
+
+    .efs-input {
+      width:100%; min-width:60px; box-sizing:border-box; border:1px solid transparent;
+      padding:2px 4px; background:transparent; color:inherit; font:inherit;
+      text-align:right; outline:none; border-radius:4px;
+    }
+    .efs-input:hover { border-color:var(--inc-border, #d1d9e6); }
+    .efs-input:focus { background:#fff; border-color:var(--inc-primary, #2f6fb3); box-shadow:0 0 0 2px rgba(47,111,179,.15); }
+    .efs-calc { color:#1f3b57; }
+    .efs-calc.neg { color:#c0392b; }
+    /* 데이터 셀(입력/계산/소계) 우측 정렬 */
+    .efs-table td.efs-g-prev,
+    .efs-table td.efs-g-curr,
+    .efs-table td.efs-g-change,
+    .efs-table td.efs-g-eff,
+    .efs-table td.efs-g-plan,
+    .efs-table td.efs-g-act,
+    .efs-table td.efs-g-ref { text-align:right; }
+
+    /* 상위 탭 */
+    .efs-toptab { display:flex; gap:6px; margin:4px 4px 16px; border-bottom:2px solid var(--inc-border,#d1d9e6); }
+    .efs-toptab-btn {
+      border:0; background:transparent; padding:10px 18px; font-size:15px; font-weight:700;
+      color:#6b7280; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px;
+    }
+    .efs-toptab-btn.active { color:var(--inc-primary,#2f6fb3); border-bottom-color:var(--inc-primary,#2f6fb3); }
+
+    /* 컬럼 그룹 토글 — 데이터 그룹 표시/숨김 */
+    .efs-table[data-view="compare"] .efs-g-change,
+    .efs-table[data-view="compare"] .efs-g-ref { display:none; }
+    .efs-table[data-view="change"] .efs-g-prev,
+    .efs-table[data-view="change"] .efs-g-curr,
+    .efs-table[data-view="change"] .efs-g-ref { display:none; }
+    .efs-table[data-view="ref"] .efs-g-prev,
+    .efs-table[data-view="ref"] .efs-g-curr,
+    .efs-table[data-view="ref"] .efs-g-change { display:none; }
+
+    @media print {
+      body.landing-body[data-page-kind="energy-fuel-summary"] { background:#fff; }
+      .energy-tab-bar { display:none; }
+      .efs-table .efs-g-prev,
+      .efs-table .efs-g-curr,
+      .efs-table .efs-g-change,
+      .efs-table .efs-g-ref { display:table-cell !important; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="energy-fuel-summary">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>1. 연료비 요약</h1>
+          <p>월별 호기 손익 분석 / 스팀생산설비 운영단가 비교</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <select id="invoiceMonth" aria-label="조회 월"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="efsExcelDownload" class="btn-secondary">엑셀 다운로드</button>
+          <button type="button" id="efsExcelUpload" class="btn-secondary">엑셀 업로드</button>
+          <input type="file" id="efsExcelFileInput" accept=".xls,.xlsx,.xlsm" hidden />
+        </div>
+      </div>
+
+      <!-- ===== 상위 탭 ===== -->
+      <div class="efs-toptab" role="tablist">
+        <button type="button" class="efs-toptab-btn active" data-top="prev">1. 전월대비 연료비 분석</button>
+        <button type="button" class="efs-toptab-btn" data-top="plan">2. 사업계획대비 연료비 분석</button>
+      </div>
+
+      <!-- ===== 탭 1: 전월대비 연료비 분석 ===== -->
+      <section class="efs-toppanel" data-top-panel="prev">
+
+      <!-- 1) 호기별 총 연료비 손익 분석 -->
+      <div class="inc-card">
+        <h3 class="inc-section-title">호기별 총 연료비 손익 분석 (소각로 운영비 포함)</h3>
+        <div class="energy-tab-bar" role="tablist" data-target="t1">
+          <button type="button" class="energy-tab" data-view="compare" aria-pressed="true">전월/당월 비교</button>
+          <button type="button" class="energy-tab" data-view="change"  aria-pressed="false">전월대비 증감</button>
+          <button type="button" class="energy-tab" data-view="ref"     aria-pressed="false">참고</button>
+          <button type="button" class="energy-tab" data-view="all"     aria-pressed="false">전체</button>
+        </div>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t1" data-form="unit-profit" data-view="compare">
+            <thead>
+              <tr>
+                <th rowspan="2">설비명</th>
+                <th colspan="3" class="efs-g-prev"><span id="prevMonthLabel1">전월</span></th>
+                <th colspan="3" class="efs-g-curr"><span id="currMonthLabel1">당월</span></th>
+                <th colspan="3" class="efs-g-change">전월대비 증감</th>
+                <th colspan="6" class="efs-g-ref">참고</th>
+              </tr>
+              <tr>
+                <th class="efs-g-prev">제품생산량<br>(톤)</th>
+                <th class="efs-g-prev">톤당연료비<br>(천원/톤)</th>
+                <th class="efs-g-prev">총연료비용<br>(백만원)</th>
+                <th class="efs-g-curr">제품생산량<br>(톤)</th>
+                <th class="efs-g-curr">톤당연료비<br>(천원/톤)</th>
+                <th class="efs-g-curr">총연료비용<br>(백만원)</th>
+                <th class="efs-g-change">톤당연료비<br>(천원/톤)</th>
+                <th class="efs-g-change">연료비용<br>(백만원)</th>
+                <th class="efs-g-change">손익영향<br>(백만원)</th>
+                <th class="efs-g-ref">분석된<br>연료비</th>
+                <th class="efs-g-ref">오차비용</th>
+                <th class="efs-g-ref">스팀운영<br>단가영향</th>
+                <th class="efs-g-ref">LNG<br>단가영향</th>
+                <th class="efs-g-ref">사용량<br>증감영향</th>
+                <th class="efs-g-ref">합계</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="col-day">제지 2호기</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">제지 3호기</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr class="summary-row">
+                <th class="col-day">제지 소계</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">화장지 3호기</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">화장지 4호기</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">화장지 5호기</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr class="summary-row">
+                <th class="col-day">화장지 소계</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr class="summary-row">
+                <th class="col-day">합  계</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2) 전월대비 스팀생산설비 운영단가 비교 -->
+      <div class="inc-card" style="margin-top:16px;">
+        <h3 class="inc-section-title">전월대비 스팀생산설비 운영단가 비교</h3>
+        <div class="energy-tab-bar" role="tablist" data-target="t2">
+          <button type="button" class="energy-tab" data-view="compare" aria-pressed="true">전월/당월 비교</button>
+          <button type="button" class="energy-tab" data-view="change"  aria-pressed="false">전월대비 증감</button>
+          <button type="button" class="energy-tab" data-view="ref"     aria-pressed="false">참고</button>
+          <button type="button" class="energy-tab" data-view="all"     aria-pressed="false">전체</button>
+        </div>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t2" data-form="steam-unit" data-view="compare">
+            <thead>
+              <tr>
+                <th rowspan="2">대분류</th>
+                <th rowspan="2">설비명</th>
+                <th colspan="3" class="efs-g-prev"><span id="prevMonthLabel2">전월</span></th>
+                <th colspan="3" class="efs-g-curr"><span id="currMonthLabel2">당월</span></th>
+                <th colspan="3" class="efs-g-change">전월대비 증감</th>
+                <th rowspan="2" class="efs-g-change">손익영향<br>(백만원)</th>
+                <th class="efs-g-ref">참고</th>
+                <th colspan="2" class="efs-g-ref">특이사항 (백만원)</th>
+              </tr>
+              <tr>
+                <th class="efs-g-prev">스팀사용량<br>(톤)</th>
+                <th class="efs-g-prev">스팀단가<br>(천원/톤)</th>
+                <th class="efs-g-prev">운영비용<br>(백만원)</th>
+                <th class="efs-g-curr">스팀사용량<br>(톤)</th>
+                <th class="efs-g-curr">스팀단가<br>(천원/톤)</th>
+                <th class="efs-g-curr">운영비용<br>(백만원)</th>
+                <th class="efs-g-change">스팀사용량<br>(톤)</th>
+                <th class="efs-g-change">스팀단가<br>(천원/톤)</th>
+                <th class="efs-g-change">운영비용<br>(백만원)</th>
+                <th class="efs-g-ref">전력비용/<br>전력단가</th>
+                <th class="efs-g-ref">페널티</th>
+                <th class="efs-g-ref">초과단가영향</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="col-day" rowspan="5">스팀생산설비</th>
+                <th class="col-day">LNG 보일러</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">복합보일러(LNG 포함)</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">폐합성소각로</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">유동상소각로</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day">외부보일러</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr class="summary-row">
+                <th class="col-day" colspan="2">소  계</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr>
+                <th class="col-day" colspan="2">공정 LNG 연료비</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+              <tr class="summary-row">
+                <th class="col-day" colspan="2">연료비 합계</th>
+                <td class="efs-g-prev">—</td><td class="efs-g-prev">—</td><td class="efs-g-prev">—</td>
+                <td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>
+                <td class="efs-g-change">—</td><td class="efs-g-change">—</td><td class="efs-g-change">—</td>
+                <td class="efs-g-change">—</td>
+                <td class="efs-g-ref">—</td><td class="efs-g-ref">—</td><td class="efs-g-ref">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:10px 4px 0;color:#6b7280;font-size:12px;">
+          * LNG 보일러 사용량은 LNG 보일러 가스만 포함되며 동력은 인건비, 운영비, 소모자재 등 제외됨 (관리부 해당 운영비로 처리됨)<br>
+          * 소각로 운영 위탁사(KNE) 위탁 운영비이며 폐기물 입.위탁/ 운영비등은 제외됨 (현장 운영비 운영비로 처리됨)
+        </p>
+      </div>
+
+      <!-- 3) 전월대비 스팀운영 손익분석 -->
+      <div class="inc-card" style="margin-top:16px;">
+        <h3 class="inc-section-title">전월대비 스팀운영 손익분석</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t3">
+            <thead>
+              <tr>
+                <th rowspan="2">호기</th>
+                <th colspan="6" class="efs-g-prev"><span id="prevMonthLabel3">전월</span></th>
+                <th colspan="6" class="efs-g-curr"><span id="currMonthLabel3">당월</span></th>
+                <th colspan="4" class="efs-g-eff">손익효과 (백만원)</th>
+              </tr>
+              <tr>
+                <th class="efs-g-prev">생산량<br>(톤)</th>
+                <th class="efs-g-prev">원단위<br>(스팀톤/톤)</th>
+                <th class="efs-g-prev">스팀사용량<br>(스팀톤)</th>
+                <th class="efs-g-prev">스팀단가<br>(천원/톤)</th>
+                <th class="efs-g-prev">연료비<br>(천원/톤)</th>
+                <th class="efs-g-prev">연료비<br>(백만원)</th>
+                <th class="efs-g-curr">생산량<br>(톤)</th>
+                <th class="efs-g-curr">원단위<br>(스팀톤/톤)</th>
+                <th class="efs-g-curr">스팀사용량<br>(스팀톤)</th>
+                <th class="efs-g-curr">스팀단가<br>(천원/톤)</th>
+                <th class="efs-g-curr">연료비<br>(천원/톤)</th>
+                <th class="efs-g-curr">연료비<br>(백만원)</th>
+                <th class="efs-g-eff">연료비효과</th>
+                <th class="efs-g-eff">원단위효과</th>
+                <th class="efs-g-eff">단가효과</th>
+                <th class="efs-g-eff">종합효과</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th class="col-day">제지 2호기</th></tr>
+              <tr><th class="col-day">제지 3호기</th></tr>
+              <tr class="summary-row"><th class="col-day">제지 소계</th></tr>
+              <tr><th class="col-day">화장지 3호기</th></tr>
+              <tr><th class="col-day">화장지 4호기</th></tr>
+              <tr><th class="col-day">화장지 5호기</th></tr>
+              <tr class="summary-row"><th class="col-day">화장지 소계</th></tr>
+              <tr class="summary-row"><th class="col-day">합  계</th></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4) 전월대비 LNG운영 손익분석 -->
+      <div class="inc-card" style="margin-top:16px;">
+        <h3 class="inc-section-title">전월대비 LNG운영 손익분석</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t4">
+            <thead>
+              <tr>
+                <th rowspan="2">호기</th>
+                <th colspan="6" class="efs-g-prev"><span id="prevMonthLabel4">전월</span></th>
+                <th colspan="6" class="efs-g-curr"><span id="currMonthLabel4">당월</span></th>
+                <th colspan="4" class="efs-g-eff">손익효과 (백만원)</th>
+              </tr>
+              <tr>
+                <th class="efs-g-prev">생산량<br>(톤)</th>
+                <th class="efs-g-prev">원단위<br>(㎥/톤)</th>
+                <th class="efs-g-prev">LNG사용량<br>(㎥)</th>
+                <th class="efs-g-prev">LNG단가<br>(원/㎥)</th>
+                <th class="efs-g-prev">연료비<br>(천원/톤)</th>
+                <th class="efs-g-prev">연료비<br>(백만원)</th>
+                <th class="efs-g-curr">생산량<br>(톤)</th>
+                <th class="efs-g-curr">원단위<br>(㎥/톤)</th>
+                <th class="efs-g-curr">LNG사용량<br>(㎥)</th>
+                <th class="efs-g-curr">LNG단가<br>(원/㎥)</th>
+                <th class="efs-g-curr">연료비<br>(천원/톤)</th>
+                <th class="efs-g-curr">연료비<br>(백만원)</th>
+                <th class="efs-g-eff">연료비효과</th>
+                <th class="efs-g-eff">원단위효과</th>
+                <th class="efs-g-eff">단가효과</th>
+                <th class="efs-g-eff">종합효과</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th class="col-day">제지 2호기</th></tr>
+              <tr><th class="col-day">제지 3호기</th></tr>
+              <tr class="summary-row"><th class="col-day">제지 소계</th></tr>
+              <tr><th class="col-day">화장지 3호기</th></tr>
+              <tr><th class="col-day">화장지 4호기</th></tr>
+              <tr><th class="col-day">화장지 5호기</th></tr>
+              <tr class="summary-row"><th class="col-day">화장지 소계</th></tr>
+              <tr class="summary-row"><th class="col-day">합  계</th></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== 경영실적 보고용 자료 (연료비 평가분) ===== -->
+      <div class="inc-card" style="margin-top:22px;">
+        <h3 class="inc-section-title">경영실적 보고용 자료 (연료비 평가분)</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t5">
+            <thead>
+              <tr>
+                <th rowspan="2" colspan="2">구분</th>
+                <th colspan="4" class="efs-g-curr"><span id="mgmtCurLabel">당월</span></th>
+                <th colspan="4" class="efs-g-prev"><span id="mgmtPrevLabel">전월</span></th>
+                <th colspan="3" class="efs-g-eff">손익영향 (백만원)</th>
+              </tr>
+              <tr>
+                <th class="efs-g-curr">생산량<br>(톤)</th>
+                <th class="efs-g-curr">원단위</th>
+                <th class="efs-g-curr">단가</th>
+                <th class="efs-g-curr">연료비<br>(백만원)</th>
+                <th class="efs-g-prev">생산량<br>(톤)</th>
+                <th class="efs-g-prev">원단위</th>
+                <th class="efs-g-prev">단가</th>
+                <th class="efs-g-prev">연료비<br>(백만원)</th>
+                <th class="efs-g-eff">사용량</th>
+                <th class="efs-g-eff">단가</th>
+                <th class="efs-g-eff">합계</th>
+              </tr>
+            </thead>
+            <tbody id="t5body"><!-- JS 생성 --></tbody>
+          </table>
+        </div>
+        <p style="margin:8px 4px 0;color:#6b7280;font-size:12px;">
+          * 스팀: 원단위 스팀톤/톤, 단가 천원/톤 · LNG: 원단위 ㎥/톤, 단가 원/㎥<br>
+          * 전월대비 연료비 분석(스팀운영·LNG운영 손익분석)의 제지/화장지 소계를 당월·전월 기준으로 재구성
+        </p>
+      </div>
+
+      <!-- ===== 경영실적 보고용 — 9월 원단위 동일 기준 (가정 시나리오) ===== -->
+      <div class="inc-card" style="margin-top:16px;">
+        <h3 class="inc-section-title" id="mgmt2Title">25년 10월 실적 (9월 원단위 동일 기준)</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table efs-table" id="t5b">
+            <thead>
+              <tr>
+                <th colspan="2">구분</th>
+                <th class="efs-g-curr">생산량<br>(톤)</th>
+                <th class="efs-g-curr">원단위</th>
+                <th class="efs-g-curr">단가</th>
+                <th class="efs-g-curr">연료비<br>(백만원)</th>
+              </tr>
+            </thead>
+            <tbody id="t5bbody"><!-- JS --></tbody>
+          </table>
+        </div>
+        <p style="margin:8px 4px 0;color:#6b7280;font-size:12px;">
+          * 당월(10월) 생산량에 전월(9월) 원단위·단가를 적용한 가정 연료비 (원단위 변화의 영향 분리용)
+        </p>
+      </div>
+
+      </section><!-- /탭1 전월대비 -->
+
+      <!-- ===== 탭 2: 사업계획대비 연료비 분석 ===== -->
+      <section class="efs-toppanel" data-top-panel="plan" style="display:none;">
+
+        <!-- P1) 호기별 총 연료비 손익 분석 (계획 vs 실적) -->
+        <div class="inc-card">
+          <h3 class="inc-section-title">호기별 총 연료비 손익 분석 (소각로 운영비 포함) — 계획 대비</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table efs-table" id="p1">
+              <thead>
+                <tr>
+                  <th rowspan="2">설비명</th>
+                  <th colspan="3" class="efs-g-plan">계획</th>
+                  <th colspan="3" class="efs-g-act">실적</th>
+                  <th colspan="3" class="efs-g-eff">계획대비 증감</th>
+                  <th rowspan="2" class="efs-g-eff">스팀운영<br>단가영향</th>
+                </tr>
+                <tr>
+                  <th class="efs-g-plan">제품생산량<br>(톤)</th>
+                  <th class="efs-g-plan">톤당연료비<br>(천원/톤)</th>
+                  <th class="efs-g-plan">총연료비용<br>(백만원)</th>
+                  <th class="efs-g-act">제품생산량<br>(톤)</th>
+                  <th class="efs-g-act">톤당연료비<br>(천원/톤)</th>
+                  <th class="efs-g-act">총연료비용<br>(백만원)</th>
+                  <th class="efs-g-eff">톤당연료비<br>(천원/톤)</th>
+                  <th class="efs-g-eff">연료비용<br>(백만원)</th>
+                  <th class="efs-g-eff">손익영향<br>(백만원)</th>
+                </tr>
+              </thead>
+              <tbody id="p1body"><!-- JS --></tbody>
+            </table>
+          </div>
+          <p id="planMonthNote" style="margin:8px 4px 0;color:#6b7280;font-size:12px;">
+            * 계획: 직접 입력 (사업계획·회계비용계획 데이터 있으면 자동) · 실적: 전월대비 연료비 분석의 당월 값
+          </p>
+        </div>
+
+        <!-- P2) 계획대비 스팀운영단가 비교 -->
+        <div class="inc-card" style="margin-top:16px;">
+          <h3 class="inc-section-title">계획대비 스팀운영단가 비교 (연료비 기준)</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table efs-table" id="p2">
+              <thead>
+                <tr>
+                  <th rowspan="2" colspan="2">구분</th>
+                  <th colspan="3" class="efs-g-plan">계획</th>
+                  <th colspan="3" class="efs-g-act">실적</th>
+                  <th colspan="3" class="efs-g-eff">계획대비 증감</th>
+                  <th rowspan="2" class="efs-g-eff">손익영향<br>(백만원)</th>
+                </tr>
+                <tr>
+                  <th class="efs-g-plan">스팀사용량<br>(톤)</th><th class="efs-g-plan">스팀단가<br>(천원/톤)</th><th class="efs-g-plan">운영비용<br>(백만원)</th>
+                  <th class="efs-g-act">스팀사용량<br>(톤)</th><th class="efs-g-act">스팀단가<br>(천원/톤)</th><th class="efs-g-act">운영비용<br>(백만원)</th>
+                  <th class="efs-g-eff">스팀사용량<br>(톤)</th><th class="efs-g-eff">스팀단가<br>(천원/톤)</th><th class="efs-g-eff">운영비용<br>(백만원)</th>
+                </tr>
+              </thead>
+              <tbody id="p2body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- P5) 계획대비 스팀운영 손익분석 -->
+        <div class="inc-card" style="margin-top:16px;">
+          <h3 class="inc-section-title">계획대비 스팀운영 손익분석</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table efs-table" id="p5">
+              <thead>
+                <tr>
+                  <th rowspan="2">호기</th>
+                  <th colspan="5" class="efs-g-plan">계획</th>
+                  <th colspan="5" class="efs-g-act">실적</th>
+                </tr>
+                <tr>
+                  <th class="efs-g-plan">생산량<br>(톤)</th><th class="efs-g-plan">원단위<br>(스팀톤/톤)</th><th class="efs-g-plan">스팀사용량<br>(스팀톤)</th><th class="efs-g-plan">스팀단가<br>(천원/톤)</th><th class="efs-g-plan">연료비<br>(백만원)</th>
+                  <th class="efs-g-act">생산량<br>(톤)</th><th class="efs-g-act">원단위<br>(스팀톤/톤)</th><th class="efs-g-act">스팀사용량<br>(스팀톤)</th><th class="efs-g-act">스팀단가<br>(천원/톤)</th><th class="efs-g-act">연료비<br>(백만원)</th>
+                </tr>
+              </thead>
+              <tbody id="p5body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- P6) 계획대비 LNG운영 손익분석 -->
+        <div class="inc-card" style="margin-top:16px;">
+          <h3 class="inc-section-title">계획대비 LNG운영 손익분석</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table efs-table" id="p6">
+              <thead>
+                <tr>
+                  <th rowspan="2">호기</th>
+                  <th colspan="5" class="efs-g-plan">계획</th>
+                  <th colspan="5" class="efs-g-act">실적</th>
+                </tr>
+                <tr>
+                  <th class="efs-g-plan">생산량<br>(톤)</th><th class="efs-g-plan">원단위<br>(㎥/톤)</th><th class="efs-g-plan">LNG사용량<br>(㎥)</th><th class="efs-g-plan">LNG단가<br>(원/㎥)</th><th class="efs-g-plan">연료비<br>(백만원)</th>
+                  <th class="efs-g-act">생산량<br>(톤)</th><th class="efs-g-act">원단위<br>(㎥/톤)</th><th class="efs-g-act">LNG사용량<br>(㎥)</th><th class="efs-g-act">LNG단가<br>(원/㎥)</th><th class="efs-g-act">연료비<br>(백만원)</th>
+                </tr>
+              </thead>
+              <tbody id="p6body"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </section><!-- /탭2 사업계획대비 -->
+    </div>
+  </main>
+
+  <script>
+    const yearSelect = document.getElementById("invoiceYear");
+    const monthSelect = document.getElementById("invoiceMonth");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    const now = new Date();
+    let currentYear = Number(__sharedPeriod.year) || now.getFullYear();
+    let currentMonth = /^(0[1-9]|1[0-2])$/.test(String(__sharedPeriod.month || "")) ? Number(__sharedPeriod.month) : (now.getMonth() + 1);
+    if (currentMonth > 11) currentMonth = 11;
+
+    (function initPeriod() {
+      const y = now.getFullYear();
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        yearSelect.appendChild(opt);
+      }
+      for (let mm = 1; mm <= 12; mm += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(mm).padStart(2, "0"); opt.textContent = `${mm}월`;
+        monthSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+      monthSelect.value = String(currentMonth).padStart(2, "0");
+    })();
+
+    function updateLabels() {
+      const prev = currentMonth > 1 ? currentMonth - 1 : 12;
+      document.getElementById("prevMonthLabel1").textContent = `${prev}월 (전월)`;
+      document.getElementById("currMonthLabel1").textContent = `${currentMonth}월 (당월)`;
+      document.getElementById("prevMonthLabel2").textContent = `${prev}월 (전월)`;
+      document.getElementById("currMonthLabel2").textContent = `${currentMonth}월 (당월)`;
+      ["3","4"].forEach((n) => {
+        const p = document.getElementById("prevMonthLabel" + n), c = document.getElementById("currMonthLabel" + n);
+        if (p) p.textContent = `${prev}월 (전월)`;
+        if (c) c.textContent = `${currentMonth}월 (당월)`;
+      });
+    }
+
+    // ── 다른 페이지 연동 (배분비율 DB 에서 읽기) ──────────────────
+    // energy_fuel_ratio DB 에서 row_key/col_index 기준으로 값 가져오기.
+    // col_index: 1=24.12월, 2=1월, ..., 13=12월. month→col: month + 1.
+    function monthToCol(m) { return m + 1; }
+    const efrCache = new Map(); // key = `${tbl}|${rk}|${col}` → number|null
+
+    async function fetchEfrYear(year) {
+      efrCache.clear();
+      const params = new URLSearchParams({
+        month: String(year),
+        tableNames: "energy_fuel_ratio,energy_month_compare,energy_fuel_plan,energy_accounting_plan",
+        limit: "10000",
+      });
+      try {
+        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        (payload.data || []).forEach((row) => {
+          const tbl = row.table_name;
+          const key = `${tbl}|${row.row_key}|${row.col_index}`;
+          efrCache.set(key, num(row.cell_value));
+        });
+      } catch (e) { console.warn("[efs] fetch failed:", e); }
+    }
+    function num(v) {
+      if (v === null || v === undefined || v === "") return null;
+      const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    function getRatio(tbl, rNum, col) {
+      const rk = `${tbl}|r${String(rNum).padStart(2,"0")}`;
+      return efrCache.get(`energy_fuel_ratio|${rk}|${col}`) ?? null;
+    }
+    function getEmc(section, rowKey, monthIdx) {
+      const key = `energy_month_compare|${section}|${rowKey}|${monthIdx}`;
+      return efrCache.get(key) ?? null;
+    }
+
+    const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
+    function fmt(v, d) {
+      if (v === null || !Number.isFinite(v)) return "—";
+      const dig = d === undefined ? 1 : d;
+      return v.toLocaleString("ko-KR", { minimumFractionDigits: dig, maximumFractionDigits: dig });
+    }
+
+    // ── 직접 입력 override 저장소 (energy_fuel_summary) ───────────
+    // 입력칸은 배분비율(efr) 업로드값을 기본 표시하고, 사용자가 수정하면 override 로 저장.
+    // row_key = `${t}|${idx}|${metric}`, col_index = 월(1~12)
+    const PAGE_TABLE = "energy_fuel_summary";
+    const efsStore = new Map(); // `${dbKey}|${month}` → string (override)
+
+    async function loadEfs(year) {
+      efsStore.clear();
+      const params = new URLSearchParams({ month: String(year), tableNames: PAGE_TABLE, limit: "10000" });
+      try {
+        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== PAGE_TABLE) return;
+          efsStore.set(`${row.row_key}|${row.col_index}`, row.cell_value);
+        });
+      } catch (e) { console.warn("[efs] override load failed:", e); }
+    }
+    async function saveEfs(dbKey, month, value) {
+      const k = `${dbKey}|${month}`;
+      if (value === "" || value === null) efsStore.delete(k); else efsStore.set(k, value);
+      try {
+        await fetch(`/tables/table_cell_value`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            month: String(currentYear), year_no: Number(currentYear), month_no: 0,
+            table_name: PAGE_TABLE, row_key: dbKey, col_index: month,
+            cell_value: (value === "" ? null : value),
+          }),
+        });
+      } catch (e) { console.error("[efs] save failed:", e); }
+    }
+    // efr(배분비율) 에서 해당 입력 셀에 대응하는 기본값
+    function efrFallback(dbKey, month) {
+      const col = monthToCol(month);
+      const parts = dbKey.split("|"); const t = parts[0], idx = Number(parts[1]), metric = parts[2];
+      if (t === "t1") {
+        if (metric === "prod") { const v = getRatio("t06", idx + 1, col); return v != null ? v / 1000 : null; } // kg→톤
+        if (metric === "fuel") return getRatio("t04", idx + 1, col);
+      } else if (t === "t2") {
+        if (metric === "usage") return getRatio("t01", idx + 1, col);
+        if (metric === "price") return getRatio("t03", idx + 1, col);
+        if (metric === "cost")  return getRatio("t02", idx + 1, col);
+      } else if (t === "p1") {
+        // 사업계획대비 계획값: 생산량=efp(사업계획), 연료비=eap(회계비용계획)
+        // (efp 생산량은 외부참조, eap 연료비는 계산식 → 현재 DB 미존재시 null → 직접 입력)
+        if (metric === "prod") return getEfp(idx === 2 ? "t01|r01" : "t01|r02", month);
+        if (metric === "fuel") return getEap(idx === 2 ? "r16" : "r17", month);
+      }
+      return null;
+    }
+    // 입력 셀 계산값: override 우선, 없으면 efr 기본값
+    function val(dbKey, month) {
+      const ov = efsStore.get(`${dbKey}|${month}`);
+      if (ov !== undefined && ov !== null && ov !== "") return num(ov);
+      return efrFallback(dbKey, month);
+    }
+    function makeInput(td, dbKey, month) {
+      td.innerHTML = "";
+      const inp = document.createElement("input");
+      inp.className = "efs-input";
+      inp.type = "text"; inp.inputMode = "decimal"; inp.autocomplete = "off";
+      inp.dataset.dbkey = dbKey; inp.dataset.month = String(month);
+      const ov = efsStore.get(`${dbKey}|${month}`);
+      let v;
+      if (ov !== undefined && ov !== null && ov !== "") { v = num(ov); }
+      else { v = efrFallback(dbKey, month); }
+      inp.value = (v === null || v === undefined) ? "" : String(Math.round(v * 100) / 100);
+      td.appendChild(inp);
+    }
+    function setCalcCell(td, v, digits) {
+      td.innerHTML = "";
+      const span = document.createElement("span");
+      span.className = "efs-calc" + (Number.isFinite(v) && v < 0 ? " neg" : "");
+      span.textContent = fmt(v, digits);
+      td.appendChild(span);
+    }
+
+    // ── 행/입력 모델 (직접 입력) ──────────────────────────────────
+    //   Table 1 (호기별 손익, 8 rows): 입력=제품생산량(prod,톤)/총연료비용(fuel,백만원)
+    //     0 제지2(입력) 1 제지3(입력) 2 제지소계(=0+1) 3 화장지3(입력) 4 화장지4(입력)
+    //     5 화장지5(입력) 6 화장지소계(=3+4+5) 7 합계(=2+6)
+    //     계산: 톤당연료비=fuel×1000/prod, 증감/손익영향
+    //   Table 2 (운영단가, 8 rows): 입력=스팀사용량(usage,톤)/스팀단가(price,천원/톤)/운영비용(cost,백만원)
+    //     0 LNG 1 복합 2 폐합성 3 유동상 4 외부 (입력) 5 소계(=합산) 6 공정LNG(cost만 입력) 7 연료비합계(=소계+공정LNG)
+    const T1_SUM = { 2: [0,1], 6: [3,4,5], 7: [2,6] };
+
+    function populate() {
+      const prevMonth = currentMonth > 1 ? currentMonth - 1 : 12;
+      const cur = currentMonth, prev = prevMonth;
+
+      // ── Table 1 ─────────────────────────────────────────────
+      const t1 = document.getElementById("t1").tBodies[0];
+      // 입력 셀 먼저 렌더 (소계 제외)
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = t1.rows[idx]; if (!tr) continue;
+        const cells = tr.cells;
+        const isSub = !!T1_SUM[idx];
+        if (!isSub) {
+          makeInput(cells[1], `t1|${idx}|prod`, prev);
+          makeInput(cells[3], `t1|${idx}|fuel`, prev);
+          makeInput(cells[4], `t1|${idx}|prod`, cur);
+          makeInput(cells[6], `t1|${idx}|fuel`, cur);
+        }
+      }
+      // 값 조회 (소계는 멤버 합산)
+      function t1val(metric, idx, month) {
+        if (T1_SUM[idx]) {
+          let s = 0, has = false;
+          T1_SUM[idx].forEach((p) => { const v = t1val(metric, p, month); if (Number.isFinite(v)) { s += v; has = true; } });
+          return has ? s : null;
+        }
+        return val(`t1|${idx}|${metric}`, month);
+      }
+      const __t1imp = {}; // 손익영향 (합계행에서 소계 합산에 사용)
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = t1.rows[idx]; if (!tr) continue;
+        const cells = tr.cells;
+        const prodP = t1val("prod", idx, prev), prodC = t1val("prod", idx, cur);
+        const fuelP = t1val("fuel", idx, prev), fuelC = t1val("fuel", idx, cur);
+        const unitP = safeDiv((fuelP || 0) * 1000, prodP);
+        const unitC = safeDiv((fuelC || 0) * 1000, prodC);
+        // 소계 행은 prod/fuel 도 계산 셀로 표시
+        if (T1_SUM[idx]) {
+          setCalcCell(cells[1], prodP, 1); setCalcCell(cells[4], prodC, 1);
+          setCalcCell(cells[3], fuelP, 1); setCalcCell(cells[6], fuelC, 1);
+        }
+        setCalcCell(cells[2], unitP, 1);
+        setCalcCell(cells[5], unitC, 1);
+        const unitDelta = (Number.isFinite(unitC) && Number.isFinite(unitP)) ? unitC - unitP : null;
+        const fuelDelta = (Number.isFinite(fuelC) && Number.isFinite(fuelP)) ? fuelC - fuelP : null;
+        // 손익영향 = 톤당연료비증감 × 당월생산량 / 1000 (엑셀 J=H*E/1000).
+        // 합계행(7)은 엑셀과 동일하게 제지소계(2)+화장지소계(6) 합산.
+        let impact;
+        if (idx === 7) {
+          impact = (Number.isFinite(__t1imp[2]) || Number.isFinite(__t1imp[6]))
+            ? (__t1imp[2] || 0) + (__t1imp[6] || 0) : null;
+        } else {
+          impact = (Number.isFinite(unitDelta) && Number.isFinite(prodC)) ? unitDelta * prodC / 1000 : null;
+        }
+        __t1imp[idx] = impact;
+        setCalcCell(cells[7], unitDelta, 1);
+        setCalcCell(cells[8], fuelDelta, 1);
+        setCalcCell(cells[9], impact, 1);
+        for (let i = 10; i <= 15; i++) if (cells[i]) cells[i].textContent = "—";
+      }
+
+      // ── Table 2 ─────────────────────────────────────────────
+      const t2 = document.getElementById("t2").tBodies[0];
+      const T2_INPUT = [0,1,2,3,4];      // 보일러 (usage/price/cost 입력)
+      const T2_PROC_LNG = 6;             // 공정 LNG (cost 만 입력)
+      function t2val(metric, idx, month) {
+        if (idx === 5) { // 소계 = sum(0..4)
+          let s = 0, has = false;
+          for (let r = 0; r <= 4; r++) { const v = val(`t2|${r}|${metric}`, month); if (Number.isFinite(v)) { s += v; has = true; } }
+          return has ? s : null;
+        }
+        if (idx === 6) { // 공정 LNG 연료비: 운영비용 = emc 직버너 LNG 사용 비용
+          return metric === "cost" ? getEmc("fuel", "lngBurner", month) : null;
+        }
+        if (idx === 7) { // 연료비합계 = 소계 + 공정LNG (엑셀상 운영비용만 존재, 사용량/단가 없음)
+          if (metric !== "cost") return null;
+          const a = t2val("cost", 5, month), b = t2val("cost", 6, month);
+          if (!Number.isFinite(a) && !Number.isFinite(b)) return null;
+          return (a || 0) + (b || 0);
+        }
+        return val(`t2|${idx}|${metric}`, month);
+      }
+      // 입력 셀 렌더 (보일러 0~4 만). 데이터 13칸: 전월3+당월3+증감3+손익1+참고/특이3
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = t2.rows[idx]; if (!tr) continue;
+        const cells = tr.cells;
+        const offset = cells.length - 13;
+        if (offset < 0) continue;
+        if (T2_INPUT.includes(idx)) {
+          makeInput(cells[offset+0], `t2|${idx}|usage`, prev);
+          makeInput(cells[offset+1], `t2|${idx}|price`, prev);
+          makeInput(cells[offset+2], `t2|${idx}|cost`, prev);
+          makeInput(cells[offset+3], `t2|${idx}|usage`, cur);
+          makeInput(cells[offset+4], `t2|${idx}|price`, cur);
+          makeInput(cells[offset+5], `t2|${idx}|cost`, cur);
+        }
+        // 참고/특이사항 (전 행 입력 가능): 전력비용/전력단가(10), 페널티(11), 초과단가영향(12)
+        makeInput(cells[offset+10], `t2|${idx}|elec`, cur);
+        makeInput(cells[offset+11], `t2|${idx}|penalty`, cur);
+        makeInput(cells[offset+12], `t2|${idx}|overprice`, cur);
+      }
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = t2.rows[idx]; if (!tr) continue;
+        const cells = tr.cells;
+        const offset = cells.length - 13;
+        if (offset < 0) continue;
+        const usageP = t2val("usage", idx, prev), usageC = t2val("usage", idx, cur);
+        const costP  = t2val("cost",  idx, prev), costC  = t2val("cost",  idx, cur);
+        let priceP = t2val("price", idx, prev), priceC = t2val("price", idx, cur);
+        // 소계 단가는 가중평균(=비용×1000/사용량). 연료비합계(7)는 단가 없음(공란).
+        if (idx === 5) {
+          priceP = safeDiv((costP || 0) * 1000, usageP);
+          priceC = safeDiv((costC || 0) * 1000, usageC);
+        }
+        const isCalc = (idx === 5 || idx === 6 || idx === 7);
+        if (isCalc) {
+          setCalcCell(cells[offset+0], usageP, 0); setCalcCell(cells[offset+1], priceP, 1); setCalcCell(cells[offset+2], costP, 1);
+          setCalcCell(cells[offset+3], usageC, 0); setCalcCell(cells[offset+4], priceC, 1); setCalcCell(cells[offset+5], costC, 1);
+        }
+        const uDelta = (Number.isFinite(usageC) && Number.isFinite(usageP)) ? usageC - usageP : null;
+        const pDelta = (Number.isFinite(priceC) && Number.isFinite(priceP)) ? priceC - priceP : null;
+        const cDelta = (Number.isFinite(costC) && Number.isFinite(costP)) ? costC - costP : null;
+        setCalcCell(cells[offset+6], uDelta, 0);
+        setCalcCell(cells[offset+7], pDelta, 1);
+        setCalcCell(cells[offset+8], cDelta, 1);
+        const impact = (Number.isFinite(pDelta) && Number.isFinite(usageC)) ? -pDelta * usageC / 1000 : null;
+        setCalcCell(cells[offset+9], impact, 1);
+        // offset+10~12 (전력비용/전력단가·페널티·초과단가영향)는 입력 셀 — 위 루프에서 렌더됨
+      }
+
+      // 당월 소계 스팀단가 (Table3 에서 사용): 비용합×1000/사용량합
+      const t2SubPriceCur = safeDiv((t2val("cost",5,cur)||0) * 1000, t2val("usage",5,cur));
+      const t2SubPricePrev = safeDiv((t2val("cost",5,prev)||0) * 1000, t2val("usage",5,prev));
+
+      // ── Table 3 (스팀운영 손익분석) ─────────────────────────────
+      // 원단위=efr t17, 단가=Table2 소계, 생산량=Table1 prod
+      // 행 idx 0~7 ↔ t17 r01~r07 (idx7 합계는 원단위 없음)
+      populateEffectTable("t3", {
+        prodOf: (idx, mo) => t1val("prod", idx, mo),
+        unitOf: (idx, mo) => (idx === 7 ? null : getRatio("t17", idx + 1, monthToCol(mo))),
+        priceOf: (mo) => (mo === cur ? t2SubPriceCur : t2SubPricePrev),
+        // 연료비(천원/톤): 사용량×단가/생산량 (= 원단위×단가)
+        lngMode: false, cur, prev,
+      });
+
+      // ── Table 4 (LNG운영 손익분석) ──────────────────────────────
+      // 원단위=efr t12 (제지2=0, 제지3=t12r01, 초지3~5=t12r02~04, 화소계=t12r05)
+      // LNG단가=efr t11|r02 (25년 LNG단가), 생산량=Table1 prod
+      const t12map = { 0: null, 1: 1, 3: 2, 4: 3, 5: 4, 6: 5 }; // Table4 idx → t12 row (소계 2/7 별도)
+      populateEffectTable("t4", {
+        prodOf: (idx, mo) => t1val("prod", idx, mo),
+        unitOf: (idx, mo) => {
+          if (idx === 0) return 0;
+          const r = t12map[idx];
+          return r ? getRatio("t12", r, monthToCol(mo)) : null; // 소계(2,6,7) 는 별도 계산
+        },
+        priceOf: (mo) => getRatio("t11", 2, monthToCol(mo)),
+        lngMode: true, cur, prev,
+      });
+
+      // ── Table 1 참고 컬럼 (Table3·4 효과값 합산) ─────────────────
+      const t3 = document.getElementById("t3").tBodies[0];
+      const t4 = document.getElementById("t4").tBodies[0];
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = t1.rows[idx]; if (!tr) continue;
+        const cells = tr.cells;
+        // 분석된연료비 = T3.M(당월연료비) + T4.M
+        const m3 = __effCache[`t3|${idx}|M`], m4 = __effCache[`t4|${idx}|M`];
+        const analyzed = (Number.isFinite(m3) || Number.isFinite(m4)) ? (m3 || 0) + (m4 || 0) : null;
+        const fuelC = t1val("fuel", idx, cur);
+        const errCost = (Number.isFinite(analyzed) && Number.isFinite(fuelC)) ? analyzed - fuelC : null;
+        const steamEff = __effCache[`t3|${idx}|P`];   // 스팀운영 단가효과
+        const lngEff = __effCache[`t4|${idx}|P`];      // LNG 단가효과
+        const o3 = __effCache[`t3|${idx}|O`], o4 = __effCache[`t4|${idx}|O`];
+        const usageEff = (Number.isFinite(o3) || Number.isFinite(o4)) ? (o3 || 0) + (o4 || 0) : null;
+        const total = [steamEff, lngEff, usageEff].some(Number.isFinite)
+          ? (steamEff || 0) + (lngEff || 0) + (usageEff || 0) : null;
+        setCalcCell(cells[10], analyzed, 1);
+        setCalcCell(cells[11], errCost, 1);
+        setCalcCell(cells[12], steamEff, 1);
+        setCalcCell(cells[13], lngEff, 1);
+        setCalcCell(cells[14], usageEff, 1);
+        setCalcCell(cells[15], total, 1);
+      }
+
+      // ── 경영실적 보고용 자료 ───────────────────────────────────
+      buildMgmtReport(cur, prev);
+      buildMgmtReport2(cur, prev);
+
+      // ── 사업계획대비 분석 (탭2) ─────────────────────────────────
+      buildPlanTables(cur, t1val, t2val);
+    }
+
+    // efp(사업계획)/eap(회계비용계획) 값 — fetchEfrYear 가 efrCache 에 함께 적재함
+    //  efp col_index = 월(1~12)  (E열=1월)
+    //  eap col_index = 월+1      (C열=24.12월, D열=1월)
+    function getEfp(rk, month) { return efrCache.get(`energy_fuel_plan|${rk}|${month}`) ?? null; }
+    function getEap(rk, month) { return efrCache.get(`energy_accounting_plan|${rk}|${month + 1}`) ?? null; }
+
+    // 사업계획대비: P1 호기별 총 연료비 손익 (계획 vs 실적)
+    //  계획 제품생산량/총연료비용 = 직접 입력(p1|idx|prod, p1|idx|fuel). efp/eap 에 값 있으면 자동 채움.
+    //  계획 톤당연료비·증감·손익 = 계산. 실적 = 전월대비 분석 당월값.
+    function buildPlanTables(cur, t1val, t2val) {
+      const p2plan = buildP2(cur, t2val);
+      const steamPlanPrice = safeDiv((p2plan.subCost || 0) * 1000, p2plan.subUsage);
+      buildP1(cur, t1val, steamPlanPrice);
+      buildP56(cur, "p5", "t3", false, {
+        prod: ["t01|r01", "t01|r02"], usage: ["t01|r11", "t01|r12"], price: () => steamPlanPrice });
+      buildP56(cur, "p6", "t4", true, {
+        prod: ["t01|r01", "t01|r02"], usage: ["t06|r07", "t06|r06"], price: () => getEfp("t07|r01", cur) });
+    }
+    const tdCalc = (cls, v, d) => `<td class="${cls}"><span class="efs-calc${Number.isFinite(v)&&v<0?" neg":""}">${fmt(v,d)}</span></td>`;
+
+    // P2) 계획대비 스팀운영단가 — 계획(입력) vs 실적(Table2 당월)
+    function buildP2(cur, t2val) {
+      const body = document.getElementById("p2body"); if (!body) return;
+      body.innerHTML = "";
+      const labels = ["LNG 보일러","복합보일러(LNG포함)","폐합성소각로","유동상소각로","외부보일러","소  계","공정 LNG 연료비","연료비 합계"];
+      // 계획값 출처(자동): 스팀사용량=efp 사업계획(보일러별 스팀생산량 t04), 운영비용=eap 회계비용계획
+      //   LNG=t04r01/eap r03−공정LNG계획, 복합=t04r03/eap r36, 폐합성=t04r02/eap r04, 유동상=t04r05/eap r05, 외부=t04r04/eap r37
+      const PLAN_USAGE = { 0:"t04|r01", 1:"t04|r03", 2:"t04|r02", 3:"t04|r05", 4:"t04|r04" };
+      const PLAN_EAP   = { 0:"r03", 1:"r36", 2:"r04", 3:"r05", 4:"r37" };
+      const procLngPlan = getEfp("x73", cur); // 공정LNG 계획 = efp 직버너 LNG사용금액(73행)
+      const planUsage = (i) => {
+        if (i>=5) { if(i===6) return null; if(i===7) return planUsage(5);
+          let s=0,h=false; for(let r=0;r<=4;r++){const v=getEfp(PLAN_USAGE[r],cur); if(Number.isFinite(v)){s+=v;h=true;}} return h?s:null; }
+        return getEfp(PLAN_USAGE[i], cur);
+      };
+      const planCost = (i) => {
+        if (i===0) return sub(getEap("r03",cur), Number.isFinite(procLngPlan)?procLngPlan:0);
+        if (i>=1 && i<=4) return getEap(PLAN_EAP[i], cur);
+        if (i===5) { let s=0,h=false; for(let r=0;r<=4;r++){const v=planCost(r); if(Number.isFinite(v)){s+=v;h=true;}} return h?s:null; }
+        if (i===6) return Number.isFinite(procLngPlan)?procLngPlan:null;
+        if (i===7) return add(planCost(5), planCost(6));
+        return null;
+      };
+      for (let i=0;i<8;i++){
+        const tr=document.createElement("tr"); if(i>=5)tr.className="summary-row";
+        let h="";
+        if(i===0) h+=`<th class="col-day" rowspan="5">스팀생산설비</th>`;
+        if(i<5) h+=`<th class="col-day">${labels[i]}</th>`;
+        else h+=`<th class="col-day" colspan="2">${labels[i]}</th>`;
+        h+=tdCalc("efs-g-plan",null,0)+tdCalc("efs-g-plan",null,1)+tdCalc("efs-g-plan",null,1);
+        h+=tdCalc("efs-g-act",null,0)+tdCalc("efs-g-act",null,1)+tdCalc("efs-g-act",null,1)
+          +tdCalc("efs-g-eff",null,0)+tdCalc("efs-g-eff",null,1)+tdCalc("efs-g-eff",null,1)+tdCalc("efs-g-eff",null,1);
+        tr.innerHTML=h; body.appendChild(tr);
+        const c=tr.cells, off=c.length-10; // 계획3+실적3+증감3+손익1 = 10 데이터셀
+        // 계획 (자동/표시)
+        const pU = planUsage(i), pC = planCost(i);
+        const pPr = (i===6||i===7)? null : safeDiv((pC||0)*1000,pU);
+        setCalcCell(c[off+0], (i===6)?null:pU, 0);
+        setCalcCell(c[off+1], (i===6||i===7)?null:pPr, 1);
+        setCalcCell(c[off+2], pC, 1);
+        // 실적 (Table2 당월)
+        const aU=t2val("usage",i,cur), aC=t2val("cost",i,cur);
+        let aPr=t2val("price",i,cur);
+        if(i===5) aPr=safeDiv((aC||0)*1000,aU);
+        setCalcCell(c[off+3],aU,0); setCalcCell(c[off+4],aPr,1); setCalcCell(c[off+5],aC,1);
+        // 증감 + 손익
+        const uD=sub(aU,pU), prD=sub(aPr,pPr), cD=sub(aC,pC);
+        setCalcCell(c[off+6],uD,0); setCalcCell(c[off+7],prD,1); setCalcCell(c[off+8],cD,1);
+        const imp=(Number.isFinite(prD)&&Number.isFinite(aU))? prD*aU/1000 : null;
+        setCalcCell(c[off+9], (i===6||i===7)?null:imp, 1);
+      }
+      // P5 에서 쓸 계획 소계 (스팀사용량/운영비용)
+      return { subUsage: planUsage(5), subCost: planCost(5) };
+    }
+
+    // P5/P6) 계획대비 스팀(또는 LNG)운영 손익 — 계획(efp 자동/표시) vs 실적(Table3/4 당월 full 캐시)
+    //  planCfg = { prod:[제지키,화장지키], usage:[제지키,화장지키], price:()=>단가 }
+    function buildP56(cur, bodyId, effTbl, lngMode, planCfg){
+      const body=document.getElementById(bodyId+"body"); if(!body) return;
+      body.innerHTML="";
+      const rows=[["제지 소계",2,0],["화장지 소계",6,1]];
+      const uD = lngMode?2:3;
+      const comp=[];
+      rows.forEach(([label,idx,pi])=>{
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<th class="col-day">${label}</th>`
+          +tdCalc("efs-g-plan",null,0)+tdCalc("efs-g-plan",null,uD)+tdCalc("efs-g-plan",null,0)+tdCalc("efs-g-plan",null,1)+tdCalc("efs-g-plan",null,1)
+          +tdCalc("efs-g-act",null,0)+tdCalc("efs-g-act",null,uD)+tdCalc("efs-g-act",null,0)+tdCalc("efs-g-act",null,1)+tdCalc("efs-g-act",null,1);
+        body.appendChild(tr);
+        const c=tr.cells;
+        // 계획 (efp 자동): 생산량/사용량/단가 → 원단위·연료비 계산
+        const pProd=getEfp(planCfg.prod[pi],cur), pUse=getEfp(planCfg.usage[pi],cur), pPrice=planCfg.price();
+        const pUnit=safeDiv(pUse,pProd);
+        const pMan=(Number.isFinite(pUse)&&Number.isFinite(pPrice))?(lngMode?pUse*pPrice/1000000:pUse*pPrice/1000):null;
+        setCalcCell(c[1],pProd,0); setCalcCell(c[2],pUnit,uD); setCalcCell(c[3],pUse,0); setCalcCell(c[4],pPrice,1); setCalcCell(c[5],pMan,1);
+        // 실적 (full 캐시)
+        const f=__effCache[`${effTbl}|${idx}|full`]||{};
+        const aUse=(Number.isFinite(f.pC)&&Number.isFinite(f.uC))?f.pC*f.uC:null;
+        setCalcCell(c[6],f.pC,0); setCalcCell(c[7],f.uC,uD); setCalcCell(c[8],aUse,0); setCalcCell(c[9],f.priceC,1); setCalcCell(c[10],f.mC,1);
+        comp.push({pProd,pUse,pMan,aProd:f.pC,aUse,aMan:f.mC});
+      });
+      // 합계
+      const s=k=>comp.reduce((a,c)=>Number.isFinite(c[k])?a+c[k]:a,0);
+      const has=k=>comp.some(c=>Number.isFinite(c[k]));
+      const tr=document.createElement("tr"); tr.className="summary-row";
+      tr.innerHTML=`<th class="col-day">합  계</th>`
+        +tdCalc("efs-g-plan",has('pProd')?s('pProd'):null,0)+`<td class="efs-g-plan">—</td>`+tdCalc("efs-g-plan",has('pUse')?s('pUse'):null,0)+`<td class="efs-g-plan">—</td>`+tdCalc("efs-g-plan",has('pMan')?s('pMan'):null,1)
+        +tdCalc("efs-g-act",has('aProd')?s('aProd'):null,0)+`<td class="efs-g-act">—</td>`+tdCalc("efs-g-act",has('aUse')?s('aUse'):null,0)+`<td class="efs-g-act">—</td>`+tdCalc("efs-g-act",has('aMan')?s('aMan'):null,1);
+      body.appendChild(tr);
+    }
+    function sub(a,b){ return (Number.isFinite(a)&&Number.isFinite(b))? a-b : null; }
+
+    function buildP1(cur, t1val, steamPlanPrice) {
+      const body = document.getElementById("p1body");
+      if (!body) return;
+      const td = (cls, v, d) => `<td class="${cls}"><span class="efs-calc${Number.isFinite(v)&&v<0?" neg":""}">${fmt(v,d)}</span></td>`;
+      // 계획값 출처(자동, 표시 전용): 생산량=efp 사업계획, 연료비=eap 회계비용계획
+      const PLAN = { 2: { efpProd: "t01|r01", eapFuel: "r16" }, 6: { efpProd: "t01|r02", eapFuel: "r17" } };
+      const rows = [ { label: "제지 소계", idx: 2 }, { label: "화장지 소계", idx: 6 } ];
+      body.innerHTML = "";
+      const computed = [];
+      // 스팀운영단가영향 = (계획스팀단가 − 실적스팀단가) × 실적원단위 × 실적생산량 / 1000  (P5 단가효과)
+      function steamUnitEff(idx) {
+        const f = __effCache[`t3|${idx}|full`] || {};
+        if (!Number.isFinite(steamPlanPrice) || !Number.isFinite(f.priceC) || !Number.isFinite(f.uC) || !Number.isFinite(f.pC)) return null;
+        return (steamPlanPrice - f.priceC) * f.uC * f.pC / 1000;
+      }
+      rows.forEach((r) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<th class="col-day">${r.label}</th>`
+          + td("efs-g-plan", null, 0) + td("efs-g-plan", null, 1) + td("efs-g-plan", null, 1)
+          + td("efs-g-act", null, 0) + td("efs-g-act", null, 1) + td("efs-g-act", null, 1)
+          + td("efs-g-eff", null, 1) + td("efs-g-eff", null, 1) + td("efs-g-eff", null, 1) + td("efs-g-eff", null, 1);
+        body.appendChild(tr);
+        // 계획 = efp/eap 에서 자동 (표시 전용)
+        const planProd = getEfp(PLAN[r.idx].efpProd, cur);
+        const planFuel = getEap(PLAN[r.idx].eapFuel, cur);
+        const planUnit = safeDiv((planFuel || 0) * 1000, planProd);
+        setCalcCell(tr.cells[1], planProd, 0);
+        setCalcCell(tr.cells[3], planFuel, 1);
+        const actProd = t1val("prod", r.idx, cur);
+        const actFuel = t1val("fuel", r.idx, cur);
+        const actUnit = safeDiv((actFuel || 0) * 1000, actProd);
+        const unitD = (Number.isFinite(actUnit) && Number.isFinite(planUnit)) ? actUnit - planUnit : null;
+        const fuelD = (Number.isFinite(actFuel) && Number.isFinite(planFuel)) ? actFuel - planFuel : null;
+        const impact = (Number.isFinite(unitD) && Number.isFinite(actProd)) ? unitD * actProd / 1000 : null;
+        setCalcCell(tr.cells[2], planUnit, 1);
+        setCalcCell(tr.cells[4], actProd, 0); setCalcCell(tr.cells[5], actUnit, 1); setCalcCell(tr.cells[6], actFuel, 1);
+        const sUEff = steamUnitEff(r.idx);
+        setCalcCell(tr.cells[7], unitD, 1); setCalcCell(tr.cells[8], fuelD, 1); setCalcCell(tr.cells[9], impact, 1);
+        setCalcCell(tr.cells[10], sUEff, 1);
+        computed.push({ planProd, planFuel, actProd, actFuel, impact, sUEff });
+      });
+      // 합계 (전부 계산)
+      const sum = (k) => computed.reduce((s, c) => Number.isFinite(c[k]) ? s + c[k] : s, 0);
+      const anyP = computed.some(c => Number.isFinite(c.planProd));
+      const anyA = computed.some(c => Number.isFinite(c.actProd));
+      const pProd = anyP ? sum("planProd") : null, pFuel = anyP ? sum("planFuel") : null;
+      const aProd = anyA ? sum("actProd") : null, aFuel = anyA ? sum("actFuel") : null;
+      const pUnit = safeDiv((pFuel || 0) * 1000, pProd), aUnit = safeDiv((aFuel || 0) * 1000, aProd);
+      const uD = (Number.isFinite(aUnit) && Number.isFinite(pUnit)) ? aUnit - pUnit : null;
+      const fD = (Number.isFinite(aFuel) && Number.isFinite(pFuel)) ? aFuel - pFuel : null;
+      const imp = computed.some(c => Number.isFinite(c.impact)) ? sum("impact") : null;
+      const sUE = computed.some(c => Number.isFinite(c.sUEff)) ? sum("sUEff") : null;
+      const tr = document.createElement("tr"); tr.className = "summary-row";
+      tr.innerHTML = `<th class="col-day">합  계</th>`
+        + td("efs-g-plan", pProd, 0) + td("efs-g-plan", pUnit, 1) + td("efs-g-plan", pFuel, 1)
+        + td("efs-g-act", aProd, 0) + td("efs-g-act", aUnit, 1) + td("efs-g-act", aFuel, 1)
+        + td("efs-g-eff", uD, 1) + td("efs-g-eff", fD, 1) + td("efs-g-eff", imp, 1) + td("efs-g-eff", sUE, 1);
+      body.appendChild(tr);
+    }
+
+    // 경영실적 보고용 자료 (Table5) — Table3·4 의 제지소계(idx2)/화장지소계(idx6) 를 당월·전월 재배치
+    function buildMgmtReport(cur, prev) {
+      const body = document.getElementById("t5body");
+      if (!body) return;
+      document.getElementById("mgmtCurLabel").textContent = `${cur}월 (당월) 실적`;
+      document.getElementById("mgmtPrevLabel").textContent = `${prev}월 (전월) 실적`;
+      body.innerHTML = "";
+      const td = (cls, v, d) => `<td class="${cls}"><span class="efs-calc${Number.isFinite(v)&&v<0?" neg":""}">${fmt(v,d)}</span></td>`;
+      const blank = (cls) => `<td class="${cls}">—</td>`;
+
+      function fullRow(tblId, idx, uDigits) {
+        const f = __effCache[`${tblId}|${idx}|full`] || {};
+        return {
+          pC: f.pC, uC: f.uC, dC: f.priceC, mC: f.mC,
+          pP: f.pP, uP: f.uP, dP: f.priceP, mP: f.mP,
+          O: f.O, P: f.P,
+          uDigits,
+        };
+      }
+      // 한 섹션(스팀 또는 LNG) 렌더 — rows: PS(idx2), 화)초지(idx6), 소계
+      function section(daeLabel, tblId, uDigits) {
+        const ps = fullRow(tblId, 2, uDigits);
+        const ts = fullRow(tblId, 6, uDigits);
+        const sum = {
+          pC: add(ps.pC, ts.pC), mC: add(ps.mC, ts.mC),
+          pP: add(ps.pP, ts.pP), mP: add(ps.mP, ts.mP),
+          O: add(ps.O, ts.O), P: add(ps.P, ts.P),
+        };
+        const rows = [["PS", ps], ["화)초지", ts]];
+        rows.forEach(([label, r], i) => {
+          const tr = document.createElement("tr");
+          let html = "";
+          if (i === 0) html += `<th class="col-day" rowspan="3">${daeLabel}</th>`;
+          html += `<th class="col-day">${label}</th>`;
+          html += td("efs-g-curr", r.pC, 0) + td("efs-g-curr", r.uC, r.uDigits) + td("efs-g-curr", r.dC, 1) + td("efs-g-curr", r.mC, 1);
+          html += td("efs-g-prev", r.pP, 0) + td("efs-g-prev", r.uP, r.uDigits) + td("efs-g-prev", r.dP, 1) + td("efs-g-prev", r.mP, 1);
+          html += td("efs-g-eff", r.O, 1) + td("efs-g-eff", r.P, 1) + td("efs-g-eff", add(r.O, r.P), 1);
+          tr.innerHTML = html;
+          body.appendChild(tr);
+        });
+        // 소계 (원단위/단가 공란)
+        const tr = document.createElement("tr"); tr.className = "summary-row";
+        tr.innerHTML = `<th class="col-day">소 계</th>`
+          + td("efs-g-curr", sum.pC, 0) + blank("efs-g-curr") + blank("efs-g-curr") + td("efs-g-curr", sum.mC, 1)
+          + td("efs-g-prev", sum.pP, 0) + blank("efs-g-prev") + blank("efs-g-prev") + td("efs-g-prev", sum.mP, 1)
+          + td("efs-g-eff", sum.O, 1) + td("efs-g-eff", sum.P, 1) + td("efs-g-eff", add(sum.O, sum.P), 1);
+        body.appendChild(tr);
+        return sum;
+      }
+      const steamSum = section("스팀", "t3", 3);
+      const lngSum = section("LNG", "t4", 2);
+      // 합계 (당월/전월 연료비 + 손익만)
+      const tr = document.createElement("tr"); tr.className = "summary-row";
+      tr.innerHTML = `<th class="col-day" colspan="2">합  계</th>`
+        + blank("efs-g-curr") + blank("efs-g-curr") + blank("efs-g-curr") + td("efs-g-curr", add(steamSum.mC, lngSum.mC), 1)
+        + blank("efs-g-prev") + blank("efs-g-prev") + blank("efs-g-prev") + td("efs-g-prev", add(steamSum.mP, lngSum.mP), 1)
+        + td("efs-g-eff", add(steamSum.O, lngSum.O), 1) + td("efs-g-eff", add(steamSum.P, lngSum.P), 1)
+        + td("efs-g-eff", add(add(steamSum.O, lngSum.O), add(steamSum.P, lngSum.P)), 1);
+      body.appendChild(tr);
+    }
+    function add(a, b) {
+      if (!Number.isFinite(a) && !Number.isFinite(b)) return null;
+      return (a || 0) + (b || 0);
+    }
+
+    // 경영실적 보고용 — "25년 N월 실적 (N-1월 원단위 동일 기준)"
+    //  당월 생산량 × 전월 원단위 × 전월 단가 = 원단위가 전월 수준이었다면의 가정 연료비
+    function buildMgmtReport2(cur, prev) {
+      const body = document.getElementById("t5bbody"); if (!body) return;
+      const t = document.getElementById("mgmt2Title");
+      if (t) t.textContent = `25년 ${cur}월 실적 (${prev}월 원단위 동일 기준)`;
+      body.innerHTML = "";
+      const td = (cls, v, d) => `<td class="${cls}"><span class="efs-calc${Number.isFinite(v)&&v<0?" neg":""}">${fmt(v,d)}</span></td>`;
+      function rowVals(effTbl, idx, lngMode) {
+        const f = __effCache[`${effTbl}|${idx}|full`] || {};
+        const prod = f.pC, unit = f.uP, price = f.priceP; // 당월생산량 × 전월원단위 × 전월단가
+        const fuel = (Number.isFinite(prod) && Number.isFinite(unit) && Number.isFinite(price))
+          ? (lngMode ? prod * unit * price / 1000000 : prod * unit * price / 1000) : null;
+        return { prod, unit, price, fuel };
+      }
+      function section(daeLabel, effTbl, lngMode, uDig) {
+        const ps = rowVals(effTbl, 2, lngMode), ts = rowVals(effTbl, 6, lngMode);
+        const sumProd = add(ps.prod, ts.prod), sumFuel = add(ps.fuel, ts.fuel);
+        [["PS", ps, 0], ["화)초지", ts, 1]].forEach(([label, r, i]) => {
+          const tr = document.createElement("tr");
+          let h = "";
+          if (i === 0) h += `<th class="col-day" rowspan="3">${daeLabel}</th>`;
+          h += `<th class="col-day">${label}</th>`;
+          h += td("efs-g-curr", r.prod, 0) + td("efs-g-curr", r.unit, uDig) + td("efs-g-curr", r.price, 1) + td("efs-g-curr", r.fuel, 1);
+          tr.innerHTML = h; body.appendChild(tr);
+        });
+        const tr = document.createElement("tr"); tr.className = "summary-row";
+        tr.innerHTML = `<th class="col-day">소 계</th>`
+          + td("efs-g-curr", sumProd, 0) + `<td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>` + td("efs-g-curr", sumFuel, 1);
+        body.appendChild(tr);
+        return sumFuel;
+      }
+      const steamFuel = section("스팀", "t3", false, 2);
+      const lngFuel = section("LNG", "t4", true, 2);
+      const tr = document.createElement("tr"); tr.className = "summary-row";
+      tr.innerHTML = `<th class="col-day" colspan="2">합  계</th>`
+        + `<td class="efs-g-curr">—</td><td class="efs-g-curr">—</td><td class="efs-g-curr">—</td>`
+        + td("efs-g-curr", add(steamFuel, lngFuel), 1);
+      body.appendChild(tr);
+    }
+
+    // 효과 분석 테이블(Table3/4) 계산 + 렌더. 효과값은 __effCache 에 저장(Table1 참고에서 사용).
+    const __effCache = {};
+    function populateEffectTable(tblId, opt) {
+      const { prodOf, unitOf, priceOf, lngMode, cur, prev } = opt;
+      const tbody = document.getElementById(tblId).tBodies[0];
+      const SUM = { 2: [0,1], 6: [3,4,5], 7: [2,6] };
+      // 단가: 월별 (모든 행 공통)
+      const priceP = priceOf(prev), priceC = priceOf(cur);
+      // 행별 기본값 계산 (소계는 멤버 합산)
+      function prod(idx, mo) {
+        if (SUM[idx]) { let s=0,h=false; SUM[idx].forEach(p=>{const v=prod(p,mo); if(Number.isFinite(v)){s+=v;h=true;}}); return h?s:null; }
+        return prodOf(idx, mo);
+      }
+      function usage(idx, mo) { // 사용량 = 생산량 × 원단위 ; 소계는 멤버 합산
+        if (SUM[idx]) { let s=0,h=false; SUM[idx].forEach(p=>{const v=usage(p,mo); if(Number.isFinite(v)){s+=v;h=true;}}); return h?s:null; }
+        const p = prod(idx, mo), u = unitOf(idx, mo);
+        return (Number.isFinite(p) && Number.isFinite(u)) ? p * u : null;
+      }
+      function unit(idx, mo) { // 표시용 원단위 (소계 = 사용량합/생산량합)
+        if (SUM[idx]) return safeDiv(usage(idx, mo), prod(idx, mo));
+        return unitOf(idx, mo);
+      }
+      function fuelMan(idx, mo) { // 연료비(백만원)
+        const us = usage(idx, mo), pr = (mo === cur ? priceC : priceP);
+        if (!Number.isFinite(us) || !Number.isFinite(pr)) return null;
+        return lngMode ? us * pr / 1000000 : us * pr / 1000; // LNG: ㎥×원/㎥→원→백만원
+      }
+      function fuelTon(idx, mo) { // 연료비(천원/톤) = 연료비(백만원)×1000/생산량
+        return safeDiv((fuelMan(idx, mo) || 0) * 1000, prod(idx, mo));
+      }
+      for (let idx = 0; idx < 8; idx++) {
+        const tr = tbody.rows[idx]; if (!tr) continue;
+        // 셀 구성: th + [prev 6] + [curr 6] + [eff 3] = 15 td 추가
+        while (tr.cells.length > 1) tr.deleteCell(1);
+        const mk = (cls, v, d) => { const td = tr.insertCell(-1); td.className = cls;
+          const s = document.createElement("span"); s.className = "efs-calc" + (Number.isFinite(v)&&v<0?" neg":""); s.textContent = fmt(v, d); td.appendChild(s); };
+        const pP=prod(idx,prev), uP=unit(idx,prev), gP=usage(idx,prev), fP=fuelTon(idx,prev), mP=fuelMan(idx,prev);
+        const pC=prod(idx,cur),  uC=unit(idx,cur),  gC=usage(idx,cur),  fC=fuelTon(idx,cur),  mC=fuelMan(idx,cur);
+        mk("efs-g-prev",pP,0); mk("efs-g-prev",uP,3); mk("efs-g-prev",gP,0); mk("efs-g-prev",mo2price(priceP),1); mk("efs-g-prev",fP,1); mk("efs-g-prev",mP,1);
+        mk("efs-g-curr",pC,0); mk("efs-g-curr",uC,3); mk("efs-g-curr",gC,0); mk("efs-g-curr",mo2price(priceC),1); mk("efs-g-curr",fC,1); mk("efs-g-curr",mC,1);
+        // 효과: 연료비효과=(F-L)×H/1000, 원단위효과=(C-I)×E×H/단위, 단가효과=(E-K)×I×H/단위
+        // 합계행(idx7)은 엑셀과 동일하게 소계(idx2)+소계(idx6) 의 합으로 계산 (직접식은 비선형이라 불일치)
+        const divEff = lngMode ? 1000000 : 1000;
+        let nEff, oEff, pEff;
+        if (idx === 7) {
+          const sumEff = (k) => {
+            const a = __effCache[`${tblId}|2|${k}`], b = __effCache[`${tblId}|6|${k}`];
+            return (Number.isFinite(a) || Number.isFinite(b)) ? (a||0)+(b||0) : null;
+          };
+          nEff = sumEff("N"); oEff = sumEff("O"); pEff = sumEff("P");
+        } else {
+          nEff = (Number.isFinite(fP)&&Number.isFinite(fC)&&Number.isFinite(pC)) ? (fP-fC)*pC/1000 : null;
+          oEff = (Number.isFinite(uP)&&Number.isFinite(uC)&&Number.isFinite(priceP)&&Number.isFinite(pC)) ? (uP-uC)*priceP*pC/divEff : null;
+          pEff = (Number.isFinite(priceP)&&Number.isFinite(priceC)&&Number.isFinite(uC)&&Number.isFinite(pC)) ? (priceP-priceC)*uC*pC/divEff : null;
+        }
+        // 종합효과 = 원단위효과 + 단가효과
+        const totEff = (Number.isFinite(oEff) || Number.isFinite(pEff)) ? (oEff||0) + (pEff||0) : null;
+        mk("efs-g-eff",nEff,1); mk("efs-g-eff",oEff,1); mk("efs-g-eff",pEff,1); mk("efs-g-eff",totEff,1);
+        __effCache[`${tblId}|${idx}|N`] = nEff;
+        __effCache[`${tblId}|${idx}|M`] = mC;
+        __effCache[`${tblId}|${idx}|O`] = oEff;
+        __effCache[`${tblId}|${idx}|P`] = pEff;
+        // 경영실적 보고용 자료에서 사용할 전체 값 캐시
+        __effCache[`${tblId}|${idx}|full`] = { pP, uP, mP, pC, uC, mC, O: oEff, P: pEff, priceP, priceC };
+      }
+    }
+    function mo2price(v) { return v; }
+
+    // 입력 변경 → DB 저장 + 재계산
+    document.addEventListener("change", (e) => {
+      const inp = e.target.closest?.(".efs-input");
+      if (!inp) return;
+      const raw = String(inp.value || "").replace(/,/g, "").trim();
+      saveEfs(inp.dataset.dbkey, Number(inp.dataset.month), raw).then(() => {
+        // 포커스 보존 위해 다음 task 에서 재계산
+        const key = `${inp.dataset.dbkey}|${inp.dataset.month}`;
+        setTimeout(() => { populate(); restoreFocus(key); }, 0);
+      });
+    });
+    let __focusKey = null;
+    function restoreFocus(key) {
+      const next = document.querySelector(`.efs-input[data-dbkey="${key.split("|").slice(0,3).join("|")}"][data-month="${key.split("|")[3]}"]`);
+      if (next) { next.focus(); const l = next.value.length; try { next.setSelectionRange(l, l); } catch(e){} }
+    }
+
+    async function reload() {
+      updateLabels();
+      await Promise.all([fetchEfrYear(currentYear), loadEfs(currentYear)]);
+      populate();
+    }
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      currentMonth = Number(monthSelect.value) || (new Date().getMonth() + 1);
+      try {
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: String(currentMonth).padStart(2,"0") }));
+      } catch (e) {}
+      reload();
+    });
+    // 셀렉트 변경은 shared-period만 저장 (즉시 로드 X, 조회 버튼 클릭으로만)
+    yearSelect.addEventListener("change", () => {
+      try {
+        const s = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        s.year = yearSelect.value;
+        localStorage.setItem("steamlog:shared-period", JSON.stringify(s));
+      } catch (e) {}
+    });
+    monthSelect.addEventListener("change", () => {
+      try {
+        const s = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        s.month = monthSelect.value;
+        localStorage.setItem("steamlog:shared-period", JSON.stringify(s));
+      } catch (e) {}
+    });
+    reload();
+
+    // 컬럼 그룹 토글 (전월/당월 비교 · 증감 · 참고 · 전체)
+    document.querySelectorAll(".energy-tab-bar").forEach((bar) => {
+      const targetId = bar.getAttribute("data-target");
+      const table = document.getElementById(targetId);
+      bar.addEventListener("click", (e) => {
+        const btn = e.target.closest(".energy-tab");
+        if (!btn || !table) return;
+        const view = btn.getAttribute("data-view");
+        table.setAttribute("data-view", view);
+        bar.querySelectorAll(".energy-tab").forEach((b) => {
+          b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+        });
+      });
+    });
+
+    // 상위 탭 전환 (전월대비 / 사업계획대비)
+    document.querySelectorAll(".efs-toptab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const top = btn.dataset.top;
+        document.querySelectorAll(".efs-toptab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        document.querySelectorAll(".efs-toppanel").forEach((p) => {
+          p.style.display = (p.dataset.topPanel === top) ? "" : "none";
+        });
+      });
+    });
+  </script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20260527-energy-excel2"></script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>유동상 운전일지</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260818-fdl1" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260818-fdl1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="fluidized-daily-log"] {
+      background: var(--inc-bg-page);
+      font-family: "Inter", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+      color: var(--inc-text);
+      height: auto; min-height: 100vh; align-items: stretch; overflow: visible;
+    }
+    body.landing-body[data-page-kind="fluidized-daily-log"] .landing-main {
+      padding: 24px 22px 24px 26px; overflow: visible; height: auto; min-height: auto;
+    }
+    body.landing-body[data-page-kind="fluidized-daily-log"] .landing-canvas {
+      padding: 0; min-width: 0; overflow: visible; background: transparent; box-shadow: none;
+    }
+    body.landing-body[data-page-kind="fluidized-daily-log"] .sidebar-shell {
+      position: sticky; top: 0; align-self: flex-start; height: 100vh; min-height: 100vh;
+    }
+    body.platform-embedded[data-page-kind="fluidized-daily-log"] { height: 100vh !important; overflow: auto !important; }
+    html.platform-embedded { overflow: hidden !important; }
+    body.landing-body.embedded-mode[data-page-kind="fluidized-daily-log"] .sidebar-shell { display: none !important; }
+    body.landing-body.embedded-mode[data-page-kind="fluidized-daily-log"] .landing-main { padding: 0; }
+
+    /* ── 일지 용지 ───────────────────────────────────────────── */
+    .fdl-sheet {
+      background: #fff; border: 1px solid var(--inc-border-card); border-radius: var(--inc-radius-card);
+      box-shadow: var(--inc-shadow-card); padding: 12px 14px 14px; max-width: none;
+    }
+
+    /* 상단 결재/근무자 밴드 (엑셀 1~3행) */
+    .fdl-topband {
+      display: grid; grid-template-columns: minmax(300px, 1fr) minmax(260px, 1.4fr) minmax(240px, 1fr);
+      gap: 10px; align-items: stretch; margin-bottom: 10px;
+    }
+    .fdl-band-box { border: 1px solid rgba(120,181,217,.5); border-radius: 8px; overflow: hidden; display: flex; }
+    .fdl-band-label {
+      flex: 0 0 30px; display: flex; align-items: center; justify-content: center; text-align: center;
+      background: #eaf3fb; font-weight: 800; font-size: 11.5px; color: #173a54; letter-spacing: 2px;
+      writing-mode: vertical-rl; padding: 4px 0;
+    }
+    .fdl-band-cells { flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+    .fdl-band-cells > div { border-left: 1px solid rgba(120,181,217,.4); display: flex; flex-direction: column; }
+    .fdl-band-cells > div:first-child { border-left: 0; }
+    .fdl-band-cells span {
+      display: block; text-align: center; background: #f6fafd; border-bottom: 1px solid rgba(120,181,217,.35);
+      font-size: 11px; font-weight: 700; color: #4a6a83; padding: 3px 0;
+    }
+    .fdl-band-cells input { border: 0; width: 100%; box-sizing: border-box; text-align: center; font: inherit; font-size: 12.5px; font-weight: 700; color: #173a54; padding: 4px 4px; background: #fff; outline: none; }
+    .fdl-band-cells input:focus { background: #f0f8ff; }
+
+    .fdl-title-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgba(120,181,217,.5); border-radius: 8px; background: linear-gradient(180deg,#fafcff 0%,#eef5fb 100%); padding: 8px 10px; }
+    .fdl-title-box h2 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: 3px; color: #12395b; }
+    .fdl-title-date { font-size: 13.5px; font-weight: 700; color: #3d6786; }
+
+    /* 섹션 2단 배치 (엑셀 좌/우) */
+    .fdl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; align-items: start; }
+    .fdl-block { min-width: 0; }
+    .fdl-block h3 {
+      margin: 0 0 3px; font-size: 13px; font-weight: 800; color: #12395b;
+    }
+    .fdl-block h3 em { font-style: normal; font-weight: 600; font-size: 11.5px; color: #7c93a6; }
+
+    table.fdl-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+    .fdl-table th, .fdl-table td {
+      border: 1px solid rgba(120,181,217,.62); padding: 0; text-align: center; vertical-align: middle;
+      height: 22px; white-space: nowrap;
+    }
+    .fdl-table thead th, .fdl-table th.rowhead {
+      background: #eaf3fb; font-weight: 700; color: #173a54; font-size: 11.5px; padding: 2px 4px; line-height: 15px;
+    }
+    .fdl-table th.rowhead { text-align: center; }
+    .fdl-table td input {
+      width: 100%; box-sizing: border-box; border: 0; background: #fff; padding: 1px 5px;
+      font: inherit; font-size: 12px; line-height: 16px; color: #173a54; text-align: right; outline: none;
+    }
+    .fdl-table td input:hover { background: #f2f9ff; }
+    .fdl-table td input:focus { background: #fff; box-shadow: inset 0 0 0 2px rgba(47,111,179,.35); }
+    .fdl-table td input.text-input { text-align: center; }
+    /* 자동 계산 셀 */
+    .fdl-table td.calc { background: var(--inc-bg-computed); font-weight: 700; color: #24406b; padding: 1px 6px; line-height: 16px; text-align: right; }
+    /* 전일 이월 자동값 (수정 가능) */
+    .fdl-table td input.is-auto { color: #7b8ea3; background: #fbfcfe; font-style: italic; }
+    .fdl-table tr.total-row th.rowhead { background: #f7f2dd; }
+    .fdl-table tr.total-row td.calc { background: #fdf8e6; color: #6b5615; }
+
+    .fdl-msg { min-width: 74px; font-size: 12px; font-weight: 700; }
+    /* 저장하지 않은 변경이 있을 때 */
+    #fdlSave:disabled { opacity: .5; cursor: default; }
+    body.fdl-dirty #fdlSave { box-shadow: 0 0 0 3px rgba(220, 38, 38, .25); }
+    body.fdl-dirty .fdl-table td input:not([value=""]).is-edited,
+    body.fdl-dirty .fdl-sum-table td input.is-edited { background: #fff7e6; }
+    .fdl-table td input.is-edited, .fdl-sum-table td input.is-edited,
+    .fdl-band-cells input.is-edited { background: #fff7e6 !important; }
+    .fdl-msg.ok { color: #16a34a; } .fdl-msg.err { color: #dc2626; }
+    /* ── 탭 ─────────────────────────────────────────────── */
+    .fdl-tabs { display:flex; gap:6px; margin:0 0 8px; flex-wrap:wrap; }
+    .fdl-tab {
+      border:1px solid rgba(120,181,217,.5); border-radius:9px; background:#fff; color:#3d6786;
+      padding:7px 14px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+    }
+    .fdl-tab:hover { background:#f2f9ff; }
+    .fdl-tab.is-active { background:linear-gradient(180deg,#2f6fb3 0%,#1f4f82 100%); border-color:#1f4f82; color:#fff; }
+
+    /* ── 월 요약 표 ──────────────────────────────────────── */
+    /* 세로/가로 모두 이 컨테이너에서 스크롤 → 상단 일자 행이 sticky 로 고정된다 */
+    .fdl-sum-scroll { overflow:auto; max-height:calc(100vh - 230px); } /* JS 가 실제 여백에 맞춰 다시 잡는다 */
+    table.fdl-sum-table { border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
+    .fdl-sum-table th, .fdl-sum-table td {
+      border-right:1px solid rgba(120,181,217,.62); border-bottom:1px solid rgba(120,181,217,.62);
+      padding:0; height:26px; text-align:center; vertical-align:middle; white-space:nowrap; overflow:hidden;
+    }
+    .fdl-sum-table tr > :first-child { border-left:1px solid rgba(120,181,217,.62); }
+    .fdl-sum-table thead th { border-top:1px solid rgba(120,181,217,.62); }
+    .fdl-sum-table thead th { background:#eaf3fb; font-weight:700; color:#173a54; padding:3px 4px; position:sticky; top:0; z-index:3; }
+    .fdl-sum-table th.name-col { background:#eaf3fb; font-weight:700; color:#173a54; padding:3px 6px;
+      position:sticky; left:0; z-index:2; }
+    .fdl-sum-table th.kind-col { background:#f2f8fd; font-weight:700; color:#3d6786;
+      position:sticky; left:104px; z-index:2; }
+    .fdl-sum-table thead th.name-col, .fdl-sum-table thead th.kind-col { z-index:5; }
+    /* 열 폭 고정 — 일자 열은 모두 동일 */
+    .fdl-sum-table col.name-col-w { width:104px; }
+    .fdl-sum-table col.kind-col-w { width:52px; }
+    .fdl-sum-table col.day-col { width:58px; }
+    .fdl-sum-table col.total-col { width:82px; }
+    .fdl-sum-table td input {
+      width:100%; box-sizing:border-box; border:0; background:#fff; padding:3px 5px;
+      font:inherit; font-size:11.5px; color:#173a54; text-align:right; outline:none;
+    }
+    .fdl-sum-table td input:hover { background:#f2f9ff; }
+    .fdl-sum-table td input:focus { background:#fff; box-shadow:inset 0 0 0 2px rgba(47,111,179,.35); }
+    .fdl-sum-table td.calc { background:var(--inc-bg-computed); color:#24406b; font-weight:700; padding:3px 5px; text-align:right; }
+    .fdl-sum-table td.total-cell, .fdl-sum-table th.total-head { background:#fdf8e6; color:#6b5615; font-weight:700; padding:3px 5px; text-align:right; }
+    .fdl-sum-empty { padding:24px 8px; color:#7c93a6; font-size:13px; }
+    /* 함수율 일간/월간 전환 */
+    .fdl-subtabs { display:flex; gap:6px; margin:0 0 8px; }
+    .fdl-subtab {
+      border:1px solid rgba(120,181,217,.5); border-radius:8px; background:#fff; color:#3d6786;
+      padding:5px 14px; font:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    }
+    .fdl-subtab:hover { background:#f2f9ff; }
+    .fdl-subtab.is-active { background:#dff0ff; border-color:#2f6fb3; color:#12395b; }
+    .fdl-sum-table td input.moist-text { text-align:center; }
+
+    /* ── 인쇄: 운전일지 1장 (A4 세로) ──────────────────────── */
+    /* ── 인쇄 레이아웃 ────────────────────────────────────────
+       A4 세로 한 장을 채우도록 화면보다 행/특이사항 칸을 키운다.
+       아래 .fdl-print-measure 블록과 @media print 블록은 항상 같은 값을 유지할 것.
+       (measure 는 배율 계산용으로 인쇄와 동일한 크기를 화면에서 재기 위한 것) */
+    .fdl-print-measure .fdl-sheet { width: 780px !important; padding: 0 !important; border: 0 !important; }
+    .fdl-print-measure .fdl-grid { grid-template-columns: 1fr 1fr !important; gap: 12px 16px !important; }
+    .fdl-print-measure .fdl-topband { grid-template-columns: minmax(300px, 1fr) minmax(260px, 1.4fr) minmax(240px, 1fr) !important; }
+    .fdl-print-measure .fdl-table th, .fdl-print-measure .fdl-table td { height: 42px !important; }
+    .fdl-print-measure .fdl-table td input { font-size: 12.5px !important; }
+    .fdl-print-measure .fdl-table td.calc { font-size: 11px !important; }
+    .fdl-print-measure .fdl-table thead th, .fdl-print-measure .fdl-table th.rowhead {
+      font-size: 11.5px !important; white-space: normal !important; line-height: 1.15 !important; word-break: keep-all;
+    }
+    .fdl-print-measure .fdl-table td input { line-height: 22px !important; padding: 3px 5px !important; }
+    .fdl-print-measure .fdl-table td.calc { padding: 5px 6px !important; line-height: 20px !important; }
+    .fdl-print-measure #fdlChem col:nth-child(1) { width: 15% !important; }
+    .fdl-print-measure #fdlChem col:nth-child(6),
+    .fdl-print-measure #fdlChem col:nth-child(7) { width: 16% !important; }
+    .fdl-print-measure .fdl-band-cells input { padding: 9px 4px !important; font-size: 13.5px !important; }
+    .fdl-print-measure    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      .fdl-sheet { width: 780px !important; }
+      html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+      .inc-header, .fdl-tabs, .sidebar-shell, .fdl-msg { display: none !important; }
+      [data-fdl-panel]:not([data-fdl-panel="log"]) { display: none !important; }
+      body.landing-body[data-page-kind="fluidized-daily-log"] .landing-main { padding: 0 !important; }
+      /* 인쇄 영역을 A4 세로 1장 크기로 고정(194×281mm @96dpi)해 페이지가 넘어가지 않게 한다.
+         내부 시트는 축소 배율만 적용한다. */
+      .landing-canvas { padding: 0 !important; width: 733px !important; height: 1062px !important; overflow: hidden !important; }
+      .fdl-sheet {
+        border: 0 !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important;
+        transform: scale(var(--fdl-print-scale, 1)); transform-origin: top left;
+      }
+      .fdl-table td input, .fdl-band-cells input {
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      /* 위 .fdl-print-measure 와 동일한 값 (한 장을 채우는 크기) */
+      .fdl-grid { grid-template-columns: 1fr 1fr !important; gap: 12px 16px !important; }
+      .fdl-topband { grid-template-columns: minmax(300px, 1fr) minmax(260px, 1.4fr) minmax(240px, 1fr) !important; }
+      .fdl-table th, .fdl-table td { height: 42px !important; }
+      .fdl-table td input { font-size: 12.5px !important; }
+      .fdl-table td.calc { font-size: 11px !important; }
+      /* 좁아진 열에서 '전일 재고량' 처럼 긴 제목은 두 줄로 접는다 */
+      .fdl-table thead th, .fdl-table th.rowhead {
+        font-size: 11.5px !important; white-space: normal !important; line-height: 1.15 !important; word-break: keep-all;
+      }
+      .fdl-table td input { line-height: 22px !important; padding: 3px 5px !important; }
+      .fdl-table td.calc { padding: 5px 6px !important; line-height: 20px !important; }
+      #fdlChem col:nth-child(1) { width: 15% !important; }
+      #fdlChem col:nth-child(6),
+      #fdlChem col:nth-child(7) { width: 16% !important; }
+      .fdl-band-cells input { padding: 9px 4px !important; font-size: 13.5px !important; }
+    }
+
+    @media screen and (max-width: 1100px) { .fdl-grid { grid-template-columns: 1fr; } .fdl-topband { grid-template-columns: 1fr; } }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="fluidized-daily-log">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>유동상 운전일지</h1>
+        </div>
+        <div class="inc-toolbar">
+          <button type="button" id="fdlPrevDay" class="btn-secondary" title="전일">&#x2039; 전일</button>
+          <select id="fdlYear" aria-label="연도"></select>
+          <select id="fdlMonth" aria-label="월"></select>
+          <select id="fdlDay" aria-label="일"></select>
+          <button type="button" id="fdlNextDay" class="btn-secondary" title="익일">익일 &#x203A;</button>
+          <button type="button" id="fdlReload" class="btn-secondary">조회</button>
+          <button type="button" id="fdlSave" disabled>저장</button>
+          <button type="button" id="fdlUpload" class="btn-secondary">엑셀 업로드</button>
+          <button type="button" id="fdlDownload" class="btn-secondary">엑셀 다운로드</button>
+          <input type="file" id="fdlUploadFile" accept=".xlsx,.xls,.xlsm" hidden />
+          <button type="button" id="fdlPrint" class="btn-secondary">인쇄</button>
+          <span class="fdl-msg" id="fdlMsg"></span>
+        </div>
+      </div>
+
+      <div class="fdl-tabs" id="fdlTabs">
+        <button type="button" class="fdl-tab is-active" data-fdl-tab="log">운전일지</button>
+        <button type="button" class="fdl-tab" data-fdl-tab="chem">요약(약품)</button>
+        <button type="button" class="fdl-tab" data-fdl-tab="etc">요약(그외)</button>
+        <button type="button" class="fdl-tab" data-fdl-tab="moisture">함수율</button>
+      </div>
+
+      <section class="fdl-sheet" data-fdl-panel="log">
+        <div class="fdl-topband">
+          <div class="fdl-band-box">
+            <div class="fdl-band-label">근무자</div>
+            <div class="fdl-band-cells">
+              <div><span>오 전</span><input id="fdlWorkerAm" autocomplete="off" /></div>
+              <div><span>오 후</span><input id="fdlWorkerPm" autocomplete="off" /></div>
+              <div><span>야 간</span><input id="fdlWorkerNight" autocomplete="off" /></div>
+            </div>
+          </div>
+          <div class="fdl-title-box">
+            <h2>유동상소각로 운전일지</h2>
+            <div class="fdl-title-date" id="fdlSheetDate"></div>
+          </div>
+          <div class="fdl-band-box">
+            <div class="fdl-band-label">결재</div>
+            <div class="fdl-band-cells">
+              <div><span>반장</span><input id="fdlApprLeader" autocomplete="off" /></div>
+              <div><span>대리</span><input id="fdlApprAssistant" autocomplete="off" /></div>
+              <div><span>팀장</span><input id="fdlApprManager" autocomplete="off" /></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fdl-grid">
+          <div class="fdl-block">
+            <h3>1. 소각현황 <em>(KG)</em></h3>
+            <div id="fdlBurn"></div>
+          </div>
+          <div class="fdl-block">
+            <h3>2. BOILER 운전현황 <em>(TON, HR)</em></h3>
+            <div id="fdlBoiler"></div>
+          </div>
+          <div class="fdl-block">
+            <h3>3. 약품 사용현황 <em>(KG)</em></h3>
+            <div id="fdlChem"></div>
+          </div>
+          <div class="fdl-block">
+            <h3>4. 소각재 발생량 <em>(TON, 대)</em></h3>
+            <div id="fdlAsh"></div>
+          </div>
+          <div class="fdl-block">
+            <h3>5. 전력 사용량 <em>(KWH)</em></h3>
+            <div id="fdlPower"></div>
+          </div>
+          <div class="fdl-block">
+            <h3>6. 유틸리티 사용현황 <em>(㎥)</em></h3>
+            <div id="fdlUtil"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="fdl-sheet" data-fdl-panel="chem" hidden>
+        <div class="fdl-sum-scroll"><div id="fdlChemSummary"></div></div>
+      </section>
+
+      <section class="fdl-sheet" data-fdl-panel="etc" hidden>
+        <div class="fdl-sum-scroll"><div id="fdlEtcSummary"></div></div>
+      </section>
+
+      <section class="fdl-sheet" data-fdl-panel="moisture" hidden>
+        <div class="fdl-sum-scroll"><div id="fdlMoisture"></div></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    if (new URLSearchParams(window.location.search).get("embedded") === "1") {
+      document.body.classList.add("embedded-mode");
+    }
+  </script>
+  <script src="/steam/js/fluidized-daily-log-pages.js?v=20260819-manualsave1"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

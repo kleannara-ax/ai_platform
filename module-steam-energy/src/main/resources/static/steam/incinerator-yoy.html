@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>소각로 위탁운영 - 전년대비 및 절감내역</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="incinerator-yoy"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="incinerator-yoy"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="incinerator-yoy"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="incinerator-yoy"] .landing-canvas-table { overflow:visible !important; }
+    .inc-table-wrap { overflow:visible !important; }
+    .inc-card { margin-bottom:18px; }
+    .inc-table th.linked-source-header {
+      text-decoration: underline dotted rgba(31, 75, 153, 0.6);
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+    /* yoy 표 컬럼 폭 (페이지 고유) */
+    .inc-table colgroup col.c-label { width:11%; }
+    .inc-table colgroup col.c-sub   { width:7%; }
+    .inc-table colgroup col.c-month { width:6%; }
+    .inc-table colgroup col.c-total { width:10%; }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="incinerator-yoy">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>3. 소각로 위탁운영비용 전년도 실적 및 비교</h1>
+          <p>폐합성소각로 (단위: 천원)</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <section class="inc-card">
+        <h3 class="inc-section-title">3. 폐합성소각로 합계 (천원)</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table" data-form="cost">
+            <colgroup>
+              <col class="c-label"><col class="c-sub">
+              <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+              <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+              <col class="c-total">
+            </colgroup>
+            <thead>
+              <tr><th class="col-label">구 분</th><th>구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="inc-card">
+        <h3 class="inc-section-title">4. 소각로 운영실적 비교 (단위: 톤)</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table" data-form="ton">
+            <colgroup>
+              <col class="c-label"><col class="c-sub">
+              <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+              <col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month"><col class="c-month">
+              <col class="c-total">
+            </colgroup>
+            <thead>
+              <tr><th class="col-label">구 분</th><th>구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* 전년대비 및 절감내역 — 행 구조:
+       - 폐합성소각로 합계 (천원): 전년실적 / 금년실적 / 증감
+       - 폐합성소각로 스팀생산량 (톤): 전년실적 / 금년실적 / 증감
+       증감 = 금년 - 전년 (자동 계산). 입력은 전년/금년 행만. */
+    const MONTHS = Array.from({length: 12}, (_, i) => `m${i+1}`);
+    const FORMS = [
+      { id: "cost", label: "폐합성소각로 합계", rows: ["prev", "curr", "diff"],
+        currHint: "금년 실적은 ‘사업계획대비 실적’ 페이지의 인건비 실적과 ‘도급내역’의 운영비용 한 달 합계(천원)를 더해 자동으로 계산됩니다." },
+      { id: "ton",  label: "폐합성소각로 스팀생산량", rows: ["prev", "curr", "diff"],
+        currHint: "금년 실적은 ‘도급내역’ 페이지에 일별로 입력한 1·2호기 스팀량을 한 달치 모두 더해서 자동으로 보여줍니다." },
+    ];
+
+    const yearSelect = document.getElementById("invoiceYear");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();
+    document.title = "소각로 위탁운영 - 전년 실적 비교";
+    document.querySelector(".inc-header-title h1")?.replaceChildren(document.createTextNode("3. 소각로 위탁운영비용 전년 실적 비교"));
+
+    (function initYears() {
+      const now = new Date().getFullYear();
+      for (let y = now - 5; y <= now + 2; y += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(y); opt.textContent = `${y}년`;
+        yearSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+    })();
+
+    function rowLabel(form, rowKey) {
+      if (rowKey === "prev") return `${currentYear - 1}실적`;
+      if (rowKey === "curr") return `${currentYear}실적`;
+      return "증감";
+    }
+
+    /* curr 행은 자동 (사업계획대비 합계 또는 도급내역에서 가져옴) */
+    function isAutoCell(rk) { return rk === "prev" || rk === "diff" || rk === "curr"; }
+    function buildTable(form) {
+      const tbody = document.querySelector(`table[data-form="${form.id}"] tbody`);
+      const rows = form.rows.map((rk, i) => {
+        const label = rowLabel(form, rk);
+        const isFirst = i === 0;
+        const groupCell = isFirst ? `<th class="col-label" rowspan="${form.rows.length}">${form.label}</th>` : "";
+        const cells = MONTHS.map((m) => {
+          if (isAutoCell(rk)) return `<td class="computed" data-section="${form.id}" data-field="${rk}-${m}">—</td>`;
+          return `<td class="input-cell"><input data-section="${form.id}" data-field="${rk}-${m}" /></td>`;
+        }).join("");
+        const total = `<td class="computed" data-section="${form.id}" data-field="${rk}-total">—</td>`;
+        return `<tr>${groupCell}<th class="col-label">${label}</th>${cells}${total}</tr>`;
+      }).join("");
+      tbody.innerHTML = rows;
+    }
+    FORMS.forEach(buildTable);
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtDec(n) { return Number.isFinite(n) ? n.toLocaleString("en-US", {maximumFractionDigits: 2}) : "—"; }
+
+    /* 외부 소스 (도급내역/사업계획대비)에서 가져온 월별 금년실적 값 */
+    function externalValue(formId, mKey, previous) {
+      const mn = Number(String(mKey).slice(1));
+      const contracts = previous ? previousContractByMonth : contractByMonth;
+      const plans = previous ? previousPlanVsByMonth : planVsByMonth;
+      if (formId === "ton") {
+        const c = contracts[mn];
+        if (!c) return NaN;
+        // Excel 공식: 사업계획대비!L12 = 도급내역!Y43 (실 사용량 합계).
+        // 도급내역의 real 섹션 (steam-1 + steam-2) 합을 사용. 결산기준(unit1+unit2)이 아님.
+        const v = ((c.real?.["steam-1"]) || 0) + ((c.real?.["steam-2"]) || 0);
+        return v > 0 ? v : NaN;
+      }
+      if (formId === "cost") {
+        // 사업계획대비 total.actual = labor.actual + operation.actual
+        //   operation.actual = (도급 총금액/1000) - labor.actual  (Excel K43=L43-J43)
+        //   ⇒ total.actual = (도급 총금액/1000) = (unit1.sub + unit2.sub) / 1000
+        const c = contracts[mn];
+        if (!c) return NaN;
+        const totalKw = ((c.unit1.oper||0) + (c.unit1.stop||0) + (c.unit2.oper||0) + (c.unit2.stop||0)) / 1000;
+        return totalKw > 0 ? totalKw : NaN;
+      }
+      return NaN;
+    }
+    function externalCurr(formId, mKey) { return externalValue(formId, mKey, false); }
+    function externalPrev(formId, mKey) { return externalValue(formId, mKey, true); }
+    function recompute(form) {
+      let prevTotal = 0, prevCnt = 0, currTotal = 0, currCnt = 0, diffTotal = 0;
+      const tbl = document.querySelector(`table[data-form="${form.id}"]`);
+      MONTHS.forEach((m) => {
+        const prev = externalPrev(form.id, m);
+        const curr = externalCurr(form.id, m);
+        const prevEl = tbl.querySelector(`[data-section="${form.id}"][data-field="prev-${m}"]`);
+        const currEl = tbl.querySelector(`[data-section="${form.id}"][data-field="curr-${m}"]`);
+        if (prevEl) prevEl.textContent = fmt(prev);
+        if (currEl) currEl.textContent = fmt(curr);
+        const diff = Number.isFinite(prev) && Number.isFinite(curr) ? curr - prev : (Number.isFinite(curr) ? curr : (Number.isFinite(prev) ? -prev : NaN));
+        tbl.querySelector(`[data-field="diff-${m}"]`).textContent = fmt(diff);
+        if (Number.isFinite(prev)) { prevTotal += prev; prevCnt++; }
+        if (Number.isFinite(curr)) { currTotal += curr; currCnt++; }
+        if (Number.isFinite(diff)) diffTotal += diff;
+      });
+      tbl.querySelector(`[data-field="prev-total"]`).textContent = prevCnt ? fmt(prevTotal) : "—";
+      tbl.querySelector(`[data-field="curr-total"]`).textContent = currCnt ? fmt(currTotal) : "—";
+      tbl.querySelector(`[data-field="diff-total"]`).textContent = (prevCnt || currCnt) ? fmt(diffTotal) : "—";
+    }
+    function recomputeAll() { FORMS.forEach(recompute); }
+    document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
+
+    /* DB */
+    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_yoy";
+    const CONTRACT_NAME = "incinerator_contract";
+    const PLANVS_NAME   = "incinerator_plan_vs";
+    function monthKey() { return String(currentYear); }
+    /* 도급내역 12개월 합산 + 사업계획대비 labor.actual 월별 값 캐시 */
+    const contractByMonth = {};
+    const previousContractByMonth = {};
+    const planVsByMonth = {}; // { 1..12: { laborActual } }
+    const previousPlanVsByMonth = {};
+    function emptyContract() { return { unit1:{steam:0,oper:0,stop:0,runtime:0}, unit2:{steam:0,oper:0,stop:0,runtime:0}, real:{"steam-1":0,"steam-2":0} }; }
+    async function loadContract() {
+      for (let m = 1; m <= 12; m++) contractByMonth[m] = emptyContract();
+      const tasks = [];
+      for (let m = 1; m <= 12; m++) {
+        const mk = `${currentYear}-${String(m).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              const s = emptyContract();
+              (j.data || []).forEach(row => {
+                if (row.table_name !== CONTRACT_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 3) return;
+                const [sec, , field] = parts;
+                if (!(sec in s) || !(field in s[sec])) return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v)) s[sec][field] += v;
+              });
+              contractByMonth[m] = s;
+            })
+            .catch(() => {})
+        );
+      }
+      // 사업계획대비: monthKey 가 year-month — 12개 버킷에서 labor|actual-m{N} 수집 (가장 큰 값 우선)
+      for (let m = 1; m <= 12; m++) planVsByMonth[m] = { laborActual: NaN };
+      for (let mk_idx = 1; mk_idx <= 12; mk_idx++) {
+        const mk = `${currentYear}-${String(mk_idx).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(PLANVS_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              (j.data || []).forEach(row => {
+                if (row.table_name !== PLANVS_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 2) return;
+                const [grp, ...rest] = parts;
+                const fld = rest.join("|");
+                const mt = fld.match(/^actual-m(\d{1,2})$/);
+                if (!mt) return;
+                const mNo = Number(mt[1]);
+                if (!(mNo >= 1 && mNo <= 12)) return;
+                if (grp !== "labor") return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v) && (!Number.isFinite(planVsByMonth[mNo].laborActual) || v !== 0)) {
+                  planVsByMonth[mNo].laborActual = v;
+                }
+              });
+            })
+            .catch(() => {})
+        );
+      }
+      for (let m = 1; m <= 12; m++) previousContractByMonth[m] = emptyContract();
+      for (let m = 1; m <= 12; m++) {
+        const mk = `${currentYear - 1}-${String(m).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              const s = emptyContract();
+              (j.data || []).forEach(row => {
+                if (row.table_name !== CONTRACT_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 3) return;
+                const [sec, , field] = parts;
+                if (!(sec in s) || !(field in s[sec])) return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v)) s[sec][field] += v;
+              });
+              previousContractByMonth[m] = s;
+            })
+            .catch(() => {})
+        );
+      }
+      for (let m = 1; m <= 12; m++) previousPlanVsByMonth[m] = { laborActual: NaN };
+      for (let mk_idx = 1; mk_idx <= 12; mk_idx++) {
+        const mk = `${currentYear - 1}-${String(mk_idx).padStart(2,"0")}`;
+        tasks.push(
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(PLANVS_NAME)}`)
+            .then(r => r.ok ? r.json() : { data: [] })
+            .then(j => {
+              (j.data || []).forEach(row => {
+                if (row.table_name !== PLANVS_NAME) return;
+                const parts = String(row.row_key || "").split("|");
+                if (parts.length < 2) return;
+                const [grp, ...rest] = parts;
+                const fld = rest.join("|");
+                const mt = fld.match(/^actual-m(\d{1,2})$/);
+                if (!mt) return;
+                const mNo = Number(mt[1]);
+                if (!(mNo >= 1 && mNo <= 12)) return;
+                if (grp !== "labor") return;
+                const v = Number(String(row.cell_value || "").replace(/[,\s]/g, ""));
+                if (Number.isFinite(v) && (!Number.isFinite(previousPlanVsByMonth[mNo].laborActual) || v !== 0)) {
+                  previousPlanVsByMonth[mNo].laborActual = v;
+                }
+              });
+            })
+            .catch(() => {})
+        );
+      }
+      await Promise.all(tasks);
+    }
+    const storedRows = new Map();
+    function rowKeyFor(section, field) { return `${section}|${field}`; }
+    function eachInput(cb) {
+      document.querySelectorAll('table.inc-table input[data-section]').forEach((input) => {
+        cb(input, input.dataset.section, input.dataset.field);
+      });
+    }
+    async function load() {
+      storedRows.clear();
+      eachInput((input) => { input.value = ""; });
+      recomputeAll();
+      try {
+        const [res] = await Promise.all([
+          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`),
+          loadContract(),
+        ]);
+        if (res.ok) {
+          const payload = await res.json();
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== T_NAME) return;
+            storedRows.set(row.row_key, row);
+          });
+          eachInput((input, section, field) => {
+            const stored = storedRows.get(rowKeyFor(section, field));
+            if (stored && stored.cell_value != null && stored.cell_value !== "") input.value = stored.cell_value;
+          });
+        }
+        recomputeAll();
+      } catch (e) {}
+    }
+    async function save(input, section, field) {
+      const key = rowKeyFor(section, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = { month: monthKey(), year_no: currentYear, month_no: 0, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload) });
+        if (res.ok) storedRows.set(key, await res.json());
+      } catch (e) {}
+    }
+    eachInput((input, section, field) => input.addEventListener("blur", () => save(input, section, field)));
+
+    function refreshRowLabels() {
+      FORMS.forEach((f) => {
+        const tbody = document.querySelector(`table[data-form="${f.id}"] tbody`);
+        const labels = tbody.querySelectorAll("th.col-label:not([rowspan])");
+        labels.forEach((th, i) => {
+          th.textContent = rowLabel(f, f.rows[i]);
+          if (f.rows[i] === "curr" && f.currHint) {
+            th.classList.add("linked-source-header");
+            th.setAttribute("title", f.currHint);
+          } else {
+            th.classList.remove("linked-source-header");
+            th.removeAttribute("title");
+          }
+        });
+      });
+    }
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      try {
+        const prev = JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}");
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: prev.month || "01" }));
+      } catch (e) {}
+      refreshRowLabels();
+      load();
+    });
+
+    refreshRowLabels();
+    load();
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20260522-incinerator-xlsx4-monthsync"></script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오늘 일지 등록</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-unit.css?v=20260520-split2-applied" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-responsive-fix" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* TM 호기별 가로 한 줄 배치 */
+    .today-entry-tm-rows { display:flex; flex-direction:column; gap:10px; }
+    .tm-row {
+      display:flex; align-items:flex-end; gap:12px;
+      padding:8px 10px; border:1px solid rgba(120,181,217,.22); border-radius:8px; background:rgba(245,251,255,.55);
+    }
+    .tm-row .tm-row-label {
+      flex:0 0 54px; align-self:center; font-weight:800; color:#325873; font-size:13px;
+    }
+    .tm-row .today-entry-field { flex:1 1 0; }
+    .tm-note-row { margin-top:2px; }
+    .tm-note-row .today-entry-field { flex:1 1 100%; }
+    @media (max-width: 640px) {
+      .tm-row { flex-wrap:wrap; }
+      .tm-row .tm-row-label { flex-basis:100%; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="today-entry">
+  <main class="landing-main">
+    <div class="landing-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>오늘 일지 등록</h1>
+          <p>어제 날짜 기준으로 직접 입력해야 하는 값만 등록합니다. (단가는 ‘단가 입력’ 페이지에서 등록)</p>
+        </div>
+        <div class="today-entry-actions">
+          <div class="today-entry-date-chip">
+            <strong id="todayEntryDateLabel"></strong>
+            <span>입력 날짜 (어제)</span>
+          </div>
+          <button type="button" class="landing-filter-action" id="todayEntrySaveButton">저장</button>
+        </div>
+      </div>
+
+      <section class="today-entry-section">
+        <h2>스팀사용 원단위</h2>
+        <div class="today-entry-grid">
+          <article class="today-entry-card">
+            <h3>PM-2</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>Main 스팀</span><input id="pm2MainSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>Coater 스팀</span><input id="pm2CoaterSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>가동시간</span><input id="usagePm2Runtime" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>생산량(kg)</span><input id="pm2Production" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>생산품종</span><input id="pm2ProductionType"></label>
+              <label class="today-entry-field"><span>비고</span><input id="usagePm2Note"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>PM-3</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>Main 스팀</span><input id="pm3MainSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>Coater 스팀</span><input id="pm3CoaterSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>가동시간</span><input id="usagePm3McRuntime" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>디스퍼져 스팀</span><input id="pm3DisperserSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>Vent 스팀</span><input id="pm3VentSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>생산량(kg)</span><input id="pm3Production" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>생산품종</span><input id="pm3ProductionType"></label>
+              <label class="today-entry-field"><span>비고</span><input id="usagePm3McNote"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>TM <span style="font-weight:500;font-size:12px;color:#7c93a6;">(화장지 계 가동시간 = TM-3~5 합)</span></h3>
+            <div class="today-entry-tm-rows">
+              <div class="tm-row">
+                <span class="tm-row-label">TM-3</span>
+                <label class="today-entry-field"><span>스팀</span><input id="tm3Steam" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>가동시간</span><input id="usageTm3Runtime" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>생산량</span><input id="tm3Production" inputmode="decimal"></label>
+              </div>
+              <div class="tm-row">
+                <span class="tm-row-label">TM-4</span>
+                <label class="today-entry-field"><span>스팀</span><input id="tm4Steam" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>가동시간</span><input id="usageTm4Runtime" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>생산량</span><input id="tm4Production" inputmode="decimal"></label>
+              </div>
+              <div class="tm-row">
+                <span class="tm-row-label">TM-5</span>
+                <label class="today-entry-field"><span>스팀</span><input id="tm5Steam" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>가동시간</span><input id="usageTm5Runtime" inputmode="decimal"></label>
+                <label class="today-entry-field"><span>생산량</span><input id="tm5Production" inputmode="decimal"></label>
+              </div>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>기타</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>TOC 스팀</span><input id="tocSteam" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>PICA-121 Vent</span><input id="pica121Vent" inputmode="decimal"></label>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="today-entry-section">
+        <h2>LNG 연료 사용 비용</h2>
+        <div class="today-entry-grid">
+          <article class="today-entry-card">
+            <h3>보일러 LNG</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>LNG(20톤 1)</span><input id="lngBoiler1" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>LNG(20톤 2)</span><input id="lngBoiler2" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>LNG(50톤)</span><input id="lngBoiler3" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>LNG(60톤)</span><input id="lngBoiler4" inputmode="decimal"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>버너 LNG</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>PM-3</span><input id="lngBurnerPm3" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-3</span><input id="lngBurnerTm3" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-4</span><input id="lngBurnerTm4" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-5</span><input id="lngBurnerTm5" inputmode="decimal"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>복합 + 외부 + 유동상 + 보일러 LNG</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>PM-2</span><input id="lngMixPm2" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>PM-3</span><input id="lngMixPm3" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-3</span><input id="lngMixTm3" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-4</span><input id="lngMixTm4" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>TM-5</span><input id="lngMixTm5" inputmode="decimal"></label>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="today-entry-section">
+        <h2>유동상 / 소각로 / 외부 / 복합</h2>
+        <div class="today-entry-grid">
+          <article class="today-entry-card">
+            <h3>유동상 / 소각로</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>유동상 생산량</span><input id="flowFluidAmount" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>소각로 생산량</span><input id="flowIncineratorAmount" inputmode="decimal"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>복합</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>생산량</span><input id="flowCombinedAmount" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>차감비</span><input id="flowCombinedDeduction" inputmode="decimal"></label>
+            </div>
+          </article>
+
+          <article class="today-entry-card">
+            <h3>외부</h3>
+            <div class="today-entry-field-grid">
+              <label class="today-entry-field"><span>생산량</span><input id="flowBoilerAmount" inputmode="decimal"></label>
+              <label class="today-entry-field"><span>차감비</span><input id="flowBoilerDeduction" inputmode="decimal"></label>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/unit-pages.js?v=20260415-dayfix"></script>
+  <script src="js/today-entry-pages.js?v=20260723-revamp1"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

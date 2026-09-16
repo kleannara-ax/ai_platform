@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>소각로 위탁운영 - 도급내역</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* 페이지 고유 baseline — inc-design.css 의 .inc-page 가 동일 역할 (data-page-kind 셀렉터를 별도 보장) */
+    body.landing-body[data-page-kind="incinerator-co"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="incinerator-co"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="incinerator-co"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    /* inc-card 의 overflow:hidden 이 sticky thead 를 깨뜨림 → 이 페이지에서 visible 로.
+       body 가 단일 스크롤 컨테이너이므로 thead sticky(top:0) 가 동작. */
+    body.landing-body[data-page-kind="incinerator-co"] .inc-card { overflow:visible; }
+    /* '실 스팀량 기준' 표는 헤더가 2행(rowspan/colspan) → 2번째 행은 1행 높이만큼 내려 고정 */
+    body.landing-body[data-page-kind="incinerator-co"] .inc-table[data-form="real"] thead tr:last-child th { top:34px; }
+    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead sticky 동작 */
+    body.platform-embedded[data-page-kind="incinerator-co"] { height:100vh !important; overflow:auto !important; }
+    html.platform-embedded { overflow:hidden !important; }
+    @media print {
+      body.landing-body[data-page-kind="incinerator-co"] { background:#fff; }
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="incinerator-co">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>1. 소각로 도급비용 (일별)</h1>
+          <p>결산 기준 1호기/2호기 + 실 스팀량 기준 비교</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <select id="invoiceMonth" aria-label="조회 월"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="invoicePrint">인쇄</button>
+        </div>
+      </div>
+
+      <div class="inc-tabs" role="tablist">
+        <button type="button" class="inc-tab active" data-target="unit1">1호기</button>
+        <button type="button" class="inc-tab" data-target="unit2">2호기</button>
+        <button type="button" class="inc-tab" data-target="real">실 스팀량 기준</button>
+      </div>
+
+      <!-- 1호기 -->
+      <section class="inc-section active" data-section="unit1">
+        <div class="inc-card">
+          <h3 class="inc-section-title">1호기 — 결산 기준</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="unit1">
+              <colgroup>
+                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+              </colgroup>
+              <thead>
+                <tr><th>일별</th>
+                  <th>스팀량(톤)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th>
+                  <th>1호기 소계(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2호기 -->
+      <section class="inc-section" data-section="unit2">
+        <div class="inc-card">
+          <h3 class="inc-section-title">2호기 — 결산 기준</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="unit2">
+              <colgroup>
+                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+              </colgroup>
+              <thead>
+                <tr><th>일별</th>
+                  <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th>
+                  <th>2호기 소계(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 실 스팀량 기준 -->
+      <section class="inc-section" data-section="real">
+        <div class="inc-card">
+          <h3 class="inc-section-title">실 스팀량 기준 — 1호기 + 2호기</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="real">
+              <colgroup>
+                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th rowspan="2">일별</th>
+                  <th colspan="3">1호기</th>
+                  <th colspan="3">2호기</th>
+                  <th rowspan="2">스팀량 합계(ton)</th>
+                  <th rowspan="2">총 운영비용(원)</th>
+                </tr>
+                <tr>
+                  <th>스팀량(톤)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                  <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 공통 월 합계 표 (Excel 도급내역 H42:L43 — 모든 탭 공통 표시) -->
+      <div class="inc-card" style="margin-top:16px;">
+        <h3 class="inc-section-title">월 합계 (폐합성소각로)</h3>
+        <div class="inc-table-wrap">
+          <table class="data-table inc-table" data-form="summary" style="width:100%;">
+            <colgroup>
+              <col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>구 분</th>
+                <th>스팀량(톤/월)</th>
+                <th>인건비(원)</th>
+                <th>운영비(원)</th>
+                <th>총 금액(원)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th class="col-day">폐합성소각로</th>
+                <td class="computed" data-section="summary" data-field="steam">—</td>
+                <td class="input-cell"><input data-section="summary" data-day="0" data-field="labor" /></td>
+                <td class="computed" data-section="summary" data-field="oper">—</td>
+                <td class="computed" data-section="summary" data-field="total">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    /* 도급내역 — 3개 탭:
+       - unit1: 1호기 결산 기준 [스팀량, 단가, 운영비용(자동), 운휴시간, 시간당고정비, 운휴비용(자동), 소계(자동)]
+       - unit2: 2호기 동일 구조
+       - real:  실 스팀량 기준 [1호기/2호기 각각 스팀량,단가,운영비용(자동) + 스팀량합계, 총운영비용]
+       모든 탭에 합계/평균 행. 월별 조회. */
+    const yearSelect = document.getElementById("invoiceYear");
+    const monthSelect = document.getElementById("invoiceMonth");
+    const searchButton = document.getElementById("invoiceSearch");
+    const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem("steamlog:shared-period") || "{}"); } catch (e) { return {}; } })();
+    const now = new Date();
+    let currentYear = Number(__sharedPeriod.year) || now.getFullYear();
+    let currentMonth = /^(0[1-9]|1[0-2])$/.test(String(__sharedPeriod.month || "")) ? Number(__sharedPeriod.month) : (now.getMonth() + 1);
+    (function initPeriod() {
+      const y = now.getFullYear();
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        yearSelect.appendChild(opt);
+      }
+      for (let mm = 1; mm <= 12; mm += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(mm).padStart(2, "0"); opt.textContent = `${mm}월`;
+        monthSelect.appendChild(opt);
+      }
+      yearSelect.value = String(currentYear);
+      monthSelect.value = String(currentMonth).padStart(2, "0");
+    })();
+
+    function monthKey() { return `${currentYear}-${String(currentMonth).padStart(2,"0")}`; }
+    function daysInMonth() { return new Date(currentYear, currentMonth, 0).getDate(); }
+
+    /* 탭 전환 */
+    const tabs = document.querySelectorAll(".inc-tab");
+    const sections = document.querySelectorAll(".inc-section");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const t = tab.dataset.target;
+        tabs.forEach((x) => x.classList.toggle("active", x === tab));
+        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
+      });
+    });
+
+    /* 표 생성 */
+    function buildUnitTable(section) {
+      const tbody = document.querySelector(`table[data-form="${section}"] tbody`);
+      const days = daysInMonth();
+      const rows = Array.from({length: 31}, (_, i) => {
+        const day = i + 1;
+        const trClass = day > days ? ' style="opacity:.4"' : '';
+        return `<tr${trClass}><th class="col-day">${day}일</th>
+          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="steam" /></td>
+          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="unit" /></td>
+          <td class="computed" data-section="${section}" data-day="${day}" data-field="oper">—</td>
+          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="runtime" /></td>
+          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="fixed" /></td>
+          <td class="computed" data-section="${section}" data-day="${day}" data-field="stop">—</td>
+          <td class="computed" data-section="${section}" data-day="${day}" data-field="sub">—</td>
+        </tr>`;
+      }).join("");
+      const totalRow = `<tr class="summary-row"><th class="col-day">합계</th>
+        ${["steam","unit","oper","runtime","fixed","stop","sub"].map(f => `<td class="computed" data-section="${section}" data-field="${f}-sum">—</td>`).join("")}</tr>`;
+      const avgRow = `<tr class="summary-row"><th class="col-day">평균</th>
+        ${["steam","unit","oper","runtime","fixed","stop","sub"].map(f => `<td class="computed" data-section="${section}" data-field="${f}-avg">—</td>`).join("")}</tr>`;
+      tbody.innerHTML = rows + totalRow + avgRow;
+    }
+    function buildRealTable() {
+      const tbody = document.querySelector('table[data-form="real"] tbody');
+      const days = daysInMonth();
+      const rows = Array.from({length: 31}, (_, i) => {
+        const day = i + 1;
+        const trClass = day > days ? ' style="opacity:.4"' : '';
+        return `<tr${trClass}><th class="col-day">${day}일</th>
+          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="steam-1" /></td>
+          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="unit-1" /></td>
+          <td class="computed" data-section="real" data-day="${day}" data-field="oper-1">—</td>
+          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="steam-2" /></td>
+          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="unit-2" /></td>
+          <td class="computed" data-section="real" data-day="${day}" data-field="oper-2">—</td>
+          <td class="computed" data-section="real" data-day="${day}" data-field="steam-sum">—</td>
+          <td class="computed" data-section="real" data-day="${day}" data-field="total-cost">—</td>
+        </tr>`;
+      }).join("");
+      const totalRow = `<tr class="summary-row"><th class="col-day">합계</th>
+        ${["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].map(f => `<td class="computed" data-section="real" data-field="${f}-sum">—</td>`).join("")}</tr>`;
+      const avgRow = `<tr class="summary-row"><th class="col-day">평균</th>
+        ${["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].map(f => `<td class="computed" data-section="real" data-field="${f}-avg">—</td>`).join("")}</tr>`;
+      tbody.innerHTML = rows + totalRow + avgRow;
+    }
+
+    function parseNum(input) {
+      if (!input) return NaN;
+      const v = String(input.value || "").replace(/[,\s]/g, "");
+      if (!v) return NaN;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
+    function fmtDec(n) { return Number.isFinite(n) ? n.toLocaleString("en-US", {maximumFractionDigits: 2}) : "—"; }
+
+    function recomputeUnit(section) {
+      const sums = {}; const counts = {};
+      ["steam","unit","oper","runtime","fixed","stop","sub"].forEach((f) => { sums[f] = 0; counts[f] = 0; });
+      const days = daysInMonth();
+      for (let day = 1; day <= 31; day += 1) {
+        if (day > days) {
+          ["oper","stop","sub"].forEach((f) => {
+            const el = document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="${f}"]`);
+            if (el) el.textContent = "—";
+          });
+          continue;
+        }
+        const s = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="steam"]`));
+        const u = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="unit"]`));
+        const r = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="runtime"]`));
+        const f = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="fixed"]`));
+        const oper = Number.isFinite(s) && Number.isFinite(u) ? s * u : NaN;
+        const stop = Number.isFinite(r) && Number.isFinite(f) ? r * f : NaN;
+        const sub = (Number.isFinite(oper) || Number.isFinite(stop)) ? (oper || 0) + (stop || 0) : NaN;
+        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="oper"]`).textContent = fmt(oper);
+        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="stop"]`).textContent = fmt(stop);
+        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="sub"]`).textContent = fmt(sub);
+        const vals = { steam: s, unit: u, oper, runtime: r, fixed: f, stop, sub };
+        Object.entries(vals).forEach(([k, v]) => { if (Number.isFinite(v)) { sums[k] += v; counts[k]++; } });
+      }
+      Object.keys(sums).forEach((f) => {
+        document.querySelector(`[data-section="${section}"][data-field="${f}-sum"]`).textContent = counts[f] ? fmt(sums[f]) : "—";
+        document.querySelector(`[data-section="${section}"][data-field="${f}-avg"]`).textContent = counts[f] ? fmtDec(sums[f] / counts[f]) : "—";
+      });
+    }
+
+    function recomputeReal() {
+      const sums = {}; const counts = {};
+      ["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].forEach((f) => { sums[f] = 0; counts[f] = 0; });
+      const days = daysInMonth();
+      for (let day = 1; day <= 31; day += 1) {
+        if (day > days) {
+          ["oper-1","oper-2","steam-sum","total-cost"].forEach((f) => {
+            const el = document.querySelector(`[data-section="real"][data-day="${day}"][data-field="${f}"]`);
+            if (el) el.textContent = "—";
+          });
+          continue;
+        }
+        const s1 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-1"]`));
+        const u1 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="unit-1"]`));
+        const s2 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-2"]`));
+        const u2 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="unit-2"]`));
+        const oper1 = Number.isFinite(s1) && Number.isFinite(u1) ? s1 * u1 : NaN;
+        const oper2 = Number.isFinite(s2) && Number.isFinite(u2) ? s2 * u2 : NaN;
+        const steamSum = (Number.isFinite(s1) || Number.isFinite(s2)) ? (s1 || 0) + (s2 || 0) : NaN;
+        const totalCost = (Number.isFinite(oper1) || Number.isFinite(oper2)) ? (oper1 || 0) + (oper2 || 0) : NaN;
+        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="oper-1"]`).textContent = fmt(oper1);
+        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="oper-2"]`).textContent = fmt(oper2);
+        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="steam-sum"]`).textContent = fmtDec(steamSum);
+        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="total-cost"]`).textContent = fmt(totalCost);
+        const vals = {"steam-1": s1, "unit-1": u1, "oper-1": oper1, "steam-2": s2, "unit-2": u2, "oper-2": oper2, "steam-sum": steamSum, "total-cost": totalCost};
+        Object.entries(vals).forEach(([k, v]) => { if (Number.isFinite(v)) { sums[k] += v; counts[k]++; } });
+      }
+      Object.keys(sums).forEach((f) => {
+        document.querySelector(`[data-section="real"][data-field="${f}-sum"]`).textContent = counts[f] ? fmt(sums[f]) : "—";
+        document.querySelector(`[data-section="real"][data-field="${f}-avg"]`).textContent = counts[f] ? fmtDec(sums[f] / counts[f]) : "—";
+      });
+    }
+
+    /* 공통 월합계 표 — Excel H42:L43 공식
+       스팀량(톤/월) = unit1.steam 합 + unit2.steam 합
+       총 금액      = (unit1.oper + unit1.stop + unit2.oper + unit2.stop) 합 (원)
+       운영비      = 총 금액 - 인건비
+       인건비      = 사용자 입력 */
+    function recomputeSummary() {
+      let steamSum = 0, steamCnt = 0, totalSum = 0, hasTotal = false;
+      ["unit1", "unit2"].forEach((section) => {
+        for (let day = 1; day <= 31; day += 1) {
+          const s = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="steam"]`));
+          const u = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="unit"]`));
+          const r = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="runtime"]`));
+          const f = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="fixed"]`));
+          if (Number.isFinite(s)) { steamSum += s; steamCnt += 1; }
+          const oper = Number.isFinite(s) && Number.isFinite(u) ? s * u : 0;
+          const stop = Number.isFinite(r) && Number.isFinite(f) ? r * f : 0;
+          if (oper > 0 || stop > 0) { totalSum += oper + stop; hasTotal = true; }
+        }
+      });
+      const steamEl = document.querySelector(`[data-section="summary"][data-field="steam"]`);
+      const totalEl = document.querySelector(`[data-section="summary"][data-field="total"]`);
+      const operEl  = document.querySelector(`[data-section="summary"][data-field="oper"]`);
+      if (steamEl) steamEl.textContent = steamCnt > 0 ? fmtDec(steamSum) : "—";
+      if (totalEl) totalEl.textContent = hasTotal ? fmt(totalSum) : "—";
+      const labor = parseNum(document.querySelector(`input[data-section="summary"][data-field="labor"]`));
+      const operCost = (hasTotal && Number.isFinite(labor)) ? totalSum - labor : NaN;
+      if (operEl) operEl.textContent = Number.isFinite(operCost) ? fmt(operCost) : "—";
+    }
+
+    function recomputeAll() {
+      recomputeUnit("unit1");
+      recomputeUnit("unit2");
+      recomputeReal();
+      recomputeSummary();
+    }
+
+    /* DB */
+    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_contract";
+    const storedRows = new Map();
+    function rowKeyFor(section, day, field) { return `${section}|${day}|${field}`; }
+    function eachInput(cb) {
+      document.querySelectorAll('table.inc-table input[data-day]').forEach((i) =>
+        cb(i, i.dataset.section, Number(i.dataset.day), i.dataset.field));
+    }
+    function rebuild() {
+      buildUnitTable("unit1");
+      buildUnitTable("unit2");
+      buildRealTable();
+      document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
+      eachInput((i, s, d, f) => {
+        const handler = () => save(i, s, d, f);
+        i.addEventListener("blur", handler);
+        i.addEventListener("change", handler);
+      });
+    }
+    async function load() {
+      storedRows.clear();
+      rebuild();
+      // 월 변경 시 정적인 summary 입력값 초기화 (rebuild 는 동적 테이블만 innerHTML 재생성)
+      eachInput((i) => { i.value = ""; });
+      try {
+        const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`);
+        if (!res.ok) { recomputeAll(); return; }
+        (await res.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
+        eachInput((i, s, d, f) => {
+          const stored = storedRows.get(rowKeyFor(s, d, f));
+          if (stored && stored.cell_value != null && stored.cell_value !== "") i.value = stored.cell_value;
+        });
+        recomputeAll();
+      } catch (e) { recomputeAll(); }
+    }
+    async function save(input, section, day, field) {
+      const key = rowKeyFor(section, day, field);
+      const existing = storedRows.get(key);
+      const raw = String(input.value || "").replace(/[,\s]/g, "");
+      const payload = { month: monthKey(), year_no: currentYear, month_no: currentMonth, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
+      try {
+        const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
+        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error(await res.text());
+        storedRows.set(key, await res.json());
+      } catch (e) { console.error(e); }
+    }
+
+    searchButton.addEventListener("click", () => {
+      currentYear = Number(yearSelect.value) || new Date().getFullYear();
+      currentMonth = Number(monthSelect.value) || (new Date().getMonth() + 1);
+      try {
+        localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: currentYear, month: String(currentMonth).padStart(2,"0") }));
+      } catch (e) {}
+      load();
+    });
+    load();
+    document.getElementById("invoicePrint")?.addEventListener("click", () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setTimeout(() => window.print(), 50);
+    });
+  </script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20260608-sticky3"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>월별 운영내역 프레임</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/steam/css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="/steam/css/page-fluidized.css?v=20260520-split2-applied" />
+  <link rel="stylesheet" href="/steam/css/inc-design.css?v=20260526-revert-A-B" />
+  <style>
+    html,
+    body.monthly-frame-body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    body.monthly-frame-body {
+      font-family: "Inter", sans-serif;
+      color: #173a54;
+    }
+
+    .monthly-frame-shell {
+      padding: 0;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="monthly-frame-body">
+  <div class="monthly-frame-shell" id="monthlyFrameRoot"></div>
+  <script src="/steam/js/unit-fluidized-detail-data.js?v=20260421-fluidized-detail-data"></script>
+  <script src="/steam/js/unit-fluidized-monthly-render.js?v=20260528-fmc-db-cache"></script>
+  <script src="/steam/js/unit-fluidized-monthly-frame-pages.js?v=20260422-fluidized-monthly-frame2"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

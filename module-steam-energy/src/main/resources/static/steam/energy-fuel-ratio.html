@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>에너지 회계비용 - 연료비 배분비율</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260528-efr-inputbox" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260528-efr-inputbox" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="energy-fuel-ratio"] {
+      height:auto; min-height:100vh; align-items:stretch; overflow:visible;
+      background:var(--inc-bg-page);
+      font-family:"Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color:var(--inc-text);
+    }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:100vh; }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table-wrap { overflow-x:hidden !important; }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table-input {
+      width:100%;
+      min-width:0;
+      border:1px solid rgba(120,181,217,0.45);
+      border-radius:4px;
+      padding:2px 4px;
+      background:#fbfdff;
+      color:#173a54;
+      font:inherit;
+      text-align:center;
+      outline:none;
+      box-sizing:border-box;
+    }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table-input:hover {
+      border-color:#66b7e7;
+      background:#f0f8ff;
+    }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table-input:focus {
+      background:#fff;
+      border-color:var(--inc-primary,#2f6fb3);
+      box-shadow:0 0 0 2px rgba(47,111,179,.15);
+    }
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table th.label-cell,
+    body.landing-body[data-page-kind="energy-fuel-ratio"] .energy-table td.label-cell {
+      width:clamp(118px, 13vw, 190px);
+      white-space:normal;
+      overflow-wrap:anywhere;
+      word-break:keep-all;
+      line-height:1.3;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="energy-fuel-ratio">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1 id="efrTitle">3. 2025 연료비 배분비율</h1>
+          <p>보일러별 / 호기별 연료비·스팀사용량·원단위 분석 + 버너 LNG + 2019 호기별 참조</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="efrExcelDownload" class="btn-secondary">엑셀 다운로드</button>
+          <button type="button" id="efrExcelUpload" class="btn-secondary">엑셀 업로드</button>
+          <input type="file" id="efrExcelFileInput" accept=".xls,.xlsx,.xlsm" hidden />
+        </div>
+      </div>
+
+      <div class="energy-tab-bar" role="tablist">
+        <button type="button" class="energy-tab" data-target="boiler" aria-pressed="true">1. 보일러별 종합</button>
+        <button type="button" class="energy-tab" data-target="dist"   aria-pressed="false">2. 호기별 연료비 배분</button>
+        <button type="button" class="energy-tab" data-target="fuel"   aria-pressed="false">3. 호기별 연료비 분석</button>
+        <button type="button" class="energy-tab" data-target="lng"    aria-pressed="false">4. 버너 LNG</button>
+        <button type="button" class="energy-tab" data-target="unit"   aria-pressed="false">5. 종합 원단위</button>
+        <button type="button" class="energy-tab" data-target="hist"   aria-pressed="false">6. 2019 호기별 참조</button>
+      </div>
+
+      <!-- ============ Tab 1: 보일러별 종합 ============ -->
+      <section class="energy-panel active" data-panel="boiler">
+        <!-- r2: 스팀생산량 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀생산량 (톤)">2025년 스팀생산량 (톤)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th data-prev-dec>24.12월</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">LNG 보일러</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합보일러</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">폐합성소각로</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">유동상소각로</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">외부보일러</td><td colspan="15">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">유동상 밴트량 (톤)</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합 페널티량</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합 보증량</td><td colspan="15">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r14: 보일러 연료비 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 보일러 연료비 (백만원)">2025년 보일러 연료비 (백만원)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th data-prev-dec>24.12월</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">LNG 보일러</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합보일러 (LNG, 페널티 포함)</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">폐합성소각로</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">유동상소각로 (잉여포함)</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">외부보일러</td><td colspan="15">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">유동상 소내사용 + 밴트스팀 비용</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합보일러 페널티 비용</td><td colspan="15">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r25: 스팀단가 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀단가 (천원/톤·스팀)">2025년 스팀단가 (천원/톤·스팀)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th data-prev-dec>24.12월</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">LNG 보일러</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">복합보일러</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">폐합성소각로</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">유동상소각로</td><td colspan="15">—</td></tr>
+            <tr><td class="label-cell">외부보일러</td><td colspan="15">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="15">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 2: 호기별 연료비 배분 ============ -->
+      <section class="energy-panel" data-panel="dist">
+        <!-- r37: 호기별 연료비배분 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" data-title-tpl="{Y} 호기별 연료비배분 (백만원)">2025 호기별 연료비배분 (백만원)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">총 에너지비용</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">스팀생산량</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">스팀사용단가</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지배분비율</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r51: 스팀사용량 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀사용량">2025년 스팀사용량</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">총 생산스팀량</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">기타 사용량</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 스팀사용원가</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 스팀사용원가</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r66: 제품생산량 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 제품생산량 (kg)">2025년 제품생산량 (kg)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">제품생산량</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 3: 호기별 연료비 분석 ============ -->
+      <section class="energy-panel" data-panel="fuel">
+        <!-- r77: 스팀 연료비 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀 연료비 (백만원) — 버너 LNG사용금액 제외">2025년 스팀 연료비 (백만원) — 버너 LNG사용금액 제외</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구 분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r88: 연료 원단위 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 연료 원단위 (천원/톤·제품) — 스팀연료비/제품">2025년 연료 원단위 (천원/톤·제품) — 스팀연료비/제품</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">연료단가</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r99: 스팀 톤당 연료비 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀 톤당 연료비 (천원/톤·스팀) — 연료비/스팀사용량">2025년 스팀 톤당 연료비 (천원/톤·스팀) — 연료비/스팀사용량</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합  계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 4: 버너 LNG ============ -->
+      <section class="energy-panel" data-panel="lng">
+        <!-- r110: 버너 LNG 사용량 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 버너 LNG 사용량 (㎥)">2025년 버너 LNG 사용량 (㎥)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r119: 버너 LNG 비용 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 버너 LNG 비용 (백만원)">2025년 버너 LNG 비용 (백만원)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">24년 LNG 단가</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">25년 LNG 단가</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">증감률(%)</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r131: LNG 사용량 원단위 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 버너 LNG 사용량 원단위 (㎥/제품톤)">2025년 버너 LNG 사용량 원단위 (㎥/제품톤)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r139: LNG 사용비용 원단위 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 버너 LNG 사용비용 원단위 (천원/제품톤)">2025년 버너 LNG 사용비용 원단위 (천원/제품톤)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 5: 종합 원단위 ============ -->
+      <section class="energy-panel" data-panel="unit">
+        <!-- r147: 총 연료단가 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 총 연료단가 (천원/톤·제품) — 총 연료비/제품생산량">2025년 총 연료단가 (천원/톤·제품) — 총 연료비/제품생산량</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합  계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r158: 스팀사용량 원단위 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀사용량 원단위 (톤·스팀/톤·제품)">2025년 스팀사용량 원단위 (톤·스팀/톤·제품)</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r168: 호기별 스팀사용비율 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y} 호기별 스팀사용비율 — 호기별 배분">2025 호기별 스팀사용비율 — 호기별 배분</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r179: 스팀사용량 원단위(기타 포함) -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title" data-title-tpl="{Y}년 스팀사용량 원단위 (톤·스팀/톤·제품) — 기타 스팀량 포함">2025년 스팀사용량 원단위 (톤·스팀/톤·제품) — 기타 스팀량 포함</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">구분</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지2</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지3</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지3</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지4</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지5</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 6: 2019 historical (참조) ============ -->
+      <section class="energy-panel" data-panel="hist">
+        <!-- r227: 2019 호기별 스팀생산량 -->
+        <div class="inc-card">
+          <h3 class="inc-section-title">2019 호기별 스팀생산량</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r240: 2019 호기별 스팀사용비율 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title">2019 호기별 스팀사용비율 — 호기별 배분</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+        <!-- r253: 2019 호기별 에너지비용 배분 -->
+        <div class="inc-card" style="margin-top:14px;">
+          <h3 class="inc-section-title">2019 호기별 에너지비용 배분</h3>
+          <div class="energy-table-wrap"><table class="energy-table"><thead><tr><th class="label-cell">공정</th><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th><th>평균</th></tr></thead><tbody>
+            <tr><td class="label-cell">제지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 2호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">제지 3호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">제지 소계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 1호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 3호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 4호기</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">화장지 5호기</td><td colspan="14">—</td></tr>
+            <tr class="subtotal"><td class="label-cell">화장지 소계</td><td colspan="14">—</td></tr>
+            <tr class="total"><td class="label-cell">합 계</td><td colspan="14">—</td></tr>
+            <tr><td class="label-cell">총 에너지비용</td><td colspan="14">—</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    const SHARED_PERIOD_KEY = "steamlog:shared-period";
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const PAGE_TABLE_NAME = "energy_fuel_ratio";
+    const yearSel = document.getElementById("invoiceYear");
+    const searchBtn = document.getElementById("invoiceSearch");
+    const mainTitle = document.getElementById("efrTitle");
+    const storedRows = new Map();
+    let currentYear = "";
+
+    function readSharedYear() {
+      try { return (JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}").year || null); } catch (e) { return null; }
+    }
+    function saveSharedYear(year) {
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        shared.year = year;
+        localStorage.setItem(SHARED_PERIOD_KEY, JSON.stringify(shared));
+      } catch (e) {}
+    }
+    function initYearOptions() {
+      const y = new Date().getFullYear();
+      const target = String(readSharedYear() || y);
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        if (String(yy) === target) opt.selected = true;
+        yearSel.appendChild(opt);
+      }
+      if (yearSel.value !== target) {
+        const opt = document.createElement("option");
+        opt.value = target; opt.textContent = `${target}년`;
+        opt.selected = true;
+        yearSel.appendChild(opt);
+      }
+    }
+    function applyYear(year) {
+      mainTitle.textContent = `3. ${year} 연료비 배분비율`;
+      document.querySelectorAll("[data-title-tpl]").forEach((el) => {
+        el.textContent = el.dataset.titleTpl.replace("{Y}", year);
+      });
+      const prevYY = String(Number(year) - 1).slice(-2);
+      document.querySelectorAll("th[data-prev-dec]").forEach((th) => { th.textContent = `${prevYY}.12월`; });
+    }
+
+    function cellMapKey(rowKey, colIndex) {
+      return `${rowKey}::${colIndex}`;
+    }
+
+    function rowKey(table, rowIndex) {
+      return `${table.dataset.efrTableKey}|r${String(rowIndex + 1).padStart(2, "0")}`;
+    }
+
+    function getDataColumnCount(table) {
+      const headerRow = table.tHead?.rows?.[0];
+      if (!headerRow) return 0;
+      return Array.from(headerRow.cells).reduce((sum, cell) => sum + (cell.colSpan || 1), 0) - 1;
+    }
+
+    function createValueCell(table, rowIndex, colIndex, value) {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "energy-table-input";
+      input.inputMode = "decimal";
+      input.autocomplete = "off";
+      input.value = value === "—" ? "" : String(value || "");
+      input.dataset.rowKey = rowKey(table, rowIndex);
+      input.dataset.colIndex = String(colIndex);
+      input.dataset.rawValue = input.value;
+      td.appendChild(input);
+      return td;
+    }
+
+    function expandPlaceholderRows() {
+      document.querySelectorAll(".energy-table").forEach((table, tableIndex) => {
+        table.dataset.efrTableKey = `t${String(tableIndex + 1).padStart(2, "0")}`;
+        const columnCount = getDataColumnCount(table);
+        Array.from(table.tBodies[0]?.rows || []).forEach((tr, rowIndex) => {
+          const cells = Array.from(tr.children);
+          if (cells.length < 2) return;
+          const first = cells[0];
+          const placeholders = cells.slice(1);
+          if (placeholders.length === columnCount && placeholders.every((cell) => cell.querySelector(".energy-table-input"))) return;
+          const values = [];
+          placeholders.forEach((cell) => {
+            const span = Math.max(1, Number(cell.getAttribute("colspan") || cell.colSpan || 1));
+            const text = (cell.textContent || "").trim();
+            for (let i = 0; i < span; i += 1) values.push(text);
+          });
+          tr.textContent = "";
+          tr.appendChild(first);
+          for (let colIndex = 1; colIndex <= columnCount; colIndex += 1) {
+            tr.appendChild(createValueCell(table, rowIndex, colIndex, values[colIndex - 1] || ""));
+          }
+        });
+      });
+    }
+
+    function setLoading(isLoading) {
+      searchBtn.disabled = isLoading;
+      searchBtn.textContent = isLoading ? "조회 중" : "조회";
+    }
+
+    async function fetchSavedRows(year) {
+      storedRows.clear();
+      const params = new URLSearchParams({
+        month: String(year),
+        tableNames: PAGE_TABLE_NAME,
+        limit: "5000",
+      });
+      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to load saved cells");
+      const payload = await response.json();
+      (payload.data || [])
+        .filter((row) => row.table_name === PAGE_TABLE_NAME)
+        .forEach((row) => storedRows.set(cellMapKey(row.row_key, Number(row.col_index)), row));
+    }
+
+    function applySavedRows() {
+      document.querySelectorAll(".energy-table-input").forEach((input) => {
+        const stored = storedRows.get(cellMapKey(input.dataset.rowKey, Number(input.dataset.colIndex)));
+        const value = stored?.cell_value == null ? "" : String(stored.cell_value);
+        input.value = value;
+        input.dataset.rawValue = value;
+      });
+    }
+
+    async function loadYear(year) {
+      currentYear = String(year);
+      applyYear(currentYear);
+      setLoading(true);
+      try {
+        await fetchSavedRows(currentYear);
+        // emc 캐시 비우고 새 연도로 fetch — readEmc 가 사용
+        __emcCache.year = null; __emcCache.data = null;
+        await fetchEmcCache(currentYear);
+        applySavedRows();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function normalizeInputValue(input) {
+      return String(input.value || "").trim();
+    }
+
+    async function saveInput(input) {
+      const value = normalizeInputValue(input);
+      if (value === String(input.dataset.rawValue || "")) return;
+      const payload = {
+        month: currentYear,
+        year_no: Number(currentYear),
+        month_no: 0,
+        table_name: PAGE_TABLE_NAME,
+        row_key: input.dataset.rowKey,
+        col_index: Number(input.dataset.colIndex),
+        cell_value: value,
+      };
+      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("Failed to save cell");
+      const saved = await response.json();
+      storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
+      input.dataset.rawValue = String(saved.cell_value || "");
+    }
+
+    function bindInputs() {
+      document.addEventListener("blur", (event) => {
+        const input = event.target.closest?.(".energy-table-input");
+        if (!input) return;
+        saveInput(input).catch((error) => {
+          console.error(error);
+          input.value = String(input.dataset.rawValue || "");
+        });
+      }, true);
+      document.addEventListener("keydown", (event) => {
+        const input = event.target.closest?.(".energy-table-input");
+        if (!input) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          input.blur();
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 엑셀 수식 구현 — 외부 참조는 energy-month-compare DB (table_cell_value),
+    // 내부 수식은 다른 셀 값에서 계산.
+    // ─────────────────────────────────────────────────────────────
+    const EMC_TABLE = "energy_month_compare";
+    const __emcCache = { year: null, data: null };
+    async function fetchEmcCache(year) {
+      if (__emcCache.year === year && __emcCache.data) return __emcCache.data;
+      try {
+        const params = new URLSearchParams({ month: String(year), tableNames: EMC_TABLE, limit: "10000" });
+        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        if (!resp.ok) return null;
+        const payload = await resp.json();
+        const map = new Map();
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== EMC_TABLE) return;
+          map.set(`${row.row_key}|${row.col_index}`, row.cell_value);
+        });
+        __emcCache.year = year; __emcCache.data = map;
+        return map;
+      } catch (e) { return null; }
+    }
+    function readEmc(section, rowKey, monthIdx) {
+      if (!__emcCache.data) return null;
+      const v = __emcCache.data.get(`${section}|${rowKey}|${monthIdx}`);
+      if (v === undefined || v === null || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
+    function num(v) {
+      if (v === null || v === undefined || v === "") return null;
+      const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    // 테이블 요소 캐시 — 매번 querySelector 하지 않음
+    const __tableCache = {};
+    function getTable(tblKey) {
+      if (!__tableCache[tblKey]) {
+        __tableCache[tblKey] = document.querySelector(`.energy-table[data-efr-table-key="${tblKey}"]`);
+      }
+      return __tableCache[tblKey];
+    }
+    function getCell(tblKey, rowIdx, colIdx) {
+      const table = getTable(tblKey);
+      if (!table) return null;
+      const tr = table.tBodies[0]?.rows[rowIdx];
+      if (!tr) return null;
+      const cell = tr.cells[colIdx];
+      if (!cell) return null;
+      const input = cell.firstElementChild;
+      if (input && input.classList && input.classList.contains("energy-table-input")) return num(input.value);
+      if (input && input.classList && input.classList.contains("efr-calc")) return num(input.textContent);
+      const text = (cell.textContent || "").trim();
+      return text === "—" ? null : num(text);
+    }
+    function setCalc(tblKey, rowIdx, colIdx, value, digits) {
+      const table = getTable(tblKey);
+      if (!table) return;
+      const tr = table.tBodies[0]?.rows[rowIdx];
+      if (!tr) return;
+      const cell = tr.cells[colIdx];
+      if (!cell) return;
+      // input 제거 → span 으로 대체
+      const input = cell.querySelector(".energy-table-input");
+      if (input) input.remove();
+      let span = cell.querySelector("span.efr-calc");
+      if (!span) {
+        span = document.createElement("span");
+        span.className = "efr-calc";
+        span.style.display = "block";
+        span.style.textAlign = "center";
+        span.style.fontWeight = "600";
+        cell.appendChild(span);
+      }
+      const d = (digits === undefined) ? 1 : digits;
+      if (value === null || !Number.isFinite(value)) {
+        span.textContent = "—";
+        span.style.color = "#94a3b8";
+      } else {
+        span.textContent = value.toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+        span.style.color = value < 0 ? "#c0392b" : "#1f3b57";
+      }
+    }
+    const __dataColsCache = {};
+    const __prevDecCache = {};
+    function getDataCols(tblKey) {
+      if (__dataColsCache[tblKey] !== undefined) return __dataColsCache[tblKey];
+      const table = getTable(tblKey);
+      if (!table) return (__dataColsCache[tblKey] = 0);
+      const headerRow = table.tHead.rows[0];
+      return (__dataColsCache[tblKey] = headerRow.cells.length - 1);
+    }
+    function hasPrevDec(tblKey) {
+      if (__prevDecCache[tblKey] !== undefined) return __prevDecCache[tblKey];
+      const table = getTable(tblKey);
+      return (__prevDecCache[tblKey] = !!table?.querySelector("th[data-prev-dec]"));
+    }
+    // 표 데이터 컬럼 = [전년12월?] + 12개월 + 합계 + 평균
+    // 마지막 2 컬럼은 합계 / 평균. 그 외는 월 데이터.
+    function dataMonthCount(tblKey) { return getDataCols(tblKey) - 2; }
+    function efrColToEmcMonth(tblKey, colIdx) {
+      // 24.12월 컬럼 있을 때: colIdx=1 → emc month 0, colIdx=2 → 1월 → emc 1
+      // 없을 때:              colIdx=1 → 1월 → emc 1
+      return hasPrevDec(tblKey) ? (colIdx - 1) : colIdx;
+    }
+    function sumRows(tblKey, rowIdxs, colIdx) {
+      let s = 0, hasAny = false;
+      rowIdxs.forEach((r) => {
+        const v = getCell(tblKey, r, colIdx);
+        if (Number.isFinite(v)) { s += v; hasAny = true; }
+      });
+      return hasAny ? s : null;
+    }
+
+    // 표 → row index 매핑 (tbody 의 0-based row 인덱스):
+    //   t01 스팀생산량: 0=LNG, 1=복합, 2=폐합성, 3=유동상, 4=외부, 5=합계, 6=유동상밴트, 7=복합페널티량, 8=복합보증량
+    //   t02 보일러연료비: 0=LNG, 1=복합(EMC), 2=폐합성(EMC), 3=유동상(EMC), 4=외부(EMC), 5=합계, 6=유동상소내+밴트, 7=복합페널티비용
+    //   t03 스팀단가: 0~4 보일러별, 5=합계 (모두 = 연료비/생산량×1000)
+    //   t06 제품생산량: 0=제지2, 1=제지3, 2=제지소계, 3=화장지3, 4=화장지4, 5=화장지5, 6=화장지소계, 7=제품생산량
+    //   t05 호기별 스팀사용량: 0=제지2, 1=제지3, 2=제지소계, 3=화장지3,4,5, 6=화장지소계, 7=합계, 8=총생산스팀량, 9=기타사용량, 10=제지스팀사용원가, 11=화장지스팀사용원가
+    //   t04 호기별 연료비배분: 0=제지2, 1=제지3, 2=제지소계, 3=화장지3,4,5, 6=화장지소계, 7=합계, 8=총에너지비용(EMC), 9=스팀생산량, 10=스팀사용단가, 11=제지배분비율
+    //   t07 스팀 연료비: 0=제지2, 1=제지3, 2=제지소계, 3=화장지3,4,5, 6=화장지소계, 7=합계
+    //   t08 연료 원단위: 0=연료단가(EMC), 1=제지2, 2=제지3, 3=제지소계, 4=화장지3,4,5, 7=화장지소계
+    //   t09 스팀 톤당 연료비, t10~t13 LNG, t14~t17 종합 원단위 등
+
+    // 디바운스: 빠른 연속 입력 시 마지막 한 번만 계산
+    let __formulaTimer = null;
+    function scheduleApplyFormulas(delay) {
+      if (__formulaTimer) clearTimeout(__formulaTimer);
+      __formulaTimer = setTimeout(() => {
+        __formulaTimer = null;
+        applyFormulas();
+      }, delay === undefined ? 250 : delay);
+    }
+    function applyFormulas() {
+      // 2 패스로 충분 — 의존성 체인: input → sum/calc → cross-table calc
+      applyFormulasOnce();
+      applyFormulasOnce();
+    }
+    function applyFormulasOnce() {
+      // ── Table 1 (t01): 스팀생산량 ──
+      // row 5: 합계 = SUM(rows 0-4)
+      const t1cols = dataMonthCount("t01");
+      for (let c = 1; c <= t1cols; c++) setCalc("t01", 5, c, sumRows("t01", [0,1,2,3,4], c), 1);
+      finalizeSumAvg("t01", [0,1,2,3,4,5,6,7,8]);
+
+      // ── Table 2 (t02): 보일러 연료비 ──
+      const t2cols = dataMonthCount("t02");
+      for (let c = 1; c <= t2cols; c++) {
+        const m = efrColToEmcMonth("t02", c);
+        // row 1 복합: emc.compositeSteam - (compositeLngEtc + compositeInvest + compositeIncome + landLease)
+        const composite = readEmc("fuel", "compositeSteam", m);
+        const lngEtc    = readEmc("fuel", "compositeLngEtc", m);
+        const inv       = readEmc("fuel", "compositeInvest", m);
+        const inc       = readEmc("fuel", "compositeIncome", m);
+        const land      = readEmc("fuel", "landLease", m);
+        const v1 = (composite !== null) ? composite - ((lngEtc||0)+(inv||0)+(inc||0)+(land||0)) : null;
+        setCalc("t02", 1, c, v1, 1);
+        // row 2 폐합성: emc.pyhsynSteam
+        setCalc("t02", 2, c, readEmc("fuel", "pyhsynSteam", m), 1);
+        // row 3 유동상: emc.fluidSteam (이미 contractCost 기반 계산값)
+        setCalc("t02", 3, c, readEmc("fuel", "fluidSteam", m), 1);
+        // row 4 외부보일러: emc.zescoSteam - (zescoOffset + zescoPenalty)
+        const zs = readEmc("fuel", "zescoSteam", m);
+        const off = readEmc("fuel", "zescoOffset", m);
+        const pen = readEmc("fuel", "zescoPenalty", m);
+        const v4 = (zs !== null) ? zs - ((off||0)+(pen||0)) : null;
+        setCalc("t02", 4, c, v4, 1);
+        // row 5 합계 = SUM(0-4)
+        setCalc("t02", 5, c, sumRows("t02", [0,1,2,3,4], c), 1);
+        // row 7 복합페널티비용 = MAX(0, t01.row7 (복합페널티량)) * 21902 / 1000000
+        const penQty = getCell("t01", 7, c);
+        const penCost = Number.isFinite(penQty) && penQty > 0 ? penQty * 21902 / 1_000_000 : null;
+        setCalc("t02", 7, c, penCost, 1);
+      }
+      finalizeSumAvg("t02", [0,1,2,3,4,5,6,7]);
+
+      // ── Table 3 (t03): 스팀단가 = 연료비 × 1000 / 스팀생산량 ──
+      const t3cols = dataMonthCount("t03");
+      for (let c = 1; c <= t3cols; c++) {
+        for (let r = 0; r <= 4; r++) {
+          const fuel = getCell("t02", r, c);
+          const prod = getCell("t01", r, c);
+          setCalc("t03", r, c, safeDiv((fuel||0) * 1000, prod), 1);
+        }
+        setCalc("t03", 5, c, safeDiv((getCell("t02",5,c)||0) * 1000, getCell("t01",5,c)), 1);
+      }
+      finalizeSumAvg("t03", [0,1,2,3,4,5], { avgOnly: true });
+
+      // ── Table 4 (t04): 호기별 연료비배분 ──
+      // rows 2 (제지소계), 6 (화장지소계), 7 (합계) 만 자동
+      const t4cols = dataMonthCount("t04");
+      for (let c = 1; c <= t4cols; c++) {
+        setCalc("t04", 2, c, sumRows("t04", [0,1], c), 1);
+        setCalc("t04", 6, c, sumRows("t04", [3,4,5], c), 1);
+        setCalc("t04", 7, c, sumRows("t04", [0,1,3,4,5], c), 1);
+        // row 8 총에너지비용 = emc.fuelActual
+        const m = efrColToEmcMonth("t04", c);
+        setCalc("t04", 8, c, readEmc("fuel", "fuelActual", m), 1);
+        // row 10 스팀사용단가 = row7 × 1000000 / row9
+        const fuelDistTotal = getCell("t04", 7, c);
+        const steamProd = getCell("t04", 9, c);
+        setCalc("t04", 10, c, safeDiv((fuelDistTotal||0) * 1_000_000, steamProd), 1);
+        // row 11 제지배분비율 = row2 / row7
+        setCalc("t04", 11, c, safeDiv(getCell("t04", 2, c), getCell("t04", 7, c)), 4);
+      }
+      finalizeSumAvg("t04", [0,1,2,3,4,5,6,7,8,9,10,11]);
+
+      // ── Table 5 (t05): 호기별 스팀사용량 — 일부 계산행 ──
+      const t5cols = dataMonthCount("t05");
+      for (let c = 1; c <= t5cols; c++) {
+        setCalc("t05", 2, c, sumRows("t05", [0,1], c), 1);
+        setCalc("t05", 6, c, sumRows("t05", [3,4,5], c), 1);
+        setCalc("t05", 7, c, sumRows("t05", [0,1,3,4,5], c), 1);
+        // row 9 기타사용량 = 총생산스팀량 - 합계
+        const total = getCell("t05", 8, c);
+        const used = getCell("t05", 7, c);
+        if (Number.isFinite(total) && Number.isFinite(used)) {
+          setCalc("t05", 9, c, total - used, 1);
+        }
+        // row 10 제지스팀사용원가 = t04.row2 * 1000000 / t05.row2
+        setCalc("t05", 10, c, safeDiv((getCell("t04",2,c)||0) * 1_000_000, getCell("t05",2,c)), 1);
+        // row 11 화장지스팀사용원가 = t04.row6 * 1000000 / t05.row6
+        setCalc("t05", 11, c, safeDiv((getCell("t04",6,c)||0) * 1_000_000, getCell("t05",6,c)), 1);
+      }
+      finalizeSumAvg("t05", [0,1,2,3,4,5,6,7,8,9,10,11]);
+
+      // ── Table 6 (t06): 제품생산량 ──
+      const t6cols = dataMonthCount("t06");
+      for (let c = 1; c <= t6cols; c++) {
+        setCalc("t06", 2, c, sumRows("t06", [0,1], c), 1);
+        setCalc("t06", 6, c, sumRows("t06", [3,4,5], c), 1);
+        setCalc("t06", 7, c, sumRows("t06", [0,1,3,4,5], c), 1);
+      }
+      finalizeSumAvg("t06", [0,1,2,3,4,5,6,7]);
+
+      // ── Table 7 (t07): 스팀 연료비 ──
+      // r79~r85: 제지2/3, 화장지3/4/5 = t04 row 0,1,3,4,5 - t11 row 3,4,5,6 (LNG비용)
+      // 간단히: 제지2 = t04.row0 - (LNG비용 제지3은 t11 row3, 제지2는 LNG 비용 없음)
+      // 화장지3 = t04.row3 - t11.row4 (화장지3 LNG비용)
+      // 등 — 정확한 매핑이 복잡. 우선 합계만:
+      const t7cols = dataMonthCount("t07");
+      for (let c = 1; c <= t7cols; c++) {
+        // 제지2 = t04.row0 - 0
+        setCalc("t07", 0, c, getCell("t04", 0, c), 1);
+        // 제지3 = t04.row1 - t11.row3 (LNG비용 제지3)
+        const t04r1 = getCell("t04", 1, c);
+        const t11r3 = getCell("t11", 3, c);
+        setCalc("t07", 1, c, (Number.isFinite(t04r1)||Number.isFinite(t11r3)) ? (t04r1||0) - (t11r3||0) : null, 1);
+        // 제지 소계 = SUM(0-1)
+        setCalc("t07", 2, c, sumRows("t07", [0,1], c), 1);
+        // 화장지3,4,5 = t04.row3,4,5 - t11.row4,5,6
+        for (let i = 0; i < 3; i++) {
+          const fr = getCell("t04", 3 + i, c);
+          const lng = getCell("t11", 4 + i, c);
+          setCalc("t07", 3 + i, c, (Number.isFinite(fr)||Number.isFinite(lng)) ? (fr||0) - (lng||0) : null, 1);
+        }
+        setCalc("t07", 6, c, sumRows("t07", [3,4,5], c), 1);
+        setCalc("t07", 7, c, sumRows("t07", [0,1,3,4,5], c), 1);
+      }
+      finalizeSumAvg("t07", [0,1,2,3,4,5,6,7]);
+
+      // ── Table 8 (t08): 연료 원단위 = 스팀연료비 × 1000000 / 제품생산량 ──
+      const t8cols = dataMonthCount("t08");
+      for (let c = 1; c <= t8cols; c++) {
+        // row 0 연료단가 = emc fuelSteamUnit (스팀톤당연료비)
+        setCalc("t08", 0, c, readEmc("fuel", "fuelSteamUnit", efrColToEmcMonth("t08", c)), 2);
+        // 제지2/3 = t07.row0,1 × 1000000 / t06.row0,1
+        for (let i = 0; i < 2; i++) {
+          setCalc("t08", 1+i, c, safeDiv((getCell("t07",i,c)||0) * 1_000_000, getCell("t06",i,c)), 2);
+        }
+        setCalc("t08", 3, c, safeDiv((getCell("t07",2,c)||0) * 1_000_000, getCell("t06",2,c)), 2); // 제지소계
+        // 화장지 3,4,5
+        for (let i = 0; i < 3; i++) {
+          setCalc("t08", 4+i, c, safeDiv((getCell("t07",3+i,c)||0) * 1_000_000, getCell("t06",3+i,c)), 2);
+        }
+        setCalc("t08", 7, c, safeDiv((getCell("t07",6,c)||0) * 1_000_000, getCell("t06",6,c)), 2); // 화장지소계
+      }
+      finalizeSumAvg("t08", [0,1,2,3,4,5,6,7], { avgOnly: true });
+
+      // ── Table 9 (t09): 스팀 톤당 연료비 = 스팀연료비 × 1000 / 스팀사용량 ──
+      const t9cols = dataMonthCount("t09");
+      for (let c = 1; c <= t9cols; c++) {
+        for (let i = 0; i < 2; i++) setCalc("t09", i, c, safeDiv((getCell("t07",i,c)||0) * 1000, getCell("t05",i,c)), 1);
+        setCalc("t09", 2, c, safeDiv((getCell("t07",2,c)||0) * 1000, getCell("t05",2,c)), 1);
+        for (let i = 0; i < 3; i++) setCalc("t09", 3+i, c, safeDiv((getCell("t07",3+i,c)||0) * 1000, getCell("t05",3+i,c)), 1);
+        setCalc("t09", 6, c, safeDiv((getCell("t07",6,c)||0) * 1000, getCell("t05",6,c)), 1);
+        setCalc("t09", 7, c, safeDiv((getCell("t07",7,c)||0) * 1000, getCell("t05",8,c)), 1); // 총생산스팀량 기준
+      }
+      finalizeSumAvg("t09", [0,1,2,3,4,5,6,7], { avgOnly: true });
+
+      // ── Table 10 (t10): LNG 사용량 — 합계 행만 ──
+      const t10cols = dataMonthCount("t10");
+      for (let c = 1; c <= t10cols; c++) {
+        setCalc("t10", 4, c, sumRows("t10", [1,2,3], c), 1); // 화장지 소계
+        setCalc("t10", 5, c, sumRows("t10", [0,1,2,3], c), 1); // 합계 (제지3 + 화장지소계)
+      }
+      finalizeSumAvg("t10", [0,1,2,3,4,5]);
+
+      // ── Table 11 (t11): LNG 비용 = 사용량 × 25년 단가 / 1000000 ──
+      const t11cols = dataMonthCount("t11");
+      for (let c = 1; c <= t11cols; c++) {
+        // row 2 증감률 = (25년단가 - 24년단가) / 24년단가
+        const r0 = getCell("t11", 0, c);
+        const r1 = getCell("t11", 1, c);
+        if (Number.isFinite(r0) && Number.isFinite(r1) && r0 !== 0) setCalc("t11", 2, c, (r1 - r0) / r0, 3);
+        // rows 3~6: 사용량(t10 row0,1,2,3) × 25년단가(row1) / 1000000
+        const rate = getCell("t11", 1, c);
+        for (let i = 0; i < 4; i++) {
+          const qty = getCell("t10", i, c);
+          setCalc("t11", 3+i, c, safeDiv((qty||0) * (rate||0), 1_000_000), 1);
+        }
+        setCalc("t11", 7, c, sumRows("t11", [4,5,6], c), 1); // 화장지 소계
+        setCalc("t11", 8, c, sumRows("t11", [3,4,5,6], c), 1); // 합계
+      }
+      finalizeSumAvg("t11", [0,1,2,3,4,5,6,7,8]);
+
+      // ── Table 12 (t12): LNG 사용량 원단위 = LNG사용량 / 제품생산량 × 1000 ──
+      const t12cols = dataMonthCount("t12");
+      for (let c = 1; c <= t12cols; c++) {
+        // 제지3 = t10.row0 / t06.row1 × 1000
+        setCalc("t12", 0, c, safeDiv((getCell("t10",0,c)||0) * 1000, getCell("t06",1,c)), 2);
+        for (let i = 0; i < 3; i++) setCalc("t12", 1+i, c, safeDiv((getCell("t10",1+i,c)||0) * 1000, getCell("t06",3+i,c)), 2);
+        setCalc("t12", 4, c, safeDiv((getCell("t10",4,c)||0) * 1000, getCell("t06",6,c)), 2);
+      }
+      finalizeSumAvg("t12", [0,1,2,3,4], { avgOnly: true });
+
+      // ── Table 13 (t13): LNG 사용비용 원단위 = LNG비용 × 1000000 / 제품생산량 ──
+      const t13cols = dataMonthCount("t13");
+      for (let c = 1; c <= t13cols; c++) {
+        setCalc("t13", 0, c, safeDiv((getCell("t11",3,c)||0) * 1_000_000, getCell("t06",1,c)), 2);
+        for (let i = 0; i < 3; i++) setCalc("t13", 1+i, c, safeDiv((getCell("t11",4+i,c)||0) * 1_000_000, getCell("t06",3+i,c)), 2);
+        setCalc("t13", 4, c, safeDiv((getCell("t11",7,c)||0) * 1_000_000, getCell("t06",6,c)), 2);
+      }
+      finalizeSumAvg("t13", [0,1,2,3,4], { avgOnly: true });
+
+      // ── Table 14 (t14): 총 연료단가 = t04 (호기별 연료비) × 1000000 / t06 (제품생산량) ──
+      const t14cols = dataMonthCount("t14");
+      for (let c = 1; c <= t14cols; c++) {
+        for (let i = 0; i < 2; i++) setCalc("t14", i, c, safeDiv((getCell("t04",i,c)||0) * 1_000_000, getCell("t06",i,c)), 2);
+        setCalc("t14", 2, c, safeDiv((getCell("t04",2,c)||0) * 1_000_000, getCell("t06",2,c)), 2);
+        for (let i = 0; i < 3; i++) setCalc("t14", 3+i, c, safeDiv((getCell("t04",3+i,c)||0) * 1_000_000, getCell("t06",3+i,c)), 2);
+        setCalc("t14", 6, c, safeDiv((getCell("t04",6,c)||0) * 1_000_000, getCell("t06",6,c)), 2);
+        setCalc("t14", 7, c, safeDiv((getCell("t04",7,c)||0) * 1_000_000, getCell("t06",7,c)), 2);
+      }
+      finalizeSumAvg("t14", [0,1,2,3,4,5,6,7], { avgOnly: true });
+
+      // ── Table 15 (t15): 스팀사용량 원단위 = 스팀사용량 / (제품생산량 / 1000) ──
+      const t15cols = dataMonthCount("t15");
+      for (let c = 1; c <= t15cols; c++) {
+        for (let i = 0; i < 2; i++) setCalc("t15", i, c, safeDiv(getCell("t05",i,c), (getCell("t06",i,c)||0) / 1000), 3);
+        setCalc("t15", 2, c, safeDiv(getCell("t05",2,c), (getCell("t06",2,c)||0) / 1000), 3);
+        for (let i = 0; i < 3; i++) setCalc("t15", 3+i, c, safeDiv(getCell("t05",3+i,c), (getCell("t06",3+i,c)||0) / 1000), 3);
+        setCalc("t15", 6, c, safeDiv(getCell("t05",6,c), (getCell("t06",6,c)||0) / 1000), 3);
+      }
+      finalizeSumAvg("t15", [0,1,2,3,4,5,6], { avgOnly: true });
+
+      // ── Table 16 (t16): 호기별 스팀사용비율 = t05.row[i] / t05.row7 (합계) ──
+      const t16cols = dataMonthCount("t16");
+      for (let c = 1; c <= t16cols; c++) {
+        const total = getCell("t05", 7, c);
+        for (let i = 0; i < 2; i++) setCalc("t16", i, c, safeDiv(getCell("t05",i,c), total), 4);
+        setCalc("t16", 2, c, safeDiv(getCell("t05",2,c), total), 4);
+        for (let i = 0; i < 3; i++) setCalc("t16", 3+i, c, safeDiv(getCell("t05",3+i,c), total), 4);
+        setCalc("t16", 6, c, safeDiv(getCell("t05",6,c), total), 4);
+        setCalc("t16", 7, c, safeDiv(total, total), 4); // 합계 = 1
+      }
+      finalizeSumAvg("t16", [0,1,2,3,4,5,6,7], { avgOnly: true });
+
+      // ── Table 17 (t17): 스팀사용량 원단위(기타 포함) = (스팀사용량 + 기타사용량×호기별비율) / (생산량/1000) ──
+      const t17cols = dataMonthCount("t17");
+      for (let c = 1; c <= t17cols; c++) {
+        const etcUse = getCell("t05", 9, c);
+        // 제지2,3
+        for (let i = 0; i < 2; i++) {
+          const used = getCell("t05", i, c);
+          const ratio = getCell("t16", i, c);
+          const prod = getCell("t06", i, c);
+          const allUse = (used||0) + (etcUse||0) * (ratio||0);
+          setCalc("t17", i, c, safeDiv(allUse, (prod||0)/1000), 3);
+        }
+        // 제지 소계
+        setCalc("t17", 2, c, safeDiv((getCell("t05",2,c)||0) + (etcUse||0) * (getCell("t16",2,c)||0), (getCell("t06",2,c)||0)/1000), 3);
+        // 화장지
+        for (let i = 0; i < 3; i++) {
+          const used = getCell("t05", 3+i, c);
+          const ratio = getCell("t16", 3+i, c);
+          const prod = getCell("t06", 3+i, c);
+          const allUse = (used||0) + (etcUse||0) * (ratio||0);
+          setCalc("t17", 3+i, c, safeDiv(allUse, (prod||0)/1000), 3);
+        }
+        setCalc("t17", 6, c, safeDiv((getCell("t05",6,c)||0) + (etcUse||0) * (getCell("t16",6,c)||0), (getCell("t06",6,c)||0)/1000), 3);
+      }
+      finalizeSumAvg("t17", [0,1,2,3,4,5,6], { avgOnly: true });
+    }
+
+    function finalizeSumAvg(tblKey, rowIdxs, opts) {
+      const cols = getDataCols(tblKey);
+      const monthCols = dataMonthCount(tblKey);
+      const sumCol = monthCols + 1;
+      const avgCol = monthCols + 2;
+      const isAvgOnly = opts && opts.avgOnly;
+      rowIdxs.forEach((r) => {
+        const monthVals = [];
+        // 24.12월 있는 표는 c=1 이 prev dec, 12개월은 c=2~13
+        // 평균은 1월~12월(=12개월)만 집계
+        const startCol = hasPrevDec(tblKey) ? 2 : 1;
+        const endCol = startCol + 11;
+        for (let c = startCol; c <= endCol && c <= monthCols; c++) {
+          const v = getCell(tblKey, r, c);
+          if (Number.isFinite(v)) monthVals.push(v);
+        }
+        if (!isAvgOnly) {
+          const sum = monthVals.reduce((s, v) => s + v, 0);
+          setCalc(tblKey, r, sumCol, monthVals.length ? sum : null, 1);
+        }
+        const avg = monthVals.length ? monthVals.reduce((s, v) => s + v, 0) / monthVals.length : null;
+        setCalc(tblKey, r, avgCol, avg, isAvgOnly ? 2 : 1);
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    initYearOptions();
+    expandPlaceholderRows();
+    bindInputs();
+    // 입력 후 저장되면 자동 재계산
+    document.addEventListener("blur", (e) => {
+      if (e.target.classList?.contains("energy-table-input")) {
+        scheduleApplyFormulas(300); // 300ms 디바운스 — 빠른 연속 입력에서 마지막에만 계산
+      }
+    }, true);
+    loadYear(yearSel.value).then(() => scheduleApplyFormulas(50));
+    yearSel.addEventListener("change", () => { saveSharedYear(yearSel.value); });
+    searchBtn.addEventListener("click", () => loadYear(yearSel.value).then(() => applyFormulas()));
+    window.addEventListener("storage", (e) => {
+      if (e.key !== SHARED_PERIOD_KEY) return;
+      try {
+        const shared = JSON.parse(e.newValue || "{}");
+        if (shared.year && String(shared.year) !== yearSel.value) {
+          yearSel.value = String(shared.year);
+          loadYear(yearSel.value);
+        }
+      } catch (er) {}
+    });
+
+    // 탭 전환
+    document.querySelector(".energy-tab-bar").addEventListener("click", (e) => {
+      const btn = e.target.closest(".energy-tab");
+      if (!btn) return;
+      document.querySelectorAll(".energy-tab").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+      document.querySelectorAll(".energy-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === btn.dataset.target));
+    });
+  })();
+  </script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20260527-energy-excel2"></script>
+</body>
+</html>

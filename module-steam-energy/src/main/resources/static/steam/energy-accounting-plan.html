@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>에너지 회계비용 - 회계비용 계획</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky4" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky4" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    body.landing-body[data-page-kind="energy-accounting-plan"] {
+      background: var(--inc-bg-page);
+      font-family: "Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color: var(--inc-text);
+    }
+    body.landing-body[data-page-kind="energy-accounting-plan"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:auto; }
+    body.landing-body[data-page-kind="energy-accounting-plan"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="energy-accounting-plan"] .landing-canvas-table { overflow:visible !important; }
+    body.landing-body[data-page-kind="energy-accounting-plan"] .inc-card { overflow:visible; }
+    /* inc-design.css 의 .energy-table-wrap{overflow-y:hidden!important} 가 sticky 를
+       가로채므로, 이 페이지에서 !important 로 visible 로 환원 (body 가 스크롤 컨테이너). */
+    body.landing-body[data-page-kind="energy-accounting-plan"] .energy-table-wrap { overflow:visible !important; }
+    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead(월 행) sticky 동작 */
+    body.platform-embedded[data-page-kind="energy-accounting-plan"] { height:100vh !important; overflow:auto !important; }
+    html.platform-embedded { overflow:hidden !important; }
+    .energy-table-input {
+      width:100%; min-width:0; box-sizing:border-box;
+      border:1px solid rgba(120,181,217,0.45); border-radius:4px; padding:2px 4px;
+      background:#fbfdff; color:#173a54; font:inherit;
+      text-align:center; outline:none;
+    }
+    .energy-table-input:hover { border-color:#66b7e7; background:#f0f8ff; }
+    .energy-table-input:focus { background:#fff; border-color:var(--inc-primary,#2f6fb3); box-shadow:0 0 0 2px rgba(47,111,179,.15); }
+    .energy-table th.col-cat-sub, .energy-table td.col-cat-sub { width:90px; }
+    .energy-table th.label-cell, .energy-table td.label-cell {
+      width:clamp(150px, 14vw, 220px);
+      white-space:normal; overflow-wrap:anywhere; word-break:keep-all; line-height:1.3;
+    }
+    .energy-table thead th { position:sticky; top:0; z-index:5;
+      background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+      box-shadow: inset 0 -1px 0 rgba(120, 181, 217, .45);
+    }
+    .energy-table th.col-cat-sub, .energy-table td.col-cat-sub {
+      position:sticky; left:0; z-index:4; background:#eef3f8; font-weight:700;
+    }
+    .energy-table thead th.col-cat-sub { z-index:6; background:linear-gradient(180deg, #fafcff 0%, #eef3f9 100%); }
+    .efr-calc { display:block; font-weight:600; color:#1f3b57; text-align:center; }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="energy-accounting-plan">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1 id="eapTitle">5. 25년 회계비용 계획</h1>
+          <p>월별 연료비 계획 — 차감비 / 실적 / 계획금액 / 증감 / 손익 / 원단위</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="invoiceYear" aria-label="조회 연도"></select>
+          <button type="button" id="invoiceSearch" class="btn-secondary">조회</button>
+          <button type="button" id="eapExcelDownload" class="btn-secondary">엑셀 다운로드</button>
+          <button type="button" id="eapExcelUpload" class="btn-secondary">엑셀 업로드</button>
+          <input type="file" id="eapExcelFileInput" accept=".xls,.xlsx,.xlsm" hidden />
+        </div>
+      </div>
+
+      <div class="inc-card">
+        <h3 class="inc-section-title" id="eapSubTitle">2025년 회계비용 (연료비) 계획 — 월별</h3>
+        <div class="energy-table-wrap">
+          <table class="energy-table" id="eapTable">
+            <thead>
+              <tr>
+                <th colspan="2" class="label-cell col-cat-sub">구분</th>
+                <th data-prev-dec>24.12월</th>
+                <th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th>
+                <th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th>
+                <th>합계</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 연료비 -->
+              <tr><th rowspan="6" class="col-cat-sub">연료비</th><td class="label-cell">복합보일러 스팀구매</td></tr>
+              <tr><td class="label-cell">제스코 스팀구매</td></tr>
+              <tr><td class="label-cell">LNG 구매</td></tr>
+              <tr><td class="label-cell">폐합성소각로</td></tr>
+              <tr><td class="label-cell">유동상소각로</td></tr>
+              <tr class="subtotal"><td class="label-cell">연료비 월별 (소계)</td></tr>
+
+              <!-- 차감비 -->
+              <tr><th rowspan="8" class="col-cat-sub">차감비</th><td class="label-cell">제스코 상계비 (용수사용 등)</td></tr>
+              <tr><td class="label-cell">제스코 페널티</td></tr>
+              <tr><td class="label-cell">제스코 선급금 상환</td></tr>
+              <tr><td class="label-cell">복합 LNG, 용수사용량</td></tr>
+              <tr><td class="label-cell">복합 투자비 감가상각</td></tr>
+              <tr><td class="label-cell">복합보일러 처분수익 연료비 차감분</td></tr>
+              <tr><td class="label-cell">토지 지상권 지료</td></tr>
+              <tr class="subtotal"><td class="label-cell">차감비 소계</td></tr>
+
+              <!-- 실적/계획 -->
+              <tr class="total"><th colspan="2" class="label-cell">연료비(회계비용) 실적</th></tr>
+              <tr><th rowspan="2" class="col-cat-sub">스팀사용비율</th><td class="label-cell">제지 연료비 (× 0.7)</td></tr>
+              <tr><td class="label-cell">생활 연료비 (실적 − 제지)</td></tr>
+              <tr><th colspan="2" class="label-cell">연료비(회계비용) 계획금액</th></tr>
+              <tr><th colspan="2" class="label-cell">회계비용 대비 증감</th></tr>
+              <tr><th colspan="2" class="label-cell">전월대비 증감</th></tr>
+
+              <!-- 생산량 -->
+              <tr><th colspan="2" class="label-cell">생산량</th></tr>
+              <tr><th rowspan="2" class="col-cat-sub">제품생산량</th><td class="label-cell">제지 제품생산량 (24년 반영)</td></tr>
+              <tr><td class="label-cell">화장지 제품생산량 (24년 반영)</td></tr>
+
+              <!-- 원단위 -->
+              <tr><th colspan="2" class="label-cell">총 원단위 (연료비/생산량)</th></tr>
+              <tr><th rowspan="2" class="col-cat-sub">원단위</th><td class="label-cell">제지 원단위 (연료비/생산량)</td></tr>
+              <tr><td class="label-cell">생활 원단위 (연료비/생산량)</td></tr>
+
+              <!-- 손익 -->
+              <tr><th colspan="2" class="label-cell">전월대비 손익증감</th></tr>
+              <tr><th rowspan="3" class="col-cat-sub">손익</th><td class="label-cell">제지손익</td></tr>
+              <tr><td class="label-cell">생활손익</td></tr>
+              <tr class="subtotal"><td class="label-cell">손익합계 (제지+생활)</td></tr>
+
+              <!-- 보조 -->
+              <tr><th rowspan="5" class="col-cat-sub">보조</th><td class="label-cell">스팀생산량</td></tr>
+              <tr><td class="label-cell">LNG 직버너 사용 비용</td></tr>
+              <tr><td class="label-cell">보일러 운영 연료비 (버너 제외)</td></tr>
+              <tr><td class="label-cell">스팀톤당 보일러 연료비 (천원/톤)</td></tr>
+              <tr><td class="label-cell">스팀톤당 연료비 (천원/톤)</td></tr>
+
+              <!-- 참고 -->
+              <tr><th rowspan="2" class="col-cat-sub">참고</th><td class="label-cell">복합 (스팀구매 − 차감비 일부)</td></tr>
+              <tr><td class="label-cell">제스코 (스팀구매 − 상계비 − 페널티 − 선급금)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    const SHARED_PERIOD_KEY = "steamlog:shared-period";
+    const TABLES_BASE = "/tables";
+    const CELL_TABLE = "table_cell_value";
+    const PAGE_TABLE_NAME = "energy_accounting_plan";
+    const yearSel = document.getElementById("invoiceYear");
+    const searchBtn = document.getElementById("invoiceSearch");
+    const mainTitle = document.getElementById("eapTitle");
+    const subTitle = document.getElementById("eapSubTitle");
+    const storedRows = new Map();
+    let currentYear = "";
+
+    // ── 연도 / shared-period ──────────────────────────────────────
+    function readSharedYear() {
+      try { return (JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}").year || null); } catch (e) { return null; }
+    }
+    function saveSharedYear(year) {
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        shared.year = year;
+        localStorage.setItem(SHARED_PERIOD_KEY, JSON.stringify(shared));
+      } catch (e) {}
+    }
+    function initYearOptions() {
+      const y = new Date().getFullYear();
+      const target = String(readSharedYear() || y);
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        if (String(yy) === target) opt.selected = true;
+        yearSel.appendChild(opt);
+      }
+      if (yearSel.value !== target) {
+        const opt = document.createElement("option");
+        opt.value = target; opt.textContent = `${target}년`;
+        opt.selected = true;
+        yearSel.appendChild(opt);
+      }
+    }
+    function applyYear(year) {
+      const yy = String(year).slice(-2);
+      mainTitle.textContent = `5. ${yy}년 회계비용 계획`;
+      subTitle.textContent = `${year}년 회계비용 (연료비) 계획 — 월별`;
+      const prevYY = String(Number(year) - 1).slice(-2);
+      document.querySelectorAll("th[data-prev-dec]").forEach((th) => { th.textContent = `${prevYY}.12월`; });
+    }
+
+    // ── input cell 확장 (각 행에 13 month + 합계 = 14 셀) ───────────
+    // 데이터 컬럼: 0=prev Dec, 1~12 = 1~12월, 13=합계
+    // 합계는 자동 계산이므로 input 이 아닌 calc span 으로 채움
+    const DATA_COL_COUNT = 14; // 13개월 + 합계
+    const ROW_COUNT = 32;       // tbody 의 논리적 행 수
+
+    function rowKeyFor(rowIdx) { return `r${String(rowIdx + 1).padStart(2, "0")}`; }
+
+    function expandPlaceholderRows() {
+      const tbody = document.querySelector("#eapTable tbody");
+      Array.from(tbody.rows).forEach((tr, rowIdx) => {
+        // 이미 확장되어 있으면 skip
+        const existing = tr.querySelectorAll("td.value-cell, td.calc-cell").length;
+        if (existing >= DATA_COL_COUNT) return;
+        for (let c = 0; c < DATA_COL_COUNT; c += 1) {
+          const td = document.createElement("td");
+          if (c === DATA_COL_COUNT - 1) {
+            // 합계 셀 — calc only
+            td.className = "calc-cell";
+            const span = document.createElement("span");
+            span.className = "efr-calc";
+            span.textContent = "—";
+            span.style.color = "#94a3b8";
+            td.appendChild(span);
+          } else {
+            // 데이터 입력 셀
+            td.className = "value-cell";
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "energy-table-input";
+            input.inputMode = "decimal";
+            input.autocomplete = "off";
+            input.dataset.rowKey = rowKeyFor(rowIdx);
+            input.dataset.colIndex = String(c + 1); // 1-based
+            input.dataset.rawValue = "";
+            td.appendChild(input);
+          }
+          tr.appendChild(td);
+        }
+      });
+    }
+
+    // ── DB ──────────────────────────────────────────────────────
+    function cellMapKey(rk, col) { return `${rk}::${col}`; }
+    function setLoading(isLoading) {
+      searchBtn.disabled = isLoading;
+      searchBtn.textContent = isLoading ? "조회 중" : "조회";
+    }
+    async function fetchSavedRows(year) {
+      storedRows.clear();
+      const params = new URLSearchParams({ month: String(year), tableNames: PAGE_TABLE_NAME, limit: "5000" });
+      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to load");
+      const payload = await response.json();
+      (payload.data || []).filter((r) => r.table_name === PAGE_TABLE_NAME)
+        .forEach((r) => storedRows.set(cellMapKey(r.row_key, Number(r.col_index)), r));
+    }
+    // 표시용 정수 반올림 (DB/계산은 full precision 유지)
+    function roundDisplay(v) {
+      if (v === null || v === undefined || v === "") return "";
+      const n = Number(v);
+      if (!Number.isFinite(n)) return String(v);
+      return String(Math.round(n));
+    }
+    function applySavedRows() {
+      document.querySelectorAll(".energy-table-input").forEach((input) => {
+        const stored = storedRows.get(cellMapKey(input.dataset.rowKey, Number(input.dataset.colIndex)));
+        const v = stored?.cell_value == null ? "" : String(stored.cell_value);
+        input.value = roundDisplay(v);   // 표시는 정수
+        input.dataset.rawValue = v;       // 원본 보존
+      });
+    }
+    async function loadYear(year) {
+      currentYear = String(year);
+      applyYear(currentYear);
+      setLoading(true);
+      try { await fetchSavedRows(currentYear); applySavedRows(); }
+      catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    }
+    async function saveInput(input) {
+      const value = String(input.value || "").trim();
+      // 사용자가 변경 안 했으면(입력값 == 반올림된 원본) DB full precision 보존
+      if (value === roundDisplay(input.dataset.rawValue || "")) return;
+      const payload = {
+        month: currentYear, year_no: Number(currentYear), month_no: 0,
+        table_name: PAGE_TABLE_NAME,
+        row_key: input.dataset.rowKey, col_index: Number(input.dataset.colIndex),
+        cell_value: value,
+      };
+      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("Failed to save");
+      const saved = await response.json();
+      storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
+      input.dataset.rawValue = String(saved.cell_value || "");
+    }
+    function bindInputs() {
+      document.addEventListener("blur", (e) => {
+        const input = e.target.closest?.(".energy-table-input");
+        if (!input) return;
+        saveInput(input).catch((err) => { console.error(err); input.value = String(input.dataset.rawValue || ""); });
+        scheduleApplyFormulas(300);
+      }, true);
+      document.addEventListener("keydown", (e) => {
+        const input = e.target.closest?.(".energy-table-input");
+        if (!input) return;
+        if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      });
+    }
+
+    // ── 수식 ────────────────────────────────────────────────────
+    // 행 인덱스 (tbody의 0-based row index)
+    //  0 복합보일러스팀구매       (입력)
+    //  1 제스코스팀구매            (입력)
+    //  2 LNG 구매                  (입력)
+    //  3 폐합성소각로              (입력)
+    //  4 유동상소각로              (입력)
+    //  5 연료비 월별 (소계)        = SUM(0..4)
+    //  6 제스코 상계비             (입력)
+    //  7 제스코 페널티             (입력)
+    //  8 제스코 선급금 상환        (입력)
+    //  9 복합 LNG, 용수사용량      (입력)
+    // 10 복합 투자비 감가상각      (입력)
+    // 11 복합보일러 처분수익 차감  (입력)
+    // 12 토지 지상권 지료          (입력)
+    // 13 차감비 소계               = SUM(6..12)
+    // 14 연료비 실적               = 5 - 13
+    // 15 제지 연료비               = 14 × 0.7
+    // 16 생활 연료비               = 14 - 15
+    // 17 연료비 계획금액           = 14   (자기참조)
+    // 18 회계비용 대비 증감        (수식 없음 — 사용자 입력 그대로)
+    // 19 전월대비 증감             = 14[c] - 14[c-1]
+    // 20 생산량                    = 21 + 22
+    // 21 제지 제품생산량           (입력)
+    // 22 화장지 제품생산량         (입력)
+    // 23 총 원단위                 = 14 / 20 × 1000
+    // 24 제지 원단위               = 15 / 21 × 1000
+    // 25 생활 원단위               = 16 / 22 × 1000
+    // 26 전월대비 손익증감         = (23[c] - 23[c-1]) × 20[c] / 1000
+    // 27 제지손익                  = (24[c] - 24[c-1]) × 21[c] / 1000
+    // 28 생활손익                  = (25[c] - 25[c-1]) × 22[c] / 1000
+    // 29 손익합계                  = 27 + 28
+    // 30 스팀생산량                (입력)
+    // 31 LNG 직버너 사용 비용      (입력)
+    // 32 보일러 운영 연료비        = 14 - 31
+    // 33 스팀톤당 보일러 연료비    = 32 × 1000 / 30
+    // 34 스팀톤당 연료비           = 14 × 1000 / 30
+    // 35 복합 (참고)               = 0 - SUM(8..12)
+    // 36 제스코 (참고)             = 1 - 6 - 7 - 8
+
+    const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
+    function num(v) {
+      if (v === null || v === undefined || v === "") return null;
+      const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    const tbody = () => document.querySelector("#eapTable tbody");
+    function getRow(rowIdx) { return tbody().rows[rowIdx]; }
+    function getValueCell(rowIdx, col) {
+      // col: 1=prev Dec, 2~13 = 1~12월, 14 = 합계
+      const row = getRow(rowIdx); if (!row) return null;
+      // 각 행에 fixed cells (cat/label) 다음에 데이터 셀들
+      const fixed = Array.from(row.children).findIndex((c) => c.classList.contains("value-cell") || c.classList.contains("calc-cell"));
+      if (fixed < 0) return null;
+      const cell = row.children[fixed + col - 1];
+      if (!cell) return null;
+      const input = cell.querySelector(".energy-table-input");
+      if (input) {
+        const raw = input.dataset.rawValue;
+        return num(raw !== undefined && raw !== "" ? raw : input.value);
+      }
+      const span = cell.querySelector(".efr-calc");
+      if (span) return num(span.dataset.raw !== undefined ? span.dataset.raw : span.textContent);
+      return null;
+    }
+    function setCalcCell(rowIdx, col, value, digits) {
+      const row = getRow(rowIdx); if (!row) return;
+      const fixed = Array.from(row.children).findIndex((c) => c.classList.contains("value-cell") || c.classList.contains("calc-cell"));
+      if (fixed < 0) return;
+      const cell = row.children[fixed + col - 1];
+      if (!cell) return;
+      const input = cell.querySelector(".energy-table-input");
+      if (input) input.remove();
+      let span = cell.querySelector("span.efr-calc");
+      if (!span) {
+        span = document.createElement("span");
+        span.className = "efr-calc";
+        cell.appendChild(span);
+      }
+      if (value === null || !Number.isFinite(value)) {
+        delete span.dataset.raw;
+        span.textContent = "—"; span.style.color = "#94a3b8";
+      } else {
+        span.dataset.raw = String(value);   // 계산용 full precision 보존
+        span.textContent = Math.round(value).toLocaleString("ko-KR");  // 표시는 정수 반올림
+        span.style.color = value < 0 ? "#c0392b" : "#1f3b57";
+      }
+    }
+    function sumRows(rows, col) {
+      let s = 0, has = false;
+      rows.forEach((r) => { const v = getValueCell(r, col); if (Number.isFinite(v)) { s += v; has = true; } });
+      return has ? s : null;
+    }
+    function rowSum(rowIdx) {
+      // 1~12월 (col 2~13) 합산
+      let s = 0, has = false;
+      for (let c = 2; c <= 13; c++) { const v = getValueCell(rowIdx, c); if (Number.isFinite(v)) { s += v; has = true; } }
+      return has ? s : null;
+    }
+
+    let __formulaTimer = null;
+    function scheduleApplyFormulas(delay) {
+      if (__formulaTimer) clearTimeout(__formulaTimer);
+      __formulaTimer = setTimeout(() => { __formulaTimer = null; applyFormulas(); }, delay === undefined ? 250 : delay);
+    }
+    function applyFormulas() { applyOnce(); applyOnce(); }
+    function applyOnce() {
+      // col 1=prev Dec, col 2~13 = 1~12월
+      for (let c = 1; c <= 13; c++) {
+        // 5 연료비 월별 (소계) = SUM(0..4)
+        setCalcCell(5, c, sumRows([0,1,2,3,4], c), 1);
+        // 13 차감비 소계 = SUM(6..12)
+        setCalcCell(13, c, sumRows([6,7,8,9,10,11,12], c), 1);
+        // 14 연료비 실적 = 5 - 13
+        const fuel = getValueCell(5, c), deduct = getValueCell(13, c);
+        setCalcCell(14, c, (Number.isFinite(fuel) || Number.isFinite(deduct)) ? (fuel || 0) - (deduct || 0) : null, 1);
+        // 15 제지 연료비 = 14 × 0.7
+        setCalcCell(15, c, Number.isFinite(getValueCell(14, c)) ? getValueCell(14, c) * 0.7 : null, 1);
+        // 16 생활 연료비 = 14 - 15
+        setCalcCell(16, c, (Number.isFinite(getValueCell(14, c))) ? getValueCell(14, c) - (getValueCell(15, c) || 0) : null, 1);
+        // 17 계획금액 = 14 (자기참조)
+        setCalcCell(17, c, getValueCell(14, c), 1);
+        // 18 회계비용 대비 증감 — 입력 그대로 (수식 없음)
+        // 19 전월대비 증감 = 14[c] - 14[c-1]
+        const cur14 = getValueCell(14, c), prev14 = c > 1 ? getValueCell(14, c-1) : null;
+        setCalcCell(19, c, (Number.isFinite(cur14) && Number.isFinite(prev14)) ? cur14 - prev14 : null, 1);
+        // 20 생산량 = 21 + 22
+        setCalcCell(20, c, sumRows([21,22], c), 1);
+        // 23 총 원단위 = 14 / 20 × 1000
+        setCalcCell(23, c, safeDiv((getValueCell(14,c)||0) * 1000, getValueCell(20,c)), 1);
+        // 24 제지 원단위 = 15 / 21 × 1000
+        setCalcCell(24, c, safeDiv((getValueCell(15,c)||0) * 1000, getValueCell(21,c)), 1);
+        // 25 생활 원단위 = 16 / 22 × 1000
+        setCalcCell(25, c, safeDiv((getValueCell(16,c)||0) * 1000, getValueCell(22,c)), 1);
+        // 26 전월대비 손익증감 = (23[c] - 23[c-1]) × 20[c] / 1000
+        const cur23 = getValueCell(23, c), prev23 = c > 1 ? getValueCell(23, c-1) : null;
+        const v26 = (Number.isFinite(cur23) && Number.isFinite(prev23)) ? (cur23 - prev23) * (getValueCell(20,c)||0) / 1000 : null;
+        setCalcCell(26, c, v26, 1);
+        // 27 제지손익 = (24[c] - 24[c-1]) × 21[c] / 1000
+        const cur24 = getValueCell(24, c), prev24 = c > 1 ? getValueCell(24, c-1) : null;
+        setCalcCell(27, c, (Number.isFinite(cur24) && Number.isFinite(prev24)) ? (cur24 - prev24) * (getValueCell(21,c)||0) / 1000 : null, 1);
+        // 28 생활손익 = (25[c] - 25[c-1]) × 22[c] / 1000
+        const cur25 = getValueCell(25, c), prev25 = c > 1 ? getValueCell(25, c-1) : null;
+        setCalcCell(28, c, (Number.isFinite(cur25) && Number.isFinite(prev25)) ? (cur25 - prev25) * (getValueCell(22,c)||0) / 1000 : null, 1);
+        // 29 손익합계 = 27 + 28
+        setCalcCell(29, c, sumRows([27,28], c), 1);
+        // 32 보일러 운영 연료비 = 14 - 31
+        const v14 = getValueCell(14, c), v31 = getValueCell(31, c);
+        setCalcCell(32, c, (Number.isFinite(v14) || Number.isFinite(v31)) ? (v14 || 0) - (v31 || 0) : null, 1);
+        // 33 스팀톤당 보일러 연료비 = 32 × 1000 / 30
+        setCalcCell(33, c, safeDiv((getValueCell(32,c)||0) * 1000, getValueCell(30,c)), 1);
+        // 34 스팀톤당 연료비 = 14 × 1000 / 30
+        setCalcCell(34, c, safeDiv((getValueCell(14,c)||0) * 1000, getValueCell(30,c)), 1);
+        // 35 참고 복합 = 0 - SUM(8..12)
+        const r0 = getValueCell(0, c);
+        const dedComposite = sumRows([8,9,10,11,12], c);
+        setCalcCell(35, c, (Number.isFinite(r0) || Number.isFinite(dedComposite)) ? (r0 || 0) - (dedComposite || 0) : null, 1);
+        // 36 참고 제스코 = 1 - 6 - 7 - 8
+        const r1 = getValueCell(1, c);
+        setCalcCell(36, c, (Number.isFinite(r1)) ? r1 - (getValueCell(6,c)||0) - (getValueCell(7,c)||0) - (getValueCell(8,c)||0) : null, 1);
+      }
+      // 합계 컬럼 (col 14) — 1~12월(col 2~13) 합
+      for (let r = 0; r < ROW_COUNT + 5; r++) {  // +5 for 보조/참고 rows
+        const row = getRow(r);
+        if (!row) continue;
+        setCalcCell(r, 14, rowSum(r), 1);
+      }
+    }
+
+    // ── 초기화 ──────────────────────────────────────────────────
+    initYearOptions();
+    expandPlaceholderRows();
+    bindInputs();
+    loadYear(yearSel.value).then(() => scheduleApplyFormulas(50));
+
+    yearSel.addEventListener("change", () => { saveSharedYear(yearSel.value); });
+    searchBtn.addEventListener("click", () => loadYear(yearSel.value).then(() => scheduleApplyFormulas(50)));
+    window.addEventListener("storage", (e) => {
+      if (e.key !== SHARED_PERIOD_KEY) return;
+      try {
+        const shared = JSON.parse(e.newValue || "{}");
+        if (shared.year && String(shared.year) !== yearSel.value) {
+          yearSel.value = String(shared.year);
+          applyYear(yearSel.value);
+        }
+      } catch (er) {}
+    });
+  })();
+  </script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260608-sticky4"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20260608-sticky4"></script>
+</body>
+</html>

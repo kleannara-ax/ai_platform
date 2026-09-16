@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>&#xC6D4;&#xBCC4; &#xC6B4;&#xC601;&#xB0B4;&#xC5ED;</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260526-responsive-fix" />  <link rel="stylesheet" href="css/page-fluidized.css?v=20260520-split2-applied" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260526-revert-A-B" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* 페이지 스크롤은 브라우저(viewport) 기본 동작 사용 — html/body 에 overflow 강제하지 않음.
+       overflow 가 html, body 양쪽에 걸리면 이중 스크롤이 생기던 문제 제거. */
+    html {
+      overflow-x: hidden;     /* 페이지 가로 스크롤만 차단 — 표는 카드 안에서 자체 스크롤 */
+    }
+    body.landing-body[data-page-kind="fluidized-monthly"] {
+      height: auto;
+      min-height: 100vh;
+      align-items: stretch;
+      overflow-x: hidden;
+      overflow-y: visible;    /* viewport 가 세로 스크롤 처리 */
+    }
+
+    body.landing-body[data-page-kind="fluidized-monthly"] .sidebar-shell {
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    body.landing-body[data-page-kind="fluidized-monthly"] .landing-main.monthly-workspace {
+      padding: 24px 18px 18px 26px;
+      overflow: visible;
+      height: auto;
+      min-height: 100vh;
+    }
+
+    body.landing-body[data-page-kind="fluidized-monthly"] .monthly-canvas {
+      padding: 14px;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    /* 부모 .landing-canvas-table 의 overflow-x:auto 가 overflow-y 도 자동 promote 하는
+       CSS 스펙 동작 무력화. 표 안쪽 스크롤 (가로/세로 모두) 제거. */
+    body.landing-body[data-page-kind="fluidized-monthly"] .landing-canvas-table {
+      overflow: visible !important;
+    }
+
+    body.landing-body[data-page-kind="fluidized-monthly"] .monthly-workspace .landing-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    body.landing-body[data-page-kind="fluidized-monthly"] .monthly-workspace .landing-page-copy {
+      padding-left: 18px;
+      align-self: center;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+
+    .monthly-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex: 1 1 auto;
+      gap: 14px;
+      min-width: 0;
+      flex-wrap: wrap;        /* 좁아지면 줄바꿈 — 헤더 영역 가로 스크롤 제거 */
+    }
+
+    .monthly-right-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .monthly-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .monthly-toolbar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .monthly-excel-actions {
+      display: flex;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .monthly-excel-actions .landing-filter-box {
+      margin: 0;
+    }
+
+    #monthlySectionTabs {
+      display: flex;
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
+      gap: 8px;
+      min-width: 0;
+      margin-right: auto;
+    }
+
+    .monthly-subtab-row {
+      padding-left: 4px;
+    }
+
+    .monthly-header-actions .landing-filter-box,
+    .monthly-header-actions .period-tab-button {
+      flex: 0 0 auto;
+    }
+
+    .monthly-section-label {
+      display: none;
+    }
+
+    .monthly-frame-wrap {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 0;
+      /* 가로 스크롤은 각 .monthly-table-scroll 안쪽에서만 처리 */
+      overflow: visible;
+      border: 1px solid rgba(120, 181, 217, 0.24);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 10px 24px rgba(23, 65, 95, 0.08);
+      box-sizing: border-box;
+    }
+
+    .monthly-content-root {
+      width: 100%;
+      min-width: 0;
+      background: transparent;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="fluidized-monthly">
+  <main class="landing-main monthly-workspace">
+    <div class="landing-canvas landing-canvas-table monthly-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1 id="monthlyPageTitle">&#xC6D4;&#xBCC4; &#xC6B4;&#xC601;&#xB0B4;&#xC5ED;</h1>
+        </div>
+        <div class="monthly-header-actions">
+          <div id="monthlySectionTabs" class="monthly-toolbar-row" aria-label="&#xC6D4;&#xBCC4; &#xC6B4;&#xC601;&#xB0B4;&#xC5ED; &#xBA54;&#xB274;"></div>
+          <div class="monthly-right-actions">
+            <div class="landing-filter-box" aria-label="&#xC870;&#xD68C; &#xC5F0;&#xC6D4;">
+              <span class="landing-filter-title">&#xC870;&#xD68C;</span>
+              <select id="filterYear"></select>
+              <button type="button" class="landing-filter-action" id="filterSubmit">&#xC870;&#xD68C;</button>
+            </div>
+            <div id="monthlyExcelActions" class="monthly-excel-actions" aria-label="&#xC5D1;&#xC140; &#xC791;&#xC5C5;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="monthly-toolbar">
+        <div class="monthly-toolbar-row monthly-subtab-row">
+          <span class="monthly-section-label" id="monthlySubtabLabel">&#xC6B4;&#xC601;&#xD604;&#xD669; &#xD558;&#xC704; &#xBA54;&#xB274;</span>
+          <div id="monthlySubtabs" class="monthly-toolbar-row" aria-label="&#xC6D4;&#xBCC4; &#xC6B4;&#xC601;&#xB0B4;&#xC5ED; &#xD558;&#xC704; &#xBA54;&#xB274;"></div>
+        </div>
+      </div>
+
+      <section class="period-panel active" data-period-panel="monthly-fluidized">
+        <div class="monthly-frame-wrap">
+          <div id="monthlyContentRoot" class="monthly-content-root"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
+  <script defer src="/steam/js/unit-fluidized-detail-data.js?v=20260421-fluidized-detail-data"></script>
+  <script defer src="/steam/js/unit-fluidized-monthly-render.js?v=20260528-fmc-db-cache"></script>
+  <script defer src="/steam/js/unit-fluidized-monthly-pages.js?v=20260526-subtab-split"></script>
+  <script defer src="/steam/js/fluidized-excel-controls.js?v=20260508-monthly-toolbar1"></script>
+  <script defer src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

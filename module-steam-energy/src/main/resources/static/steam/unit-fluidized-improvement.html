@@ -1,0 +1,412 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>설비 개선 리스트</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />  <link rel="stylesheet" href="css/page-fluidized.css?v=20260608-sticky3" />
+
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    html,
+    body.landing-body[data-page-kind="fluidized-improvement"] {
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] {
+      height: auto;
+      min-height: 100vh;
+      align-items: stretch;
+      overflow: visible;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] .sidebar-shell {
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] .landing-main.improvement-workspace {
+      padding: 24px 18px 18px 26px;
+      overflow: visible;
+      height: auto;
+      min-height: 100vh;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] .landing-canvas.improvement-canvas {
+      padding: 14px;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    body.landing-body[data-page-kind="fluidized-improvement"] .landing-page-copy {
+      padding-left: 18px;
+      align-self: center;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+
+    .improvement-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: 14px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      white-space: nowrap;
+    }
+
+    .improvement-left-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .improvement-top-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
+    }
+
+    .improvement-header-actions .landing-filter-box {
+      flex: 0 0 auto;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] {
+      display: block;
+      min-height: auto;
+      overflow: visible;
+      background: transparent;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] .sidebar-shell {
+      display: none !important;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] .landing-page-header {
+      display: flex !important;
+      margin-bottom: 12px;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] .landing-page-copy {
+      display: none !important;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] .landing-main.improvement-workspace {
+      padding: 0;
+      min-height: auto;
+    }
+
+    body.landing-body.embedded-mode[data-page-kind="fluidized-improvement"] .landing-canvas.improvement-canvas {
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+    }
+
+    /* 카드 자체 overflow 해제 → thead sticky(top:0) 가 body 기준 동작. */
+    body.landing-body[data-page-kind="fluidized-improvement"] .improvement-card {
+      overflow: visible !important;
+    }
+    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead sticky 동작 */
+    body.platform-embedded[data-page-kind="fluidized-improvement"] {
+      height: 100vh !important;
+      overflow: auto !important;
+    }
+    html.platform-embedded { overflow: hidden !important; }
+
+    .improvement-toolbar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .improvement-tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .improvement-card {
+      border: 1px solid rgba(120, 181, 217, 0.24);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 10px 24px rgba(23, 65, 95, 0.08);
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .improvement-title {
+      margin: 0;
+      padding: 14px 16px 6px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #173a54;
+    }
+
+    .improvement-table-wrap {
+      padding: 0 0 12px;
+    }
+
+    .improvement-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #173a54;
+    }
+
+    .improvement-table th,
+    .improvement-table td {
+      border: 1px solid rgba(159, 190, 212, 0.72);
+      padding: 6px 5px;
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .improvement-table thead th {
+      background: #dff2ff;
+      font-weight: 800;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .improvement-table .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      background: #eef8ff;
+    }
+
+    .improvement-table .sticky-col-2 {
+      position: sticky;
+      left: 88px;
+      z-index: 4;
+      background: #eef8ff;
+    }
+
+    .improvement-table thead .sticky-col,
+    .improvement-table thead .sticky-col-2 {
+      z-index: 8;
+      background: #dff2ff;
+    }
+
+    .improvement-table .month-col {
+      min-width: 48px;
+      max-width: 60px;
+      font-weight: 800;
+    }
+
+    .improvement-table .no-col {
+      min-width: 38px;
+      max-width: 40px;
+      font-weight: 700;
+    }
+
+    .improvement-table .action-col {
+      min-width: 40px;
+      max-width: 40px;
+    }
+
+    .improvement-table .drag-col {
+      min-width: 38px;
+    }
+
+    .improvement-table .money-col {
+      width: 120px;
+      min-width: 80px;
+      max-width: 150px;
+    }
+
+    .improvement-table .usage-col {
+      width: 400px;
+      min-width: 400px;
+      max-width: 600px;
+    }
+
+    .improvement-table tbody tr.summary-row td,
+    .improvement-table tbody tr.summary-row th {
+      background: #f6f1d8;
+      font-weight: 800;
+    }
+
+    .improvement-table tbody tr.meta-row td,
+    .improvement-table tbody tr.meta-row th {
+      background: #eff7ee;
+      font-weight: 800;
+    }
+
+.improvement-input,
+.improvement-select {
+  width: 100%;
+ min-width: 0 !important;
+  max-width: 100% !important;
+
+  border: 1px solid #b7d7ef;
+  border-radius: 8px;
+
+  background: #eef8ff;
+
+  padding: 7px 8px;
+
+  color: #173a54;
+
+  font-size: inherit;
+  font-weight: 700;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+}
+
+    .improvement-input.money-input {
+      min-width: 52px;
+    }
+
+    .improvement-input.usage-input {
+      min-width: 300px;
+    }
+
+    .improvement-select.month-select {
+      min-width: 78px;
+    }
+
+    .improvement-input[data-align="right"] {
+      text-align: right;
+    }
+
+    .improvement-calc {
+      display: block;
+      min-width: 86px;
+      border-radius: 8px;
+      background: #f4f7fa;
+      padding: 7px 8px;
+      text-align: right;
+      font-weight: 700;
+      color: #486172;
+    }
+
+    .improvement-table-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 14px 0;
+    }
+
+    .improvement-button {
+      border: 1px solid rgba(72, 126, 161, 0.18);
+      border-radius: 10px;
+      background: linear-gradient(180deg, #f7fbff 0%, #e8f3fb 100%);
+      color: #173a54;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(23, 65, 95, 0.08);
+    }
+
+    .improvement-delete-button {
+      width: 100%;
+      border: 1px solid rgba(183, 111, 111, 0.22);
+      border-radius: 8px;
+      background: #fff4f4;
+      color: #8a3f3f;
+      padding: 7px 8px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .improvement-drag-handle {
+      width: 100%;
+      border: 1px solid rgba(72, 126, 161, 0.18);
+      border-radius: 8px;
+      background: #eef6fc;
+      color: #173a54;
+      padding: 7px 8px;
+      font: inherit;
+      font-weight: 700;
+      cursor: grab;
+    }
+
+    .improvement-row.is-dragging {
+      opacity: 0.45;
+    }
+
+    .improvement-row.drop-before {
+      box-shadow: inset 0 3px 0 #56a7e2;
+    }
+
+    .improvement-row.drop-after {
+      box-shadow: inset 0 -3px 0 #56a7e2;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260824-auth1"></script>
+</head>
+<body class="landing-body" data-page-kind="fluidized-improvement">
+  <main class="landing-main improvement-workspace">
+    <div class="landing-canvas landing-canvas-table improvement-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>설비 개선 리스트</h1>
+        </div>
+        <div class="improvement-header-actions">
+          <div class="improvement-left-actions">
+            <div class="improvement-tabs" id="improvementTabs"></div>
+            <div class="improvement-top-actions" id="improvementTopActions"></div>
+          </div>
+          <div class="landing-filter-box" aria-label="조회 연도">
+            <span class="landing-filter-title">조회</span>
+            <select id="filterYear"></select>
+            <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="improvement-card">
+        <h3 class="improvement-title" id="improvementPanelTitle">월별개선</h3>
+        <div class="improvement-table-wrap" id="improvementTableWrap"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    if (new URLSearchParams(window.location.search).get("embedded") === "1") {
+      document.body.classList.add("embedded-mode");
+    }
+  </script>
+  <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/unit-fluidized-improvement-pages.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/fluidized-excel-controls.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260608-sticky3"></script>
+</body>
+</html>

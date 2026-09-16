@@ -1,0 +1,321 @@
+/* Auto-generated from common.css. Group: fluidized */
+
+.landing-body .fluidized-inline-excel-box {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}.landing-body .fluidized-inline-excel-box .landing-filter-title {
+  display: none;
+}.landing-body .fluidized-inline-excel-box select {
+  min-width: 76px;
+}.landing-body[data-page-kind="fluidized-summary"] .table-wrap {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  max-width: none;
+}.landing-body[data-page-kind="fluidized-summary"] .landing-canvas {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 8px 10px 14px;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table {
+  width: max-content;
+  min-width: 100%;
+}.landing-body[data-page-kind="fluidized-summary"] .landing-canvas-table {
+  overflow-x: auto;
+  overflow-y: visible;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-flat-section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table th,
+.landing-body[data-page-kind="fluidized-summary"] .data-table td {
+  padding: 6px 8px;
+  min-width: 50px;
+  vertical-align: middle;
+  text-align: center;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table th:first-child,
+.landing-body[data-page-kind="fluidized-summary"] .data-table td:first-child {
+  min-width: 100px;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  margin: 0;
+  text-align: right;
+  border-radius: 4px;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table td:has(.fluidized-note-input) {
+  min-width: 520px;
+  text-align: left;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-note-input {
+  text-align: left;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-title-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  width: 100%;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-title-row h1 {
+  margin-bottom: 0;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-title-row .landing-filter-box {
+  margin-left: auto;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-filter-box {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #7fb8de !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  visibility: visible;
+  opacity: 1;
+  position: relative;
+  z-index: 3;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-flat-section + .fluidized-flat-section {
+  margin-top: 14px;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-filter-box select,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-page-filter-box .landing-filter-action {
+  display: inline-flex !important;
+  visibility: visible;
+  opacity: 1;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-flat-section,
+.landing-body[data-page-kind="fluidized-summary"] .period-panel,
+.landing-body[data-page-kind="fluidized-summary"] .landing-page-header,
+.landing-body[data-page-kind="fluidized-summary"] .landing-page-copy {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-main {
+  padding: 12px 14px;
+  background: transparent !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-shell {
+  min-width: 0;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-topline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-topline h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  color: #173a54;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  margin-left: 8px;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-filter-dot {
+  color: #5b7f98;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-filter select,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-filter button {
+  min-width: 74px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(120, 181, 217, 0.4);
+  background: #ffffff;
+  color: #1d425d;
+  font: inherit;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-filter button {
+  min-width: 82px;
+  font-weight: 700;
+  cursor: pointer;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-section {
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-section + .fluidized-summary-section {
+  margin-top: 16px;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-section h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #173a54;
+}.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-table {
+  overflow: visible !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .period-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .landing-main,
+.landing-body[data-page-kind="fluidized-summary"] main,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-main,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-shell,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-topline,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-tabs,
+.landing-body[data-page-kind="fluidized-summary"] .period-panel,
+.landing-body[data-page-kind="fluidized-summary"] .fluidized-summary-section {
+  border-radius: 0 !important;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table,
+.landing-body[data-page-kind="fluidized-summary"] .data-table thead,
+.landing-body[data-page-kind="fluidized-summary"] .data-table tbody,
+.landing-body[data-page-kind="fluidized-summary"] .data-table tr,
+.landing-body[data-page-kind="fluidized-summary"] .data-table th,
+.landing-body[data-page-kind="fluidized-summary"] .data-table td {
+  background: transparent !important;
+  box-shadow: none !important;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table th {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(120, 181, 217, 0.45) !important;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table td {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9) !important;
+}.landing-body[data-page-kind="fluidized-summary"] .data-table input,
+.landing-body[data-page-kind="fluidized-summary"] .data-table input.calc-input {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(120, 181, 217, 0.35) !important;
+}.landing-body[data-page-kind="fluidized-summary"] .period-tab-button {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}.fluidized-clean-main .period-panel,
+.fluidized-clean-main .period-panel.active,
+.fluidized-clean-main .fluidized-clean-section,
+.fluidized-clean-main .fluidized-clean-table-host {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}.fluidized-clean-main .data-table {
+  width: max-content;
+  min-width: 100%;
+  background: transparent !important;
+  table-layout: auto;
+}.fluidized-clean-main .data-table th,
+.fluidized-clean-main .data-table td {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 3px 5px !important;
+  min-width: 60px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}.fluidized-clean-main .data-table th:first-child,
+.fluidized-clean-main .data-table td:first-child {
+  min-width: 72px !important;
+}.fluidized-clean-main .data-table th {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(120, 181, 217, 0.45) !important;
+}.fluidized-clean-main .data-table td {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9) !important;
+}.fluidized-clean-main .data-table input,
+.fluidized-clean-main .data-table input.calc-input {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(120, 181, 217, 0.35) !important;
+  height: 26px !important;
+  min-width: 0 !important;
+  padding: 0 5px !important;
+  font-size: 11px !important;
+  border-radius: 0 !important;
+}.fluidized-clean-main,
+.fluidized-clean-main *,
+.landing-body[data-page-kind="fluidized-summary"],
+.landing-body[data-page-kind="fluidized-summary"] .landing-main {
+  box-shadow: none !important;
+}.landing-body[data-page-kind="fluidized-summary"] {
+  background: #eef9ff !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}.landing-body[data-page-kind="fluidized-summary"] .landing-main {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}.fluidized-plain-page .period-panel,
+.fluidized-plain-page .period-panel.active {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}.fluidized-plain-page .data-table {
+  width: max-content;
+  min-width: 100%;
+  background: transparent !important;
+  table-layout: auto;
+}.fluidized-plain-page .data-table th,
+.fluidized-plain-page .data-table td {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 3px 5px !important;
+  min-width: 60px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}.fluidized-plain-page .data-table th:first-child,
+.fluidized-plain-page .data-table td:first-child {
+  min-width: 72px !important;
+}.fluidized-plain-page .data-table th {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(120, 181, 217, 0.45) !important;
+}.fluidized-plain-page .data-table td {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9) !important;
+}.fluidized-plain-page .data-table input,
+.fluidized-plain-page .data-table input.calc-input {
+  height: 26px !important;
+  min-width: 0 !important;
+  padding: 0 5px !important;
+  font-size: 11px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(120, 181, 217, 0.35) !important;
+}.landing-body.embedded-mode[data-page-kind="fluidized-summary"] .fluidized-plain-header,
+.landing-body.embedded-mode[data-page-kind="fluidized-summary"] .fluidized-clean-topbar,
+.landing-body.embedded-mode[data-page-kind="fluidized-summary"] .fluidized-clean-tabs,
+.landing-body.embedded-mode[data-page-kind="fluidized-summary"] .fluidized-summary-tabs {
+  display: none !important;
+}
