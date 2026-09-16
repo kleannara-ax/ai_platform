@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>에너지 회계비용 - 회계비용 마감과 실마감 비교</title>
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="css/common.css?v=20260608-sticky4" />
-  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky4" />
+  <link rel="stylesheet" href="css/common.css?v=20260916-cardfit" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260916-cardfit" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
   <style>
-    /* body 자체를 세로 스크롤 컨테이너로 → page 스크롤 시 위 컨텐츠(제목/탭) 가 위로
-       올라가 가려지고, thead 가 viewport 상단(= 부모 iframe 의 흰색 topbar 바로 아래)
-       에 sticky 됨. 내부 wrap 에는 overflow 를 두지 않아야 sticky 가 body 까지 올라감. */
+    /* 표 스크롤은 카드 안(.energy-table-wrap)에서 처리한다.
+       예전에는 thead sticky 를 위해 wrap 의 overflow 를 없애고 body 를 스크롤 컨테이너로 삼았는데,
+       .landing-body 가 height:100vh / overflow:hidden 이라 1900px 넓이의 표가 카드 밖으로
+       삐져나간 채 잘려 보였다. 운전일지(.wil-scroll)·유동상 일지(.fdl-sum-scroll) 와 같이
+       wrap 을 스크롤 컨테이너로 되돌리면 thead·좌측 열 sticky 는 wrap 기준으로 그대로 동작한다. */
     body.landing-body[data-page-kind="energy-month-compare"] {
       background: var(--inc-bg-page);
       font-family: "Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
@@ -21,11 +23,14 @@
     body.landing-body[data-page-kind="energy-month-compare"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:auto; }
     body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
     body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas-table { overflow:visible; min-width:0; }
-    body.landing-body[data-page-kind="energy-month-compare"] .inc-card { overflow:visible; }
-    /* inc-design.css 의 .energy-table-wrap{overflow-y:hidden!important} 가 sticky 를
-       가로채므로, 이 페이지에서 !important 로 visible 로 환원 (body 가 스크롤 컨테이너). */
-    body.landing-body[data-page-kind="energy-month-compare"] .energy-table-wrap { overflow:visible !important; }
-    /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead(제목 행) sticky 동작 */
+    /* 표 영역만 스크롤 — inc-design.css 의 overflow-y:hidden!important 를 되돌린다.
+       max-height 는 아래 fitTableHeight() 가 실제 화면 높이에 맞춰 다시 잡는다. */
+    body.landing-body[data-page-kind="energy-month-compare"] .energy-table-wrap {
+      overflow: auto !important;
+      max-height: calc(100vh - 250px);
+      overscroll-behavior: contain;
+    }
+    /* 셸 iframe: 바깥 높이는 화면에 맞추고, 스크롤은 표 영역이 담당 */
     body.platform-embedded[data-page-kind="energy-month-compare"] { height:100vh !important; overflow:auto !important; }
     html.platform-embedded { overflow:hidden !important; }
 
@@ -136,7 +141,7 @@
       height:200px; color:#9ca3af; font-size:13px;
     }
   </style>
-  <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth2"></script>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-month-compare">
   <main class="landing-main">
@@ -946,7 +951,10 @@
         if (!btn) return;
         document.querySelectorAll(".energy-tab").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
         document.querySelectorAll(".energy-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === btn.dataset.target));
+        fitTableHeight();
       });
+
+      window.addEventListener("resize", fitTableHeight);
 
       // 연도 / 조회 / 초기화
       const yearSel = document.getElementById("emcYear");
@@ -962,6 +970,18 @@
         await deleteYearFromDB(currentYear);
         delete store[currentYear];
         renderAll();
+      });
+    }
+
+    // 표 스크롤 영역을 화면 아래까지 채운다 — 바깥(body)에는 스크롤이 생기지 않게 한다.
+    function fitTableHeight() {
+      // 셸 iframe 안에서는 body 가, 단독으로 열면 html 이 스크롤 컨테이너라 둘을 더해 쓴다.
+      const docTop = (document.scrollingElement ? document.scrollingElement.scrollTop : 0)
+                   + (document.body ? document.body.scrollTop : 0);
+      document.querySelectorAll(".energy-panel.active .energy-table-wrap").forEach((wrap) => {
+        // 스크롤된 상태에서도 같은 값이 나오도록 문서 기준 위치로 계산한다.
+        const top = wrap.getBoundingClientRect().top + docTop;
+        wrap.style.maxHeight = `${Math.max(240, Math.floor(window.innerHeight - top - 24))}px`;
       });
     }
 
@@ -1013,6 +1033,7 @@
         fetchFluidizedContract(currentYear).catch(() => {}),
       ]);
       renderAll();
+      fitTableHeight();
     }
 
     initYearSelect();
@@ -1021,7 +1042,7 @@
     loadAndRender();
   })();
   </script>
-  <script defer src="/steam/js/excel-upload-errors.js?v=20260608-sticky4"></script>
-  <script defer src="/steam/js/energy-excel-controls.js?v=20260608-sticky4"></script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260916-cardfit"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20260916-cardfit"></script>
 </body>
 </html>

@@ -138,6 +138,9 @@ public class SecurityConfig {
                 // API(/dailyreport-api/**)는 인증 필요
                 .requestMatchers("/dailyreport/page", "/dailyreport/page/**").permitAll()
                 .requestMatchers("/dailyreport/**").permitAll()
+                // 스팀에너지관리 모듈: 화면(iframe)·정적리소스만 공개
+                // 데이터 API(/steam/api/tables/**)는 인증 필요 (아래 anyRequest().authenticated())
+                .requestMatchers("/steam/*.html", "/steam/css/**", "/steam/js/**", "/steam/images/**").permitAll()
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()
             )

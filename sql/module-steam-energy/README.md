@@ -45,39 +45,6 @@ mysql -u {user} -p {database} < 09_roles.sql
 mysql -u {user} -p {database} < steam-data-YYYYMMDD.sql
 ```
 
-## 플랫폼 반영 요청 사항 (운영자 작업)
-
-업무 모듈 규격상 이 모듈은 플랫폼 파일(`settings.gradle`, `app/`, `core/`)을 건드리지 않는다.
-따라서 아래 4곳은 **플랫폼 담당자가 직접** 넣어야 모듈이 빌드되고 화면이 열린다.
-
-### 1. `settings.gradle`
-
-```gradle
-include 'module-steam-energy'
-```
-
-### 2. `app/build.gradle`
-
-```gradle
-implementation project(':module-steam-energy')
-```
-
-### 3. `core/.../config/SecurityConfig.java` — 화면·정적 리소스 공개
-
-`anyRequest().authenticated()` 앞에 추가한다. 데이터 API(`/steam/api/tables/**`)는 공개하지 않는다.
-
-```java
-.requestMatchers("/steam/*.html", "/steam/css/**", "/steam/js/**", "/steam/images/**").permitAll()
-```
-
-### 4. `app/.../static/index.html` — SPA 메뉴를 iframe 으로 연결
-
-`/steam/` 로 시작하는 메뉴 URL 을 iframe 으로 여는 처리다(KIMS·안전 모듈과 같은 방식).
-넣을 코드 5곳은 [PLATFORM_HOOKS.md](PLATFORM_HOOKS.md) 에 그대로 적어 두었다.
-
-> 4번을 넣지 않으면 좌측 메뉴에서 스팀 페이지가 열리지 않는다.
-> 3번을 넣지 않으면 `/steam/*.html` 이 401 이 된다.
-
 ## 테이블
 
 | 테이블 | 설명 | UNIQUE 키 |
