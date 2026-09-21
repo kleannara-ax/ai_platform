@@ -662,6 +662,20 @@ public class CellService {
      *   직접 입력하지 않았다"는 상태가 그대로 유지되어, 이후 또 다른 과거 날짜
      *   수정이 있어도 계속 전파 대상이 될 수 있다.
      * ※ 무한 루프/과도한 조회 방지를 위해 최대 366일(약 1년)까지만 전파한다.
+     *
+     * ★★★ 2026-09-21 버그 수정 — 표5/6/7/8 사고통계 소계·합계가 "다음 날 이후
+     * 이어받기가 되지 않는" 문제. 이 메서드가 값을 전파(carryOverValue)하는 좌표는
+     * 항상 "사람이 직접 입력하는 컬럼"(기계/전기/생산 등) 1개뿐이다 — 소계/합계
+     * 컬럼 자신은 저장 요청에 포함되지 않으므로 이 메서드가 그 좌표까지 전파하지
+     * 않는다. 그런데 recomputeSafetyIncidentTotalIfNeeded/
+     * recomputeSafetyTrendTotalsIfNeeded는 "저장 요청에 포함된 셀"에 대해서만
+     * 호출되므로(saveCells 참고), 값이 전파되어 도착한 "이미 존재하던 미래 일보"
+     * (nextTable)에서는 그 재계산이 단 한 번도 실행되지 않는다. 결과: 미래 일보의
+     * 기계/전기/생산 값은 정상 전파되지만, 그 값들로부터 계산되어야 할 소계/합계는
+     * 예전(전파 이전) 상태로 멈춰 있다가, 그 미래 일보가 "직전 일보"가 되어 그 다음
+     * 날짜가 또 새로 생성될 때 그 멈춰 있던(잘못된/빈) 값이 그대로 이어받아진다 —
+     * 한번 멈추면 그 이후 모든 날짜에 계속 전파되는 구조이므로 반드시 그 자리에서
+     * 재계산까지 함께 해줘야 한다.
      */
     private void propagateValueForward(LocalDate fromDate, String tableCode,
                                         String excelCoord, String newValue) {
@@ -701,6 +715,14 @@ public class CellService {
             if (!Objects.equals(nextCell.getCellValue(), newValue)) {
                 nextCell.carryOverValue(newValue);
             }
+
+            // ★★★ 2026-09-21 추가 — 방금 전파된 이 미래 일보(nextTable)에서도
+            // 표5/6/7/8 소계·합계를 즉시 재계산한다. 두 메서드 모두 "새 계산값이
+            // 기존 저장값과 다를 때만" carryOverValue를 호출하는 멱등적 구조이므로,
+            // 매 hop마다 항상 호출해도 안전하며 불필요한 갱신이나 무한 루프를
+            // 유발하지 않는다.
+            recomputeSafetyIncidentTotalIfNeeded(nextTable, nextCell.getRowIndex(), nextCell.getColIndex());
+            recomputeSafetyTrendTotalsIfNeeded(nextTable, nextCell.getRowIndex(), nextCell.getColIndex());
             // 이 셀은 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
         }
     }
