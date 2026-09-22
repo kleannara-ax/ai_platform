@@ -29,9 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
         { code: "comb_bsc",          label: "BSC 단가",                    unit: "원/톤", method: "direct" },
         { code: "comb_asc",          label: "ASC 단가",                    unit: "원/톤", method: "direct" },
         { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct" },
-        { code: "comb_lng_cost",     label: "(차감) 복합 LNG 사용비용",     unit: "",      method: "auto", note: "복합 LNG 사용량 × 단가" },
-        { code: "comb_disposal",     label: "(차감) 처분부담금",            unit: "",      method: "direct" },
-        { code: "comb_depreciation", label: "(차감) 감가상각 + 토지지상권 지료", unit: "", method: "direct" },
       ],
     },
     // 폐합성소각로는 1·2호기 단가가 서로 달라 호기별로 따로 등록한다.

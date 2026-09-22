@@ -6,6 +6,7 @@ import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.SheetMap;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -45,6 +46,7 @@ public class WasteIncineratorLogExportService {
     private static final Pattern TITLE_MONTH = Pattern.compile("\\(\\s*\\d{1,2}\\s*월\\s*\\)");
 
     private final TableService tableService;
+    private final DataFormatter dataFormatter = new DataFormatter();
 
     public WasteIncineratorLogExportService(TableService tableService) {
         this.tableService = tableService;
@@ -64,7 +66,10 @@ public class WasteIncineratorLogExportService {
                 Sheet sheet = workbook.getSheet(sheetMap.sheetName());
                 if (sheet == null) continue;
                 writeTitleMonth(sheet, sheetMap, month);
-                writeSheet(sheet, sheetMap, cells, monthDays);
+                // 업로드와 같은 방식으로, 채울 자리도 헤더 글자로 찾는다(좌표는 폴백).
+                WasteIncineratorLogSheetIndex index = WasteIncineratorLogSheetIndex.build(
+                        sheet, sheetMap, (row, col) -> headerText(sheet, row, col));
+                writeSheet(sheet, sheetMap, index, cells, monthDays);
             }
 
             workbook.setForceFormulaRecalculation(true);
@@ -77,22 +82,34 @@ public class WasteIncineratorLogExportService {
         return String.format("폐합성소각로 운전일지 (%d년 %d월).xlsx", year, month);
     }
 
+    /** 헤더 색인용 — 라벨 칸은 수식이 아니므로 서식만 적용해 읽는다. */
+    private String headerText(Sheet sheet, int rowNumber, int colNumber) {
+        if (rowNumber < 1 || colNumber < 1) return "";
+        Row row = sheet.getRow(rowNumber - 1);
+        if (row == null) return "";
+        Cell cell = row.getCell(colNumber - 1);
+        return cell == null ? "" : dataFormatter.formatCellValue(cell).trim();
+    }
+
     // ── 시트 채우기 ─────────────────────────────────────────────────
-    private void writeSheet(Sheet sheet, SheetMap sheetMap, Map<String, String> cells, int monthDays) {
+    private void writeSheet(Sheet sheet, SheetMap sheetMap, WasteIncineratorLogSheetIndex index,
+                            Map<String, String> cells, int monthDays) {
         boolean daysInColumns = sheetMap.layout() == Layout.DAYS_IN_COLUMNS;
+
+        // 항목 줄은 시트당 한 번만 해석한다.
+        Map<Entry, Integer> lines = new HashMap<>();
+        for (Entry entry : sheetMap.entries()) lines.put(entry, index.resolve(entry).line());
 
         // 템플릿은 31일까지 있으므로, 그 달에 없는 날짜 칸은 비운다(지난달 값이 남지 않게).
         for (int day = 1; day <= 31; day += 1) {
             boolean inMonth = day <= monthDays;
+            int dayLine = index.dayLine(day);
             for (Entry entry : sheetMap.entries()) {
                 if (entry.firstDay() && day != 1) continue;
 
-                int rowNumber = daysInColumns
-                        ? WasteIncineratorLogCellMap.parseRow(entry.line())
-                        : sheetMap.firstDayRow() + day - 1;
-                int colNumber = daysInColumns
-                        ? sheetMap.firstDayCol() + day - 1
-                        : WasteIncineratorLogCellMap.parseCol(entry.line());
+                int itemLine = lines.get(entry);
+                int rowNumber = daysInColumns ? itemLine : dayLine;
+                int colNumber = daysInColumns ? dayLine : itemLine;
 
                 Cell target = cellAt(sheet, rowNumber, colNumber, inMonth);
                 if (target == null || target.getCellType() == CellType.FORMULA) continue;

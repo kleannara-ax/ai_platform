@@ -68,6 +68,21 @@ public class IncineratorWorkbookService {
     private static final String[] UNIT_FIELDS = {"steam", "unit", "oper", "runtime", "fixed", "stop", "sub"};
     private static final String[] REAL_FIELDS = {"steam-1", "unit-1", "oper-1", "steam-2", "unit-2", "oper-2", "steam-sum", "total-cost"};
 
+    /** 우리 내려받기 양식의 도급내역 머리글 — UNIT_FIELDS / REAL_FIELDS 와 같은 순서. 가져오기도 이 글자로 칸을 찾는다. */
+    private static final String[] CONTRACT_UNIT_HEADERS = {"스팀량", "운영단가", "운영비용", "운휴시간", "시간당 고정비", "운휴비용", "소계"};
+    private static final String[] CONTRACT_REAL_HEADERS = {"1호기 스팀량", "1호기 단가", "1호기 운영비용", "2호기 스팀량", "2호기 단가", "2호기 운영비용", "스팀량 합계", "총 운영비용"};
+
+    /** 우리 내려받기 양식의 가동실적 머리글 — {필드, 머리글}. 가져오기도 이 글자로 칸을 찾는다. */
+    private static final String[][] OPERATION_HOURS_HEADERS = {
+            {"u1-plan", "1호기 계획"}, {"u1-actual", "1호기 실적"}, {"u1-rate", "1호기 달성율"},
+            {"u2-plan", "2호기 계획"}, {"u2-actual", "2호기 실적"}, {"u2-rate", "2호기 달성율"}
+    };
+    private static final String[][] OPERATION_METRIC_HEADERS = {
+            {"steam-plan", "스팀량 계획"}, {"steam-actual", "스팀량 실적"}, {"steam-diff", "스팀량 증감"},
+            {"rate-plan", "단가 계획"}, {"rate-actual", "단가 실적"}, {"rate-diff", "단가 증감"},
+            {"cost-plan", "운영비 계획"}, {"cost-actual", "운영비 실적"}, {"cost-diff", "운영비 증감"}
+    };
+
     private final TableService tableService;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
 
@@ -122,130 +137,333 @@ public class IncineratorWorkbookService {
         c.setCellValue(value);
     }
 
-    /** Sheet 1 도급내역 — rows 7~37 (1-indexed) = day 1~31. 컬럼은 원본 엑셀과 동일. */
+    /** Sheet 1 도급내역 — 가져오기와 같은 {@link ContractLayout} 로 칸·일자를 찾아 쓴다. */
     private void fillContractTemplate(Sheet sheet, int year, int month) {
         String monthKey = monthKey(year, month);
         Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, monthKey), CONTRACT_TABLE);
-        // 제목 B1 업데이트
-        setTemplateText(sheet, 0, 1, "1. " + year + "년 " + month + "월 소각로 도급비용");
-        for (int day = 1; day <= 31; day += 1) {
-            int row = 5 + day; // POI 0-indexed: row 6 = day 1
-            // unit1: cols C(2) steam, D(3) unit, F(5) runtime, G(6) fixed
-            setTemplateValue(sheet, row, 2, contractVal(cells, "unit1", day, "steam"));
-            setTemplateValue(sheet, row, 3, contractVal(cells, "unit1", day, "unit"));
-            setTemplateValue(sheet, row, 5, contractVal(cells, "unit1", day, "runtime"));
-            setTemplateValue(sheet, row, 6, contractVal(cells, "unit1", day, "fixed"));
-            // unit2: cols J(9) steam, K(10) unit, M(12) runtime, N(13) fixed
-            setTemplateValue(sheet, row, 9, contractVal(cells, "unit2", day, "steam"));
-            setTemplateValue(sheet, row, 10, contractVal(cells, "unit2", day, "unit"));
-            setTemplateValue(sheet, row, 12, contractVal(cells, "unit2", day, "runtime"));
-            setTemplateValue(sheet, row, 13, contractVal(cells, "unit2", day, "fixed"));
-            // real: cols U(20) steam-1, V(21) unit-1, X(23) steam-2, Y(24) unit-2
-            setTemplateValue(sheet, row, 20, contractVal(cells, "real", day, "steam-1"));
-            setTemplateValue(sheet, row, 21, contractVal(cells, "real", day, "unit-1"));
-            setTemplateValue(sheet, row, 23, contractVal(cells, "real", day, "steam-2"));
-            setTemplateValue(sheet, row, 24, contractVal(cells, "real", day, "unit-2"));
+        int[] title = findTitleCell(sheet, k -> k.startsWith("1.") && k.contains("도급"));
+        if (title != null) setTemplateText(sheet, title[0], title[1], "1. " + year + "년 " + month + "월 소각로 도급비용");
+
+        ContractLayout layout = ContractLayout.of(sheet);
+        // 입력 칸만 쓴다(운영비용·소계 등은 템플릿 수식이 계산한다)
+        String[][] writes = {
+                {"unit1", "steam"}, {"unit1", "unit"}, {"unit1", "runtime"}, {"unit1", "fixed"},
+                {"unit2", "steam"}, {"unit2", "unit"}, {"unit2", "runtime"}, {"unit2", "fixed"},
+                {"real", "steam-1"}, {"real", "unit-1"}, {"real", "steam-2"}, {"real", "unit-2"},
+        };
+        for (String[] w : writes) {
+            Integer col = layout.columns(w[0]).get(w[1]);
+            if (col == null) continue;
+            for (Map.Entry<Integer, Integer> day : layout.dayRows(w[0]).entrySet()) {
+                setTemplateValue(sheet, day.getValue(), col, contractVal(cells, w[0], day.getKey(), w[1]));
+            }
         }
-        // 인건비 (J43) — summary|0|labor
-        Object labor = cells.get(rowKey(CONTRACT_TABLE, monthKeyMarker(), "summary|0|labor", 1));
-        if (labor != null) setTemplateValue(sheet, 42, 9, labor);  // J43 = row 42, col 9
+        int[] labor = contractLaborCell(sheet);
+        Object laborValue = cells.get(rowKey(CONTRACT_TABLE, monthKeyMarker(), "summary|0|labor", 1));
+        if (labor != null && laborValue != null) setTemplateValue(sheet, labor[0], labor[1], laborValue);
+    }
+
+    /** 도급 지급현황 표의 인건비 칸 — "구 분 / 인건비 / 총 금액" 머리글 아래 첫 줄. 없으면 null. */
+    private static int[] contractLaborCell(Sheet sheet) {
+        int header = SheetLabels.findRowWithAll(sheet, 0, "구 분", "인건비", "총 금액");
+        if (header < 0) return null;
+        Integer nameCol = SheetLabels.column(sheet, header, "구 분", 0);
+        Integer laborCol = SheetLabels.column(sheet, header, "인건비", 0);
+        int dataRow = SheetLabels.findRowInColumn(sheet, nameCol, header + 1, header + 5, k -> !k.isEmpty());
+        return (laborCol == null || dataRow < 0) ? null : new int[]{dataRow, laborCol};
+    }
+
+    /** 앞쪽 줄에서 조건에 맞는 제목 칸 {행, 열}. 없으면 null. */
+    private static int[] findTitleCell(Sheet sheet, java.util.function.Predicate<String> match) {
+        for (int r = 0; r <= 5; r += 1) {
+            for (int c = 0; c < SheetLabels.MAX_COL; c += 1) {
+                if (match.test(SheetLabels.key(SheetLabels.text(sheet, r, c)))) return new int[]{r, c};
+            }
+        }
+        return null;
     }
 
     private Object contractVal(Map<String, Object> cells, String section, int day, String field) {
         return cells.get(rowKey(CONTRACT_TABLE, monthKeyMarker(), section + "|" + day + "|" + field, 1));
     }
 
-    /** Sheet 2 사업계획대비 — 본표는 rows 5~10, 비고는 rows 18~41 */
+    /** Sheet 2 사업계획대비 — 가져오기와 같은 {@link #planVsLayout} 으로 칸을 찾아 쓴다. */
     private void fillPlanVsTemplate(Sheet sheet, int year, int month) {
         Map<String, String> values = collectPlanVsValues(year, month);
         hydratePlanVsComputedValues(values, year);
-        // 본표 — POI 0-indexed: row 4=labor.plan, row 5=labor.actual, row 6=op.plan, row 7=op.actual, row 8=total.plan, row 9=total.actual
-        // 각 row 의 month 컬럼: 0-indexed col 2 = m1, ..., col 13 = m12. 합계는 col 14.
-        String[][] planRows = {
-                {"labor", "plan"}, {"labor", "actual"},
-                {"operation", "plan"}, {"operation", "actual"},
-                {"total", "plan"}, {"total", "actual"},
-        };
-        for (int i = 0; i < planRows.length; i += 1) {
-            int rowIdx = 4 + i;
-            String section = planRows[i][0];
-            String kind = planRows[i][1];
-            for (int m = 1; m <= 12; m += 1) {
-                String v = values.get(section + "|" + kind + "-m" + m);
-                setTemplateValue(sheet, rowIdx, 1 + m, v);
+        PlanVsLayout layout = planVsLayout(sheet);
+        for (Map.Entry<String, Integer> row : layout.rows().entrySet()) {
+            for (Map.Entry<Integer, Integer> m : layout.months().entrySet()) {
+                setTemplateValue(sheet, row.getValue(), m.getValue(), values.get(row.getKey() + "-m" + m.getKey()));
             }
         }
-        // 구분(break) — POI row 15 (Excel row 16)
-        setTemplateValue(sheet, 15, 1, values.get("break|m-plan"));
-        setTemplateValue(sheet, 15, 2, values.get("break|m-actual"));
-        setTemplateValue(sheet, 15, 4, values.get("break|y-plan"));
-        setTemplateValue(sheet, 15, 5, values.get("break|y-actual"));
-        setTemplateValue(sheet, 15, 7, values.get("break|prev-actual"));
-        setTemplateText (sheet, 15, 10, values.get("break|note"));
-        // 비고 — POI rows 17..40 (Excel rows 18..41), 12 month × 2 unit
-        int rowIdx = 17;
-        for (int m = 1; m <= 12; m += 1) {
-            for (String unit : new String[]{"u1", "u2"}) {
-                String v = values.get("notes|m" + m + "-" + unit);
-                setTemplateText(sheet, rowIdx, 4, v);  // col E (4) — 비고 텍스트 위치
-                rowIdx += 1;
-            }
+        for (Map.Entry<String, Integer> b : layout.breakCols().entrySet()) {
+            String v = values.get("break|" + b.getKey());
+            if ("note".equals(b.getKey())) setTemplateText(sheet, layout.breakRow(), b.getValue(), v);
+            else setTemplateValue(sheet, layout.breakRow(), b.getValue(), v);
+        }
+        // 비고: 라벨 오른쪽 글자 칸들을 비우고 첫 칸에 쓴다 — 템플릿에 남은 옛 글자가 다시 올릴 때 붙지 않게
+        for (Map.Entry<String, int[]> n : layout.notes().entrySet()) {
+            int row = n.getValue()[0];
+            int[] textCols = java.util.Arrays.copyOfRange(n.getValue(), 1, n.getValue().length);
+            for (int col : textCols) setTemplateText(sheet, row, col, null);
+            if (textCols.length > 0) setTemplateText(sheet, row, textCols[0], values.get("notes|" + n.getKey()));
         }
     }
 
-    /** Sheet 3 전년대비 — row 4 (prev), row 5 (curr), row 6 (diff) for cost; rows 11/12/13 for ton */
+    /**
+     * 사업계획대비 시트 배치 — 가져오기·내보내기가 같이 쓴다.
+     *
+     * @param rows      "labor|plan" 등 → 줄
+     * @param months    월 → 열
+     * @param breakRow  이달 요약 줄. 없으면 -1
+     * @param breakCols "m-plan" 등 → 열
+     * @param notes     "m1-u1" 등 → {줄, 글자 칸…}
+     */
+    private record PlanVsLayout(Map<String, Integer> rows, Map<Integer, Integer> months, int breakRow,
+                                Map<String, Integer> breakCols, Map<String, int[]> notes) {
+    }
+
+    private PlanVsLayout planVsLayout(Sheet sheet) {
+        Map<String, Integer> rows = new LinkedHashMap<>();
+        Map<String, Integer> breakCols = new LinkedHashMap<>();
+        Map<String, int[]> notes = new LinkedHashMap<>();
+        int header = -1;
+        for (int r = 0; r <= SheetLabels.MAX_ROW && header < 0; r += 1) {
+            if (SheetLabels.column(sheet, r, "구 분", 0) != null && SheetLabels.isMonthHeader(sheet, r)) header = r;
+        }
+        if (header < 0) return new PlanVsLayout(rows, Map.of(), -1, breakCols, notes);
+        int labelCol = SheetLabels.column(sheet, header, "구 분", 0);
+        Map<Integer, Integer> months = SheetLabels.monthColumns(sheet, header);
+        int firstMonthCol = months.values().stream().min(Integer::compare).orElse(labelCol + 2);
+
+        // ① 월별 표 — A열 "(인건비)/(운영비)/(합계)" × 구분 칸 "…계획/…실적"
+        String group = "";
+        int r = header + 1;
+        for (; r <= header + 14; r += 1) {
+            if (SheetLabels.isMonthHeader(sheet, r) || SheetLabels.is(sheet, r, labelCol, "구 분")) break;
+            String a = SheetLabels.key(SheetLabels.text(sheet, r, labelCol));
+            if (!a.isEmpty()) group = a;
+            String section = group.contains("인건비") ? "labor" : group.contains("운영비") ? "operation"
+                    : group.contains("합계") ? "total" : null;
+            String kind = kindOf(sheet, r, labelCol + 1, firstMonthCol);
+            if (section != null && kind != null) rows.putIfAbsent(section + "|" + kind, r);
+        }
+
+        // ② 이달 요약 — 윗줄 "계획/실적" 왼쪽부터: 이달 계획·실적, 누계 계획·실적, 전월 실적 / "비 고"
+        int breakRow = SheetLabels.findRowInColumn(sheet, labelCol, r, SheetLabels.MAX_ROW,
+                k -> k.startsWith(SheetLabels.key("위탁운영비")));
+        if (breakRow > 0) {
+            int itemRow = -1;
+            for (int up = breakRow - 1; up >= Math.max(breakRow - 3, 0) && itemRow < 0; up -= 1) {
+                if (SheetLabels.column(sheet, up, "계 획", 0) != null && SheetLabels.column(sheet, up, "실 적", 0) != null) itemRow = up;
+            }
+            if (itemRow >= 0) {
+                java.util.List<Integer> plans = new java.util.ArrayList<>();
+                java.util.List<Integer> actuals = new java.util.ArrayList<>();
+                for (int col = 0; col < SheetLabels.MAX_COL; col += 1) {
+                    String k = SheetLabels.key(SheetLabels.text(sheet, itemRow, col));
+                    if (k.equals("계획")) plans.add(col);
+                    if (k.equals("실적")) actuals.add(col);
+                }
+                if (plans.size() > 0) breakCols.put("m-plan", plans.get(0));
+                if (actuals.size() > 0) breakCols.put("m-actual", actuals.get(0));
+                if (plans.size() > 1) breakCols.put("y-plan", plans.get(1));
+                if (actuals.size() > 1) breakCols.put("y-actual", actuals.get(1));
+                if (actuals.size() > 2) breakCols.put("prev-actual", actuals.get(2));
+                for (int up = itemRow; up >= Math.max(itemRow - 2, 0); up -= 1) {
+                    Integer noteCol = SheetLabels.column(sheet, up, "비 고", 0);
+                    if (noteCol != null) { breakCols.put("note", noteCol); break; }
+                }
+            }
+        }
+
+        // ③ 비고 — "N월" 은 위에서 이어받고, "#1/#2 폐합성수지소각로" 라벨 오른쪽이 글자 칸이다
+        int notesRow = SheetLabels.findRowInColumn(sheet, labelCol, Math.max(breakRow, r), SheetLabels.MAX_ROW,
+                k -> k.equals(SheetLabels.key("비 고")));
+        if (notesRow >= 0) {
+            Integer noteMonth = null;
+            for (int nr = notesRow; nr <= sheet.getLastRowNum(); nr += 1) {
+                Integer unitCol = null;
+                String unit = null;
+                for (int col = 0; col < SheetLabels.MAX_COL && unitCol == null; col += 1) {
+                    String k = SheetLabels.key(SheetLabels.text(sheet, nr, col));
+                    if (!k.contains("폐합성")) continue;
+                    if (k.startsWith("#1")) { unitCol = col; unit = "u1"; }
+                    else if (k.startsWith("#2")) { unitCol = col; unit = "u2"; }
+                }
+                if (unitCol == null) continue;
+                for (int col = 0; col < unitCol; col += 1) {
+                    Integer m = SheetLabels.monthOf(SheetLabels.text(sheet, nr, col));
+                    if (m != null) noteMonth = m;
+                }
+                if (noteMonth == null) continue;
+                notes.put("m" + noteMonth + "-" + unit, noteTextCells(sheet, nr, unitCol));
+            }
+        }
+        return new PlanVsLayout(rows, months, breakRow, breakCols, notes);
+    }
+
+    /**
+     * 비고 줄의 글자 칸 {줄, 칸…}. 라벨 칸이 병합돼 있으면 병합 끝 다음부터, 그 줄에서 병합 묶음마다 첫 칸을 모은다.
+     * (원본은 라벨 C:D 병합, 글자 E:F · G:… 두 묶음)
+     */
+    private static int[] noteTextCells(Sheet sheet, int row, int labelCol) {
+        java.util.List<Integer> cols = new java.util.ArrayList<>();
+        cols.add(row);
+        int col = mergedLastColumn(sheet, row, labelCol) + 1;
+        int last = Math.max(col, lastUsedColumn(sheet, row));
+        while (col <= last) {
+            cols.add(col);
+            col = mergedLastColumn(sheet, row, col) + 1;
+        }
+        return cols.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    private static int mergedLastColumn(Sheet sheet, int row, int col) {
+        for (org.apache.poi.ss.util.CellRangeAddress m : sheet.getMergedRegions()) {
+            if (m.isInRange(row, col)) return m.getLastColumn();
+        }
+        return col;
+    }
+
+    private static int lastUsedColumn(Sheet sheet, int row) {
+        for (int col = SheetLabels.MAX_COL - 1; col >= 0; col -= 1) {
+            if (!SheetLabels.text(sheet, row, col).isBlank()) return col;
+        }
+        return -1;
+    }
+
+    /** Sheet 3 전년대비 — "구 분 | 1월 …" 표마다 첫 "…실적" 줄이 전년, 둘째가 올해다. */
     private void fillYoyTemplate(Sheet sheet, int year) {
         Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), YOY_TABLE);
         hydrateYoyComputedCells(cells, year);
-        // cost section
-        for (int m = 1; m <= 12; m += 1) {
-            setTemplateValue(sheet, 3, 1 + m, cells.get(rowKey(YOY_TABLE, monthKeyMarker(), "cost|prev-m" + m, 1)));
-            setTemplateValue(sheet, 4, 1 + m, cells.get(rowKey(YOY_TABLE, monthKeyMarker(), "cost|curr-m" + m, 1)));
-        }
-        // ton section
-        for (int m = 1; m <= 12; m += 1) {
-            setTemplateValue(sheet, 10, 1 + m, cells.get(rowKey(YOY_TABLE, monthKeyMarker(), "ton|prev-m" + m, 1)));
-            setTemplateValue(sheet, 11, 1 + m, cells.get(rowKey(YOY_TABLE, monthKeyMarker(), "ton|curr-m" + m, 1)));
+        for (Map.Entry<String, Integer> r : yoyRows(sheet).entrySet()) {
+            Map<Integer, Integer> months = SheetLabels.monthColumns(sheet, yoyHeaderAbove(sheet, r.getValue()));
+            for (Map.Entry<Integer, Integer> m : months.entrySet()) {
+                setTemplateValue(sheet, r.getValue(), m.getValue(),
+                        cells.get(rowKey(YOY_TABLE, monthKeyMarker(), r.getKey() + "-m" + m.getKey(), 1)));
+            }
         }
     }
 
-    /** Sheet 4 계획대비 가동실적 — rows 5~16 (1-indexed) = m1~m12 */
+    /** 전년대비 표의 "cost|prev" · "cost|curr" · "ton|prev" · "ton|curr" → 줄. */
+    private Map<String, Integer> yoyRows(Sheet sheet) {
+        Map<String, Integer> rows = new LinkedHashMap<>();
+        for (int header = 0; header <= SheetLabels.MAX_ROW; header += 1) {
+            if (!SheetLabels.isMonthHeader(sheet, header)) continue;
+            Integer labelCol = SheetLabels.column(sheet, header, "구 분", 0);
+            if (labelCol == null) continue;
+            int firstMonthCol = SheetLabels.monthColumns(sheet, header).values().stream().min(Integer::compare).orElse(labelCol + 2);
+            String group = "";
+            int actualSeen = 0;
+            for (int r = header + 1; r <= header + 5 && actualSeen < 2; r += 1) {
+                String a = SheetLabels.key(SheetLabels.text(sheet, r, labelCol));
+                if (!a.isEmpty()) group = a;
+                if (!"actual".equals(kindOf(sheet, r, labelCol + 1, firstMonthCol))) continue;
+                String form = group.contains("스팀생산량") ? "ton" : group.contains("합계") ? "cost" : null;
+                if (form == null) break;
+                rows.put(form + "|" + (actualSeen == 0 ? "prev" : "curr"), r);
+                actualSeen += 1;
+            }
+        }
+        return rows;
+    }
+
+    private static int yoyHeaderAbove(Sheet sheet, int row) {
+        for (int r = row - 1; r >= 0; r -= 1) if (SheetLabels.isMonthHeader(sheet, r)) return r;
+        return -1;
+    }
+
+    /** Sheet 4 계획대비 가동실적 — 가져오기와 같은 {@link #operationLayout} 으로 칸·월을 찾아 쓴다. */
     private void fillOperationTemplate(Sheet sheet, int year) {
         Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), OPERATION_TABLE);
         hydrateOperationComputedCells(cells);
-        // POI 0-indexed: row 4 = m1, row 15 = m12
-        // hours: cols T(19), U(20), W(22), X(23) for u1-plan, u1-actual, u2-plan, u2-actual
-        for (int m = 1; m <= 12; m += 1) {
-            int rowIdx = 3 + m;
-            setTemplateValue(sheet, rowIdx, 19, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|u1-plan", 1)));
-            setTemplateValue(sheet, rowIdx, 20, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|u1-actual", 1)));
-            setTemplateValue(sheet, rowIdx, 22, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|u2-plan", 1)));
-            setTemplateValue(sheet, rowIdx, 23, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|u2-actual", 1)));
-            // metric: steam, rate, cost — Z(25), AA(26), AC(28), AD(29), AF(31), AG(32) — plan/actual columns
-            // Excel cols: Z=25 (plan steam), AA=26 (actual steam), AC=28 (plan rate), AD=29 (actual rate), AF=31 (plan cost), AG=32 (actual cost)
-            setTemplateValue(sheet, rowIdx, 25, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|steam-plan", 1)));
-            setTemplateValue(sheet, rowIdx, 26, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|steam-actual", 1)));
-            setTemplateValue(sheet, rowIdx, 28, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|rate-plan", 1)));
-            setTemplateValue(sheet, rowIdx, 29, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|rate-actual", 1)));
-            setTemplateValue(sheet, rowIdx, 31, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|cost-plan", 1)));
-            setTemplateValue(sheet, rowIdx, 32, cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|cost-actual", 1)));
+        OperationLayout layout = operationLayout(sheet);
+        for (Map.Entry<Integer, Integer> m : layout.monthRows().entrySet()) {
+            for (Map.Entry<String, Integer> h : layout.hours().entrySet()) {
+                setTemplateValue(sheet, m.getValue(), h.getValue(),
+                        cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m.getKey() + "|" + h.getKey(), 1)));
+            }
+            for (Map.Entry<String, Integer> h : layout.metrics().entrySet()) {
+                setTemplateValue(sheet, m.getValue(), h.getValue(),
+                        cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m.getKey() + "|" + h.getKey(), 1)));
+            }
         }
     }
 
-    /** Sheet 5 총비용 — rows 6~17 (1-indexed) = m1~m12. 블록별로 다른 시작 col. */
+    /** 가동실적 배치 — 월 → 줄, 필드 → 열. 가져오기·내보내기가 같이 쓴다. */
+    private record OperationLayout(Map<Integer, Integer> monthRows, Map<String, Integer> hours, Map<String, Integer> metrics) {
+    }
+
+    /**
+     * 설비(위 줄) + 항목(아래 줄) 제목으로 칸을, "N월" 로 줄을 찾는다.
+     * 스팀생산량·운영단가·위탁운영비용은 왼쪽에도 같은 이름의 표가 있어서 "폐합성 2호기" 다음부터 찾는다.
+     */
+    private static OperationLayout operationLayout(Sheet sheet) {
+        Map<String, Integer> hours = new LinkedHashMap<>();
+        Map<String, Integer> metrics = new LinkedHashMap<>();
+        int groupRow = SheetLabels.findRow(sheet, 0, k -> k.equals(SheetLabels.key("폐합성 1호기")));
+        if (groupRow < 0) return new OperationLayout(Map.of(), hours, metrics);
+        int itemRow = groupRow + 1;
+        HeaderColumnIndex index = HeaderColumnIndex.build(sheet, -1, groupRow, itemRow, itemRow + 1, itemRow + 16, 0);
+        putIfFound(hours, "u1-plan", index.column("폐합성 1호기", "가동계획(hr)"));
+        putIfFound(hours, "u1-actual", index.column("폐합성 1호기", "가동실적(hr)"));
+        putIfFound(hours, "u2-plan", index.column("폐합성 2호기", "가동계획(hr)"));
+        putIfFound(hours, "u2-actual", index.column("폐합성 2호기", "가동실적(hr)"));
+        int cursor = hours.values().stream().max(Integer::compare).orElse(0) + 1;
+        String[][] metricHeaders = {
+                {"steam-plan", "스팀생산량", "계획"}, {"steam-actual", "스팀생산량", "실적"},
+                {"rate-plan", "운영단가(위탁)", "계획"}, {"rate-actual", "운영단가(위탁)", "실적"},
+                {"cost-plan", "위탁운영비용(천원)", "계획"}, {"cost-actual", "위탁운영비용(천원)", "실적"}
+        };
+        for (String[] h : metricHeaders) {
+            Integer col = index.columnAfter(cursor, h[1], h[2]);
+            if (col == null) continue;
+            metrics.put(h[0], col);
+            cursor = col + 1;
+        }
+        int monthCol = SheetLabels.monthLabelColumn(sheet, itemRow + 1, itemRow + 16);
+        Map<Integer, Integer> monthRows = monthCol < 0 ? Map.of()
+                : SheetLabels.monthRows(sheet, monthCol, itemRow + 1, itemRow + 16, k -> k.equals(SheetLabels.key("합계")));
+        return new OperationLayout(monthRows, hours, metrics);
+    }
+
+    /**
+     * Sheet 5 총비용 — 가져오기와 같은 제목 기반 칸·"N월" 줄로 세 표(운영내역·자체 운영비용·소모품)를 모두 쓴다.
+     * (예전에는 운영내역만, 그것도 한 줄 아래에 써서 다시 올리면 달이 하나씩 밀렸다)
+     */
     private void fillTotalCostTemplate(Sheet sheet, int year) {
         Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), TOTAL_COST_TABLE);
         hydrateTotalCostComputedCells(cells, year);
-        for (int m = 1; m <= 12; m += 1) {
-            int rowIdx = 5 + m;
-            // op-burn (block 0): cols B(1) ~ N(13). order matches TOTAL_COST_BLOCKS[0].fields
-            fillTotalCostBlock(sheet, rowIdx, m, cells, TOTAL_COST_BLOCKS[0], 1);
-            // op-cost (block 1): cols O(14) ~ W(22)
-            fillTotalCostBlock(sheet, rowIdx, m, cells, TOTAL_COST_BLOCKS[1], 14);
+        for (String table : new String[]{"op", "self", "mat"}) {
+            String anchor = totalCostAnchor(table);
+            Map<String, Integer> columns = totalCostColumns(sheet, anchor, totalCostHeaders(table));
+            for (Map.Entry<Integer, Integer> m : totalCostMonthRows(sheet, anchor).entrySet()) {
+                for (Map.Entry<String, Integer> c : columns.entrySet()) {
+                    String[] sectionField = c.getKey().split("\\|", 2);
+                    String key = sectionField[0] + "|" + m.getKey() + "|" + sectionField[1];
+                    setTemplateValue(sheet, m.getValue(), c.getValue(), cells.get(rowKey(TOTAL_COST_TABLE, monthKeyMarker(), key, 1)));
+                }
+            }
         }
-        // 자체운영비용 블록 (rows 26~37 in Excel, 0-indexed 25~36? Need to check actual template structure)
-        // 소모품 블록 (rows 49~60 in Excel)
-        // 위 블록들은 원본 엑셀에 없거나 위치가 다를 수 있어서 일단 op-burn/op-cost 만 처리.
+    }
+
+    static String totalCostAnchor(String table) {
+        return switch (table) {
+            case "op" -> "폐기물 실소각량";
+            case "self" -> "외부 폐합성수지 수익금";
+            default -> "소각로별 부생유 사용량";
+        };
+    }
+
+    /** 총 운영비용 표 한 벌의 월 → 줄. 표 제목 줄 아래 "N월" 칸, "합계" 에서 멈춘다. */
+    static Map<Integer, Integer> totalCostMonthRows(Sheet sheet, String anchor) {
+        int groupRow = SheetLabels.findRow(sheet, 0, k -> k.startsWith(SheetLabels.key(anchor)));
+        if (groupRow < 0) return Map.of();
+        int monthCol = SheetLabels.monthLabelColumn(sheet, groupRow + 1, groupRow + 20);
+        if (monthCol < 0) return Map.of();
+        return SheetLabels.monthRows(sheet, monthCol, groupRow + 1, groupRow + 20, k -> k.equals(SheetLabels.key("합계")));
     }
 
     private void fillTotalCostBlock(Sheet sheet, int rowIdx, int m, Map<String, Object> cells, TotalCostBlock block, int firstCol) {
@@ -255,32 +473,80 @@ public class IncineratorWorkbookService {
         }
     }
 
-    /** Sheet 6 사고이력 — 행 단위로 추가 */
+    /**
+     * Sheet 6 사고이력 — 가져오기와 같은 머리글("No. / 일 자 / 사 유 / …")로 사고·정비 두 표를 찾아,
+     * 템플릿에 남은 옛 기록을 비우고 DB 기록을 번호 순서대로 채운다.
+     * (예전에는 머리글 위치와 상관없이 4행 A열부터 써서, 내려받은 파일을 다시 올리면 기록이 모두 빠졌다)
+     */
     private void fillAccidentTemplate(Sheet sheet, int year) {
         String mk = year + "-00";
-        List<Map<String, Object>> rows = tableService.listAllByMonth(CELL_TABLE, mk);
-        // Sheet 6 의 헤더 위치는 원본 기준 row 3 (0-indexed 2). 데이터는 row 3 이하.
-        // 사고/정비를 id 별로 그룹화: row_key prefix:N → 사고 N 번 데이터
-        Map<String, Map<Integer, Object>> grouped = new LinkedHashMap<>();
-        for (Map<String, Object> row : rows) {
+        Map<String, java.util.TreeMap<Integer, Map<Integer, Object>>> byPrefix = new LinkedHashMap<>();
+        byPrefix.put(ACCIDENT_PREFIX, new java.util.TreeMap<>());
+        byPrefix.put(MAINTENANCE_PREFIX, new java.util.TreeMap<>());
+        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, mk)) {
             String rowKey = String.valueOf(row.get("row_key"));
-            if (!rowKey.startsWith(ACCIDENT_PREFIX) && !rowKey.startsWith(MAINTENANCE_PREFIX)) continue;
-            int colIndex = ((Number) row.getOrDefault("col_index", 0)).intValue();
-            grouped.computeIfAbsent(rowKey, k -> new LinkedHashMap<>()).put(colIndex, row.get("cell_value"));
+            for (Map.Entry<String, java.util.TreeMap<Integer, Map<Integer, Object>>> e : byPrefix.entrySet()) {
+                if (!rowKey.startsWith(e.getKey())) continue;
+                int id = recordNumber(rowKey.substring(e.getKey().length()));
+                int colIndex = ((Number) row.getOrDefault("col_index", 0)).intValue();
+                e.getValue().computeIfAbsent(id, k -> new LinkedHashMap<>()).put(colIndex, row.get("cell_value"));
+            }
         }
-        int dataRowStart = 3;  // POI 0-indexed
-        int rIdx = dataRowStart;
-        for (Map.Entry<String, Map<Integer, Object>> e : grouped.entrySet()) {
-            Map<Integer, Object> cols = e.getValue();
-            // 컬럼: 1=일자, 2=사유, 3=조치내역, 4=운휴시간, 5=손실금액(사고만), 6=비고
-            setTemplateText (sheet, rIdx, 0, String.valueOf(cols.getOrDefault(1, "")));
-            setTemplateText (sheet, rIdx, 1, String.valueOf(cols.getOrDefault(2, "")));
-            setTemplateText (sheet, rIdx, 2, String.valueOf(cols.getOrDefault(3, "")));
-            setTemplateValue(sheet, rIdx, 3, cols.get(4));
-            setTemplateValue(sheet, rIdx, 4, cols.get(5));
-            setTemplateText (sheet, rIdx, 5, String.valueOf(cols.getOrDefault(6, "")));
-            rIdx += 1;
+        java.util.List<AccidentBlock> blocks = accidentBlocks(sheet);
+        String[] prefixes = {ACCIDENT_PREFIX, MAINTENANCE_PREFIX};
+        for (int b = 0; b < blocks.size() && b < prefixes.length; b += 1) {
+            AccidentBlock block = blocks.get(b);
+            java.util.List<Map<Integer, Object>> records = new java.util.ArrayList<>(byPrefix.get(prefixes[b]).values());
+            int i = 0;
+            for (int r = block.firstRow(); r <= block.lastRow(); r += 1, i += 1) {
+                Map<Integer, Object> rec = i < records.size() ? records.get(i) : Map.of();
+                setAccidentCell(sheet, r, block.cols().get("no"), rec.isEmpty() ? null : rec.getOrDefault(7, String.valueOf(i + 1)), true);
+                setAccidentCell(sheet, r, block.cols().get("date"), rec.get(1), false);
+                setAccidentCell(sheet, r, block.cols().get("reason"), rec.get(2), false);
+                setAccidentCell(sheet, r, block.cols().get("action"), rec.get(3), false);
+                setAccidentCell(sheet, r, block.cols().get("downtime"), rec.get(4), true);
+                setAccidentCell(sheet, r, block.cols().get("loss"), rec.get(5), true);
+                setAccidentCell(sheet, r, block.cols().get("note"), rec.get(6), false);
+            }
         }
+    }
+
+    /** 기록 번호("1", "12.0") — 숫자가 아니면 뒤로 보낸다. */
+    private static int recordNumber(String id) {
+        String digits = id == null ? "" : id.replaceAll("\\.0$", "").replaceAll("\\D", "");
+        try {
+            return digits.isEmpty() ? Integer.MAX_VALUE : Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    private void setAccidentCell(Sheet sheet, int row, Integer col, Object value, boolean numeric) {
+        if (col == null) return;
+        if (numeric) setTemplateValue(sheet, row, col, value);
+        else setTemplateText(sheet, row, col, value == null ? null : String.valueOf(value));
+    }
+
+    /** 사고·정비 표 한 벌 — 머리글 칸과 데이터 줄 범위. */
+    private record AccidentBlock(Map<String, Integer> cols, int firstRow, int lastRow) {
+    }
+
+    /** "일 자 / 조치내역" 머리글이 있는 표를 위에서부터 — 첫 표 사고, 둘째 정비. 끝은 "…횟수" 집계 줄 바로 위. */
+    private static java.util.List<AccidentBlock> accidentBlocks(Sheet sheet) {
+        java.util.List<AccidentBlock> blocks = new java.util.ArrayList<>();
+        for (int header = 0; header <= SheetLabels.MAX_ROW && blocks.size() < 2; header += 1) {
+            Map<String, Integer> cols = accidentColumns(sheet, header);
+            if (cols == null) continue;
+            int noCol = cols.getOrDefault("no", cols.get("date") - 1);
+            int r = header + 1;
+            for (; r <= header + 40; r += 1) {
+                String k = SheetLabels.key(SheetLabels.text(sheet, r, noCol));
+                if (k.endsWith("횟수") || accidentColumns(sheet, r) != null) break;
+            }
+            blocks.add(new AccidentBlock(cols, header + 1, r - 1));
+            header = r;
+        }
+        return blocks;
     }
 
     private CellStyle createHeaderStyle(Workbook workbook) {
@@ -322,14 +588,12 @@ public class IncineratorWorkbookService {
         // header row
         Row header = sheet.getRow(startRow);
         if (header == null) header = sheet.createRow(startRow);
-        String[] headers;
-        if ("real".equals(section)) {
-            headers = new String[]{"일별", "1호기 스팀량", "1호기 단가", "1호기 운영비용", "2호기 스팀량", "2호기 단가", "2호기 운영비용", "스팀량 합계", "총 운영비용"};
-        } else {
-            headers = new String[]{"일별", "스팀량", "운영단가", "운영비용", "운휴시간", "시간당 고정비", "운휴비용", "소계"};
-        }
+        String[] headers = "real".equals(section) ? CONTRACT_REAL_HEADERS : CONTRACT_UNIT_HEADERS;
+        Cell dayHeader = header.createCell(0);
+        dayHeader.setCellValue("일별");
+        dayHeader.setCellStyle(headerStyle);
         for (int c = 0; c < headers.length; c += 1) {
-            Cell cell = header.createCell(c);
+            Cell cell = header.createCell(c + 1);
             cell.setCellValue(headers[c]);
             cell.setCellStyle(headerStyle);
         }
@@ -510,14 +774,12 @@ public class IncineratorWorkbookService {
         styleRow(sheet, row, 0, 6, headerStyle);
         row += 1;
         setString(sheet, row, 0, "월");
-        String[] hoursFields = {"u1-plan", "u1-actual", "u1-rate", "u2-plan", "u2-actual", "u2-rate"};
-        String[] hoursLabels = {"1호기 계획", "1호기 실적", "1호기 달성율", "2호기 계획", "2호기 실적", "2호기 달성율"};
-        for (int i = 0; i < hoursFields.length; i += 1) setString(sheet, row, i + 1, hoursLabels[i]);
+        for (int i = 0; i < OPERATION_HOURS_HEADERS.length; i += 1) setString(sheet, row, i + 1, OPERATION_HOURS_HEADERS[i][1]);
         row += 1;
         for (int m = 1; m <= 12; m += 1) {
             setString(sheet, row, 0, m + "월");
-            for (int i = 0; i < hoursFields.length; i += 1) {
-                Object v = cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|" + hoursFields[i], 1));
+            for (int i = 0; i < OPERATION_HOURS_HEADERS.length; i += 1) {
+                Object v = cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "hours|" + m + "|" + OPERATION_HOURS_HEADERS[i][0], 1));
                 if (v != null && !String.valueOf(v).isBlank()) setNumericOrText(sheet, row, i + 1, v);
             }
             row += 1;
@@ -529,24 +791,13 @@ public class IncineratorWorkbookService {
         styleRow(sheet, row, 0, 10, headerStyle);
         row += 1;
         setString(sheet, row, 0, "월");
-        String[] metricHeaders = {
-                "스팀량 계획", "스팀량 실적", "스팀량 증감",
-                "단가 계획", "단가 실적", "단가 증감",
-                "운영비 계획", "운영비 실적", "운영비 증감"
-        };
-        for (int i = 0; i < metricHeaders.length; i += 1) setString(sheet, row, i + 1, metricHeaders[i]);
+        for (int i = 0; i < OPERATION_METRIC_HEADERS.length; i += 1) setString(sheet, row, i + 1, OPERATION_METRIC_HEADERS[i][1]);
         row += 1;
-        String[] metrics = {"steam", "rate", "cost"};
-        String[] metricKinds = {"plan", "actual", "diff"};
         for (int m = 1; m <= 12; m += 1) {
             setString(sheet, row, 0, m + "월");
-            int col = 1;
-            for (String metric : metrics) {
-                for (String kind : metricKinds) {
-                    Object v = cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|" + metric + "-" + kind, 1));
-                    if (v != null && !String.valueOf(v).isBlank()) setNumericOrText(sheet, row, col, v);
-                    col += 1;
-                }
+            for (int i = 0; i < OPERATION_METRIC_HEADERS.length; i += 1) {
+                Object v = cells.get(rowKey(OPERATION_TABLE, monthKeyMarker(), "metric|" + m + "|" + OPERATION_METRIC_HEADERS[i][0], 1));
+                if (v != null && !String.valueOf(v).isBlank()) setNumericOrText(sheet, row, i + 1, v);
             }
             row += 1;
         }
@@ -739,161 +990,130 @@ public class IncineratorWorkbookService {
         return importContractSheetByPosition(sheet, year, month);
     }
 
+    /**
+     * 우리 내려받기 양식의 도급내역 — 머리글 글자로 칸을 찾는다.
+     *
+     * <p>호기 표는 "일별 | 스팀량 | 운영단가 | … | 운휴비용 | 소계", 실 스팀량 표는 "일별 | 1호기 스팀량 | …" 머리글이다.
+     * 원본 양식에도 "일별"·"운영단가" 는 있지만 "운휴비용"·"1호기 스팀량" 같은 한 칸짜리 제목은 우리 양식에만 있어서
+     * 그걸로 가른다(원본이면 0 을 돌려주고 원본용 읽기로 넘어간다). 칸 목록은 내려받기와 같은 상수를 쓴다.
+     */
     private int importContractSheetByLabel(Sheet sheet, int year, int month) {
-        // 도급내역 시트는 선택한 월 1개월치 데이터로 간주. 시트의 월 헤더 라벨은 무시하고 사용자가 지정한 month 로 저장.
         int imported = 0;
-        String currentSection = null;
-        int sectionDataStartRow = -1;
-        int lastRow = sheet.getLastRowNum();
         String monthKey = monthKey(year, month);
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String col0 = readCellValue(row.getCell(0));
-            if (col0 == null) col0 = "";
-            // 월 헤더는 단순 skip
-            if (col0.matches(".*\\d{4}년\\s*\\d{1,2}월.*")) { currentSection = null; continue; }
-            if ("1호기".equals(col0.trim())) { currentSection = "unit1"; sectionDataStartRow = r + 2; continue; }
-            if ("2호기".equals(col0.trim())) { currentSection = "unit2"; sectionDataStartRow = r + 2; continue; }
-            if (col0.trim().startsWith("실 스팀량")) { currentSection = "real"; sectionDataStartRow = r + 2; continue; }
-            if (currentSection == null) continue;
-            if (r < sectionDataStartRow) continue;
-            int day = parseDay(col0);
-            if (day < 1 || day > 31) continue;
-            String[] fields = "real".equals(currentSection) ? REAL_FIELDS : UNIT_FIELDS;
+        for (int header = 0; header <= SheetLabels.MAX_ROW; header += 1) {
+            Integer dayCol = SheetLabels.column(sheet, header, "일별", 0);
+            if (dayCol == null) continue;
+            String section;
+            String[] headers;
+            String[] fields;
+            if (SheetLabels.column(sheet, header, CONTRACT_REAL_HEADERS[0], 0) != null) {
+                section = "real";
+                headers = CONTRACT_REAL_HEADERS;
+                fields = REAL_FIELDS;
+            } else if (SheetLabels.column(sheet, header, "운휴비용", 0) != null) {
+                String above = SheetLabels.key(SheetLabels.text(sheet, header - 1, dayCol));
+                section = above.equals(SheetLabels.key("1호기")) ? "unit1" : above.equals(SheetLabels.key("2호기")) ? "unit2" : null;
+                headers = CONTRACT_UNIT_HEADERS;
+                fields = UNIT_FIELDS;
+            } else {
+                continue;
+            }
+            if (section == null) continue;
+            Map<String, Integer> columns = new LinkedHashMap<>();
             for (int idx = 0; idx < fields.length; idx += 1) {
-                String value = readCellValue(row.getCell(idx + 1));
-                if (value == null || value.isBlank()) continue;
-                imported += upsertCell(monthKey, year, month, CONTRACT_TABLE,
-                        currentSection + "|" + day + "|" + fields[idx], 1, value);
+                putIfFound(columns, fields[idx], SheetLabels.column(sheet, header, headers[idx], dayCol + 1));
+            }
+            for (int r = header + 1; r <= header + 33; r += 1) {
+                int day = parseDay(SheetLabels.text(sheet, r, dayCol));
+                if (day < 1 || day > 31) continue;
+                Row row = sheet.getRow(r);
+                for (Map.Entry<String, Integer> c : columns.entrySet()) {
+                    String value = readCellValue(row.getCell(c.getValue()));
+                    if (value == null || value.isBlank()) continue;
+                    imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, section + "|" + day + "|" + c.getKey(), 1, value);
+                }
             }
         }
         return imported;
     }
 
     private int importPlanVsSheet(Sheet sheet, int year, int month) {
-        // 형식 감지: 우리 export 는 row 2 에 c0="구분" c1="행" 헤더가 있음. 원본 엑셀은 다른 구조.
-        if (isOurExportPlanVsFormat(sheet)) {
+        // 우리 내려받기 양식은 "구분 | 행 | 1월 …" 머리글이 있다 — 원본에는 "행" 칸이 없다.
+        if (SheetLabels.findRowWithAll(sheet, 0, "구분", "행") >= 0) {
             return importPlanVsSheetByLabel(sheet, year, month);
         }
         return importPlanVsSheetByPosition(sheet, year, month);
     }
 
-    private boolean isOurExportPlanVsFormat(Sheet sheet) {
-        Row r2 = sheet.getRow(2);
-        if (r2 == null) return false;
-        String c0 = readCellValue(r2.getCell(0));
-        String c1 = readCellValue(r2.getCell(1));
-        return "구분".equals(c0 == null ? "" : c0.trim()) && "행".equals(c1 == null ? "" : c1.trim());
-    }
-
+    /**
+     * 우리 내려받기 양식의 사업계획대비 — 세 표 모두 머리글로 찾는다.
+     *
+     * <pre>
+     *  월별 표 : "구분 | 행 | 1월 … 12월"      — 구분 칸 인건비/운영비/합계 × 행 칸 계획/실적
+     *  요약 표 : "구분 (백만원)" 아래 라벨 줄     — 라벨 바로 오른쪽 칸이 값(머리글이 따로 없다)
+     *  비고 표 : "비고 | 호기 | 내용"
+     * </pre>
+     * 자동 계산 칸(달성율·증감, 운영비·합계 실적, 요약의 증감)은 예전처럼 읽지 않는다.
+     */
     private int importPlanVsSheetByLabel(Sheet sheet, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
-        int lastRow = sheet.getLastRowNum();
-        String currentBlock = null;
-        // 본 표 헤더 행 찾기: col0="구분", col1="행"
-        // plan groups rows: (groupLabel, kind)
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String c0 = readCellValue(row.getCell(0));
-            String c1 = readCellValue(row.getCell(1));
-            if (c0 == null) c0 = "";
-            if (c1 == null) c1 = "";
 
-            if (c0.equals("구분") && c1.equals("행")) { currentBlock = "plan"; continue; }
-            if (c0.startsWith("구분 (백만원)")) { currentBlock = "break"; continue; }
-            // 우리 export 형식: c0="비고", c1="호기"
-            if (c0.equals("비고") && c1.equals("호기")) { currentBlock = "notes"; continue; }
-            // 원본 엑셀 형식: c0 가 공백 포함 "비   고" (whitespace normalize 후 "비고")
-            String c0Norm = c0.replaceAll("\\s+", "");
-            if (c0Norm.equals("비고") && !c1.equals("호기")) {
-                currentBlock = "notes";
-                // c1 에 month label(예: "1월") 이 있으면 이 행도 데이터 행으로 fall-through 처리
-                if (parseMonthLabel(c1) >= 1) {
-                    // skip continue 하여 같은 행을 notes 블록 데이터 처리에 넘김
-                } else {
-                    continue;
-                }
+        int header = SheetLabels.findRowWithAll(sheet, 0, "구분", "행");
+        int groupCol = SheetLabels.column(sheet, header, "구분", 0);
+        int kindCol = SheetLabels.column(sheet, header, "행", 0);
+        Map<Integer, Integer> months = SheetLabels.monthColumns(sheet, header);
+        int breakRow = SheetLabels.findRow(sheet, header + 1, k -> k.startsWith(SheetLabels.key("구분 (백만원)")));
+        int notesHeader = SheetLabels.findRowWithAll(sheet, header + 1, "비고", "호기", "내용");
+        int planEnd = breakRow > 0 ? breakRow : (notesHeader > 0 ? notesHeader : sheet.getLastRowNum() + 1);
+
+        for (int r = header + 1; r < planEnd; r += 1) {
+            String section = mapPlanGroup(SheetLabels.text(sheet, r, groupCol));
+            String kind = mapPlanKind(SheetLabels.text(sheet, r, kindCol));
+            if (section == null || kind == null) continue;
+            if ("rate".equals(kind) || "diff".equals(kind)) continue;
+            if (("operation".equals(section) || "total".equals(section)) && "actual".equals(kind)) continue;
+            Row row = sheet.getRow(r);
+            for (Map.Entry<Integer, Integer> m : months.entrySet()) {
+                String v = readCellValue(row.getCell(m.getValue()));
+                if (v == null || v.isBlank()) continue;
+                imported += upsertCell(monthKey, year, month, PLAN_VS_TABLE, section + "|" + kind + "-m" + m.getKey(), 1, v);
             }
-            if ("plan".equals(currentBlock)) {
-                String section = mapPlanGroup(c0);
-                String kind = mapPlanKind(c1);
-                if (section == null || kind == null) continue;
-                // 자동계산 셀은 import 하지 않는다 (rate, diff; operation.actual, total.actual)
-                if ("rate".equals(kind) || "diff".equals(kind)) continue;
-                if (("operation".equals(section) || "total".equals(section)) && "actual".equals(kind)) continue;
-                for (int m = 1; m <= 12; m += 1) {
-                    String v = readCellValue(row.getCell(1 + m));
-                    if (v == null || v.isBlank()) continue;
-                    imported += upsertCell(monthKey, year, month, PLAN_VS_TABLE, section + "|" + kind + "-m" + m, 1, v);
-                }
-            } else if ("break".equals(currentBlock)) {
-                String field = mapBreakField(c0);
-                if (field == null) continue;
-                // 자동 계산 셀 skip
-                if (field.endsWith("-diff") || "prev-rate".equals(field)) continue;
-                String v = readCellValue(row.getCell(1));
+        }
+
+        if (breakRow > 0) {
+            int labelCol = SheetLabels.columnStartingWith(sheet, breakRow, "구분 (백만원)", 0);
+            int end = notesHeader > 0 ? notesHeader : sheet.getLastRowNum() + 1;
+            for (int r = breakRow + 1; r < end; r += 1) {
+                String field = mapBreakField(SheetLabels.text(sheet, r, labelCol));
+                if (field == null || field.endsWith("-diff") || "prev-rate".equals(field)) continue;
+                Row row = sheet.getRow(r);
+                String v = row == null ? null : readCellValue(row.getCell(labelCol + 1));
                 if (v == null || v.isBlank()) continue;
                 imported += upsertCell(monthKey, year, month, PLAN_VS_TABLE, "break|" + field, 1, v);
-            } else if ("notes".equals(currentBlock)) {
-                // month label: c0(우리 export) 또는 c1(원본 엑셀) 위치에서 시도
-                int m = parseMonthLabel(c0);
-                if (m < 1) m = parseMonthLabel(c1);
-                // unit label: 우리 export 는 c1, 원본 엑셀은 c2 위치
-                String unit = null;
-                if (c1.contains("#1")) unit = "u1";
-                else if (c1.contains("#2")) unit = "u2";
-                else {
-                    String c2 = readCellValue(row.getCell(2));
-                    if (c2 != null && c2.contains("#1")) unit = "u1";
-                    else if (c2 != null && c2.contains("#2")) unit = "u2";
-                }
-                if (unit == null) continue;
-                if (m < 1 || m > 12) continue;
-                String v = readNoteValue(row);
-                if (v == null || v.isBlank()) continue;
+            }
+        }
+
+        if (notesHeader > 0) {
+            int monthCol = SheetLabels.column(sheet, notesHeader, "비고", 0);
+            int unitCol = SheetLabels.column(sheet, notesHeader, "호기", 0);
+            int textCol = SheetLabels.column(sheet, notesHeader, "내용", 0);
+            for (int r = notesHeader + 1; r <= sheet.getLastRowNum(); r += 1) {
+                int m = parseMonthLabel(SheetLabels.text(sheet, r, monthCol));
+                String unitText = SheetLabels.text(sheet, r, unitCol);
+                String unit = unitText.contains("#1") ? "u1" : unitText.contains("#2") ? "u2" : null;
+                if (unit == null || m < 1 || m > 12) continue;
+                String v = SheetLabels.text(sheet, r, textCol);
+                if (v.isBlank()) continue;
                 imported += upsertCell(monthKey, year, month, PLAN_VS_TABLE, "notes|m" + m + "-" + unit, 1, v);
             }
         }
         return imported;
     }
 
+    /** 전년대비 — 지금은 가져오기에서 쓰지 않는다(importWorkbook 참고). 다시 켤 때를 위해 제목 기반 읽기만 남긴다. */
     private int importYoySheet(Sheet sheet, int year) {
-        int labeled = importYoySheetByLabel(sheet, year);
-        if (labeled > 0) return labeled;
         return importYoySheetByPosition(sheet, year);
-    }
-
-    private int importYoySheetByLabel(Sheet sheet, int year) {
-        int imported = 0;
-        String monthKey = String.valueOf(year);
-        int lastRow = sheet.getLastRowNum();
-        String currentForm = null;
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String c0 = readCellValue(row.getCell(0));
-            if (c0 == null) c0 = "";
-            if (c0.contains("폐합성소각로 합계")) { currentForm = "cost"; continue; }
-            if (c0.contains("스팀생산량")) { currentForm = "ton"; continue; }
-            if (currentForm == null) continue;
-            // row label
-            String rk;
-            if (c0.contains((year - 1) + " 실적")) rk = "prev";
-            else if (c0.contains(year + " 실적")) rk = "curr";
-            else if ("증감".equals(c0.trim())) rk = "diff";
-            else continue;
-            // 자동 계산: curr, diff
-            if (!"prev".equals(rk)) continue;
-            for (int m = 1; m <= 12; m += 1) {
-                String v = readCellValue(row.getCell(m));
-                if (v == null || v.isBlank()) continue;
-                imported += upsertCell(monthKey, year, 0, YOY_TABLE, currentForm + "|" + rk + "-m" + m, 1, v);
-            }
-        }
-        return imported;
     }
 
     private int importOperationSheet(Sheet sheet, int year) {
@@ -902,42 +1122,34 @@ public class IncineratorWorkbookService {
         return importOperationSheetByPosition(sheet, year);
     }
 
+    /**
+     * 우리 내려받기 양식의 가동실적 — "월 | 1호기 계획 | …" / "월 | 스팀량 계획 | …" 머리글로 칸을 찾는다.
+     * 달성율·증감은 자동 계산 칸이라 읽지 않는다. 칸 목록은 내려받기와 같은 상수를 쓴다.
+     */
     private int importOperationSheetByLabel(Sheet sheet, int year) {
         int imported = 0;
         String monthKey = String.valueOf(year);
-        int lastRow = sheet.getLastRowNum();
-        String currentSection = null;
-        String[] hoursFields = {"u1-plan", "u1-actual", "u1-rate", "u2-plan", "u2-actual", "u2-rate"};
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String c0 = readCellValue(row.getCell(0));
-            if (c0 == null) c0 = "";
-            if (c0.contains("가동시간")) { currentSection = "hours"; continue; }
-            if (c0.contains("스팀생산량")) { currentSection = "metric"; continue; }
-            if (currentSection == null) continue;
-            int m = parseMonthLabel(c0);
-            if (m < 1 || m > 12) continue;
-            if ("hours".equals(currentSection)) {
-                for (int i = 0; i < hoursFields.length; i += 1) {
-                    if (hoursFields[i].endsWith("-rate")) continue;
-                    String v = readCellValue(row.getCell(i + 1));
+        String[][][] tables = {OPERATION_HOURS_HEADERS, OPERATION_METRIC_HEADERS};
+        String[] prefixes = {"hours", "metric"};
+        for (int t = 0; t < tables.length; t += 1) {
+            String[][] headers = tables[t];
+            int header = SheetLabels.findRowWithAll(sheet, 0, "월", headers[0][1]);
+            if (header < 0) continue;
+            int monthCol = SheetLabels.column(sheet, header, "월", 0);
+            Map<String, Integer> columns = new LinkedHashMap<>();
+            for (String[] h : headers) {
+                if (h[0].endsWith("-rate") && "hours".equals(prefixes[t])) continue;
+                if (h[0].endsWith("-diff")) continue;
+                putIfFound(columns, h[0], SheetLabels.column(sheet, header, h[1], monthCol + 1));
+            }
+            Map<Integer, Integer> monthRows = SheetLabels.monthRows(sheet, monthCol, header + 1, header + 13, null);
+            for (Map.Entry<Integer, Integer> m : monthRows.entrySet()) {
+                Row row = sheet.getRow(m.getValue());
+                for (Map.Entry<String, Integer> c : columns.entrySet()) {
+                    String v = readCellValue(row.getCell(c.getValue()));
                     if (v == null || v.isBlank()) continue;
-                    imported += upsertCell(monthKey, year, m, OPERATION_TABLE, "hours|" + m + "|" + hoursFields[i], 1, v);
-                }
-            } else {
-                String[] metrics = {"steam", "rate", "cost"};
-                String[] kinds = {"plan", "actual", "diff"};
-                int col = 1;
-                for (String metric : metrics) {
-                    for (String kind : kinds) {
-                        if ("diff".equals(kind)) { col += 1; continue; }
-                        String v = readCellValue(row.getCell(col));
-                        col += 1;
-                        if (v == null || v.isBlank()) continue;
-                        imported += upsertCell(monthKey, year, m, OPERATION_TABLE,
-                                "metric|" + m + "|" + metric + "-" + kind, 1, v);
-                    }
+                    imported += upsertCell(monthKey, year, m.getKey(), OPERATION_TABLE,
+                            prefixes[t] + "|" + m.getKey() + "|" + c.getKey(), 1, v);
                 }
             }
         }
@@ -950,35 +1162,33 @@ public class IncineratorWorkbookService {
         return importTotalCostSheetByPosition(sheet, year);
     }
 
+    /**
+     * 우리 내려받기 양식의 총 운영비용 — 블록 이름 줄 다음의 "월 | burn-1 | burn-2 | …" 머리글이 곧 필드 이름이라
+     * 그 글자로 칸을 찾는다. 자동 계산 필드는 읽지 않는다.
+     */
     private int importTotalCostSheetByLabel(Sheet sheet, int year) {
         int imported = 0;
         String monthKey = String.valueOf(year);
-        int lastRow = sheet.getLastRowNum();
-        TotalCostBlock currentBlock = null;
-        boolean headerSeen = false;
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String c0 = readCellValue(row.getCell(0));
-            if (c0 == null) c0 = "";
-            // header label?
-            TotalCostBlock matched = null;
-            for (TotalCostBlock b : TOTAL_COST_BLOCKS) {
-                if (c0.equals(b.label)) { matched = b; break; }
+        for (TotalCostBlock block : TOTAL_COST_BLOCKS) {
+            int labelRow = SheetLabels.findRow(sheet, 0, k -> k.equals(SheetLabels.key(block.label)));
+            if (labelRow < 0) continue;
+            int header = SheetLabels.findRowWithAll(sheet, labelRow + 1, "월", block.fields[0]);
+            if (header < 0 || header > labelRow + 3) continue;
+            int monthCol = SheetLabels.column(sheet, header, "월", 0);
+            Map<String, Integer> columns = new LinkedHashMap<>();
+            for (String field : block.fields) {
+                if (isAutoTotalCostField(block.section, field)) continue;
+                putIfFound(columns, field, SheetLabels.column(sheet, header, field, monthCol + 1));
             }
-            if (matched != null) { currentBlock = matched; headerSeen = false; continue; }
-            if (currentBlock == null) continue;
-            if ("월".equals(c0.trim()) && !headerSeen) { headerSeen = true; continue; }
-            if (!headerSeen) continue;
-            int m = parseMonthLabel(c0);
-            if (m < 1 || m > 12) continue;
-            // 자동계산 필드 set — block-specific
-            for (int i = 0; i < currentBlock.fields.length; i += 1) {
-                if (isAutoTotalCostField(currentBlock.section, currentBlock.fields[i])) continue;
-                String v = readCellValue(row.getCell(i + 1));
-                if (v == null || v.isBlank()) continue;
-                imported += upsertCell(monthKey, year, m, TOTAL_COST_TABLE,
-                        currentBlock.section + "|" + m + "|" + currentBlock.fields[i], 1, v);
+            Map<Integer, Integer> monthRows = SheetLabels.monthRows(sheet, monthCol, header + 1, header + 13, null);
+            for (Map.Entry<Integer, Integer> m : monthRows.entrySet()) {
+                Row row = sheet.getRow(m.getValue());
+                for (Map.Entry<String, Integer> c : columns.entrySet()) {
+                    String v = readCellValue(row.getCell(c.getValue()));
+                    if (v == null || v.isBlank()) continue;
+                    imported += upsertCell(monthKey, year, m.getKey(), TOTAL_COST_TABLE,
+                            block.section + "|" + m.getKey() + "|" + c.getKey(), 1, v);
+                }
             }
         }
         return imported;
@@ -1000,219 +1210,269 @@ public class IncineratorWorkbookService {
     private int importContractSheetByPosition(Sheet sheet, int year, int month) {
         String mk = monthKey(year, month);
         int imported = 0;
-        imported += importContractSectionByPosition(sheet, mk, year, month, 6, "unit1", UNIT_FIELDS, 2);
-        imported += importContractSectionByPosition(sheet, mk, year, month, 6, "unit2", UNIT_FIELDS, 9);
-        imported += importContractSectionByPosition(sheet, mk, year, month, 6, "real", REAL_FIELDS, 20);
-        // 월합계 표 인건비: 원본 '1. 도급내역' J42 (0-indexed row 42, col 9) → summary|0|labor.
-        //  (도급내역 페이지 월합계 표의 운영비 = 총금액 − 인건비 계산 입력. export J43 도 이 값을 사용)
-        Row laborRow = sheet.getRow(42);
-        if (laborRow != null) {
-            String labor = readCellValue(laborRow.getCell(9));
-            if (labor != null && !labor.isBlank()) {
-                imported += upsertCell(mk, year, month, CONTRACT_TABLE, "summary|0|labor", 1, labor);
+        // 열은 머리글(호기 + 항목)로, 행은 '일별' 칸으로 찾는다. 열 번호를 박아 두면
+        // 원본에 열이 하나만 추가돼도 오른쪽 값이 전부 다른 항목으로 저장된다.
+        ContractLayout layout = ContractLayout.of(sheet);
+        imported += importContractSection(sheet, mk, year, month, layout, "unit1", UNIT_FIELDS);
+        imported += importContractSection(sheet, mk, year, month, layout, "unit2", UNIT_FIELDS);
+        imported += importContractSection(sheet, mk, year, month, layout, "real", REAL_FIELDS);
+        // 월합계 표 인건비 → summary|0|labor. "구 분 / 인건비 / 총 금액" 머리글 아래 첫 줄의 "인건비" 칸이다.
+        //  (예전에는 J43 으로 박아 뒀다. 도급내역 페이지 월합계 표의 운영비 = 총금액 − 인건비 계산 입력)
+        int header = SheetLabels.findRowWithAll(sheet, 0, "구 분", "인건비", "총 금액");
+        if (header >= 0) {
+            Integer nameCol = SheetLabels.column(sheet, header, "구 분", 0);
+            Integer laborCol = SheetLabels.column(sheet, header, "인건비", 0);
+            int dataRow = SheetLabels.findRowInColumn(sheet, nameCol, header + 1, header + 5, k -> !k.isEmpty());
+            if (laborCol != null && dataRow >= 0) {
+                Row row = sheet.getRow(dataRow);
+                String labor = row == null ? null : readCellValue(row.getCell(laborCol));
+                if (labor != null && !labor.isBlank()) {
+                    imported += upsertCell(mk, year, month, CONTRACT_TABLE, "summary|0|labor", 1, labor);
+                }
             }
         }
         return imported;
     }
 
-    private int importContractSectionByPosition(Sheet sheet, String monthKey, int year, int month, int firstDataRow, String section, String[] fields, int firstValueCol) {
+    private int importContractSection(Sheet sheet, String monthKey, int year, int month,
+                                      ContractLayout layout, String section, String[] fields) {
+        Map<String, Integer> columns = layout.columns(section);
+        Map<Integer, Integer> dayRows = layout.dayRows(section);
+        if (columns.isEmpty() || dayRows.isEmpty()) return 0;
+
         int imported = 0;
         for (int day = 1; day <= 31; day += 1) {
-            Row row = sheet.getRow(firstDataRow + day - 1);
+            Integer rowIndex = dayRows.get(day);
+            if (rowIndex == null) continue;
+            Row row = sheet.getRow(rowIndex);
             if (row == null) continue;
-            for (int idx = 0; idx < fields.length; idx += 1) {
-                String value = readCellValue(row.getCell(firstValueCol + idx));
+            for (String field : fields) {
+                Integer col = columns.get(field);
+                if (col == null) continue;          // 머리글에 없는 항목 — 건너뛴다
+                String value = readCellValue(row.getCell(col));
                 if (value == null || value.isBlank()) continue;
-                imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, section + "|" + day + "|" + fields[idx], 1, value);
+                imported += upsertCell(monthKey, year, month, CONTRACT_TABLE,
+                        section + "|" + day + "|" + field, 1, value);
             }
         }
         return imported;
     }
 
+    /**
+     * 원본 "사업계획대비" 시트 — {@link #planVsLayout} 으로 찾은 칸에서 읽는다.
+     *
+     * <pre>
+     *  ① 월별 표   : "구 분 | 1월 … 12월" 머리글, A열 "(인건비)/(운영비)/(합계)" × B열 "…계획/…실적"
+     *  ② 이달 요약 : A열 "위탁운영비" 줄 — 윗줄 "계획/실적" 순서로 이달·누계·전월, "비 고" 칸
+     *  ③ 비고      : A열 "비 고" 아래 — "N월" 과 "#1/#2 폐합성수지소각로" 라벨 오른쪽 글자
+     * </pre>
+     */
     private int importPlanVsSheetByPosition(Sheet sheet, int year, int month) {
         String mk = monthKey(year, month);
         int imported = 0;
-        String[][] planRows = {
-                {"labor", "plan"},
-                {"labor", "actual"},
-                {"operation", "plan"},
-                {"operation", "actual"},
-                {"total", "plan"},
-                {"total", "actual"},
-                {"total", "rate"},
-                {"total", "diff"},
-        };
-        for (int i = 0; i < planRows.length; i += 1) {
-            String section = planRows[i][0];
-            String kind = planRows[i][1];
-            if ("rate".equals(kind) || "diff".equals(kind)) continue;
-            Row row = sheet.getRow(4 + i);
-            if (row == null) continue;
-            for (int m = 1; m <= 12; m += 1) {
-                String value = readCellValue(row.getCell(1 + m));
+        PlanVsLayout layout = planVsLayout(sheet);
+        for (Map.Entry<String, Integer> r : layout.rows().entrySet()) {
+            Row row = sheet.getRow(r.getValue());
+            for (Map.Entry<Integer, Integer> m : layout.months().entrySet()) {
+                String value = readCellValue(row.getCell(m.getValue()));
                 if (value == null || value.isBlank()) continue;
-                imported += upsertCell(mk, year, month, PLAN_VS_TABLE, section + "|" + kind + "-m" + m, 1, value);
+                imported += upsertCell(mk, year, month, PLAN_VS_TABLE, r.getKey() + "-m" + m.getKey(), 1, value);
             }
         }
-
-        Row breakRow = sheet.getRow(15);
-        if (breakRow != null) {
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|m-plan", 1, breakRow, 1);
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|m-actual", 1, breakRow, 2);
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|y-plan", 1, breakRow, 4);
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|y-actual", 1, breakRow, 5);
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|prev-actual", 1, breakRow, 7);
-            imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|note", 1, breakRow, 10);
-        }
-
-        int rowIndex = 17;
-        for (int m = 1; m <= 12; m += 1) {
-            for (String unit : new String[]{"u1", "u2"}) {
-                Row row = sheet.getRow(rowIndex++);
-                if (row == null) continue;
-                String value = readNoteValue(row);
-                if (value == null || value.isBlank()) continue;
-                imported += upsertCell(mk, year, month, PLAN_VS_TABLE, "notes|m" + m + "-" + unit, 1, value);
+        if (layout.breakRow() > 0) {
+            Row row = sheet.getRow(layout.breakRow());
+            for (Map.Entry<String, Integer> b : layout.breakCols().entrySet()) {
+                imported += upsertCellIfPresent(mk, year, month, PLAN_VS_TABLE, "break|" + b.getKey(), 1, row, b.getValue());
             }
+        }
+        for (Map.Entry<String, int[]> n : layout.notes().entrySet()) {
+            int row = n.getValue()[0];
+            StringBuilder note = new StringBuilder();
+            for (int i = 1; i < n.getValue().length; i += 1) {
+                String text = SheetLabels.text(sheet, row, n.getValue()[i]);
+                if (text.isBlank()) continue;
+                if (note.length() > 0) note.append(' ');
+                note.append(text);
+            }
+            if (note.length() == 0) continue;
+            imported += upsertCell(mk, year, month, PLAN_VS_TABLE, "notes|" + n.getKey(), 1, note.toString());
         }
         return imported;
     }
 
-    /** 비고 셀 값 읽기 — 원본 엑셀(col 4=E + col 6=G) 우선, 없으면 우리 export(col 2)
-     *  col 2 가 "#1 폐합성수지소각로" 같은 라벨이면 skip. */
-    private String readNoteValue(Row row) {
-        if (row == null) return "";
-        String c4 = readCellValue(row.getCell(4));
-        String c6 = readCellValue(row.getCell(6));
-        StringBuilder sb = new StringBuilder();
-        if (c4 != null && !c4.isBlank()) sb.append(c4.trim());
-        if (c6 != null && !c6.isBlank()) {
-            if (sb.length() > 0) sb.append(' ');
-            sb.append(c6.trim());
+    /** 구분 칸(머리글과 첫 월 칸 사이)의 "…계획" / "…실적" — 연도가 붙어 있어도("2025계획") 끝으로 가른다. */
+    private String kindOf(Sheet sheet, int row, int fromCol, int untilCol) {
+        for (int col = fromCol; col < untilCol; col += 1) {
+            String k = SheetLabels.key(SheetLabels.text(sheet, row, col));
+            if (k.endsWith("계획")) return "plan";
+            if (k.endsWith("실적")) return "actual";
         }
-        if (sb.length() > 0) return sb.toString();
-        String c2 = readCellValue(row.getCell(2));
-        if (c2 == null) return "";
-        String c2t = c2.trim();
-        if (c2t.contains("#1 폐합성수지소각로") || c2t.contains("#2 폐합성수지소각로")) return "";
-        return c2t;
+        return null;
     }
 
+    /**
+     * 원본 "전년대비" 시트 — "구 분 | 1월 … 12월" 머리글마다 표 하나. 각 표의 첫 "…실적" 줄이 전년 실적이다.
+     * 표 이름(A열)이 "…합계" 면 비용(cost|prev), "…스팀생산량" 이면 스팀량(ton|prev).
+     */
     private int importYoySheetByPosition(Sheet sheet, int year) {
         String mk = String.valueOf(year);
         int imported = 0;
-        imported += importYoyRowByPosition(sheet, mk, year, 3, "cost|prev");
-        imported += importYoyRowByPosition(sheet, mk, year, 10, "ton|prev");
-        return imported;
-    }
-
-    private int importYoyRowByPosition(Sheet sheet, String monthKey, int year, int rowIndex, String prefix) {
-        Row row = sheet.getRow(rowIndex);
-        if (row == null) return 0;
-        int imported = 0;
-        for (int m = 1; m <= 12; m += 1) {
-            String value = readCellValue(row.getCell(m + 1));
-            if (value == null || value.isBlank()) continue;
-            imported += upsertCell(monthKey, year, 0, YOY_TABLE, prefix + "-m" + m, 1, value);
+        for (Map.Entry<String, Integer> r : yoyRows(sheet).entrySet()) {
+            if (!r.getKey().endsWith("|prev")) continue;
+            Row row = sheet.getRow(r.getValue());
+            for (Map.Entry<Integer, Integer> m : SheetLabels.monthColumns(sheet, yoyHeaderAbove(sheet, r.getValue())).entrySet()) {
+                String value = readCellValue(row.getCell(m.getValue()));
+                if (value == null || value.isBlank()) continue;
+                imported += upsertCell(mk, year, 0, YOY_TABLE, r.getKey() + "-m" + m.getKey(), 1, value);
+            }
         }
         return imported;
     }
 
+    /** 원본 "계획대비 가동실적" 시트 — {@link #operationLayout} 으로 찾은 칸에서 읽는다. */
     private int importOperationSheetByPosition(Sheet sheet, int year) {
         String mk = String.valueOf(year);
         int imported = 0;
-        String[] hoursFields = {"u1-plan", "u1-actual", "u2-plan", "u2-actual"};
-        int[] hoursCols = {19, 20, 22, 23};
-        for (int m = 1; m <= 12; m += 1) {
-            Row row = sheet.getRow(3 + m);
+        OperationLayout layout = operationLayout(sheet);
+        for (Map.Entry<Integer, Integer> m : layout.monthRows().entrySet()) {
+            Row row = sheet.getRow(m.getValue());
             if (row == null) continue;
-            for (int i = 0; i < hoursFields.length; i += 1) {
-                String value = readCellValue(row.getCell(hoursCols[i]));
+            for (Map.Entry<String, Integer> h : layout.hours().entrySet()) {
+                String value = readCellValue(row.getCell(h.getValue()));
                 if (value == null || value.isBlank()) continue;
-                imported += upsertCell(mk, year, m, OPERATION_TABLE, "hours|" + m + "|" + hoursFields[i], 1, value);
+                imported += upsertCell(mk, year, m.getKey(), OPERATION_TABLE, "hours|" + m.getKey() + "|" + h.getKey(), 1, value);
             }
-        }
-
-        String[] metricFields = {"steam-plan", "steam-actual", "rate-plan", "rate-actual", "cost-plan", "cost-actual"};
-        int[] metricCols = {25, 26, 28, 29, 31, 32};
-        for (int m = 1; m <= 12; m += 1) {
-            Row row = sheet.getRow(3 + m);
-            if (row == null) continue;
-            for (int i = 0; i < metricFields.length; i += 1) {
-                String value = readCellValue(row.getCell(metricCols[i]));
+            for (Map.Entry<String, Integer> h : layout.metrics().entrySet()) {
+                String value = readCellValue(row.getCell(h.getValue()));
                 if (value == null || value.isBlank()) continue;
-                imported += upsertCell(mk, year, m, OPERATION_TABLE, "metric|" + m + "|" + metricFields[i], 1, value);
+                imported += upsertCell(mk, year, m.getKey(), OPERATION_TABLE, "metric|" + m.getKey() + "|" + h.getKey(), 1, value);
             }
         }
         return imported;
     }
 
+    private static void putIfFound(Map<String, Integer> map, String key, Integer col) {
+        if (col != null) map.put(key, col);
+    }
+
+    /**
+     * 원본 "총 운영비용" 시트 — 표 세 개(운영내역 / 자체 운영비용 / 소모품)를 표 제목으로 찾고,
+     * 칸은 설비·항목 제목으로, 줄은 A열 "N월" 로 찾는다.
+     *
+     * <p>예전 위치 읽기는 위탁운영비용 11칸을 O열부터 순서대로 읽어서, 원본의 "1호기(천원): 고정비·스팀구매비·합계"
+     * 세 칸 구조와 어긋났다(차감비 자리에 X열 등). 제목으로 찾으면서 바로잡았다 — 호기별 스팀량(u1-steam)은
+     * 이 표에 없어(운영내역의 스팀생산량과 같다) 건너뛴다. 화면에서는 이 칸들이 도급내역에서 자동 계산된다.
+     */
     private int importTotalCostSheetByPosition(Sheet sheet, int year) {
         String mk = String.valueOf(year);
         int imported = 0;
-        for (int m = 1; m <= 12; m += 1) {
-            Row row = sheet.getRow(4 + m);
-            if (row == null) continue;
-            imported += importTotalCostRow(mk, year, m, row, "op-burn", TOTAL_COST_BLOCKS[0].fields, 1);
-            imported += importTotalCostRow(mk, year, m, row, "op-cost", TOTAL_COST_BLOCKS[1].fields, 14);
-            // 주의: 과거 코드에서 총비용 시트의 월별 합계를 contract 의 day-1 값으로 저장하던 로직이 있었으나,
-            // 도급내역 페이지가 "1일에 데이터가 들어가" 보이는 부작용이 있어 제거함.
-            // contract 데이터는 도급내역 시트(혹은 페이지에서 직접 일별 입력)로만 채워짐.
-        }
-        for (int m = 1; m <= 12; m += 1) {
-            Row row = sheet.getRow(26 + m - 1);
-            if (row == null) continue;
-            imported += importTotalCostRow(mk, year, m, row, "self-srf", TOTAL_COST_BLOCKS[2].fields, 1);
-            // self-util 은 Excel 에서 비연속 컬럼: N(13)1호기,O(14)2호기,[P(15)합계 auto],Q(16)전력단가,
-            //  R(17)비용소계,S(18)가성소다구입량,T(19)단가,U(20)구입비용,V(21)용수,W(22)폐기물부담금,X(23)기타.
-            //  (기존 firstCol=13 순차 매핑이 P/R auto 열 때문에 전력단가·가성소다 데이터를 한 칸씩 밀어 읽던 버그 교정)
-            imported += importTotalCostRow(mk, year, m, row, "self-util", TOTAL_COST_BLOCKS[3].fields,
-                    new int[]{13, 14, 16, 17, 18, 19, 20, 21, 22, 23});
-            imported += importTotalCostRow(mk, year, m, row, "self-total", TOTAL_COST_BLOCKS[4].fields, 25);
-        }
-        for (int m = 1; m <= 12; m += 1) {
-            Row row = sheet.getRow(49 + m - 1);
-            if (row == null) continue;
-            imported += importTotalCostRow(mk, year, m, row, "mat-oil", TOTAL_COST_BLOCKS[5].fields, 1);
-            imported += importTotalCostRow(mk, year, m, row, "mat-chem", TOTAL_COST_BLOCKS[6].fields, 9);
-            imported += importTotalCostRow(mk, year, m, row, "mat-misc", TOTAL_COST_BLOCKS[7].fields, 15);
+        for (String table : new String[]{"op", "self", "mat"}) {
+            String anchor = totalCostAnchor(table);
+            Map<String, Integer> columns = totalCostColumns(sheet, anchor, totalCostHeaders(table));
+            for (Map.Entry<Integer, Integer> m : totalCostMonthRows(sheet, anchor).entrySet()) {
+                Row row = sheet.getRow(m.getValue());
+                if (row == null) continue;
+                for (Map.Entry<String, Integer> c : columns.entrySet()) {
+                    String value = readCellValue(row.getCell(c.getValue()));
+                    if (value == null || value.isBlank()) continue;
+                    String[] sectionField = c.getKey().split("\\|", 2);
+                    imported += upsertCell(mk, year, m.getKey(), TOTAL_COST_TABLE,
+                            sectionField[0] + "|" + m.getKey() + "|" + sectionField[1], 1, value);
+                }
+            }
         }
         return imported;
     }
 
-    private int importTotalCostRow(String monthKey, int year, int month, Row row, String section, String[] fields, int firstCol) {
-        int imported = 0;
-        for (int i = 0; i < fields.length; i += 1) {
-            String value = readCellValue(row.getCell(firstCol + i));
-            if (value == null || value.isBlank()) continue;
-            imported += upsertCell(monthKey, year, month, TOTAL_COST_TABLE, section + "|" + month + "|" + fields[i], 1, value);
+    /**
+     * 총 운영비용 표 한 벌 — {@code {구역, 필드, 층, 위 제목, 아래 제목}}.
+     * 층 1 = 표 제목 줄 + 다음 줄, 층 2 = 그다음 두 줄(위탁운영비용의 호기별 고정비·스팀구매비), top = 제목 줄에만 이름이 있는 칸.
+     * 같은 이름이 한 설비 안에 두 번 나오면(바닥재·비산재) 왼쪽부터 순서대로 찾으므로 표 순서대로 적는다.
+     */
+    private static final String[][] TOTAL_COST_OP_HEADERS = {
+            {"op-burn", "burn-1", "1", "폐기물 실소각량", "1호기"}, {"op-burn", "burn-2", "1", "폐기물 실소각량", "2호기"},
+            {"op-burn", "burn-sum", "1", "폐기물 실소각량", "합계"},
+            {"op-burn", "runtime-1", "1", "소각로 가동시간", "1호기"}, {"op-burn", "runtime-2", "1", "소각로 가동시간", "2호기"},
+            {"op-burn", "stop-1", "1", "소각로 운휴시간", "1호기"}, {"op-burn", "stop-2", "1", "소각로 운휴시간", "2호기"},
+            {"op-burn", "steam-1", "1", "스팀생산량", "1호기"}, {"op-burn", "steam-2", "1", "스팀생산량", "2호기"},
+            {"op-burn", "steam-sum", "1", "스팀생산량", "합계"},
+            {"op-burn", "rate-1", "1", "스팀생산원단위", "1호기"}, {"op-burn", "rate-2", "1", "스팀생산원단위", "2호기"},
+            {"op-cost", "unit", "1", "위탁운영비용", "위탁계약단가"},
+            {"op-cost", "u1-stop", "2", "1호기(천원)", "고정비"}, {"op-cost", "u1-op", "2", "1호기(천원)", "스팀구매비"},
+            {"op-cost", "u1-sub", "2", "1호기(천원)", "합 계"},
+            {"op-cost", "u2-stop", "2", "2호기(천원)", "고정비"}, {"op-cost", "u2-op", "2", "2호기(천원)", "스팀구매비"},
+            {"op-cost", "u2-sub", "2", "2호기(천원)", "합 계"},
+            {"op-cost", "deduct", "1", "위탁운영비용", "차감비"}, {"op-cost", "total", "1", "위탁운영비용", "비용합계"},
+    };
+    private static final String[][] TOTAL_COST_SELF_HEADERS = {
+            {"self-srf", "in-qty", "1", "외부 폐합성수지 수익금(톤, 천원)", "입고량"},
+            {"self-srf", "in-rev", "1", "외부 폐합성수지 수익금(톤, 천원)", "수익비용"},
+            {"self-srf", "floor-recycle", "1", "폐기물 처리량(톤)", "바닥재(재활용)"},
+            {"self-srf", "floor-bury", "1", "폐기물 처리량(톤)", "바닥재(매립)"},
+            {"self-srf", "floor-sub", "1", "폐기물 처리량(톤)", "바닥재 소계"},
+            {"self-srf", "fly-solid", "1", "폐기물 처리량(톤)", "비산재(고형화)"},
+            {"self-srf", "fly-bury", "1", "폐기물 처리량(톤)", "비산재(매립)"},
+            {"self-srf", "fly-sub", "1", "폐기물 처리량(톤)", "비산재 소계"},
+            {"self-srf", "cost-floor", "1", "폐기물처리비용(천원)", "바닥재"},
+            {"self-srf", "cost-fly", "1", "폐기물처리비용(천원)", "비산재"},
+            {"self-srf", "cost-misc", "1", "폐기물처리비용(천원)", "기타(내화물 등)"},
+            {"self-util", "p1", "1", "전력비용(Kw, 천원)", "1호기사용량"},
+            {"self-util", "p2", "1", "전력비용(Kw, 천원)", "2호기사용량"},
+            {"self-util", "prate", "1", "전력비용(Kw, 천원)", "전력단가"},
+            {"self-util", "psub", "1", "전력비용(Kw, 천원)", "비용소계"},
+            {"self-util", "naoh-qty", "1", "가성소다 (Kg, 천원)", "구입량"},
+            {"self-util", "naoh-unit", "1", "가성소다 (Kg, 천원)", "단가"},
+            {"self-util", "naoh-cost", "1", "가성소다 (Kg, 천원)", "구입비용"},
+            {"self-util", "water", "1", "기타 운영비용(천원)", "용수사용비"},
+            {"self-util", "waste-charge", "1", "기타 운영비용(천원)", "폐기물처분부담금"},
+            {"self-util", "etc", "1", "기타 운영비용(천원)", "기타"},
+            {"self-total", "total", "top", "비용합계", ""},
+            {"self-total", "burn-rate", "1", "원단위", "처리량당 비용"},
+            {"self-total", "steam-rate", "1", "원단위", "스팀톤당 비용"},
+    };
+    private static final String[][] TOTAL_COST_MAT_HEADERS = {
+            {"mat-oil", "u1", "1", "소각로별 부생유 사용량", "#1폐합성"}, {"mat-oil", "u2", "1", "소각로별 부생유 사용량", "#2폐합성"},
+            {"mat-oil", "sub", "1", "소각로별 부생유 사용량", "사용량소계"}, {"mat-oil", "unit", "1", "소각로별 부생유 사용량", "단가"},
+            {"mat-oil", "cost", "1", "소각로별 부생유 사용량", "비용"},
+            {"mat-oil", "ck-qty", "1", "청관제", "구입량"}, {"mat-oil", "ck-unit", "1", "청관제", "단가"}, {"mat-oil", "ck-cost", "1", "청관제", "구입비용"},
+            {"mat-chem", "u-qty", "1", "요소수", "구입량"}, {"mat-chem", "u-unit", "1", "요소수", "단가"}, {"mat-chem", "u-cost", "1", "요소수", "구입비용"},
+            {"mat-chem", "s-qty", "1", "소 금", "구입량"}, {"mat-chem", "s-unit", "1", "소 금", "단가"}, {"mat-chem", "s-cost", "1", "소 금", "구입비용"},
+            {"mat-misc", "a-qty", "1", "분말활성탄", "구입량"}, {"mat-misc", "a-unit", "1", "분말활성탄", "단가"}, {"mat-misc", "a-cost", "1", "분말활성탄", "구입비용"},
+            {"mat-misc", "k-qty", "1", "크링커제거제", "구입량"}, {"mat-misc", "k-unit", "1", "크링커제거제", "단가"}, {"mat-misc", "k-cost", "1", "크링커제거제", "구입비용"},
+            {"mat-misc", "total", "1", "합 계", "사용비용"},
+    };
+
+
+
+    /** "구역|필드" → 열. 표 제목·항목 제목으로 찾는다. 테스트에서도 쓴다. */
+    static Map<String, Integer> totalCostColumns(Sheet sheet, String anchor, String[][] headers) {
+        Map<String, Integer> columns = new LinkedHashMap<>();
+        int groupRow = SheetLabels.findRow(sheet, 0, k -> k.startsWith(SheetLabels.key(anchor)));
+        if (groupRow < 0) return columns;
+        HeaderColumnIndex level1 = HeaderColumnIndex.build(sheet, groupRow, groupRow, groupRow + 1, groupRow + 2, groupRow + 20, 0);
+        HeaderColumnIndex level2 = HeaderColumnIndex.build(sheet, -1, groupRow + 1, groupRow + 2, groupRow + 3, groupRow + 20, 0);
+        Map<String, Integer> cursors = new LinkedHashMap<>();
+        for (String[] h : headers) {
+            String cursorKey = h[2] + "|" + h[3];
+            int cursor = cursors.getOrDefault(cursorKey, 0);
+            Integer col = switch (h[2]) {
+                case "top" -> level1.columnByTopLabel(h[3]);
+                case "2" -> level2.columnAfter(cursor, h[3], h[4]);
+                default -> level1.columnAfter(cursor, h[3], h[4]);
+            };
+            if (col == null) continue;
+            columns.put(h[0] + "|" + h[1], col);
+            cursors.put(cursorKey, col + 1);
         }
-        return imported;
+        return columns;
     }
 
-    // 비연속 컬럼 매핑용 오버로드 (self-util 처럼 중간에 auto 계산 열이 끼어 있는 블록).
-    private int importTotalCostRow(String monthKey, int year, int month, Row row, String section, String[] fields, int[] cols) {
-        int imported = 0;
-        for (int i = 0; i < fields.length && i < cols.length; i += 1) {
-            String value = readCellValue(row.getCell(cols[i]));
-            if (value == null || value.isBlank()) continue;
-            imported += upsertCell(monthKey, year, month, TOTAL_COST_TABLE, section + "|" + month + "|" + fields[i], 1, value);
-        }
-        return imported;
-    }
-
-    private int importContractMonthSummaryFromTotalCost(int year, int month, Row row) {
-        String mk = monthKey(year, month);
-        int imported = 0;
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit1|1|steam", 1, row, 8);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit1|1|runtime", 1, row, 6);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit1|1|oper", 1, row, 16);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit1|1|stop", 1, row, 15);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit2|1|steam", 1, row, 9);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit2|1|runtime", 1, row, 7);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit2|1|oper", 1, row, 19);
-        imported += upsertCellIfPresent(mk, year, month, CONTRACT_TABLE, "unit2|1|stop", 1, row, 18);
-        return imported;
+    static String[][] totalCostHeaders(String table) {
+        return switch (table) {
+            case "op" -> TOTAL_COST_OP_HEADERS;
+            case "self" -> TOTAL_COST_SELF_HEADERS;
+            default -> TOTAL_COST_MAT_HEADERS;
+        };
     }
 
     private void hydrateContractComputedCells(Map<String, Object> cells) {
@@ -1420,90 +1680,78 @@ public class IncineratorWorkbookService {
             double unit2Runtime
     ) {}
 
+    /**
+     * 사고이력 — 원본("No. / 일 자 / 사 유 / …")과 우리 내려받기 양식("ID / 일자 / 사유 / …") 모두
+     * 같은 머리글 기반 읽기로 처리한다({@link #importAccidentSheetByPosition}).
+     */
     private int importAccidentSheet(Sheet sheet, int year) {
-        int positioned = importAccidentSheetByPosition(sheet, year);
-        if (positioned > 0) return positioned;
+        return importAccidentSheetByPosition(sheet, year);
+    }
 
+    /**
+     * 사고이력 — 원본("No. / 일 자 / 사 유 / …")과 우리 내려받기 양식("ID / 일자 / 사유 / …") 모두
+     * {@link #accidentBlocks} 로 찾은 표에서 읽는다. 정비 표에는 "손실금액" 칸이 없다.
+     */
+    private int importAccidentSheetByPosition(Sheet sheet, int year) {
         int imported = 0;
         String monthKey = year + "-00";
-        int lastRow = sheet.getLastRowNum();
-        String currentKind = null; // accident or maintenance
-        boolean headerSeen = false;
-        for (int r = 0; r <= lastRow; r += 1) {
-            Row row = sheet.getRow(r);
-            if (row == null) continue;
-            String c0 = readCellValue(row.getCell(0));
-            if (c0 == null) c0 = "";
-            if ("사고이력".equals(c0.trim())) { currentKind = "accident"; headerSeen = false; continue; }
-            if ("정비이력".equals(c0.trim())) { currentKind = "maintenance"; headerSeen = false; continue; }
-            if (currentKind == null) continue;
-            if ("ID".equals(c0.trim())) { headerSeen = true; continue; }
-            if (!headerSeen) continue;
-            if (c0.isBlank()) continue;
-            String prefix = "accident".equals(currentKind) ? ACCIDENT_PREFIX : MAINTENANCE_PREFIX;
-            String rowKey = prefix + c0.trim();
-            String date = readDateCellValue(row.getCell(1));
-            String reason = readCellValue(row.getCell(2));
-            String action = readCellValue(row.getCell(3));
-            String downtime = readCellValue(row.getCell(4));
-            String lossOrNote = readCellValue(row.getCell(5));
-            String noteForAcc = readCellValue(row.getCell(6));
-            if (isAllBlank(date, reason, action, downtime, lossOrNote, noteForAcc)) continue;
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 1, date);
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 2, reason);
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 3, action);
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 4, downtime);
-            if ("accident".equals(currentKind)) {
-                imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 5, lossOrNote);
-                imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 6, noteForAcc);
-            } else {
-                imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 6, lossOrNote);
+        java.util.List<AccidentBlock> blocks = accidentBlocks(sheet);
+        String[] prefixes = {ACCIDENT_PREFIX, MAINTENANCE_PREFIX};
+        for (int b = 0; b < blocks.size() && b < prefixes.length; b += 1) {
+            AccidentBlock block = blocks.get(b);
+            for (int r = block.firstRow(); r <= block.lastRow(); r += 1) {
+                imported += importAccidentRecordRow(monthKey, year, sheet.getRow(r), prefixes[b], block.cols());
             }
         }
         return imported;
     }
 
-    private int importAccidentSheetByPosition(Sheet sheet, int year) {
-        int imported = 0;
-        String monthKey = year + "-00";
-        for (int r = 4; r <= 13; r += 1) {
-            Row row = sheet.getRow(r);
-            imported += importAccidentRecordRow(monthKey, year, row, ACCIDENT_PREFIX, true);
-        }
-        for (int r = 23; r <= 32; r += 1) {
-            Row row = sheet.getRow(r);
-            imported += importAccidentRecordRow(monthKey, year, row, MAINTENANCE_PREFIX, false);
-        }
-        return imported;
+    /** 사고·정비 표 머리글이면 항목 → 열, 아니면 null. */
+    static Map<String, Integer> accidentColumns(Sheet sheet, int row) {
+        Integer date = SheetLabels.column(sheet, row, "일 자", 0);
+        Integer action = SheetLabels.column(sheet, row, "조치내역", 0);
+        if (date == null || action == null) return null;
+        Map<String, Integer> cols = new LinkedHashMap<>();
+        Integer no = SheetLabels.column(sheet, row, "No.", 0);
+        putIfFound(cols, "no", no != null ? no : SheetLabels.column(sheet, row, "ID", 0));   // 우리 양식은 "ID"
+        cols.put("date", date);
+        putIfFound(cols, "reason", SheetLabels.column(sheet, row, "사 유", 0));
+        cols.put("action", action);
+        putIfFound(cols, "downtime", SheetLabels.columnStartingWith(sheet, row, "운휴시간", 0));
+        putIfFound(cols, "loss", SheetLabels.columnStartingWith(sheet, row, "손실금액", 0));
+        putIfFound(cols, "note", SheetLabels.column(sheet, row, "비 고", 0));
+        return cols;
     }
 
-    private int importAccidentRecordRow(String monthKey, int year, Row row, String prefix, boolean hasLoss) {
+    private int importAccidentRecordRow(String monthKey, int year, Row row, String prefix, Map<String, Integer> cols) {
         if (row == null) return 0;
-        String no = readCellValue(row.getCell(1));
+        String no = cellAt(row, cols, "no");
         if (no == null || no.isBlank()) return 0;
         String rowId = no.replaceAll("\\.0$", "").trim();
         if (rowId.isBlank()) return 0;
+        boolean hasLoss = cols.containsKey("loss");
         String rowKey = prefix + rowId;
-        String date = readDateCellValue(row.getCell(2));
-        String reason = readCellValue(row.getCell(3));
-        String action = readCellValue(row.getCell(4));
-        String downtime = readCellValue(row.getCell(5));
-        String lossOrNote = readCellValue(row.getCell(6));
-        String note = hasLoss ? readCellValue(row.getCell(7)) : lossOrNote;
-        if (isAllBlank(date, reason, action, downtime, lossOrNote, note)) return 0;
+        String date = cols.containsKey("date") ? readDateCellValue(row.getCell(cols.get("date"))) : null;
+        String reason = cellAt(row, cols, "reason");
+        String action = cellAt(row, cols, "action");
+        String downtime = cellAt(row, cols, "downtime");
+        String loss = cellAt(row, cols, "loss");
+        String note = cellAt(row, cols, "note");
+        if (isAllBlank(date, reason, action, downtime, loss, note)) return 0;
         int imported = 0;
         imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 1, date);
         imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 2, reason);
         imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 3, action);
         imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 4, downtime);
-        if (hasLoss) {
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 5, lossOrNote);
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 6, note);
-        } else {
-            imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 6, note);
-        }
+        if (hasLoss) imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 5, loss);
+        imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 6, note);
         imported += upsertCell(monthKey, year, 0, CELL_TABLE, rowKey, 7, rowId);
         return imported;
+    }
+
+    private String cellAt(Row row, Map<String, Integer> cols, String key) {
+        Integer col = cols.get(key);
+        return col == null ? null : readCellValue(row.getCell(col));
     }
 
     // =============================================================

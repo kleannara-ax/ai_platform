@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,7 +30,7 @@ import java.util.stream.Stream;
  *
  * Excel sheet pattern : "회계비용\s*마감과\s*실마감\s*비교" (예: '회계비용 마감과 실마감 비교(2025)')
  * DB table            : energy_month_compare
- * Row key 형식         : {section}|{rowKey}  (section ∈ {fuel,power,total})
+ * Row key 형식         : {section}|{rowKey}  (section = fuel. 전력비·에너지 합산은 화면에서 제거돼 연동하지 않는다)
  * Col index 0..13     ↔ Excel col C..P  (excel_col_zero_based = col_index + 2)
  *                       0=전년 12월, 1=1월, ..., 12=12월, 13=다음해 1월
  *
@@ -45,70 +46,55 @@ public class EnergyMonthCompareWorkbookService {
     private static final String CELL_TABLE = "table_cell_value";
     private static final String PAGE_TABLE = "energy_month_compare";
 
-    private record RowMap(String section, String rowKey, int excelRowOneBased) {}
+    /**
+     * @param excelRowOneBased 원본 시트 행 — 이름을 못 찾았을 때의 폴백 좌표
+     * @param label            원본 시트에 적힌 항목 이름. 이걸로 행을 찾는다
+     */
+    record RowMap(String section, String rowKey, int excelRowOneBased, String label) {}
 
-    private static final List<RowMap> ROW_MAPS = List.of(
-            // ── fuel 섹션 ────────────────────────────────────────────
-            new RowMap("fuel", "compositeSteam",   3),
-            new RowMap("fuel", "zescoSteam",       4),
-            new RowMap("fuel", "lngBuy",           5),
-            new RowMap("fuel", "pyhsynSteam",      6),
-            new RowMap("fuel", "fluidSteam",       7),
+    // 위에서 아래 순서 그대로 둔다 — 직전에 찾은 행 다음부터 훑는다(resolveRowAfter).
+    static final List<RowMap> ROW_MAPS = List.of(
+            // -- fuel 섹션 --
+            // r3 복합보일러 스팀구매 = SRF Boiler 인보이스 Summary(VK) TOTAL SERVICE CHARGES 연동값
+            //    (화면이 인보이스에서 계산해 가져오므로 엑셀과 왕복하지 않는다)
+            new RowMap("fuel", "zescoSteam",       4, "제스코 스팀구매"),
+            new RowMap("fuel", "lngBuy",           5, "LNG 구매"),
+            new RowMap("fuel", "pyhsynSteam",      6, "폐합성소각로 스팀구매"),
+            new RowMap("fuel", "fluidSteam",       7, "유동상소각로 스팀구매"),
             // r8 fuelMonthly = formula
-            new RowMap("fuel", "zescoOffset",      9),
-            new RowMap("fuel", "zescoPenalty",    10),
-            new RowMap("fuel", "compositeLngEtc", 11),
-            new RowMap("fuel", "compositeInvest", 12),
-            new RowMap("fuel", "compositeIncome", 13),
-            new RowMap("fuel", "landLease",       14),
-            // r15 deductSubtotal = formula
-            // r16 fuelActual = formula
-            new RowMap("fuel", "paperFuel",       17),
-            new RowMap("fuel", "livingFuel",      18),
-            new RowMap("fuel", "fuelPlan",        19),
-            new RowMap("fuel", "diff",            20),
-            new RowMap("fuel", "monthDiff",       21),
+            new RowMap("fuel", "zescoOffset",      9, "제스코 상계비 (유틸리티)"),
+            new RowMap("fuel", "zescoPenalty",    10, "제스코 페널티"),
+            // r11 복합 LNG 사용량, 처분부담금 등 = SRF Boiler Client Invoice 청구금액 합계(전력 제외) 연동값
+            new RowMap("fuel", "compositeInvest", 12, "복합 투자비 감가상각"),
+            new RowMap("fuel", "compositeIncome", 13, "복합보일러 처분수익 연료비 차감분"),
+            new RowMap("fuel", "landLease",       14, "토지 지상권 지료"),
+            // r15 deductSubtotal = formula / r16 fuelActual = formula
+            new RowMap("fuel", "paperFuel",       17, "제지 연료비(스팀사용비율)"),
+            new RowMap("fuel", "livingFuel",      18, "생활 연료비(스팀사용비율)"),
+            new RowMap("fuel", "fuelPlan",        19, "연료비(회계비용) SG 계획금액"),
+            new RowMap("fuel", "diff",            20, "회계비용 대비 증감"),
+            new RowMap("fuel", "monthDiff",       21, "전월대비 증감"),
             // r22 prodTotal = formula
-            new RowMap("fuel", "paperProd",       23),
-            new RowMap("fuel", "tissueProd",      24),
+            new RowMap("fuel", "paperProd",       23, "제지 제품생산량"),
+            new RowMap("fuel", "tissueProd",      24, "화장지 제품생산량"),
             // r25~r27 unit = formula
-            new RowMap("fuel", "profitDelta",     28),
-            new RowMap("fuel", "paperProfit",     29),
-            new RowMap("fuel", "livingProfit",    30),
+            new RowMap("fuel", "profitDelta",     28, "전월대비 손익증감"),
+            new RowMap("fuel", "paperProfit",     29, "제지손익"),
+            new RowMap("fuel", "livingProfit",    30, "생활손익"),
             // r31 profitSum = formula
-            new RowMap("fuel", "steamProd",       32),
-            new RowMap("fuel", "lngBurner",       33),
+            new RowMap("fuel", "steamProd",       32, "스팀생산량"),
+            new RowMap("fuel", "lngBurner",       33, "LNG 직버너 사용 비용")
             // r34~r36 = formula
 
-            // ── power 섹션 ────────────────────────────────────────────
-            new RowMap("power", "powerMonthly",     40),
-            new RowMap("power", "energyKSettle",    41),
-            new RowMap("power", "essSettle",        42),
-            new RowMap("power", "kepcoBill",        43),
-            new RowMap("power", "dongjinWh",        44),
-            new RowMap("power", "eumseongFct",      45),
-            new RowMap("power", "logisticsWh",      46),
-            new RowMap("power", "drRefund",         47),
-            new RowMap("power", "compositePower",   48),
-            new RowMap("power", "powerSettle",      49),
-            // r50 powerDeductSum / r51 powerActualCj / r52 powerActualAll = computed
-            new RowMap("power", "paperPower",       53),
-            new RowMap("power", "tissuePower",      54),
-            new RowMap("power", "padPower",         55),
-            new RowMap("power", "powerPlan",        56),
-            // r57 powerVsPlan / r58 powerProdTotal = formula
-            new RowMap("power", "powerPaperProd",   59),
-            new RowMap("power", "powerTissueProd",  60),
-            new RowMap("power", "padProd",          61),
-            // r62~r66 unit/delta = formula
-            new RowMap("power", "paperPowerProfit", 67),
-            new RowMap("power", "tissuePowerProfit",68),
-            new RowMap("power", "padPowerProfit",   69),
-            // r70 powerProfitSum / r72 powerRateWon = formula/sum
-            new RowMap("power", "powerUsageMw",     71)
-
-            // total 섹션: 전부 formula/sum 이므로 매핑 없음 (Excel 자동 계산)
+            // 37행 이후(전력비·에너지 합산)는 연동하지 않는다 — 화면에서 뺀 항목이라
+            // 엑셀에서 읽어 와도 쓰는 곳이 없다. 36행까지(연료비)만 왕복한다.
     );
+
+    /** 라벨 열 - 구분(B)이 우선, 비어 있으면 대분류(A). */
+    static final int[] LABEL_COLS = {1, 2};
+    /** "1월"~"12월" 이 적힌 머리글 행. */
+    static final int MONTH_HEADER_ROW = 2;
+    static final int FIRST_DATA_ROW = 3;
 
     private final TableService tableService;
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
@@ -143,11 +129,15 @@ public class EnergyMonthCompareWorkbookService {
         if (sheet == null) return 0;
         tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
         int imported = 0;
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, FIRST_DATA_ROW, MONTH_HEADER_ROW);
+        Map<String, Integer> rows = resolveRows(index);
         for (RowMap map : ROW_MAPS) {
-            Row row = sheet.getRow(map.excelRowOneBased() - 1);
+            Integer rowNumber = rows.get(dbRowKey(map));
+            if (rowNumber == null) continue;   // 원본에 없는 항목
+            Row row = sheet.getRow(rowNumber - 1);
             if (row == null) continue;
             for (int colIndex = 0; colIndex <= 13; colIndex += 1) {
-                int excelColZeroBased = colIndex + 2;
+                int excelColZeroBased = resolveMonthCol(index, colIndex);
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
@@ -162,13 +152,17 @@ public class EnergyMonthCompareWorkbookService {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return;
         Map<String, String> cells = loadCells(year);
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, FIRST_DATA_ROW, MONTH_HEADER_ROW);
+        Map<String, Integer> rows = resolveRows(index);
         for (RowMap map : ROW_MAPS) {
+            Integer rowNumber = rows.get(dbRowKey(map));
+            if (rowNumber == null) continue;   // 원본에 없는 항목
             for (int colIndex = 0; colIndex <= 13; colIndex += 1) {
                 String key = dbRowKey(map) + "|" + colIndex;
                 String value = cells.get(key);
                 if (value == null) continue;
-                int excelColZeroBased = colIndex + 2;
-                setNonFormulaCellNumber(sheet, map.excelRowOneBased(), excelColZeroBased, value);
+                int excelColZeroBased = resolveMonthCol(index, colIndex);
+                setNonFormulaCellNumber(sheet, rowNumber, excelColZeroBased, value);
             }
         }
     }
@@ -176,6 +170,36 @@ public class EnergyMonthCompareWorkbookService {
     /* ── helpers ─────────────────────────────────────────────── */
 
     private String dbRowKey(RowMap m) { return m.section() + "|" + m.rowKey(); }
+
+    /**
+     * 매핑표 순서대로 항목 이름을 찾아 실제 행을 정한다.
+     * 직전에 찾은 행 다음부터 훑으므로 연료비/전력비에 같은 이름이 있어도 섞이지 않는다.
+     */
+    private Map<String, Integer> resolveRows(EnergySheetIndex index) {
+        Map<String, Integer> rows = new LinkedHashMap<>();
+        int cursor = FIRST_DATA_ROW;
+        for (RowMap map : ROW_MAPS) {
+            Integer found = index.rowOrNull(cursor, map.excelRowOneBased(), map.label(), map.label());
+            if (found == null) continue;   // 원본에서 지워진 항목 — 건너뛴다(다른 줄에 붙이지 않는다)
+            rows.put(dbRowKey(map), found);
+            cursor = found + 1;            // 찾았을 때만 커서를 옮긴다
+        }
+        return rows;
+    }
+
+    /**
+     * 화면 열 -> 원본 시트 열(0-based).
+     * 0 = 전년 12월, 1~12 = 1~12월, 13 = 다음 해 1월(12월 오른쪽 칸).
+     */
+    private int resolveMonthCol(EnergySheetIndex index, int colIndex) {
+        int declaredZeroBased = colIndex + 2;
+        if (colIndex == 13) {
+            int decemberOneBased = index.monthColumn(12, declaredZeroBased);
+            return decemberOneBased == declaredZeroBased ? declaredZeroBased : decemberOneBased;
+        }
+        int month = colIndex == 0 ? 0 : colIndex;
+        return index.monthColumn(month, declaredZeroBased + 1) - 1;
+    }
 
     private Sheet findSheetByPattern(Workbook workbook) {
         for (int i = 0; i < workbook.getNumberOfSheets(); i += 1) {
@@ -257,17 +281,11 @@ public class EnergyMonthCompareWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .filter(p -> p.getFileName().toString().endsWith(".xlsx"))
-                    .filter(p -> !p.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("에너지 회계비용 원본 엑셀을 찾을 수 없습니다."));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith(FILE_PREFIX) && name.endsWith(".xlsx"), "에너지 회계비용");
+        cachedWorkbookPath = resolved;
+        return resolved;
     }
 
     private int toInt(Object v) {

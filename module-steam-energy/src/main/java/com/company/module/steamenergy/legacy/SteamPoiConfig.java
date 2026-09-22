@@ -17,6 +17,11 @@ public class SteamPoiConfig {
 
     @PostConstruct
     public void configurePoiLimits() {
+        applyLimits();
+    }
+
+    /** 스프링 없이도(테스트 등) 같은 한도를 적용할 수 있게 static 으로 둔다. */
+    public static void applyLimits() {
         ZipSecureFile.setMaxFileCount(100_000);
         ZipSecureFile.setMaxEntrySize(1_024L * 1024 * 1024); // 1 GiB
         ZipSecureFile.setMaxTextSize(1_024L * 1024 * 1024);  // 1 GiB

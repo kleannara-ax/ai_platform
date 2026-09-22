@@ -76,6 +76,8 @@ public class FluidizedDailyLogImportService {
 
             Map<YearMonth, Integer> sheetMonths = new LinkedHashMap<>();
             Set<String> layoutMismatch = new LinkedHashSet<>();
+            List<String> headerMissing = new ArrayList<>();
+            List<String> headerMoved = new ArrayList<>();
 
             for (int day = 1; day <= monthDays; day += 1) {
                 Sheet sheet = workbook.getSheet(String.valueOf(day));
@@ -87,7 +89,8 @@ public class FluidizedDailyLogImportService {
                 List<String> mismatched = checkLayout(sheet);
                 if (!mismatched.isEmpty()) layoutMismatch.add(day + "일(" + String.join(", ", mismatched) + ")");
 
-                int written = importDaySheet(sheet, evaluator, monthKey, year, month, day);
+                int written = importDaySheet(sheet, evaluator, monthKey, year, month, day,
+                        headerMissing, headerMoved);
                 if (written > 0) {
                     dayCount += 1;
                     cellCount += written;
@@ -98,6 +101,12 @@ public class FluidizedDailyLogImportService {
                 if (sheetMonth.equals(target)) return;
                 warnings.add("시트 날짜가 " + sheetMonth + " (" + count + "개 시트) 로 선택한 월 " + target + " 과 다릅니다.");
             });
+            if (!headerMoved.isEmpty()) {
+                warnings.add("원본 양식의 칸 위치가 바뀌어 항목명으로 찾아 읽었습니다 — " + summarize(headerMoved));
+            }
+            if (!headerMissing.isEmpty()) {
+                warnings.add("항목명을 찾지 못해 기존 좌표로 읽었습니다. 값을 확인해 주세요 — " + summarize(headerMissing));
+            }
             if (!layoutMismatch.isEmpty()) {
                 warnings.add("양식 위치가 기준과 다른 시트가 있습니다. 해당 칸은 비어 있거나 잘못 들어갔을 수 있습니다 — "
                         + String.join(" / ", layoutMismatch));
@@ -122,6 +131,12 @@ public class FluidizedDailyLogImportService {
         return result;
     }
 
+    /** 31개 시트가 같은 양식이라 경고도 같은 내용이 반복된다 — 앞 3건만 보여 준다. */
+    private static String summarize(List<String> messages) {
+        if (messages.size() <= 3) return String.join(" / ", messages);
+        return String.join(" / ", messages.subList(0, 3)) + " 외 " + (messages.size() - 3) + "건";
+    }
+
     /** 매핑표의 앵커 셀과 실제 값을 대조해 어긋난 셀 주소를 돌려준다. */
     private List<String> checkLayout(Sheet sheet) {
         List<String> mismatched = new ArrayList<>();
@@ -134,11 +149,17 @@ public class FluidizedDailyLogImportService {
     }
 
     // ── 하루치 시트 ─────────────────────────────────────────────────
-    private int importDaySheet(Sheet sheet, FormulaEvaluator evaluator, String monthKey, int year, int month, int day) {
+    private int importDaySheet(Sheet sheet, FormulaEvaluator evaluator, String monthKey, int year, int month, int day,
+                               List<String> headerMissing, List<String> headerMoved) {
         int written = 0;
 
+        // 칸 위치는 (섹션, 행 라벨, 열 라벨) 로 찾는다. 좌표는 못 찾았을 때의 폴백이다.
+        FluidizedDailyLogSheetIndex index = FluidizedDailyLogSheetIndex.build(
+                sheet, (row, col) -> textAt(sheet, row, col, evaluator));
+
         for (Entry entry : FluidizedDailyLogCellMap.DAY_CELLS) {
-            Cell cell = cellByRef(sheet, entry.ref());
+            FluidizedDailyLogSheetIndex.Resolved at = index.resolve(entry);
+            Cell cell = cellAt(sheet, at.row(), at.col());
             if (entry.text()) {
                 written += store(monthKey, year, month, day, entry.store(), entry.target(), readText(cell, evaluator));
                 continue;
@@ -151,13 +172,35 @@ public class FluidizedDailyLogImportService {
 
         // 전력 사용량 = 금일지침 − 전일지침 (세부 운영내역 전력량 행)
         for (PowerUsage usage : FluidizedDailyLogCellMap.POWER_USAGE) {
-            Double prev = readNumber(cellByRef(sheet, usage.prevRef()), evaluator);
-            Double today = readNumber(cellByRef(sheet, usage.todayRef()), evaluator);
+            FluidizedDailyLogSheetIndex.Resolved prevAt = index.resolve(
+                    FluidizedDailyLogCellMap.POWER_SECTION, usage.rowLabel(),
+                    FluidizedDailyLogCellMap.POWER_PREV_COL, usage.prevRef(), usage.label() + " 전일지침");
+            FluidizedDailyLogSheetIndex.Resolved todayAt = index.resolve(
+                    FluidizedDailyLogCellMap.POWER_SECTION, usage.rowLabel(),
+                    FluidizedDailyLogCellMap.POWER_TODAY_COL, usage.todayRef(), usage.label() + " 금일지침");
+
+            Double prev = readNumber(cellAt(sheet, prevAt.row(), prevAt.col()), evaluator);
+            Double today = readNumber(cellAt(sheet, todayAt.row(), todayAt.col()), evaluator);
             if (prev == null && today == null) continue;
             double used = (today == null ? 0 : today) - (prev == null ? 0 : prev);
             written += store(monthKey, year, month, day, Store.DETAIL, usage.detailRow(), format(round(used)));
         }
+
+        if (!index.notFound().isEmpty()) headerMissing.add(day + "일(" + String.join(", ", index.notFound()) + ")");
+        if (!index.moved().isEmpty()) headerMoved.add(day + "일(" + String.join(", ", index.moved()) + ")");
         return written;
+    }
+
+    /** 1-based 행/열로 셀을 읽는다. */
+    private Cell cellAt(Sheet sheet, int rowNumber, int colNumber) {
+        if (rowNumber < 1 || colNumber < 1) return null;
+        Row row = sheet.getRow(rowNumber - 1);
+        return row == null ? null : row.getCell(colNumber - 1);
+    }
+
+    /** 헤더 색인용 — 라벨 글자를 읽는다. */
+    private String textAt(Sheet sheet, int rowNumber, int colNumber, FormulaEvaluator evaluator) {
+        return readText(cellAt(sheet, rowNumber, colNumber), evaluator);
     }
 
     // ── 함수율 시트 ─────────────────────────────────────────────────

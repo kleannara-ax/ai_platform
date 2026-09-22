@@ -34,7 +34,6 @@ import java.util.stream.Stream;
 
 @Service
 public class FluidizedSummaryWorkbookService {
-    private static final String ORIGINAL_DIR = "\uC6D0\uBCF8";
 
     private static final String PLAN_TABLE = "fluidized_plan_actual";
     private static final String SUMMARY_TABLE = "fluidized_plan_summary";
@@ -49,30 +48,45 @@ public class FluidizedSummaryWorkbookService {
     private static final String ACCIDENT_PREFIX = "accident-record:";
     private static final String MAINTENANCE_PREFIX = "maintenance-record:";
 
-    private static final int[] PLAN_INPUT_ROWS = {5, 6, 7, 8};
     private static final String[] PLAN_ROW_KEYS = {"operating", "power", "waste", "srf_income"};
-    private static final int[][] MONTH_PLAN_COLS = {
-            {2, 3}, {5, 6}, {8, 9}, {11, 12}, {14, 15}, {17, 18},
-            {20, 21}, {23, 24}, {26, 27}, {29, 30}, {32, 33}, {35, 36}
-    };
 
-    private static final int SUMMARY_NOTE_ROW = 14;
-    private static final int SUMMARY_NOTE_COL = 10;
-    private static final int MONTHLY_NOTE_START_ROW = 23;
     private static final int MONTHLY_NOTE_COL = 3;
 
-    private static final int CONTRACT_START_ROW = 7;
-    private static final int CONTRACT_END_ROW = 37;
-    private static final int COST_ROW = 43;
+
+    /** 세부 운영내역에서 훑을 서식 기준 범위 — 줄은 1~102, 칸은 A~AK. */
+    private static final int DETAIL_LAST_ROW = 102;
+    private static final int DETAIL_LAST_COL = 37;
+
+    /** 서식에만 있고 파일에는 빠져 있기도 한 "KNE지급비용 / 추가비용" 줄(서식 기준). */
+    private static final int DETAIL_EXTRA_COST_ROW = 16;
+
+    /** 일별 도급비용: 머리글 키 → {@code table_cell_value.col_index}. 순서가 화면 열 순서다. */
+    private static final Map<String, Integer> CONTRACT_COL_INDEX = new LinkedHashMap<>(Map.of(
+            "steam", 0, "price", 2, "stopHours", 4, "fixedCost", 5
+    ));
+
+    /** 지급현황: 머리글 키 → {@code table_cell_value.col_index}. */
+    private static final Map<String, Integer> COST_COL_INDEX = Map.of(
+            "labor", 0, "operating", 1, "improvement", 2
+    );
 
     private final TableService tableService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
+    private final SheetMetadataLoader sheetMetadataLoader;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public FluidizedSummaryWorkbookService(TableService tableService, FluidizedDetailWorkbookService fluidizedDetailWorkbookService) {
+    public FluidizedSummaryWorkbookService(TableService tableService,
+                                           FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
+                                           SheetMetadataLoader sheetMetadataLoader) {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
+        this.sheetMetadataLoader = sheetMetadataLoader;
+    }
+
+    /** 세부 운영내역 시트에서 항목 이름으로 줄·칸을 잇는 색인. */
+    private FluidizedDetailSheetIndex detailIndex(Sheet sheet) {
+        return FluidizedDetailSheetIndex.of(sheet, sheetMetadataLoader.load(FluidizedDetailSheetIndex.METADATA_NAME));
     }
 
     public byte[] exportWorkbook(int year, int month) throws IOException {
@@ -83,10 +97,11 @@ public class FluidizedSummaryWorkbookService {
 
             workbook.setForceFormulaRecalculation(true);
 
-            Sheet annualSheet = workbook.getSheetAt(0);
-            Sheet monthlySheet = workbook.getSheetAt(1);
-            Sheet detailSheet = workbook.getSheetAt(2);
-            Sheet monthlySummarySheet = workbook.getSheetAt(3);
+            // 내려받기도 업로드와 같은 방식으로 시트를 찾는다.
+            Sheet annualSheet = FluidizedSummaryLayout.sheetByName(workbook, 0, "1.");
+            Sheet monthlySheet = FluidizedSummaryLayout.sheetByName(workbook, 1, "2.");
+            Sheet detailSheet = FluidizedSummaryLayout.sheetByName(workbook, 2, "3. 세부");
+            Sheet monthlySummarySheet = FluidizedSummaryLayout.sheetByName(workbook, 3, "3-1.");
             String monthKey = monthKey(year, month);
             Map<String, Object> annualCells = buildCellMap(loadCellsForYear(year));
             Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("table_cell_value", monthKey));
@@ -109,39 +124,50 @@ public class FluidizedSummaryWorkbookService {
     // 탭별 부분 import/export
     //  - 실적비교: 시트1 단일. 입력 대상은 월별 특이사항만 (compare 본문은 계획대비실적의 실적 합산이므로 별도 저장 X).
     //  - 도급비용: 시트1 단일. 일별 contract 입력 셀 + 지급현황 입력 셀.
-    // 셀 ↔ DB 매핑 사양:
+    // 셀 ↔ DB 매핑 사양 — 칸은 좌표가 아니라 머리글 글자로 찾는다(FluidizedSummaryLayout).
     //   [실적비교]
-    //     B10..B21  -> fluidized_year_note  row_key="note-01".."note-12", col_index=0
+    //     "월 / 특이사항" 머리글 아래 "N월" 줄 -> fluidized_year_note row_key="note-01".."note-12", col_index=0
     //   [도급비용]
-    //     일별표(7-37행):
-    //       B(col1) T/D       -> fluidized_contract_daily row="DD" col_index=0
-    //       D(col3) 스팀단가   -> col_index=2
-    //       F(col5) 운휴시간   -> col_index=4
-    //       G(col6) 고정비     -> col_index=5
-    //     지급현황표(43행):
-    //       B(col1) 인건비     -> fluidized_contract_cost  row="cost" col_index=0
-    //       C(col2) 운영비     -> col_index=1
-    //       D(col3) 설비개선비용-> col_index=2
+    //     일별표("일별" 칸의 "N일" 줄):
+    //       스팀 생산량        -> fluidized_contract_daily row="DD" col_index=0
+    //       스팀단가           -> col_index=2
+    //       운휴시간           -> col_index=4
+    //       운휴시간당 고정비   -> col_index=5
+    //     지급현황표("설비명" 머리글 다음 줄):
+    //       인건비             -> fluidized_contract_cost row="cost" col_index=0
+    //       운영비             -> col_index=1
+    //       설비개선비용        -> col_index=2
     // ========================================================================
 
     public Map<String, Object> importCompareWorkbook(MultipartFile file, int year) throws IOException {
         int noteRows = 0;
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            // 월별 특이사항: B10..B21 (0-based row 9..20, col 1)
+            Sheet sheet = FluidizedSummaryLayout.sheetByName(workbook, 0, "실적비교");
+            // 월별 특이사항: "월 / 특이사항" 머리글을 찾아, 그 아래 "N월" 줄에서 읽는다.
+            // (예전에는 B10..B21 로 못 박아 둬서 줄을 하나만 지워도 달이 어긋났다)
             String anchorMonth = yearAnchorKey(year);
-            for (int monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-                Cell noteCell = getCell(sheet, 9 + monthIndex, 1);
-                noteRows += upsertCell(
-                        anchorMonth,
-                        year,
-                        1,
-                        NOTE_TABLE,
-                        "note-" + String.format("%02d", monthIndex + 1),
-                        0,
-                        readCellValue(noteCell)
-                );
+            int headerRow = FluidizedSummaryLayout.findRowByLabel(sheet, 0, 60, 1, "특이사항");
+            if (headerRow >= 0) {
+                Integer noteCol = FluidizedSummaryLayout.columnInRow(sheet, headerRow, "특이사항");
+                Integer monthCol = FluidizedSummaryLayout.columnInRow(sheet, headerRow, "월");
+                if (noteCol != null && monthCol != null) {
+                    Map<Integer, Integer> monthRows =
+                            FluidizedSummaryLayout.monthRowsBelow(sheet, headerRow, monthCol);
+                    for (int month = 1; month <= 12; month += 1) {
+                        Integer row = monthRows.get(month);
+                        if (row == null) continue;
+                        noteRows += upsertCell(
+                                anchorMonth,
+                                year,
+                                1,
+                                NOTE_TABLE,
+                                "note-" + String.format("%02d", month),
+                                0,
+                                readCellValue(getCell(sheet, row, noteCol))
+                        );
+                    }
+                }
             }
         }
         return Map.of(
@@ -157,29 +183,29 @@ public class FluidizedSummaryWorkbookService {
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            // 일별 도급비용: 7..37 행, B/D/F/G 컬럼 (0-based: 1, 3, 5, 6)
-            for (int day = 1; day <= 31; day += 1) {
-                if (day > monthDays) continue;
-                int rowIndex = 6 + day - 1; // 0-based row index for day d
-                String rowKey = String.format("%02d", day);
-                contractRows += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 0,
-                        readCellValue(getCell(sheet, rowIndex, 1))); // B
-                contractRows += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 2,
-                        readCellValue(getCell(sheet, rowIndex, 3))); // D
-                contractRows += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 4,
-                        readCellValue(getCell(sheet, rowIndex, 5))); // F
-                contractRows += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 5,
-                        readCellValue(getCell(sheet, rowIndex, 6))); // G
+            Sheet sheet = FluidizedSummaryLayout.sheetByName(workbook, 0, "도급비용");
+            // 내려받은 파일도 좌표가 아니라 머리글로 읽는다 — 줄·칸을 지운 채 올려도 밀리지 않는다.
+            FluidizedSummaryLayout.Contract contract = FluidizedSummaryLayout.contractOf(sheet);
+
+            for (Map.Entry<Integer, Integer> day : contract.dayRows().entrySet()) {
+                if (day.getKey() > monthDays) continue;
+                String rowKey = String.format("%02d", day.getKey());
+                for (Map.Entry<String, Integer> field : CONTRACT_COL_INDEX.entrySet()) {
+                    Integer column = contract.columns().get(field.getKey());
+                    if (column == null) continue;
+                    contractRows += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, field.getValue(),
+                            readCellValue(getCell(sheet, day.getValue(), column)));
+                }
             }
-            // 지급현황: 43 행, B/C/D 컬럼 (0-based: 1, 2, 3) → 인건비/운영비/설비개선비용
-            int costRowIndex = 42; // 0-based row 42 = 43 행
-            costRows += upsertCell(monthKey, year, month, COST_TABLE, "cost", 0,
-                    readCellValue(getCell(sheet, costRowIndex, 1)));
-            costRows += upsertCell(monthKey, year, month, COST_TABLE, "cost", 1,
-                    readCellValue(getCell(sheet, costRowIndex, 2)));
-            costRows += upsertCell(monthKey, year, month, COST_TABLE, "cost", 2,
-                    readCellValue(getCell(sheet, costRowIndex, 3)));
+            // 지급현황: 인건비 / 운영비 / 설비개선비용
+            if (contract.costRow() >= 0) {
+                for (Map.Entry<String, Integer> field : COST_COL_INDEX.entrySet()) {
+                    Integer column = contract.costColumns().get(field.getKey());
+                    if (column == null) continue;
+                    costRows += upsertCell(monthKey, year, month, COST_TABLE, "cost", field.getValue(),
+                            readCellValue(getCell(sheet, contract.costRow(), column)));
+                }
+            }
         }
         return Map.of(
                 "year", year,
@@ -382,12 +408,13 @@ public class FluidizedSummaryWorkbookService {
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
-            Sheet annualSheet = workbook.getSheetAt(0);
-            Sheet monthlySheet = workbook.getSheetAt(1);
-            Sheet detailSheet = workbook.getSheetAt(2);
-            Sheet srfSheet = workbook.getSheetAt(4);
+            // 시트는 순번이 아니라 이름으로 찾는다 — 원본에 시트가 끼어들어도 엉뚱한 시트를 읽지 않는다.
+            Sheet annualSheet = FluidizedSummaryLayout.sheetByName(workbook, 0, "1.");
+            Sheet monthlySheet = FluidizedSummaryLayout.sheetByName(workbook, 1, "2.");
+            Sheet detailSheet = FluidizedSummaryLayout.sheetByName(workbook, 2, "3. 세부");
+            Sheet srfSheet = FluidizedSummaryLayout.sheetByName(workbook, 4, "4.");
             Sheet improvementSheet = resolveImprovementSheet(workbook, year);
-            Sheet accidentSheet = workbook.getSheetAt(7);
+            Sheet accidentSheet = FluidizedSummaryLayout.sheetByName(workbook, 7, "6.");
             clearImportedWorkbookTargets(year, month);
             importedPlanRows += importAnnualPlanSheet(annualSheet, year);
             importedNoteRows += importNotes(annualSheet, year, month);
@@ -565,28 +592,37 @@ public class FluidizedSummaryWorkbookService {
             Map<String, Map<String, String>> annualDetailCells
     ) {
         setString(sheet, 0, 0, "1. 운영실적");
+        // 업로드와 같은 색인을 쓴다 — 읽는 자리와 쓰는 자리가 어긋나지 않게.
+        FluidizedSummaryLayout.Annual annual = FluidizedSummaryLayout.annualOf(sheet);
 
-        for (int monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-            String targetMonth = monthKey(year, monthIndex + 1);
+        for (int month = 1; month <= 12; month += 1) {
+            String targetMonth = monthKey(year, month);
             Map<String, String> targetDetailCells = annualDetailCells.getOrDefault(targetMonth, Map.of());
-            for (int rowIndex = 0; rowIndex < PLAN_ROW_KEYS.length; rowIndex += 1) {
-                Object plan = annualCells.get(cellKey(PLAN_TABLE, targetMonth, PLAN_ROW_KEYS[rowIndex], 0));
-                Object actual = calculatePlanActual(PLAN_ROW_KEYS[rowIndex], targetDetailCells);
-                setCellValue(sheet, PLAN_INPUT_ROWS[rowIndex] - 1, MONTH_PLAN_COLS[monthIndex][0] - 1, plan);
-                setCellValue(sheet, PLAN_INPUT_ROWS[rowIndex] - 1, MONTH_PLAN_COLS[monthIndex][1] - 1, actual);
+            Integer planCol = annual.planCols().get(month);
+            for (String rowKey : PLAN_ROW_KEYS) {
+                Integer row = annual.planRows().get(rowKey);
+                if (row == null || planCol == null) continue;
+                Object plan = annualCells.get(cellKey(PLAN_TABLE, targetMonth, rowKey, 0));
+                Object actual = calculatePlanActual(rowKey, targetDetailCells);
+                setCellValue(sheet, row, planCol, plan);
+                setCellValue(sheet, row, planCol + 1, actual);   // 계획 오른쪽이 실적
             }
 
+            Integer noteRow = annual.noteRows().get(month);
+            if (noteRow == null) continue;
             Object note = annualCells.get(cellKey(
                     NOTE_TABLE,
                     yearAnchorKey(year),
-                    "note-" + String.format("%02d", monthIndex + 1),
+                    "note-" + String.format("%02d", month),
                     0
             ));
-            setCellValue(sheet, MONTHLY_NOTE_START_ROW + monthIndex - 1, MONTHLY_NOTE_COL, note);
+            setCellValue(sheet, noteRow, MONTHLY_NOTE_COL, note);
         }
 
-        Object summaryNote = annualCells.get(cellKey(SUMMARY_TABLE, selectedMonthKey, "monthly-summary", 0));
-        setCellValue(sheet, SUMMARY_NOTE_ROW - 1, SUMMARY_NOTE_COL, summaryNote);
+        if (annual.summaryRow() >= 0 && annual.summaryCol() >= 0) {
+            Object summaryNote = annualCells.get(cellKey(SUMMARY_TABLE, selectedMonthKey, "monthly-summary", 0));
+            setCellValue(sheet, annual.summaryRow(), annual.summaryCol(), summaryNote);
+        }
     }
 
     private Map<String, Map<String, String>> renderAnnualDetailCells(int year) throws IOException {
@@ -620,26 +656,28 @@ public class FluidizedSummaryWorkbookService {
         setString(sheet, 0, 1, String.format("1. %d년 %d월 소각로 도급 비용", year, month));
 
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        for (int day = 1; day <= 31; day += 1) {
-            int rowIndex = CONTRACT_START_ROW + day - 1;
-            clearCell(sheet, rowIndex - 1, 2);
-            clearCell(sheet, rowIndex - 1, 4);
-            clearCell(sheet, rowIndex - 1, 6);
-            clearCell(sheet, rowIndex - 1, 7);
+        // 업로드와 같은 색인을 쓴다 — 읽는 자리와 쓰는 자리가 어긋나지 않게.
+        FluidizedSummaryLayout.Contract contract = FluidizedSummaryLayout.contractOf(sheet);
 
-            if (day > monthDays) {
-                continue;
+        for (Map.Entry<Integer, Integer> day : contract.dayRows().entrySet()) {
+            for (Map.Entry<String, Integer> field : CONTRACT_COL_INDEX.entrySet()) {
+                Integer column = contract.columns().get(field.getKey());
+                if (column == null) continue;
+                clearCell(sheet, day.getValue(), column);
+                if (day.getKey() > monthDays) continue;
+                String rowKey = String.format("%02d", day.getKey());
+                setCellValue(sheet, day.getValue(), column,
+                        monthlyCells.get(cellKey(CONTRACT_TABLE, monthKey, rowKey, field.getValue())));
             }
-
-            String rowKey = String.format("%02d", day);
-            setCellValue(sheet, rowIndex - 1, 2, monthlyCells.get(cellKey(CONTRACT_TABLE, monthKey, rowKey, 0)));
-            setCellValue(sheet, rowIndex - 1, 4, monthlyCells.get(cellKey(CONTRACT_TABLE, monthKey, rowKey, 2)));
-            setCellValue(sheet, rowIndex - 1, 6, monthlyCells.get(cellKey(CONTRACT_TABLE, monthKey, rowKey, 4)));
-            setCellValue(sheet, rowIndex - 1, 7, monthlyCells.get(cellKey(CONTRACT_TABLE, monthKey, rowKey, 5)));
         }
 
-        setCellValue(sheet, COST_ROW - 1, 4, monthlyCells.get(cellKey(COST_TABLE, monthKey, "cost", 0)));
-        setCellValue(sheet, COST_ROW - 1, 6, monthlyCells.get(cellKey(COST_TABLE, monthKey, "cost", 2)));
+        if (contract.costRow() < 0) return;
+        for (String field : new String[]{"labor", "improvement"}) {
+            Integer column = contract.costColumns().get(field);
+            if (column == null) continue;
+            setCellValue(sheet, contract.costRow(), column,
+                    monthlyCells.get(cellKey(COST_TABLE, monthKey, "cost", COST_COL_INDEX.get(field))));
+        }
     }
 
     private Map<String, String> renderDetailCells(String monthKey) throws IOException {
@@ -662,8 +700,16 @@ public class FluidizedSummaryWorkbookService {
         return cells;
     }
 
+    /** 내려받기도 업로드와 같은 색인을 거친다 — 읽는 자리와 쓰는 자리가 어긋나지 않게. */
     private void fillDetailSheet(Sheet sheet, Map<String, String> detailCells) {
-        detailCells.forEach((cellRef, value) -> setCellValue(sheet, cellRef, value));
+        FluidizedDetailSheetIndex index = detailIndex(sheet);
+        detailCells.forEach((cellRef, value) -> {
+            org.apache.poi.ss.util.CellAddress address = new org.apache.poi.ss.util.CellAddress(cellRef);
+            Integer sheetRow = index.rowFor(address.getRow() + 1);
+            Integer sheetCol = index.columnFor(columnLabel(address.getColumn() + 1));
+            if (sheetRow == null || sheetCol == null) return;
+            setCellValue(sheet, sheetRow, sheetCol, value);
+        });
     }
 
     /**
@@ -797,18 +843,19 @@ public class FluidizedSummaryWorkbookService {
 
     private int importAnnualPlanSheet(Sheet sheet, int year) {
         int imported = 0;
+        FluidizedSummaryLayout.Annual annual = FluidizedSummaryLayout.annualOf(sheet);
 
-        for (int monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-            String targetMonth = monthKey(year, monthIndex + 1);
-
-            for (int rowIndex = 0; rowIndex < PLAN_ROW_KEYS.length; rowIndex += 1) {
-                Cell planCell = getCell(sheet, PLAN_INPUT_ROWS[rowIndex] - 1, MONTH_PLAN_COLS[monthIndex][0] - 1);
-                String planValue = readCellValue(planCell);
-
-                imported += upsertCell(targetMonth, year, monthIndex + 1, PLAN_TABLE, PLAN_ROW_KEYS[rowIndex], 0, planValue);
+        for (int month = 1; month <= 12; month += 1) {
+            Integer planCol = annual.planCols().get(month);
+            if (planCol == null) continue;
+            String targetMonth = monthKey(year, month);
+            for (String rowKey : PLAN_ROW_KEYS) {
+                Integer row = annual.planRows().get(rowKey);
+                if (row == null) continue;
+                imported += upsertCell(targetMonth, year, month, PLAN_TABLE, rowKey, 0,
+                        readCellValue(getCell(sheet, row, planCol)));
             }
         }
-
         return imported;
     }
 
@@ -816,23 +863,26 @@ public class FluidizedSummaryWorkbookService {
         int imported = 0;
         String anchorMonth = yearAnchorKey(year);
         String selectedMonthKey = monthKey(year, month);
+        FluidizedSummaryLayout.Annual annual = FluidizedSummaryLayout.annualOf(sheet);
 
-        for (int monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-            Cell noteCell = getCell(sheet, MONTHLY_NOTE_START_ROW + monthIndex - 1, MONTHLY_NOTE_COL);
+        for (int noteMonth = 1; noteMonth <= 12; noteMonth += 1) {
+            Integer row = annual.noteRows().get(noteMonth);
+            if (row == null) continue;
             imported += upsertCell(
                     anchorMonth,
                     year,
                     1,
                     NOTE_TABLE,
-                    "note-" + String.format("%02d", monthIndex + 1),
+                    "note-" + String.format("%02d", noteMonth),
                     0,
-                    readCellValue(noteCell)
+                    readCellValue(getCell(sheet, row, MONTHLY_NOTE_COL))
             );
         }
 
-        Cell summaryNoteCell = getCell(sheet, SUMMARY_NOTE_ROW - 1, SUMMARY_NOTE_COL);
-        imported += upsertCell(selectedMonthKey, year, month, SUMMARY_TABLE, "monthly-summary", 0, readCellValue(summaryNoteCell));
-
+        if (annual.summaryRow() >= 0 && annual.summaryCol() >= 0) {
+            imported += upsertCell(selectedMonthKey, year, month, SUMMARY_TABLE, "monthly-summary", 0,
+                    readCellValue(getCell(sheet, annual.summaryRow(), annual.summaryCol())));
+        }
         return imported;
     }
 
@@ -840,54 +890,66 @@ public class FluidizedSummaryWorkbookService {
         int imported = 0;
         String monthKey = monthKey(year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
+        FluidizedSummaryLayout.Contract contract = FluidizedSummaryLayout.contractOf(sheet);
 
-        for (int day = 1; day <= 31; day += 1) {
-            if (day > monthDays) {
-                continue;
+        for (Map.Entry<Integer, Integer> day : contract.dayRows().entrySet()) {
+            if (day.getKey() > monthDays) continue;
+            String rowKey = String.format("%02d", day.getKey());
+            for (Map.Entry<String, Integer> field : CONTRACT_COL_INDEX.entrySet()) {
+                Integer column = contract.columns().get(field.getKey());
+                if (column == null) continue;
+                imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, field.getValue(),
+                        readCellValue(getCell(sheet, day.getValue(), column)));
             }
-
-            int rowIndex = CONTRACT_START_ROW + day - 1;
-            String rowKey = String.format("%02d", day);
-            imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 0, readCellValue(getCell(sheet, rowIndex - 1, 2)));
-            imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 2, readCellValue(getCell(sheet, rowIndex - 1, 4)));
-            imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 4, readCellValue(getCell(sheet, rowIndex - 1, 6)));
-            imported += upsertCell(monthKey, year, month, CONTRACT_TABLE, rowKey, 5, readCellValue(getCell(sheet, rowIndex - 1, 7)));
         }
-
         return imported;
     }
 
     private int importCostSheet(Sheet sheet, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
+        FluidizedSummaryLayout.Contract contract = FluidizedSummaryLayout.contractOf(sheet);
+        if (contract.costRow() < 0) return imported;
 
-        String laborValue = readCellValue(getCell(sheet, COST_ROW - 1, 4));
-        String improvementValue = readCellValue(getCell(sheet, COST_ROW - 1, 6));
-
-        imported += upsertCell(monthKey, year, month, COST_TABLE, "cost", 0, laborValue);
-        imported += upsertCell(monthKey, year, month, COST_TABLE, "cost", 2, improvementValue);
-
+        // 운영비(col_index 1)는 화면에서 계산하므로 예전처럼 읽지 않는다.
+        for (String field : new String[]{"labor", "improvement"}) {
+            Integer column = contract.costColumns().get(field);
+            if (column == null) continue;
+            imported += upsertCell(monthKey, year, month, COST_TABLE, "cost", COST_COL_INDEX.get(field),
+                    readCellValue(getCell(sheet, contract.costRow(), column)));
+        }
         return imported;
     }
 
+    /**
+     * 세부 운영내역을 읽는다.
+     *
+     * <p>DB 키는 서식 기준 셀 주소({@code "AK16"})를 그대로 쓰되, 올라온 파일에서 그 자리는
+     * <b>항목 이름으로</b> 찾는다({@link FluidizedDetailSheetIndex}). 사용자가 줄을 지웠거나
+     * 내려받기가 추가 항목을 끼워 넣은 파일을 다시 올려도 값이 밀리지 않는다.
+     */
     private int importDetailSheet(Sheet sheet, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        boolean hasExtraCostRow = hasDetailExtraCostRow(sheet);
-        if (!hasExtraCostRow) {
+        FluidizedDetailSheetIndex index = detailIndex(sheet);
+        if (!index.usable()) return imported;
+
+        if (index.rowFor(DETAIL_EXTRA_COST_ROW) == null) {
             deleteDetailExtraCost(monthKey);
         }
 
-        for (int row = 1; row <= 102; row += 1) {
-            int targetRow = mapDetailImportRow(row, hasExtraCostRow);
-            if (targetRow < 1 || targetRow > 102) continue;
-            for (int col = 1; col <= 37; col += 1) {
+        for (int canonicalRow = 1; canonicalRow <= DETAIL_LAST_ROW; canonicalRow += 1) {
+            Integer sheetRow = index.rowFor(canonicalRow);
+            if (sheetRow == null) continue;
+            for (int col = 1; col <= DETAIL_LAST_COL; col += 1) {
                 String colLabel = columnLabel(col);
-                if (!isEditableDetailCell(targetRow, colLabel)) continue;
+                if (!isEditableDetailCell(canonicalRow, colLabel)) continue;
                 if (isDayColumn(colLabel) && dayNumber(colLabel) > monthDays) continue;
-                String cellRef = colLabel + targetRow;
-                String value = readCellValue(getCell(sheet, row - 1, col - 1));
+                Integer sheetCol = index.columnFor(colLabel);
+                if (sheetCol == null) continue;
+                String cellRef = colLabel + canonicalRow;
+                String value = readCellValue(getCell(sheet, sheetRow, sheetCol));
                 if ("AK16".equals(cellRef) && value.isBlank()) {
                     deleteDetailExtraCost(monthKey);
                     continue;
@@ -903,44 +965,47 @@ public class FluidizedSummaryWorkbookService {
         tableService.deleteTableCellValue(monthKey, DETAIL_MAIN_TABLE, KNE_EXTRA_COST_KEY, 0);
     }
 
-    private boolean hasDetailExtraCostRow(Sheet sheet) {
-        String rowLabel = (readCellValue(getCell(sheet, 15, 0)) + " " + readCellValue(getCell(sheet, 15, 1))).replaceAll("\\s+", "");
-        return rowLabel.contains("\uCD94\uAC00\uBE44\uC6A9");
-    }
-
+    /**
+     * 서식에는 있는 "추가비용" 줄이 빠진 파일이면 그 자리에 끼워 넣는다.
+     *
+     * <p>자리는 바로 윗줄("설비개선비용")을 이름으로 찾아 정한다.
+     */
     private void ensureDetailExtraCostRow(Sheet sheet) {
-        if (hasDetailExtraCostRow(sheet)) return;
-        int insertRowIndex = 15;
-        int lastRow = Math.max(sheet.getLastRowNum(), 101);
+        FluidizedDetailSheetIndex index = detailIndex(sheet);
+        if (index.rowFor(DETAIL_EXTRA_COST_ROW) != null) return;
+        Integer above = index.rowFor(DETAIL_EXTRA_COST_ROW - 1);
+        if (above == null) return;
+
+        int insertRowIndex = above + 1;
+        int lastRow = Math.max(sheet.getLastRowNum(), insertRowIndex);
         sheet.shiftRows(insertRowIndex, lastRow, 1, true, false);
         Row row = sheet.getRow(insertRowIndex);
         if (row == null) row = sheet.createRow(insertRowIndex);
-        setCellValue(sheet, insertRowIndex, 1, "\uCD94\uAC00\uBE44\uC6A9");
+        setCellValue(sheet, insertRowIndex, 1, "추가비용");
         clearCell(sheet, insertRowIndex, 35);
         clearCell(sheet, insertRowIndex, 36);
-    }
-
-    private int mapDetailImportRow(int sourceRow, boolean hasExtraCostRow) {
-        if (hasExtraCostRow) return sourceRow;
-        if (sourceRow == 16) return -1;
-        if (sourceRow >= 17) return sourceRow + 1;
-        return sourceRow;
     }
 
     private int importSrfInboundSheet(Sheet sheet, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
+        FluidizedSummaryLayout.SrfInbound srf = FluidizedSummaryLayout.srfInboundOf(sheet);
+        List<Integer> vendorCols = srf.vendorCols();
 
-        for (int day = 1; day <= monthDays; day += 1) {
-            int rowIndex = 5 + day - 1;
-            String rowKey = "entry:" + String.format("%02d", day);
-            for (int vendorIndex = 0; vendorIndex < 10; vendorIndex += 1) {
-                imported += upsertCell(monthKey, year, month, SRF_INBOUND_TABLE, rowKey, vendorIndex + 1, readCellValue(getCell(sheet, rowIndex - 1, 2 + vendorIndex)));
+        for (Map.Entry<Integer, Integer> day : srf.dayRows().entrySet()) {
+            if (day.getKey() > monthDays) continue;
+            String rowKey = "entry:" + String.format("%02d", day.getKey());
+            for (int vendorIndex = 0; vendorIndex < vendorCols.size(); vendorIndex += 1) {
+                imported += upsertCell(monthKey, year, month, SRF_INBOUND_TABLE, rowKey, vendorIndex + 1,
+                        readCellValue(getCell(sheet, day.getValue(), vendorCols.get(vendorIndex))));
             }
         }
-        for (int vendorIndex = 0; vendorIndex < 10; vendorIndex += 1) {
-            imported += upsertCell(monthKey, year, month, SRF_INBOUND_TABLE, "rate", vendorIndex + 1, readCellValue(getCell(sheet, 36, 2 + vendorIndex)));
+        if (srf.rateRow() >= 0) {
+            for (int vendorIndex = 0; vendorIndex < vendorCols.size(); vendorIndex += 1) {
+                imported += upsertCell(monthKey, year, month, SRF_INBOUND_TABLE, "rate", vendorIndex + 1,
+                        readCellValue(getCell(sheet, srf.rateRow(), vendorCols.get(vendorIndex))));
+            }
         }
         return imported;
     }
@@ -949,17 +1014,20 @@ public class FluidizedSummaryWorkbookService {
         int imported = 0;
         String monthKey = yearAnchorKey(year).replace("-01", "-00");
 
+        // 좌표가 아니라 머리글로 칸을 찾는다 — 왼쪽은 "월/지급액/사용액/업체명/사용처",
+        // 오른쪽은 "구 분/No./Item/계획비용/실 비용/완료여부". 줄 범위도 합계 줄 앞까지 스스로 잡는다.
+        FluidizedSummaryLayout.LabeledTable monthly = FluidizedSummaryLayout.improvementMonthlyOf(sheet);
         String currentMonth = "";
         int monthlySort = 1;
-        for (int row = 6; row <= 25; row += 1) {
-            String monthValue = readCellValue(getCell(sheet, row - 1, 1));
+        for (int row = monthly.firstRow(); monthly.usable() && row <= monthly.lastRow(); row += 1) {
+            String monthValue = cellText(sheet, row, monthly, "month");
             if (!monthValue.isBlank()) currentMonth = normalizeMonthText(monthValue);
-            String payment = readCellValue(getCell(sheet, row - 1, 2));
-            String spent = readCellValue(getCell(sheet, row - 1, 3));
-            String vendor = readCellValue(getCell(sheet, row - 1, 5));
-            String usage = readCellValue(getCell(sheet, row - 1, 6));
+            String payment = cellText(sheet, row, monthly, "payment");
+            String spent = cellText(sheet, row, monthly, "spent");
+            String vendor = cellText(sheet, row, monthly, "vendor");
+            String usage = cellText(sheet, row, monthly, "usage");
             if (currentMonth.isBlank() && payment.isBlank() && spent.isBlank() && vendor.isBlank() && usage.isBlank()) continue;
-            String rowKey = IMPROVEMENT_MONTHLY_PREFIX + "xlsx-r" + row;
+            String rowKey = IMPROVEMENT_MONTHLY_PREFIX + "xlsx-r" + (row + 1);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, currentMonth.isBlank() ? "01" : currentMonth);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, payment);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, spent);
@@ -968,20 +1036,21 @@ public class FluidizedSummaryWorkbookService {
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, String.valueOf(monthlySort++));
         }
 
+        FluidizedSummaryLayout.LabeledTable items = FluidizedSummaryLayout.improvementItemOf(sheet);
         String currentCategory = "";
         int itemSort = 1;
-        for (int row = 6; row <= 26; row += 1) {
-            String category = readCellValue(getCell(sheet, row - 1, 8));
+        for (int row = items.firstRow(); items.usable() && row <= items.lastRow(); row += 1) {
+            String category = cellText(sheet, row, items, "category");
             if (!category.isBlank()) currentCategory = normalizeImprovementCategory(category);
-            String no = readCellValue(getCell(sheet, row - 1, 9));
-            String item = readCellValue(getCell(sheet, row - 1, 10));
-            String planCost = readCellValue(getCell(sheet, row - 1, 11));
-            String actualCost = readCellValue(getCell(sheet, row - 1, 12));
-            String status = readCellValue(getCell(sheet, row - 1, 13));
-            String note = readCellValue(getCell(sheet, row - 1, 14));
+            String no = cellText(sheet, row, items, "no");
+            String item = cellText(sheet, row, items, "item");
+            String planCost = cellText(sheet, row, items, "planCost");
+            String actualCost = cellText(sheet, row, items, "actualCost");
+            String status = cellText(sheet, row, items, "status");
+            String note = cellText(sheet, row, items, "note");
             if (currentCategory.isBlank() && no.isBlank() && item.isBlank() && planCost.isBlank() && actualCost.isBlank() && status.isBlank() && note.isBlank()) continue;
             if (isImprovementSummaryRow(currentCategory)) continue;
-            String rowKey = IMPROVEMENT_ITEM_PREFIX + "xlsx-r" + row;
+            String rowKey = IMPROVEMENT_ITEM_PREFIX + "xlsx-r" + (row + 1);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, currentCategory.isBlank() ? "설비개선" : currentCategory);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, no);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, item);
@@ -994,36 +1063,54 @@ public class FluidizedSummaryWorkbookService {
         return imported;
     }
 
+    /** 머리글로 찾은 칸의 글자. 그 머리글이 없으면 빈 글자를 준다. */
+    private String cellText(Sheet sheet, int row, FluidizedSummaryLayout.LabeledTable table, String key) {
+        Integer column = table.columns().get(key);
+        return column == null ? "" : readCellValue(getCell(sheet, row, column));
+    }
+
     private int importAccidentSheet(Sheet sheet, int year) {
         int imported = 0;
         String monthKey = yearAnchorKey(year).replace("-01", "-00");
-        imported += importAccidentRows(sheet, year, monthKey, "accident", ACCIDENT_PREFIX, 5, 11);
-        imported += importAccidentRows(sheet, year, monthKey, "maintenance", MAINTENANCE_PREFIX, 20, 29);
+        // "일 자 / 조치내역" 머리글이 있는 표를 위에서부터 찾는다 — 첫 표가 사고, 둘째가 정기 정비다.
+        // (예전에는 5~11행 / 20~29행으로 못 박아 둬서 줄을 하나만 넣어도 어긋났다)
+        List<FluidizedSummaryLayout.LabeledTable> blocks = FluidizedSummaryLayout.accidentBlocksOf(sheet);
+        String[] kinds = {"accident", "maintenance"};
+        String[] prefixes = {ACCIDENT_PREFIX, MAINTENANCE_PREFIX};
+        for (int index = 0; index < blocks.size() && index < kinds.length; index += 1) {
+            imported += importAccidentRows(sheet, year, monthKey, kinds[index], prefixes[index], blocks.get(index));
+        }
         return imported;
     }
 
-    private int importAccidentRows(Sheet sheet, int year, String monthKey, String kind, String prefix, int startRow, int endRow) {
+    /**
+     * 사고·정비 이력 한 표를 읽는다.
+     *
+     * <p>정비 표에는 "손실금액" 칸이 없다 — 머리글로 찾으므로 없으면 저절로 비고만 담긴다.
+     */
+    private int importAccidentRows(Sheet sheet, int year, String monthKey, String kind, String prefix,
+                                   FluidizedSummaryLayout.LabeledTable table) {
+        if (!table.usable()) return 0;
         int imported = 0;
         int sortOrder = 1;
-        for (int row = startRow; row <= endRow; row += 1) {
-            String date = readDateCellValue(getCell(sheet, row - 1, 2));
-            String reason = readCellValue(getCell(sheet, row - 1, 3));
-            String action = readCellValue(getCell(sheet, row - 1, 4));
-            String downtime = readCellValue(getCell(sheet, row - 1, 5));
-            String lossOrNote = readCellValue(getCell(sheet, row - 1, 6));
-            String note = "accident".equals(kind) ? readCellValue(getCell(sheet, row - 1, 7)) : lossOrNote;
-            if (date.isBlank() && reason.isBlank() && action.isBlank() && downtime.isBlank() && lossOrNote.isBlank() && note.isBlank()) continue;
-            String rowKey = prefix + "xlsx-r" + row;
+        for (int row = table.firstRow(); row <= table.lastRow(); row += 1) {
+            Integer dateColumn = table.columns().get("date");
+            String date = dateColumn == null ? "" : readDateCellValue(getCell(sheet, row, dateColumn));
+            String reason = cellText(sheet, row, table, "reason");
+            String action = cellText(sheet, row, table, "action");
+            String downtime = cellText(sheet, row, table, "downtime");
+            String loss = cellText(sheet, row, table, "loss");
+            String note = cellText(sheet, row, table, "note");
+            if (date.isBlank() && reason.isBlank() && action.isBlank() && downtime.isBlank() && loss.isBlank() && note.isBlank()) continue;
+            String rowKey = prefix + "xlsx-r" + (row + 1);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, date);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, reason);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, action);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 4, downtime);
             if ("accident".equals(kind)) {
-                imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 5, lossOrNote);
-                imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, note);
-            } else {
-                imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, note);
+                imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 5, loss);
             }
+            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, note);
             imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 7, String.valueOf(sortOrder++));
         }
         return imported;
@@ -1170,21 +1257,14 @@ public class FluidizedSummaryWorkbookService {
         if (cached != null && Files.isRegularFile(cached)) {
             return cached;
         }
-        Path originalDir = Path.of("").toAbsolutePath().resolve(ORIGINAL_DIR);
-        try (Stream<Path> stream = Files.list(originalDir)) {
-            Path resolved = stream
-                    .filter(Files::isRegularFile)
-                    .filter(path -> {
-                        String name = path.getFileName().toString();
-                        String lower = name.toLowerCase(Locale.ROOT);
-                        return name.startsWith("2.") && (lower.endsWith(".xlsx") || lower.endsWith(".xlsm") || lower.endsWith(".xls"));
-                    })
-                    .sorted()
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("Fluidized summary workbook not found in original folder"));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(name -> {
+            String lower = name.toLowerCase(Locale.ROOT);
+            return name.startsWith("2.")
+                    && (lower.endsWith(".xlsx") || lower.endsWith(".xlsm") || lower.endsWith(".xls"));
+        }, "유동상 운영내역");
+        cachedWorkbookPath = resolved;
+        return resolved;
     }
 
     private void setString(Sheet sheet, int rowIndex, int colIndex, String value) {
@@ -1212,11 +1292,6 @@ public class FluidizedSummaryWorkbookService {
         } catch (NumberFormatException exception) {
             cell.setCellValue(String.valueOf(value));
         }
-    }
-
-    private void setCellValue(Sheet sheet, String cellRef, Object value) {
-        org.apache.poi.ss.util.CellAddress address = new org.apache.poi.ss.util.CellAddress(cellRef);
-        setCellValue(sheet, address.getRow(), address.getColumn(), value);
     }
 
     private String divideText(String value, double divisor) {

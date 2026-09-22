@@ -90,6 +90,23 @@
     },
   };
 
+  /**
+   * 화면 열 순서 → 저장 번호(col_index).
+   *
+   * 보통은 화면 순서가 곧 저장 번호지만, 보일러 LNG 표는 나중에 추가한 복합보일러(7)·신설소각로(8)를
+   * 60톤 다음 자리에 보여 준다. 기존 번호를 밀면 단가(5)를 읽고 쓰는 단가 입력·오늘 일지 등록·
+   * 원단위 엑셀 입출력이 모두 어긋나므로, 번호는 그대로 두고 보이는 순서만 바꾼다.
+   */
+  const COLUMN_ORDER = {
+    lng_m_boiler: [0, 1, 2, 3, 7, 8, 4, 5, 6],
+    lng_y_boiler: [0, 1, 2, 3, 7, 8, 4, 5, 6],
+  };
+
+  function columnOrder(tableName, count) {
+    const order = COLUMN_ORDER[tableName];
+    return order && order.length === count ? order : Array.from({ length: count }, (_, index) => index);
+  }
+
   function monthKey(year = yearSelect.value, month = monthSelect.value) {
     return `${year}-${month}`;
   }
@@ -419,7 +436,7 @@
 
   function buildSummaryRow(tableName, rowKey, label, colCount) {
     const cells = [`<td>${label}</td>`];
-    for (let col = 0; col < colCount; col += 1) {
+    for (const col of columnOrder(tableName, colCount)) {
       cells.push(`<td>${buildInput(tableName, "daily", rowKey, col, "", true)}</td>`);
     }
     return `<tr data-row-key="${rowKey}" class="summary-row">${cells.join("")}</tr>`;
@@ -546,9 +563,12 @@
       const c1 = sumMonth("lng_m_boiler", monthNo, 1);
       const c2 = sumMonth("lng_m_boiler", monthNo, 2);
       const c3 = sumMonth("lng_m_boiler", monthNo, 3);
-      const total = c0 + c1 + c2 + c3;
+      const c7 = sumMonth("lng_m_boiler", monthNo, 7);   // 복합보일러
+      const c8 = sumMonth("lng_m_boiler", monthNo, 8);   // 신설소각로
+      const total = c0 + c1 + c2 + c3 + c7 + c8;
       const price = firstMonthValue("lng_m_boiler", monthNo, 5);
-      return [c0, c1, c2, c3, total, price, total * parseNumber(price) / 1000000];
+      // 저장 번호 순서로 돌려준다 — 화면 순서는 COLUMN_ORDER 가 정한다
+      return [c0, c1, c2, c3, total, price, total * parseNumber(price) / 1000000, c7, c8];
     }
     if (tableName === "lng_y_burner") {
       const pm3 = sumMonth("lng_m_burner", monthNo, 0);
@@ -853,7 +873,7 @@
       const rowKey = String(day).padStart(2, "0");
       const inactiveDay = day > maxDays;
       const cells = [`<td>${rowKey}</td>`];
-      for (let col = 0; col < totalCols - 1; col += 1) {
+      for (const col of columnOrder(tableName, totalCols - 1)) {
         const value = page === "unit-steam-usage.html" ? monthlyUsageValue(tableName, rowKey, col) : getCellValue(tableName, monthKey(), rowKey, col);
         cells.push(`<td>${buildInput(tableName, "daily", rowKey, col, value, inactiveDay)}</td>`);
       }
@@ -873,7 +893,7 @@
     for (let monthNo = 1; monthNo <= 12; monthNo += 1) {
       const values = yearlyValues(tableName, monthNo);
       const cells = [`<td>${monthNo}월</td>`];
-      for (let col = 0; col < totalCols - 1; col += 1) {
+      for (const col of columnOrder(tableName, totalCols - 1)) {
         cells.push(`<td>${buildInput(tableName, "yearly", String(monthNo).padStart(2, "0"), col, values[col] ?? "")}</td>`);
       }
       rows.push(`<tr>${cells.join("")}</tr>`);
@@ -1169,7 +1189,8 @@
     const tableName = row.querySelector("input")?.dataset.tableName;
     if (!tableName) return;
     if (tableName === "lng_m_boiler" || tableName === "lng_y_boiler") {
-      const total = parseNumber(getInput(row, 0)?.value.trim() ?? "") + parseNumber(getInput(row, 1)?.value.trim() ?? "") + parseNumber(getInput(row, 2)?.value.trim() ?? "") + parseNumber(getInput(row, 3)?.value.trim() ?? "");
+      // 사용합계 = 20톤-1 + 20톤-2 + 50톤 + 60톤 + 복합보일러(7) + 신설소각로(8)
+      const total = [0, 1, 2, 3, 7, 8].reduce((sum, col) => sum + parseNumber(getInput(row, col)?.value.trim() ?? ""), 0);
       setCalc(row, 4, total > 0 ? total : "");
       const price = parseNumber(getInput(row, 5)?.value.trim() ?? "");
       setCalc(row, 6, total > 0 || price > 0 ? total * price / 1000000 : "", 2);

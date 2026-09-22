@@ -19,9 +19,6 @@ import java.util.Map;
 
 @Service
 public class SteamUnitExcelExportService {
-    private static final int DAILY_START_ROW = 5;
-    private static final int DAILY_END_ROW = 35;
-    private static final String TEMPLATE_FILE = "1. 원단위 일지 누계(2025년).xls";
 
     private final TableService tableService;
 
@@ -71,9 +68,10 @@ public class SteamUnitExcelExportService {
             cellByKey.put(cellKey(row.get("table_name"), row.get("row_key"), row.get("col_index")), row.get("cell_value"));
         }
 
-        setString(sheet, 0, 0, String.format("1. 호기별 생산량당 스팀사용 원단위 (%d.%d )", year, monthNo));
-        setString(sheet, 154, 0, monthNo + "월 누계");
-        setString(sheet, 168, 0, monthNo + "월");
+        // 제목 칸도 번호가 아니라 글자로 찾는다 — 표 제목 / 월 누계 표 / 월 요약 표 머리글
+        setLabel(sheet, TITLE_PATTERN, false, String.format("1. 호기별 생산량당 스팀사용 원단위 (%d.%d )", year, monthNo));
+        setLabel(sheet, MONTH_TOTAL_PATTERN, true, monthNo + "월 누계");
+        setLabel(sheet, MONTH_PATTERN, true, monthNo + "월");
 
         fillUnitSection(sheet, unitByKey, rawByDay);
         fillUsageSection(sheet, cellByKey);
@@ -81,14 +79,37 @@ public class SteamUnitExcelExportService {
         fillFlowSection(sheet, cellByKey);
     }
 
+    private static final java.util.regex.Pattern TITLE_PATTERN = java.util.regex.Pattern.compile("^1\\.\\s*호기별 생산량당.*");
+    private static final java.util.regex.Pattern MONTH_TOTAL_PATTERN = java.util.regex.Pattern.compile("^\\d{1,2}\\s*월\\s*누계$");
+    private static final java.util.regex.Pattern MONTH_PATTERN = java.util.regex.Pattern.compile("^\\d{1,2}\\s*월$");
+
+    /** A열에서 규칙에 맞는 제목 칸을 찾아 글자를 바꾼다. 못 찾으면 그대로 둔다. */
+    private void setLabel(Sheet sheet, java.util.regex.Pattern pattern, boolean unitInC, String value) {
+        int row = SteamUnitSectionLayout.findLabelRow(sheet, pattern, unitInC);
+        if (row >= 0) setString(sheet, row, 0, value);
+    }
+
     private void fillUnitSection(Sheet sheet, Map<String, Map<String, Object>> unitByKey, Map<String, Map<String, Object>> rawByDay) {
-        for (int rowIndex = DAILY_START_ROW; rowIndex <= DAILY_END_ROW; rowIndex += 1) {
+        // 업로드와 같은 방식으로 머리글 줄·열·일자 줄을 제목에서 찾는다.
+        HeaderColumnIndex index = SteamUnitSectionLayout.unitHeaderIndex(sheet);
+        if (index == null) return;
+
+        Map<String, Integer> pm2Cols = SteamUnitLogColumnMap.columns(index, "PM-2");
+        Map<String, Integer> pm3Cols = SteamUnitLogColumnMap.columns(index, "PM-3");
+        Map<String, Integer> tm3Cols = SteamUnitLogColumnMap.columns(index, "TM-3");
+        Map<String, Integer> tm4Cols = SteamUnitLogColumnMap.columns(index, "TM-4");
+        Map<String, Integer> tm5Cols = SteamUnitLogColumnMap.columns(index, "TM-5");
+        Map<String, Integer> rawCols = SteamUnitLogColumnMap.rawColumns(index);
+
+        for (int day = 1; day <= 31; day += 1) {
+            Integer rowIndex = index.rowOfDay(day);
+            if (rowIndex == null) continue;
             Row row = sheet.getRow(rowIndex);
             if (row == null) {
                 continue;
             }
-            int day = rowIndex - DAILY_START_ROW + 1;
-            clearCells(row, 1, 2, 4, 6, 7, 8, 9, 10, 12, 14, 18, 19, 21, 22, 24, 25, 34, 35);
+            clearCells(row, SteamUnitLogColumnMap.allColumns(
+                    pm2Cols, pm3Cols, tm3Cols, tm4Cols, tm5Cols, rawCols));
 
             Map<String, Object> pm2 = unitByKey.get("PM-2:" + day);
             Map<String, Object> pm3 = unitByKey.get("PM-3:" + day);
@@ -97,103 +118,86 @@ public class SteamUnitExcelExportService {
             Map<String, Object> tm5 = unitByKey.get("TM-5:" + day);
             Map<String, Object> raw = rawByDay.get(String.valueOf(day));
 
-            setNumber(row, 1, pm2, "main_steam");
-            setNumber(row, 2, pm2, "coater_steam");
-            setNumber(row, 4, pm2, "production");
-            setString(row, 6, pm2, "production_type");
+            setNumberAt(row, pm2Cols, "main_steam", pm2);
+            setNumberAt(row, pm2Cols, "coater_steam", pm2);
+            setNumberAt(row, pm2Cols, "production", pm2);
+            setStringAt(row, pm2Cols, "production_type", pm2);
 
-            setNumber(row, 7, pm3, "main_steam");
-            setNumber(row, 8, pm3, "coater_steam");
-            setNumber(row, 9, raw, "disperser_total");
-            setNumber(row, 10, pm3, "ventilation_steam");
-            setNumber(row, 12, pm3, "production");
-            setString(row, 14, pm3, "production_type");
+            setNumberAt(row, pm3Cols, "main_steam", pm3);
+            setNumberAt(row, pm3Cols, "coater_steam", pm3);
+            setNumberAt(row, rawCols, "disperser_total", raw);
+            setNumberAt(row, pm3Cols, "ventilation_steam", pm3);
+            setNumberAt(row, pm3Cols, "production", pm3);
+            setStringAt(row, pm3Cols, "production_type", pm3);
 
-            setNumber(row, 18, tm3, "steam");
-            setNumber(row, 19, tm3, "production");
-            setNumber(row, 21, tm4, "steam");
-            setNumber(row, 22, tm4, "production");
-            setNumber(row, 24, tm5, "steam");
-            setNumber(row, 25, tm5, "production");
+            setNumberAt(row, tm3Cols, "steam", tm3);
+            setNumberAt(row, tm3Cols, "production", tm3);
+            setNumberAt(row, tm4Cols, "steam", tm4);
+            setNumberAt(row, tm4Cols, "production", tm4);
+            setNumberAt(row, tm5Cols, "steam", tm5);
+            setNumberAt(row, tm5Cols, "production", tm5);
 
-            setNumber(row, 34, raw, "toc_steam");
-            setNumber(row, 35, raw, "pica121_vent");
+            setNumberAt(row, rawCols, "toc_steam", raw);
+            setNumberAt(row, rawCols, "pica121_vent", raw);
         }
     }
 
+    /** 2번 호기별 가동시간당 스팀 구역 — 가져오기와 같은 제목 기반 배치로 쓴다({@link SteamUnitSectionLayout}). */
     private void fillUsageSection(Sheet sheet, Map<String, Object> cellByKey) {
-        for (int rowIndex = 42; rowIndex <= 72; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
-            if (row == null) {
-                continue;
-            }
-            String rowKey = String.format("%02d", rowIndex - 41);
-            clearCells(row, 2, 4, 6, 8, 10, 13, 19, 22, 25, 28);
-
-            setValue(row, 2, cellByKey.get(cellKey("usage_m_pm2", rowKey, 1)));
-            setValue(row, 4, cellByKey.get(cellKey("usage_m_pm2", rowKey, 3)));
-            setValue(row, 6, cellByKey.get(cellKey("usage_m_pm3a", rowKey, 1)));
-            setValue(row, 8, cellByKey.get(cellKey("usage_m_pm3a", rowKey, 3)));
-            setValue(row, 10, cellByKey.get(cellKey("usage_m_pm3b", rowKey, 1)));
-            setValue(row, 13, cellByKey.get(cellKey("usage_m_pm3b", rowKey, 5)));
-            setValue(row, 19, cellByKey.get(cellKey("usage_m_tm", rowKey, 1)));
-            setValue(row, 22, cellByKey.get(cellKey("usage_m_tm", rowKey, 4)));
-            setValue(row, 25, cellByKey.get(cellKey("usage_m_tm", rowKey, 7)));
-            setValue(row, 28, cellByKey.get(cellKey("usage_m_tissue", rowKey, 1)));
-        }
+        fillSection(SteamUnitSectionLayout.usage(sheet), sheet, cellByKey);
     }
 
+    /** LNG 구역 — 가져오기와 같은 제목 기반 배치로 쓴다({@link SteamUnitLngLayout}). */
     private void fillLngSection(Sheet sheet, Map<String, Object> cellByKey) {
-        for (int rowIndex = 80; rowIndex <= 110; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
+        SteamUnitLngLayout layout = SteamUnitLngLayout.of(sheet);
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            Row row = sheet.getRow(day.getValue());
             if (row == null) {
                 continue;
             }
-            String rowKey = String.format("%02d", rowIndex - 79);
-            clearCells(row, 1, 2, 3, 4, 6, 8, 9, 10, 11, 14, 19, 20, 22, 23, 24);
-
-            setValue(row, 1, cellByKey.get(cellKey("lng_m_boiler", rowKey, 0)));
-            setValue(row, 2, cellByKey.get(cellKey("lng_m_boiler", rowKey, 1)));
-            setValue(row, 3, cellByKey.get(cellKey("lng_m_boiler", rowKey, 2)));
-            setValue(row, 4, cellByKey.get(cellKey("lng_m_boiler", rowKey, 3)));
-            setValue(row, 6, cellByKey.get(cellKey("lng_m_boiler", rowKey, 5)));
-
-            setValue(row, 8, cellByKey.get(cellKey("lng_m_burner", rowKey, 0)));
-            setValue(row, 9, cellByKey.get(cellKey("lng_m_burner", rowKey, 1)));
-            setValue(row, 10, cellByKey.get(cellKey("lng_m_burner", rowKey, 2)));
-            setValue(row, 11, cellByKey.get(cellKey("lng_m_burner", rowKey, 3)));
-            setValue(row, 14, cellByKey.get(cellKey("lng_m_burner", rowKey, 6)));
-
-            setValue(row, 19, cellByKey.get(cellKey("lng_m_mix", rowKey, 0)));
-            setValue(row, 20, cellByKey.get(cellKey("lng_m_mix", rowKey, 1)));
-            setValue(row, 22, cellByKey.get(cellKey("lng_m_mix", rowKey, 3)));
-            setValue(row, 23, cellByKey.get(cellKey("lng_m_mix", rowKey, 4)));
-            setValue(row, 24, cellByKey.get(cellKey("lng_m_mix", rowKey, 5)));
+            String rowKey = String.format("%02d", day.getKey());
+            for (String tableName : new String[]{"lng_m_boiler", "lng_m_burner", "lng_m_mix"}) {
+                for (Map.Entry<Integer, Integer> column : layout.columns(tableName).entrySet()) {
+                    clearCells(row, column.getValue());
+                    setValue(row, column.getValue(), cellByKey.get(cellKey(tableName, rowKey, column.getKey())));
+                }
+            }
         }
     }
 
+    /** 4번 유동상·소각로·외부·복합 구역 — 가져오기와 같은 제목 기반 배치로 쓴다({@link SteamUnitSectionLayout}). */
     private void fillFlowSection(Sheet sheet, Map<String, Object> cellByKey) {
-        for (int rowIndex = 119; rowIndex <= 149; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
+        fillSection(SteamUnitSectionLayout.flow(sheet), sheet, cellByKey);
+    }
+
+    /** 구역 하나를 일자 × 항목으로 채운다. */
+    private void fillSection(SteamUnitSectionLayout layout, Sheet sheet, Map<String, Object> cellByKey) {
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            Row row = sheet.getRow(day.getValue());
             if (row == null) {
                 continue;
             }
-            String rowKey = String.format("%02d", rowIndex - 118);
-            clearCells(row, 1, 2, 4, 5, 7, 8, 10, 12, 13, 15);
-
-            setValue(row, 1, cellByKey.get(cellKey("flow_m_fluid_incinerator", rowKey, 0)));
-            setValue(row, 2, cellByKey.get(cellKey("flow_m_fluid_incinerator", rowKey, 1)));
-            setValue(row, 4, cellByKey.get(cellKey("flow_m_fluid_incinerator", rowKey, 3)));
-            setValue(row, 5, cellByKey.get(cellKey("flow_m_fluid_incinerator", rowKey, 4)));
-
-            setValue(row, 7, cellByKey.get(cellKey("flow_m_combined", rowKey, 0)));
-            setValue(row, 8, cellByKey.get(cellKey("flow_m_combined", rowKey, 1)));
-            setValue(row, 10, cellByKey.get(cellKey("flow_m_combined", rowKey, 3)));
-
-            setValue(row, 12, cellByKey.get(cellKey("flow_m_boiler", rowKey, 0)));
-            setValue(row, 13, cellByKey.get(cellKey("flow_m_boiler", rowKey, 1)));
-            setValue(row, 15, cellByKey.get(cellKey("flow_m_boiler", rowKey, 3)));
+            String rowKey = String.format("%02d", day.getKey());
+            for (String tableName : layout.tables()) {
+                for (Map.Entry<Integer, Integer> column : layout.columns(tableName).entrySet()) {
+                    clearCells(row, column.getValue());
+                    setValue(row, column.getValue(), cellByKey.get(cellKey(tableName, rowKey, column.getKey())));
+                }
+            }
         }
+    }
+
+    /** 머리글에서 찾은 열에만 쓴다 — 못 찾은 항목(null)은 건너뛴다. */
+    private void setNumberAt(Row row, Map<String, Integer> columns, String key, Map<String, Object> data) {
+        Integer columnIndex = columns.get(key);
+        if (columnIndex == null) return;
+        setNumber(row, columnIndex, data, key);
+    }
+
+    private void setStringAt(Row row, Map<String, Integer> columns, String key, Map<String, Object> data) {
+        Integer columnIndex = columns.get(key);
+        if (columnIndex == null) return;
+        setString(row, columnIndex, data, key);
     }
 
     private void setNumber(Row row, int columnIndex, Map<String, Object> data, String key) {
@@ -269,11 +273,20 @@ public class SteamUnitExcelExportService {
         return String.valueOf(tableName) + ":" + String.valueOf(rowKey) + ":" + String.valueOf(colIndex);
     }
 
+    /**
+     * 서식 파일을 찾는다.
+     *
+     * <p>예전에는 작업 디렉터리 바로 아래만 봤다. bootRun 은 작업 디렉터리가 {@code app/} 이라
+     * 항상 못 찾고 500 이 났다. 이제 '원본' 폴더를 찾아 올라가고, 파일명의 연도는 보지 않는다.
+     */
     private Path resolveTemplatePath() {
-        Path direct = Path.of("").toAbsolutePath().resolve(TEMPLATE_FILE);
-        if (Files.exists(direct)) {
-            return direct;
+        try {
+            return OriginalWorkbookFiles.find(
+                    name -> name.replace(" ", "").contains("원단위일지")
+                            && (name.endsWith(".xls") || name.endsWith(".xlsx")),
+                    "원단위 일지");
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception.getMessage(), exception);
         }
-        throw new IllegalStateException("Excel template file not found: " + TEMPLATE_FILE);
     }
 }

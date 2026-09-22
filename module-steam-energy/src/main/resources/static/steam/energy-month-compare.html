@@ -109,37 +109,6 @@
       z-index: 7;
     }
 
-    /* === 차트 === */
-    .emc-chart-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 16px;
-    }
-    .emc-chart-card {
-      background: #fff;
-      border: 1px solid rgba(120,181,217,.24);
-      border-radius: 12px;
-      box-shadow: 0 8px 18px rgba(23,65,95,.06);
-      padding: 14px 16px;
-    }
-    .emc-chart-title {
-      font: 700 13px Inter, "Apple SD Gothic Neo", sans-serif;
-      color: #1f3b57;
-      margin: 0 0 6px 0;
-    }
-    .emc-chart-legend {
-      display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px;
-      font: 500 11.5px Inter, sans-serif; color: #475569;
-    }
-    .emc-chart-legend .dot {
-      display:inline-block; width:10px; height:10px; border-radius:3px;
-      margin-right:4px; vertical-align:middle;
-    }
-    .emc-chart-svg { width: 100%; height: 220px; display: block; }
-    .emc-chart-empty {
-      display:flex; align-items:center; justify-content:center;
-      height:200px; color:#9ca3af; font-size:13px;
-    }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
 </head>
@@ -149,7 +118,7 @@
       <div class="inc-header">
         <div class="inc-header-title">
           <h1>2. 회계비용 마감과 실마감 비교</h1>
-          <p id="emcSubtitle">— 월별 회계비용 마감 vs 실마감 차이 (연료비 / 전력비 / 에너지 합산)</p>
+          <p id="emcSubtitle">— 월별 회계비용 마감 vs 실마감 차이 (연료비)</p>
         </div>
         <div class="inc-toolbar">
           <select id="emcYear" aria-label="조회 연도"></select>
@@ -161,16 +130,9 @@
         </div>
       </div>
 
-      <div class="energy-tab-bar" role="tablist" id="emcTabs">
-        <button type="button" class="energy-tab" data-target="fuel"  aria-pressed="true">1. 연료비</button>
-        <button type="button" class="energy-tab" data-target="power" aria-pressed="false">2. 전력비</button>
-        <button type="button" class="energy-tab" data-target="total" aria-pressed="false">3. 에너지 합산 / 손익</button>
-        <button type="button" class="energy-tab" data-target="charts" aria-pressed="false">4. 차트</button>
-      </div>
-
       <section class="energy-panel active" data-panel="fuel">
         <div class="inc-card">
-          <h3 class="inc-section-title">1. 연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+          <h3 class="inc-section-title">연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
           <div class="energy-table-wrap">
             <table class="energy-table" data-section="fuel">
               <colgroup id="emcFuelCols"></colgroup>
@@ -181,41 +143,10 @@
         </div>
       </section>
 
-      <section class="energy-panel" data-panel="power">
-        <div class="inc-card">
-          <h3 class="inc-section-title">2. 전력비 — 회계비용 마감 vs 실마감 (백만원)</h3>
-          <div class="energy-table-wrap">
-            <table class="energy-table" data-section="power">
-              <colgroup id="emcPowerCols"></colgroup>
-              <thead><tr id="emcPowerHeader"></tr></thead>
-              <tbody id="emcPowerBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="energy-panel" data-panel="total">
-        <div class="inc-card">
-          <h3 class="inc-section-title">3. 에너지 합산 / 손익 (연료비 + 전력비)</h3>
-          <div class="energy-table-wrap">
-            <table class="energy-table" data-section="total">
-              <colgroup id="emcTotalCols"></colgroup>
-              <thead><tr id="emcTotalHeader"></tr></thead>
-              <tbody id="emcTotalBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="energy-panel" data-panel="charts">
-        <div class="inc-card">
-          <h3 class="inc-section-title">4. 차트 — 제품톤당 에너지</h3>
-          <div class="emc-chart-grid" id="emcChartGrid"></div>
-        </div>
-      </section>
     </div>
   </main>
 
+  <script src="/steam/js/energy-linked-sources.js?v=20260922-client2"></script>
   <script>
   (function () {
     const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -307,6 +238,8 @@
     }
 
     function importValues(importSource, year) {
+      if (importSource === "srf-invoice-total") return window.EnergyLinkedSources.compositeSteamPurchaseSync(year);
+      if (importSource === "srf-client-non-power") return window.EnergyLinkedSources.compositeLngEtcSync(year);
       if (importSource === "fluidized-monthly") return importFluidizedContract(year);
       if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
       if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
@@ -323,8 +256,12 @@
     //   formula: formula 일 때 (rows, m) => 값
     //   cls: 'subtotal' | 'total'
     //   note: 비고 표시 여부 (기본 true). 비고는 같은 카테고리의 첫 row 에서만 rowspan
+    // 월마다 바뀌지 않는 차감비 — 연료비 배분비율 페이지도 같은 값을 써서 js/energy-linked-sources.js 에 둔다.
+    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED } = window.EnergyLinkedSources;
+
     const FUEL_ROWS = [
-      { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"input" },
+      { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"imported",
+        importSource:"srf-invoice-total", importLabel:"SRF Boiler 인보이스 → Summary(VK) TOTAL SERVICE CHARGES FOR THE MONTH (원 → 백만원)" },
       { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input" },
       { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
       { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"input" },
@@ -335,10 +272,14 @@
 
       { key:"zescoOffset",     label:"제스코 상계비 (유틸리티)",     cat:"차감비",    kind:"input" },
       { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input" },
-      { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"input" },
+      { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"imported",
+        importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 청구금액 합계, 전력 제외 (원 → 백만원)" },
       { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"input" },
-      { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"input" },
-      { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"input" },
+      // 아래 둘은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"formula",
+        formula:() => COMPOSITE_INCOME_FIXED },
+      { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"formula",
+        formula:() => LAND_LEASE_FIXED },
       { key:"deductSum",       label:"차감비 소계",                  cat:"차감비",    kind:"sum",
         srcKeys:["zescoOffset","zescoPenalty","compositeLngEtc","compositeInvest","compositeIncome","landLease"], cls:"subtotal" },
 
@@ -384,109 +325,14 @@
         formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
     ];
 
-    const POWER_ROWS = [
-      { key:"powerMonthly",    label:"전력비 월별 (백만원)",         cat:"전력비",    kind:"input" },
-      { key:"energyKSettle",   label:"에너지K 정산 지급비용 (AJ)",   cat:"전력비",    kind:"input" },
-      { key:"essSettle",       label:"ESS 정산 지급비용",            cat:"전력비",    kind:"input" },
-      { key:"kepcoBill",       label:"한전 청구비용 (백만원)",       cat:"전력비",    kind:"input" },
-      { key:"dongjinWh",       label:"동진창고",                     cat:"전력비",    kind:"input" },
-      { key:"eumseongFct",     label:"음성공장",                     cat:"전력비",    kind:"input" },
-      { key:"logisticsWh",     label:"물류창고",                     cat:"전력비",    kind:"input" },
-
-      { key:"drRefund",        label:"신뢰성수요반응 환급 (별도)",   cat:"차감비",    kind:"input" },
-      { key:"compositePower",  label:"복합보일러 전력비",            cat:"차감비",    kind:"input" },
-      { key:"powerSettle",     label:"전력비 정산 (AJ, SDI 환급)",   cat:"차감비",    kind:"input" },
-      { key:"powerDeductSum",  label:"차감비 소계",                  cat:"차감비",    kind:"sum",
-        srcKeys:["drRefund","compositePower","powerSettle"], cls:"subtotal" },
-
-      { key:"powerActualCj",   label:"전력비(회계비용) 실적 : 청주공장만 해당", cat:"실적", kind:"formula", cls:"total",
-        formula:(r,m) => (r.powerMonthly[m] ?? 0) - (r.powerDeductSum[m] ?? 0) },
-      { key:"powerActualAll",  label:"전력비(회계비용) 실적 : 청주+음성+물류",  cat:"실적", kind:"formula", cls:"total",
-        formula:(r,m) => (r.powerActualCj[m] ?? 0) + (r.eumseongFct[m] ?? 0) + (r.logisticsWh[m] ?? 0) },
-
-      { key:"paperPower",      label:"제지 전력비 (전표비용 확인)",  cat:"전력비용",  kind:"input" },
-      { key:"tissuePower",     label:"화장지 전력비",                cat:"전력비용",  kind:"input" },
-      { key:"padPower",        label:"PAD 전력비",                  cat:"전력비용",  kind:"input" },
-
-      { key:"powerPlan",       label:"전력비(회계비용) SG 계획금액", cat:"계획",      kind:"input" },
-      { key:"powerVsPlan",     label:"회계비용 대비 증감",           cat:"계획",      kind:"formula",
-        formula:(r,m) => (r.powerActualAll[m] ?? null) === null ? null : r.powerActualAll[m] - (r.powerPlan[m] ?? 0) },
-
-      { key:"powerProdTotal",  label:"생산량",                       cat:"생산량",    kind:"formula",
-        formula:(r,m) => (r.powerPaperProd[m] ?? 0) + (r.powerTissueProd[m] ?? 0) + (r.padProd[m] ?? 0) },
-      { key:"powerPaperProd",  label:"제지 제품생산량",              cat:"제품생산량", kind:"input" },
-      { key:"powerTissueProd", label:"화장지 제품생산량",            cat:"제품생산량", kind:"input" },
-      { key:"padProd",         label:"PAD 제품생산량 (천EA)",        cat:"제품생산량", kind:"input" },
-
-      { key:"powerTotalUnit",  label:"전력비 / 생산량 (천원/톤·제품)", cat:"원단위", kind:"formula",
-        formula:(r,m) => safeDiv((r.powerActualAll[m] ?? 0) * 1000, (r.powerPaperProd[m] ?? 0) + (r.powerTissueProd[m] ?? 0)) },
-      { key:"paperPowerUnit",  label:"제지 원단위 (전력비/생산량)",  cat:"원단위",    kind:"formula",
-        formula:(r,m) => safeDiv((r.paperPower[m] ?? 0) * 1000, r.powerPaperProd[m] ?? 0) },
-      { key:"tissuePowerUnit", label:"화장지 원단위 (전력비/생산량)", cat:"원단위",   kind:"formula",
-        formula:(r,m) => safeDiv((r.tissuePower[m] ?? 0) * 1000, r.powerTissueProd[m] ?? 0) },
-      { key:"padPowerUnit",    label:"PAD 원단위 (전력비/생산량)",   cat:"원단위",    kind:"formula",
-        formula:(r,m) => safeDiv((r.padPower[m] ?? 0) * 1000, r.padProd[m] ?? 0) },
-
-      { key:"powerProfitDelta", label:"전월대비 손익증감",           cat:"손익",      kind:"formula",
-        formula:(r,m) => m > 0 && Number.isFinite(r.powerActualAll[m]) && Number.isFinite(r.powerActualAll[m-1]) ? -(r.powerActualAll[m] - r.powerActualAll[m-1]) : null },
-      { key:"paperPowerProfit", label:"제지손익",                    cat:"손익",      kind:"input" },
-      { key:"tissuePowerProfit",label:"화장지손익",                  cat:"손익",      kind:"input" },
-      { key:"padPowerProfit",   label:"PAD 손익",                   cat:"손익",      kind:"input" },
-      { key:"powerProfitSum",   label:"손익합계 (제지+생활+PAD)",    cat:"손익",      kind:"sum",
-        srcKeys:["paperPowerProfit","tissuePowerProfit","padPowerProfit"], cls:"subtotal" },
-
-      { key:"powerUsageMw",     label:"전력사용량 (MW)",             cat:"보조 분석", kind:"input" },
-      { key:"powerRateWon",     label:"전력단가 (원/Kw)",            cat:"보조 분석", kind:"formula",
-        formula:(r,m) => safeDiv((r.powerActualAll[m] ?? 0) * 1000000, (r.powerUsageMw[m] ?? 0) * 1000) },
-    ];
-
-    const TOTAL_ROWS = [
-      { key:"energyCostSum",   label:"에너지비용 합계 (백만원)",     cat:"에너지 합산", kind:"formula", cls:"total",
-        formula:(r,m,xr) => (xr.fuel.fuelActual[m] ?? 0) + (xr.power.powerActualAll[m] ?? 0) },
-      { key:"energyPerProd",   label:"1톤 생산량당 에너지비용 (천원/톤)", cat:"에너지 합산", kind:"formula",
-        formula:(r,m,xr) => safeDiv(r.energyCostSum[m] * 1000, (xr.fuel.prodTotal[m] ?? 0)) },
-      { key:"energyProfitDelta", label:"전월대비 손익증감",          cat:"에너지 합산", kind:"formula",
-        formula:(r,m) => m > 0 && Number.isFinite(r.energyCostSum[m]) && Number.isFinite(r.energyCostSum[m-1]) ? -(r.energyCostSum[m] - r.energyCostSum[m-1]) : null },
-      { key:"energySplitDelta", label:"전월대비 손익증감 (제지·생활 분리 적용시)", cat:"에너지 합산", kind:"formula",
-        formula:(r,m,xr) => (xr.fuel.profitSum[m] ?? 0) + (xr.power.powerProfitSum[m] ?? 0) },
-
-      { key:"paperProfitSum",    label:"제지손익",                  cat:"에너지비용 손익 (백만원)", kind:"formula",
-        formula:(r,m,xr) => (xr.fuel.paperProfit[m] ?? 0) + (xr.power.paperPowerProfit[m] ?? 0) },
-      { key:"tissueProfitSum",   label:"화장지손익",                cat:"에너지비용 손익 (백만원)", kind:"formula",
-        formula:(r,m,xr) => (xr.fuel.livingProfit[m] ?? 0) + (xr.power.tissuePowerProfit[m] ?? 0) },
-      { key:"padProfitSum",      label:"PAD 손익",                  cat:"에너지비용 손익 (백만원)", kind:"formula",
-        formula:(r,m,xr) => (xr.power.padPowerProfit[m] ?? 0) },
-      { key:"profitSumTotal",    label:"합계",                      cat:"에너지비용 손익 (백만원)", kind:"sum",
-        srcKeys:["paperProfitSum","tissueProfitSum","padProfitSum"], cls:"subtotal" },
-
-      { key:"paperEnergy",       label:"제지",                      cat:"에너지비용", kind:"formula",
-        formula:(r,m,xr) => (xr.fuel.paperFuel[m] ?? 0) + (xr.power.paperPower[m] ?? 0) },
-      { key:"tissueEnergy",      label:"화장지",                    cat:"에너지비용", kind:"formula",
-        formula:(r,m,xr) => (xr.fuel.livingFuel[m] ?? 0) + (xr.power.tissuePower[m] ?? 0) },
-      { key:"padEnergy",         label:"PAD",                       cat:"에너지비용", kind:"formula",
-        formula:(r,m,xr) => (xr.power.padPower[m] ?? 0) },
-      { key:"energySumMW",       label:"합계 (백만원)",             cat:"에너지비용", kind:"sum",
-        srcKeys:["paperEnergy","tissueEnergy","padEnergy"], cls:"subtotal" },
-
-      { key:"paperTonCost",      label:"제지",                      cat:"톤당비용", kind:"formula",
-        formula:(r,m,xr) => safeDiv(r.paperEnergy[m] * 1000, xr.fuel.paperProd[m] ?? 0) },
-      { key:"tissueTonCost",     label:"생활",                      cat:"톤당비용", kind:"formula",
-        formula:(r,m,xr) => safeDiv(r.tissueEnergy[m] * 1000, xr.fuel.tissueProd[m] ?? 0) },
-      { key:"padTonCost",        label:"PAD",                       cat:"톤당비용", kind:"formula",
-        formula:(r,m,xr) => safeDiv(r.padEnergy[m] * 1000, xr.power.padProd[m] ?? 0) },
-      { key:"totalTonCost",      label:"에너지 총비용",             cat:"톤당비용", kind:"formula",
-        formula:(r,m,xr) => safeDiv(r.energyCostSum[m] * 1000, (xr.fuel.paperProd[m] ?? 0) + (xr.fuel.tissueProd[m] ?? 0)) },
-    ];
 
     const SECTION_DEFS = {
-      fuel:  { rows: FUEL_ROWS,  headerId: "emcFuelHeader",  bodyId: "emcFuelBody",  colId: "emcFuelCols",  hasNote: true },
-      power: { rows: POWER_ROWS, headerId: "emcPowerHeader", bodyId: "emcPowerBody", colId: "emcPowerCols", hasNote: true },
-      total: { rows: TOTAL_ROWS, headerId: "emcTotalHeader", bodyId: "emcTotalBody", colId: "emcTotalCols", hasNote: false },
+      fuel: { rows: FUEL_ROWS, headerId: "emcFuelHeader", bodyId: "emcFuelBody", colId: "emcFuelCols", hasNote: true },
     };
 
     let currentYear = String(new Date().getFullYear());
     let store = {}; // DB 캐시 — loadStoreFromDB() 로 채움
-    let computed = { fuel:{}, power:{}, total:{} };
+    let computed = { fuel:{} };
     let notes = {}; // notes[section][rowKey]
 
     /* ── DB 저장소 (table_cell_value / table_name=energy_month_compare) ─
@@ -502,7 +348,7 @@
         const resp = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
         if (!resp.ok) return;
         const payload = await resp.json();
-        store[yearStr] = { fuel:{}, power:{}, total:{}, notes:{ fuel:{}, power:{}, total:{} } };
+        store[yearStr] = { fuel:{}, notes:{ fuel:{} } };
         const yd = store[yearStr];
         (payload.data || []).forEach((row) => {
           if (row.table_name !== PAGE_TABLE_NAME) return;
@@ -560,9 +406,9 @@
     function getYearState() {
       if (!store[currentYear]) store[currentYear] = { fuel:{}, power:{}, total:{}, notes:{} };
       const s = store[currentYear];
-      ["fuel","power","total"].forEach((sec) => { if (!s[sec]) s[sec] = {}; });
+      ["fuel"].forEach((sec) => { if (!s[sec]) s[sec] = {}; });
       if (!s.notes) s.notes = {};
-      ["fuel","power","total"].forEach((sec) => { if (!s.notes[sec]) s.notes[sec] = {}; });
+      ["fuel"].forEach((sec) => { if (!s.notes[sec]) s.notes[sec] = {}; });
       return s;
     }
 
@@ -761,12 +607,7 @@
         focusCoord = { ...__lastFocusCoord };
       }
       buildHeader("fuel");
-      buildHeader("power");
-      buildHeader("total");
       renderSection("fuel");
-      renderSection("power");
-      renderSection("total");
-      renderCharts();
       if (focusCoord) {
         const sel = `.emc-input[data-section="${focusCoord.section}"][data-row="${focusCoord.row}"][data-month="${focusCoord.month}"]`;
         const next = document.querySelector(sel);
@@ -790,128 +631,6 @@
       }
     }
 
-    // ====== 차트 ======
-    function getSeries(section, rowKey) {
-      // 1..12월 값 배열
-      const arr = [];
-      for (let m = 1; m <= 12; m++) {
-        const v = computed[section]?.[rowKey]?.[m];
-        arr.push(Number.isFinite(v) ? v : null);
-      }
-      return arr;
-    }
-
-    function hasAnyData(seriesList) {
-      return seriesList.some((s) => s.values.some((v) => Number.isFinite(v) && v !== 0));
-    }
-
-    function renderLineBarChart({ title, series, type = "line", unit = "" }) {
-      const w = 480, h = 220, pad = { l: 44, r: 14, t: 10, b: 28 };
-      const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-      if (!hasAnyData(series)) {
-        return `
-          <div class="emc-chart-card">
-            <div class="emc-chart-title">${escapeHtml(title)}</div>
-            <div class="emc-chart-empty">데이터를 입력하면 차트가 표시됩니다</div>
-          </div>`;
-      }
-      // y range
-      const allVals = series.flatMap((s) => s.values).filter(Number.isFinite);
-      let yMin = Math.min(0, ...allVals);
-      let yMax = Math.max(0, ...allVals);
-      if (yMin === yMax) yMax = yMin + 1;
-      const yPad = (yMax - yMin) * 0.08;
-      yMin -= yPad; yMax += yPad;
-      const xScale = (i) => pad.l + ((i + 0.5) / 12) * innerW;
-      const yScale = (v) => pad.t + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
-      const y0 = yScale(0);
-
-      // y축 grid (4 ticks)
-      const ticks = [];
-      for (let k = 0; k <= 4; k++) {
-        const y = pad.t + (innerH * k / 4);
-        const val = yMax - (yMax - yMin) * k / 4;
-        ticks.push(`<line x1="${pad.l}" x2="${w - pad.r}" y1="${y}" y2="${y}" stroke="#e6ecf2" stroke-width="1"/>`);
-        ticks.push(`<text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#64748b">${fmtAxis(val)}</text>`);
-      }
-      // x축 라벨 (월)
-      const xLabels = [];
-      for (let m = 1; m <= 12; m++) {
-        xLabels.push(`<text x="${xScale(m - 1)}" y="${h - pad.b + 14}" text-anchor="middle" font-size="10" fill="#64748b">${m}월</text>`);
-      }
-
-      // 시리즈 렌더
-      const seriesSvg = series.map((s, sIdx) => {
-        if (type === "bar") {
-          const barW = innerW / 12 * 0.7 / series.length;
-          const offset = (sIdx - (series.length - 1) / 2) * barW;
-          return s.values.map((v, i) => {
-            if (!Number.isFinite(v)) return "";
-            const x = xScale(i) - barW / 2 + offset;
-            const y = v >= 0 ? yScale(v) : y0;
-            const ht = Math.abs(yScale(v) - y0);
-            return `<rect x="${x}" y="${y}" width="${barW * 0.92}" height="${ht}" fill="${s.color}" opacity="0.85"/>`;
-          }).join("");
-        }
-        // line
-        const pts = s.values.map((v, i) => Number.isFinite(v) ? `${xScale(i)},${yScale(v)}` : null);
-        const segs = [];
-        let cur = [];
-        pts.forEach((p) => {
-          if (p) cur.push(p);
-          else { if (cur.length) segs.push(cur); cur = []; }
-        });
-        if (cur.length) segs.push(cur);
-        const polylines = segs.map((seg) =>
-          `<polyline points="${seg.join(" ")}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join("");
-        const dots = s.values.map((v, i) => Number.isFinite(v)
-          ? `<circle cx="${xScale(i)}" cy="${yScale(v)}" r="3" fill="${s.color}"/>` : "").join("");
-        return polylines + dots;
-      }).join("");
-
-      // 범례
-      const legend = series.map((s) =>
-        `<span><span class="dot" style="background:${s.color};"></span>${escapeHtml(s.label)}</span>`).join("");
-
-      return `
-        <div class="emc-chart-card">
-          <div class="emc-chart-title">${escapeHtml(title)}${unit ? ` <span style="color:#94a3b8;font-weight:500;">(${escapeHtml(unit)})</span>` : ""}</div>
-          <div class="emc-chart-legend">${legend}</div>
-          <svg class="emc-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
-            ${ticks.join("")}
-            <line x1="${pad.l}" x2="${w - pad.r}" y1="${y0}" y2="${y0}" stroke="#94a3b8" stroke-width="1"/>
-            ${seriesSvg}
-            ${xLabels.join("")}
-          </svg>
-        </div>`;
-    }
-
-    function fmtAxis(v) {
-      if (!Number.isFinite(v)) return "";
-      if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
-      return v.toFixed(0);
-    }
-
-    function renderCharts() {
-      const grid = document.getElementById("emcChartGrid");
-      if (!grid) return;
-      const charts = [];
-
-      // 엑셀 회계비용 마감비교 시트의 유일한 차트: "제품톤당 에너지" (line, 3계열)
-      //   제지 톤당비용 / 생활 톤당비용 / 에너지 총비용(톤당)
-      charts.push(renderLineBarChart({
-        title: "제품톤당 에너지",
-        unit: "천원/톤",
-        type: "line",
-        series: [
-          { label: "제지",          color: "#1f4f82", values: getSeries("total", "paperTonCost") },
-          { label: "생활",          color: "#e07b3a", values: getSeries("total", "tissueTonCost") },
-          { label: "에너지 총비용",  color: "#5b6cb1", values: getSeries("total", "totalTonCost") },
-        ],
-      }));
-
-      grid.innerHTML = charts.join("");
-    }
 
     // 이벤트
     function bind() {
@@ -945,14 +664,6 @@
         }
       });
 
-      // 탭
-      document.getElementById("emcTabs").addEventListener("click", (e) => {
-        const btn = e.target.closest(".energy-tab");
-        if (!btn) return;
-        document.querySelectorAll(".energy-tab").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
-        document.querySelectorAll(".energy-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === btn.dataset.target));
-        fitTableHeight();
-      });
 
       window.addEventListener("resize", fitTableHeight);
 
@@ -1021,13 +732,16 @@
 
     function updateSubtitle() {
       document.getElementById("emcSubtitle").textContent =
-        `${currentYear}년 월별 회계비용 마감 vs 실마감 차이 (연료비 / 전력비 / 에너지 합산)`;
+        `${currentYear}년 월별 회계비용 마감 vs 실마감 차이 (연료비)`;
     }
 
     async function loadAndRender() {
       // 캐시 무효화 후 새 연도 fetch (병렬)
       __fmcCache.year = null; __fmcCache.data = null;
+      window.EnergyLinkedSources.resetCache();
       await Promise.all([
+        window.EnergyLinkedSources.fetchCompositeSteamPurchase(currentYear).catch(() => {}),
+        window.EnergyLinkedSources.fetchCompositeLngEtc(currentYear).catch(() => {}),
         loadStoreFromDB(currentYear).catch(() => {}),
         fetchFuelRatio(currentYear).catch(() => {}),
         fetchFluidizedContract(currentYear).catch(() => {}),

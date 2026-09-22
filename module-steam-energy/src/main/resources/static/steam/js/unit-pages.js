@@ -370,8 +370,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (page === "unit-lng-cost.html") {
-      setHeaderTexts('[data-cell-table="lng_m_boiler"]', ["일자", `LNG (20${ton}-1)`, `LNG (20${ton}-2)`, `LNG (50${ton})`, `LNG (60${ton})`, `LNG 사용합계(${ton})`, `단가(${wonPerTon})`, `비용(${millionWon})`]);
-      setHeaderTexts('[data-cell-table="lng_y_boiler"]', ["월", `LNG (20${ton}-1)`, `LNG (20${ton}-2)`, `LNG (50${ton})`, `LNG (60${ton})`, `LNG 사용합계(${ton})`, `단가(${wonPerTon})`, `비용(${millionWon})`]);
+      setHeaderTexts('[data-cell-table="lng_m_boiler"]', ["일자", `LNG (20${ton}-1)`, `LNG (20${ton}-2)`, `LNG (50${ton})`, `LNG (60${ton})`, "복합보일러", "신설소각로", `LNG 사용합계(${ton})`, `단가(${wonPerTon})`, `비용(${millionWon})`]);
+      setHeaderTexts('[data-cell-table="lng_y_boiler"]', ["월", `LNG (20${ton}-1)`, `LNG (20${ton}-2)`, `LNG (50${ton})`, `LNG (60${ton})`, "복합보일러", "신설소각로", `LNG 사용합계(${ton})`, `단가(${wonPerTon})`, `비용(${millionWon})`]);
       // 버너 표(lng_m_burner / lng_y_burner)는 제지·화장지 2행 그룹 헤더를 HTML에 직접 두고,
       // 단위(톤/원·톤/백만원)는 아래 .lpg-table th forEach 에서 자동 부여한다.
       document.querySelectorAll(".lpg-table th, .lpg-mix-table th").forEach((th) => {
