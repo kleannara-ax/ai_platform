@@ -15,8 +15,9 @@
 
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><button class="nav-link active" id="rtab-home" onclick="showRTab('home')">홈</button></li>
-      <li class="nav-item"><button class="nav-link" id="rtab-list" onclick="showRTab('list')">업무요청 목록</button></li>
-      <li class="nav-item"><button class="nav-link" id="rtab-monthly" onclick="showRTab('monthly')">당월 업무 요청 목록</button></li>
+      <!-- 목록 탭은 KIMS 관리자(공통코드 KIMS_PERM)만 — 확인 전까지 숨김 -->
+      <li class="nav-item d-none admin-tab"><button class="nav-link" id="rtab-list" onclick="showRTab('list')">업무요청 목록</button></li>
+      <li class="nav-item d-none admin-tab"><button class="nav-link" id="rtab-monthly" onclick="showRTab('monthly')">당월 업무 요청 목록</button></li>
     </ul>
 
     <!-- ===== 홈: 유형별 카드 ===== -->
@@ -170,6 +171,7 @@
     let createModal, detailModal, typeModal, reasonModal, currentId = null, currentReq = null, curType = null;
     let pendingQuick = null; // 보류/반려 사유 입력 대기 컨텍스트 {id,status,btn,label}
     let homeLoaded = false, listLoaded = false, monthsLoaded = false;
+    let isKimsAdmin = false;   // KIMS_PERM 등록 여부 (목록 탭 노출)
     const TYPES = { SUPPLY:'전산소모품 지급', IP:'IP 변경/생성', PROGRAM:'PC관련 불편사항 조치', INTERNET:'인터넷 공사' };
     const TYPE_ICON = { SUPPLY:'🖱️', IP:'🌐', PROGRAM:'💻', INTERNET:'📡' };
     // PC관련 불편사항 조치(PROGRAM)의 세부 불편유형 (백엔드 IssueType enum 과 코드 일치)
@@ -198,6 +200,11 @@
       fillOpt('f-type', TYPES, true); fillOpt('f-status', STATUS_CHOICES, true); fillOpt('c-type', TYPES, false); fillOpt('c-channel', CHANNELS, false);
       // 기본 탭 = 홈
       homeLoaded = true; loadTypeCards();
+      // 업무요청 목록·당월 업무 요청 목록 탭은 KIMS 관리자에게만 노출
+      KIMS.isAdmin().then(ok => {
+        isKimsAdmin = ok;
+        if (ok) document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('d-none'));
+      });
       // 딥링크: ?open=<requestId> 이면 해당 요청 상세를 바로 연다 (대시보드 "오늘 접수"에서 이동)
       const openId = new URLSearchParams(location.search).get('open');
       if (openId) detail(Number(openId));
@@ -205,6 +212,7 @@
 
     // ---- 하위 탭 전환 ----
     function showRTab(t) {
+      if (t !== 'home' && !isKimsAdmin) t = 'home';
       ['home','list','monthly'].forEach(x => {
         document.getElementById('rpane-' + x).style.display = (x === t) ? '' : 'none';
         document.getElementById('rtab-' + x).classList.toggle('active', x === t);
