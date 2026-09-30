@@ -122,6 +122,7 @@ public class IpAddressService {
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
                 req.getHangulVersion(), req.getHangulSerial(), req.getRentalCompany(), req.getPcAssetNo(), req.getMonitorAssetNo());
+        ip.updateUsageAndPurchase(req.getUsageType(), req.getPurchaseDate());
         String afterUser = ip.getUserName();
 
         String content = (req.getReason() != null && !req.getReason().isBlank())
@@ -347,6 +348,40 @@ public class IpAddressService {
                 .approved(true).changedBy(changedBy)
                 .beforeUser(beforeUser).afterUser(ip.getUserName()).build());
         return toJson(snaps, java.util.List.of());
+    }
+
+    /**
+     * [반납/회수] 대상 PC(ipId)를 업무요청 완료 시 자동으로 반납 또는 회수 처리한다.
+     * <ul>
+     *   <li>반납(isReturn=true): 사용자(userName) 항목만 보관 표시값(returnDepartment, 예: "{부서}보관")으로 갱신. 부서·장치·스펙 등 나머지는 그대로 유지</li>
+     *   <li>회수(isReturn=false): 사용자·부서·장치·스펙·자산 정보를 모두 비움</li>
+     * </ul>
+     * @return 원복용 스냅샷 JSON
+     */
+    @Transactional
+    public String applyReturn(Long ipId, boolean isReturn, String returnDepartment, String changedBy, Long requestId) {
+        IpAddress ip = findIp(ipId);
+        List<com.company.module.kims.entity.IpRowSnapshot> snaps = new ArrayList<>();
+        snaps.add(ip.toSnapshot());
+        String beforeUser = ip.getUserName();
+        String content;
+        IpChangeType type;
+        if (isReturn) {
+            ip.applyReturn(returnDepartment);
+            content = "업무요청 반납" + (returnDepartment != null && !returnDepartment.isBlank() ? " (보관: " + returnDepartment + ")" : "");
+            type = IpChangeType.RETURNED;
+        } else {
+            ip.applyReclaim();
+            content = "업무요청 회수 (사용자·부서·장치·스펙 모두 비움)";
+            type = IpChangeType.RECLAIMED;
+        }
+        ipHistoryRepository.save(IpHistory.builder()
+                .ipAddress(ip).serviceRequest(findRequestOrNull(requestId))
+                .changeType(type)
+                .content(content)
+                .approved(true).changedBy(changedBy)
+                .beforeUser(beforeUser).afterUser(ip.getUserName()).build());
+        return toJson(snaps, List.of());
     }
 
     /** 완료된 요청의 자동 반영을 취소 시 원복 */

@@ -7,7 +7,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 
 번호는 실행 순서 그대로다(건너뛰는 번호 없음). 모든 파일이 재실행해도 안전한 idempotent
 패턴(표는 `IF NOT EXISTS`, 컬럼/인덱스는 `INFORMATION_SCHEMA` 존재 체크 후 추가, 메뉴는 삭제 후
-재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 08번까지
+재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 11번까지
 순서대로 전부 실행**하면 된다.
 
 | 순서 | 파일 | 설명 |
@@ -20,6 +20,9 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 | 6 | `06_seoul_perm_code.sql` | 공통코드 `KIMS_PERM_SEOUL` ("KIMS 서울", PC 관리 서울 전용 접근 그룹) 생성 |
 | 7 | `07_seoul_ip_band_backfill.sql` | 서울 IP 대역(192.1.17/104/107/117.x) 기존 데이터 `SITE` 보정 |
 | 8 | `08_supply_issue_subtype_column.sql` | `supply_issue.SUB_TYPE` 컬럼 추가 — 지급 시 선택한 세부 구분(신형/구형/제조사 등) 기록. 01_schema.sql 에 이미 반영된 신규 설치 DB에서는 실행해도 아무 변화 없음(idempotent) |
+| 9 | `09_service_request_return_type_column.sql` | `service_request.RETURN_TYPE` 컬럼 추가 — 요청목록에 추가된 "반납"(PC_RETURN)의 세부 반납유형(RETURN:반납/RECLAIM:회수) 기록. 01_schema.sql 에 이미 반영된 신규 설치 DB에서는 실행해도 아무 변화 없음(idempotent) |
+| 10 | `10_klogi_sync_20260923.sql` | PC 관리(`ip_address`)를 관리대장 엑셀(KLOGI, 2026-09-23 추출) 기준으로 보정 — 엑셀 값과 다른 행 갱신, 엑셀에만 있는 IP/별도관리 장비 등록, 엑셀에 없는 별도관리 행(이관 시 깨진 행 포함)은 이력과 함께 삭제. 원본 엑셀 데이터를 파일 안에 담고 있음. 1회성 — 이미 적용된 DB(`klogi_sync` 표시 행 존재)에서는 아무 것도 하지 않음(재실행 안전). 폐기 Win 7 노트북(11번 대상)은 등록하지 않음 |
+| 11 | `11_delete_disposed_win7_notebooks.sql` | 별도관리(IP 없음) 노트북 중 OS가 Win 7 계열인 장비 삭제(이력 포함) — 창고 보관 노트북 전량 폐기(2026-09-23). 재실행 안전, 10번과 순서 무관 |
 
 ```bash
 mysql -u root --default-character-set=utf8mb4 {db} < 01_schema.sql
@@ -30,6 +33,9 @@ mysql -u root --default-character-set=utf8mb4 {db} < 05_pc_site_column.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 06_seoul_perm_code.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 07_seoul_ip_band_backfill.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 08_supply_issue_subtype_column.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 09_service_request_return_type_column.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 10_klogi_sync_20260923.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 11_delete_disposed_win7_notebooks.sql
 ```
 
 ### 기존 KIMS 데이터를 함께 옮길 때

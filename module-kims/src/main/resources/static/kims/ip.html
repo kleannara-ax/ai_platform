@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KIMS - PC 관리</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/kims-theme.css?v=20260915d" rel="stylesheet">
   <style>
     /* 목록/변경내역: 셀 줄바꿈 금지 → 가로로 길게, 컨테이너 좌우 스크롤 */
     /* (별도관리 탭은 pane-list 를 재사용하므로 함께 적용됨) */
@@ -23,12 +24,73 @@
        표를 세로로 얼마나 내리더라도 좌우 스크롤을 즉시 사용할 수 있음. */
     .table-top-scroll { overflow-x: auto; overflow-y: hidden; height: 14px;
       position: sticky; top: 0; z-index: 15; background: #f8f9fa;
-      border-bottom: 1px solid #dee2e6; }
+      border-bottom: 1px solid #e2e8f0; }
     .table-top-scroll > div { height: 1px; }
+
+    /* ── PC 목록: 상단(버튼·검색 카드·보조 스크롤바) 고정 ── */
+    #list-sticky { position: sticky; top: 0; z-index: 30; background: #f1f5f9;
+      padding-top: 10px; margin-top: -10px; }
+    #list-sticky .table-top-scroll { position: static; border-bottom: 0; background: transparent; }
+    #list-sticky .card { margin-bottom: .5rem !important; }
+    /* 좁은 화면에서는 검색 카드가 세로로 길어져 표를 가리므로 고정 해제 */
+    @media (max-width: 767.98px) { #list-sticky { position: static; } }
+    .dirty-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: #bae6fd;
+      border: 1px solid #38bdf8; margin-right: 6px; vertical-align: -1px; }
+    #grid-dirty-info:not(.text-muted) { color: #0369a1; font-weight: 500; }
+    .grid-help { cursor: help; border-bottom: 1px dotted #94a3b8; }
+
+    /* ── PC 목록 표 틀고정: 페이지 스크롤 하나 + 머리글은 불투명한 고정 영역(#list-sticky) 안에 복제해서 표시 ──
+       표 본문 머리글은 열 너비 계산용으로만 남기고(높이 0) 보이는 머리글(#list-head)과 너비를 맞춘다.
+       → 고정 영역 뒤로 표 내용이 비치지 않는다. 가로는 잘라두고(clip) 상단 보조 스크롤바로 두 표를 함께 옮긴다 */
+    #list-head-wrap { overflow-x: clip; background: #fff; border: 1px solid #e2e8f0; border-bottom: 0;
+      border-radius: 10px 10px 0 0; }
+    #list-head { margin-bottom: 0; table-layout: fixed; }
+    #list-head th { background: #f8fafc; box-shadow: inset 0 -1px 0 #cbd5e1; border-top: 0; overflow: hidden; }
+    #list-table-scroll { overflow-x: clip; overflow-y: visible; background: #fff; border: 1px solid #e2e8f0;
+      border-top: 0; border-radius: 0 0 10px 10px; margin-bottom: .6rem; }
+    #list-table { margin-bottom: 0; }
+    #list-table > thead > tr > th { height: 0; padding-top: 0 !important; padding-bottom: 0 !important;
+      line-height: 0; border-top-width: 0; border-bottom-width: 0; visibility: hidden; }
+
+    /* ── 엑셀식 편집 셀 ── */
+    .kims-grid td.gc { cursor: cell; user-select: none; -webkit-user-select: none; position: relative; }
+    .kims-grid td.gc.ro { color: #475569; }
+    .kims-grid tbody tr:hover > td { background-color: #f8fafc; }
+    .kims-grid td.gc.dirty { background-color: #bae6fd !important; }          /* 수정됨(저장 전) = 하늘색 */
+    .kims-grid td.gc.sel { background-color: #dbeafe !important; }
+    .kims-grid td.gc.sel.dirty { background-color: #93d3f7 !important; }
+    .kims-grid td.gc.cur { box-shadow: inset 0 0 0 2px #2563eb !important; }
+    .kims-grid td.gc.err { box-shadow: inset 0 0 0 2px #ef4444 !important; }
+    .kims-grid td.gc.editing .gv { visibility: hidden; }
+    #list-table td.gc.editing.remark-cell { max-width: none; overflow: visible; }
+    /* 선택된 칸 위의 입력칸: 평소엔 투명(커서 안 보임), 더블클릭·글자 입력 시에만 보인다 */
+    #grid-editor { position: absolute; left: 0; top: 0; width: 100%; height: 100%; margin: 0;
+      padding: .42rem .55rem; border: 0; outline: none; resize: none; overflow: hidden; white-space: pre;
+      font: inherit; line-height: 1.5; color: transparent; background: transparent; caret-color: transparent;
+      opacity: 0; pointer-events: none; z-index: 1; box-sizing: border-box; }
+    body > #grid-editor { position: fixed; left: -9999px; width: 1px; height: 1px; }
+    #grid-editor.on { opacity: 1; color: #0f172a; caret-color: #0f172a; background: #fff; pointer-events: auto;
+      border: 2px solid #2563eb; padding: calc(.42rem - 2px) calc(.55rem - 2px); z-index: 2;
+      box-shadow: 0 4px 14px rgba(37,99,235,.18); }
+    /* ── 선택형 칸(렌탈사) 드롭다운 ── */
+    .kims-grid td.gc.opt.cur::after { content: '▾'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      color: #2563eb; font-size: .75rem; pointer-events: none; }
+    .grid-dd { position: absolute; left: -1px; top: calc(100% + 2px); min-width: calc(100% + 2px); z-index: 20;
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px; white-space: nowrap;
+      box-shadow: 0 10px 28px rgba(15,23,42,.16); cursor: default; }
+    .grid-dd.up { top: auto; bottom: calc(100% + 2px); }
+    .grid-dd-item { padding: .35rem .75rem .35rem 1.6rem; border-radius: 6px; cursor: pointer; position: relative; }
+    .grid-dd-item.hl { background: #eff6ff; color: #1d4ed8; }
+    .grid-dd-item.is-cur::before { content: '✓'; position: absolute; left: .55rem; color: #2563eb; font-weight: 700; }
+
+    /* ── 휠 클릭(가운데 버튼) 자동 스크롤 표시 ── */
+    #grid-pan-icon { position: fixed; width: 30px; height: 30px; margin: -15px 0 0 -15px; z-index: 10000;
+      pointer-events: none; filter: drop-shadow(0 2px 4px rgba(15,23,42,.25)); }
+
     /* 사용 흐름 플로우차트 */
-    .flow-node { border: 1px solid #0d6efd; border-radius: 8px; padding: 4px 10px; background: #f0f6ff;
+    .flow-node { border: 1px solid #93c5fd; border-radius: 8px; padding: 4px 10px; background: #eff6ff;
                  text-align: center; white-space: nowrap; min-width: 90px; }
-    .flow-arrow { color: #0d6efd; font-weight: bold; font-size: 1.2rem; padding: 0 6px; }
+    .flow-arrow { color: #3b82f6; font-weight: bold; font-size: 1.2rem; padding: 0 6px; }
   </style>
 </head>
 <body class="bg-light">
@@ -58,6 +120,8 @@
       <div id="sep-hint" class="alert alert-info py-2 mb-2" style="display:none">
         <b>별도관리</b> — IP 대역이 없거나(사외 시설·협력업체 설치 등) 미배정 상태로 별도 관리하는 장비 목록입니다.
       </div>
+      <!-- 스크롤을 내려도 항상 보이는 영역: 상단 버튼 · 검색 카드(저장 버튼 포함) · 상단 보조 스크롤바 -->
+      <div id="list-sticky">
       <div class="d-flex justify-content-end gap-1 mb-2">
         <button class="btn btn-outline-warning btn-sm" onclick="showUnapproved()">미품의 변경 내역</button>
         <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
@@ -68,32 +132,42 @@
       <!-- 검색/필터 -->
       <div class="card mb-3"><div class="card-body py-2">
         <div class="row g-2 align-items-end">
-          <div class="col-md-2"><label class="form-label small mb-0">검색 기준</label>
+          <div class="col-6 col-md-3 col-xl-2"><label class="form-label small mb-0">검색 기준</label>
             <select id="f-field" class="form-select form-select-sm" onchange="onFieldChange()">
               <option value="">전체(IP/사용자/장치/비고)</option>
               <option value="serial">제조번호</option>
               <option value="user">사용자</option>
               <option value="dept">부서</option>
             </select></div>
-          <div class="col-md-3"><label class="form-label small mb-0">검색어</label>
+          <div class="col-6 col-md-3 col-xl-2"><label class="form-label small mb-0">검색어</label>
             <input id="f-keyword" class="form-control form-control-sm" placeholder="검색어 입력 후 Enter"
                    onkeydown="if(event.key==='Enter'){page=0;load();}"></div>
-          <div class="col-md-2"><label class="form-label small mb-0">상태</label>
+          <div class="col-6 col-md-2 col-xl-1"><label class="form-label small mb-0">상태</label>
             <select id="f-status" class="form-select form-select-sm">
               <option value="">전체</option><option value="IN_USE">사용중</option>
               <option value="AVAILABLE">가용</option><option value="RECLAIMED">회수</option>
             </select></div>
-          <div class="col-md-2"><label class="form-label small mb-0">IP그룹 분류</label>
+          <div class="col-6 col-md-2 col-xl-2"><label class="form-label small mb-0">IP그룹 분류</label>
             <select id="f-group" class="form-select form-select-sm" onchange="page=0;load()">
               <option value="">전체 대역</option>
             </select></div>
-          <div class="col-md-2"><button class="btn btn-secondary btn-sm" onclick="page=0;load()">검색</button>
+          <div class="col-auto"><button class="btn btn-secondary btn-sm" onclick="page=0;load()">검색</button>
             <button class="btn btn-light btn-sm" onclick="resetFilter()">초기화</button></div>
+          <!-- 표 직접 편집: 수정한 칸(하늘색)은 [변경사항 저장] 을 눌러야 저장된다 -->
+          <div class="col-12 col-xl d-flex flex-wrap align-items-center justify-content-end gap-2">
+            <span class="small text-muted grid-help"
+                  title="더블클릭 또는 글자 입력: 수정&#10;클릭·드래그 / Shift+방향키: 범위 선택&#10;Ctrl+C / Ctrl+V: 복사·붙여넣기 (엑셀 호환)&#10;Ctrl+Z / Ctrl+Y: 되돌리기 / 다시 실행&#10;Delete: 지우기 · F2: 수정 · Esc: 입력 취소&#10;렌탈사: 선택된 칸 한 번 더 클릭 또는 Alt+↓ 로 목록 선택&#10;휠 클릭: 상하좌우 자동 스크롤 · Shift+휠: 가로 이동">편집 도움말</span>
+            <span id="grid-dirty-info" class="small text-muted">수정된 칸 없음</span>
+            <button id="grid-revert-btn" class="btn btn-outline-secondary btn-sm" onclick="gridRevertAll()" disabled>변경 취소</button>
+            <button id="grid-save-btn" class="btn btn-primary btn-sm" onclick="gridSave()" disabled>변경사항 저장</button>
+          </div>
         </div>
       </div></div>
       <div class="table-top-scroll" id="list-top-scroll"><div id="list-top-scroll-inner">&nbsp;</div></div>
-      <div class="table-responsive" id="list-table-scroll">
-        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+      <div id="list-head-wrap"><table class="table table-sm table-bordered align-middle" id="list-head"><colgroup></colgroup><thead class="table-light"></thead></table></div>
+      </div><!-- /#list-sticky -->
+      <div id="list-table-scroll">
+        <table class="table table-sm table-bordered bg-white align-middle kims-grid" id="list-table">
           <thead class="table-light"><tr>
             <th>IP그룹</th><th>IP주소</th><th>상태</th><th>상주/임시</th><th>부서</th><th>장치구분</th><th>사용자</th><th>렌탈사</th><th>PC자산번호</th><th>모니터자산번호</th>
             <th>모델</th><th>제조번호</th><th>구입업체</th><th>구입일</th>
@@ -217,13 +291,8 @@
       <div class="d-flex justify-content-between align-items-center mb-1">
         <div class="small text-muted">PC / 장비 상세 스펙</div>
         <div class="d-flex align-items-center gap-1">
-          <label class="form-label small mb-0" for="e-rental">렌탈사/구입처</label>
-          <input id="e-rental" class="form-control form-control-sm" list="rentalList" style="width:180px"
-                 placeholder="비우면 자산">
-          <datalist id="rentalList">
-            <option value="롯데렌탈"><option value="AJ렌탈"><option value="기재요망">
-            <option value="AJ네트웍스"><option value="에이텍"><option value="ADT캡스">
-          </datalist></div>
+          <label class="form-label small mb-0" for="e-rental">렌탈사</label>
+          <select id="e-rental" class="form-select form-select-sm" style="width:180px"></select></div>
       </div>
       <div class="row g-2 mt-0">
         <div class="col"><label class="form-label small mb-0">PC 자산번호</label><input id="e-pcasset" class="form-control form-control-sm"></div>
@@ -368,33 +437,10 @@
       // 기본 탭 = 홈(대시보드 + 신규요청)
       utilLoaded = true; loadUtil(); loadIpRequests();
       loadGroups();
-      setupTopScroll();
+      setupGrid();
+      setupListFreeze();
     });
 
-    // ---- PC 목록 표 상단 보조 스크롤바 (하단 스크롤바와 상호 동기화) ----
-    function setupTopScroll() {
-      const top = document.getElementById('list-top-scroll');
-      const topInner = document.getElementById('list-top-scroll-inner');
-      const bottom = document.getElementById('list-table-scroll');
-      if (!top || !bottom) return;
-      let syncing = false;
-      const syncWidth = () => {
-        const table = bottom.querySelector('table');
-        if (table) topInner.style.width = table.scrollWidth + 'px';
-      };
-      top.addEventListener('scroll', () => {
-        if (syncing) return; syncing = true;
-        bottom.scrollLeft = top.scrollLeft; syncing = false;
-      });
-      bottom.addEventListener('scroll', () => {
-        if (syncing) return; syncing = true;
-        top.scrollLeft = bottom.scrollLeft; syncing = false;
-      });
-      syncWidth();
-      window.addEventListener('resize', syncWidth);
-      // 표 내용(행)이 갱신될 때마다 폭 재계산
-      new MutationObserver(syncWidth).observe(document.getElementById('rows'), { childList: true });
-    }
 
     // IP그룹 분류 드롭다운 채우기 (별도관리는 전용 탭이 있으므로 제외)
     async function loadGroups() {
@@ -409,6 +455,9 @@
 
     // ---- 하위 탭 전환 ----
     function showTab(t) {
+      // PC 목록/별도관리는 다시 불러오므로, 저장 안 한 표 수정이 있으면 먼저 확인
+      if ((t === 'list' || t === 'sep') && !confirmDiscardGrid()) return;
+      if (t === 'list' || t === 'sep') grid.edits.clear();
       const paneOf = { list:'list', sep:'list', dash:'dash', current:'current', monthly:'monthly', histmgmt:'histmgmt' };
       ['list','dash','current','monthly','histmgmt'].forEach(x => {
         document.getElementById('pane-' + x).style.display = (paneOf[t] === x) ? '' : 'none';
@@ -554,7 +603,7 @@
         box.appendChild(col);
         charts.push(new Chart(document.getElementById('ch'+idx), {
           type: 'doughnut',
-          data: { labels: ['사용중','미사용'], datasets: [{ data: [g.used, g.available], backgroundColor: ['#0d6efd','#dee2e6'] }] },
+          data: { labels: ['사용중','미사용'], datasets: [{ data: [g.used, g.available], backgroundColor: ['#3b82f6','#e2e8f0'], borderWidth: 0 }] },
           options: { plugins: { legend: { position: 'bottom' } } }
         }));
       });
@@ -636,6 +685,7 @@
     }
 
     async function load() {
+      if (!confirmDiscardGrid()) return;
       try {
         const p = filters(); p.set('page', page); p.set('size', size); p.set('site', SITE);
         if (sepMode) {
@@ -660,6 +710,20 @@
       return v ? `<span class="badge bg-warning text-dark">${E(v)}</span>`
                : '<span class="badge bg-secondary">자산</span>';
     }
+    // 렌탈사 선택지 (값 '' = 자산). 목록 밖의 기존 값(ADT캡스 등)은 사용자가 바꾸기 전까지 그대로 둔다
+    const RENTAL_OPTIONS = [
+      { value: '', label: '자산' },
+      { value: '롯데렌탈', label: '롯데렌탈' },
+      { value: 'AJ렌탈', label: 'AJ렌탈' },
+    ];
+    // 변경 모달의 렌탈사 드롭다운 채우기 (기존 값이 목록에 없으면 "(기존값)" 으로 맨 위에 보존)
+    function fillRentalSelect(cur) {
+      const sel = document.getElementById('e-rental');
+      const opts = RENTAL_OPTIONS.slice();
+      if (cur && !opts.some(o => o.value === cur)) opts.unshift({ value: cur, label: cur + ' (기존값)' });
+      sel.innerHTML = opts.map(o => `<option value="${E(o.value)}">${E(o.label)}</option>`).join('');
+      sel.value = cur || '';
+    }
     // 전체 IP 에서 끝자리(KKK)만 추출 — 대역(XXX.Y.ZZ)은 IP그룹 컬럼에서 표시
     function octet(ip) {
       if (!ip) return '';
@@ -667,21 +731,77 @@
       return i >= 0 ? ip.substring(i + 1) : ip;
     }
 
+    // =====================================================================
+    // PC 목록 표 — 엑셀식 직접 편집
+    //  · 클릭/드래그 = 칸 선택, 더블클릭 또는 글자 입력 = 수정(이때만 커서 표시)
+    //  · Ctrl+C / Ctrl+V = 복사·붙여넣기(엑셀과 TSV 호환), Ctrl+Z / Ctrl+Y = 되돌리기 / 다시 실행
+    //  · 수정한 칸은 하늘색으로 표시만 하고, [변경사항 저장] 을 눌러야 행 단위 PATCH 로 저장된다
+    //  · 저장은 기존 변경 API(/kims-api/ips/{id})를 그대로 쓰므로 변경 이력·사업장 권한 검사도 동일하게 적용
+    //  · 선택된 칸 위에 투명한 입력칸(#grid-editor)을 미리 포커스해 둔다 → 한글 첫 글자 조합이 끊기지 않는다
+    // =====================================================================
+    // 표 컬럼 정의 (순서 = 화면 열 순서). editable=false 는 복사만 가능
+    const GRID_COLS = [
+      { key: 'ipGroup',        label: 'IP그룹',        editable: false },
+      { key: 'ipAddress',      label: 'IP주소',        editable: false, html: r => `<b>${E(octet(r.ipAddress))}</b>` },
+      { key: 'status',         label: '상태',          editable: false, html: r => statusBadge(r.status), text: r => r.statusLabel || r.status || '' },
+      { key: 'usageType',      label: '상주/임시',     editable: true },
+      { key: 'department',     label: '부서',          editable: true },
+      { key: 'device',         label: '장치구분',      editable: true },
+      { key: 'userName',       label: '사용자',        editable: true },
+      { key: 'rentalCompany',  label: '렌탈사',        editable: true, html: (r, v) => rentalBadge(v), options: RENTAL_OPTIONS },
+      { key: 'pcAssetNo',      label: 'PC자산번호',    editable: true },
+      { key: 'monitorAssetNo', label: '모니터자산번호', editable: true },
+      { key: 'model',          label: '모델',          editable: true },
+      { key: 'serialNo',       label: '제조번호',      editable: true },
+      { key: 'vendor',         label: '구입업체',      editable: true },
+      { key: 'purchaseDate',   label: '구입일',        editable: true },
+      { key: 'osVersion',      label: 'OS버전',        editable: true },
+      { key: 'osSerial',       label: 'OS시리얼',      editable: true },
+      { key: 'officeVersion',  label: 'OFFICE버전',    editable: true },
+      { key: 'officeSerial',   label: 'OFFICE시리얼',  editable: true },
+      { key: 'hangulVersion',  label: '한글버전',      editable: true },
+      { key: 'hangulSerial',   label: '한글시리얼',    editable: true },
+      { key: 'remark',         label: '비고',          editable: true, cls: 'remark-cell' },
+    ];
+    const grid = {
+      rows: [],            // 현재 표에 표시된 PC 데이터(서버 원본)
+      edits: new Map(),    // "r:c" → 수정값 (원본과 다른 칸만)
+      errors: new Set(),   // 저장 실패한 칸 "r:c"
+      anchor: null,        // 활성 칸(입력 대상) {r,c}
+      focus: null,         // 선택 범위의 반대쪽 끝 {r,c}
+      dragging: false,
+      editing: null,       // { r, c, mode: 'enter'(글자 입력으로 시작) | 'edit'(더블클릭/F2) }
+      undo: [], redo: [],  // [[{k, had, val}]] 배치 단위
+      saving: false,
+    };
+    const gKey = (r, c) => r + ':' + c;
+    const origVal = (r, c) => { const v = grid.rows[r]?.[GRID_COLS[c].key]; return v == null ? '' : String(v); };
+    const cellVal = (r, c) => grid.edits.has(gKey(r, c)) ? grid.edits.get(gKey(r, c)) : origVal(r, c);
+    const cellText = (r, c) => {   // 복사용 텍스트
+      const col = GRID_COLS[c];
+      if (col.key === 'ipAddress') return grid.rows[r].ipAddress || '';
+      if (col.text) return col.text(grid.rows[r]);
+      if (col.options) { const v = cellVal(r, c), o = col.options.find(x => x.value === v); return o ? o.label : v; }   // 자산 → "자산"
+      return cellVal(r, c);
+    };
+    const tdOf = (r, c) => document.querySelector(`#rows td[data-r="${r}"][data-c="${c}"]`);
+    const editorEl = () => document.getElementById('grid-editor');
+    const selRect = () => {
+      if (!grid.anchor || !grid.focus) return null;
+      return { r1: Math.min(grid.anchor.r, grid.focus.r), r2: Math.max(grid.anchor.r, grid.focus.r),
+               c1: Math.min(grid.anchor.c, grid.focus.c), c2: Math.max(grid.anchor.c, grid.focus.c) };
+    };
+
     function renderRows(list) {
       const tb = document.getElementById('rows');
-      if (!list || !list.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
-      tb.innerHTML = list.map(r => `
+      parkEditor();
+      grid.rows = list || []; grid.edits.clear(); grid.errors.clear(); grid.undo = []; grid.redo = [];
+      grid.anchor = grid.focus = null; grid.editing = null;
+      gridUpdateToolbar();
+      if (!grid.rows.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
+      tb.innerHTML = grid.rows.map((r, ri) => `
         <tr>
-          <td>${E(r.ipGroup)}</td>
-          <td><b>${E(octet(r.ipAddress))}</b></td>
-          <td>${statusBadge(r.status)}</td>
-          <td>${E(r.usageType)}</td>
-          <td>${E(r.department)}</td><td>${E(r.device)}</td><td>${E(r.userName)}</td>
-          <td>${rentalBadge(r.rentalCompany)}</td>
-          <td>${E(r.pcAssetNo)}</td><td>${E(r.monitorAssetNo)}</td>
-          <td>${E(r.model)}</td><td>${E(r.serialNo)}</td><td>${E(r.vendor)}</td><td>${E(r.purchaseDate)}</td>
-          <td>${E(r.osVersion)}</td><td>${E(r.osSerial)}</td><td>${E(r.officeVersion)}</td><td>${E(r.officeSerial)}</td><td>${E(r.hangulVersion)}</td><td>${E(r.hangulSerial)}</td>
-          <td class="remark-cell" title="${E(r.remark)}">${E(r.remark)}</td>
+          ${GRID_COLS.map((col, ci) => `<td data-r="${ri}" data-c="${ci}" class="gc ${col.editable ? '' : 'ro'} ${col.options ? 'opt' : ''} ${col.cls || ''}"${col.key === 'remark' ? ` title="${E(r.remark)}"` : ''}><span class="gv">${cellHtml(ri, ci)}</span></td>`).join('')}
           <td class="text-nowrap">
             <button class="btn btn-outline-secondary btn-sm py-0" onclick="detail(${r.ipId})">상세</button>
             <button class="btn btn-outline-primary btn-sm py-0" onclick="openEdit(${r.ipId})">변경</button>
@@ -689,6 +809,609 @@
             <button class="btn btn-outline-danger btn-sm py-0" onclick="returnPc(${r.ipId},'${E(r.ipAddress)}')">반납</button>
           </td>
         </tr>`).join('');
+    }
+    function cellHtml(r, c) {
+      const col = GRID_COLS[c], v = cellVal(r, c);
+      return col.html ? col.html(grid.rows[r], v) : E(v);
+    }
+    // 한 칸 다시 그리기 (값 + 수정/오류 표시). 칸 안의 입력칸은 건드리지 않도록 값은 span 에만 넣는다
+    function paintCell(r, c) {
+      const td = tdOf(r, c); if (!td) return;
+      const k = gKey(r, c);
+      const span = td.querySelector('.gv'); if (span) span.innerHTML = cellHtml(r, c);
+      td.classList.toggle('dirty', grid.edits.has(k));
+      td.classList.toggle('err', grid.errors.has(k));
+      if (GRID_COLS[c].key === 'remark') td.title = cellVal(r, c);
+    }
+    function paintSelection() {
+      document.querySelectorAll('#rows td.sel, #rows td.cur').forEach(td => td.classList.remove('sel', 'cur'));
+      const s = selRect();
+      if (s) {
+        for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) tdOf(r, c)?.classList.add('sel');
+        tdOf(grid.anchor.r, grid.anchor.c)?.classList.add('cur');
+      }
+      placeEditor();
+    }
+    function gridUpdateToolbar() {
+      const n = grid.edits.size;
+      const rowsN = new Set([...grid.edits.keys()].map(k => k.split(':')[0])).size;
+      const info = document.getElementById('grid-dirty-info');
+      const save = document.getElementById('grid-save-btn');
+      const revert = document.getElementById('grid-revert-btn');
+      if (!info) return;
+      info.innerHTML = n ? `<span class="dirty-dot"></span>수정 <b>${n}</b>칸 (${rowsN}행) — 저장 전` : '수정된 칸 없음';
+      info.classList.toggle('text-muted', !n);
+      save.disabled = !n || grid.saving; revert.disabled = !n || grid.saving;
+      if (!grid.saving) save.textContent = n ? `변경사항 저장 (${rowsN}행)` : '변경사항 저장';
+    }
+
+    // 값 설정 (원본과 같아지면 수정 표시 해제). batch 에 되돌리기 정보 기록
+    function setCell(r, c, value, batch) {
+      const col = GRID_COLS[c];
+      if (!col?.editable || !grid.rows[r]) return;
+      const k = gKey(r, c);
+      let v = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+      if (col.options) {   // 선택형(렌탈사): "자산" 같은 표시 이름도 받아준다
+        const o = col.options.find(x => x.value === v || x.label === v);
+        if (o) v = o.value;
+      }
+      if (v === cellVal(r, c)) return;
+      if (col.options && v !== origVal(r, c) && !col.options.some(x => x.value === v)) {
+        grid.rejected = (grid.rejected || 0) + 1;   // 선택지에 없는 값은 넣지 않는다
+        return;
+      }
+      if (batch) batch.push({ k, had: grid.edits.has(k), val: grid.edits.get(k) });
+      if (v === origVal(r, c)) grid.edits.delete(k); else grid.edits.set(k, v);
+      grid.errors.delete(k);
+      paintCell(r, c);
+    }
+    function pushUndo(batch) {
+      if (batch.length) { grid.undo.push(batch); if (grid.undo.length > 200) grid.undo.shift(); grid.redo = []; }
+      gridUpdateToolbar();
+    }
+    // 되돌리기/다시 실행: 배치를 적용하고 반대 방향 배치를 만들어 돌려준다. 바뀐 칸들을 선택해 보여준다
+    function applyBatch(batch) {
+      const inverse = [];
+      let r1 = Infinity, r2 = -1, c1 = Infinity, c2 = -1;
+      batch.slice().reverse().forEach(({ k, had, val }) => {
+        inverse.push({ k, had: grid.edits.has(k), val: grid.edits.get(k) });
+        if (had) grid.edits.set(k, val); else grid.edits.delete(k);
+        const [r, c] = k.split(':').map(Number); paintCell(r, c);
+        r1 = Math.min(r1, r); r2 = Math.max(r2, r); c1 = Math.min(c1, c); c2 = Math.max(c2, c);
+      });
+      if (r2 >= 0) { grid.anchor = { r: r1, c: c1 }; grid.focus = { r: r2, c: c2 }; paintSelection(); ensureVisible(r1, c1); }
+      gridUpdateToolbar();
+      return inverse;
+    }
+    function gridUndo() { const b = grid.undo.pop(); if (b) grid.redo.push(applyBatch(b)); }
+    function gridRedo() { const b = grid.redo.pop(); if (b) grid.undo.push(applyBatch(b)); }
+    function gridRevertAll() {
+      if (!grid.edits.size) return;
+      if (!confirm(`수정한 ${grid.edits.size}칸을 모두 원래 값으로 되돌릴까요?`)) return;
+      finishEdit(false);
+      const keys = [...grid.edits.keys()];
+      grid.edits.clear(); grid.errors.clear(); grid.undo = []; grid.redo = [];
+      keys.forEach(k => { const [r, c] = k.split(':').map(Number); paintCell(r, c); });
+      gridUpdateToolbar();
+    }
+    // 저장하지 않은 수정이 있으면 목록을 다시 불러오기 전에 확인
+    function confirmDiscardGrid() {
+      return !grid.edits.size || confirm(`저장하지 않은 수정 ${grid.edits.size}칸이 있습니다.\n저장하지 않고 목록을 새로 불러올까요? (수정 내용은 사라집니다)`);
+    }
+
+    // ---- 입력칸(#grid-editor): 선택된 활성 칸 위에 투명하게 올려두고 포커스 유지 ----
+    function parkEditor() {
+      const ed = editorEl(); if (!ed) return;
+      ed.classList.remove('on'); ed.value = '';
+      if (ed.parentNode !== document.body) document.body.appendChild(ed);
+    }
+    function placeEditor() {
+      const ed = editorEl(); if (!ed || grid.editing) return;
+      if (!grid.anchor) { parkEditor(); return; }
+      const td = tdOf(grid.anchor.r, grid.anchor.c); if (!td) return;
+      if (ed.parentNode !== td) td.appendChild(ed);
+      ed.classList.remove('on'); ed.style.width = '';
+      if (document.activeElement !== ed) ed.focus({ preventScroll: true });
+    }
+    function autosizeEditor() {
+      const ed = editorEl(); if (!ed || !grid.editing) return;
+      const td = ed.parentNode;
+      ed.style.width = '';
+      ed.style.width = Math.max(td.offsetWidth, ed.scrollWidth + 6) + 'px';
+    }
+    // 수정 시작. mode 'enter' = 이미 입력칸에 친 글자 유지, 'edit' = 기존 값 불러와 커서를 끝에
+    function beginEdit(mode) {
+      if (!grid.anchor || grid.saving) return false;
+      const { r, c } = grid.anchor;
+      if (!GRID_COLS[c].editable) return false;
+      if (grid.editing) return grid.editing.r === r && grid.editing.c === c;   // 이미 수정 중(더블클릭 중복 등)
+      const ed = editorEl(), td = tdOf(r, c); if (!ed || !td) return false;
+      if (ed.parentNode !== td) td.appendChild(ed);
+      if (GRID_COLS[c].options) { openDropdown(r, c); return true; }   // 렌탈사 등 선택형 칸
+      grid.editing = { r, c, mode };
+      td.classList.add('editing');
+      ed.classList.add('on');
+      if (mode === 'edit') { ed.value = cellVal(r, c); }
+      if (document.activeElement !== ed) ed.focus({ preventScroll: true });
+      if (mode === 'edit') ed.setSelectionRange(ed.value.length, ed.value.length);
+      autosizeEditor();
+      return true;
+    }
+    // ---- 선택형 칸 드롭다운 (렌탈사: 자산 / 롯데렌탈 / AJ렌탈) ----
+    function openDropdown(r, c) {
+      const col = GRID_COLS[c], td = tdOf(r, c), ed = editorEl();
+      ed.value = '';
+      if (document.activeElement !== ed) ed.focus({ preventScroll: true });
+      const cur = cellVal(r, c);
+      const opts = col.options.slice();
+      if (!opts.some(o => o.value === cur)) opts.unshift({ value: cur, label: cur + ' (기존값)' });
+      const dd = document.createElement('div');
+      dd.id = 'grid-dd'; dd.className = 'grid-dd';
+      dd.innerHTML = opts.map((o, i) => `<div class="grid-dd-item${o.value === cur ? ' is-cur' : ''}" data-i="${i}">${E(o.label)}</div>`).join('');
+      td.appendChild(dd);
+      // 화면 아래 공간이 부족하면 위로 펼친다
+      if (window.innerHeight - td.getBoundingClientRect().bottom < dd.offsetHeight + 8) dd.classList.add('up');
+      grid.editing = { r, c, mode: 'select', opts, hl: Math.max(0, opts.findIndex(o => o.value === cur)) };
+      td.classList.add('editing-select');
+      paintDropdown();
+      dd.addEventListener('mousedown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const it = e.target.closest('.grid-dd-item'); if (it) chooseOption(+it.dataset.i);
+      });
+      dd.addEventListener('mousemove', e => {
+        const it = e.target.closest('.grid-dd-item');
+        if (it && grid.editing?.mode === 'select' && grid.editing.hl !== +it.dataset.i) { grid.editing.hl = +it.dataset.i; paintDropdown(); }
+      });
+    }
+    function paintDropdown() {
+      const dd = document.getElementById('grid-dd'); if (!dd || !grid.editing) return;
+      dd.querySelectorAll('.grid-dd-item').forEach((el, i) => el.classList.toggle('hl', i === grid.editing.hl));
+    }
+    function chooseOption(i) {
+      const ge = grid.editing; if (!ge || ge.mode !== 'select') return;
+      ge.choose = ge.opts[i].value;
+      finishEdit(true);
+      placeEditor();
+    }
+
+    function finishEdit(commit) {
+      const ed = grid.editing; if (!ed) return;
+      grid.editing = null;
+      if (ed.mode === 'select') {   // 드롭다운: 항목을 고른 경우에만 반영
+        document.getElementById('grid-dd')?.remove();
+        tdOf(ed.r, ed.c)?.classList.remove('editing-select');
+        editorEl().value = '';
+        if (commit && ed.choose !== undefined) { const b = []; setCell(ed.r, ed.c, ed.choose, b); pushUndo(b); }
+        paintCell(ed.r, ed.c);
+        return;
+      }
+      const el = editorEl();
+      const value = el.value;
+      el.classList.remove('on'); el.style.width = ''; el.value = '';
+      tdOf(ed.r, ed.c)?.classList.remove('editing');
+      if (commit) { const b = []; setCell(ed.r, ed.c, value, b); pushUndo(b); }
+      paintCell(ed.r, ed.c);
+    }
+
+    // ---- 이동·스크롤 ----
+    function moveFocus(dr, dc, extend) {
+      if (!grid.anchor || !grid.rows.length) return;
+      const base = extend ? grid.focus : grid.anchor;
+      const r = Math.min(grid.rows.length - 1, Math.max(0, base.r + dr));
+      const c = Math.min(GRID_COLS.length - 1, Math.max(0, base.c + dc));
+      if (extend) grid.focus = { r, c }; else grid.anchor = grid.focus = { r, c };
+      paintSelection();
+      ensureVisible(r, c);
+    }
+    // 페이지 세로 이동은 즉시 이동으로 — Bootstrap 기본 CSS(:root scroll-behavior: smooth) 때문에
+    // scrollBy 를 연속 호출하면 매번 부드러운 스크롤 애니메이션이 새로 시작돼 거의 움직이지 않는다
+    const pageScrollBy = (dy) => window.scrollBy({ top: dy, left: 0, behavior: 'instant' });
+    // 칸이 고정 머리글·화면 밖에 가려져 있으면 페이지(세로)·상단 보조 스크롤바(가로)를 움직여 보이게 한다
+    function ensureVisible(r, c) {
+      const td = tdOf(r, c); if (!td) return;
+      const rc = td.getBoundingClientRect();
+      const headBottom = Math.max(0, document.getElementById('list-head').getBoundingClientRect().bottom);
+      if (rc.top < headBottom) pageScrollBy(rc.top - headBottom - 2);
+      else if (rc.bottom > window.innerHeight - 4) pageScrollBy(rc.bottom - window.innerHeight + 4);
+      const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
+      const top = document.getElementById('list-top-scroll');
+      if (rc.left < cont.left) top.scrollLeft -= (cont.left - rc.left) + 2;
+      else if (rc.right > cont.right) top.scrollLeft += (rc.right - cont.right) + 2;
+    }
+
+    // ---- 복사 / 붙여넣기 ----
+    const tsvQuote = (s) => /[\t\n\r"]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    function selectionTsv() {
+      const s = selRect(); if (!s) return '';
+      const lines = [];
+      for (let r = s.r1; r <= s.r2; r++) {
+        const cells = [];
+        for (let c = s.c1; c <= s.c2; c++) cells.push(tsvQuote(cellText(r, c)));
+        lines.push(cells.join('\t'));
+      }
+      return lines.join('\r\n');
+    }
+    // 엑셀 클립보드(TSV, 따옴표로 감싼 줄바꿈 포함) 파싱
+    function parseTsv(text) {
+      const rows = []; let row = [], cur = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (q) {
+          if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+          else cur += ch;
+        } else if (ch === '"' && cur === '') q = true;
+        else if (ch === '\t') { row.push(cur); cur = ''; }
+        else if (ch === '\n' || ch === '\r') {
+          if (ch === '\r' && text[i + 1] === '\n') i++;
+          row.push(cur); rows.push(row); row = []; cur = '';
+        } else cur += ch;
+      }
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows;
+    }
+    function pasteText(text) {
+      const s = selRect(); if (!s || grid.saving) return;
+      const data = parseTsv(text); if (!data.length) return;
+      const batch = [];
+      grid.rejected = 0;
+      if (data.length === 1 && data[0].length === 1) {
+        // 값 하나 → 선택 범위 전체 채우기
+        for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) setCell(r, c, data[0][0], batch);
+      } else {
+        // 여러 칸 → 선택 범위 왼쪽 위부터 칸마다 나눠 붙여넣기 (표 밖은 버림, 읽기전용 열은 건너뜀)
+        let maxR = s.r1, maxC = s.c1;
+        data.forEach((line, i) => line.forEach((v, j) => {
+          const r = s.r1 + i, c = s.c1 + j;
+          if (r >= grid.rows.length || c >= GRID_COLS.length) return;
+          setCell(r, c, v, batch); maxR = Math.max(maxR, r); maxC = Math.max(maxC, c);
+        }));
+        grid.anchor = { r: s.r1, c: s.c1 }; grid.focus = { r: maxR, c: maxC }; paintSelection();
+      }
+      pushUndo(batch);
+      if (grid.rejected) KIMS.toast(`렌탈사는 ${RENTAL_OPTIONS.map(o => o.label).join(' / ')} 중에서만 입력할 수 있습니다. (${grid.rejected}칸 제외)`, false);
+      else if (data.flat().length > 1 && batch.length === 0) KIMS.toast('붙여넣을 수 있는 칸이 없습니다. (IP그룹·IP주소·상태 열은 수정할 수 없습니다)', false);
+    }
+
+    function setupGrid() {
+      const tb = document.getElementById('rows');
+      const ed = document.createElement('textarea');
+      ed.id = 'grid-editor'; ed.setAttribute('wrap', 'off'); ed.setAttribute('autocomplete', 'off');
+      ed.setAttribute('spellcheck', 'false'); ed.rows = 1;
+      document.body.appendChild(ed);
+
+      const cellFromEvent = (e) => {
+        const td = e.target.closest ? e.target.closest('td.gc') : null;
+        return td && tb.contains(td) ? { r: +td.dataset.r, c: +td.dataset.c } : null;
+      };
+      // 클릭/드래그 = 선택만 (커서 없음)
+      tb.addEventListener('mousedown', e => {
+        if (e.button !== 0 || grid.saving) return;
+        if (e.target === ed && grid.editing) return;          // 수정 중 입력칸 안 클릭 → 커서 이동
+        const cell = cellFromEvent(e); if (!cell) return;
+        e.preventDefault();
+        const wasActive = !e.shiftKey && grid.anchor && grid.anchor.r === cell.r && grid.anchor.c === cell.c;
+        const wasSelectOpen = grid.editing?.mode === 'select';
+        if (grid.editing) finishEdit(true);
+        if (e.shiftKey && grid.anchor) grid.focus = cell;
+        else grid.anchor = grid.focus = cell;
+        grid.dragging = true;
+        paintSelection();
+        // 이미 선택된 선택형 칸(렌탈사)을 한 번 더 클릭 → 드롭다운 열기/닫기
+        if (wasActive && GRID_COLS[cell.c].options && !wasSelectOpen) { grid.dragging = false; beginEdit('edit'); }
+      });
+      tb.addEventListener('mouseover', e => {
+        if (!grid.dragging) return;
+        const cell = cellFromEvent(e); if (!cell) return;
+        if (cell.r !== grid.focus.r || cell.c !== grid.focus.c) { grid.focus = cell; paintSelection(); }
+      });
+      // 더블클릭 = 기존 값 수정
+      tb.addEventListener('dblclick', e => {
+        const cell = cellFromEvent(e); if (!cell || grid.saving) return;
+        if (!GRID_COLS[cell.c].editable) return;
+        grid.anchor = grid.focus = cell; paintSelection();
+        beginEdit('edit');
+      });
+      // 드래그 중 화면·표 가장자리에 가까우면 자동 스크롤
+      document.addEventListener('mousemove', e => {
+        if (!grid.dragging) return;
+        const headBottom = Math.max(0, document.getElementById('list-head').getBoundingClientRect().bottom);
+        const cont = document.getElementById('list-table-scroll').getBoundingClientRect();
+        const top = document.getElementById('list-top-scroll');
+        let moved = false;
+        if (e.clientY > window.innerHeight - 30) { pageScrollBy(24); moved = true; }
+        else if (e.clientY < headBottom + 16 && window.scrollY > 0) { pageScrollBy(-24); moved = true; }
+        if (e.clientX > cont.right - 28) { top.scrollLeft += 24; moved = true; }
+        else if (e.clientX < cont.left + 28) { top.scrollLeft -= 24; moved = true; }
+        if (moved) {
+          const td = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('#rows td.gc');
+          if (td) { const cell = { r: +td.dataset.r, c: +td.dataset.c }; if (cell.r !== grid.focus.r || cell.c !== grid.focus.c) { grid.focus = cell; paintSelection(); } }
+        }
+      });
+      document.addEventListener('mouseup', () => { grid.dragging = false; });
+
+      // 글자 입력으로 수정 시작 (한글은 compositionstart 에서, 그 외는 input 에서)
+      ed.addEventListener('compositionstart', () => {
+        const optCol = grid.anchor && GRID_COLS[grid.anchor.c].options;
+        if (grid.editing?.mode === 'select' || (!grid.editing && optCol)) {
+          // 선택형 칸에서 한글 입력 → 조합을 취소하고 드롭다운을 연다
+          const reopen = !grid.editing;
+          ed.blur(); ed.value = '';
+          setTimeout(() => { placeEditor(); if (reopen) beginEdit('edit'); else ed.focus({ preventScroll: true }); }, 0);
+          return;
+        }
+        if (grid.editing) return;
+        if (!beginEdit('enter')) { ed.blur(); ed.value = ''; setTimeout(() => placeEditor(), 0); }
+      });
+      ed.addEventListener('input', () => {
+        if (grid.editing?.mode === 'select') { ed.value = ''; return; }
+        if (!grid.editing) {
+          const typed = ed.value;
+          if (!beginEdit('enter')) { ed.value = ''; return; }
+          if (grid.editing?.mode === 'select') {
+            // 선택형 칸에서 글자 입력 → 드롭다운 열고 그 글자로 시작하는 항목 강조 (예: a → AJ렌탈)
+            const i = grid.editing.opts.findIndex(o => o.label.toLowerCase().startsWith(typed.toLowerCase()));
+            if (i >= 0) { grid.editing.hl = i; paintDropdown(); }
+            ed.value = '';
+            return;
+          }
+        }
+        autosizeEditor();
+      });
+      // 한글 조합 중 Enter/Tab: 조합이 끝난 직후 확정·이동 → 엑셀처럼 한 번에 입력 완료
+      let afterCompose = null;
+      ed.addEventListener('compositionend', () => {
+        if (!afterCompose) return;
+        const [dr, dc] = afterCompose; afterCompose = null;
+        setTimeout(() => { if (grid.editing) { finishEdit(true); moveFocus(dr, dc, false); } }, 0);
+      });
+
+      ed.addEventListener('keydown', e => {
+        if (grid.saving) { e.preventDefault(); return; }
+        const k = e.key, mod = e.ctrlKey || e.metaKey;
+        const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+        // ── 드롭다운 열림(선택형 칸) ──
+        if (grid.editing?.mode === 'select') {
+          const ge = grid.editing;
+          if (k === 'ArrowDown') { e.preventDefault(); ge.hl = Math.min(ge.opts.length - 1, ge.hl + 1); paintDropdown(); }
+          else if (k === 'ArrowUp') { e.preventDefault(); ge.hl = Math.max(0, ge.hl - 1); paintDropdown(); }
+          else if (k === 'Enter') { e.preventDefault(); chooseOption(ge.hl); }
+          else if (k === 'Tab') { e.preventDefault(); chooseOption(ge.hl); moveFocus(0, e.shiftKey ? -1 : 1, false); }
+          else if (k === 'Escape') { e.preventDefault(); finishEdit(false); placeEditor(); }
+          else if (k.length === 1 && !mod) {
+            e.preventDefault();
+            const i = ge.opts.findIndex(o => o.label.toLowerCase().startsWith(k.toLowerCase()));
+            if (i >= 0) { ge.hl = i; paintDropdown(); }
+          }
+          return;
+        }
+        if (e.isComposing || e.keyCode === 229) {
+          if (grid.editing) {
+            if (k === 'Enter') afterCompose = [1, 0];
+            else if (k === 'Tab') { e.preventDefault(); afterCompose = [0, e.shiftKey ? -1 : 1]; }
+          }
+          return;
+        }
+        // ── 수정 중 ──
+        if (grid.editing) {
+          if (k === 'Enter') { e.preventDefault(); finishEdit(true); moveFocus(e.shiftKey ? -1 : 1, 0, false); }
+          else if (k === 'Tab') { e.preventDefault(); finishEdit(true); moveFocus(0, e.shiftKey ? -1 : 1, false); }
+          else if (k === 'Escape') { e.preventDefault(); finishEdit(false); placeEditor(); }
+          else if (arrows[k] && grid.editing.mode === 'enter') { e.preventDefault(); finishEdit(true); moveFocus(...arrows[k], false); }
+          return;   // 그 외(글자·Ctrl+Z 등)는 입력칸 기본 동작
+        }
+        // ── 선택만 된 상태 ──
+        if (!grid.anchor) return;
+        if (mod && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+          ed.value = selectionTsv(); ed.select();   // 기본 복사 동작이 이 값을 클립보드로 보낸다
+          return;
+        }
+        if (mod && (k === 'v' || k === 'V')) { ed.value = ''; return; }   // paste 이벤트에서 처리
+        if (mod && !e.shiftKey && (k === 'z' || k === 'Z')) { e.preventDefault(); gridUndo(); return; }
+        if (mod && (k === 'y' || k === 'Y' || (e.shiftKey && (k === 'z' || k === 'Z')))) { e.preventDefault(); gridRedo(); return; }
+        if (mod && (k === 'a' || k === 'A')) {
+          e.preventDefault(); grid.anchor = { r: 0, c: 0 };
+          grid.focus = { r: grid.rows.length - 1, c: GRID_COLS.length - 1 }; paintSelection(); return;
+        }
+        if (mod && (k === 's' || k === 'S')) { e.preventDefault(); gridSave(); return; }
+        if (e.altKey && k === 'ArrowDown') { e.preventDefault(); beginEdit('edit'); return; }   // 엑셀처럼 Alt+↓ = 드롭다운
+        if (arrows[k]) { e.preventDefault(); moveFocus(...arrows[k], e.shiftKey); return; }
+        if (k === 'Tab') { e.preventDefault(); moveFocus(0, e.shiftKey ? -1 : 1, false); return; }
+        if (k === 'Enter') { e.preventDefault(); moveFocus(e.shiftKey ? -1 : 1, 0, false); return; }
+        if (k === 'F2') { e.preventDefault(); beginEdit('edit'); return; }
+        if (k === 'Escape') { e.preventDefault(); grid.focus = grid.anchor; paintSelection(); return; }
+        if (k === 'Delete' || k === 'Backspace') {
+          e.preventDefault();
+          const s = selRect(), batch = [];
+          for (let r = s.r1; r <= s.r2; r++) for (let c = s.c1; c <= s.c2; c++) setCell(r, c, '', batch);
+          pushUndo(batch); return;
+        }
+        // 일반 글자는 막지 않는다 → 입력칸에 들어가면서 input/compositionstart 로 수정 시작
+      });
+      ed.addEventListener('paste', e => {
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        if (grid.editing) {
+          // 수정 중이라도 여러 칸(탭/줄바꿈 포함) 내용이면 칸마다 나눠 붙여넣기
+          if (!/[\t\r\n]/.test(text.replace(/[\r\n]+$/, ''))) return;   // 한 칸 내용 → 입력칸에 그대로
+          e.preventDefault(); finishEdit(false);
+        } else {
+          e.preventDefault();
+        }
+        ed.value = '';
+        pasteText(text);
+      });
+      ed.addEventListener('copy', () => setTimeout(() => { if (!grid.editing) ed.value = ''; }, 0));
+      ed.addEventListener('blur', () => {
+        // 검색창 등 다른 곳을 누르면 수정 확정
+        setTimeout(() => { if (grid.editing && document.activeElement !== ed) finishEdit(true); }, 0);
+      });
+
+      window.addEventListener('beforeunload', e => {
+        if (grid.edits.size) { e.preventDefault(); e.returnValue = ''; }
+      });
+    }
+
+    // ---- 저장: 수정된 행마다 기존 PATCH API 호출 ----
+    const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    async function gridSave() {
+      if (grid.editing) finishEdit(true);
+      if (!grid.edits.size || grid.saving) return;
+      // 행별로 수정 칸 묶기
+      const byRow = new Map();
+      grid.edits.forEach((v, k) => {
+        const [r, c] = k.split(':').map(Number);
+        if (!byRow.has(r)) byRow.set(r, new Map());
+        byRow.get(r).set(GRID_COLS[c].key, v);
+      });
+      grid.saving = true;
+      const saveBtn = document.getElementById('grid-save-btn');
+      gridUpdateToolbar();
+      const nv = (v) => (v == null || v === '') ? null : v;
+      let ok = 0; const fails = [];
+      let i = 0;
+      for (const [r, changes] of byRow) {
+        i++; saveBtn.textContent = `저장 중... ${i}/${byRow.size}`;
+        const row = grid.rows[r];
+        const pick = (key) => changes.has(key) ? nv(changes.get(key)) : row[key];
+        const payload = {
+          userName: pick('userName'), department: pick('department'), location: row.location,
+          device: pick('device'), approved: !!row.approved, approvalNo: row.approvalNo,
+          remark: pick('remark'), noteDate: changes.has('remark') ? todayStr() : row.noteDate,
+          model: pick('model'), serialNo: pick('serialNo'), vendor: pick('vendor'),
+          osVersion: pick('osVersion'), osSerial: pick('osSerial'),
+          officeVersion: pick('officeVersion'), officeSerial: pick('officeSerial'),
+          hangulVersion: pick('hangulVersion'), hangulSerial: pick('hangulSerial'),
+          rentalCompany: pick('rentalCompany'), pcAssetNo: pick('pcAssetNo'), monitorAssetNo: pick('monitorAssetNo'),
+          changedBy: KIMS.getUser() || 'admin',
+          // 이력 내용: "표 직접 수정 — 부서: 환경팀 → 환경안전팀, 사용자: (없음) → 홍길동"
+          reason: '표 직접 수정 — ' + [...changes].map(([k, v]) => {
+            const col = GRID_COLS.find(c => c.key === k);
+            const before = row[k] == null || row[k] === '' ? '(없음)' : String(row[k]);
+            return `${col.label}: ${before} → ${v === '' ? '(없음)' : v}`;
+          }).join(', '),
+        };
+        // 상주/임시·구입일은 바꾼 경우에만 보낸다 (안 보내면 서버에서 그대로 유지)
+        if (changes.has('usageType')) payload.usageType = changes.get('usageType');
+        if (changes.has('purchaseDate')) payload.purchaseDate = changes.get('purchaseDate');
+        try {
+          const updated = await KIMS.api('/kims-api/ips/' + row.ipId, { method: 'PATCH', body: payload });
+          grid.rows[r] = Object.assign({}, row, updated || {});
+          GRID_COLS.forEach((col, c) => { grid.edits.delete(gKey(r, c)); grid.errors.delete(gKey(r, c)); paintCell(r, c); });
+          ok++;
+        } catch (e) {
+          GRID_COLS.forEach((col, c) => { if (grid.edits.has(gKey(r, c))) { grid.errors.add(gKey(r, c)); paintCell(r, c); } });
+          fails.push(`${E(row.ipAddress)} — ${E(e.message)}`);
+        }
+      }
+      grid.saving = false;
+      grid.undo = []; grid.redo = [];
+      gridUpdateToolbar();
+      if (fails.length) {
+        KIMS.alertModal(`저장 실패 ${fails.length}행 (성공 ${ok}행)`,
+          '빨간 테두리 칸은 저장되지 않았습니다. 값을 확인한 뒤 다시 저장하세요.<br><ul class="mt-2 mb-0 small">' +
+          fails.map(f => `<li>${f}</li>`).join('') + '</ul>');
+      } else {
+        KIMS.toast(`${ok}행이 저장되었습니다.`);
+      }
+    }
+
+    // ---- 틀고정: 페이지 스크롤 하나로 움직이고, 머리글은 고정 영역(#list-sticky) 안의 복제본으로 보여준다 ----
+    // 가로 스크롤 컨테이너(overflow:auto)는 고정 머리글을 깨뜨리므로 표 영역은 가로로 잘라두고(overflow-x:clip)
+    // 상단 보조 스크롤바 위치만큼 머리글·본문 표를 함께 옮긴다(translateX).
+    function setupListFreeze() {
+      const sticky = document.getElementById('list-sticky');
+      const top = document.getElementById('list-top-scroll');
+      const topInner = document.getElementById('list-top-scroll-inner');
+      const cont = document.getElementById('list-table-scroll');
+      const table = document.getElementById('list-table');
+      const head = document.getElementById('list-head');
+      if (!sticky || !top || !cont || !table || !head) return;
+      // 본문 표의 머리글 행을 복제해 고정 영역에 넣는다
+      const srcRow = table.querySelector('thead tr');
+      head.querySelector('thead').appendChild(srcRow.cloneNode(true));
+      head.querySelector('colgroup').innerHTML = [...srcRow.children].map(() => '<col>').join('');
+      const cols = head.querySelectorAll('col');
+      const apply = () => {
+        const t = top.scrollLeft ? `translateX(${-top.scrollLeft}px)` : '';
+        table.style.transform = t; head.style.transform = t;
+      };
+      const sync = () => {
+        // 보이는 머리글 열 너비 = 본문 표(데이터 기준) 열 너비
+        [...srcRow.children].forEach((th, i) => { if (cols[i]) cols[i].style.width = th.getBoundingClientRect().width + 'px'; });
+        head.style.width = table.getBoundingClientRect().width + 'px';
+        // 보조 스크롤바 폭 = 표 전체 폭 + (스크롤바 영역과 표 영역의 폭 차이)
+        topInner.style.width = (table.offsetWidth + (top.clientWidth - cont.clientWidth)) + 'px';
+        top.style.visibility = table.offsetWidth > cont.clientWidth + 1 ? '' : 'hidden';
+        apply();
+      };
+      // 보이는 머리글 위에서도 Shift+휠 가로 이동
+      document.getElementById('list-head-wrap').addEventListener('wheel', e => {
+        const dx = e.shiftKey ? (e.deltaY || e.deltaX) : (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0);
+        if (!dx) return;
+        e.preventDefault(); top.scrollLeft += dx;
+      }, { passive: false });
+      top.addEventListener('scroll', apply);
+      // 표 위에서 Shift+휠 / 가로 휠 → 가로 이동
+      cont.addEventListener('wheel', e => {
+        const dx = e.shiftKey ? (e.deltaY || e.deltaX) : (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0);
+        if (!dx) return;
+        e.preventDefault(); top.scrollLeft += dx;
+      }, { passive: false });
+      window.addEventListener('resize', sync);
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver(sync);
+        ro.observe(cont); ro.observe(table);
+      }
+      new MutationObserver(sync).observe(document.getElementById('rows'), { childList: true });
+      sync();
+
+      // ---- 휠 클릭(가운데 버튼) 자동 스크롤 ----
+      // 표 영역은 가로 스크롤 컨테이너가 아니라서 브라우저 기본 자동 스크롤은 세로만 된다 → 가로·세로를 직접 처리
+      const panZones = [cont, document.getElementById('list-head-wrap')];
+      const panIcon = document.createElement('div');
+      panIcon.id = 'grid-pan-icon'; panIcon.hidden = true;
+      panIcon.innerHTML = '<svg viewBox="0 0 30 30" width="30" height="30"><circle cx="15" cy="15" r="14" fill="#fff" stroke="#475569" stroke-width="1.2"/>'
+        + '<circle cx="15" cy="15" r="2" fill="#475569"/><path d="M15 4l3.2 4.2h-6.4zM15 26l-3.2-4.2h6.4zM4 15l4.2-3.2v6.4zM26 15l-4.2 3.2v-6.4z" fill="#475569"/></svg>';
+      document.body.appendChild(panIcon);
+      let pan = null;
+      const stopPan = () => {
+        if (!pan) return;
+        cancelAnimationFrame(pan.raf); pan = null;
+        panIcon.hidden = true; document.documentElement.style.cursor = '';
+      };
+      const panSpeed = (d) => { const a = Math.abs(d) - 12; return a > 0 ? Math.sign(d) * Math.pow(a, 1.25) * 0.12 : 0; };
+      const panStep = () => {
+        if (!pan) return;
+        const vx = panSpeed(pan.cx - pan.x), vy = panSpeed(pan.cy - pan.y);
+        // 1px 미만 이동량은 버려지므로 누적했다가 정수만큼 이동 (느린 속도에서도 멈추지 않게)
+        pan.ax += vx; pan.ay += vy;
+        const sx = Math.trunc(pan.ax), sy = Math.trunc(pan.ay);
+        if (sx) { top.scrollLeft += sx; pan.ax -= sx; }
+        if (sy) { pageScrollBy(sy); pan.ay -= sy; }
+        const dir = (vy < 0 ? 'n' : vy > 0 ? 's' : '') + (vx < 0 ? 'w' : vx > 0 ? 'e' : '');
+        document.documentElement.style.cursor = dir ? dir + '-resize' : 'all-scroll';
+        pan.raf = requestAnimationFrame(panStep);
+      };
+      panZones.forEach(z => z.addEventListener('mousedown', e => {
+        if (e.button !== 1) return;
+        e.preventDefault();   // 브라우저 기본(세로만) 자동 스크롤 막기
+        if (pan) { stopPan(); return; }
+        pan = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, ax: 0, ay: 0, moved: false, t: Date.now() };
+        panIcon.style.left = e.clientX + 'px'; panIcon.style.top = e.clientY + 'px'; panIcon.hidden = false;
+        pan.raf = requestAnimationFrame(panStep);
+      }));
+      document.addEventListener('mousemove', e => {
+        if (!pan) return;
+        pan.cx = e.clientX; pan.cy = e.clientY;
+        if (Math.abs(e.clientX - pan.x) + Math.abs(e.clientY - pan.y) > 12) pan.moved = true;
+      });
+      // 휠을 누른 채 끌었다가 떼면 종료, 짧게 클릭했으면 다음 클릭까지 유지 (브라우저 기본 동작과 동일)
+      document.addEventListener('mouseup', e => { if (pan && e.button === 1 && pan.moved && Date.now() - pan.t > 250) stopPan(); });
+      document.addEventListener('mousedown', e => {
+        if (!pan || (e.button === 1 && panZones.some(z => z.contains(e.target)))) return;
+        e.preventDefault(); e.stopPropagation(); stopPan();   // 자동 스크롤 중 다른 클릭은 종료만
+      }, true);
+      document.addEventListener('keydown', e => { if (pan && e.key === 'Escape') stopPan(); }, true);
+      window.addEventListener('blur', stopPan);
     }
 
     function renderPager(d) {
@@ -723,7 +1446,7 @@
       ['e-ipId','e-ip','e-user','e-dept','e-loc','e-device','e-appno','e-remark','e-reqid','e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
       SPEC_FIELDS.forEach(([id]) => document.getElementById(id).value = '');
       document.getElementById('e-approved').checked = false;
-      document.getElementById('e-rental').value = '';
+      fillRentalSelect('');
       document.getElementById('e-ip').disabled = false;
       document.getElementById('editTabs').style.display = 'none';   // 등록은 PC 입력만
       showEditTab('pc');
@@ -747,7 +1470,7 @@
         document.getElementById('e-remark').value = '';
         document.getElementById('e-reqid').value = '';
         SPEC_FIELDS.forEach(([id, key]) => document.getElementById(id).value = d[key] || '');
-        document.getElementById('e-rental').value = d.rentalCompany || '';
+        fillRentalSelect(d.rentalCompany || '');
         // IP 변경 탭 초기화
         document.getElementById('e-curip').value = d.ipAddress;
         ['e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
