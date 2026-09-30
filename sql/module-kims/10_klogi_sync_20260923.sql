@@ -17,11 +17,15 @@
 --      엑셀에만 있으면 신규 등록, DB에만 있으면 ip_history 와 함께 삭제
 --   ip_history 에는 보정 이력을 남기지 않는다. 변경 행은 UPDATED_BY/CREATED_BY = 'klogi_sync'.
 --
--- idempotent: 값이 같은 행은 건드리지 않으므로 재실행해도 추가 변경 없음.
+-- 1회성 보정: 이미 적용된 DB(ip_address 에 CREATED_BY/UPDATED_BY = 'klogi_sync' 행이 있음)에서는 아무 것도 하지 않는다.
+--   (재실행 시 그 사이 새로 등록한 별도관리 장비를 지우거나 화면에서 고친 값을 엑셀 값으로 되돌리지 않도록)
+-- 폐기된 별도관리 Win 7 노트북(11번 대상)은 등록하지 않으므로 10·11 실행 순서와 무관하게 결과가 같다.
 -- 실행: mariadb --default-character-set=utf8mb4 -u platform_user -p platform_db < sql/module-kims/10_klogi_sync_20260923.sql
 
 SET NAMES utf8mb4;
 SET @run_at := NOW();
+SET @klogi_applied := EXISTS (SELECT 1 FROM ip_address WHERE CREATED_BY = 'klogi_sync' OR UPDATED_BY = 'klogi_sync');
+SELECT IF(@klogi_applied, '10_klogi_sync: 이미 적용된 DB — 변경 없이 종료', '10_klogi_sync: 보정 시작') AS message;
 
 DROP TABLE IF EXISTS tmp_klogi_src, tmp_klogi_ip, tmp_klogi_sep, tmp_klogi_map;
 
@@ -1551,6 +1555,13 @@ UPDATE tmp_klogi_src SET
 UPDATE tmp_klogi_src SET FULL_IP = CONCAT(IP_GROUP, '.', IP_LAST)
  WHERE IP_GROUP REGEXP '^[0-9]+\\.[0-9]+\\.[0-9]+$' AND IP_LAST REGEXP '^[0-9]+$';
 
+-- 폐기된 별도관리 Win 7 노트북은 등록 대상에서 제외 (11번과 같은 조건)
+DELETE FROM tmp_klogi_src
+ WHERE FULL_IP IS NULL AND DEVICE = '노트북' AND OS_VERSION LIKE 'Win 7%';
+
+-- 이미 적용된 DB 면 원본을 비워 아래 갱신·등록이 일어나지 않게 한다 (삭제문은 별도로 @klogi_applied 조건을 건다)
+DELETE FROM tmp_klogi_src WHERE @klogi_applied = 1;
+
 -- ============================================================
 -- 1) IP 있는 행 — 같은 IP가 여러 줄이면 데이터 있는 줄(없으면 첫 줄)을 대표로
 -- ============================================================
@@ -1695,10 +1706,11 @@ UPDATE ip_address a JOIN tmp_klogi_map m ON m.IP_ID = a.IP_ID JOIN tmp_klogi_sep
         AND a.HANGUL_SERIAL <=> s.HANGUL_SERIAL AND a.REMARK <=> s.REMARK AND a.DELETED_YN = 'N');
 
 -- 3-5) DB에만 있는 별도관리 행 삭제 (이력 포함 — 앱의 행 삭제와 동일). 이번 실행에서 새로 넣을 행은 아직 없음
+--      이미 적용된 DB 에서는 원본이 비어 있어 전부 삭제 대상이 되므로 반드시 @klogi_applied = 0 일 때만 실행
 DELETE h FROM ip_history h JOIN ip_address a ON a.IP_ID = h.IP_ID
- WHERE a.IP_ADDRESS IS NULL AND a.IP_ID NOT IN (SELECT IP_ID FROM tmp_klogi_map);
+ WHERE @klogi_applied = 0 AND a.IP_ADDRESS IS NULL AND a.IP_ID NOT IN (SELECT IP_ID FROM tmp_klogi_map);
 DELETE FROM ip_address
- WHERE IP_ADDRESS IS NULL AND IP_ID NOT IN (SELECT IP_ID FROM tmp_klogi_map);
+ WHERE @klogi_applied = 0 AND IP_ADDRESS IS NULL AND IP_ID NOT IN (SELECT IP_ID FROM tmp_klogi_map);
 
 -- 3-6) 엑셀에만 있는 별도관리 행 → 신규 등록
 INSERT INTO ip_address (IP_ADDRESS, IP_GROUP, SITE, STATUS, USAGE_TYPE, USER_NAME, DEPARTMENT, DEVICE,
