@@ -22,4 +22,11 @@ public class InboundRequest {
 
     /** 입고 비고 (선택) */
     private String note;
+
+    /**
+     * 세부 구분(신형/구형, 제조사 등) — 해당 구분이 있는 품목(마우스/키보드/노트북/모니터/
+     * 데스크탑 본체 → "신형"/"구형", 태블릿 → "레노버"/"갤럭시"/"대여")을 입고할 때만 선택되어
+     * 전달된다. 구분이 없는 품목은 null.
+     */
+    private String subType;
 }
