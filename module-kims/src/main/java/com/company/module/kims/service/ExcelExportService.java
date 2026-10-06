@@ -86,7 +86,7 @@ public class ExcelExportService {
             CellStyle headerStyle = createHeaderStyle(workbook);
 
             String[] headers = {
-                    "지급일", "요청번호", "품목명", "지급수량",
+                    "지급일", "요청번호", "요청자", "품목명", "지급수량",
                     "지급대상자", "부서", "지급담당자"
             };
             writeHeader(sheet, headers, headerStyle);
@@ -96,7 +96,8 @@ public class ExcelExportService {
                 Row row = sheet.createRow(rowIdx++);
                 int c = 0;
                 setCell(row, c++, s.getIssuedAt() != null ? s.getIssuedAt().format(DATE) : "");
-                setCell(row, c++, s.getServiceRequest().getRequestNo());
+                setCell(row, c++, s.getServiceRequest() != null ? s.getServiceRequest().getRequestNo() : "");
+                setCell(row, c++, s.getRequesterName());
                 setCell(row, c++, s.getInventoryItem().getItemName());
                 setCell(row, c++, String.valueOf(s.getQuantity()));
                 setCell(row, c++, s.getReceiverName());

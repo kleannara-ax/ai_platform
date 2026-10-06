@@ -48,6 +48,8 @@ public class InventoryItemService {
 
     /** 출고 이력 비고("업무요청 KIMS-20261006-0001 지급")에서 요청번호를 뽑는 패턴 */
     private static final Pattern REQUEST_NO_IN_NOTE = Pattern.compile("업무요청\\s+(\\S+)\\s+지급");
+    /** 업무요청 없이 지급한 출고 이력 비고("요청자 홍길동 직접 지급")에서 요청자명을 뽑는 패턴 */
+    private static final Pattern DIRECT_REQUESTER_IN_NOTE = Pattern.compile("요청자\\s+(.+?)\\s+직접 지급");
 
     // ================================================================
     // 6. 품목 등록
@@ -125,8 +127,14 @@ public class InventoryItemService {
 
         return PageResponse.of(result.map(t -> {
             String no = requestNoOf(t);
-            return InventoryLedgerResponse.of(t, no != null ? requests.get(no) : null);
+            return InventoryLedgerResponse.of(t, no != null ? requests.get(no) : null, directRequesterOf(t));
         }));
+    }
+
+    private String directRequesterOf(InventoryTransaction t) {
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        Matcher m = DIRECT_REQUESTER_IN_NOTE.matcher(t.getNote());
+        return m.find() ? m.group(1) : null;
     }
 
     private String requestNoOf(InventoryTransaction t) {

@@ -56,11 +56,15 @@ public interface SupplyIssueRepository extends JpaRepository<SupplyIssue, Long> 
             """)
     List<Object[]> sumByDepartment(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /** 요청자별 지급 수량 합계 (연결된 요청의 요청자 기준): [requesterName, Long] */
+    /**
+     * 요청자별 지급 수량 합계: [requesterName, Long].
+     * <p>업무요청 없이 지급한 건도 포함되도록 지급 내역의 요청자명(REQUESTER_NAME) 기준으로 집계한다
+     * (업무요청 연결 건은 지급 시 요청의 요청자명이 저장되고, 기존 건은 12번 SQL로 백필됨).
+     */
     @Query("""
-            SELECT s.serviceRequest.requesterName, SUM(s.quantity) FROM SupplyIssue s
+            SELECT s.requesterName, SUM(s.quantity) FROM SupplyIssue s
             WHERE s.issuedAt BETWEEN :from AND :to
-            GROUP BY s.serviceRequest.requesterName ORDER BY SUM(s.quantity) DESC
+            GROUP BY s.requesterName ORDER BY SUM(s.quantity) DESC
             """)
     List<Object[]> sumByRequester(@Param("from") LocalDate from, @Param("to") LocalDate to);
 

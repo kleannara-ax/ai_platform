@@ -144,7 +144,8 @@
     <div class="modal-body">
       <input type="hidden" id="is-itemId">
       <div class="row g-2">
-        <div class="col"><label class="form-label small mb-0">연결 요청 ID *</label><input id="is-req" type="number" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">요청자명 *</label><input id="is-requester" class="form-control form-control-sm"
+          onchange="const r=document.getElementById('is-receiver'); if(!r.value.trim()) r.value=this.value.trim();"></div>
         <div class="col"><label class="form-label small mb-0">지급 수량 *</label><input id="is-qty" type="number" class="form-control form-control-sm"></div>
       </div>
       <div class="row g-2 mt-0" id="is-subtype-row" style="display:none">
@@ -444,7 +445,7 @@
     function openIssue(id, name) {
       document.getElementById('issueTitle').textContent = '소모품 지급 - ' + name;
       document.getElementById('is-itemId').value = id;
-      ['is-req', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
+      ['is-requester', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
       document.getElementById('is-by').value = KIMS.getUser() || '';
       document.getElementById('is-at').value = new Date().toISOString().substring(0, 10);
       // 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
@@ -463,11 +464,11 @@
     async function issue() {
       const subRow = document.getElementById('is-subtype-row');
       const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('is-subtype').value : null;
-      const payload = { itemId: Number(document.getElementById('is-itemId').value), requestId: Number(document.getElementById('is-req').value),
+      const payload = { itemId: Number(document.getElementById('is-itemId').value), requesterName: document.getElementById('is-requester').value.trim(),
         quantity: Number(document.getElementById('is-qty').value), receiverName: document.getElementById('is-receiver').value.trim(),
         department: document.getElementById('is-dept').value.trim(), issuedBy: document.getElementById('is-by').value.trim(),
         issuedAt: document.getElementById('is-at').value || null, subType: subType };
-      if (!payload.requestId || !payload.quantity || !payload.receiverName || !payload.issuedBy) { KIMS.toast('요청ID/수량/대상자/담당자는 필수입니다.', false); return; }
+      if (!payload.requesterName || !payload.quantity || !payload.receiverName || !payload.issuedBy) { KIMS.toast('요청자명/수량/대상자/담당자는 필수입니다.', false); return; }
       try {
         // 재고 사전 검사 — 부족하면 지급하지 않고 모달로 안내
         const item = await KIMS.api('/kims-api/inventory-items/' + payload.itemId);
