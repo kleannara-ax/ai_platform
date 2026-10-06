@@ -95,10 +95,23 @@ public class InventoryItemService {
         item.increaseStock(request.getQuantity()); // 재고 증가
         int after = item.getCurrentStock();
 
-        // 입고 이력 기록
+        // 세부 구분(신형/구형, 제조사 등)이 선택된 경우, 비고(remark)의 해당 구분 수치도
+        // 함께 늘린다 — 지급(SupplyIssueService.issue)과 같은 방식으로 대시보드 막대와 맞춘다.
+        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
+                ? request.getSubType().trim() : null;
+        if (subType != null) {
+            item.adjustRemarkSegment(subType, request.getQuantity());
+        }
+
+        // 입고 이력 기록 (세부 구분은 입고 내역에서 보이도록 비고 앞에 표시)
+        String note = request.getNote();
+        if (subType != null) {
+            note = "[" + subType + "]" + (note != null && !note.isBlank() ? " " + note : "");
+            if (note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
+        }
         inventoryTransactionRepository.save(
                 InventoryTransaction.ofInbound(item, request.getQuantity(), before, after,
-                        request.getCreatedBy(), request.getNote()));
+                        request.getCreatedBy(), note));
 
         return InventoryItemResponse.from(item);
     }
