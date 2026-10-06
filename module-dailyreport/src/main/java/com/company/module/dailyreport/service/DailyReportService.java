@@ -1020,6 +1020,12 @@ public class DailyReportService {
      *   아니라 일보 전체 단위 조회이므로 findDataCellsByTableCode가 아닌
      *   report.getTables() 순회로 직접 필터링한다).
      * - 빈 값("")이나 null인 셀은 이어받을 필요가 없으므로 맵에서 제외한다.
+     * - ★★ 2026-10 추가: 직전 일보와 월(YearMonth)이 다를 경우, 사고통계
+     *   "당월" 컬럼(DefaultCellTemplate.MONTH_RESET_LIVE_COORDS)은 이어받기
+     *   대상에서 제외한다. 표1/표2의 "실측 누적" 컬럼과 달리 표5/6/8의 "당월"
+     *   컬럼은 그 달의 신규 집계이므로, 새 달이 시작되면 항상 빈 값(0)으로
+     *   시작해야 한다. (과거월 헤더의 실측 조회(historicalValueLookup 등)는
+     *   이 맵과 무관한 별도 메커니즘이라 영향받지 않는다.)
      *
      * @return key = "tableCode:excelCoord", value = 직전 일보에 입력된 값
      */
@@ -1030,11 +1036,16 @@ public class DailyReportService {
             return Map.of();
         }
 
+        boolean monthChanged = !YearMonth.from(reportDate)
+                .equals(YearMonth.from(previous.get().getReportDate()));
+
         return previous.get().getTables().stream()
                 .flatMap(table -> table.getCells().stream()
                         .filter(cell -> "DATA".equals(cell.getCellType()))
                         .filter(cell -> cell.getCellValue() != null && !cell.getCellValue().isBlank())
                         .filter(cell -> cell.getExcelCoord() != null)
+                        .filter(cell -> !monthChanged || !DefaultCellTemplate.MONTH_RESET_LIVE_COORDS
+                                .contains(DefaultCellTemplate.monthResetKey(table.getTableCode(), cell.getColIndex())))
                         .map(cell -> Map.entry(
                                 carryOverKey(table.getTableCode(), cell.getExcelCoord()),
                                 cell.getCellValue())))

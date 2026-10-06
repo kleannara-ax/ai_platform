@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 기본 셀 템플릿 — 일보 자동 생성 시 4개 표의 HEADER/READONLY/DATA 셀을 구성한다.
@@ -34,6 +35,37 @@ public final class DefaultCellTemplate {
      *   실측이 없으면 마찬가지로 하드코딩 샘플로 대체한다.
      */
     public static final LocalDate FEATURE_CUTOFF_DATE = LocalDate.of(2026, 7, 22);
+
+    /**
+     * ★★ 사고통계 "당월" 컬럼 월 경계 리셋 대상 (2026-10 추가) — 표5/6/8의 "당월"
+     * (라이브 입력) 컬럼은 표1/표2(생산지표/재공품)와 달리, 새로운 달이 시작되면
+     * 직전 달 값을 이어받지 않고 항상 0(빈 값)으로 리셋되어야 한다.
+     *
+     * - 표5(TBL_SAFETY_INCIDENT_COUNT)/표6(TBL_SAFETY_INCIDENT_AMOUNT): 당월 4개
+     *   서브컬럼(14=기계/15=전기/16=생산/17=소계) — 8개 행(기여행 7개+합계행) 전부 대상.
+     * - 표8(TBL_SAFETY_MONTHLY_TREND): 당월 1개 컬럼(18) — 전체 데이터 행 대상.
+     * - 표7(TBL_SAFETY_YEARLY_TREND)은 "연도" 단위 롤링 표라 이 월 경계 리셋과
+     *   무관하다(연도 변경 시 리셋이 필요하면 별도 처리 대상) — 의도적으로 제외.
+     *
+     * 이 Set은 "(tableCode, colIndex)" 조합을 "tableCode:colIndex" 문자열 키로
+     * 담아, 값 이어받기(DailyReportService.findPreviousCellValues)와 값 전파
+     * (CellService.propagateValueForward) 양쪽에서 동일한 기준으로 참조한다.
+     * 과거월 헤더의 실측값 조회(historicalValueLookup 등, 그 달 최종 입력값을
+     * 과거 컬럼에 보여주는 로직)는 이 리셋과 무관하게 기존대로 계속 동작한다 —
+     * 리셋 대상은 오직 "당월(라이브)" 컬럼 자신뿐이다.
+     */
+    public static final Set<String> MONTH_RESET_LIVE_COORDS = Set.of(
+            "TBL_SAFETY_INCIDENT_COUNT:14", "TBL_SAFETY_INCIDENT_COUNT:15",
+            "TBL_SAFETY_INCIDENT_COUNT:16", "TBL_SAFETY_INCIDENT_COUNT:17",
+            "TBL_SAFETY_INCIDENT_AMOUNT:14", "TBL_SAFETY_INCIDENT_AMOUNT:15",
+            "TBL_SAFETY_INCIDENT_AMOUNT:16", "TBL_SAFETY_INCIDENT_AMOUNT:17",
+            "TBL_SAFETY_MONTHLY_TREND:18"
+    );
+
+    /** {@link #MONTH_RESET_LIVE_COORDS} 조회용 키 생성 헬퍼 */
+    public static String monthResetKey(String tableCode, int colIndex) {
+        return tableCode + ":" + colIndex;
+    }
 
     /**
      * ★ 롤링 실측값 조회 콜백 — DailyReportService가 DailyReportCellRepository를

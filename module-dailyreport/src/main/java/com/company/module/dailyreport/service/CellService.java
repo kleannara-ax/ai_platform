@@ -712,6 +712,18 @@ public class CellService {
                 break; // 이미 사람이 직접 입력해 둔 값 — 의도적 오버라이드이므로 전파 중단
             }
 
+            // ★★ 2026-10 추가 — 사고통계(표5/6/8) "당월" 컬럼은 표1/표2의 "실측
+            // 누적" 컬럼과 달리 그 달의 신규 집계값이므로, 월 경계를 넘어서는
+            // 전파되어서는 안 된다. fromDate와 다음 일보(cursor)의 YearMonth가
+            // 다르면 여기서 전파를 멈춘다(이후 날짜들은 자신의 달이 시작될 때
+            // findPreviousCellValues()의 월 변경 필터에 의해 별도로 0으로
+            // 리셋된다 — 중복 처리가 아니라 서로 다른 진입 경로의 동일 정책 적용).
+            if (DefaultCellTemplate.MONTH_RESET_LIVE_COORDS.contains(
+                    DefaultCellTemplate.monthResetKey(tableCode, nextCell.getColIndex()))
+                    && !YearMonth.from(cursor).equals(YearMonth.from(fromDate))) {
+                break;
+            }
+
             if (!Objects.equals(nextCell.getCellValue(), newValue)) {
                 nextCell.carryOverValue(newValue);
             }
