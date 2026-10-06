@@ -69,7 +69,15 @@ public class SupplyIssueService {
         int quantity = request.getQuantity();
         int before = item.getCurrentStock();
 
-        // 2) 재고 차감 (재고 부족 시 IllegalArgumentException 발생)
+        // 2) 재고 차감 — 대여 중인 수량은 지급할 수 없으므로 출고 가능 수량(현재재고 − 대여) 기준으로 먼저 검사
+        if (quantity > item.getAvailableStock()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "재고가 부족합니다. 품목=" + item.getItemName()
+                            + ", 출고 가능=" + item.getAvailableStock()
+                            + (item.getRentedCount() > 0
+                                ? " (현재고 " + item.getCurrentStock() + " 중 대여 " + item.getRentedCount() + ")" : "")
+                            + ", 요청수량=" + quantity);
+        }
         item.decreaseStock(quantity);
         int after = item.getCurrentStock();
 
