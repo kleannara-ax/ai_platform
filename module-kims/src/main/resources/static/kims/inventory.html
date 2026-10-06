@@ -64,9 +64,9 @@
         </div>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover table-bordered bg-white align-middle">
+        <table class="table table-sm table-hover table-bordered bg-white align-middle" style="table-layout:fixed">
           <thead class="table-light"><tr>
-            <th>품목명</th><th>카테고리</th><th>현재재고</th><th style="width:170px">관리</th>
+            <th style="width:25%">품목명</th><th style="width:25%">카테고리</th><th style="width:25%">현재재고</th><th style="width:25%">관리</th>
           </tr></thead>
           <tbody id="stockRows"><tr><td colspan="4" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
@@ -371,7 +371,7 @@
         tb.innerHTML = items.length ? items.map(r => `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
             <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
             <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
-            <td>
+            <td class="text-nowrap">
               <button class="btn btn-outline-success btn-sm py-0" onclick="openInbound(${r.itemId},'${E(r.itemName)}')">입고</button>
               <button class="btn btn-outline-primary btn-sm py-0" onclick="openIssue(${r.itemId},'${E(r.itemName)}')">출고</button>
               <button class="btn btn-outline-secondary btn-sm py-0" onclick="showItemHist(${r.itemId},'${E(r.itemName)}')">이력</button>
