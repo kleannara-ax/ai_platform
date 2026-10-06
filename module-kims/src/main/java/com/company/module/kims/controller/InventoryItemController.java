@@ -5,10 +5,13 @@ import com.company.core.common.response.PageResponse;
 import com.company.module.kims.dto.request.InboundRequest;
 import com.company.module.kims.dto.request.InventoryItemCreateRequest;
 import com.company.module.kims.dto.response.InventoryItemResponse;
+import com.company.module.kims.dto.response.InventoryLedgerResponse;
 import com.company.module.kims.dto.response.InventoryTransactionResponse;
+import com.company.module.kims.entity.enums.TransactionType;
 import com.company.module.kims.service.InventoryItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -59,6 +63,23 @@ public class InventoryItemController {
     @GetMapping("/low-stock")
     public ResponseEntity<ApiResponse<List<InventoryItemResponse>>> getLowStock() {
         return ResponseEntity.ok(ApiResponse.success(inventoryItemService.getLowStockItems()));
+    }
+
+    /**
+     * 전체 품목 입출고 이력 검색 (기간/품목/구분/담당자 + 페이징, 최신순).
+     * <p>type: INBOUND(입고) / OUTBOUND(출고), 미지정 시 전체. 고정 경로이므로 {@code /{itemId}} 보다 먼저 선언.
+     */
+    @GetMapping("/ledger")
+    public ResponseEntity<ApiResponse<PageResponse<InventoryLedgerResponse>>> getLedger(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long itemId,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) String createdBy,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success(
+                inventoryItemService.searchLedger(from, to, itemId, type, createdBy, page, size)));
     }
 
     /** 6. 품목 상세 조회 */

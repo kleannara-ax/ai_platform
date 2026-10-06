@@ -73,27 +73,32 @@
       </div>
     </div>
 
-    <!-- ============ 소모품 업무요청 이력 탭 (전산소모품 지급 요청만) ============ -->
+    <!-- ============ 소모품 업무요청 이력 탭 (전체 품목 입출고 이력) ============ -->
     <div id="pane-reqhist" style="display:none">
       <div class="card mb-3"><div class="card-body py-2">
         <div class="row g-2 align-items-end">
           <div class="col-md-2"><label class="form-label small mb-0">기간(부터)</label><input id="rh-from" type="date" class="form-control form-control-sm"></div>
           <div class="col-md-2"><label class="form-label small mb-0">기간(까지)</label><input id="rh-to" type="date" class="form-control form-control-sm"></div>
-          <div class="col-md-2"><label class="form-label small mb-0">처리상태</label><select id="rh-status" class="form-select form-select-sm"><option value="">전체</option></select></div>
-          <div class="col-md-2"><label class="form-label small mb-0">요청자</label><input id="rh-requester" class="form-control form-control-sm"></div>
-          <div class="col-md-2"><label class="form-label small mb-0">부서</label><input id="rh-dept" class="form-control form-control-sm"></div>
-          <div class="col-md-2"><label class="form-label small mb-0">담당자</label><input id="rh-assignee" class="form-control form-control-sm"></div>
-          <div class="col-12 mt-2"><button class="btn btn-secondary btn-sm" onclick="rhPage=0;loadReqHist()">검색</button>
+          <div class="col-md-3"><label class="form-label small mb-0">품목</label><select id="rh-item" class="form-select form-select-sm" onchange="rhPage=0;loadReqHist()"><option value="">전체 품목</option></select></div>
+          <div class="col-md-2"><label class="form-label small mb-0">담당자</label><input id="rh-by" class="form-control form-control-sm" onkeydown="if(event.key==='Enter'){rhPage=0;loadReqHist()}"></div>
+          <div class="col-12 mt-2 d-flex flex-wrap gap-2 align-items-center">
+            <div class="btn-group btn-group-sm" role="group" aria-label="입출고 구분">
+              <button type="button" class="btn btn-outline-secondary active" id="rh-type-all" onclick="setRhType('')">전체</button>
+              <button type="button" class="btn btn-outline-success" id="rh-type-INBOUND" onclick="setRhType('INBOUND')">입고</button>
+              <button type="button" class="btn btn-outline-primary" id="rh-type-OUTBOUND" onclick="setRhType('OUTBOUND')">출고</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="rhPage=0;loadReqHist()">검색</button>
             <button class="btn btn-light btn-sm" onclick="resetReqHist()">초기화</button>
-            <span class="small text-muted ms-2">전산소모품 지급 요청만 표시됩니다.</span></div>
+            <span class="small text-muted">품목별 입고·출고 이력이 최신순으로 표시됩니다.</span>
+          </div>
         </div>
       </div></div>
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>요청번호</th><th>요청일</th><th>요청자</th><th>부서</th><th>상태</th><th>담당자</th><th>요청 소모품</th><th style="width:70px">상세</th>
+            <th>일시</th><th>구분</th><th>품목</th><th>수량</th><th>재고 변동</th><th>요청번호</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
           </tr></thead>
-          <tbody id="reqhistRows"><tr><td colspan="8" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          <tbody id="reqhistRows"><tr><td colspan="11" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
       </div>
       <div id="reqhistPager" class="d-flex justify-content-center gap-2"></div>
@@ -492,66 +497,62 @@
       catch (e) { KIMS.toast(e.message, false); }
     }
 
-    // ================= 소모품 업무요청 이력 탭 =================
-    // 업무요청 목록과 동일한 스타일 + '요청 소모품' 컬럼(지급된 품목) — 전산소모품 지급(SUPPLY)만
-    let rhPage = 0; const rhSize = 20;
+    // ================= 소모품 업무요청 이력 탭 (전체 품목 입출고 이력) =================
+    let rhPage = 0; const rhSize = 20; let rhType = ''; let rhItemsFilled = false;
+    // 요청 상태 라벨/배지 (업무요청 상세 모달에서 사용)
     const RH_STATUS = { RECEIVED:'접수', IN_PROGRESS:'처리중', ON_HOLD:'보류', COMPLETED:'완료', REJECTED:'반려', CANCELED:'취소' };
     const RH_SB = { RECEIVED:'bg-secondary', IN_PROGRESS:'bg-info', ON_HOLD:'bg-warning text-dark', COMPLETED:'bg-success', REJECTED:'bg-danger', CANCELED:'bg-dark' };
-    let rhStatusFilled = false;
 
-    function resetReqHist() {
-      ['rh-from','rh-to','rh-requester','rh-dept','rh-assignee'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('rh-status').value = '';
+    // 입고/출고 구분 버튼 (전체/입고/출고)
+    function setRhType(t) {
+      rhType = t;
+      document.getElementById('rh-type-all').classList.toggle('active', t === '');
+      document.getElementById('rh-type-INBOUND').classList.toggle('active', t === 'INBOUND');
+      document.getElementById('rh-type-OUTBOUND').classList.toggle('active', t === 'OUTBOUND');
       rhPage = 0; loadReqHist();
     }
 
+    function resetReqHist() {
+      ['rh-from', 'rh-to', 'rh-by', 'rh-item'].forEach(id => document.getElementById(id).value = '');
+      setRhType('');
+    }
+
     async function loadReqHist() {
-      if (!rhStatusFilled) {
-        document.getElementById('rh-status').innerHTML = '<option value="">전체</option>' +
-          Object.entries(RH_STATUS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
-        rhStatusFilled = true;
+      if (!rhItemsFilled) {
+        try {
+          const items = await fetchItems('');
+          document.getElementById('rh-item').innerHTML = '<option value="">전체 품목</option>' +
+            items.map(i => `<option value="${i.itemId}">${E(i.itemName)} (${E(i.category)})</option>`).join('');
+          rhItemsFilled = true;
+        } catch (e) { /* 품목 목록은 보조 정보 */ }
       }
       const tb = document.getElementById('reqhistRows');
       try {
         const p = new URLSearchParams();
         const g = id => document.getElementById(id).value.trim();
-        p.set('requestType', 'SUPPLY');                       // 소모품 지급 요청만
-        if (g('rh-from')) p.set('from', g('rh-from') + 'T00:00:00');
-        if (g('rh-to'))   p.set('to',   g('rh-to')   + 'T23:59:59');
-        if (document.getElementById('rh-status').value) p.set('status', document.getElementById('rh-status').value);
-        if (g('rh-requester')) p.set('requester', g('rh-requester'));
-        if (g('rh-dept'))      p.set('department', g('rh-dept'));
-        if (g('rh-assignee'))  p.set('assignee', g('rh-assignee'));
+        if (g('rh-from')) p.set('from', g('rh-from'));
+        if (g('rh-to'))   p.set('to', g('rh-to'));
+        if (g('rh-item')) p.set('itemId', g('rh-item'));
+        if (g('rh-by'))   p.set('createdBy', g('rh-by'));
+        if (rhType)       p.set('type', rhType);
         p.set('page', rhPage); p.set('size', rhSize);
-
-        // 요청 목록 + 지급내역(요청별 품목) 동시 조회
-        const [reqData, issuesData] = await Promise.all([
-          KIMS.api('/kims-api/requests?' + p.toString()),
-          KIMS.api('/kims-api/supply-issues?size=500')
-        ]);
-        // 요청ID -> "품목 수량" 목록
-        const itemsByReq = {};
-        (issuesData.content || []).forEach(s => {
-          (itemsByReq[s.requestId] = itemsByReq[s.requestId] || []).push(`${s.itemName} ${s.quantity}`);
-        });
-
-        const list = reqData.content || [];
-        tb.innerHTML = list.length ? list.map(r => {
-          const items = itemsByReq[r.requestId];
-          const itemsTxt = items && items.length
-            ? items.map(E).join(', ')
-            : '<span class="text-muted">미지급</span>';
+        const data = await KIMS.api('/kims-api/inventory-items/ledger?' + p.toString());
+        const list = data.content || [];
+        tb.innerHTML = list.length ? list.map(t => {
+          const inb = t.transactionType === 'INBOUND';
           return `<tr>
-            <td><b>${E(r.requestNo)}</b> ${r.urgent?'<span class="badge bg-danger">긴급</span>':''}</td>
-            <td>${dateOnly(r.createdAt)}</td><td>${E(r.requesterName)}</td><td>${E(r.department)}</td>
-            <td><span class="badge ${RH_SB[r.status]||'bg-secondary'}">${E(r.statusLabel)}</span></td>
-            <td>${E(r.assignee)}</td>
-            <td>${itemsTxt}</td>
-            <td><button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${r.requestId})">상세</button></td>
+            <td class="text-nowrap">${(t.createdAt || '').substring(0, 16).replace('T', ' ')}</td>
+            <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
+            <td><b>${E(t.itemName)}</b></td>
+            <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td>
+            <td class="text-nowrap">${t.beforeStock} → ${t.afterStock}</td>
+            <td>${E(t.requestNo || '')}</td><td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
+            <td>${E(t.createdBy)}</td><td>${E(t.note || '')}</td>
+            <td>${t.requestId ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>` : ''}</td>
           </tr>`;
-        }).join('') : '<tr><td colspan="8" class="text-center text-muted">해당 조건의 소모품 요청이 없습니다.</td></tr>';
-        renderReqHistPager(reqData);
-      } catch (e) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-danger">불러오기 실패</td></tr>'; }
+        }).join('') : '<tr><td colspan="11" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
+        renderReqHistPager(data);
+      } catch (e) { tb.innerHTML = '<tr><td colspan="11" class="text-center text-danger">불러오기 실패</td></tr>'; }
     }
 
     function renderReqHistPager(d) {
