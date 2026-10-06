@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 
 /**
  * 소모품 입출고 이력(전체 품목) 응답 DTO.
- * <p>출고 이력은 비고에 남은 업무요청 번호로 요청을 찾아 요청자·부서를 함께 담는다
- * (연결된 요청이 없으면 요청 관련 필드는 null).
+ * <p>출고 이력은 비고에 남은 업무요청 번호로 요청을 찾아 요청자·부서를 함께 담는다.
+ * 업무요청 없이 지급한 출고는 비고의 요청자명만 담고, 그 밖의 요청 관련 필드는 null.
  */
 @Getter
 @Builder
@@ -37,7 +37,11 @@ public class InventoryLedgerResponse {
     private final String requesterName;
     private final String department;
 
-    public static InventoryLedgerResponse of(InventoryTransaction t, ServiceRequest request) {
+    /**
+     * @param request         비고의 요청번호로 찾은 업무요청 (없으면 null)
+     * @param directRequester 업무요청 없이 지급한 출고의 요청자명 (없으면 null)
+     */
+    public static InventoryLedgerResponse of(InventoryTransaction t, ServiceRequest request, String directRequester) {
         return InventoryLedgerResponse.builder()
                 .transactionId(t.getTransactionId())
                 .createdAt(t.getCreatedAt())
@@ -53,7 +57,7 @@ public class InventoryLedgerResponse {
                 .note(t.getNote())
                 .requestId(request != null ? request.getRequestId() : null)
                 .requestNo(request != null ? request.getRequestNo() : null)
-                .requesterName(request != null ? request.getRequesterName() : null)
+                .requesterName(request != null ? request.getRequesterName() : directRequester)
                 .department(request != null ? request.getDepartment() : null)
                 .build();
     }

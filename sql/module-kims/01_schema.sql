@@ -271,7 +271,8 @@ CREATE TABLE IF NOT EXISTS `service_request` (
 ) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='전산업무 요청 마스터';
 CREATE TABLE IF NOT EXISTS `supply_issue` (
   `ISSUE_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '지급 ID (PK)',
-  `REQUEST_ID` bigint(20) NOT NULL COMMENT '연결된 업무요청 ID (FK)',
+  `REQUEST_ID` bigint(20) DEFAULT NULL COMMENT '연결된 업무요청 ID (FK, 선택 — 업무요청 없이 지급하면 NULL)',
+  `REQUESTER_NAME` varchar(50) DEFAULT NULL COMMENT '요청자명 (업무요청 연결 시 그 요청의 요청자, 없으면 직접 입력)',
   `ITEM_ID` bigint(20) NOT NULL COMMENT '지급 품목 ID (FK)',
   `QUANTITY` int(11) NOT NULL COMMENT '지급 수량',
   `RECEIVER_NAME` varchar(50) NOT NULL COMMENT '지급 대상자',
