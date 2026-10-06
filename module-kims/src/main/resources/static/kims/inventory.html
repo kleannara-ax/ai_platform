@@ -15,8 +15,7 @@
 
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><button class="nav-link active" id="tab-dash" onclick="showTab('dash')">대시보드</button></li>
-      <li class="nav-item"><button class="nav-link" id="tab-inbound" onclick="showTab('inbound')">입고 내역</button></li>
-      <li class="nav-item"><button class="nav-link" id="tab-issue" onclick="showTab('issue')">지급 내역</button></li>
+      <li class="nav-item"><button class="nav-link" id="tab-stock" onclick="showTab('stock')">입출고 내역</button></li>
       <li class="nav-item"><button class="nav-link" id="tab-reqhist" onclick="showTab('reqhist')">소모품 업무요청 이력</button></li>
     </ul>
 
@@ -52,40 +51,24 @@
       </div></div>
     </div>
 
-    <!-- ============ 입고 내역 탭 ============ -->
-    <div id="pane-inbound" style="display:none">
+    <!-- ============ 입출고 내역 탭 (입고/출고 통합) ============ -->
+    <div id="pane-stock" style="display:none">
       <div class="d-flex justify-content-between align-items-end mb-2">
         <div class="d-flex gap-2 align-items-end">
-          <div><label class="form-label small mb-0">품목명 검색</label><input id="in-keyword" class="form-control form-control-sm"></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadInboundTab()">검색</button>
+          <div><label class="form-label small mb-0">품목명 검색</label><input id="st-keyword" class="form-control form-control-sm" onkeydown="if(event.key==='Enter')loadStockTab()"></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadStockTab()">검색</button>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="openItemCreate()">+ 품목 등록</button>
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-success btn-sm" onclick="downloadIssueExcel()">출고 Excel 다운로드</button>
+          <button class="btn btn-primary btn-sm" onclick="openItemCreate()">+ 품목 등록</button>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>품목명</th><th>카테고리</th><th>현재재고</th><th>단위</th><th>최근 입고 내역</th><th style="width:150px">관리</th>
+            <th>품목명</th><th>카테고리</th><th>현재재고</th><th style="width:170px">관리</th>
           </tr></thead>
-          <tbody id="inboundRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ============ 지급 내역 탭 ============ -->
-    <div id="pane-issue" style="display:none">
-      <div class="d-flex justify-content-between align-items-end mb-2">
-        <div class="d-flex gap-2 align-items-end">
-          <div><label class="form-label small mb-0">품목명 검색</label><input id="is-keyword" class="form-control form-control-sm"></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadIssueTab()">검색</button>
-        </div>
-        <button class="btn btn-outline-success btn-sm" onclick="downloadIssueExcel()">Excel 다운로드</button>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover table-bordered bg-white align-middle">
-          <thead class="table-light"><tr>
-            <th>품목명</th><th>카테고리</th><th>현재재고</th><th>단위</th><th>최신 지급 내역</th><th style="width:150px">관리</th>
-          </tr></thead>
-          <tbody id="issueRows"><tr><td colspan="6" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          <tbody id="stockRows"><tr><td colspan="4" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -252,13 +235,12 @@
 
     // ---------- 탭 전환 ----------
     function showTab(t) {
-      ['dash', 'inbound', 'issue', 'reqhist'].forEach(x => {
+      ['dash', 'stock', 'reqhist'].forEach(x => {
         document.getElementById('pane-' + x).style.display = (x === t) ? '' : 'none';
         document.getElementById('tab-' + x).classList.toggle('active', x === t);
       });
       if (t === 'dash') loadDashboard();
-      if (t === 'inbound') loadInboundTab();
-      if (t === 'issue') loadIssueTab();
+      if (t === 'stock') loadStockTab();
       if (t === 'reqhist') loadReqHist();
     }
 
@@ -375,95 +357,38 @@
       return (data.content || []).slice().sort((a, b) => a.itemId - b.itemId);
     }
 
-    // ================= 입고 내역 탭 =================
-    async function loadInboundTab() {
-      const tb = document.getElementById('inboundRows');
+    // ================= 입출고 내역 탭 =================
+    async function loadStockTab() {
+      const tb = document.getElementById('stockRows');
       try {
-        const items = await fetchItems(document.getElementById('in-keyword').value.trim());
-        // 품목별 최근 입고(INBOUND) 1건
-        const txLists = await Promise.all(items.map(i => KIMS.api('/kims-api/inventory-items/' + i.itemId + '/transactions').catch(() => [])));
-        tb.innerHTML = items.length ? items.map((r, idx) => {
-          const ins = (txLists[idx] || []).filter(t => t.transactionType === 'INBOUND')
-            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-          const last = ins[0];
-          const lastTxt = last
-            ? `${dateOnly(last.createdAt)} · <span class="text-success">+${last.quantity}</span> · ${E(last.createdBy || '')}`
-            : '<span class="text-muted">입고 내역 없음</span>';
-          return `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
+        const items = await fetchItems(document.getElementById('st-keyword').value.trim());
+        tb.innerHTML = items.length ? items.map(r => `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
             <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
             <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
-            <td>${E(r.unit)}</td><td>${lastTxt}</td>
             <td>
               <button class="btn btn-outline-success btn-sm py-0" onclick="openInbound(${r.itemId},'${E(r.itemName)}')">입고</button>
-              <button class="btn btn-outline-secondary btn-sm py-0" onclick="showInboundHist(${r.itemId},'${E(r.itemName)}')">이력</button>
-            </td></tr>`;
-        }).join('') : '<tr><td colspan="6" class="text-center text-muted">데이터가 없습니다.</td></tr>';
-      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
-    }
-
-    // ================= 지급 내역 탭 =================
-    async function loadIssueTab() {
-      const tb = document.getElementById('issueRows');
-      try {
-        const [items, issuesData] = await Promise.all([
-          fetchItems(document.getElementById('is-keyword').value.trim()),
-          KIMS.api('/kims-api/supply-issues?size=500')
-        ]);
-        const issues = issuesData.content || [];
-        // 품목별 최신 지급 1건
-        const lastByItem = {};
-        issues.forEach(s => {
-          const cur = lastByItem[s.itemId];
-          if (!cur || (s.issuedAt || '') > (cur.issuedAt || '')) lastByItem[s.itemId] = s;
-        });
-        tb.innerHTML = items.length ? items.map(r => {
-          const last = lastByItem[r.itemId];
-          const lastTxt = last
-            ? `${E(last.issuedAt)} · <span class="text-primary">-${last.quantity}</span> · ${E(last.receiverName || '')}`
-            : '<span class="text-muted">지급 내역 없음</span>';
-          return `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
-            <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
-            <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
-            <td>${E(r.unit)}</td><td>${lastTxt}</td>
-            <td>
-              <button class="btn btn-outline-primary btn-sm py-0" onclick="openIssue(${r.itemId},'${E(r.itemName)}')">지급</button>
-              <button class="btn btn-outline-secondary btn-sm py-0" onclick="showIssueHist(${r.itemId},'${E(r.itemName)}')">이력</button>
-            </td></tr>`;
-        }).join('') : '<tr><td colspan="6" class="text-center text-muted">데이터가 없습니다.</td></tr>';
-      } catch (e) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-danger">불러오기 실패</td></tr>'; }
+              <button class="btn btn-outline-primary btn-sm py-0" onclick="openIssue(${r.itemId},'${E(r.itemName)}')">출고</button>
+              <button class="btn btn-outline-secondary btn-sm py-0" onclick="showItemHist(${r.itemId},'${E(r.itemName)}')">이력</button>
+            </td></tr>`).join('')
+          : '<tr><td colspan="4" class="text-center text-muted">데이터가 없습니다.</td></tr>';
+      } catch (e) { tb.innerHTML = '<tr><td colspan="4" class="text-center text-danger">불러오기 실패</td></tr>'; }
     }
 
     // ================= 이력 모달 =================
-    // 입고 이력 (INBOUND 만)
-    async function showInboundHist(id, name) {
+    // 품목별 입출고 이력 (입고/출고 모두, 최신순)
+    async function showItemHist(id, name) {
       try {
         const list = (await KIMS.api('/kims-api/inventory-items/' + id + '/transactions'))
-          .filter(t => t.transactionType === 'INBOUND')
           .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        document.getElementById('histTitle').textContent = '입고 이력 - ' + name;
+        document.getElementById('histTitle').textContent = '입출고 이력 - ' + name;
         document.getElementById('histBody').innerHTML = list.length ? `
           <table class="table table-sm table-bordered"><thead class="table-light"><tr>
-            <th>일시</th><th>입고수량</th><th>변동전</th><th>변동후</th><th>입고담당자</th><th>비고</th></tr></thead><tbody>
-          ${list.map(t => `<tr><td>${(t.createdAt || '').substring(0, 19).replace('T', ' ')}</td>
-            <td class="text-success">+${t.quantity}</td><td>${t.beforeStock}</td><td>${t.afterStock}</td>
-            <td>${E(t.createdBy)}</td><td>${E(t.note)}</td></tr>`).join('')}
-          </tbody></table>` : '<p class="text-muted">입고 이력이 없습니다.</p>';
-        histModal.show();
-      } catch (e) { KIMS.toast(e.message, false); }
-    }
-
-    // 지급 이력 (해당 품목 지급 내역)
-    async function showIssueHist(id, name) {
-      try {
-        const data = await KIMS.api('/kims-api/supply-issues?itemId=' + id + '&size=500');
-        const list = (data.content || []).sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || ''));
-        document.getElementById('histTitle').textContent = '지급 이력 - ' + name;
-        document.getElementById('histBody').innerHTML = list.length ? `
-          <table class="table table-sm table-bordered"><thead class="table-light"><tr>
-            <th>지급일</th><th>수량</th><th>대상자</th><th>부서</th><th>지급담당자</th><th>요청번호</th></tr></thead><tbody>
-          ${list.map(s => `<tr><td>${E(s.issuedAt)}</td><td class="text-primary">-${s.quantity}</td>
-            <td>${E(s.receiverName)}</td><td>${E(s.department)}</td><td>${E(s.issuedBy)}</td><td>${E(s.requestNo)}</td></tr>`).join('')}
-          </tbody></table>` : '<p class="text-muted">지급 이력이 없습니다.</p>';
+            <th>일시</th><th>구분</th><th>수량</th><th>변동전</th><th>변동후</th><th>담당자</th><th>비고</th></tr></thead><tbody>
+          ${list.map(t => { const inb = t.transactionType === 'INBOUND'; return `<tr><td>${(t.createdAt || '').substring(0, 19).replace('T', ' ')}</td>
+            <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
+            <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td><td>${t.beforeStock}</td><td>${t.afterStock}</td>
+            <td>${E(t.createdBy)}</td><td>${E(t.note)}</td></tr>`; }).join('')}
+          </tbody></table>` : '<p class="text-muted">입출고 이력이 없습니다.</p>';
         histModal.show();
       } catch (e) { KIMS.toast(e.message, false); }
     }
@@ -479,7 +404,7 @@
         currentStock: Number(document.getElementById('it-stock').value), minStock: Number(document.getElementById('it-min').value),
         unit: document.getElementById('it-unit').value.trim(), remark: document.getElementById('it-remark').value.trim() };
       if (!payload.itemName || !payload.category || !payload.unit) { KIMS.toast('품목명/카테고리/단위는 필수입니다.', false); return; }
-      try { await KIMS.api('/kims-api/inventory-items', { method: 'POST', body: payload }); KIMS.toast('등록되었습니다.'); itemModal.hide(); loadInboundTab(); }
+      try { await KIMS.api('/kims-api/inventory-items', { method: 'POST', body: payload }); KIMS.toast('등록되었습니다.'); itemModal.hide(); loadStockTab(); }
       catch (e) { KIMS.toast(e.message, false); }
     }
 
@@ -507,7 +432,7 @@
       const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('in-subtype').value : null;
       const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim(), subType: subType };
       if (!payload.quantity || payload.quantity <= 0 || !payload.createdBy) { KIMS.toast('수량(1+)과 담당자는 필수입니다.', false); return; }
-      try { await KIMS.api('/kims-api/inventory-items/' + id + '/inbound', { method: 'POST', body: payload }); KIMS.toast('입고되었습니다.'); inboundModal.hide(); loadInboundTab(); }
+      try { await KIMS.api('/kims-api/inventory-items/' + id + '/inbound', { method: 'POST', body: payload }); KIMS.toast('입고되었습니다.'); inboundModal.hide(); loadStockTab(); }
       catch (e) { KIMS.toast(e.message, false); }
     }
 
@@ -543,7 +468,7 @@
         const item = await KIMS.api('/kims-api/inventory-items/' + payload.itemId);
         if (payload.quantity > item.currentStock) { showShortage(item, payload.quantity); return; }
         await KIMS.api('/kims-api/supply-issues', { method: 'POST', body: payload });
-        KIMS.toast('지급되었습니다. (재고 차감)'); issueModal.hide(); loadIssueTab(); loadStockChart && loadStockChart();
+        KIMS.toast('지급되었습니다. (재고 차감)'); issueModal.hide(); loadStockTab(); loadStockChart && loadStockChart();
       } catch (e) {
         if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 재고 부족', E(e.message));
         else KIMS.toast(e.message, false);
