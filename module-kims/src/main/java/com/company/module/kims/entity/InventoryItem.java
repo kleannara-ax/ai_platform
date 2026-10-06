@@ -100,6 +100,24 @@ public class InventoryItem extends BaseTimeEntity {
         this.currentStock -= quantity;
     }
 
+    /** 비고(remark)의 "대여 N" 패턴 — 대여 중인 수량 (예: 태블릿 "레노버 1대 / 갤럭시 6대 / 대여 3대 (...)") */
+    private static final Pattern RENTED_IN_REMARK = Pattern.compile("대여\\s*(\\d+)");
+
+    /**
+     * 대여 중인 수량. 비고에 "대여 N"이 있으면 N, 없으면 0.
+     * <p>대여는 품목의 종류(세부 구분)가 아니라 상태이며, 현재재고(currentStock)에 포함되어 있다.
+     */
+    public int getRentedCount() {
+        if (this.remark == null) return 0;
+        Matcher m = RENTED_IN_REMARK.matcher(this.remark);
+        return m.find() ? Integer.parseInt(m.group(1)) : 0;
+    }
+
+    /** 출고(지급) 가능 수량 = 현재재고 − 대여 중인 수량 */
+    public int getAvailableStock() {
+        return Math.max(0, this.currentStock - getRentedCount());
+    }
+
     /**
      * 재고부족 여부. 업무 정책상 <b>재고가 0(품절)</b>일 때만 재고부족으로 표시한다.
      * (최소재고 minStock 은 참고용으로만 보관하고 이 판정에는 사용하지 않는다.)
