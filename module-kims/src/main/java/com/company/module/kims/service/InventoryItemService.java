@@ -150,14 +150,20 @@ public class InventoryItemService {
     public InventoryItemResponse inbound(Long itemId, InboundRequest request) {
         InventoryItem item = findItem(itemId);
 
+        // 세부 구분(신형/구형, 레노버/갤럭시)을 추적하는 품목은 구분을 반드시 골라야 한다.
+        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
+                ? request.getSubType().trim() : null;
+        if (item.tracksSegments() && (subType == null || !InventoryItem.SEGMENT_LABELS.contains(subType))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "세부 구분을 선택하세요. 품목=" + item.getItemName());
+        }
+
         int before = item.getCurrentStock();
         item.increaseStock(request.getQuantity()); // 재고 증가
         int after = item.getCurrentStock();
 
-        // 세부 구분(신형/구형, 제조사 등)이 선택된 경우, 비고(remark)의 해당 구분 수치도
-        // 함께 늘린다 — 지급(SupplyIssueService.issue)과 같은 방식으로 대시보드 막대와 맞춘다.
-        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
-                ? request.getSubType().trim() : null;
+        // 세부 구분이 선택된 경우, 비고(remark)의 해당 구분 수치도 함께 늘린다
+        // (비고에 그 구분이 없으면 새로 덧붙임) — 지급(SupplyIssueService.issue)과 같은 방식으로 대시보드 막대와 맞춘다.
         if (subType != null) {
             item.adjustRemarkSegment(subType, request.getQuantity());
         }
