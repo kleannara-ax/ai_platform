@@ -7,11 +7,15 @@ import com.company.core.common.response.PageResponse;
 import com.company.module.kims.dto.request.InboundRequest;
 import com.company.module.kims.dto.request.InventoryItemCreateRequest;
 import com.company.module.kims.dto.response.InventoryItemResponse;
+import com.company.module.kims.dto.response.InventoryLedgerResponse;
 import com.company.module.kims.dto.response.InventoryTransactionResponse;
 import com.company.module.kims.entity.InventoryItem;
 import com.company.module.kims.entity.InventoryTransaction;
+import com.company.module.kims.entity.ServiceRequest;
+import com.company.module.kims.entity.enums.TransactionType;
 import com.company.module.kims.repository.InventoryItemRepository;
 import com.company.module.kims.repository.InventoryTransactionRepository;
+import com.company.module.kims.repository.ServiceRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,7 +23,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 전산소모품 품목/재고 관련 비즈니스 로직.
@@ -32,6 +44,12 @@ public class InventoryItemService {
 
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
+
+    /** 출고 이력 비고("업무요청 KIMS-20261006-0001 지급")에서 요청번호를 뽑는 패턴 */
+    private static final Pattern REQUEST_NO_IN_NOTE = Pattern.compile("업무요청\\s+(\\S+)\\s+지급");
+    /** 업무요청 없이 지급한 출고 이력 비고("요청자 홍길동 직접 지급")에서 요청자명을 뽑는 패턴 */
+    private static final Pattern DIRECT_REQUESTER_IN_NOTE = Pattern.compile("요청자\\s+(.+?)\\s+직접 지급");
 
     // ================================================================
     // 6. 품목 등록
@@ -82,6 +100,47 @@ public class InventoryItemService {
                 .stream()
                 .map(InventoryTransactionResponse::from)
                 .toList();
+    }
+
+    // ================================================================
+    // 전체 품목 입출고 이력 검색 (소모품 업무요청 이력 탭)
+    // ================================================================
+    public PageResponse<InventoryLedgerResponse> searchLedger(LocalDate from, LocalDate to, Long itemId,
+                                                             TransactionType type, String createdBy,
+                                                             int page, int size) {
+        Page<InventoryTransaction> result = inventoryTransactionRepository.search(
+                from != null ? from.atStartOfDay() : null,
+                to != null ? to.plusDays(1).atStartOfDay().minusNanos(1) : null,
+                itemId, type,
+                (createdBy == null || createdBy.isBlank()) ? null : createdBy.trim(),
+                PageRequest.of(page, size));
+
+        // 출고 이력의 비고에 남은 요청번호로 업무요청을 한 번에 조회해 요청자·부서를 붙인다.
+        Set<String> requestNos = new HashSet<>();
+        result.forEach(t -> {
+            String no = requestNoOf(t);
+            if (no != null) requestNos.add(no);
+        });
+        Map<String, ServiceRequest> requests = requestNos.isEmpty() ? Map.of()
+                : serviceRequestRepository.findByRequestNoIn(requestNos).stream()
+                    .collect(Collectors.toMap(ServiceRequest::getRequestNo, Function.identity(), (a, b) -> a));
+
+        return PageResponse.of(result.map(t -> {
+            String no = requestNoOf(t);
+            return InventoryLedgerResponse.of(t, no != null ? requests.get(no) : null, directRequesterOf(t));
+        }));
+    }
+
+    private String directRequesterOf(InventoryTransaction t) {
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        Matcher m = DIRECT_REQUESTER_IN_NOTE.matcher(t.getNote());
+        return m.find() ? m.group(1) : null;
+    }
+
+    private String requestNoOf(InventoryTransaction t) {
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        Matcher m = REQUEST_NO_IN_NOTE.matcher(t.getNote());
+        return m.find() ? m.group(1) : null;
     }
 
     // ================================================================
