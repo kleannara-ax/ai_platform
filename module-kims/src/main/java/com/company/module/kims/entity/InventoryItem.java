@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -157,10 +158,29 @@ public class InventoryItem extends BaseTimeEntity {
         Pattern p = Pattern.compile(Pattern.quote(label) + "\\s*(\\d+)");
         Matcher m = p.matcher(this.remark);
         if (!m.find()) {
+            // 세부 구분을 추적하는 품목인데 이 구분만 아직 비고에 없으면, 입고분을 새 구분으로 덧붙인다.
+            if (delta > 0 && tracksSegments()) {
+                this.remark = this.remark.trim() + " / " + label + " " + delta;
+            }
             return;
         }
         int current = Integer.parseInt(m.group(1));
         int next = Math.max(0, current + delta);
         this.remark = this.remark.substring(0, m.start(1)) + next + this.remark.substring(m.end(1));
+    }
+
+    /** 세부 구분 라벨 — 비고에 "라벨 숫자"로 기록되는 품목 종류 구분 ('대여'는 종류가 아니라 상태라 제외) */
+    public static final List<String> SEGMENT_LABELS = List.of("신형", "구형", "레노버", "갤럭시");
+
+    /** 비고에 기록된 해당 세부 구분 수량. 비고에 그 구분이 없으면 null. */
+    public Integer getSegmentCount(String label) {
+        if (this.remark == null || label == null || label.isBlank()) return null;
+        Matcher m = Pattern.compile(Pattern.quote(label) + "\\s*(\\d+)").matcher(this.remark);
+        return m.find() ? Integer.parseInt(m.group(1)) : null;
+    }
+
+    /** 비고에 세부 구분(신형/구형, 레노버/갤럭시 등) 수량을 기록해 추적하는 품목인지 */
+    public boolean tracksSegments() {
+        return SEGMENT_LABELS.stream().anyMatch(l -> getSegmentCount(l) != null);
     }
 }

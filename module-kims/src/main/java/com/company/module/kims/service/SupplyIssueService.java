@@ -78,14 +78,31 @@ public class SupplyIssueService {
                                 ? " (현재고 " + item.getCurrentStock() + " 중 대여 " + item.getRentedCount() + ")" : "")
                             + ", 요청수량=" + quantity);
         }
+
+        // 2-0) 세부 구분(신형/구형, 레노버/갤럭시)을 추적하는 품목이면 구분을 반드시 고르고,
+        //      그 구분의 수량을 넘겨 지급할 수 없다 — 넘기면 비고의 구분 수량이 실제 재고와 어긋나
+        //      대시보드에서 다른 구분의 재고가 줄어든 것처럼 보이게 된다.
+        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
+                ? request.getSubType().trim() : null;
+        if (item.tracksSegments()) {
+            if (subType == null || !InventoryItem.SEGMENT_LABELS.contains(subType)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "세부 구분을 선택하세요. 품목=" + item.getItemName());
+            }
+            Integer segmentCount = item.getSegmentCount(subType);
+            int segmentStock = (segmentCount != null) ? segmentCount : 0;
+            if (quantity > segmentStock) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "재고가 부족합니다. 품목=" + item.getItemName()
+                                + ", " + subType + " 재고=" + segmentStock + ", 요청수량=" + quantity);
+            }
+        }
         item.decreaseStock(quantity);
         int after = item.getCurrentStock();
 
         // 2-1) 세부 구분(신형/구형, 제조사 등)이 선택된 경우, 비고(remark)의 해당
         //      구분 수치도 함께 차감한다 — 대시보드 재고 막대그래프가 remark 를 파싱해
         //      세부 구분을 그리므로, 실제 지급 내역과 어긋나지 않도록 여기서 반영한다.
-        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
-                ? request.getSubType() : null;
         if (subType != null) {
             item.adjustRemarkSegment(subType, -quantity);
         }

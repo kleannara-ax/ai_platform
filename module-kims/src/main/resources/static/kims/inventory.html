@@ -199,6 +199,27 @@
       '모니터': ['신형', '구형'], '데스크탑 본체': ['신형', '구형'],
       '태블릿': ['레노버', '갤럭시'],
     };
+    // 품목 비고에 기록된 세부 구분 수량 (예: "신형 5 / 구형 8" 에서 '신형' → 5). 없으면 null
+    function segCount(remark, label) {
+      const m = (remark || '').match(new RegExp(label + '\\s*(\\d+)'));
+      return m ? Number(m[1]) : null;
+    }
+    // 세부 구분 선택지 HTML — 비고를 알면 구분별 재고를 함께 표시 (예: "신형 (재고 5)")
+    function subTypeOptionsHtml(options, remark) {
+      return options.map(o => {
+        const c = remark == null ? null : segCount(remark, o);
+        return `<option value="${E(o)}">${E(o)}${c != null ? ' (재고 ' + c + ')' : ''}</option>`;
+      }).join('');
+    }
+    // 모달을 연 뒤 품목 비고를 조회해 선택지에 구분별 재고를 채운다 (선택값은 유지)
+    async function fillSubTypeCounts(sel, itemId, options) {
+      try {
+        const item = await KIMS.api('/kims-api/inventory-items/' + itemId);
+        const cur = sel.value;
+        sel.innerHTML = subTypeOptionsHtml(options, item.remark || '');
+        if (cur) sel.value = cur;
+      } catch (e) { /* 재고 표시는 보조 정보 */ }
+    }
     // 품목 비고에서 세부 수량 파싱 (예: "신형 5 / 구형 8", "레노버 1대 / 갤럭시 6대 / 대여 3대 ...")
     function itemBreakdown(it) {
       const r = it.remark || '';
@@ -426,7 +447,8 @@
       const sub = document.getElementById('in-subtype');
       const options = SUBTYPE_BY_ITEM[name];
       if (options) {
-        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        sub.innerHTML = subTypeOptionsHtml(options, null);
+        fillSubTypeCounts(sub, id, options);
         subRow.style.display = '';
       } else {
         sub.innerHTML = '';
@@ -455,7 +477,8 @@
       const sub = document.getElementById('is-subtype');
       const options = SUBTYPE_BY_ITEM[name];
       if (options) {
-        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        sub.innerHTML = subTypeOptionsHtml(options, null);
+        fillSubTypeCounts(sub, id, options);
         subRow.style.display = '';
       } else {
         sub.innerHTML = '';
@@ -604,7 +627,7 @@
         const data = await KIMS.api('/kims-api/inventory-items?size=200');
         const sel = document.getElementById('rd-item');
         if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
-          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.availableStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock}${i.rentedCount > 0 ? ', 대여 ' + i.rentedCount + ', 출고가능 ' + i.availableStock : ''})</option>`).join('');
+          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.availableStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}" data-remark="${E(i.remark||'')}">${E(i.itemName)} (재고 ${i.currentStock}${i.rentedCount > 0 ? ', 대여 ' + i.rentedCount + ', 출고가능 ' + i.availableStock : ''})</option>`).join('');
         updateReqSubTypeUI();
       } catch (e) { /* 무시 */ }
     }
@@ -619,7 +642,7 @@
       const name = opt ? (opt.dataset.name || '') : '';
       const options = SUBTYPE_BY_ITEM[name];
       if (options) {
-        sub.innerHTML = options.map(o => `<option value="${E(o)}">${E(o)}</option>`).join('');
+        sub.innerHTML = subTypeOptionsHtml(options, opt.dataset.remark || '');
         wrap.style.display = '';
       } else {
         sub.innerHTML = '';
