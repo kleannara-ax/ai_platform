@@ -192,11 +192,12 @@
     // 재고 세부 구분(막대 색 분할): 신형/구형, 태블릿은 레노버/갤럭시/대여, 그 외 미구분
     const SEG_ORDER = ['신형', '구형', '레노버', '갤럭시', '대여', '미구분'];
     const SEG_COLOR = { '신형': '#3b82f6', '구형': '#cbd5e1', '레노버': '#22c55e', '갤럭시': '#8b5cf6', '대여': '#f97316', '미구분': '#14b8a6' };
-    // 품목명 → 지급 시 선택 가능한 세부 구분 목록. 이 목록에 없는 품목은 세부 구분 선택 UI를 표시하지 않는다.
+    // 품목명 → 지급/입고 시 선택 가능한 세부 구분 목록. 이 목록에 없는 품목은 세부 구분 선택 UI를 표시하지 않는다.
+    // 태블릿의 '대여'는 종류가 아니라 대여 중인 상태이므로 세부 구분에서 제외한다(출고 가능 수량에서 빠짐).
     const SUBTYPE_BY_ITEM = {
       '마우스': ['신형', '구형'], '키보드': ['신형', '구형'], '노트북': ['신형', '구형'],
       '모니터': ['신형', '구형'], '데스크탑 본체': ['신형', '구형'],
-      '태블릿': ['레노버', '갤럭시', '대여'],
+      '태블릿': ['레노버', '갤럭시'],
     };
     // 품목 비고에서 세부 수량 파싱 (예: "신형 5 / 구형 8", "레노버 1대 / 갤럭시 6대 / 대여 3대 ...")
     function itemBreakdown(it) {
@@ -370,7 +371,8 @@
         const items = await fetchItems(document.getElementById('st-keyword').value.trim());
         tb.innerHTML = items.length ? items.map(r => `<tr class="${r.belowMinStock ? 'table-danger' : ''}">
             <td><b>${E(r.itemName)}</b></td><td>${E(r.category)}</td>
-            <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}</td>
+            <td>${r.currentStock} ${r.belowMinStock ? '<span class="badge bg-danger">부족</span>' : ''}
+              ${r.rentedCount > 0 ? `<span class="small text-muted ms-1">(대여 ${r.rentedCount} · 출고가능 ${r.availableStock})</span>` : ''}</td>
             <td class="text-nowrap">
               <button class="btn btn-outline-success btn-sm py-0" onclick="openInbound(${r.itemId},'${E(r.itemName)}')">입고</button>
               <button class="btn btn-outline-primary btn-sm py-0" onclick="openIssue(${r.itemId},'${E(r.itemName)}')">출고</button>
@@ -472,7 +474,7 @@
       try {
         // 재고 사전 검사 — 부족하면 지급하지 않고 모달로 안내
         const item = await KIMS.api('/kims-api/inventory-items/' + payload.itemId);
-        if (payload.quantity > item.currentStock) { showShortage(item, payload.quantity); return; }
+        if (payload.quantity > item.availableStock) { showShortage(item, payload.quantity); return; }
         await KIMS.api('/kims-api/supply-issues', { method: 'POST', body: payload });
         KIMS.toast('지급되었습니다. (재고 차감)'); issueModal.hide(); loadStockTab(); loadStockChart && loadStockChart();
       } catch (e) {
@@ -481,13 +483,16 @@
       }
     }
 
-    // 재고 부족 안내 모달 (부족 수량 명시)
+    // 재고 부족 안내 모달 (부족 수량 명시) — 대여 중인 수량은 출고할 수 없으므로 출고 가능 수량 기준
     function showShortage(item, requested) {
-      const short = requested - item.currentStock;
+      const short = requested - item.availableStock;
+      const u = E(item.unit||'');
       KIMS.alertModal('⚠ 재고 부족',
         `<b>${E(item.itemName)}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
         `<table class="table table-sm mb-0"><tbody>` +
-        `<tr><td>현재 재고</td><td class="text-end fw-bold">${item.currentStock} ${E(item.unit||'')}</td></tr>` +
+        `<tr><td>현재 재고</td><td class="text-end fw-bold">${item.currentStock} ${u}</td></tr>` +
+        (item.rentedCount > 0 ? `<tr><td>대여 중</td><td class="text-end fw-bold">${item.rentedCount} ${u}</td></tr>` : '') +
+        `<tr><td>출고 가능</td><td class="text-end fw-bold">${item.availableStock} ${u}</td></tr>` +
         `<tr><td>요청 수량</td><td class="text-end fw-bold">${requested} ${E(item.unit||'')}</td></tr>` +
         `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${short} ${E(item.unit||'')}</td></tr>` +
         `</tbody></table>`);
@@ -599,7 +604,7 @@
         const data = await KIMS.api('/kims-api/inventory-items?size=200');
         const sel = document.getElementById('rd-item');
         if (sel) sel.innerHTML = '<option value="">품목 선택</option>'
-          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.currentStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock})</option>`).join('');
+          + (data.content||[]).map(i => `<option value="${i.itemId}" data-stock="${i.availableStock}" data-unit="${E(i.unit||'')}" data-name="${E(i.itemName)}">${E(i.itemName)} (재고 ${i.currentStock}${i.rentedCount > 0 ? ', 대여 ' + i.rentedCount + ', 출고가능 ' + i.availableStock : ''})</option>`).join('');
         updateReqSubTypeUI();
       } catch (e) { /* 무시 */ }
     }
@@ -674,7 +679,7 @@
         KIMS.alertModal('⚠ 재고 부족',
           `<b>${E(opt.dataset.name||'')}</b> 재고가 부족하여 지급할 수 없습니다.<br><br>` +
           `<table class="table table-sm mb-0"><tbody>` +
-          `<tr><td>현재 재고</td><td class="text-end fw-bold">${stock} ${E(unit)}</td></tr>` +
+          `<tr><td>출고 가능</td><td class="text-end fw-bold">${stock} ${E(unit)}</td></tr>` +
           `<tr><td>요청 수량</td><td class="text-end fw-bold">${qty} ${E(unit)}</td></tr>` +
           `<tr class="table-danger"><td>부족 수량</td><td class="text-end fw-bold text-danger">${qty - stock} ${E(unit)}</td></tr>` +
           `</tbody></table>`);
