@@ -96,9 +96,9 @@
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>일시</th><th>구분</th><th>품목</th><th>수량</th><th>재고 변동</th><th>요청번호</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
+            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th><th style="width:60px">취소</th>
           </tr></thead>
-          <tbody id="reqhistRows"><tr><td colspan="11" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          <tbody id="reqhistRows"><tr><td colspan="10" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
       </div>
       <div id="reqhistPager" class="d-flex justify-content-center gap-2"></div>
@@ -133,6 +133,7 @@
       <div class="mb-2" id="in-subtype-row" style="display:none"><label class="form-label small mb-0">세부 구분 *</label><select id="in-subtype" class="form-select form-select-sm"></select></div>
       <div class="mb-2"><label class="form-label small mb-0">입고 수량 *</label><input id="in-qty" type="number" class="form-control form-control-sm"></div>
       <div class="mb-2"><label class="form-label small mb-0">입고 담당자 *</label><input id="in-by" class="form-control form-control-sm"></div>
+      <div class="mb-2"><label class="form-label small mb-0">입고일</label><input id="in-at" type="date" class="form-control form-control-sm"></div>
       <div class="mb-2"><label class="form-label small mb-0">비고</label><input id="in-note" class="form-control form-control-sm"></div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="inbound()">입고</button></div>
@@ -157,7 +158,7 @@
       </div>
       <div class="row g-2 mt-0">
         <div class="col"><label class="form-label small mb-0">지급 담당자 *</label><input id="is-by" class="form-control form-control-sm"></div>
-        <div class="col"><label class="form-label small mb-0">지급일</label><input id="is-at" type="date" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">출고일</label><input id="is-at" type="date" class="form-control form-control-sm"></div>
       </div>
       <p class="text-muted small mt-2 mb-0">※ 지급 시 재고가 자동 차감됩니다. 재고 부족 시 등록이 거부됩니다.</p>
     </div>
@@ -168,6 +169,31 @@
   <div class="modal fade" id="histModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
     <div class="modal-header"><h5 class="modal-title" id="histTitle">이력</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
     <div class="modal-body" id="histBody"></div>
+  </div></div></div>
+
+  <!-- 입출고 이력 상세(수정) 모달 — 업무요청 없이 입출고 내역에서 처리한 입고/출고 -->
+  <div class="modal fade" id="ledgerModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="ledgerTitle">입출고 상세</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="lg-id">
+      <p class="small mb-2" id="lg-summary"></p>
+      <div class="row g-2">
+        <div class="col"><label class="form-label small mb-0" id="lg-at-label">일자 *</label><input id="lg-at" type="date" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">담당자</label><input id="lg-by" class="form-control form-control-sm"></div>
+      </div>
+      <div id="lg-out-fields">
+        <div class="row g-2 mt-0">
+          <div class="col"><label class="form-label small mb-0">요청자명 *</label><input id="lg-requester" class="form-control form-control-sm"></div>
+          <div class="col"><label class="form-label small mb-0">지급 대상자 *</label><input id="lg-receiver" class="form-control form-control-sm"></div>
+        </div>
+        <div class="row g-2 mt-0">
+          <div class="col"><label class="form-label small mb-0">부서</label><input id="lg-dept" class="form-control form-control-sm"></div>
+        </div>
+      </div>
+      <div class="mb-2 mt-1"><label class="form-label small mb-0">비고</label><input id="lg-note" class="form-control form-control-sm"></div>
+      <p class="text-muted small mb-0">※ 품목·수량·세부 구분은 재고와 연결되어 수정할 수 없습니다. 바꾸려면 이력을 취소한 뒤 다시 입고/출고하세요.</p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">닫기</button><button class="btn btn-primary btn-sm" onclick="saveLedgerEdit()">저장</button></div>
   </div></div></div>
 
   <!-- 업무요청 상세 모달 (신규 지급 요청 "처리" 버튼에서 바로 열림 — request.html 이동 없이 처리) -->
@@ -182,7 +208,7 @@
   <script>
     if (!KIMS.requireAuth()) { } else { KIMS.renderNav('inventory.html'); }
     const E = KIMS.escapeHtml;
-    let itemModal, inboundModal, issueModal, histModal, reqDetailModal;
+    let itemModal, inboundModal, issueModal, histModal, reqDetailModal, ledgerModal;
     let reqDetailId = null, reqDetailCur = null;
     let catCharts = [];
     // 분류 순서 / 색상
@@ -257,6 +283,7 @@
       inboundModal = new bootstrap.Modal('#inboundModal');
       issueModal = new bootstrap.Modal('#issueModal');
       histModal = new bootstrap.Modal('#histModal');
+      ledgerModal = new bootstrap.Modal('#ledgerModal');
       reqDetailModal = new bootstrap.Modal('#reqDetailModal');
       showTab('dash');
     });
@@ -273,6 +300,11 @@
     }
 
     const dateOnly = s => (s || '').substring(0, 10);
+    // 오늘 날짜 yyyy-MM-dd (브라우저 현지 시간 기준 — toISOString 은 UTC 라 오전 9시 전엔 전날이 됨)
+    const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    // 입출고 이력 비고 표시: [세부 구분] + (출고) 지급대상자 + 메모
+    const ledgerNote = t => [t.subType ? '[' + t.subType + ']' : '',
+      t.receiverName ? '지급대상자 ' + t.receiverName : '', t.note || ''].filter(Boolean).join(' ');
 
     // ================= 대시보드 =================
     async function loadDashboard() { loadStockChart(); loadSupplyRequests(); }
@@ -407,16 +439,16 @@
     // 품목별 입출고 이력 (입고/출고 모두, 최신순)
     async function showItemHist(id, name) {
       try {
-        const list = (await KIMS.api('/kims-api/inventory-items/' + id + '/transactions'))
-          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        const data = await KIMS.api('/kims-api/inventory-items/ledger?itemId=' + id + '&size=500');
+        const list = data.content || [];
         document.getElementById('histTitle').textContent = '입출고 이력 - ' + name;
         document.getElementById('histBody').innerHTML = list.length ? `
           <table class="table table-sm table-bordered"><thead class="table-light"><tr>
-            <th>일시</th><th>구분</th><th>수량</th><th>변동전</th><th>변동후</th><th>담당자</th><th>비고</th></tr></thead><tbody>
-          ${list.map(t => { const inb = t.transactionType === 'INBOUND'; return `<tr><td>${(t.createdAt || '').substring(0, 19).replace('T', ' ')}</td>
+            <th>일자</th><th>구분</th><th>수량</th><th>변동전</th><th>변동후</th><th>요청자</th><th>담당자</th><th>비고</th></tr></thead><tbody>
+          ${list.map(t => { const inb = t.transactionType === 'INBOUND'; return `<tr><td class="text-nowrap">${E(t.transactionDate || '')}</td>
             <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
             <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td><td>${t.beforeStock}</td><td>${t.afterStock}</td>
-            <td>${E(t.createdBy)}</td><td>${E(t.note)}</td></tr>`; }).join('')}
+            <td>${E(t.requesterName || '')}</td><td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td></tr>`; }).join('')}
           </tbody></table>` : '<p class="text-muted">입출고 이력이 없습니다.</p>';
         histModal.show();
       } catch (e) { KIMS.toast(e.message, false); }
@@ -441,6 +473,7 @@
       document.getElementById('inboundTitle').textContent = '입고 등록 - ' + name;
       document.getElementById('in-itemId').value = id;
       document.getElementById('in-qty').value = ''; document.getElementById('in-note').value = '';
+      document.getElementById('in-at').value = todayStr();
       document.getElementById('in-by').value = KIMS.getUser() || '';
       // 지급과 동일하게 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
       const subRow = document.getElementById('in-subtype-row');
@@ -460,7 +493,8 @@
       const id = document.getElementById('in-itemId').value;
       const subRow = document.getElementById('in-subtype-row');
       const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('in-subtype').value : null;
-      const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim(), subType: subType };
+      const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim(), subType: subType,
+        inboundAt: document.getElementById('in-at').value || null };
       if (!payload.quantity || payload.quantity <= 0 || !payload.createdBy) { KIMS.toast('수량(1+)과 담당자는 필수입니다.', false); return; }
       try { await KIMS.api('/kims-api/inventory-items/' + id + '/inbound', { method: 'POST', body: payload }); KIMS.toast('입고되었습니다.'); inboundModal.hide(); loadStockTab(); }
       catch (e) { KIMS.toast(e.message, false); }
@@ -471,7 +505,7 @@
       document.getElementById('is-itemId').value = id;
       ['is-requester', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
       document.getElementById('is-by').value = KIMS.getUser() || '';
-      document.getElementById('is-at').value = new Date().toISOString().substring(0, 10);
+      document.getElementById('is-at').value = todayStr();
       // 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
       const subRow = document.getElementById('is-subtype-row');
       const sub = document.getElementById('is-subtype');
@@ -528,6 +562,7 @@
 
     // ================= 소모품 업무요청 이력 탭 (전체 품목 입출고 이력) =================
     let rhPage = 0; const rhSize = 20; let rhType = ''; let rhItemsFilled = false;
+    let rhRows = {};   // transactionId → 현재 목록의 이력 (상세 모달용)
     // 요청 상태 라벨/배지 (업무요청 상세 모달에서 사용)
     const RH_STATUS = { RECEIVED:'접수', IN_PROGRESS:'처리중', ON_HOLD:'보류', COMPLETED:'완료', REJECTED:'반려', CANCELED:'취소' };
     const RH_SB = { RECEIVED:'bg-secondary', IN_PROGRESS:'bg-info', ON_HOLD:'bg-warning text-dark', COMPLETED:'bg-success', REJECTED:'bg-danger', CANCELED:'bg-dark' };
@@ -567,21 +602,77 @@
         p.set('page', rhPage); p.set('size', rhSize);
         const data = await KIMS.api('/kims-api/inventory-items/ledger?' + p.toString());
         const list = data.content || [];
+        rhRows = {}; list.forEach(t => rhRows[t.transactionId] = t);
         tb.innerHTML = list.length ? list.map(t => {
           const inb = t.transactionType === 'INBOUND';
           return `<tr>
-            <td class="text-nowrap">${(t.createdAt || '').substring(0, 16).replace('T', ' ')}</td>
+            <td class="text-nowrap">${E(t.transactionDate || '')}</td>
             <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
             <td><b>${E(t.itemName)}</b></td>
             <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td>
-            <td class="text-nowrap">${t.beforeStock} → ${t.afterStock}</td>
-            <td>${E(t.requestNo || '')}</td><td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
-            <td>${E(t.createdBy)}</td><td>${E(t.note || '')}</td>
-            <td>${t.requestId ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>` : ''}</td>
+            <td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
+            <td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td>
+            <td>${t.requestId
+                ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>`
+                : `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openLedgerEdit(${t.transactionId})">상세</button>`}</td>
+            <td>${(inb || t.issueId) ? `<button class="btn btn-outline-danger btn-sm py-0" onclick="cancelLedgerRow(${t.transactionId}, '${inb ? '입고' : '출고'}', '${E(t.itemName)}', ${t.quantity})">취소</button>` : ''}</td>
           </tr>`;
-        }).join('') : '<tr><td colspan="11" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
+        }).join('') : '<tr><td colspan="10" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
         renderReqHistPager(data);
-      } catch (e) { tb.innerHTML = '<tr><td colspan="11" class="text-center text-danger">불러오기 실패</td></tr>'; }
+      } catch (e) { tb.innerHTML = '<tr><td colspan="10" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // 입출고 이력 상세(수정) — 업무요청 없이 입출고 내역에서 처리한 입고/출고
+    function openLedgerEdit(id) {
+      const t = rhRows[id]; if (!t) return;
+      const inb = t.transactionType === 'INBOUND';
+      const out = !inb && t.issueId;   // 지급 내역과 연결된 출고만 요청자·대상자·부서 수정 가능
+      document.getElementById('ledgerTitle').textContent = (inb ? '입고' : '출고') + ' 상세 - ' + t.itemName;
+      document.getElementById('lg-id').value = id;
+      document.getElementById('lg-summary').innerHTML =
+        `<span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span> ` +
+        `<b>${E(t.itemName)}</b> ${inb ? '+' : '-'}${t.quantity}${t.subType ? ' [' + E(t.subType) + ']' : ''}`;
+      document.getElementById('lg-at-label').textContent = (inb ? '입고일' : '출고일') + ' *';
+      document.getElementById('lg-at').value = t.transactionDate || '';
+      const by = document.getElementById('lg-by');
+      by.value = t.createdBy || ''; by.disabled = !out;   // 입고 담당자는 수정 불가
+      document.getElementById('lg-out-fields').style.display = out ? '' : 'none';
+      document.getElementById('lg-requester').value = t.requesterName || '';
+      document.getElementById('lg-receiver').value = t.receiverName || '';
+      document.getElementById('lg-dept').value = t.department || '';
+      document.getElementById('lg-note').value = t.note || '';
+      ledgerModal.show();
+    }
+    async function saveLedgerEdit() {
+      const id = document.getElementById('lg-id').value;
+      const t = rhRows[id]; if (!t) return;
+      const out = t.transactionType === 'OUTBOUND' && t.issueId;
+      const g = x => document.getElementById(x).value.trim();
+      const payload = { transactionDate: g('lg-at') || null, note: g('lg-note') };
+      if (!payload.transactionDate) { KIMS.toast('일자는 필수입니다.', false); return; }
+      if (out) {
+        Object.assign(payload, { requesterName: g('lg-requester'), receiverName: g('lg-receiver'),
+          department: g('lg-dept'), issuedBy: g('lg-by') });
+        if (!payload.requesterName || !payload.receiverName || !payload.issuedBy) { KIMS.toast('요청자명/지급 대상자/담당자는 필수입니다.', false); return; }
+      }
+      try {
+        await KIMS.api('/kims-api/inventory-items/ledger/' + id, { method: 'PUT', body: payload });
+        KIMS.toast('수정되었습니다.'); ledgerModal.hide(); loadReqHist();
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+
+    // 입출고 이력 취소 — 이력을 삭제하고 그 이력의 재고 증감을 되돌린다 (출고는 지급 내역도 삭제)
+    async function cancelLedgerRow(id, typeLabel, itemName, qty) {
+      const effect = typeLabel === '입고' ? `재고가 ${qty}만큼 줄어듭니다` : `재고가 ${qty}만큼 다시 늘어나고 지급 내역도 삭제됩니다`;
+      if (!confirm(`${itemName} ${typeLabel} ${qty}건을 취소할까요?\n이 이력이 삭제되고 ${effect}.`)) return;
+      try {
+        await KIMS.api('/kims-api/inventory-items/ledger/' + id, { method: 'DELETE' });
+        KIMS.toast(`${typeLabel}이 취소되었습니다.`);
+        loadReqHist(); loadStockChart();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 취소 불가', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
     }
 
     function renderReqHistPager(d) {
