@@ -1,6 +1,8 @@
 package com.company.module.kims.service;
 
+import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.PageResponse;
 import com.company.module.kims.dto.request.SupplyIssueCreateRequest;
 import com.company.module.kims.dto.response.SupplyIssueResponse;
@@ -46,10 +48,19 @@ public class SupplyIssueService {
     // ================================================================
     @Transactional
     public SupplyIssueResponse issue(SupplyIssueCreateRequest request) {
-        // 1) 연결 대상(업무 요청 / 품목) 조회
-        ServiceRequest serviceRequest = serviceRequestRepository.findById(request.getRequestId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "업무 요청을 찾을 수 없습니다. id=" + request.getRequestId()));
+        // 1) 연결 대상(업무 요청 / 품목) 조회 — 업무 요청은 선택(없으면 요청자명만으로 지급)
+        ServiceRequest serviceRequest = null;
+        if (request.getRequestId() != null) {
+            serviceRequest = serviceRequestRepository.findById(request.getRequestId())
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "업무 요청을 찾을 수 없습니다. id=" + request.getRequestId()));
+        }
+        String requesterName = (serviceRequest != null)
+                ? serviceRequest.getRequesterName()
+                : (request.getRequesterName() != null ? request.getRequesterName().trim() : null);
+        if (requesterName == null || requesterName.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "요청자명은 필수입니다.");
+        }
 
         InventoryItem item = inventoryItemRepository.findById(request.getItemId())
                 .orElseThrow(() -> new EntityNotFoundException(
@@ -58,15 +69,40 @@ public class SupplyIssueService {
         int quantity = request.getQuantity();
         int before = item.getCurrentStock();
 
-        // 2) 재고 차감 (재고 부족 시 IllegalArgumentException 발생)
+        // 2) 재고 차감 — 대여 중인 수량은 지급할 수 없으므로 출고 가능 수량(현재재고 − 대여) 기준으로 먼저 검사
+        if (quantity > item.getAvailableStock()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "재고가 부족합니다. 품목=" + item.getItemName()
+                            + ", 출고 가능=" + item.getAvailableStock()
+                            + (item.getRentedCount() > 0
+                                ? " (현재고 " + item.getCurrentStock() + " 중 대여 " + item.getRentedCount() + ")" : "")
+                            + ", 요청수량=" + quantity);
+        }
+
+        // 2-0) 세부 구분(신형/구형, 레노버/갤럭시)을 추적하는 품목이면 구분을 반드시 고르고,
+        //      그 구분의 수량을 넘겨 지급할 수 없다 — 넘기면 비고의 구분 수량이 실제 재고와 어긋나
+        //      대시보드에서 다른 구분의 재고가 줄어든 것처럼 보이게 된다.
+        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
+                ? request.getSubType().trim() : null;
+        if (item.tracksSegments()) {
+            if (subType == null || !InventoryItem.SEGMENT_LABELS.contains(subType)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "세부 구분을 선택하세요. 품목=" + item.getItemName());
+            }
+            Integer segmentCount = item.getSegmentCount(subType);
+            int segmentStock = (segmentCount != null) ? segmentCount : 0;
+            if (quantity > segmentStock) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "재고가 부족합니다. 품목=" + item.getItemName()
+                                + ", " + subType + " 재고=" + segmentStock + ", 요청수량=" + quantity);
+            }
+        }
         item.decreaseStock(quantity);
         int after = item.getCurrentStock();
 
         // 2-1) 세부 구분(신형/구형, 제조사 등)이 선택된 경우, 비고(remark)의 해당
         //      구분 수치도 함께 차감한다 — 대시보드 재고 막대그래프가 remark 를 파싱해
         //      세부 구분을 그리므로, 실제 지급 내역과 어긋나지 않도록 여기서 반영한다.
-        String subType = (request.getSubType() != null && !request.getSubType().isBlank())
-                ? request.getSubType() : null;
         if (subType != null) {
             item.adjustRemarkSegment(subType, -quantity);
         }
@@ -84,18 +120,23 @@ public class SupplyIssueService {
                 .issuedBy(request.getIssuedBy())
                 .issuedAt(issuedAt)
                 .subType(subType)
+                .requesterName(requesterName)
                 .build();
         SupplyIssue saved = supplyIssueRepository.save(issue);
 
-        // 5) 재고 변동(출고) 이력 기록
-        String note = "업무요청 " + serviceRequest.getRequestNo() + " 지급";
+        // 5) 재고 변동(출고) 이력 기록 — 입출고 이력 화면이 이 비고에서 요청번호/요청자를 읽는다
+        String note = (serviceRequest != null)
+                ? "업무요청 " + serviceRequest.getRequestNo() + " 지급"
+                : "요청자 " + requesterName + " 직접 지급";
         inventoryTransactionRepository.save(
                 InventoryTransaction.ofOutbound(item, quantity, before, after, request.getIssuedBy(), note));
 
-        // 6) 요청 처리 로그(메모)에도 지급 사실 기록
-        String logContent = String.format("소모품 지급: %s %d%s (대상자: %s)",
-                item.getItemName(), quantity, item.getUnit(), request.getReceiverName());
-        requestLogRepository.save(RequestLog.forNote(serviceRequest, request.getIssuedBy(), logContent));
+        // 6) 업무 요청에 연결된 지급이면 요청 처리 로그(메모)에도 지급 사실 기록
+        if (serviceRequest != null) {
+            String logContent = String.format("소모품 지급: %s %d%s (대상자: %s)",
+                    item.getItemName(), quantity, item.getUnit(), request.getReceiverName());
+            requestLogRepository.save(RequestLog.forNote(serviceRequest, request.getIssuedBy(), logContent));
+        }
 
         return SupplyIssueResponse.from(saved);
     }

@@ -17,6 +17,10 @@ public class InventoryItemResponse {
     private final String itemName;
     private final String category;
     private final int currentStock;
+    /** 대여 중인 수량 (비고의 "대여 N", 없으면 0) — 현재재고에 포함됨 */
+    private final int rentedCount;
+    /** 출고(지급) 가능 수량 = 현재재고 − 대여 중인 수량 */
+    private final int availableStock;
     private final int minStock;
     private final String unit;
     private final String remark;
@@ -33,6 +37,8 @@ public class InventoryItemResponse {
                 .itemName(entity.getItemName())
                 .category(entity.getCategory())
                 .currentStock(entity.getCurrentStock())
+                .rentedCount(entity.getRentedCount())
+                .availableStock(entity.getAvailableStock())
                 .minStock(entity.getMinStock())
                 .unit(entity.getUnit())
                 .remark(entity.getRemark())
