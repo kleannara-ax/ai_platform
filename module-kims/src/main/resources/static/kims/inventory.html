@@ -96,9 +96,9 @@
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>재고 변동</th><th>요청번호</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
+            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
           </tr></thead>
-          <tbody id="reqhistRows"><tr><td colspan="11" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          <tbody id="reqhistRows"><tr><td colspan="9" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
       </div>
       <div id="reqhistPager" class="d-flex justify-content-center gap-2"></div>
@@ -582,14 +582,13 @@
             <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
             <td><b>${E(t.itemName)}</b></td>
             <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td>
-            <td class="text-nowrap">${t.beforeStock} → ${t.afterStock}</td>
-            <td>${E(t.requestNo || '')}</td><td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
+            <td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
             <td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td>
             <td>${t.requestId ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>` : ''}</td>
           </tr>`;
-        }).join('') : '<tr><td colspan="11" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
+        }).join('') : '<tr><td colspan="9" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
         renderReqHistPager(data);
-      } catch (e) { tb.innerHTML = '<tr><td colspan="11" class="text-center text-danger">불러오기 실패</td></tr>'; }
+      } catch (e) { tb.innerHTML = '<tr><td colspan="9" class="text-center text-danger">불러오기 실패</td></tr>'; }
     }
 
     function renderReqHistPager(d) {
