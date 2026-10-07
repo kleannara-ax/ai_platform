@@ -124,12 +124,12 @@ public class SupplyIssueService {
                 .build();
         SupplyIssue saved = supplyIssueRepository.save(issue);
 
-        // 5) 재고 변동(출고) 이력 기록 — 입출고 이력 화면이 이 비고에서 요청번호/요청자를 읽는다
+        // 5) 재고 변동(출고) 이력 기록 — 지급 내역과 연결해 출고일·세부 구분·요청자·지급대상자를 이력에서 볼 수 있게 한다
         String note = (serviceRequest != null)
                 ? "업무요청 " + serviceRequest.getRequestNo() + " 지급"
-                : "요청자 " + requesterName + " 직접 지급";
+                : null;
         inventoryTransactionRepository.save(
-                InventoryTransaction.ofOutbound(item, quantity, before, after, request.getIssuedBy(), note));
+                InventoryTransaction.ofOutbound(item, quantity, before, after, request.getIssuedBy(), note, saved));
 
         // 6) 업무 요청에 연결된 지급이면 요청 처리 로그(메모)에도 지급 사실 기록
         if (serviceRequest != null) {
@@ -171,7 +171,8 @@ public class SupplyIssueService {
                 item.adjustRemarkSegment(issue.getSubType(), issue.getQuantity());
             }
             inventoryTransactionRepository.save(InventoryTransaction.ofInbound(
-                    item, issue.getQuantity(), before, after, by, "요청 취소/반려로 지급 취소·재고 반환"));
+                    item, issue.getQuantity(), before, after, by, "요청 취소/반려로 지급 취소·재고 반환",
+                    java.time.LocalDate.now(), issue.getSubType()));
             reversedQty += issue.getQuantity();
         }
         supplyIssueRepository.deleteAll(issues);

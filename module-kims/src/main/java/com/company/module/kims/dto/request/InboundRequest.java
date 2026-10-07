@@ -1,5 +1,6 @@
 package com.company.module.kims.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -22,6 +23,10 @@ public class InboundRequest {
 
     /** 입고 비고 (선택) */
     private String note;
+
+    /** 입고일 (미입력 시 서버에서 오늘 날짜로 설정) */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private java.time.LocalDate inboundAt;
 
     /**
      * 세부 구분(신형/구형, 제조사 등) — 해당 구분이 있는 품목(마우스/키보드/노트북/모니터/

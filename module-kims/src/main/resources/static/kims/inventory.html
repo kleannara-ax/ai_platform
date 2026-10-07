@@ -96,7 +96,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>일시</th><th>구분</th><th>품목</th><th>수량</th><th>재고 변동</th><th>요청번호</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
+            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>재고 변동</th><th>요청번호</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
           </tr></thead>
           <tbody id="reqhistRows"><tr><td colspan="11" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
@@ -133,6 +133,7 @@
       <div class="mb-2" id="in-subtype-row" style="display:none"><label class="form-label small mb-0">세부 구분 *</label><select id="in-subtype" class="form-select form-select-sm"></select></div>
       <div class="mb-2"><label class="form-label small mb-0">입고 수량 *</label><input id="in-qty" type="number" class="form-control form-control-sm"></div>
       <div class="mb-2"><label class="form-label small mb-0">입고 담당자 *</label><input id="in-by" class="form-control form-control-sm"></div>
+      <div class="mb-2"><label class="form-label small mb-0">입고일</label><input id="in-at" type="date" class="form-control form-control-sm"></div>
       <div class="mb-2"><label class="form-label small mb-0">비고</label><input id="in-note" class="form-control form-control-sm"></div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button><button class="btn btn-primary btn-sm" onclick="inbound()">입고</button></div>
@@ -157,7 +158,7 @@
       </div>
       <div class="row g-2 mt-0">
         <div class="col"><label class="form-label small mb-0">지급 담당자 *</label><input id="is-by" class="form-control form-control-sm"></div>
-        <div class="col"><label class="form-label small mb-0">지급일</label><input id="is-at" type="date" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0">출고일</label><input id="is-at" type="date" class="form-control form-control-sm"></div>
       </div>
       <p class="text-muted small mt-2 mb-0">※ 지급 시 재고가 자동 차감됩니다. 재고 부족 시 등록이 거부됩니다.</p>
     </div>
@@ -273,6 +274,11 @@
     }
 
     const dateOnly = s => (s || '').substring(0, 10);
+    // 오늘 날짜 yyyy-MM-dd (브라우저 현지 시간 기준 — toISOString 은 UTC 라 오전 9시 전엔 전날이 됨)
+    const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    // 입출고 이력 비고 표시: [세부 구분] + (출고) 지급대상자 + 메모
+    const ledgerNote = t => [t.subType ? '[' + t.subType + ']' : '',
+      t.receiverName ? '지급대상자 ' + t.receiverName : '', t.note || ''].filter(Boolean).join(' ');
 
     // ================= 대시보드 =================
     async function loadDashboard() { loadStockChart(); loadSupplyRequests(); }
@@ -407,16 +413,16 @@
     // 품목별 입출고 이력 (입고/출고 모두, 최신순)
     async function showItemHist(id, name) {
       try {
-        const list = (await KIMS.api('/kims-api/inventory-items/' + id + '/transactions'))
-          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        const data = await KIMS.api('/kims-api/inventory-items/ledger?itemId=' + id + '&size=500');
+        const list = data.content || [];
         document.getElementById('histTitle').textContent = '입출고 이력 - ' + name;
         document.getElementById('histBody').innerHTML = list.length ? `
           <table class="table table-sm table-bordered"><thead class="table-light"><tr>
-            <th>일시</th><th>구분</th><th>수량</th><th>변동전</th><th>변동후</th><th>담당자</th><th>비고</th></tr></thead><tbody>
-          ${list.map(t => { const inb = t.transactionType === 'INBOUND'; return `<tr><td>${(t.createdAt || '').substring(0, 19).replace('T', ' ')}</td>
+            <th>일자</th><th>구분</th><th>수량</th><th>변동전</th><th>변동후</th><th>요청자</th><th>담당자</th><th>비고</th></tr></thead><tbody>
+          ${list.map(t => { const inb = t.transactionType === 'INBOUND'; return `<tr><td class="text-nowrap">${E(t.transactionDate || '')}</td>
             <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
             <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td><td>${t.beforeStock}</td><td>${t.afterStock}</td>
-            <td>${E(t.createdBy)}</td><td>${E(t.note)}</td></tr>`; }).join('')}
+            <td>${E(t.requesterName || '')}</td><td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td></tr>`; }).join('')}
           </tbody></table>` : '<p class="text-muted">입출고 이력이 없습니다.</p>';
         histModal.show();
       } catch (e) { KIMS.toast(e.message, false); }
@@ -441,6 +447,7 @@
       document.getElementById('inboundTitle').textContent = '입고 등록 - ' + name;
       document.getElementById('in-itemId').value = id;
       document.getElementById('in-qty').value = ''; document.getElementById('in-note').value = '';
+      document.getElementById('in-at').value = todayStr();
       document.getElementById('in-by').value = KIMS.getUser() || '';
       // 지급과 동일하게 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
       const subRow = document.getElementById('in-subtype-row');
@@ -460,7 +467,8 @@
       const id = document.getElementById('in-itemId').value;
       const subRow = document.getElementById('in-subtype-row');
       const subType = (subRow && subRow.style.display !== 'none') ? document.getElementById('in-subtype').value : null;
-      const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim(), subType: subType };
+      const payload = { quantity: Number(document.getElementById('in-qty').value), createdBy: document.getElementById('in-by').value.trim(), note: document.getElementById('in-note').value.trim(), subType: subType,
+        inboundAt: document.getElementById('in-at').value || null };
       if (!payload.quantity || payload.quantity <= 0 || !payload.createdBy) { KIMS.toast('수량(1+)과 담당자는 필수입니다.', false); return; }
       try { await KIMS.api('/kims-api/inventory-items/' + id + '/inbound', { method: 'POST', body: payload }); KIMS.toast('입고되었습니다.'); inboundModal.hide(); loadStockTab(); }
       catch (e) { KIMS.toast(e.message, false); }
@@ -471,7 +479,7 @@
       document.getElementById('is-itemId').value = id;
       ['is-requester', 'is-qty', 'is-receiver', 'is-dept'].forEach(x => document.getElementById(x).value = '');
       document.getElementById('is-by').value = KIMS.getUser() || '';
-      document.getElementById('is-at').value = new Date().toISOString().substring(0, 10);
+      document.getElementById('is-at').value = todayStr();
       // 신형/구형(또는 제조사) 구분이 있는 품목이면 세부 구분 선택 UI를 표시
       const subRow = document.getElementById('is-subtype-row');
       const sub = document.getElementById('is-subtype');
@@ -570,13 +578,13 @@
         tb.innerHTML = list.length ? list.map(t => {
           const inb = t.transactionType === 'INBOUND';
           return `<tr>
-            <td class="text-nowrap">${(t.createdAt || '').substring(0, 16).replace('T', ' ')}</td>
+            <td class="text-nowrap">${E(t.transactionDate || '')}</td>
             <td><span class="badge ${inb ? 'bg-success' : 'bg-primary'}">${inb ? '입고' : '출고'}</span></td>
             <td><b>${E(t.itemName)}</b></td>
             <td class="${inb ? 'text-success' : 'text-primary'}">${inb ? '+' : '-'}${t.quantity}</td>
             <td class="text-nowrap">${t.beforeStock} → ${t.afterStock}</td>
             <td>${E(t.requestNo || '')}</td><td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
-            <td>${E(t.createdBy)}</td><td>${E(t.note || '')}</td>
+            <td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td>
             <td>${t.requestId ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>` : ''}</td>
           </tr>`;
         }).join('') : '<tr><td colspan="11" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';

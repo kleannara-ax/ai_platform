@@ -96,7 +96,7 @@ public class InventoryItemService {
     public List<InventoryTransactionResponse> getTransactions(Long itemId) {
         findItem(itemId); // 존재 확인
         return inventoryTransactionRepository
-                .findByInventoryItem_ItemIdOrderByCreatedAtDesc(itemId)
+                .findByInventoryItem_ItemIdOrderByTransactionDateDescTransactionIdDesc(itemId)
                 .stream()
                 .map(InventoryTransactionResponse::from)
                 .toList();
@@ -109,13 +109,12 @@ public class InventoryItemService {
                                                              TransactionType type, String createdBy,
                                                              int page, int size) {
         Page<InventoryTransaction> result = inventoryTransactionRepository.search(
-                from != null ? from.atStartOfDay() : null,
-                to != null ? to.plusDays(1).atStartOfDay().minusNanos(1) : null,
-                itemId, type,
+                from, to, itemId, type,
                 (createdBy == null || createdBy.isBlank()) ? null : createdBy.trim(),
                 PageRequest.of(page, size));
 
-        // 출고 이력의 비고에 남은 요청번호로 업무요청을 한 번에 조회해 요청자·부서를 붙인다.
+        // 지급 내역과 연결된 출고는 그 지급 내역에서 요청자·지급대상자·부서를 가져온다.
+        // 연결되지 않은 예전 출고 이력만 비고에 남은 요청번호/요청자명으로 보완한다.
         Set<String> requestNos = new HashSet<>();
         result.forEach(t -> {
             String no = requestNoOf(t);
@@ -132,13 +131,13 @@ public class InventoryItemService {
     }
 
     private String directRequesterOf(InventoryTransaction t) {
-        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getSupplyIssue() != null || t.getNote() == null) return null;
         Matcher m = DIRECT_REQUESTER_IN_NOTE.matcher(t.getNote());
         return m.find() ? m.group(1) : null;
     }
 
     private String requestNoOf(InventoryTransaction t) {
-        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getSupplyIssue() != null || t.getNote() == null) return null;
         Matcher m = REQUEST_NO_IN_NOTE.matcher(t.getNote());
         return m.find() ? m.group(1) : null;
     }
@@ -168,15 +167,12 @@ public class InventoryItemService {
             item.adjustRemarkSegment(subType, request.getQuantity());
         }
 
-        // 입고 이력 기록 (세부 구분은 입고 내역에서 보이도록 비고 앞에 표시)
-        String note = request.getNote();
-        if (subType != null) {
-            note = "[" + subType + "]" + (note != null && !note.isBlank() ? " " + note : "");
-            if (note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
-        }
+        // 입고 이력 기록 — 입고일(모달 입력, 미입력 시 오늘)과 세부 구분을 함께 남긴다
+        String note = (request.getNote() != null && !request.getNote().isBlank()) ? request.getNote().trim() : null;
+        if (note != null && note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
         inventoryTransactionRepository.save(
                 InventoryTransaction.ofInbound(item, request.getQuantity(), before, after,
-                        request.getCreatedBy(), note));
+                        request.getCreatedBy(), note, request.getInboundAt(), subType));
 
         return InventoryItemResponse.from(item);
     }
