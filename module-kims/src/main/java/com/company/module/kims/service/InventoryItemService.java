@@ -6,6 +6,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.PageResponse;
 import com.company.module.kims.dto.request.InboundRequest;
 import com.company.module.kims.dto.request.InventoryItemCreateRequest;
+import com.company.module.kims.dto.request.LedgerUpdateRequest;
 import com.company.module.kims.dto.response.InventoryItemResponse;
 import com.company.module.kims.dto.response.InventoryLedgerResponse;
 import com.company.module.kims.dto.response.InventoryTransactionResponse;
@@ -134,6 +135,30 @@ public class InventoryItemService {
             String no = requestNoOf(t);
             return InventoryLedgerResponse.of(t, no != null ? requests.get(no) : null, directRequesterOf(t));
         }));
+    }
+
+    // ================================================================
+    // 입출고 이력 수정 — 날짜·비고와 (출고) 요청자·지급대상자·부서·지급 담당자. 재고는 바뀌지 않는다.
+    // ================================================================
+    @Transactional
+    public void updateLedger(Long transactionId, LedgerUpdateRequest request) {
+        InventoryTransaction t = inventoryTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new EntityNotFoundException("입출고 이력을 찾을 수 없습니다. id=" + transactionId));
+        SupplyIssue issue = t.getSupplyIssue();
+        if (issue != null) {
+            if (request.getReceiverName() != null && request.getReceiverName().isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지급 대상자는 비울 수 없습니다.");
+            }
+            if (issue.getServiceRequest() == null && request.getRequesterName() != null && request.getRequesterName().isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "요청자명은 비울 수 없습니다.");
+            }
+            issue.update(request.getRequesterName(), request.getReceiverName(), request.getDepartment(),
+                    request.getIssuedBy(), request.getTransactionDate());
+        }
+        t.changeTransactionDate(request.getTransactionDate());
+        String note = request.getNote();
+        if (note != null && note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
+        t.changeNote(note);
     }
 
     // ================================================================
