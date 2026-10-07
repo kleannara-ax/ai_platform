@@ -96,9 +96,9 @@
       <div class="table-responsive">
         <table class="table table-sm table-hover table-bordered bg-white align-middle">
           <thead class="table-light"><tr>
-            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th>
+            <th>일자</th><th>구분</th><th>품목</th><th>수량</th><th>요청자</th><th>부서</th><th>담당자</th><th>비고</th><th style="width:60px">상세</th><th style="width:60px">취소</th>
           </tr></thead>
-          <tbody id="reqhistRows"><tr><td colspan="9" class="text-center text-muted">불러오는 중...</td></tr></tbody>
+          <tbody id="reqhistRows"><tr><td colspan="10" class="text-center text-muted">불러오는 중...</td></tr></tbody>
         </table>
       </div>
       <div id="reqhistPager" class="d-flex justify-content-center gap-2"></div>
@@ -585,10 +585,25 @@
             <td>${E(t.requesterName || '')}</td><td>${E(t.department || '')}</td>
             <td>${E(t.createdBy)}</td><td>${E(ledgerNote(t))}</td>
             <td>${t.requestId ? `<button class="btn btn-outline-secondary btn-sm py-0" onclick="openReqDetail(${t.requestId})">상세</button>` : ''}</td>
+            <td>${(inb || t.issueId) ? `<button class="btn btn-outline-danger btn-sm py-0" onclick="cancelLedgerRow(${t.transactionId}, '${inb ? '입고' : '출고'}', '${E(t.itemName)}', ${t.quantity})">취소</button>` : ''}</td>
           </tr>`;
-        }).join('') : '<tr><td colspan="9" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
+        }).join('') : '<tr><td colspan="10" class="text-center text-muted">해당 조건의 입출고 이력이 없습니다.</td></tr>';
         renderReqHistPager(data);
-      } catch (e) { tb.innerHTML = '<tr><td colspan="9" class="text-center text-danger">불러오기 실패</td></tr>'; }
+      } catch (e) { tb.innerHTML = '<tr><td colspan="10" class="text-center text-danger">불러오기 실패</td></tr>'; }
+    }
+
+    // 입출고 이력 취소 — 이력을 삭제하고 그 이력의 재고 증감을 되돌린다 (출고는 지급 내역도 삭제)
+    async function cancelLedgerRow(id, typeLabel, itemName, qty) {
+      const effect = typeLabel === '입고' ? `재고가 ${qty}만큼 줄어듭니다` : `재고가 ${qty}만큼 다시 늘어나고 지급 내역도 삭제됩니다`;
+      if (!confirm(`${itemName} ${typeLabel} ${qty}건을 취소할까요?\n이 이력이 삭제되고 ${effect}.`)) return;
+      try {
+        await KIMS.api('/kims-api/inventory-items/ledger/' + id, { method: 'DELETE' });
+        KIMS.toast(`${typeLabel}이 취소되었습니다.`);
+        loadReqHist(); loadStockChart();
+      } catch (e) {
+        if ((e.message || '').includes('재고가 부족')) KIMS.alertModal('⚠ 취소 불가', E(e.message));
+        else KIMS.toast(e.message, false);
+      }
     }
 
     function renderReqHistPager(d) {

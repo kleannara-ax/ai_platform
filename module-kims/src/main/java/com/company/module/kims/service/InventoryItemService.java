@@ -11,11 +11,15 @@ import com.company.module.kims.dto.response.InventoryLedgerResponse;
 import com.company.module.kims.dto.response.InventoryTransactionResponse;
 import com.company.module.kims.entity.InventoryItem;
 import com.company.module.kims.entity.InventoryTransaction;
+import com.company.module.kims.entity.RequestLog;
 import com.company.module.kims.entity.ServiceRequest;
+import com.company.module.kims.entity.SupplyIssue;
 import com.company.module.kims.entity.enums.TransactionType;
 import com.company.module.kims.repository.InventoryItemRepository;
 import com.company.module.kims.repository.InventoryTransactionRepository;
+import com.company.module.kims.repository.RequestLogRepository;
 import com.company.module.kims.repository.ServiceRequestRepository;
+import com.company.module.kims.repository.SupplyIssueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -45,6 +49,8 @@ public class InventoryItemService {
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final SupplyIssueRepository supplyIssueRepository;
+    private final RequestLogRepository requestLogRepository;
 
     /** 출고 이력 비고("업무요청 KIMS-20261006-0001 지급")에서 요청번호를 뽑는 패턴 */
     private static final Pattern REQUEST_NO_IN_NOTE = Pattern.compile("업무요청\\s+(\\S+)\\s+지급");
@@ -128,6 +134,58 @@ public class InventoryItemService {
             String no = requestNoOf(t);
             return InventoryLedgerResponse.of(t, no != null ? requests.get(no) : null, directRequesterOf(t));
         }));
+    }
+
+    // ================================================================
+    // 입출고 이력 취소 — 이력을 삭제하고 그 이력의 재고 증감(세부 구분 수량 포함)을 되돌린다
+    // ================================================================
+    @Transactional
+    public void cancelLedger(Long transactionId, String changedBy) {
+        InventoryTransaction t = inventoryTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new EntityNotFoundException("입출고 이력을 찾을 수 없습니다. id=" + transactionId));
+        InventoryItem item = t.getInventoryItem();
+        int qty = t.getQuantity();
+        String by = (changedBy != null && !changedBy.isBlank()) ? changedBy : "system";
+
+        if (t.getTransactionType() == TransactionType.INBOUND) {
+            // 입고 취소 = 입고 수량만큼 재고 차감. 이미 출고되어 남은 재고가 부족하면 취소할 수 없다.
+            if (item.getCurrentStock() < qty) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "입고를 취소할 재고가 부족합니다(이미 출고됨). 품목=" + item.getItemName()
+                                + ", 현재재고=" + item.getCurrentStock() + ", 취소수량=" + qty);
+            }
+            String sub = t.getSubType();
+            if (sub != null && item.tracksSegments()) {
+                Integer segment = item.getSegmentCount(sub);
+                if (segment == null || segment < qty) {
+                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                            "입고를 취소할 재고가 부족합니다(이미 출고됨). 품목=" + item.getItemName()
+                                    + ", " + sub + " 재고=" + (segment != null ? segment : 0) + ", 취소수량=" + qty);
+                }
+            }
+            item.decreaseStock(qty);
+            if (sub != null) item.adjustRemarkSegment(sub, -qty);
+            inventoryTransactionRepository.delete(t);
+            return;
+        }
+
+        // 출고 취소 = 지급 수량만큼 재고 복원 + 연결된 지급 내역 삭제
+        SupplyIssue issue = t.getSupplyIssue();
+        if (issue == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "지급 내역과 연결되지 않은 예전 출고 이력이라 취소할 수 없습니다. id=" + transactionId);
+        }
+        item.increaseStock(qty);
+        String sub = (issue.getSubType() != null) ? issue.getSubType() : t.getSubType();
+        if (sub != null) item.adjustRemarkSegment(sub, qty);
+        ServiceRequest request = issue.getServiceRequest();
+        String receiver = issue.getReceiverName();
+        inventoryTransactionRepository.delete(t);
+        supplyIssueRepository.delete(issue);
+        if (request != null) {
+            requestLogRepository.save(RequestLog.forNote(request, by,
+                    String.format("소모품 지급 취소: %s %d%s (대상자: %s)", item.getItemName(), qty, item.getUnit(), receiver)));
+        }
     }
 
     private String directRequesterOf(InventoryTransaction t) {
