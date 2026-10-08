@@ -1,0 +1,28 @@
+// ============================================================
+// module-security_log : ISMS 보안 로그 이상징후 탐지/검토 업무 모듈
+// - 독립 실행 애플리케이션이 아닌 플랫폼 app 모듈에 포함되는 plain jar 서브모듈
+// - spring-boot 플러그인 / bootJar / main class 미적용
+// ============================================================
+
+dependencies {
+    // core 공통 클래스 참조 (ApiResponse, BusinessException, ErrorCode, CurrentUserProvider 등)
+    compileOnly project(':core')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // SecurityConfig/JWT 구현 금지
+    // @PreAuthorize 등 기존 core 권한 체계 사용을 위한 컴파일 참조만 허용
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+
+    // Lombok (플랫폼 공통 설정에 이미 포함되어 있다면 중복 선언되어도 무방)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+}
+
+// spring-boot 플러그인 미적용 서브모듈
+// 업무 모듈은 독립 실행 애플리케이션이 아니므로 plain jar만 생성
+jar {
+    enabled = true
+}
