@@ -10,6 +10,9 @@
 --           SQL 문자열 내 역슬래시는 '\\' 로 이스케이프 (NO_BACKSLASH_ESCAPES 미설정 기준)
 -- ============================================================
 
+-- 클라이언트 문자셋을 utf8mb4 로 고정 (한글 COMMENT/데이터 깨짐 방지)
+SET NAMES utf8mb4;
+
 INSERT IGNORE INTO sec_log_rule
     (RULE_CODE, RULE_NAME, DESCRIPTION, LOG_TYPE, MATCH_TYPE, PATTERN, SEVERITY, THRESHOLD_COUNT, USE_YN, SORT_ORDER, CREATED_BY)
 VALUES

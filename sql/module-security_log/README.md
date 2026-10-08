@@ -160,14 +160,51 @@
 
 | 메뉴명 | 메뉴 위치 | 메뉴 URL (프론트) | 사용 API | 접근 역할 |
 |---|---|---|---|---|
-| 보안로그 관리 (상위) | 정보보안 > 보안로그 관리 | `/security_log` | - | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
-| 로그 업로드 목록 | 정보보안 > 보안로그 관리 > 로그 업로드 목록 | `/security_log/uploads` | `GET /security_log-api/uploads`, `/summary` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
-| 로그 업로드 등록 | (목록 화면 버튼, 메뉴 비노출) | `/security_log/uploads/new` | `POST /security_log-api/uploads` | ROLE_ADMIN, ROLE_MANAGER |
-| 로그 업로드 상세 | (목록 화면 행 클릭, 메뉴 비노출) | `/security_log/uploads/{id}` | `GET /uploads/{id}`, `/detections` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
-| 로그 업로드 수정 | (상세 화면 버튼, 메뉴 비노출) | `/security_log/uploads/{id}/edit` | `PUT /security_log-api/uploads/{id}` | ROLE_ADMIN, ROLE_MANAGER |
-| 탐지 룰셋 편집 | 정보보안 > 보안로그 관리 > 탐지 룰셋 편집 | `/security_log/rules` | `/security_log-api/rules/**` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER (편집은 ROLE_ADMIN) |
+| 보안로그 관리 (상위) | 정보보안 > 보안로그 관리 | (그룹, URL 없음) | - | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+| 로그 업로드 목록 | 정보보안 > 보안로그 관리 > 로그 업로드 목록 | `/security_log/index.html` | `GET /security_log-api/uploads`, `/summary` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+| 로그 업로드 등록 | (목록 화면 버튼, 메뉴 비노출) | `/security_log/upload.html` | `POST /security_log-api/uploads` | ROLE_ADMIN, ROLE_MANAGER |
+| 로그 업로드 상세 | (목록 화면 행 클릭, 메뉴 비노출) | `/security_log/detail.html?id={id}` | `GET /uploads/{id}`, `/detections` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+| 로그 업로드 수정 | (상세 화면 버튼, 메뉴 비노출) | `/security_log/edit.html?id={id}` | `PUT /security_log-api/uploads/{id}` | ROLE_ADMIN, ROLE_MANAGER |
+| 탐지 룰셋 편집 | 정보보안 > 보안로그 관리 > 탐지 룰셋 편집 | `/security_log/rules.html` | `/security_log-api/rules/**` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER (편집은 ROLE_ADMIN) |
 
-> 이 모듈은 백엔드 API만 생성합니다. 프론트엔드 화면(목록/등록/상세/수정/룰셋 편집)은 플랫폼 프론트 표준에 따라 별도로 구현해야 하며, 위 API로 모든 화면을 구성할 수 있습니다.
+### 5-1. 화면 파일 (모듈에 포함)
+
+`module-security_log/src/main/resources/static/security_log/` 에 있으며, 앱 jar 에 포함되어 `/security_log/**` URL 로 서빙됩니다.
+module-safety 와 같은 방식으로 플랫폼 SPA 안에서 iframe 으로 열리며, 플랫폼 로그인 세션(`localStorage.fireweb_user` 의 JWT)을 그대로 사용합니다.
+
+| 화면 | 파일 | 역할별 동작 |
+|---|---|---|
+| 목록 (월별 조회 + 요약 + TOP 10 룰) | `index.html` | 전원 조회. `로그 업로드` 버튼은 ADMIN/MANAGER 만 표시 |
+| 등록 (파일 업로드 + 즉시 분석) | `upload.html` | ADMIN/MANAGER. USER 는 권한 없음 안내 |
+| 상세 (요약, 룰별 집계, 검토 현황, 탐지 목록, 일괄 검토) | `detail.html` | 검토 저장은 ADMIN/MANAGER. 최종 검토완료·취소·삭제는 ADMIN |
+| 수정 (기본정보, 재분석) | `edit.html` | ADMIN/MANAGER. 검토완료 건은 잠김 |
+| 탐지 룰셋 편집 (목록, 등록·수정, 사용여부, 패턴 테스트) | `rules.html` | 전원 조회. 편집은 ADMIN |
+| 공통 스크립트 / 스타일 | `js/seclog.js`, `css/seclog.css` | - |
+
+> 화면의 버튼 숨김은 사용성용입니다. 실제 권한은 API 의 `@PreAuthorize` 로 서버에서 막습니다.
+
+### 5-2. 화면을 플랫폼에 띄우려면 필요한 core/app 작업 (**core·app 에 추가 필요**)
+
+업무 모듈 규칙상 core·app 을 수정하지 않았기 때문에, 아래 2가지가 반영되기 전에는 운영에서 화면이 열리지 않습니다.
+(미리보기 환경에서는 같은 내용을 임시로 적용해 동작을 확인했으며, 그 수정은 커밋하지 않았습니다.)
+
+**① core `SecurityConfig` 공개 경로 추가** — iframe 진입은 Authorization 헤더를 보낼 수 없어 지금은 401 이 납니다. 데이터 API(`/security_log-api/**`)는 계속 JWT 로 보호됩니다.
+```java
+// core/src/main/java/com/company/core/config/SecurityConfig.java 의 기존 permitAll 목록에 추가
+.requestMatchers("/security_log/**").permitAll()   // 화면 (플랫폼 SPA 안에서 iframe 로드)
+```
+
+**② app `static/index.html` 에 iframe 라우팅 추가** — 플랫폼 SPA 는 `/kims/`, `/safety/` 로 시작하는 메뉴만 iframe 으로 엽니다. `/security_log/` 도 같은 방식으로 열도록 추가해야 합니다. (`isSafetyPage` 처리와 같은 패턴. `menuUrl` 이 `/security_log/` 로 시작하면 `navigateToSafetyPage(menuUrl)` 와 같은 iframe 로더로 열기)
+
+**③ 메뉴 등록** — 아래 값으로 `core_menu` / `core_role_menu` 에 등록합니다 (`MODULE_GUIDE.md` 3장 절차).
+
+| MENU_CODE | 메뉴명 | 상위 | MENU_URL | 접근 역할 |
+|---|---|---|---|---|
+| `SECLOG_MGMT` | 보안로그 관리 | (최상위 그룹) | (없음) | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+| `SECLOG_UPLOAD` | 로그 업로드 목록 | SECLOG_MGMT | `/security_log/index.html` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+| `SECLOG_RULE` | 탐지 룰셋 편집 | SECLOG_MGMT | `/security_log/rules.html` | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
+
+등록·상세·수정 화면은 목록 화면 안에서 이동하므로 메뉴로 등록하지 않습니다.
 
 ## 6. 권한 (core 역할 매핑 — 매핑안 A 확정)
 
@@ -201,6 +238,7 @@ mysql -u <user> -p <database> < sql/module-security_log/01_schema.sql
 mysql -u <user> -p <database> < sql/module-security_log/02_seed_data.sql
 ```
 
+- 두 스크립트 모두 맨 앞에서 `SET NAMES utf8mb4` 를 실행하므로, 접속 클라이언트 문자셋과 관계없이 한글 COMMENT/데이터가 깨지지 않습니다.
 - `02_seed_data.sql`의 정규식은 SQL 문자열 안에서 역슬래시를 `\\`로 이스케이프했습니다. DB 세션에 `NO_BACKSLASH_ESCAPES` SQL 모드가 **설정되어 있지 않아야** 정상적으로 저장됩니다.
 - 운영자가 이미 수정한 룰은 seed를 다시 실행해도 덮어쓰지 않습니다.
 - 기본 룰 19개: 공통 6, Linux 3, Windows 2, Web 5, DB 2, Network 1. 운영 환경의 로그 형식에 맞게 룰셋 편집 화면에서 조정하세요.
@@ -270,6 +308,10 @@ module-security_log/
     │                SecLogUploadFileRepository, SecLogDetectionRepository
     └── service/     SecLogRuleService, SecLogUploadService, SecLogDetectionService,
                      LogAnalysisEngine, SecLogConstants
+module-security_log/src/main/resources/static/security_log/
+├── index.html  upload.html  detail.html  edit.html  rules.html
+├── js/seclog.js
+└── css/seclog.css
 sql/module-security_log/
 ├── 01_schema.sql
 ├── 02_seed_data.sql
@@ -280,6 +322,7 @@ sql/module-security_log/
 
 **검증 환경**
 - 실제 저장소 빌드: `kleannara-ax/ai_platform` main(`de60b2f`)에 임시로 모듈을 포함해 `./gradlew :module-security_log:compileJava :app:bootJar`를 실행했고 성공했습니다. 이 임시 등록은 커밋하지 않았습니다.
+- 화면 E2E: 실제 브라우저(Chromium)로 플랫폼에 로그인해 메뉴에서 iframe 으로 열고, 업로드 → 일괄 검토 → 수정 → 최종 검토완료 → 룰 테스트·등록까지 클릭으로 확인했습니다. ADMIN/MANAGER/USER 별 버튼 노출이 의도대로였고 화면 스크립트 오류는 없었습니다.
 - E2E: 로컬 MariaDB에 core 스키마와 이 모듈 SQL을 적용한 뒤 앱을 기동하고, ADMIN/MANAGER/USER 계정으로 로그인해 28개 시나리오를 확인했습니다. 권한 허용·403, 업로드·분석, 중복 409, 검토 흐름, 재분석, 원본 일치, 룰 CRUD, 소프트 삭제, 비로그인 401 모두 기대대로 동작했고, Hibernate 매핑 오류는 없었습니다.
 - SQL: MariaDB 11.8에서 `01`, `02`를 2회 연속 실행해 정상 동작을 확인했습니다. 컬럼 COMMENT 누락 0건이고, Entity `@Column`과 DDL 컬럼이 4개 테이블 모두 100% 일치합니다.
 - 탐지 엔진: seed 룰 19개 정규식 컴파일 성공. 샘플 로그 11라인에서 9개 룰이 기대대로 탐지되었고, 임계 건수(5건 이상)도 확인했습니다. ReDoS 패턴 `(a+)+$`는 203ms에서 안전하게 중단됩니다.

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보안로그 업로드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main" style="max-width:900px">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-upload"></i></span>로그 업로드 (등록)</h1>
+    <div class="header-actions">
+      <a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>
+    </div>
+  </header>
+
+  <div class="alert-m alert-info">
+    <i class="fas fa-circle-info mt-1"></i>
+    <div>업로드하면 현재 <b>활성 탐지 룰</b>(선택한 로그 유형 + 공통 룰)로 즉시 분석합니다.
+      원본 파일은 SHA-256 해시와 함께 보관되며, 같은 월·시스템에 같은 파일은 중복 업로드할 수 없습니다.</div>
+  </div>
+
+  <form class="card-m" id="uploadForm" novalidate>
+    <h2><i class="fas fa-file-arrow-up"></i>업로드 정보</h2>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label" for="targetYm">대상 연월<span class="req">*</span></label>
+        <input type="month" class="form-control" id="targetYm" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="systemName">시스템명<span class="req">*</span></label>
+        <input type="text" class="form-control" id="systemName" maxlength="100" placeholder="예: 그룹웨어" required list="systemList">
+        <datalist id="systemList"></datalist>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="logType">로그 유형<span class="req">*</span></label>
+        <select class="form-select" id="logType" required><option value="">선택</option></select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="fileCharset">파일 인코딩</label>
+        <select class="form-select" id="fileCharset">
+          <option value="UTF-8">UTF-8 (기본)</option><option value="EUC-KR">EUC-KR</option><option value="MS949">MS949 (Windows 한글)</option>
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label" for="remark">비고</label>
+        <input type="text" class="form-control" id="remark" maxlength="1000" placeholder="예: 10월 정기 점검분">
+      </div>
+      <div class="col-12">
+        <label class="form-label">로그 파일<span class="req">*</span></label>
+        <div class="dropzone" id="dropzone">
+          <i class="fas fa-cloud-arrow-up"></i>
+          <div class="dz-title">파일을 끌어다 놓거나 클릭해서 선택하세요</div>
+          <div class="dz-sub">허용 확장자: .log .txt .csv .json .out · 최대 50MB · 텍스트 파일만</div>
+        </div>
+        <input type="file" id="file" accept=".log,.txt,.csv,.json,.out" class="d-none">
+        <div id="fileInfo"></div>
+      </div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-4">
+      <a href="index.html" class="btn-m btn-gray-m">취소</a>
+      <button type="submit" class="btn-m btn-primary-m" id="btnSubmit"><i class="fas fa-magnifying-glass-chart"></i>업로드 및 분석</button>
+    </div>
+  </form>
+
+  <section class="card-m hidden" id="resultCard">
+    <h2><i class="fas fa-circle-check" style="color:#16a34a"></i>분석 완료</h2>
+    <div id="resultBody"></div>
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button class="btn-m btn-gray-m" id="btnAgain"><i class="fas fa-plus"></i>다른 파일 업로드</button>
+      <a class="btn-m btn-primary-m" id="btnGoDetail"><i class="fas fa-arrow-right"></i>상세 보기 / 검토</a>
+    </div>
+  </section>
+</main>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>업로드 및 분석 중입니다...</span></div>
+
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { upload, api, esc, fmtNum, fmtSize, sevBadge, toast, LOG_TYPES } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+
+  if (!SECLOG.canWrite()) {
+    document.querySelector('main').innerHTML =
+      '<div class="card-m text-center" style="padding:50px"><i class="fas fa-lock fa-2x mb-3" style="color:#cbd5e1"></i>' +
+      '<h5>로그 업로드 권한이 없습니다</h5><p class="text-muted-m">관리자 또는 일반 사용자(ROLE_MANAGER)만 업로드할 수 있습니다.</p>' +
+      '<a href="index.html" class="btn-m btn-outline-m">목록으로</a></div>';
+    return;
+  }
+
+  LOG_TYPES.forEach(([v, l]) => $('logType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`));
+  const ym = sessionStorage.getItem('seclog_ym') || SECLOG.currentYm();
+  $('targetYm').value = ym.slice(0, 4) + '-' + ym.slice(4);
+
+  // 최근 시스템명 자동완성 (이번 달 목록에서)
+  api('/uploads?size=200&targetYm=' + ym).then(d => {
+    const names = [...new Set((d.content || []).map(u => u.systemName))];
+    $('systemList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  }).catch(() => {});
+
+  const ALLOWED = ['log', 'txt', 'csv', 'json', 'out'];
+  const MAX = 50 * 1024 * 1024;
+  let selected = null;
+
+  function setFile(f) {
+    if (!f) return;
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (!ALLOWED.includes(ext)) { toast('허용되지 않는 확장자입니다: .' + ext, 'error'); return; }
+    if (f.size > MAX) { toast('파일은 최대 50MB 까지 업로드할 수 있습니다.', 'error'); return; }
+    if (f.size === 0) { toast('빈 파일입니다.', 'error'); return; }
+    selected = f;
+    $('fileInfo').innerHTML = `<div class="file-chip"><i class="fas fa-file-lines" style="color:var(--brand)"></i>
+      <b>${esc(f.name)}</b><span class="text-muted-m">${fmtSize(f.size)}</span>
+      <button type="button" class="btn-m btn-danger-m btn-sm-m" id="btnClearFile"><i class="fas fa-xmark"></i></button></div>`;
+    $('btnClearFile').onclick = () => { selected = null; $('file').value = ''; $('fileInfo').innerHTML = ''; };
+  }
+
+  const dz = $('dropzone');
+  dz.onclick = () => $('file').click();
+  $('file').onchange = (e) => setFile(e.target.files[0]);
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', (e) => setFile(e.dataTransfer.files[0]));
+
+  $('uploadForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const targetYm = $('targetYm').value.replace('-', '');
+    if (!targetYm) return toast('대상 연월을 선택하세요.', 'error');
+    if (!$('systemName').value.trim()) return toast('시스템명을 입력하세요.', 'error');
+    if (!$('logType').value) return toast('로그 유형을 선택하세요.', 'error');
+    if (!selected) return toast('로그 파일을 선택하세요.', 'error');
+
+    const fd = new FormData();
+    fd.append('file', selected);
+    fd.append('targetYm', targetYm);
+    fd.append('systemName', $('systemName').value.trim());
+    fd.append('logType', $('logType').value);
+    fd.append('fileCharset', $('fileCharset').value);
+    if ($('remark').value.trim()) fd.append('remark', $('remark').value.trim());
+
+    $('btnSubmit').disabled = true;
+    $('loading').classList.add('show');
+    try {
+      const r = await upload('/uploads', fd);
+      sessionStorage.setItem('seclog_ym', targetYm);
+      $('uploadForm').classList.add('hidden');
+      $('resultCard').classList.remove('hidden');
+      $('btnGoDetail').href = 'detail.html?id=' + r.uploadId;
+      $('resultBody').innerHTML = `
+        <div class="info-grid mb-3">
+          <div class="i-item"><span class="i-label">시스템 / 파일</span><span class="i-value">${esc(r.systemName)} · ${esc(r.originalFileName)}</span></div>
+          <div class="i-item"><span class="i-label">분석 라인 수</span><span class="i-value">${fmtNum(r.totalLineCount)}</span></div>
+          <div class="i-item"><span class="i-label">탐지 건수</span><span class="i-value">${fmtNum(r.detectionCount)}건</span></div>
+          <div class="i-item"><span class="i-label">최고 위험도</span><span class="i-value">${sevBadge(r.maxSeverity)}</span></div>
+        </div>
+        <div class="kpi-grid mb-0">
+          <div class="kpi k-critical"><div class="k-label">심각</div><div class="k-value">${r.criticalCount}</div></div>
+          <div class="kpi k-high"><div class="k-label">높음</div><div class="k-value">${r.highCount}</div></div>
+          <div class="kpi k-medium"><div class="k-label">보통</div><div class="k-value">${r.mediumCount}</div></div>
+          <div class="kpi k-low"><div class="k-label">낮음</div><div class="k-value">${r.lowCount}</div></div>
+        </div>`;
+      toast('업로드 및 분석이 완료되었습니다.');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      $('btnSubmit').disabled = false;
+      $('loading').classList.remove('show');
+    }
+  };
+
+  $('btnAgain').onclick = () => {
+    selected = null; $('file').value = ''; $('fileInfo').innerHTML = '';
+    $('resultCard').classList.add('hidden'); $('uploadForm').classList.remove('hidden');
+  };
+})();
+</script>
+</body>
+</html>

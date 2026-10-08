@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보안로그 상세</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-file-shield"></i></span><span id="pageTitle">로그 상세</span></h1>
+    <div class="header-actions" id="headerActions">
+      <a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>
+    </div>
+  </header>
+
+  <div id="reviewAlert"></div>
+
+  <!-- 기본 정보 -->
+  <section class="card-m">
+    <h2><i class="fas fa-circle-info"></i>업로드 정보</h2>
+    <div class="info-grid" id="infoGrid"></div>
+  </section>
+
+  <!-- 분석 요약 -->
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="row g-3 mb-3">
+    <div class="col-lg-7">
+      <div class="card-m h-100 mb-0">
+        <h2><i class="fas fa-list-check"></i>룰별 탐지 건수</h2>
+        <div id="ruleHits"></div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card-m h-100 mb-0">
+        <h2><i class="fas fa-clipboard-check"></i>검토 현황</h2>
+        <div id="reviewCounts"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 탐지 목록 -->
+  <section class="card-m">
+    <h2><i class="fas fa-triangle-exclamation"></i>탐지 결과 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="detTotal"></span></h2>
+    <div class="filter-bar mb-3">
+      <div class="f-item">
+        <label for="fSev">위험도</label>
+        <select class="form-select" id="fSev" style="width:120px">
+          <option value="">전체</option><option value="CRITICAL">심각</option><option value="HIGH">높음</option><option value="MEDIUM">보통</option><option value="LOW">낮음</option>
+        </select>
+      </div>
+      <div class="f-item">
+        <label for="fRv">검토 상태</label>
+        <select class="form-select" id="fRv" style="width:150px">
+          <option value="">전체</option><option value="PENDING">미검토</option><option value="CONFIRMED">이상징후 확인</option>
+          <option value="RESOLVED">조치완료</option><option value="FALSE_POSITIVE">오탐</option>
+        </select>
+      </div>
+    </div>
+    <div class="review-panel reviewable" id="reviewPanel">
+      <span style="font-weight:700;font-size:.85rem">선택 <span id="selCount">0</span>건</span>
+      <select class="form-select" id="rvStatus" style="width:170px">
+        <option value="CONFIRMED">이상징후 확인</option><option value="RESOLVED">조치완료</option>
+        <option value="FALSE_POSITIVE">오탐</option><option value="PENDING">미검토로 되돌리기</option>
+      </select>
+      <input type="text" class="form-control" id="rvAction" maxlength="2000" placeholder="검토 의견 / 조치 내용" style="flex:1;min-width:220px">
+      <button class="btn-m btn-primary-m" id="btnReview"><i class="fas fa-check"></i>선택 건 검토 저장</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="center reviewable" style="width:40px"><input type="checkbox" class="form-check-input" id="chkAll"></th>
+            <th class="num">라인</th><th>위험도</th><th>룰</th><th>로그 원문</th><th>검토 상태</th><th>조치 내용</th><th>검토 일시</th>
+          </tr>
+        </thead>
+        <tbody id="detBody"><tr class="empty-row"><td colspan="8">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager"></div>
+  </section>
+</main>
+
+<!-- 최종 검토완료 모달 -->
+<div class="modal fade" id="completeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="fas fa-stamp me-2" style="color:var(--brand)"></i>최종 검토완료</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="text-muted-m" style="font-size:.85rem">검토완료 후에는 업로드 정보 수정, 재분석, 탐지 건 검토가 잠깁니다. (검토취소로 해제 가능)</p>
+        <label class="form-label" for="reviewComment">검토 의견<span class="req">*</span></label>
+        <textarea class="form-control" id="reviewComment" rows="4" maxlength="2000" placeholder="예: 10월 정기 점검 완료. 특권계정 접속은 사전 승인 건으로 확인."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button class="btn-m btn-success-m" id="btnCompleteOk"><i class="fas fa-stamp"></i>검토완료</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>처리 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtDt, fmtNum, fmtSize, fmtYm, sevBadge, reviewBadge, statusBadge, toast, REVIEW } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const id = SECLOG.qs('id');
+  if (!id) { location.href = 'index.html'; return; }
+
+  const PAGE_SIZE = 50;
+  const st = { page: 0, detail: null, selected: new Set() };
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  const isAdmin = SECLOG.isAdmin(), canWrite = SECLOG.canWrite();
+  const completeModal = new bootstrap.Modal($('completeModal'));
+
+  async function loadDetail() {
+    const d = await api('/uploads/' + id);
+    st.detail = d;
+    const u = d.upload;
+    const reviewed = u.status === 'REVIEWED';
+    $('pageTitle').textContent = `${u.systemName} · ${fmtYm(u.targetYm)}`;
+    document.title = u.systemName + ' - 보안로그 상세';
+
+    // 상단 버튼 (권한 + 상태별)
+    let btns = '';
+    btns += `<button class="btn-m btn-outline-m" id="btnDownload"><i class="fas fa-download"></i>원본 다운로드</button>`;
+    if (canWrite && !reviewed) {
+      btns += `<a href="edit.html?id=${u.uploadId}" class="btn-m btn-outline-m"><i class="fas fa-pen"></i>수정</a>`;
+      btns += `<button class="btn-m btn-outline-m" id="btnReanalyze"><i class="fas fa-rotate"></i>재분석</button>`;
+    }
+    if (isAdmin && !reviewed) btns += `<button class="btn-m btn-success-m" id="btnComplete"><i class="fas fa-stamp"></i>최종 검토완료</button>`;
+    if (isAdmin && reviewed) btns += `<button class="btn-m btn-gray-m" id="btnCancelReview"><i class="fas fa-rotate-left"></i>검토취소</button>`;
+    if (isAdmin) btns += `<button class="btn-m btn-danger-m" id="btnDelete"><i class="fas fa-trash"></i>삭제</button>`;
+    btns += `<a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>`;
+    $('headerActions').innerHTML = btns;
+    bindHeader();
+
+    $('reviewAlert').innerHTML = reviewed
+      ? `<div class="alert-m alert-ok"><i class="fas fa-circle-check mt-1"></i><div><b>정보보안팀 검토완료</b> · ${fmtDt(d.reviewedAt)} (검토자 ID ${esc(d.reviewedBy)})<br>${esc(d.reviewComment)}</div></div>`
+      : (d.reviewStatusCounts.PENDING > 0
+        ? `<div class="alert-m alert-warn"><i class="fas fa-hourglass-half mt-1"></i><div>미검토 탐지가 <b>${d.reviewStatusCounts.PENDING}건</b> 남아 있습니다. 모든 건을 검토해야 최종 검토완료할 수 있습니다.</div></div>`
+        : '');
+
+    $('infoGrid').innerHTML = [
+      ['대상 연월', fmtYm(u.targetYm)], ['시스템명', esc(u.systemName)], ['로그 유형', `<span class="badge-type">${esc(u.logTypeLabel)}</span>`],
+      ['상태', statusBadge(u.status)], ['원본 파일명', `<span class="mono">${esc(u.originalFileName)}</span>`],
+      ['파일 크기 / 인코딩', `${fmtSize(u.fileSize)} · ${esc(u.fileCharset)}`],
+      ['SHA-256', `<span class="mono" style="font-size:.72rem">${esc(u.fileHash)}</span>`],
+      ['분석 일시', fmtDt(u.analyzedAt)], ['업로드', `${fmtDt(u.createdAt)} (사용자 ID ${esc(u.createdBy)})`],
+      ['최종 수정', d.updatedAt ? fmtDt(d.updatedAt) + (d.updatedBy ? ` (사용자 ID ${esc(d.updatedBy)})` : '') : '-'],
+      ['비고', esc(u.remark) || '-'],
+    ].map(([l, v]) => `<div class="i-item"><span class="i-label">${l}</span><span class="i-value">${v}</span></div>`).join('');
+
+    $('kpiGrid').innerHTML = `
+      <div class="kpi"><div class="k-label">분석 라인</div><div class="k-value">${fmtNum(u.totalLineCount)}</div></div>
+      <div class="kpi"><div class="k-label">탐지 합계</div><div class="k-value">${fmtNum(u.detectionCount)}</div><div class="k-sub">최고 ${u.maxSeverityLabel}</div></div>
+      <div class="kpi k-critical"><div class="k-label">심각</div><div class="k-value">${u.criticalCount}</div></div>
+      <div class="kpi k-high"><div class="k-label">높음</div><div class="k-value">${u.highCount}</div></div>
+      <div class="kpi k-medium"><div class="k-label">보통</div><div class="k-value">${u.mediumCount}</div></div>
+      <div class="kpi k-low"><div class="k-label">낮음</div><div class="k-value">${u.lowCount}</div></div>`;
+
+    $('ruleHits').innerHTML = d.ruleHits.length === 0
+      ? '<p class="text-muted-m mb-0" style="font-size:.85rem">탐지된 룰이 없습니다.</p>'
+      : '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>룰 코드</th><th>룰명</th><th>위험도</th><th class="num">건수</th></tr></thead><tbody>' +
+        d.ruleHits.map(r => `<tr><td class="mono">${esc(r.ruleCode)}</td><td>${esc(r.ruleName)}</td><td>${sevBadge(r.severity)}</td><td class="num"><b>${fmtNum(r.hitCount)}</b></td></tr>`).join('') +
+        '</tbody></table></div>';
+
+    const total = Object.values(d.reviewStatusCounts).reduce((a, b) => a + b, 0);
+    $('reviewCounts').innerHTML = Object.entries(d.reviewStatusCounts).map(([k, v]) => {
+      const pct = total ? Math.round(v / total * 100) : 0;
+      return `<div class="d-flex align-items-center gap-2 mb-2"><div style="width:110px">${reviewBadge(k)}</div>
+        <div class="flex-grow-1" style="background:#f1f5f9;border-radius:99px;height:8px"><div style="width:${pct}%;height:8px;border-radius:99px;background:var(--brand)"></div></div>
+        <div style="width:60px;text-align:right;font-weight:700">${v}건</div></div>`;
+    }).join('') + `<div class="text-muted-m mt-2" style="font-size:.78rem">합계 ${total}건</div>`;
+
+    const lockReview = reviewed || !canWrite;
+    document.querySelectorAll('.reviewable').forEach(el => el.classList.toggle('hidden', lockReview));
+  }
+
+  async function loadDetections() {
+    const p = new URLSearchParams({ page: st.page, size: PAGE_SIZE });
+    if ($('fSev').value) p.set('severity', $('fSev').value);
+    if ($('fRv').value) p.set('reviewStatus', $('fRv').value);
+    const data = await api(`/uploads/${id}/detections?` + p.toString());
+    st.selected.clear(); updateSel(); $('chkAll').checked = false;
+    $('detTotal').textContent = `(${fmtNum(data.totalElements)}건)`;
+    const lock = st.detail.upload.status === 'REVIEWED' || !canWrite;
+    const rows = data.content || [];
+    $('detBody').innerHTML = rows.length === 0
+      ? '<tr class="empty-row"><td colspan="8">조건에 맞는 탐지 결과가 없습니다.</td></tr>'
+      : rows.map(x => `<tr>
+          <td class="center ${lock ? 'hidden' : ''}"><input type="checkbox" class="form-check-input det-chk" value="${x.detectionId}"></td>
+          <td class="num">${x.lineNumber}</td>
+          <td>${sevBadge(x.severity)}</td>
+          <td><div class="mono" style="font-weight:700">${esc(x.ruleCode)}</div><div style="font-size:.78rem">${esc(x.ruleName)}</div></td>
+          <td><div class="log-line">${esc(x.logContent)}</div></td>
+          <td>${reviewBadge(x.reviewStatus)}</td>
+          <td style="font-size:.8rem;max-width:220px">${esc(x.actionContent) || '<span class="text-muted-m">-</span>'}</td>
+          <td style="font-size:.78rem">${x.reviewedAt ? fmtDt(x.reviewedAt) + '<br><span class="text-muted-m">ID ' + esc(x.reviewedBy) + '</span>' : '-'}</td>
+        </tr>`).join('');
+    renderPager(data.totalPages || 0);
+  }
+
+  function renderPager(totalPages) {
+    if (totalPages <= 1) { $('pager').innerHTML = ''; return; }
+    const cur = st.page, start = Math.max(0, cur - 4), end = Math.min(totalPages, start + 9);
+    let h = `<button ${cur === 0 ? 'disabled' : ''} data-p="${cur - 1}"><i class="fas fa-chevron-left"></i></button>`;
+    for (let i = start; i < end; i++) h += `<button class="${i === cur ? 'active' : ''}" data-p="${i}">${i + 1}</button>`;
+    h += `<button ${cur >= totalPages - 1 ? 'disabled' : ''} data-p="${cur + 1}"><i class="fas fa-chevron-right"></i></button>`;
+    $('pager').innerHTML = h;
+  }
+
+  const updateSel = () => { $('selCount').textContent = st.selected.size; $('btnReview').disabled = st.selected.size === 0; };
+
+  async function run(fn, okMsg) {
+    loading(true);
+    try { await fn(); if (okMsg) toast(okMsg); await reload(); }
+    catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+  async function reload() { await loadDetail(); await loadDetections(); }
+
+  function bindHeader() {
+    $('btnDownload').onclick = async () => {
+      try {
+        const f = await api(`/uploads/${id}/file`);
+        const bin = atob(f.contentBase64), arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }));
+        a.download = f.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      } catch (e) { toast(e.message, 'error'); }
+    };
+    if ($('btnReanalyze')) $('btnReanalyze').onclick = () => {
+      if (!confirm('현재 활성 룰셋으로 다시 분석합니다.\n기존 탐지 결과와 검토 내용은 초기화됩니다. 계속할까요?')) return;
+      run(() => api(`/uploads/${id}/reanalyze`, { method: 'POST' }), '재분석이 완료되었습니다.');
+    };
+    if ($('btnComplete')) $('btnComplete').onclick = () => { $('reviewComment').value = ''; completeModal.show(); };
+    if ($('btnCancelReview')) $('btnCancelReview').onclick = () => {
+      if (!confirm('최종 검토완료를 취소하시겠습니까?')) return;
+      run(() => api(`/uploads/${id}/review-cancel`, { method: 'POST' }), '검토완료가 취소되었습니다.');
+    };
+    if ($('btnDelete')) $('btnDelete').onclick = async () => {
+      if (!confirm('이 업로드와 탐지 결과를 삭제하시겠습니까?\n(소프트 삭제: 데이터는 DB에 보존됩니다)')) return;
+      loading(true);
+      try { await api(`/uploads/${id}`, { method: 'DELETE' }); toast('삭제되었습니다.'); setTimeout(() => location.href = 'index.html', 600); }
+      catch (e) { toast(e.message, 'error'); loading(false); }
+    };
+  }
+
+  $('btnCompleteOk').onclick = () => {
+    const c = $('reviewComment').value.trim();
+    if (!c) return toast('검토 의견을 입력하세요.', 'error');
+    completeModal.hide();
+    run(() => api(`/uploads/${id}/review`, { method: 'POST', body: { reviewComment: c } }), '최종 검토완료 처리되었습니다.');
+  };
+
+  $('detBody').onchange = (e) => {
+    if (!e.target.classList.contains('det-chk')) return;
+    const v = +e.target.value;
+    e.target.checked ? st.selected.add(v) : st.selected.delete(v);
+    updateSel();
+  };
+  $('chkAll').onchange = (e) => {
+    document.querySelectorAll('.det-chk').forEach(c => { c.checked = e.target.checked; e.target.checked ? st.selected.add(+c.value) : st.selected.delete(+c.value); });
+    updateSel();
+  };
+  $('btnReview').onclick = () => {
+    if (st.selected.size === 0) return;
+    run(() => api(`/uploads/${id}/detections/review`, {
+      method: 'PUT',
+      body: { detectionIds: [...st.selected], reviewStatus: $('rvStatus').value, actionContent: $('rvAction').value.trim() || null },
+    }).then(() => { $('rvAction').value = ''; }), `${st.selected.size}건 검토 내용이 저장되었습니다.`);
+  };
+  $('fSev').onchange = $('fRv').onchange = () => { st.page = 0; loadDetections().catch(e => toast(e.message, 'error')); };
+  $('pager').onclick = (e) => { const b = e.target.closest('button[data-p]'); if (b && !b.disabled) { st.page = +b.dataset.p; loadDetections().catch(er => toast(er.message, 'error')); } };
+
+  (async () => {
+    loading(true);
+    try { await reload(); }
+    catch (e) {
+      toast(e.message, 'error');
+      document.querySelector('main').innerHTML = `<div class="card-m text-center" style="padding:50px"><h5>${esc(e.message)}</h5><a href="index.html" class="btn-m btn-outline-m mt-2">목록으로</a></div>`;
+    } finally { loading(false); }
+  })();
+})();
+</script>
+</body>
+</html>
