@@ -145,7 +145,7 @@
           <div class="col-6 col-md-2 col-xl-1"><label class="form-label small mb-0">상태</label>
             <select id="f-status" class="form-select form-select-sm">
               <option value="">전체</option><option value="IN_USE">사용중</option>
-              <option value="AVAILABLE">가용</option><option value="RECLAIMED">회수</option>
+              <option value="AVAILABLE">가용</option><option value="RECLAIMED">회수</option><option value="RETURNED">반납</option>
             </select></div>
           <div class="col-6 col-md-2 col-xl-2"><label class="form-label small mb-0">IP그룹 분류</label>
             <select id="f-group" class="form-select form-select-sm" onchange="page=0;load()">
@@ -701,8 +701,8 @@
     }
 
     function statusBadge(s) {
-      const m = { IN_USE: 'bg-success', AVAILABLE: 'bg-secondary', RECLAIMED: 'bg-dark' };
-      const lbl = { IN_USE: '사용중', AVAILABLE: '가용', RECLAIMED: '회수' };
+      const m = { IN_USE: 'bg-success', AVAILABLE: 'bg-secondary', RECLAIMED: 'bg-dark', RETURNED: 'bg-danger' };
+      const lbl = { IN_USE: '사용중', AVAILABLE: '가용', RECLAIMED: '회수', RETURNED: '반납' };
       return `<span class="badge ${m[s] || 'bg-secondary'}">${lbl[s] || s}</span>`;
     }
     // 렌탈사명 (없으면 자산)
@@ -710,6 +710,8 @@
       return v ? `<span class="badge bg-warning text-dark">${E(v)}</span>`
                : '<span class="badge bg-secondary">자산</span>';
     }
+    // PC/장비 정보가 있는 행인지 — 없으면(반납·빈 IP) 렌탈사 칸을 '자산'으로 표시하지 않고 비워 둔다
+    const hasPc = r => !!(r && r.status !== 'RETURNED' && (r.rentalCompany || r.model || r.serialNo || r.device || r.userName));
     // 렌탈사 선택지 (값 '' = 자산). 목록 밖의 기존 값(ADT캡스 등)은 사용자가 바꾸기 전까지 그대로 둔다
     const RENTAL_OPTIONS = [
       { value: '', label: '자산' },
@@ -748,7 +750,7 @@
       { key: 'department',     label: '부서',          editable: true },
       { key: 'device',         label: '장치구분',      editable: true },
       { key: 'userName',       label: '사용자',        editable: true },
-      { key: 'rentalCompany',  label: '렌탈사',        editable: true, html: (r, v) => rentalBadge(v), options: RENTAL_OPTIONS },
+      { key: 'rentalCompany',  label: '렌탈사',        editable: true, html: (r, v) => (v || hasPc(r)) ? rentalBadge(v) : '', options: RENTAL_OPTIONS },
       { key: 'pcAssetNo',      label: 'PC자산번호',    editable: true },
       { key: 'monitorAssetNo', label: '모니터자산번호', editable: true },
       { key: 'model',          label: '모델',          editable: true },
@@ -1546,7 +1548,7 @@
       document.getElementById('reclaimTitle').textContent = 'PC + IP 반납 - ' + ip;
       document.getElementById('rc-info').textContent = ip + ' 및 연결된 PC/장비를 반납합니다.';
       document.getElementById('rc-note').style.display = '';
-      document.getElementById('rc-note').textContent = '⚠ 사용자·장치·PC 스펙·자산번호가 모두 비워집니다.';
+      document.getElementById('rc-note').textContent = '⚠ 상태가 \'반납\'으로 바뀌고, IP 외의 정보(상주/임시·부서·사용자·장치·PC 스펙·렌탈사·자산번호·비고 등)가 모두 비워집니다. 반납 사유는 변경 내역에 남습니다.';
       document.getElementById('rc-submit').textContent = '반납';
       openReclaimModal(ipId);
     }
@@ -1585,7 +1587,7 @@
             <tr><th>부서</th><td>${E(d.department)}</td><th>위치</th><td>${E(d.location)}</td></tr>
             <tr><th>장치구분</th><td>${E(d.device)}</td><th>구입일</th><td>${E(d.purchaseDate)}</td></tr>
             <tr><th>모델</th><td>${E(d.model)}</td><th>제조번호</th><td>${E(d.serialNo)}</td></tr>
-            <tr><th>구입업체</th><td>${E(d.vendor)}</td><th>렌탈사/구입처</th><td>${rentalBadge(d.rentalCompany)}</td></tr>
+            <tr><th>구입업체</th><td>${E(d.vendor)}</td><th>렌탈사/구입처</th><td>${hasPc(d) ? rentalBadge(d.rentalCompany) : ''}</td></tr>
             <tr><th>PC 자산번호</th><td>${E(d.pcAssetNo)}</td><th>모니터 자산번호</th><td>${E(d.monitorAssetNo)}</td></tr>
             <tr><th>OS 버전</th><td>${E(d.osVersion)}</td><th>OS 시리얼</th><td>${E(d.osSerial)}</td></tr>
             <tr><th>OFFICE 버전</th><td>${E(d.officeVersion)}</td><th>OFFICE 시리얼</th><td>${E(d.officeSerial)}</td></tr>

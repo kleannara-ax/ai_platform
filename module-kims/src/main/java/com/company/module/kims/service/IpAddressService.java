@@ -161,14 +161,14 @@ public class IpAddressService {
     }
 
     // ================================================================
-    // 반납 처리 (PC+IP 반납, 이력: 반납) — PC 정보까지 비운다
+    // 반납 처리 (PC+IP 반납, 이력: 반납) — 상태 '반납', IP 외 정보는 모두 비운다 (사유는 이력에만)
     // ================================================================
     @Transactional
     public IpAddressResponse returnPc(Long ipId, IpReclaimRequest req, Authentication authentication) {
         IpAddress ip = findIp(ipId);
         assertSiteAccess(authentication, ip.getSite());
         String beforeUser = ip.getUserName();
-        ip.returnPc(req.getReason());
+        ip.returnPc();
 
         String content = (req.getReason() != null && !req.getReason().isBlank())
                 ? req.getReason() : "PC+IP 반납";

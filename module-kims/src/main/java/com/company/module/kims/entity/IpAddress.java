@@ -168,7 +168,7 @@ public class IpAddress extends BaseTimeEntity {
         this.approvalNo = approvalNo;
         this.remark = remark;
         this.noteDate = noteDate;
-        if (this.status == IpStatus.RECLAIMED) {
+        if (this.status == IpStatus.RECLAIMED || this.status == IpStatus.RETURNED) {
             this.status = IpStatus.IN_USE;
             this.reclaimedAt = null;
         } else {
@@ -202,19 +202,25 @@ public class IpAddress extends BaseTimeEntity {
     }
 
     /**
-     * PC+IP 반납 처리. PC/장비가 함께 반납되므로 사용자·장치·PC 스펙·자산정보를 모두 비운다.
-     * <p>회수(IP만)와 달리 PC 관련 정보를 남기지 않는다. 상태는 회수(RECLAIMED)로 둔다.
+     * PC+IP 반납 처리 (창고 또는 렌탈사로 반납). 상태를 반납(RETURNED)으로 바꾸고 IP 외의 정보는 모두 비운다.
+     * <p>상주/임시·사용자·부서·위치·장치·품의·비고·구입일·PC 스펙·렌탈사·자산번호를 비운다.
+     * 반납 사유는 변경 이력(ip_history)에만 남긴다.
      */
-    public void returnPc(String remark) {
+    public void returnPc() {
+        this.usageType = null;
         this.userName = null;
+        this.userId = null;
+        this.department = null;
+        this.location = null;
         this.device = null;
+        this.approved = false;
+        this.approvalNo = null;
+        this.remark = null;
+        this.noteDate = null;
+        this.purchaseDate = null;
         clearSpec();
-        this.status = IpStatus.RECLAIMED;
+        this.status = IpStatus.RETURNED;
         this.reclaimedAt = LocalDate.now();
-        if (remark != null && !remark.isBlank()) {
-            this.remark = remark;
-            this.noteDate = LocalDate.now();
-        }
     }
 
     /** IP 이동 시 원래 슬롯 비우기 (사용자·장치·스펙·자산 제거 → 가용) */
