@@ -94,6 +94,10 @@ public class IpAddressService {
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
                 req.getHangulVersion(), req.getHangulSerial(), req.getRentalCompany(), req.getPcAssetNo(), req.getMonitorAssetNo());
+        // IP 그룹(대역)을 IP 주소에서 채운다 — 비어 있으면 목록 정렬(그룹 → IP 순)에서 맨 앞에 오고 그룹 필터에서도 빠진다
+        if (req.getIpAddress() != null && !req.getIpAddress().isBlank()) {
+            ip.assignGroup(groupOf(req.getIpAddress().trim()));
+        }
         IpAddress saved = ipAddressRepository.save(ip);
 
         ipHistoryRepository.save(IpHistory.of(saved, findRequestOrNull(req.getRequestId()),
@@ -663,7 +667,8 @@ public class IpAddressService {
                 String rowSite = isSeoulBandIp(ip) ? "서울" : s;
                 IpAddress e = IpAddress.builder()
                         .ipAddress(ip)
-                        .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)))
+                        .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)) != null
+                                ? trimToNull(cellStr(row.getCell(0), fmt)) : groupOf(ip))   // 그룹 칸이 비면 IP에서 채움
                         .status(statusFromLabel(cellStr(row.getCell(2), fmt), userName))
                         .usageType(trimToNull(cellStr(row.getCell(3), fmt)))
                         .department(trimToNull(cellStr(row.getCell(4), fmt)))
