@@ -6,16 +6,21 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.PageResponse;
 import com.company.module.kims.dto.request.InboundRequest;
 import com.company.module.kims.dto.request.InventoryItemCreateRequest;
+import com.company.module.kims.dto.request.LedgerUpdateRequest;
 import com.company.module.kims.dto.response.InventoryItemResponse;
 import com.company.module.kims.dto.response.InventoryLedgerResponse;
 import com.company.module.kims.dto.response.InventoryTransactionResponse;
 import com.company.module.kims.entity.InventoryItem;
 import com.company.module.kims.entity.InventoryTransaction;
+import com.company.module.kims.entity.RequestLog;
 import com.company.module.kims.entity.ServiceRequest;
+import com.company.module.kims.entity.SupplyIssue;
 import com.company.module.kims.entity.enums.TransactionType;
 import com.company.module.kims.repository.InventoryItemRepository;
 import com.company.module.kims.repository.InventoryTransactionRepository;
+import com.company.module.kims.repository.RequestLogRepository;
 import com.company.module.kims.repository.ServiceRequestRepository;
+import com.company.module.kims.repository.SupplyIssueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -45,6 +50,8 @@ public class InventoryItemService {
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final SupplyIssueRepository supplyIssueRepository;
+    private final RequestLogRepository requestLogRepository;
 
     /** 출고 이력 비고("업무요청 KIMS-20261006-0001 지급")에서 요청번호를 뽑는 패턴 */
     private static final Pattern REQUEST_NO_IN_NOTE = Pattern.compile("업무요청\\s+(\\S+)\\s+지급");
@@ -96,7 +103,7 @@ public class InventoryItemService {
     public List<InventoryTransactionResponse> getTransactions(Long itemId) {
         findItem(itemId); // 존재 확인
         return inventoryTransactionRepository
-                .findByInventoryItem_ItemIdOrderByCreatedAtDesc(itemId)
+                .findByInventoryItem_ItemIdOrderByTransactionDateDescTransactionIdDesc(itemId)
                 .stream()
                 .map(InventoryTransactionResponse::from)
                 .toList();
@@ -109,13 +116,12 @@ public class InventoryItemService {
                                                              TransactionType type, String createdBy,
                                                              int page, int size) {
         Page<InventoryTransaction> result = inventoryTransactionRepository.search(
-                from != null ? from.atStartOfDay() : null,
-                to != null ? to.plusDays(1).atStartOfDay().minusNanos(1) : null,
-                itemId, type,
+                from, to, itemId, type,
                 (createdBy == null || createdBy.isBlank()) ? null : createdBy.trim(),
                 PageRequest.of(page, size));
 
-        // 출고 이력의 비고에 남은 요청번호로 업무요청을 한 번에 조회해 요청자·부서를 붙인다.
+        // 지급 내역과 연결된 출고는 그 지급 내역에서 요청자·지급대상자·부서를 가져온다.
+        // 연결되지 않은 예전 출고 이력만 비고에 남은 요청번호/요청자명으로 보완한다.
         Set<String> requestNos = new HashSet<>();
         result.forEach(t -> {
             String no = requestNoOf(t);
@@ -131,14 +137,90 @@ public class InventoryItemService {
         }));
     }
 
+    // ================================================================
+    // 입출고 이력 수정 — 날짜·비고와 (출고) 요청자·지급대상자·부서·지급 담당자. 재고는 바뀌지 않는다.
+    // ================================================================
+    @Transactional
+    public void updateLedger(Long transactionId, LedgerUpdateRequest request) {
+        InventoryTransaction t = inventoryTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new EntityNotFoundException("입출고 이력을 찾을 수 없습니다. id=" + transactionId));
+        SupplyIssue issue = t.getSupplyIssue();
+        if (issue != null) {
+            if (request.getReceiverName() != null && request.getReceiverName().isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지급 대상자는 비울 수 없습니다.");
+            }
+            if (issue.getServiceRequest() == null && request.getRequesterName() != null && request.getRequesterName().isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "요청자명은 비울 수 없습니다.");
+            }
+            issue.update(request.getRequesterName(), request.getReceiverName(), request.getDepartment(),
+                    request.getIssuedBy(), request.getTransactionDate());
+        }
+        t.changeTransactionDate(request.getTransactionDate());
+        String note = request.getNote();
+        if (note != null && note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
+        t.changeNote(note);
+    }
+
+    // ================================================================
+    // 입출고 이력 취소 — 이력을 삭제하고 그 이력의 재고 증감(세부 구분 수량 포함)을 되돌린다
+    // ================================================================
+    @Transactional
+    public void cancelLedger(Long transactionId, String changedBy) {
+        InventoryTransaction t = inventoryTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new EntityNotFoundException("입출고 이력을 찾을 수 없습니다. id=" + transactionId));
+        InventoryItem item = t.getInventoryItem();
+        int qty = t.getQuantity();
+        String by = (changedBy != null && !changedBy.isBlank()) ? changedBy : "system";
+
+        if (t.getTransactionType() == TransactionType.INBOUND) {
+            // 입고 취소 = 입고 수량만큼 재고 차감. 이미 출고되어 남은 재고가 부족하면 취소할 수 없다.
+            if (item.getCurrentStock() < qty) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                        "입고를 취소할 재고가 부족합니다(이미 출고됨). 품목=" + item.getItemName()
+                                + ", 현재재고=" + item.getCurrentStock() + ", 취소수량=" + qty);
+            }
+            String sub = t.getSubType();
+            if (sub != null && item.tracksSegments()) {
+                Integer segment = item.getSegmentCount(sub);
+                if (segment == null || segment < qty) {
+                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                            "입고를 취소할 재고가 부족합니다(이미 출고됨). 품목=" + item.getItemName()
+                                    + ", " + sub + " 재고=" + (segment != null ? segment : 0) + ", 취소수량=" + qty);
+                }
+            }
+            item.decreaseStock(qty);
+            if (sub != null) item.adjustRemarkSegment(sub, -qty);
+            inventoryTransactionRepository.delete(t);
+            return;
+        }
+
+        // 출고 취소 = 지급 수량만큼 재고 복원 + 연결된 지급 내역 삭제
+        SupplyIssue issue = t.getSupplyIssue();
+        if (issue == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "지급 내역과 연결되지 않은 예전 출고 이력이라 취소할 수 없습니다. id=" + transactionId);
+        }
+        item.increaseStock(qty);
+        String sub = (issue.getSubType() != null) ? issue.getSubType() : t.getSubType();
+        if (sub != null) item.adjustRemarkSegment(sub, qty);
+        ServiceRequest request = issue.getServiceRequest();
+        String receiver = issue.getReceiverName();
+        inventoryTransactionRepository.delete(t);
+        supplyIssueRepository.delete(issue);
+        if (request != null) {
+            requestLogRepository.save(RequestLog.forNote(request, by,
+                    String.format("소모품 지급 취소: %s %d%s (대상자: %s)", item.getItemName(), qty, item.getUnit(), receiver)));
+        }
+    }
+
     private String directRequesterOf(InventoryTransaction t) {
-        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getSupplyIssue() != null || t.getNote() == null) return null;
         Matcher m = DIRECT_REQUESTER_IN_NOTE.matcher(t.getNote());
         return m.find() ? m.group(1) : null;
     }
 
     private String requestNoOf(InventoryTransaction t) {
-        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getNote() == null) return null;
+        if (t.getTransactionType() != TransactionType.OUTBOUND || t.getSupplyIssue() != null || t.getNote() == null) return null;
         Matcher m = REQUEST_NO_IN_NOTE.matcher(t.getNote());
         return m.find() ? m.group(1) : null;
     }
@@ -168,15 +250,12 @@ public class InventoryItemService {
             item.adjustRemarkSegment(subType, request.getQuantity());
         }
 
-        // 입고 이력 기록 (세부 구분은 입고 내역에서 보이도록 비고 앞에 표시)
-        String note = request.getNote();
-        if (subType != null) {
-            note = "[" + subType + "]" + (note != null && !note.isBlank() ? " " + note : "");
-            if (note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
-        }
+        // 입고 이력 기록 — 입고일(모달 입력, 미입력 시 오늘)과 세부 구분을 함께 남긴다
+        String note = (request.getNote() != null && !request.getNote().isBlank()) ? request.getNote().trim() : null;
+        if (note != null && note.length() > 255) note = note.substring(0, 255);   // NOTE 컬럼 길이
         inventoryTransactionRepository.save(
                 InventoryTransaction.ofInbound(item, request.getQuantity(), before, after,
-                        request.getCreatedBy(), note));
+                        request.getCreatedBy(), note, request.getInboundAt(), subType));
 
         return InventoryItemResponse.from(item);
     }

@@ -17,6 +17,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * 소모품 재고 변동 이력.
  * <p>입고(INBOUND)와 출고(OUTBOUND, 지급)가 발생할 때마다 한 줄씩 기록되며,
@@ -37,6 +39,11 @@ public class InventoryTransaction extends BaseTimeEntity {
     @JoinColumn(name = "ITEM_ID", nullable = false)
     private InventoryItem inventoryItem;
 
+    /** 연결된 지급 내역 (출고만). 요청자·지급대상자·부서 표시와 출고 취소·수정에 사용 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ISSUE_ID")
+    private SupplyIssue supplyIssue;
+
     /** 변동 유형 (입고/출고) */
     @Enumerated(EnumType.STRING)
     @Column(name = "TRANSACTION_TYPE", nullable = false, length = 20)
@@ -54,6 +61,14 @@ public class InventoryTransaction extends BaseTimeEntity {
     @Column(name = "AFTER_STOCK", nullable = false)
     private int afterStock;
 
+    /** 입출고일 (입고일/출고일 — 모달에서 입력한 날짜) */
+    @Column(name = "TRANSACTION_DATE")
+    private LocalDate transactionDate;
+
+    /** 세부 구분 (신형/구형, 레노버/갤럭시 — 구분이 없는 품목은 null) */
+    @Column(name = "SUB_TYPE", length = 20)
+    private String subType;
+
     /** 비고 (입고 사유, 지급 메모 등) */
     @Column(name = "NOTE", length = 255)
     private String note;
@@ -61,20 +76,25 @@ public class InventoryTransaction extends BaseTimeEntity {
     @Builder
     private InventoryTransaction(InventoryItem inventoryItem, TransactionType transactionType,
                                  int quantity, int beforeStock, int afterStock,
-                                 String note, String createdBy) {
+                                 String note, String createdBy,
+                                 LocalDate transactionDate, String subType, SupplyIssue supplyIssue) {
         this.inventoryItem = inventoryItem;
         this.transactionType = transactionType;
         this.quantity = quantity;
         this.beforeStock = beforeStock;
         this.afterStock = afterStock;
         this.note = note;
+        this.transactionDate = (transactionDate != null) ? transactionDate : LocalDate.now();
+        this.subType = subType;
+        this.supplyIssue = supplyIssue;
         markCreatedBy(createdBy);
     }
 
     /** 입고 이력 생성 */
     public static InventoryTransaction ofInbound(InventoryItem item, int quantity,
                                                  int beforeStock, int afterStock,
-                                                 String createdBy, String note) {
+                                                 String createdBy, String note,
+                                                 LocalDate inboundDate, String subType) {
         return InventoryTransaction.builder()
                 .inventoryItem(item)
                 .transactionType(TransactionType.INBOUND)
@@ -83,13 +103,15 @@ public class InventoryTransaction extends BaseTimeEntity {
                 .afterStock(afterStock)
                 .createdBy(createdBy)
                 .note(note)
+                .transactionDate(inboundDate)
+                .subType(subType)
                 .build();
     }
 
-    /** 출고(지급) 이력 생성 */
+    /** 출고(지급) 이력 생성 — 지급 내역(issue)과 연결 */
     public static InventoryTransaction ofOutbound(InventoryItem item, int quantity,
                                                   int beforeStock, int afterStock,
-                                                  String createdBy, String note) {
+                                                  String createdBy, String note, SupplyIssue issue) {
         return InventoryTransaction.builder()
                 .inventoryItem(item)
                 .transactionType(TransactionType.OUTBOUND)
@@ -98,6 +120,19 @@ public class InventoryTransaction extends BaseTimeEntity {
                 .afterStock(afterStock)
                 .createdBy(createdBy)
                 .note(note)
+                .transactionDate(issue != null ? issue.getIssuedAt() : null)
+                .subType(issue != null ? issue.getSubType() : null)
+                .supplyIssue(issue)
                 .build();
+    }
+
+    /** 입출고일 변경 */
+    public void changeTransactionDate(LocalDate date) {
+        if (date != null) this.transactionDate = date;
+    }
+
+    /** 비고 변경 (빈 값이면 비움) */
+    public void changeNote(String note) {
+        this.note = (note == null || note.isBlank()) ? null : note.trim();
     }
 }
