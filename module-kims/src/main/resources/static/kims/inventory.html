@@ -296,7 +296,7 @@
       });
       if (t === 'dash') loadDashboard();
       if (t === 'stock') loadStockTab();
-      if (t === 'reqhist') loadReqHist();
+      if (t === 'reqhist') { setRhDefaultPeriod(); rhPage = 0; loadReqHist(); }
     }
 
     const dateOnly = s => (s || '').substring(0, 10);
@@ -576,8 +576,16 @@
       rhPage = 0; loadReqHist();
     }
 
+    // 기본 조회 기간 = 당월 1일 ~ 오늘 (탭을 열 때마다, 초기화 시 적용)
+    function setRhDefaultPeriod() {
+      const today = todayStr();
+      document.getElementById('rh-from').value = today.substring(0, 8) + '01';
+      document.getElementById('rh-to').value = today;
+    }
+
     function resetReqHist() {
-      ['rh-from', 'rh-to', 'rh-by', 'rh-item'].forEach(id => document.getElementById(id).value = '');
+      ['rh-by', 'rh-item'].forEach(id => document.getElementById(id).value = '');
+      setRhDefaultPeriod();
       setRhType('');
     }
 
