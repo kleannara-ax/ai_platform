@@ -36,7 +36,13 @@ document.addEventListener("DOMContentLoaded", () => {
         { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct", bulk: "sum" },
       ],
     },
-    // 폐합성소각로 1호기는 쓰지 않아 뺐다(2026-10). 2호기만 등록한다.
+    // 폐합성소각로 1호기는 고정단가만 등록한다 — 스팀단가는 쓰지 않아 뺐다(2026-10).
+    {
+      facility: "폐합성소각로 1호기",
+      items: [
+        { code: "waste1_fixed_hr",   label: "고정단가",          unit: "원/HR", method: "direct" },
+      ],
+    },
     {
       facility: "폐합성소각로 2호기",
       items: [

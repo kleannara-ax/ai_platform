@@ -136,13 +136,16 @@
       { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "13"; } },
     ] },
     // 폐합성 운영단가는 도급내역의 결산 기준 표와 실 스팀량 기준 표에 같은 값으로 들어간다.
-    // (1호기는 단가 입력에서 뺐다 — 도급내역 1호기 칸은 그 페이지에서 직접 넣는다)
+    // (1호기 스팀단가는 단가 입력에서 뺐다 — 도급내역 1호기 운영단가는 그 페이지에서 직접 넣는다)
     { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", targets: [
       { table: "flow_m_fluid_incinerator", col: 4, key: function (d) { return pad2(d); } },
       { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|unit"; } },
       { table: "incinerator_contract", col: 1, key: function (d) { return "real|" + d + "|unit-2"; } },
     ] },
     // 고정단가 → 운휴시간당 고정비(원/시간). 결산 기준 표에만 있다.
+    { code: "waste1_fixed_hr", label: "도급내역 1호기 운휴시간당 고정비", targets: [
+      { table: "incinerator_contract", col: 1, key: function (d) { return "unit1|" + d + "|fixed"; } },
+    ] },
     { code: "waste2_fixed_hr", label: "도급내역 2호기 운휴시간당 고정비", targets: [
       { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|fixed"; } },
     ] },
