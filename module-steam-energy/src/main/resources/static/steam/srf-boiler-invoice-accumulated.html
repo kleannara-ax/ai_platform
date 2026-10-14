@@ -329,7 +329,7 @@
       refreshYearLabels();
       recomputeAll();
       try {
-        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(accMonthKey())}`, {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${ACC_TABLE_NAME}&month=${encodeURIComponent(accMonthKey())}`, {
           headers: { Accept: "application/json" }
         });
         if (!response.ok) return;

@@ -512,7 +512,7 @@
       eachInput((input) => { input.value = ""; });
       recomputeAll();
       try {
-        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`, {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${MON_TABLE_NAME}&month=${encodeURIComponent(monthKey())}`, {
           headers: { Accept: "application/json" }
         });
         if (!response.ok) return;

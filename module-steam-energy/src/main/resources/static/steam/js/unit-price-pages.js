@@ -32,7 +32,8 @@ document.addEventListener("DOMContentLoaded", () => {
         { code: "comb_bsc_factor",   label: "BSC FACTOR",                  unit: "",      method: "direct" },
         { code: "comb_asc",          label: "ASC 단가",                    unit: "원/톤", method: "direct" },
         { code: "comb_asc_factor",   label: "ASC FACTOR",                  unit: "",      method: "direct" },
-        { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct" },
+        // 보증량은 달마다 다르므로 월별로만 넣는다. 일괄 칸은 입력이 아니라 12개월 합을 보여 준다.
+        { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct", bulk: "sum" },
       ],
     },
     // 폐합성소각로는 1·2호기 단가가 서로 달라 호기별로 따로 등록한다.
@@ -141,7 +142,9 @@ document.addEventListener("DOMContentLoaded", () => {
           : "";
         const note = isAuto && item.note ? `<div class="auto-note">${esc(item.note)}</div>` : "";
         const dis = isAuto ? " disabled" : "";
-        const bulk = `<td class="bulk-col"><input data-role="bulk" data-code="${item.code}" inputmode="decimal" placeholder="—"${dis}></td>`;
+        const bulk = item.bulk === "sum"
+          ? `<td class="bulk-col"><input data-role="bulk-sum" data-code="${item.code}" readonly tabindex="-1" placeholder="—" title="12개월 합계 (입력은 월별 칸에)"></td>`
+          : `<td class="bulk-col"><input data-role="bulk" data-code="${item.code}" inputmode="decimal" placeholder="—"${dis}></td>`;
         const months = MONTHS.map((m) =>
           `<td><input data-role="month" data-code="${item.code}" data-month="${m}" inputmode="decimal"${dis}></td>`
         ).join("");
@@ -156,6 +159,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function monthInput(code, m) { return body.querySelector(`input[data-role="month"][data-code="${code}"][data-month="${m}"]`); }
 
+  // 일괄 칸이 합계인 항목(BSC 보증량): 12개월 칸을 더해 보여 준다. 하나도 없으면 빈 칸.
+  function refreshBulkSum(code) {
+    const target = body.querySelector(`input[data-role="bulk-sum"][data-code="${code}"]`);
+    if (!target) return;
+    let sum = 0;
+    let any = false;
+    MONTHS.forEach((m) => {
+      const raw = rawNumber(monthInput(code, m)?.value);
+      if (raw === "" || !Number.isFinite(Number(raw))) return;
+      sum += Number(raw);
+      any = true;
+    });
+    target.value = any ? withCommas(sum) : "";
+  }
+  function refreshAllBulkSums() {
+    ALL_ITEMS.filter((item) => item.bulk === "sum").forEach((item) => refreshBulkSum(item.code));
+  }
+
   async function load() {
     reloadBtn.disabled = true;
     setMsg("불러오는 중…", true);
@@ -169,6 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const bulk = body.querySelector(`input[data-role="bulk"][data-code="${item.code}"]`);
         if (bulk) bulk.value = "";
       });
+      refreshAllBulkSums();
       setMsg("", true);
     } catch (e) {
       setMsg("불러오기 실패", false);
@@ -197,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
   body.addEventListener("change", (e) => {
     const input = e.target.closest('input[data-role="month"]');
     if (!input || input.disabled) return;
+    refreshBulkSum(input.dataset.code);
     saveMonth(input.dataset.code, Number(input.dataset.month), rawNumber(input.value));
   });
 
