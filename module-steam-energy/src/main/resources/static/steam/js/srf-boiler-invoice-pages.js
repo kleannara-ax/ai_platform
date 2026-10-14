@@ -274,6 +274,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return LINK_HINTS[`${rowIndex}:${columnIndex}`] || "";
   }
 
+  // 화면에서 계산하는 칸 — 서버는 formula 표시를 주지 않으므로(늘 false) 여기서 정한다.
+  // 이 표시가 있어야 입력칸을 고쳤을 때 renderCalculatedCells 가 다시 계산해 넣는다.
+  // (전에는 표시가 없어 1. BSC·TOTAL 같은 계산값이 새로고침 전까지 옛 값으로 남았다)
+  const CALC_CELLS = new Set(["13:3", "24:3", "39:5", "41:5", "45:5", "48:5", "59:5", "61:5", "63:5", "65:5"]);
+
+  function isCalcCell(rowIndex, columnIndex) {
+    return CALC_CELLS.has(`${rowIndex}:${columnIndex}`) || clientLinkedValue(rowIndex, columnIndex) !== null;
+  }
+
   function cellHtml(cell) {
     const rowIndex = Number(cell?.row ?? 0);
     const columnIndex = Number(cell?.col ?? 0);
@@ -283,9 +292,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const autoDate = autoDateCellValue(rowIndex, columnIndex) !== null;
     const hint = linkHint(rowIndex, columnIndex);
     const titleAttr = hint ? ` title="${escapeAttribute(hint)}"` : "";
-    const calcAttrs = cell?.formula ? ` data-calc-row="${rowIndex}" data-calc-col="${columnIndex}" data-format="${escapeAttribute(cell?.format || "")}"` : "";
+    const calc = isCalcCell(rowIndex, columnIndex);
+    const calcAttrs = calc ? ` data-calc-row="${rowIndex}" data-calc-col="${columnIndex}" data-format="${escapeAttribute(cell?.format || "")}"` : "";
     const classes = [
-      cell?.formula ? "formula-cell" : "",
+      calc ? "formula-cell" : "",
       editable ? "editable-cell" : "",
       autoDate ? "auto-date-cell" : "",
       hint && !editable ? "linked-cell" : "",
@@ -340,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fill = excelFillFor(rowIndex, columnIndex);
     style += `background:${fill};`;
     const autoDate = autoDateCellValue(rowIndex, columnIndex) !== null;
-    if (isEditableCell(cell, rowIndex, columnIndex) || cell?.formula || autoDate) {
+    if (isEditableCell(cell, rowIndex, columnIndex) || isCalcCell(rowIndex, columnIndex) || autoDate) {
       style = removeBorderStyles(style);
       const width = isThickBorderCell(rowIndex, columnIndex) ? 1.4 : 0.7;
       style += `border:${width}px solid #000;`;
