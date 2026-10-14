@@ -25,6 +25,9 @@
   const TABLES_BASE = "/tables";
   const state = {};
   let cellRows = [];
+  // 폐합성소각로 도급내역 — 2호 스팀 구입량(T/D) 의 기본값은 그 페이지의 2호기 스팀량에서 온다.
+  const CONTRACT_TABLE = "incinerator_contract";
+  let contractRows = [];
   let activeSection = "combo";
   let recoveryRowCount = 12;
 
@@ -124,8 +127,27 @@
     if (cell) cell.textContent = formatNumber(value, digits);
   }
 
+  /**
+   * 다른 페이지에서 오는 기본값. 지금은 2호 스팀 구입량(T/D) 하나 —
+   * 폐합성소각로 도급내역의 2호기 스팀량(unit2|일|steam). 연동 칸이 아니면 null, 값이 없으면 "".
+   */
+  function linkedValue(key) {
+    const match = /^wasteSteam2-(\d+)$/.exec(key);
+    if (!match) return null;
+    const row = contractRows.find((item) => String(item.row_key) === `unit2|${Number(match[1])}|steam`);
+    return row ? normalizeEditableValue(row.cell_value) : "";
+  }
+
+  const LINK_HINT = "폐합성소각로 도급내역 ▸ 2호기 스팀량에서 가져옵니다 (여기서 직접 고칠 수 있고, 비우면 다시 가져옵니다)";
+
   function inputCell(key, className = "") {
-    return `<td><input class="combo-input ${className}" type="text" data-key="${escapeHtml(key)}" value="${escapeHtml(state[key] || "")}" /></td>`;
+    const own = normalizeEditableValue(state[key]);
+    const linked = linkedValue(key);
+    // 손으로 넣은 값이 있으면 그 값, 없으면 연동값을 보여 준다.
+    const value = own !== "" ? own : (linked ?? "");
+    const linkAttrs = linked !== null ? ` title="${escapeHtml(LINK_HINT)}"` : "";
+    const linkClass = linked !== null && own === "" ? " combo-linked" : "";
+    return `<td><input class="combo-input ${className}${linkClass}" type="text" data-key="${escapeHtml(key)}" value="${escapeHtml(value)}"${linkAttrs} /></td>`;
   }
 
   function calcCell(key) {
@@ -181,10 +203,13 @@
   }
 
   async function fetchCellRows() {
-    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(currentMonthKey())}`);
+    // 자기 표와 도급내역만 받는다 — 그 달 전체를 받으면 다른 표에 밀려 잘릴 수 있다.
+    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=10000&tableNames=${pageTableName()},${CONTRACT_TABLE}&month=${encodeURIComponent(currentMonthKey())}`);
     if (!response.ok) throw new Error("Failed to load combo boiler rows");
     const body = await response.json();
-    cellRows = Array.isArray(body.data) ? body.data : [];
+    const rows = Array.isArray(body.data) ? body.data : [];
+    cellRows = rows.filter((row) => row.table_name !== CONTRACT_TABLE);
+    contractRows = rows.filter((row) => row.table_name === CONTRACT_TABLE);
     applyCellRowsToState();
   }
 
@@ -231,6 +256,15 @@
     });
     if (!response.ok) throw new Error("Failed to save combo boiler cell");
     cacheSavedRow(await response.json());
+    // 연동 칸을 비우면 다시 도급내역 값으로 돌아간다 — 칸에도 그 값을 보여 주고 다시 계산한다.
+    const linked = linkedValue(rowKey);
+    if (linked !== null) {
+      input.classList.toggle("combo-linked", rawValue === "");
+      if (rawValue === "") {
+        input.value = linked;
+        calculate();
+      }
+    }
   }
 
   function populatePeriod() {
