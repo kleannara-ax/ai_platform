@@ -30,6 +30,8 @@
     @media print {
       body.landing-body[data-page-kind="incinerator-co"] { background:#fff; }
     }
+      /* 2호기 스팀량에서 가져온 값 — 손으로 고치면 보통 입력칸 모양으로 돌아간다 */
+    .inc-table .input-cell input.linked { color:#0a7a5f; font-weight:600; }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
 </head>
@@ -357,6 +359,7 @@
     }
 
     function recomputeAll() {
+      applyRealSteam2Links();   // 2호기 스팀량이 바뀌면 실 스팀량 기준 2호기 칸도 따라간다
       recomputeUnit("unit1");
       recomputeUnit("unit2");
       recomputeReal();
@@ -380,8 +383,39 @@
         const handler = () => save(i, s, d, f);
         i.addEventListener("blur", handler);
         i.addEventListener("change", handler);
+        // 실 스팀량 기준 2호기 칸에 글자를 넣는 순간부터 손값으로 본다 — 안 그러면 표 전체 재계산이
+        // 연동값으로 되돌려 버린다 (input 이 표의 재계산보다 먼저 온다)
+        if (s === "real" && f === "steam-2") {
+          i.addEventListener("input", () => {
+            // 비우는 중이면 저장될 때까지 연동값으로 되채우지 않는다(되채우면 그 값이 손값으로 저장돼 버린다)
+            if (String(i.value || "").trim() === "") { ownRealSteam2.delete(d); i.dataset.cleared = "1"; }
+            else { ownRealSteam2.add(d); delete i.dataset.cleared; }
+          });
+        }
       });
     }
+    /* 실 스팀량 기준 2호기 스팀량 ← 2호기(결산 기준) 스팀량, 336 이상이면 336.
+       손으로 넣은 날(ownRealSteam2)은 그 값을 두고, 비우면 다시 연동값으로 돌아간다. */
+    const REAL_STEAM2_CAP = 336;
+    const ownRealSteam2 = new Set();
+    function linkedRealSteam2(day) {
+      const v = parseNum(document.querySelector(`input[data-section="unit2"][data-day="${day}"][data-field="steam"]`));
+      if (v === null || v === undefined || Number.isNaN(v)) return null;
+      return Math.min(v, REAL_STEAM2_CAP);
+    }
+    function applyRealSteam2Links() {
+      const days = daysInMonth();
+      for (let day = 1; day <= 31; day += 1) {
+        const input = document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-2"]`);
+        if (!input) continue;
+        input.title = `2호기 스팀량에서 가져옵니다 (${REAL_STEAM2_CAP} 이상이면 ${REAL_STEAM2_CAP}). 직접 고칠 수 있고, 비우면 다시 가져옵니다`;
+        if (day > days || ownRealSteam2.has(day) || input.dataset.cleared === "1") { input.classList.remove("linked"); continue; }
+        const linked = linkedRealSteam2(day);
+        input.value = linked === null ? "" : String(linked);
+        input.classList.toggle("linked", linked !== null);
+      }
+    }
+
     /* 1호기 운휴시간은 기본 24 — 저장값이 없는 날(그 달 안의 날)만 24 로 채운다. 고치면 고친 값이 우선. */
     const UNIT1_RUNTIME_DEFAULT = "24";
     function applyRuntimeDefaults() {
@@ -401,9 +435,13 @@
         const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`);
         if (!res.ok) { applyRuntimeDefaults(); recomputeAll(); return; }
         (await res.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
+        ownRealSteam2.clear();
         eachInput((i, s, d, f) => {
           const stored = storedRows.get(rowKeyFor(s, d, f));
-          if (stored && stored.cell_value != null && stored.cell_value !== "") i.value = stored.cell_value;
+          if (stored && stored.cell_value != null && stored.cell_value !== "") {
+            i.value = stored.cell_value;
+            if (s === "real" && f === "steam-2") ownRealSteam2.add(d);
+          }
         });
         applyRuntimeDefaults();
         recomputeAll();
@@ -423,6 +461,12 @@
       // 1호기 운휴시간을 비우면 기본 24 로 돌아간다 (빈 값은 저장돼 있어도 화면은 24 로 계산)
       if (section === "unit1" && field === "runtime" && raw === "" && day <= daysInMonth()) {
         input.value = UNIT1_RUNTIME_DEFAULT;
+        recomputeAll();
+      }
+      // 실 스팀량 기준 2호기 스팀량: 넣으면 손값, 비우면 다시 2호기 스팀량 연동
+      if (section === "real" && field === "steam-2") {
+        if (raw === "") ownRealSteam2.delete(day); else ownRealSteam2.add(day);
+        delete input.dataset.cleared;   // 빈 값이 저장됐으니 이제 연동값으로 되채워도 된다
         recomputeAll();
       }
     }
