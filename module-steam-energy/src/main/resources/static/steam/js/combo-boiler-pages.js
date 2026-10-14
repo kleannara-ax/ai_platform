@@ -25,7 +25,7 @@
   const TABLES_BASE = "/tables";
   const state = {};
   let cellRows = [];
-  // 폐합성소각로 도급내역 — 2호 스팀 구입량(T/D) 의 기본값은 그 페이지의 2호기 스팀량에서 온다.
+  // 폐합성소각로 도급내역 — 2호 스팀 구입량(T/D) 의 기본값은 그 페이지 '실 스팀량 기준' 표의 2호기 스팀량에서 온다.
   const CONTRACT_TABLE = "incinerator_contract";
   let contractRows = [];
   let activeSection = "combo";
@@ -129,16 +129,16 @@
 
   /**
    * 다른 페이지에서 오는 기본값. 지금은 2호 스팀 구입량(T/D) 하나 —
-   * 폐합성소각로 도급내역의 2호기 스팀량(unit2|일|steam). 연동 칸이 아니면 null, 값이 없으면 "".
+   * 폐합성소각로 도급내역 '실 스팀량 기준' 표의 2호기 스팀량(real|일|steam-2). 연동 칸이 아니면 null, 값이 없으면 "".
    */
   function linkedValue(key) {
     const match = /^wasteSteam2-(\d+)$/.exec(key);
     if (!match) return null;
-    const row = contractRows.find((item) => String(item.row_key) === `unit2|${Number(match[1])}|steam`);
+    const row = contractRows.find((item) => String(item.row_key) === `real|${Number(match[1])}|steam-2`);
     return row ? normalizeEditableValue(row.cell_value) : "";
   }
 
-  const LINK_HINT = "폐합성소각로 도급내역 ▸ 2호기 스팀량에서 가져옵니다 (여기서 직접 고칠 수 있고, 비우면 다시 가져옵니다)";
+  const LINK_HINT = "폐합성소각로 도급내역 ▸ 실 스팀량 기준 2호기 스팀량에서 가져옵니다 (여기서 직접 고칠 수 있고, 비우면 다시 가져옵니다)";
 
   function inputCell(key, className = "") {
     const own = normalizeEditableValue(state[key]);
