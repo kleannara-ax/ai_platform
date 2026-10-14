@@ -259,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
   //   단가 입력 → BASE/ADDITIONAL SERVICE CHARGE (ASC 는 직접 고칠 수도 있다)
   //   Client Invoice → 3. OTHERS / UTILITIES·OTHER DEDUCTION (원본의 ='Client Invoice'!F.. 참조)
   const LINK_HINTS = {
-    "15:3": "단가 입력 ▸ 복합보일러 BSC 단가에서 자동으로 가져옵니다",
+    "15:3": "단가 입력 ▸ 복합보일러 BSC 단가에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
     "17:3": "단가 입력 ▸ 복합보일러 BSC FACTOR 에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
     "21:3": "단가 입력 ▸ 복합보일러 BSC 보증량에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
     "26:3": "단가 입력 ▸ 복합보일러 ASC 단가에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
@@ -325,8 +325,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function isMarkedInputCell(rowIndex, columnIndex) {
     // 52:3 ASC REFUND(Annual) — 원본은 다른 칸을 곱하는 수식인데 그 칸들이 비어 있어, 여기서는 직접 넣는다.
+    // 15:3 BASE SERVICE CHARGE, 33:3·35:3 3. OTHERS, 54:3·56:3·58:3 DEDUCTION — 연동값이 기본으로 채워지고
+    // 여기서 고치면 고친 값이 우선한다(비우면 다시 연동값).
     return [
-      "17:3", "19:3", "21:3", "26:3", "28:3", "30:3", "36:3", "37:3", "43:5", "50:3", "52:3",
+      "15:3", "17:3", "19:3", "21:3", "26:3", "28:3", "30:3", "33:3", "35:3", "36:3", "37:3", "43:5",
+      "50:3", "52:3", "54:3", "56:3", "58:3",
     ].includes(`${rowIndex}:${columnIndex}`);
   }
 
@@ -412,9 +415,20 @@ document.addEventListener("DOMContentLoaded", () => {
     return any ? String(sum) : "";
   }
 
+  /** 저장값 — 비어 있으면 null (빈 칸으로 저장된 것은 "없음"으로 본다 → 연동값으로 돌아간다). */
+  function storedValue(rowIndex, columnIndex) {
+    const stored = storedCell(rowIndex, columnIndex);
+    if (!stored) return null;
+    const text = String(stored.cell_value ?? "").trim();
+    return text === "" ? null : text;
+  }
+
+  // 우선순위: 날짜 자동칸 → 손으로 넣은 저장값 → 다른 페이지 연동값 → 화면 계산값
   function valueForCell(rowIndex, columnIndex, fallback) {
     const autoDateValue = autoDateCellValue(rowIndex, columnIndex);
     if (autoDateValue !== null) return autoDateValue;
+    const storedText = storedValue(rowIndex, columnIndex);
+    if (storedText !== null) return storedText;
     const linkedValue = clientLinkedValue(rowIndex, columnIndex);
     if (linkedValue !== null) return linkedValue;
     const calculatedValue = calculatedCellValue(rowIndex, columnIndex);
@@ -480,6 +494,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function rawCellValue(rowIndex, columnIndex) {
     const autoDateValue = autoDateCellValue(rowIndex, columnIndex);
     if (autoDateValue !== null) return autoDateValue;
+    const storedText = storedValue(rowIndex, columnIndex);
+    if (storedText !== null) return storedText;
     const linkedValue = clientLinkedValue(rowIndex, columnIndex);
     if (linkedValue !== null) return linkedValue;
     const stored = storedCell(rowIndex, columnIndex);
@@ -551,6 +567,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const index = state.cellRows.findIndex((row) => row.id === saved.id);
     if (index >= 0) state.cellRows[index] = saved;
     else state.cellRows.push(saved);
+    // 연동 칸을 비우면 다시 연동값으로 돌아간다 — 칸에도 그 값을 보여 준다.
+    if (input.value.trim() === "") {
+      const linked = clientLinkedValue(rowIndex, columnIndex);
+      if (linked !== null && linked !== "") input.value = formatCellValue(linked, "", false);
+    }
     renderCalculatedCells();
   }
 

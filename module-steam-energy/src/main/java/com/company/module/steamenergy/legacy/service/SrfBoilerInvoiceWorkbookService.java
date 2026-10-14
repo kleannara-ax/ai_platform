@@ -190,7 +190,15 @@ public class SrfBoilerInvoiceWorkbookService {
     }
 
     private boolean isMarkedInputCell(int rowIndex, int columnIndex) {
-        return (rowIndex == 19 && columnIndex == 3)
+        // 원본에서 다른 시트를 끌어오던 칸(BASE SERVICE CHARGE, 3. OTHERS, 1), UTILITIES/OTHER DEDUCTION)도
+        // 입력칸으로 연다. 연동값이 기본으로 채워지고, 여기서 고치면 고친 값이 우선한다.
+        return (rowIndex == 15 && columnIndex == 3)
+                || (rowIndex == 33 && columnIndex == 3)
+                || (rowIndex == 35 && columnIndex == 3)
+                || (rowIndex == 54 && columnIndex == 3)
+                || (rowIndex == 56 && columnIndex == 3)
+                || (rowIndex == 58 && columnIndex == 3)
+                || (rowIndex == 19 && columnIndex == 3)
                 || (rowIndex == 21 && columnIndex == 3)
                 || (rowIndex == 17 && columnIndex == 3)
                 || (rowIndex == 26 && columnIndex == 3)
