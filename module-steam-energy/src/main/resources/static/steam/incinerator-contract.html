@@ -382,6 +382,16 @@
         i.addEventListener("change", handler);
       });
     }
+    /* 1호기 운휴시간은 기본 24 — 저장값이 없는 날(그 달 안의 날)만 24 로 채운다. 고치면 고친 값이 우선. */
+    const UNIT1_RUNTIME_DEFAULT = "24";
+    function applyRuntimeDefaults() {
+      const days = daysInMonth();
+      eachInput((i, s, d, f) => {
+        if (s !== "unit1" || f !== "runtime" || d > days) return;
+        i.title = `기본 ${UNIT1_RUNTIME_DEFAULT} (고칠 수 있고, 비우면 다시 ${UNIT1_RUNTIME_DEFAULT})`;
+        if (String(i.value || "").trim() === "") i.value = UNIT1_RUNTIME_DEFAULT;
+      });
+    }
     async function load() {
       storedRows.clear();
       rebuild();
@@ -389,14 +399,15 @@
       eachInput((i) => { i.value = ""; });
       try {
         const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`);
-        if (!res.ok) { recomputeAll(); return; }
+        if (!res.ok) { applyRuntimeDefaults(); recomputeAll(); return; }
         (await res.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
         eachInput((i, s, d, f) => {
           const stored = storedRows.get(rowKeyFor(s, d, f));
           if (stored && stored.cell_value != null && stored.cell_value !== "") i.value = stored.cell_value;
         });
+        applyRuntimeDefaults();
         recomputeAll();
-      } catch (e) { recomputeAll(); }
+      } catch (e) { applyRuntimeDefaults(); recomputeAll(); }
     }
     async function save(input, section, day, field) {
       const key = rowKeyFor(section, day, field);
@@ -409,6 +420,11 @@
         if (!res.ok) throw new Error(await res.text());
         storedRows.set(key, await res.json());
       } catch (e) { console.error(e); }
+      // 1호기 운휴시간을 비우면 기본 24 로 돌아간다 (빈 값은 저장돼 있어도 화면은 24 로 계산)
+      if (section === "unit1" && field === "runtime" && raw === "" && day <= daysInMonth()) {
+        input.value = UNIT1_RUNTIME_DEFAULT;
+        recomputeAll();
+      }
     }
 
     searchButton.addEventListener("click", () => {
