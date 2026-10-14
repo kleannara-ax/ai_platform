@@ -1,7 +1,8 @@
 /* 단가 입력 페이지 — 엑셀 "2. 단가 등록 (관리자)" 시트 구조를 반영한 확장판.
  *  - 시설별 세부 단가 항목을 연/월(1~12) 그리드로 등록. 저장 테이블: unit_price_detail.
  *  - 단가를 고치면 연동 대상 페이지의 그 달 전체 일자에 일괄 적용 (unit-price-common.js 의 PRICE_LINKS).
- *    LNG → LNG 연료 사용 비용 / 유동상 → 세부 운영내역 KNE / 폐합성 1·2호기 → 도급내역. 복합보일러는 미연결.
+ *    LNG → LNG 연료 사용 비용 / 유동상·폐합성 → 유동상·소각로·복합 일일 사용량 + 세부 운영내역·도급내역 /
+ *    복합보일러 BSC·ASC → Invoice Summary(VK) 의 그 달 단가 칸.
  *  - 신설소각로: 항목/DB만 존재, 아직 아무것도 연결하지 않음.
  *  - "자동계산" 항목은 화면에서 직접 입력하지 않음(계산식 안내만 표시).
  */
@@ -182,7 +183,9 @@ document.addEventListener("DOMContentLoaded", () => {
       setMsg(`저장됨 · ${m}월 ${link.label} 반영 중…`, true);
       const result = await UP.applyPriceLink(code, currentYear, m, value);
       setMsg(result.applied
-        ? `저장됨 · ${m}월 ${link.label} ${result.applied}일 적용`
+        ? (result.monthly
+            ? `저장됨 · ${currentYear}년 ${m}월 ${link.label} 적용`
+            : `저장됨 · ${m}월 ${link.label} ${result.applied}일 적용`)
         : "저장됨", true);
     } catch (e) { setMsg("저장 실패", false); }
   }

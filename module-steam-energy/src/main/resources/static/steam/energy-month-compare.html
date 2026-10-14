@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>에너지 회계비용 - 회계비용 마감과 실마감 비교</title>
+  <title>에너지 회계비용 - 월별 회계비용 마감 vs 실마감 차이</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="css/common.css?v=20260916-cardfit" />
   <link rel="stylesheet" href="css/inc-design.css?v=20260916-cardfit" />
@@ -45,6 +45,17 @@
     .emc-calc { display:block; font-weight:700; color:#1f3b57; overflow:hidden; text-overflow:ellipsis; }
     .emc-calc.neg { color:#c0392b; }
     .emc-calc.imported { color:#0a7a5f; background:#e8f7f1; border-radius:4px; padding:1px 3px; }
+    /* 카드 제목 줄 — 제목 왼쪽, 제스코 보기 단추 오른쪽 끝 (표 바로 위) */
+    .emc-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .emc-card-head .inc-section-title { margin:0; }
+    .emc-zesco-btn {
+      height:28px; padding:0 12px; border:1px solid #c7d6e4; border-radius:8px;
+      background:#fff; color:#41607d; font:600 11.5px Inter,"Apple SD Gothic Neo",sans-serif; cursor:pointer;
+    }
+    .emc-zesco-btn:hover { background:#f1f7fc; }
+    .emc-zesco-btn[aria-pressed="true"] { background:#1f4f82; border-color:#1f4f82; color:#fff; }
+    .energy-table tr.zesco-row td.label-cell,
+    .energy-table tr.zesco-row th.col-cat-sub { color:#7a8798; }
     .emc-import-badge {
       display:inline-block; margin-left:6px; padding:1px 6px;
       background:#0a7a5f; color:#fff; font-size:10px; font-weight:700;
@@ -117,7 +128,7 @@
     <div class="landing-canvas landing-canvas-table">
       <div class="inc-header">
         <div class="inc-header-title">
-          <h1>2. 회계비용 마감과 실마감 비교</h1>
+          <h1>월별 회계비용 마감 vs 실마감 차이</h1>
           <p id="emcSubtitle">— 월별 회계비용 마감 vs 실마감 차이 (연료비)</p>
         </div>
         <div class="inc-toolbar">
@@ -132,7 +143,11 @@
 
       <section class="energy-panel active" data-panel="fuel">
         <div class="inc-card">
-          <h3 class="inc-section-title">연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+          <div class="emc-card-head">
+            <h3 class="inc-section-title">연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+            <!-- 제스코는 없어진 업체라 행을 숨겨 둔다. 계산에는 그대로 들어간다. -->
+            <button type="button" id="emcZescoToggle" class="emc-zesco-btn" aria-pressed="false">제스코 보기</button>
+          </div>
           <div class="energy-table-wrap">
             <table class="energy-table" data-section="fuel">
               <colgroup id="emcFuelCols"></colgroup>
@@ -146,10 +161,12 @@
     </div>
   </main>
 
-  <script src="/steam/js/energy-linked-sources.js?v=20260922-client2"></script>
+  <script src="/steam/js/energy-linked-sources.js?v=20260922-client3"></script>
   <script>
   (function () {
     const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
+    // 제스코 행 표시 여부 — 없어진 업체라 기본은 숨김. 소계·실적 계산에는 숨겨도 그대로 들어간다.
+    let showZesco = false;
     const PAGE_TABLE_NAME = "energy_month_compare";
     const TABLES_BASE = "/tables";
     const CELL_TABLE = "table_cell_value";
@@ -262,7 +279,8 @@
     const FUEL_ROWS = [
       { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"imported",
         importSource:"srf-invoice-total", importLabel:"SRF Boiler 인보이스 → Summary(VK) TOTAL SERVICE CHARGES FOR THE MONTH (원 → 백만원)" },
-      { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input" },
+      // 제스코(zesco:true) 행은 없어진 업체라 기본으로 숨긴다 — 값·수식은 그대로 두고 화면에서만 뺀다.
+      { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input", zesco:true },
       { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
       { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"input" },
       { key:"fluidSteam",      label:"유동상소각로 스팀구매",        cat:"연료비",    kind:"imported",
@@ -270,10 +288,10 @@
       { key:"fuelMonthlySum",  label:"연료비 월별 (소계)",           cat:"연료비",    kind:"sum",
         srcKeys:["compositeSteam","zescoSteam","lngBuy","pyhsynSteam","fluidSteam"], cls:"subtotal" },
 
-      { key:"zescoOffset",     label:"제스코 상계비 (유틸리티)",     cat:"차감비",    kind:"input" },
-      { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input" },
+      { key:"zescoOffset",     label:"제스코 상계비 (유틸리티)",     cat:"차감비",    kind:"input", zesco:true },
+      { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input", zesco:true },
       { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"imported",
-        importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 청구금액 합계, 전력 제외 (원 → 백만원)" },
+        importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 1. Utilities(전력 제외) + 2. Other Charge 청구금액 합 (원 → 백만원)" },
       { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"input" },
       // 아래 둘은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
       { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"formula",
@@ -516,10 +534,10 @@
         }
       });
 
-      // group rows by cat for rowspan
+      // group rows by cat for rowspan — 숨긴 제스코 행은 그리지 않는다(계산은 위에서 이미 끝났다)
       const catGroups = [];
       let curCat = null, curGroup = null;
-      def.rows.forEach((row) => {
+      def.rows.filter((row) => showZesco || !row.zesco).forEach((row) => {
         if (row.cat !== curCat) {
           curCat = row.cat;
           curGroup = { cat: curCat, rows: [] };
@@ -532,7 +550,8 @@
       catGroups.forEach((group) => {
         group.rows.forEach((row, idx) => {
           const tr = [];
-          tr.push(`<tr${row.cls ? ` class="${row.cls}"` : ""}>`);
+          const rowCls = [row.cls, row.zesco ? "zesco-row" : ""].filter(Boolean).join(" ");
+          tr.push(`<tr${rowCls ? ` class="${rowCls}"` : ""}>`);
           if (idx === 0) {
             tr.push(`<th rowspan="${group.rows.length}" class="col-cat-sub">${escapeHtml(group.cat)}</th>`);
           }
@@ -681,6 +700,16 @@
         await deleteYearFromDB(currentYear);
         delete store[currentYear];
         renderAll();
+      });
+
+      // 제스코 보기 — 없어진 업체라 기본은 숨김. 눌러야 지난 자료를 볼 수 있다(계산에는 늘 들어간다).
+      const zescoBtn = document.getElementById("emcZescoToggle");
+      zescoBtn.addEventListener("click", () => {
+        showZesco = !showZesco;
+        zescoBtn.setAttribute("aria-pressed", String(showZesco));
+        zescoBtn.textContent = showZesco ? "제스코 숨기기" : "제스코 보기";
+        renderAll();
+        fitTableHeight();
       });
     }
 

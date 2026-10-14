@@ -469,10 +469,61 @@
     setCellText(row, 9, format(tm5Unit, 2));
   }
 
+  /**
+   * 월단위 표 맨 아래 합계 행의 열 구성.
+   *   sum   = 그 열을 더한다
+   *   unit  = 원단위 — 더하지 않고 (합계 스팀 x 1000 / 합계 생산량) 으로 다시 구한다
+   *   blank = 생산지종처럼 더할 수 없는 열
+   */
+  const MONTHLY_TOTAL_SPECS = [
+    { selector: '[data-unit-monthly="pm2"]',           kinds: ["sum", "sum", "sum", "sum", { unit: [3, 4] }, "blank"] },
+    { selector: '[data-unit-monthly="pm3"]',           kinds: ["sum", "sum", "sum", "sum", "sum", "sum", { unit: [5, 6] }, "blank"] },
+    { selector: '[data-unit-monthly="tm"]',            kinds: ["sum", "sum", { unit: [1, 2] }, "sum", "sum", { unit: [4, 5] }, "sum", "sum", { unit: [7, 8] }] },
+    { selector: '[data-machine-panel="paper-total"] .unit-table',  kinds: ["sum", "sum", { unit: [1, 2] }] },
+    { selector: '[data-machine-panel="tissue-total"] .unit-table', kinds: ["sum", "sum", { unit: [1, 2] }] },
+    { selector: '[data-machine-panel="other-total"] .unit-table',  kinds: ["sum", "sum", { unit: [1, 2] }, "sum", "sum", "sum"] },
+  ];
+
+  /** 셀 값 — 입력칸이면 입력값, 아니면 적힌 글자. */
+  function cellNumber(row, index) {
+    const cellElement = row.children[index];
+    if (!cellElement) return 0;
+    const input = cellElement.querySelector("input");
+    return asNumber(input ? input.value : cellElement.textContent) ?? 0;
+  }
+
+  /** 월단위 표마다 맨 아래 합계 행을 다시 그린다. 날짜가 없는 행(말일 뒤)은 빼고 더한다. */
+  function renderMonthlyTotals() {
+    MONTHLY_TOTAL_SPECS.forEach((spec) => {
+      const body = document.querySelector(`${spec.selector} tbody`);
+      if (!body) return;
+      body.querySelectorAll("tr.summary-row").forEach((row) => row.remove());
+      const rows = Array.from(body.querySelectorAll("tr")).filter((row) => !row.classList.contains("invalid-day-row"));
+      if (!rows.length) return;
+
+      const sums = spec.kinds.map((kind, offset) => (
+        kind === "sum" ? rows.reduce((total, row) => total + cellNumber(row, offset + 1), 0) : null
+      ));
+      const cells = spec.kinds.map((kind, offset) => {
+        if (kind === "blank") return "<td></td>";
+        if (kind === "sum") return `<td>${format(sums[offset])}</td>`;
+        const [steamIndex, prodIndex] = kind.unit;
+        const steam = sums[steamIndex - 1];
+        const production = sums[prodIndex - 1];
+        return `<td>${format(production ? (steam * 1000) / production : 0, 2)}</td>`;
+      });
+      const total = document.createElement("tr");
+      total.className = "summary-row";
+      total.innerHTML = `<td>합계</td>${cells.join("")}`;
+      body.appendChild(total);
+      Array.from(total.children).forEach(alignUnitCell);
+    });
+  }
+
   function syncMonthlySummaryTables() {
-    const pm2Rows = Array.from(document.querySelectorAll('[data-unit-monthly="pm2"] tbody tr'));
-    const pm3Rows = Array.from(document.querySelectorAll('[data-unit-monthly="pm3"] tbody tr'));
-    const tmRows = Array.from(document.querySelectorAll('[data-unit-monthly="tm"] tbody tr'));
+    const pm2Rows = Array.from(document.querySelectorAll('[data-unit-monthly="pm2"] tbody tr:not(.summary-row)'));
+    const pm3Rows = Array.from(document.querySelectorAll('[data-unit-monthly="pm3"] tbody tr:not(.summary-row)'));
+    const tmRows = Array.from(document.querySelectorAll('[data-unit-monthly="tm"] tbody tr:not(.summary-row)'));
     const paperBody = document.querySelector('[data-machine-panel="paper-total"] tbody');
     const tissueBody = document.querySelector('[data-machine-panel="tissue-total"] tbody');
     const totalBody = document.querySelector('[data-machine-panel="other-total"] tbody');
@@ -523,6 +574,7 @@
     paperBody.innerHTML = paperRows.join("");
     tissueBody.innerHTML = tissueRows.join("");
     totalBody.innerHTML = totalRows.join("");
+    renderMonthlyTotals();
   }
 
   function renderUnitMonthly() {

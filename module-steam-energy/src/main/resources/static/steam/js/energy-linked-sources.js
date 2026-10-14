@@ -7,7 +7,8 @@
  *  1) 차감비 고정값 — 월마다 바뀌지 않는다 (백만원)
  *  2) 복합보일러 스팀구매 — SRF Boiler 인보이스 Summary(VK) 의
  *     "TOTAL SERVICE CHARGES FOR THE MONTH" (원) 를 백만원으로 바꾼 값
- *  3) 복합 LNG 사용량, 처분부담금 등 — SRF Boiler Client Invoice 청구금액 합계(전력 제외)를 백만원으로 바꾼 값
+ *  3) 복합 LNG 사용량, 처분부담금 등 — SRF Boiler Client Invoice 1. Utilities(전력 제외) + 2. Other Charge
+ *     청구금액 합을 백만원으로 바꾼 값
  */
 (function (global) {
   "use strict";
@@ -74,16 +75,17 @@
   // ── SRF Boiler Client Invoice ───────────────────────────────────────────
   // 저장: table_cell_value (table_name=srf_boiler_invoice_client, month="YYYY-MM")
   //       row_key = "{구역}|{순번}|{qty|price|…}", 청구금액 = 양 × 단가 (화면 srf-boiler-invoice-client.html 과 같다)
-  // 복합 LNG 사용량, 처분부담금 등 = 전력(utilities 0번)만 뺀 모든 청구금액을 그대로 더한 값.
+  // 복합 LNG 사용량, 처분부담금 등 = 1. Utilities(전력 제외) + 2. Other Charge(깨끗한 나라 → 베올리아) 청구금액 합.
+  //   3. Other Charge(베올리아 → 깨끗한 나라)는 넣지 않는다.
   const CLIENT_TABLE = "srf_boiler_invoice_client";
-  const CLIENT_SECTIONS = new Set(["utilities", "other-out", "other-in"]);
+  const CLIENT_SECTIONS = new Set(["utilities", "other-out"]);
   const CLIENT_EXCLUDED = new Set(["utilities|0"]);   // · Electricity (전력)
 
   function clientNonPowerCharges(stored) {
     const byItem = new Map();
     stored.forEach((value, key) => {
       const [section, idx, field] = key.split("|");
-      if (!CLIENT_SECTIONS.has(section) ||(field !== "qty" && field !== "price")) return;
+      if (!CLIENT_SECTIONS.has(section) || (field !== "qty" && field !== "price")) return;
       const itemKey = `${section}|${idx}`;
       if (CLIENT_EXCLUDED.has(itemKey)) return;
       if (!byItem.has(itemKey)) byItem.set(itemKey, {});
