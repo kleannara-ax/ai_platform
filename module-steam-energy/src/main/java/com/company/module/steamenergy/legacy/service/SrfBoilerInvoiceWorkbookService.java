@@ -199,7 +199,9 @@ public class SrfBoilerInvoiceWorkbookService {
                 || (rowIndex == 36 && columnIndex == 3)
                 || (rowIndex == 37 && columnIndex == 3)
                 || (rowIndex == 43 && columnIndex == 5)
-                || (rowIndex == 50 && columnIndex == 3);
+                || (rowIndex == 50 && columnIndex == 3)
+                // ASC REFUND(Annual) — 원본은 빈 칸끼리 곱하는 수식이라 여기서는 직접 넣는다.
+                || (rowIndex == 52 && columnIndex == 3);
     }
 
     private boolean isWideTitleRow(int rowIndex) {
