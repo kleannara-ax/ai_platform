@@ -260,7 +260,9 @@ document.addEventListener("DOMContentLoaded", () => {
   //   Client Invoice → 3. OTHERS / UTILITIES·OTHER DEDUCTION (원본의 ='Client Invoice'!F.. 참조)
   const LINK_HINTS = {
     "15:3": "단가 입력 ▸ 복합보일러 BSC 단가에서 자동으로 가져옵니다",
+    "17:3": "단가 입력 ▸ 복합보일러 BSC FACTOR 에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
     "26:3": "단가 입력 ▸ 복합보일러 ASC 단가에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "28:3": "단가 입력 ▸ 복합보일러 ASC FACTOR 에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
     "33:3": "Client Invoice ▸ 3. Other Charge (깨끗한 나라 ← 베올리아) 첫째 줄 청구금액",
     "35:3": "Client Invoice ▸ 3. Other Charge (깨끗한 나라 ← 베올리아) 둘째 줄 청구금액",
     "54:3": "Client Invoice ▸ 1. Utilities Sub total",

@@ -27,8 +27,11 @@ document.addEventListener("DOMContentLoaded", () => {
     {
       facility: "복합보일러",
       items: [
+        // Invoice Summary(VK) 의 BSC·ASC 블록 — 단가(Won/ton steam)와 ESCALATION FACTOR 를 여기서 넣는다.
         { code: "comb_bsc",          label: "BSC 단가",                    unit: "원/톤", method: "direct" },
+        { code: "comb_bsc_factor",   label: "BSC FACTOR",                  unit: "",      method: "direct" },
         { code: "comb_asc",          label: "ASC 단가",                    unit: "원/톤", method: "direct" },
+        { code: "comb_asc_factor",   label: "ASC FACTOR",                  unit: "",      method: "direct" },
         { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct" },
       ],
     },

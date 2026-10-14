@@ -110,12 +110,20 @@
       { table: "lng_m_boiler", col: 5, key: function (d) { return pad2(d); } },
       { table: "lng_m_burner", col: 6, key: function (d) { return pad2(d); } },
     ] },
-    // 복합보일러 BSC·ASC → Invoice Summary(VK) 의 단가 칸 (Won/ton steam).
+    // 복합보일러 BSC·ASC → Invoice Summary(VK) 의 단가 칸(Won/ton steam)과 ESCALATION FACTOR 칸.
+    //   1. BSC = (ROUND(BSC 단가 x BSC FACTOR) + AFBSCr) x STEAM SUPPLY AMOUNT   (원본 D14)
+    //   2. ASC = ROUND(ASC 단가 x ASC FACTOR) x STEAM SUPPLY AMOUNT              (원본 D25)
     { code: "comb_bsc", label: "Invoice Summary(VK) BASE SERVICE CHARGE", monthTargets: [
       { table: SUMMARY_TABLE, rowKey: "summary-vk-r16", col: 4 },
     ] },
+    { code: "comb_bsc_factor", label: "Invoice Summary(VK) BSC ESCALATION FACTOR", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r18", col: 4 },
+    ] },
     { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", monthTargets: [
       { table: SUMMARY_TABLE, rowKey: "summary-vk-r27", col: 4 },
+    ] },
+    { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r29", col: 4 },
     ] },
     { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", targets: [
       { table: "flow_m_fluid_incinerator", col: 1, key: function (d) { return pad2(d); } },
