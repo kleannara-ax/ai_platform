@@ -383,22 +383,12 @@
         const handler = () => save(i, s, d, f);
         i.addEventListener("blur", handler);
         i.addEventListener("change", handler);
-        // 2호기 스팀량 칸에 글자를 넣는 순간부터 손값으로 본다 — 안 그러면 표 전체 재계산이
-        // 연동값으로 되돌려 버린다 (input 이 표의 재계산보다 먼저 온다)
-        if (s === "unit2" && f === "steam") {
-          i.addEventListener("input", () => {
-            // 비우는 중이면 저장될 때까지 연동값으로 되채우지 않는다(되채우면 그 값이 손값으로 저장돼 버린다)
-            if (String(i.value || "").trim() === "") { ownUnit2Steam.delete(d); i.dataset.cleared = "1"; }
-            else { ownUnit2Steam.add(d); delete i.dataset.cleared; }
-          });
-        }
       });
     }
-    /* 2호기(결산 기준) 스팀량 ← 실 스팀량 기준 2호기 스팀량, 336 이상이면 336.
-       실 스팀량 기준이 입력 원본이고 2호기 표는 그걸 따라간다.
-       2호기 칸에 손으로 넣은 날(ownUnit2Steam)은 그 값을 두고, 비우면 다시 연동값으로 돌아간다. */
+    /* 2호기(결산 기준) 스팀량 = 실 스팀량 기준 2호기 스팀량, 336 이상이면 336.
+       실 스팀량 기준이 입력 원본이고 2호기 칸은 늘 그 값을 따른다(읽기 전용).
+       저장된 2호기 값이 있어도 화면은 연동값을 쓰고, 실 스팀량을 저장할 때 2호기 값도 같이 저장해 DB 를 맞춘다. */
     const UNIT2_STEAM_CAP = 336;
-    const ownUnit2Steam = new Set();
     function linkedUnit2Steam(day) {
       const v = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-2"]`));
       if (v === null || v === undefined || Number.isNaN(v)) return null;
@@ -409,8 +399,10 @@
       for (let day = 1; day <= 31; day += 1) {
         const input = document.querySelector(`input[data-section="unit2"][data-day="${day}"][data-field="steam"]`);
         if (!input) continue;
-        input.title = `실 스팀량 기준 2호기 스팀량에서 가져옵니다 (${UNIT2_STEAM_CAP} 이상이면 ${UNIT2_STEAM_CAP}). 직접 고칠 수 있고, 비우면 다시 가져옵니다`;
-        if (day > days || ownUnit2Steam.has(day) || input.dataset.cleared === "1") { input.classList.remove("linked"); continue; }
+        input.readOnly = true;
+        input.tabIndex = -1;
+        input.title = `실 스팀량 기준 2호기 스팀량에서 가져옵니다 (${UNIT2_STEAM_CAP} 이상이면 ${UNIT2_STEAM_CAP}). 실 스팀량 기준 표에서 고치세요`;
+        if (day > days) { input.value = ""; input.classList.remove("linked"); continue; }
         const linked = linkedUnit2Steam(day);
         input.value = linked === null ? "" : String(linked);
         input.classList.toggle("linked", linked !== null);
@@ -436,13 +428,9 @@
         const res = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`);
         if (!res.ok) { applyRuntimeDefaults(); recomputeAll(); return; }
         (await res.json()).data?.forEach((row) => { if (row.table_name === T_NAME) storedRows.set(row.row_key, row); });
-        ownUnit2Steam.clear();
         eachInput((i, s, d, f) => {
           const stored = storedRows.get(rowKeyFor(s, d, f));
-          if (stored && stored.cell_value != null && stored.cell_value !== "") {
-            i.value = stored.cell_value;
-            if (s === "unit2" && f === "steam") ownUnit2Steam.add(d);
-          }
+          if (stored && stored.cell_value != null && stored.cell_value !== "") i.value = stored.cell_value;
         });
         applyRuntimeDefaults();
         recomputeAll();
@@ -464,11 +452,12 @@
         input.value = UNIT1_RUNTIME_DEFAULT;
         recomputeAll();
       }
-      // 2호기 스팀량: 넣으면 손값, 비우면 다시 실 스팀량 기준 연동
-      if (section === "unit2" && field === "steam") {
-        if (raw === "") ownUnit2Steam.delete(day); else ownUnit2Steam.add(day);
-        delete input.dataset.cleared;   // 빈 값이 저장됐으니 이제 연동값으로 되채워도 된다
+      // 실 스팀량 기준 2호기 스팀량을 저장하면 2호기(결산 기준) 스팀량도 같은 값(336 상한)으로 저장한다 —
+      // 엑셀 내려받기 등 DB 를 읽는 곳과 화면이 어긋나지 않게.
+      if (section === "real" && field === "steam-2") {
         recomputeAll();
+        const unit2Input = document.querySelector(`input[data-section="unit2"][data-day="${day}"][data-field="steam"]`);
+        if (unit2Input) await save(unit2Input, "unit2", day, "steam");
       }
     }
 
