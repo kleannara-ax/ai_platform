@@ -36,14 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
         { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct", bulk: "sum" },
       ],
     },
-    // 폐합성소각로는 1·2호기 단가가 서로 달라 호기별로 따로 등록한다.
-    {
-      facility: "폐합성소각로 1호기",
-      items: [
-        { code: "waste1_steam",      label: "스팀단가",          unit: "원/톤", method: "direct" },
-        { code: "waste1_fixed_hr",   label: "고정단가",          unit: "원/HR", method: "direct" },
-      ],
-    },
+    // 폐합성소각로 1호기는 쓰지 않아 뺐다(2026-10). 2호기만 등록한다.
     {
       facility: "폐합성소각로 2호기",
       items: [

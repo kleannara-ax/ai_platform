@@ -4,7 +4,7 @@
 
 ## 실행 순서
 
-파일 번호 순서대로 실행하면 된다(01 → 13). 번호가 곧 실행 순서다.
+파일 번호 순서대로 실행하면 된다(01 → 14). 번호가 곧 실행 순서다.
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
@@ -21,6 +21,7 @@
 | 11 | `11_remove_month_compare_power_rows.sql` | 회계비용 마감비교 전력비·에너지 합산 행 값 제거 |
 | 12 | `12_remove_month_compare_composite_steam.sql` | 마감비교 복합보일러 스팀구매 입력값 제거 (SRF 인보이스 연동) |
 | 13 | `13_remove_month_compare_composite_lng_etc.sql` | 마감비교 복합 LNG 사용량·처분부담금 입력값 제거 (Client Invoice 연동) |
+| 14 | `14_remove_waste1_price_items.sql` | 단가 입력의 폐합성소각로 1호기 항목 제거 |
 
 ```bash
 mysql -u {user} -p {database} < 01_schema.sql
@@ -36,6 +37,7 @@ mysql -u {user} -p {database} < 10_remove_combo_deduction_items.sql
 mysql -u {user} -p {database} < 11_remove_month_compare_power_rows.sql
 mysql -u {user} -p {database} < 12_remove_month_compare_composite_steam.sql
 mysql -u {user} -p {database} < 13_remove_month_compare_composite_lng_etc.sql
+mysql -u {user} -p {database} < 14_remove_waste1_price_items.sql
 ```
 
 표를 만든 뒤(01~03) 데이터를 넣고, 그다음 메뉴·권한(07~09)을 등록하는 순서다.
