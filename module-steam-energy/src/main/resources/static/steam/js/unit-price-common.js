@@ -119,6 +119,9 @@
     { code: "comb_bsc_factor", label: "Invoice Summary(VK) BSC ESCALATION FACTOR", monthTargets: [
       { table: SUMMARY_TABLE, rowKey: "summary-vk-r18", col: 4 },
     ] },
+    { code: "comb_bsc_guarantee", label: "Invoice Summary(VK) BSC STEAM SUPPLY AMOUNT", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r22", col: 4 },
+    ] },
     { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", monthTargets: [
       { table: SUMMARY_TABLE, rowKey: "summary-vk-r27", col: 4 },
     ] },
