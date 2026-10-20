@@ -46,7 +46,53 @@ public class EnergyAccountingPlanWorkbookService {
     private static final String CELL_TABLE = "table_cell_value";
     private static final String PAGE_TABLE = "energy_accounting_plan";
     private static final int HTML_ROW_COUNT = 32;
-    private static final int HTML_TO_EXCEL_ROW_OFFSET = 2; // HTML r01 → Excel row 3
+    private static final int HTML_TO_EXCEL_ROW_OFFSET = 2; // HTML r01 → Excel row 3 (이름을 못 찾을 때의 폴백)
+
+    /**
+     * 화면 행(r01~r32) 에 대응하는 <b>원본 시트의 항목 이름</b>.
+     * 구분 열(B)에 적힌 글자를 그대로 쓰되, 소계 행처럼 B 가 비어 있으면 대분류 열(A)의 글자다.
+     * 위치(행 번호)가 아니라 이 이름으로 찾으므로 원본에 행이 끼어들어도 밀리지 않는다.
+     */
+    private static final String[] ROW_LABELS = {
+            "복합보일러 스팀구매",            // r01
+            "제스코 스팀구매",               // r02
+            "LNG 구매",                   // r03
+            "폐합성소각로",                  // r04
+            "유동상소각로",                  // r05
+            "연료비 월별",                  // r06
+            "제스코 상계비 (용수사용 등)",      // r07
+            "제스코 페널티",                 // r08
+            "제스코 선급금 상환",             // r09
+            "복합 LNG, 용수사용량",          // r10
+            "복합 투자비 감가상각",            // r11
+            "복합보일러 처분수익 연료비 차감분",   // r12
+            "토지 지상권 지료",               // r13
+            "차감비 소계",                   // r14
+            "연료비(회계비용) 실적",           // r15  (A열)
+            "제지 연료비(스팀사용비율)",        // r16
+            "생활 연료비(스팀사용비율)",        // r17
+            "연료비(회계비용) 계획금액",        // r18  (A열)
+            "회계비용 대비 증감",             // r19  (A열)
+            "전월대비 증감",                 // r20  (A열)
+            "생산량",                      // r21  (A열)
+            "제지 제품생산량 (24년 반영)",     // r22
+            "화장지 제품생산량 (24년 반영)",    // r23
+            "총 원단위 (연료비/생산량)",       // r24  (A열)
+            "제지 원단위(연료비/생산량)",       // r25
+            "생활 원단위(연료비/생산량)",       // r26
+            "전월대비 손익증감",              // r27  (A열)
+            "제지손익",                     // r28
+            "생활손익",                     // r29
+            "손익합계(제지+생활)",            // r30
+            "스팀생산량",                    // r31
+            "LNG 직버너 사용 비용"           // r32
+    };
+
+    /** 라벨이 있는 열 — 뒤쪽(구분 B)이 우선이고, 비어 있으면 A 를 쓴다. */
+    private static final int[] LABEL_COLS = {1, 2};
+    /** "1월"~"12월" 이 적힌 머리글 행. */
+    private static final int MONTH_HEADER_ROW = 2;
+
 
     private final TableService tableService;
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
@@ -82,12 +128,15 @@ public class EnergyAccountingPlanWorkbookService {
         if (sheet == null) return 0;
         tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
         int imported = 0;
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS,
+                HTML_TO_EXCEL_ROW_OFFSET + 1, MONTH_HEADER_ROW);
         for (int htmlRow = 1; htmlRow <= HTML_ROW_COUNT; htmlRow += 1) {
-            int excelRowOneBased = htmlRow + HTML_TO_EXCEL_ROW_OFFSET;
+            Integer excelRowOneBased = resolveRow(index, htmlRow);
+            if (excelRowOneBased == null) continue;   // 원본에 없는 항목
             Row row = sheet.getRow(excelRowOneBased - 1);
             if (row == null) continue;
             for (int colIndex = 1; colIndex <= 13; colIndex += 1) {
-                int excelColZeroBased = colIndex + 1;
+                int excelColZeroBased = resolveMonthCol(index, colIndex);
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
@@ -103,13 +152,16 @@ public class EnergyAccountingPlanWorkbookService {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return;
         Map<String, String> cells = loadCells(year);
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS,
+                HTML_TO_EXCEL_ROW_OFFSET + 1, MONTH_HEADER_ROW);
         for (int htmlRow = 1; htmlRow <= HTML_ROW_COUNT; htmlRow += 1) {
-            int excelRowOneBased = htmlRow + HTML_TO_EXCEL_ROW_OFFSET;
+            Integer excelRowOneBased = resolveRow(index, htmlRow);
+            if (excelRowOneBased == null) continue;   // 원본에 없는 항목
             for (int colIndex = 1; colIndex <= 13; colIndex += 1) {
                 String key = rowKey(htmlRow) + "|" + colIndex;
                 String value = cells.get(key);
                 if (value == null) continue;
-                int excelColZeroBased = colIndex + 1;
+                int excelColZeroBased = resolveMonthCol(index, colIndex);
                 setNonFormulaCellNumber(sheet, excelRowOneBased, excelColZeroBased, value);
             }
         }
@@ -203,17 +255,30 @@ public class EnergyAccountingPlanWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .filter(p -> p.getFileName().toString().endsWith(".xlsx"))
-                    .filter(p -> !p.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("에너지 회계비용 원본 엑셀을 찾을 수 없습니다."));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith(FILE_PREFIX) && name.endsWith(".xlsx"), "에너지 회계비용");
+        cachedWorkbookPath = resolved;
+        return resolved;
+    }
+
+    /** 화면 행 → 원본 시트 행. 이름으로 찾고, 못 찾으면 기존 offset 으로 폴백한다. */
+    private Integer resolveRow(EnergySheetIndex index, int htmlRow) {
+        int declared = htmlRow + HTML_TO_EXCEL_ROW_OFFSET;
+        String label = htmlRow <= ROW_LABELS.length ? ROW_LABELS[htmlRow - 1] : null;
+        if (label == null) return declared;
+        // 이름을 못 찾으면 null — 호출부가 그 항목을 건너뛴다(다른 제목 줄에 붙이지 않는다)
+        return index.rowOrNull(0, declared, label, label);
+    }
+
+    /**
+     * 화면 열(1=전년 12월, 2~13=1~12월) → 원본 시트 열(0-based).
+     * 머리글에서 찾고, 못 찾으면 기존 계산식으로 폴백한다.
+     */
+    private int resolveMonthCol(EnergySheetIndex index, int colIndex) {
+        int declaredZeroBased = colIndex + 1;
+        int month = colIndex == 1 ? 0 : colIndex - 1;
+        return index.monthColumn(month, declaredZeroBased + 1) - 1;
     }
 
     private String rowKey(int htmlRow) {

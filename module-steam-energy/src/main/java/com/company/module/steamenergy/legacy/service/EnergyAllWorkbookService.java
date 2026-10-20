@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
  * 에너지 회계비용 5개 페이지 통합 워크북 처리.
@@ -23,7 +22,6 @@ import java.util.stream.Stream;
  */
 @Service
 public class EnergyAllWorkbookService {
-    private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
 
     private final EnergyAccountingPlanWorkbookService eap;
@@ -74,16 +72,10 @@ public class EnergyAllWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .filter(p -> p.getFileName().toString().endsWith(".xlsx"))
-                    .filter(p -> !p.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("에너지 회계비용 원본 엑셀을 찾을 수 없습니다."));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith(FILE_PREFIX) && name.endsWith(".xlsx"), "에너지 회계비용");
+        cachedWorkbookPath = resolved;
+        return resolved;
     }
 }

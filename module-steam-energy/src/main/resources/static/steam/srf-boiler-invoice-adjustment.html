@@ -603,7 +603,7 @@
       eachInput((input) => { input.value = ""; });
       document.querySelectorAll("table.adj-table").forEach((table) => recomputeTable(table));
       try {
-        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(adjMonthKey())}`, {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${ADJ_TABLE_NAME}&month=${encodeURIComponent(adjMonthKey())}`, {
           headers: { Accept: "application/json" }
         });
         if (!response.ok) return;

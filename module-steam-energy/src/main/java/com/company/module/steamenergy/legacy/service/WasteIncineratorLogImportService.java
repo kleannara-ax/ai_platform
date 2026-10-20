@@ -5,6 +5,7 @@ import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Entry;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Layout;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.SheetMap;
+import com.company.module.steamenergy.legacy.service.WasteIncineratorLogSheetIndex.Resolved;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellValue;
@@ -57,6 +58,8 @@ public class WasteIncineratorLogImportService {
         List<String> missingSheets = new ArrayList<>();
         List<String> monthMismatch = new ArrayList<>();
         List<String> layoutMismatch = new ArrayList<>();
+        List<String> headerMissing = new ArrayList<>();
+        List<String> headerMoved = new ArrayList<>();
         List<String> conflicts = new ArrayList<>();
         // 같은 col_index 를 쓰는 시트가 있다(스팀량 생산량 = 스팀량(적산) 생산량).
         // 값이 서로 다르면 나중 시트가 덮어쓰므로 그 사실을 알린다.
@@ -87,8 +90,19 @@ public class WasteIncineratorLogImportService {
                     layoutMismatch.add(sheetMap.sheetName() + "(" + String.join(", ", mismatched) + ")");
                 }
 
-                int written = importSheet(sheet, evaluator, sheetMap, monthKey, year, month, monthDays,
+                // 항목 위치는 헤더 글자로 찾는다. 좌표는 못 찾았을 때의 폴백이다.
+                WasteIncineratorLogSheetIndex index = WasteIncineratorLogSheetIndex.build(
+                        sheet, sheetMap, (row, col) -> readText(cellAt(sheet, row, col), evaluator));
+
+                int written = importSheet(sheet, evaluator, sheetMap, index, monthKey, year, month, monthDays,
                         writtenBy, conflicts);
+
+                if (!index.notFound().isEmpty()) {
+                    headerMissing.add(sheetMap.sheetName() + "(" + String.join(", ", index.notFound()) + ")");
+                }
+                if (!index.moved().isEmpty()) {
+                    headerMoved.add(sheetMap.sheetName() + "(" + String.join(", ", index.moved()) + ")");
+                }
                 if (written > 0) {
                     sheetCount += 1;
                     cellCount += written;
@@ -105,6 +119,13 @@ public class WasteIncineratorLogImportService {
         if (!conflicts.isEmpty()) {
             warnings.add("같은 항목이 두 시트에 다르게 적혀 있어 나중 시트 값으로 저장했습니다 — "
                     + String.join(" / ", conflicts));
+        }
+        if (!headerMoved.isEmpty()) {
+            warnings.add("원본 양식의 항목 위치가 바뀌어 항목명으로 찾아 읽었습니다 — " + String.join(" / ", headerMoved));
+        }
+        if (!headerMissing.isEmpty()) {
+            warnings.add("항목명을 찾지 못해 기존 좌표로 읽었습니다. 값을 확인해 주세요 — "
+                    + String.join(" / ", headerMissing));
         }
         if (!layoutMismatch.isEmpty()) {
             warnings.add("양식 위치가 기준과 다른 시트가 있습니다. 해당 칸은 비어 있거나 잘못 들어갔을 수 있습니다 — "
@@ -132,19 +153,26 @@ public class WasteIncineratorLogImportService {
 
     private int importSheet(
             Sheet sheet, FormulaEvaluator evaluator, SheetMap sheetMap,
+            WasteIncineratorLogSheetIndex index,
             String monthKey, int year, int month, int monthDays,
             Map<String, String[]> writtenBy, List<String> conflicts
     ) {
         int written = 0;
+        // 항목 줄은 하루마다 다시 찾을 필요가 없다 — 시트당 한 번만 해석한다.
+        Map<Entry, Resolved> lines = new LinkedHashMap<>();
+        for (Entry entry : sheetMap.entries()) lines.put(entry, index.resolve(entry));
+
         for (int day = 1; day <= monthDays; day += 1) {
+            int dayLine = index.dayLine(day);
             for (Entry entry : sheetMap.entries()) {
                 if (entry.firstDay() && day != 1) continue;
 
+                int itemLine = lines.get(entry).line();
                 Cell cell = sheetMap.layout() == Layout.DAYS_IN_COLUMNS
-                        // 일자가 열: 항목 = 엑셀 행, 날짜 = 시작열 + (일 - 1)
-                        ? cellAt(sheet, WasteIncineratorLogCellMap.parseRow(entry.line()), sheetMap.firstDayCol() + day - 1)
-                        // 일자가 행: 항목 = 엑셀 열, 날짜 = 시작행 + (일 - 1)
-                        : cellAt(sheet, sheetMap.firstDayRow() + day - 1, WasteIncineratorLogCellMap.parseCol(entry.line()));
+                        // 일자가 열: 항목 = 엑셀 행, 날짜 = 일자 헤더에서 찾은 열
+                        ? cellAt(sheet, itemLine, dayLine)
+                        // 일자가 행: 항목 = 엑셀 열, 날짜 = 일자 열에서 찾은 행
+                        : cellAt(sheet, dayLine, itemLine);
 
                 String value;
                 if (entry.text()) {

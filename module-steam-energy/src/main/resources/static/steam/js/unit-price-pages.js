@@ -1,7 +1,8 @@
 /* 단가 입력 페이지 — 엑셀 "2. 단가 등록 (관리자)" 시트 구조를 반영한 확장판.
  *  - 시설별 세부 단가 항목을 연/월(1~12) 그리드로 등록. 저장 테이블: unit_price_detail.
  *  - 단가를 고치면 연동 대상 페이지의 그 달 전체 일자에 일괄 적용 (unit-price-common.js 의 PRICE_LINKS).
- *    LNG → LNG 연료 사용 비용 / 유동상 → 세부 운영내역 KNE / 폐합성 1·2호기 → 도급내역. 복합보일러는 미연결.
+ *    LNG → LNG 연료 사용 비용 / 유동상·폐합성 → 유동상·소각로·복합 일일 사용량 + 세부 운영내역·도급내역 /
+ *    복합보일러 BSC·ASC → Invoice Summary(VK) 의 그 달 단가 칸.
  *  - 신설소각로: 항목/DB만 존재, 아직 아무것도 연결하지 않음.
  *  - "자동계산" 항목은 화면에서 직접 입력하지 않음(계산식 안내만 표시).
  */
@@ -26,19 +27,19 @@ document.addEventListener("DOMContentLoaded", () => {
     {
       facility: "복합보일러",
       items: [
+        // Invoice Summary(VK) 의 BSC·ASC 블록 — 단가(Won/ton steam)와 ESCALATION FACTOR 를 여기서 넣는다.
         { code: "comb_bsc",          label: "BSC 단가",                    unit: "원/톤", method: "direct" },
+        { code: "comb_bsc_factor",   label: "BSC FACTOR",                  unit: "",      method: "direct" },
         { code: "comb_asc",          label: "ASC 단가",                    unit: "원/톤", method: "direct" },
-        { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct" },
-        { code: "comb_lng_cost",     label: "(차감) 복합 LNG 사용비용",     unit: "",      method: "auto", note: "복합 LNG 사용량 × 단가" },
-        { code: "comb_disposal",     label: "(차감) 처분부담금",            unit: "",      method: "direct" },
-        { code: "comb_depreciation", label: "(차감) 감가상각 + 토지지상권 지료", unit: "", method: "direct" },
+        { code: "comb_asc_factor",   label: "ASC FACTOR",                  unit: "",      method: "direct" },
+        // 보증량은 달마다 다르므로 월별로만 넣는다. 일괄 칸은 입력이 아니라 12개월 합을 보여 준다.
+        { code: "comb_bsc_guarantee",label: "BSC 보증량",                  unit: "",      method: "direct", bulk: "sum" },
       ],
     },
-    // 폐합성소각로는 1·2호기 단가가 서로 달라 호기별로 따로 등록한다.
+    // 폐합성소각로 1호기는 고정단가만 등록한다 — 스팀단가는 쓰지 않아 뺐다(2026-10).
     {
       facility: "폐합성소각로 1호기",
       items: [
-        { code: "waste1_steam",      label: "스팀단가",          unit: "원/톤", method: "direct" },
         { code: "waste1_fixed_hr",   label: "고정단가",          unit: "원/HR", method: "direct" },
       ],
     },
@@ -140,7 +141,9 @@ document.addEventListener("DOMContentLoaded", () => {
           : "";
         const note = isAuto && item.note ? `<div class="auto-note">${esc(item.note)}</div>` : "";
         const dis = isAuto ? " disabled" : "";
-        const bulk = `<td class="bulk-col"><input data-role="bulk" data-code="${item.code}" inputmode="decimal" placeholder="—"${dis}></td>`;
+        const bulk = item.bulk === "sum"
+          ? `<td class="bulk-col"><input data-role="bulk-sum" data-code="${item.code}" readonly tabindex="-1" placeholder="—" title="12개월 합계 (입력은 월별 칸에)"></td>`
+          : `<td class="bulk-col"><input data-role="bulk" data-code="${item.code}" inputmode="decimal" placeholder="—"${dis}></td>`;
         const months = MONTHS.map((m) =>
           `<td><input data-role="month" data-code="${item.code}" data-month="${m}" inputmode="decimal"${dis}></td>`
         ).join("");
@@ -155,6 +158,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function monthInput(code, m) { return body.querySelector(`input[data-role="month"][data-code="${code}"][data-month="${m}"]`); }
 
+  // 일괄 칸이 합계인 항목(BSC 보증량): 12개월 칸을 더해 보여 준다. 하나도 없으면 빈 칸.
+  function refreshBulkSum(code) {
+    const target = body.querySelector(`input[data-role="bulk-sum"][data-code="${code}"]`);
+    if (!target) return;
+    let sum = 0;
+    let any = false;
+    MONTHS.forEach((m) => {
+      const raw = rawNumber(monthInput(code, m)?.value);
+      if (raw === "" || !Number.isFinite(Number(raw))) return;
+      sum += Number(raw);
+      any = true;
+    });
+    target.value = any ? withCommas(sum) : "";
+  }
+  function refreshAllBulkSums() {
+    ALL_ITEMS.filter((item) => item.bulk === "sum").forEach((item) => refreshBulkSum(item.code));
+  }
+
   async function load() {
     reloadBtn.disabled = true;
     setMsg("불러오는 중…", true);
@@ -168,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const bulk = body.querySelector(`input[data-role="bulk"][data-code="${item.code}"]`);
         if (bulk) bulk.value = "";
       });
+      refreshAllBulkSums();
       setMsg("", true);
     } catch (e) {
       setMsg("불러오기 실패", false);
@@ -185,7 +207,9 @@ document.addEventListener("DOMContentLoaded", () => {
       setMsg(`저장됨 · ${m}월 ${link.label} 반영 중…`, true);
       const result = await UP.applyPriceLink(code, currentYear, m, value);
       setMsg(result.applied
-        ? `저장됨 · ${m}월 ${link.label} ${result.applied}일 적용`
+        ? (result.monthly
+            ? `저장됨 · ${currentYear}년 ${m}월 ${link.label} 적용`
+            : `저장됨 · ${m}월 ${link.label} ${result.applied}일 적용`)
         : "저장됨", true);
     } catch (e) { setMsg("저장 실패", false); }
   }
@@ -194,6 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
   body.addEventListener("change", (e) => {
     const input = e.target.closest('input[data-role="month"]');
     if (!input || input.disabled) return;
+    refreshBulkSum(input.dataset.code);
     saveMonth(input.dataset.code, Number(input.dataset.month), rawNumber(input.value));
   });
 

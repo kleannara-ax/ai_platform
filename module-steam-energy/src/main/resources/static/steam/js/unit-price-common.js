@@ -100,24 +100,45 @@
   //   - LNG 연료 사용 비용 : lng_m_boiler 5열 / lng_m_burner 6열, row_key "01".."31"
   //   - 유동상 세부 운영내역: fluidized_detail_main, row_key = 일자열(일+2) + 행번호, col 0
   //   - 폐합성 도급내역     : incinerator_contract, row_key "섹션|일|필드", col 1
-  //  복합보일러 단가는 아직 연결하지 않는다.
+  //   - 유동상/소각로/복합 일일 사용량: flow_m_fluid_incinerator, row_key "01".."31"
+  //
+  //  monthTargets 는 일자별이 아니라 그 달에 한 칸만 있는 자리다(Invoice Summary(VK)).
+  //  row_key 는 인보이스 화면과 같은 "summary-vk-r{행번호}", col 은 col_index(=열+1) 그대로다.
+  var SUMMARY_TABLE = "srf_boiler_invoice_summary";
   var PRICE_LINKS = [
     { code: "lng_unit", label: "LNG 연료 사용 비용 단가(보일러·버너)", targets: [
       { table: "lng_m_boiler", col: 5, key: function (d) { return pad2(d); } },
       { table: "lng_m_burner", col: 6, key: function (d) { return pad2(d); } },
     ] },
-    { code: "fluid_steam", label: "세부 운영내역 KNE 스팀단가", targets: [
+    // 복합보일러 BSC·ASC → Invoice Summary(VK) 의 단가 칸(Won/ton steam)과 ESCALATION FACTOR 칸.
+    //   1. BSC = (ROUND(BSC 단가 x BSC FACTOR) + AFBSCr) x STEAM SUPPLY AMOUNT   (원본 D14)
+    //   2. ASC = ROUND(ASC 단가 x ASC FACTOR) x STEAM SUPPLY AMOUNT              (원본 D25)
+    { code: "comb_bsc", label: "Invoice Summary(VK) BASE SERVICE CHARGE", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r16", col: 4 },
+    ] },
+    { code: "comb_bsc_factor", label: "Invoice Summary(VK) BSC ESCALATION FACTOR", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r18", col: 4 },
+    ] },
+    { code: "comb_bsc_guarantee", label: "Invoice Summary(VK) BSC STEAM SUPPLY AMOUNT", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r22", col: 4 },
+    ] },
+    { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r27", col: 4 },
+    ] },
+    { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", monthTargets: [
+      { table: SUMMARY_TABLE, rowKey: "summary-vk-r29", col: 4 },
+    ] },
+    { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", targets: [
+      { table: "flow_m_fluid_incinerator", col: 1, key: function (d) { return pad2(d); } },
       { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "11"; } },
     ] },
     { code: "fluid_fixed_hr", label: "세부 운영내역 KNE 운휴시간 단가", targets: [
       { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "13"; } },
     ] },
     // 폐합성 운영단가는 도급내역의 결산 기준 표와 실 스팀량 기준 표에 같은 값으로 들어간다.
-    { code: "waste1_steam", label: "도급내역 1호기 운영단가", targets: [
-      { table: "incinerator_contract", col: 1, key: function (d) { return "unit1|" + d + "|unit"; } },
-      { table: "incinerator_contract", col: 1, key: function (d) { return "real|" + d + "|unit-1"; } },
-    ] },
-    { code: "waste2_steam", label: "도급내역 2호기 운영단가", targets: [
+    // (1호기 스팀단가는 단가 입력에서 뺐다 — 도급내역 1호기 운영단가는 그 페이지에서 직접 넣는다)
+    { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", targets: [
+      { table: "flow_m_fluid_incinerator", col: 4, key: function (d) { return pad2(d); } },
       { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|unit"; } },
       { table: "incinerator_contract", col: 1, key: function (d) { return "real|" + d + "|unit-2"; } },
     ] },
@@ -174,7 +195,31 @@
     var ym = String(year) + "-" + pad2(month);
     var days = daysInMonth(year, month);
     var tasks = [];
-    link.targets.forEach(function (target) {
+    function post(target, rowKey) {
+      return function () {
+        return fetch(TABLES_BASE + "/" + CELL_TABLE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            month: ym, year_no: Number(year), month_no: Number(month),
+            table_name: target.table,
+            row_key: rowKey,
+            col_index: target.col,
+            cell_value: clean,
+          }),
+        }).then(function (r) { if (!r.ok) throw new Error("단가 연동 저장 실패"); return r; });
+      };
+    }
+    // 그 달에 한 칸만 있는 자리(Invoice Summary(VK)) — 일자별로 쓰지 않는다.
+    (link.monthTargets || []).forEach(function (target) {
+      tasks.push(post(target, target.rowKey));
+    });
+    if (link.monthTargets && !link.targets) {
+      return runLimited(tasks, 6).then(function () {
+        return { applied: 1, cells: tasks.length, label: link.label, monthly: true };
+      });
+    }
+    (link.targets || []).forEach(function (target) {
       for (var d = 1; d <= days; d++) {
         (function (day) {
           tasks.push(function () {

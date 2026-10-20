@@ -6,6 +6,7 @@ import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Po
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Store;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -36,6 +37,8 @@ import java.util.stream.Stream;
  */
 @Service
 public class FluidizedDailyLogExportService {
+
+    private static final DataFormatter HEADER_FORMATTER = new DataFormatter();
 
     private static final String ORIGINAL_DIR = "원본";
     private static final String TEMPLATE_KEYWORD = "유동상 운전일지";
@@ -87,8 +90,13 @@ public class FluidizedDailyLogExportService {
     private void writeDaySheet(Sheet sheet, Map<String, String> cells, String monthKey, int year, int month, int day) {
         setDate(cell(sheet, FluidizedDailyLogCellMap.DATE_REF, true), LocalDate.of(year, month, day));
 
+        // 업로드와 같은 방식으로, 채울 자리도 (섹션, 행 라벨, 열 라벨) 로 찾는다(좌표는 폴백).
+        FluidizedDailyLogSheetIndex index = FluidizedDailyLogSheetIndex.build(
+                sheet, (row, col) -> headerText(sheet, row, col));
+
         for (Entry entry : FluidizedDailyLogCellMap.DAY_CELLS) {
-            Cell target = cell(sheet, entry.ref(), true);
+            FluidizedDailyLogSheetIndex.Resolved at = index.resolve(entry);
+            Cell target = cellAt(sheet, at.row(), at.col(), true);
             if (target == null || target.getCellType() == CellType.FORMULA) continue; // 수식은 그대로 둔다
             String value = lookup(cells, entry, monthKey, day);
             if (value == null || value.isBlank()) {
@@ -119,14 +127,40 @@ public class FluidizedDailyLogExportService {
 
     /** 그 달에 없는 날짜(30·31일 등)의 시트는 입력칸을 비운다. */
     private void clearDaySheet(Sheet sheet) {
+        FluidizedDailyLogSheetIndex index = FluidizedDailyLogSheetIndex.build(
+                sheet, (row, col) -> headerText(sheet, row, col));
+
         for (Entry entry : FluidizedDailyLogCellMap.DAY_CELLS) {
-            Cell target = cell(sheet, entry.ref(), false);
+            FluidizedDailyLogSheetIndex.Resolved at = index.resolve(entry);
+            Cell target = cellAt(sheet, at.row(), at.col(), false);
             if (target != null && target.getCellType() != CellType.FORMULA) target.setBlank();
         }
         for (PowerUsage usage : FluidizedDailyLogCellMap.POWER_USAGE) {
-            Cell prev = cell(sheet, usage.prevRef(), false);
+            FluidizedDailyLogSheetIndex.Resolved at = index.resolve(
+                    FluidizedDailyLogCellMap.POWER_SECTION, usage.rowLabel(),
+                    FluidizedDailyLogCellMap.POWER_PREV_COL, usage.prevRef(), usage.label());
+            Cell prev = cellAt(sheet, at.row(), at.col(), false);
             if (prev != null && prev.getCellType() != CellType.FORMULA) prev.setBlank();
         }
+    }
+
+    /** 1-based 행/열의 셀. create 면 없을 때 만든다. */
+    private Cell cellAt(Sheet sheet, int rowNumber, int colNumber, boolean create) {
+        if (rowNumber < 1 || colNumber < 1) return null;
+        Row row = sheet.getRow(rowNumber - 1);
+        if (row == null) {
+            if (!create) return null;
+            row = sheet.createRow(rowNumber - 1);
+        }
+        Cell cell = row.getCell(colNumber - 1);
+        if (cell == null && create) cell = row.createCell(colNumber - 1);
+        return cell;
+    }
+
+    /** 헤더 색인용 — 라벨 칸은 수식이 아니므로 서식만 적용해 읽는다. */
+    private String headerText(Sheet sheet, int rowNumber, int colNumber) {
+        Cell cell = cellAt(sheet, rowNumber, colNumber, false);
+        return cell == null ? "" : HEADER_FORMATTER.formatCellValue(cell).trim();
     }
 
     // ── 함수율 시트 ─────────────────────────────────────────────────
@@ -264,20 +298,10 @@ public class FluidizedDailyLogExportService {
         return label.toString();
     }
 
-    /** 원본 폴더 위치. 실행 위치가 app 하위일 수 있어 상위 폴더까지 훑는다. */
-    private Path resolveOriginalDir() throws IOException {
-        Path base = Path.of("").toAbsolutePath();
-        for (int depth = 0; depth < 4 && base != null; depth += 1) {
-            Path candidate = base.resolve(ORIGINAL_DIR);
-            if (Files.isDirectory(candidate)) return candidate;
-            base = base.getParent();
-        }
-        throw new IOException("'" + ORIGINAL_DIR + "' 폴더를 찾지 못했습니다.");
-    }
 
     /** 원본 폴더에서 운전일지 서식 파일을 찾는다 (백업본·임시파일 제외). */
     private Path resolveTemplatePath() throws IOException {
-        Path dir = resolveOriginalDir();
+        Path dir = OriginalWorkbookFiles.dir();
         try (Stream<Path> paths = Files.list(dir)) {
             Optional<Path> found = paths
                     .filter(Files::isRegularFile)

@@ -222,7 +222,7 @@ A monthly charge (the Base Service Charge) shall be payable in respect of each m
       rateInput.value = "";
       recompute();
       try {
-        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=200&month=${encodeURIComponent(bscMonthKey())}`, {
+        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${BSC_TABLE}&month=${encodeURIComponent(bscMonthKey())}`, {
           headers: { Accept: "application/json" }
         });
         if (!response.ok) return;

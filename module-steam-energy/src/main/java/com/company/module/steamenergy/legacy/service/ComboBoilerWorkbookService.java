@@ -21,19 +21,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 @Service
 public class ComboBoilerWorkbookService {
-    private static final String ORIGINAL_DIR = "\uC6D0\uBCF8";
     private static final String CELL_TABLE = "table_cell_value";
     private static final String PRODUCTION_TABLE = "combo_boiler_production";
     private static final String DOWNTIME_TABLE = "combo_boiler_downtime";
     private static final String RECOVERY_TABLE = "combo_boiler_recovery";
     private static final String ETC_TABLE = "combo_boiler_etc";
-    private static final int FIRST_DAY_ROW = 7;
     private static final int MAX_RECOVERY_ROWS = 26;
 
     private final TableService tableService;
@@ -53,13 +51,15 @@ public class ComboBoilerWorkbookService {
                 Sheet sheet = workbook.getSheetAt(i);
                 int month = sheetMonth(sheet.getSheetName());
                 if (month < 1 || month > 12) continue;
-                validateMonthlySheet(sheet);
+                // 좌표가 아니라 머리글 글자로 칸을 찾는다 — 원본에서 행·열을 지워도 밀리지 않는다.
+                ComboBoilerLayout layout = ComboBoilerLayout.of(sheet);
+                validateMonthlySheet(sheet, layout);
                 validSheets += 1;
                 clearImportedMonth(year, month);
-                imported += importProductionSheet(sheet, year, month);
-                imported += importDowntimeSheet(sheet, year, month);
-                imported += importRecoverySheet(sheet, year, month);
-                imported += importEtcSheet(sheet, year, month);
+                imported += importProductionSheet(sheet, layout, year, month);
+                imported += importDowntimeSheet(sheet, layout, year, month);
+                imported += importRecoverySheet(sheet, layout, year, month);
+                imported += importEtcSheet(sheet, layout, year, month);
             }
         }
         if (validSheets == 0) {
@@ -90,11 +90,13 @@ public class ComboBoilerWorkbookService {
                 String monthKey = monthKey(year, month);
                 Map<String, Map<String, String>> cells = loadMonthCells(monthKey);
                 Map<String, Map<String, String>> annualCells = loadMonthCells(monthKey(year, 1));
+                // \uB0B4\uB824\uBC1B\uAE30\uB3C4 \uAC19\uC740 \uC0C9\uC778\uC744 \uC4F4\uB2E4 \u2014 \uC5C5\uB85C\uB4DC\uC640 \uC790\uB9AC\uAC00 \uC5B4\uAE0B\uB098\uC9C0 \uC54A\uAC8C.
+                ComboBoilerLayout layout = ComboBoilerLayout.of(sheet);
                 setCellValue(sheet, 2, 0, year + "\uB144  " + month + "\uC6D4");
-                fillProductionSheet(sheet, cells.getOrDefault(PRODUCTION_TABLE, Map.of()));
-                fillDowntimeSheet(sheet, cells.getOrDefault(DOWNTIME_TABLE, Map.of()));
-                fillRecoverySheet(sheet, cells.getOrDefault(RECOVERY_TABLE, Map.of()));
-                fillEtcSheet(sheet, annualCells.getOrDefault(ETC_TABLE, Map.of()));
+                fillProductionSheet(sheet, layout, cells.getOrDefault(PRODUCTION_TABLE, Map.of()));
+                fillDowntimeSheet(sheet, layout, cells.getOrDefault(DOWNTIME_TABLE, Map.of()));
+                fillRecoverySheet(sheet, layout, cells.getOrDefault(RECOVERY_TABLE, Map.of()));
+                fillEtcSheet(sheet, layout, annualCells.getOrDefault(ETC_TABLE, Map.of()));
             }
             workbook.write(outputStream);
             return outputStream.toByteArray();
@@ -104,195 +106,184 @@ public class ComboBoilerWorkbookService {
     // validateWorkbook(int year) 제거됨 — Excel 을 다시 파싱하던 데드 메서드.
     // Excel 파일은 업로드/다운로드 외에서 열지 않는다는 정책에 위배.
 
-    private int importProductionSheet(Sheet sheet, int year, int month) {
+    private int importProductionSheet(Sheet sheet, ComboBoilerLayout layout, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
-        String[][] fields = {
-                {"comboSteam", "B"}, {"comboCondensate", "D"}, {"comboMakeup", "E"},
-                {"comboDeaerator", "F"}, {"comboProcess", "G"}, {"comboDilution", "H"},
-                {"externalSteam", "I"}, {"externalCondensate", "K"}, {"externalMakeup", "L"},
-                {"wasteSteam1", "M"}, {"wasteSteam2", "O"}, {"kn20", "Q"}, {"kn50", "R"},
-                {"fluidizedSteam", "S"}, {"fluidizedCondensate", "T"},
-                {"runtime20", "W"}, {"runtime50", "X"}, {"runtimeFluidized", "Y"}
+        String[] fields = {
+                "comboSteam", "comboCondensate", "comboMakeup",
+                "comboDeaerator", "comboProcess", "comboDilution",
+                "externalSteam", "externalCondensate", "externalMakeup",
+                "wasteSteam1", "wasteSteam2", "kn20", "kn50",
+                "fluidizedSteam", "fluidizedCondensate",
+                "runtime20", "runtime50", "runtimeFluidized"
         };
-        for (int day = 1; day <= 31; day += 1) {
-            int row = FIRST_DAY_ROW + day - 1;
-            for (String[] field : fields) {
-                imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, field[0] + "-" + day, cellText(sheet, row, col(field[1])));
-            }
-        }
-        imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, "fuelPrice-lngBoiler", cellText(sheet, 42, col("F")));
-        imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, "fuelPrice-fluidized", cellText(sheet, 43, col("F")));
-        imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, "fuelPrice-combo", cellText(sheet, 44, col("F")));
-        imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, "fuelPrice-waste", cellText(sheet, 45, col("F")));
-        imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, "fuelPrice-external", cellText(sheet, 46, col("F")));
-        return imported;
-    }
+        imported += importDayFields(sheet, layout, PRODUCTION_TABLE, monthKey, year, month, fields);
 
-    private int importDowntimeSheet(Sheet sheet, int year, int month) {
-        int imported = 0;
-        String monthKey = monthKey(year, month);
-        String[][] dayFields = {
-                {"changeCombo", "AA"},
-                {"changeJesco", "AE"},
-                {"down1", "AI"},
-                {"down2", "AJ"},
-                {"disperserSteam", "AK"},
-                {"runtimeMin", "AM"}
-        };
-        for (int day = 1; day <= 31; day += 1) {
-            int row = FIRST_DAY_ROW + day - 1;
-            for (String[] field : dayFields) {
-                imported += upsertCell(DOWNTIME_TABLE, monthKey, year, month, field[0] + "-" + day, cellText(sheet, row, col(field[1])));
-            }
-        }
-        imported += upsertCell(DOWNTIME_TABLE, monthKey, year, month, "ventLossUnitPrice", cellText(sheet, 54, col("D")));
-        String[][] rows = {
-                {"ventProduction", "50"},
-                {"ventInternal", "51"},
-                {"ventUsage", "52"}
-        };
-        for (String[] rowDef : rows) {
-            int row = Integer.parseInt(rowDef[1]);
-            for (int day = 1; day <= 31; day += 1) {
-                imported += upsertCell(DOWNTIME_TABLE, monthKey, year, month, rowDef[0] + "-" + day, cellText(sheet, row, col("E") + day - 1));
+        // 연료단가: 설비 이름으로 줄을, "연료단가" 머리글로 칸을 찾는다.
+        int priceColumn = layout.fuelPriceColumn();
+        if (priceColumn >= 0) {
+            for (Map.Entry<String, Integer> entry : layout.fuelPriceRows().entrySet()) {
+                imported += upsertCell(PRODUCTION_TABLE, monthKey, year, month, entry.getKey(),
+                        cellText(sheet, entry.getValue(), priceColumn));
             }
         }
         return imported;
     }
 
-    private int importRecoverySheet(Sheet sheet, int year, int month) {
+    private int importDowntimeSheet(Sheet sheet, ComboBoilerLayout layout, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, month);
+        String[] dayFields = {"changeCombo", "changeJesco", "down1", "down2", "disperserSteam", "runtimeMin"};
+        imported += importDayFields(sheet, layout, DOWNTIME_TABLE, monthKey, year, month, dayFields);
+
+        // 벤트 손실: 항목 이름으로 줄을, 날짜 머리글로 칸을 찾는다.
+        Integer lossRow = layout.ventRows().get("ventLossUnitPrice");
+        if (lossRow != null && layout.ventUnitPriceColumn() >= 0) {
+            imported += upsertCell(DOWNTIME_TABLE, monthKey, year, month, "ventLossUnitPrice",
+                    cellText(sheet, lossRow, layout.ventUnitPriceColumn()));
+        }
+        for (String key : new String[]{"ventProduction", "ventInternal", "ventUsage"}) {
+            Integer row = layout.ventRows().get(key);
+            if (row == null) continue;
+            for (Map.Entry<Integer, Integer> day : layout.ventDayColumns().entrySet()) {
+                imported += upsertCell(DOWNTIME_TABLE, monthKey, year, month, key + "-" + day.getKey(),
+                        cellText(sheet, row, day.getValue()));
+            }
+        }
+        return imported;
+    }
+
+    /** 일별 표를 항목 키로 읽는다. 머리글을 못 찾은 항목·일자는 건너뛴다. */
+    private int importDayFields(Sheet sheet, ComboBoilerLayout layout, String tableName,
+                                String monthKey, int year, int month, String[] fields) {
+        int imported = 0;
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            for (String field : fields) {
+                Integer column = layout.dayColumns().get(field);
+                if (column == null) continue;
+                imported += upsertCell(tableName, monthKey, year, month, field + "-" + day.getKey(),
+                        cellText(sheet, day.getValue(), column));
+            }
+        }
+        return imported;
+    }
+
+    private int importRecoverySheet(Sheet sheet, ComboBoilerLayout layout, int year, int month) {
+        int imported = 0;
+        String monthKey = monthKey(year, month);
+        int firstRow = layout.recoveryFirstRow();
+        if (firstRow < 0) return imported;
         for (int index = 1; index <= MAX_RECOVERY_ROWS; index += 1) {
-            int row = 58 + index - 1;
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossDate-" + index, cellText(sheet, row, col("A")));
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossTime-" + index, cellText(sheet, row, col("B")));
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossNote-" + index, cellText(sheet, row, col("D")));
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossSteamRate-" + index, cellText(sheet, row, col("J")));
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossBaseRate-" + index, cellText(sheet, row, col("K")));
-            imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, "lossMinutes-" + index, cellText(sheet, row, col("L")));
+            int row = firstRow + index - 1;
+            for (Map.Entry<String, Integer> column : layout.recoveryColumns().entrySet()) {
+                imported += upsertCell(RECOVERY_TABLE, monthKey, year, month, column.getKey() + "-" + index,
+                        cellText(sheet, row, column.getValue()));
+            }
         }
         return imported;
     }
 
-    private int importEtcSheet(Sheet sheet, int year, int month) {
+    private int importEtcSheet(Sheet sheet, ComboBoilerLayout layout, int year, int month) {
         int imported = 0;
         String monthKey = monthKey(year, 1);
-        imported += importHorizontal(sheet, year, 1, monthKey, "combo-plan-1-", 58, "S", "AG");
-        imported += importHorizontal(sheet, year, 1, monthKey, "combo-plan-2-", 59, "S", "AG");
-        imported += importHorizontal(sheet, year, 1, monthKey, "combo-plan-3-", 60, "S", "AG");
-        imported += importHorizontal(sheet, year, 1, monthKey, "combo-plan-4-", 61, "S", "AG");
-        imported += importHorizontal(sheet, year, 1, monthKey, "combo-plan-5-", 62, "S", "AG");
-        imported += importHorizontal(sheet, year, 1, monthKey, "jesco-plan-0-", 67, "R", "AD");
-        imported += importHorizontal(sheet, year, 1, monthKey, "jesco-plan-1-", 68, "R", "AD");
-        imported += importHorizontal(sheet, year, 1, monthKey, "jesco-plan-2-", 69, "R", "AD");
-        imported += importHorizontal(sheet, year, 1, monthKey, "lngBoiler-", 73, "R", "AC", 1);
-        imported += importHorizontal(sheet, year, 1, monthKey, "lngCombo-", 74, "R", "AC", 1);
+        for (String block : new String[]{"combo", "jesco", "lng"}) {
+            imported += importPlanBlock(sheet, layout.planBlock(block), year, monthKey, "lng".equals(block) ? 1 : 0);
+        }
         return imported;
     }
 
-    private int importHorizontal(Sheet sheet, int year, int month, String monthKey, String prefix, int row, String startCol, String endCol) {
-        return importHorizontal(sheet, year, month, monthKey, prefix, row, startCol, endCol, 0);
-    }
-
-    private int importHorizontal(Sheet sheet, int year, int month, String monthKey, String prefix, int row, String startCol, String endCol, int keyOffset) {
+    /**
+     * 연간 계획 표 한 벌을 읽는다.
+     *
+     * <p>월 칸은 머리글에서 찾은 범위({@code 첫 월 ~ "계" 바로 왼쪽})를 쓴다. 저장 키는 예전처럼
+     * <b>왼쪽에서 몇 번째 칸인지</b>로 매긴다 — 화면이 그 순서로 월을 그리기 때문이다.
+     */
+    private int importPlanBlock(Sheet sheet, ComboBoilerLayout.PlanBlock block, int year, String monthKey, int keyOffset) {
+        if (block == null || !block.usable()) return 0;
         int imported = 0;
-        int start = col(startCol);
-        int end = col(endCol);
-        for (int column = start; column <= end; column += 1) {
-            imported += upsertCell(ETC_TABLE, monthKey, year, month, prefix + (column - start + keyOffset), cellText(sheet, row, column));
+        for (Map.Entry<String, Integer> row : block.rows().entrySet()) {
+            for (int column = block.firstMonthCol(); column <= block.lastMonthCol(); column += 1) {
+                imported += upsertCell(ETC_TABLE, monthKey, year, 1,
+                        row.getKey() + (column - block.firstMonthCol() + keyOffset),
+                        cellText(sheet, row.getValue(), column));
+            }
         }
         return imported;
     }
 
-    private void fillProductionSheet(Sheet sheet, Map<String, String> cells) {
-        String[][] fields = {
-                {"comboSteam", "B"}, {"comboCondensate", "D"}, {"comboMakeup", "E"},
-                {"comboDeaerator", "F"}, {"comboProcess", "G"}, {"comboDilution", "H"},
-                {"externalSteam", "I"}, {"externalCondensate", "K"}, {"externalMakeup", "L"},
-                {"wasteSteam1", "M"}, {"wasteSteam2", "O"}, {"kn20", "Q"}, {"kn50", "R"},
-                {"fluidizedSteam", "S"}, {"fluidizedCondensate", "T"},
-                {"runtime20", "W"}, {"runtime50", "X"}, {"runtimeFluidized", "Y"}
+    private void fillProductionSheet(Sheet sheet, ComboBoilerLayout layout, Map<String, String> cells) {
+        String[] fields = {
+                "comboSteam", "comboCondensate", "comboMakeup",
+                "comboDeaerator", "comboProcess", "comboDilution",
+                "externalSteam", "externalCondensate", "externalMakeup",
+                "wasteSteam1", "wasteSteam2", "kn20", "kn50",
+                "fluidizedSteam", "fluidizedCondensate",
+                "runtime20", "runtime50", "runtimeFluidized"
         };
-        for (int day = 1; day <= 31; day += 1) {
-            int row = FIRST_DAY_ROW + day - 1;
-            for (String[] field : fields) setCellValue(sheet, row, col(field[1]), cells.get(field[0] + "-" + day));
+        fillDayFields(sheet, layout, cells, fields);
+
+        int priceColumn = layout.fuelPriceColumn();
+        if (priceColumn < 0) return;
+        for (Map.Entry<String, Integer> entry : layout.fuelPriceRows().entrySet()) {
+            setCellValue(sheet, entry.getValue(), priceColumn, cells.get(entry.getKey()));
         }
-        setCellValue(sheet, 42, col("F"), cells.get("fuelPrice-lngBoiler"));
-        setCellValue(sheet, 43, col("F"), cells.get("fuelPrice-fluidized"));
-        setCellValue(sheet, 44, col("F"), cells.get("fuelPrice-combo"));
-        setCellValue(sheet, 45, col("F"), cells.get("fuelPrice-waste"));
-        setCellValue(sheet, 46, col("F"), cells.get("fuelPrice-external"));
     }
 
-    private void fillDowntimeSheet(Sheet sheet, Map<String, String> cells) {
-        String[][] dayFields = {
-                {"changeCombo", "AA"},
-                {"changeJesco", "AE"},
-                {"down1", "AI"},
-                {"down2", "AJ"},
-                {"disperserSteam", "AK"},
-                {"runtimeMin", "AM"}
-        };
-        for (int day = 1; day <= 31; day += 1) {
-            int row = FIRST_DAY_ROW + day - 1;
-            for (String[] field : dayFields) {
-                setCellValue(sheet, row, col(field[1]), cells.get(field[0] + "-" + day));
-            }
+    private void fillDowntimeSheet(Sheet sheet, ComboBoilerLayout layout, Map<String, String> cells) {
+        fillDayFields(sheet, layout, cells,
+                new String[]{"changeCombo", "changeJesco", "down1", "down2", "disperserSteam", "runtimeMin"});
+
+        Integer lossRow = layout.ventRows().get("ventLossUnitPrice");
+        if (lossRow != null && layout.ventUnitPriceColumn() >= 0) {
+            setCellValue(sheet, lossRow, layout.ventUnitPriceColumn(), cells.get("ventLossUnitPrice"));
         }
-        setCellValue(sheet, 54, col("D"), cells.get("ventLossUnitPrice"));
-        String[][] rows = {
-                {"ventProduction", "50"},
-                {"ventInternal", "51"},
-                {"ventUsage", "52"}
-        };
-        for (String[] rowDef : rows) {
-            int row = Integer.parseInt(rowDef[1]);
-            for (int day = 1; day <= 31; day += 1) {
-                setCellValue(sheet, row, col("E") + day - 1, cells.get(rowDef[0] + "-" + day));
+        for (String key : new String[]{"ventProduction", "ventInternal", "ventUsage"}) {
+            Integer row = layout.ventRows().get(key);
+            if (row == null) continue;
+            for (Map.Entry<Integer, Integer> day : layout.ventDayColumns().entrySet()) {
+                setCellValue(sheet, row, day.getValue(), cells.get(key + "-" + day.getKey()));
             }
         }
     }
 
-    private void fillRecoverySheet(Sheet sheet, Map<String, String> cells) {
+    private void fillDayFields(Sheet sheet, ComboBoilerLayout layout, Map<String, String> cells, String[] fields) {
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            for (String field : fields) {
+                Integer column = layout.dayColumns().get(field);
+                if (column == null) continue;
+                setCellValue(sheet, day.getValue(), column, cells.get(field + "-" + day.getKey()));
+            }
+        }
+    }
+
+    private void fillRecoverySheet(Sheet sheet, ComboBoilerLayout layout, Map<String, String> cells) {
+        int firstRow = layout.recoveryFirstRow();
+        if (firstRow < 0) return;
         for (int index = 1; index <= MAX_RECOVERY_ROWS; index += 1) {
-            int row = 58 + index - 1;
-            setCellValue(sheet, row, col("A"), cells.get("lossDate-" + index));
-            setCellValue(sheet, row, col("B"), cells.get("lossTime-" + index));
-            setCellValue(sheet, row, col("D"), cells.get("lossNote-" + index));
-            setCellValue(sheet, row, col("J"), cells.get("lossSteamRate-" + index));
-            setCellValue(sheet, row, col("K"), cells.get("lossBaseRate-" + index));
-            setCellValue(sheet, row, col("L"), cells.get("lossMinutes-" + index));
+            int row = firstRow + index - 1;
+            for (Map.Entry<String, Integer> column : layout.recoveryColumns().entrySet()) {
+                setCellValue(sheet, row, column.getValue(), cells.get(column.getKey() + "-" + index));
+            }
         }
     }
 
-    private void fillEtcSheet(Sheet sheet, Map<String, String> cells) {
-        fillHorizontal(sheet, cells, "combo-plan-1-", 58, "S", "AG");
-        fillHorizontal(sheet, cells, "combo-plan-2-", 59, "S", "AG");
-        fillHorizontal(sheet, cells, "combo-plan-3-", 60, "S", "AG", 0, true);
-        fillHorizontal(sheet, cells, "combo-plan-4-", 61, "S", "AG");
-        fillHorizontal(sheet, cells, "combo-plan-5-", 62, "S", "AG", 0, true);
-        fillHorizontal(sheet, cells, "jesco-plan-0-", 67, "R", "AD");
-        fillHorizontal(sheet, cells, "jesco-plan-1-", 68, "R", "AD");
-        fillHorizontal(sheet, cells, "jesco-plan-2-", 69, "R", "AD", 0, true);
-        fillHorizontal(sheet, cells, "lngBoiler-", 73, "R", "AC", 1);
-        fillHorizontal(sheet, cells, "lngCombo-", 74, "R", "AC", 1);
+    private void fillEtcSheet(Sheet sheet, ComboBoilerLayout layout, Map<String, String> cells) {
+        // 소계·잔량 줄은 원본이 수식이지만 화면에서 고칠 수 있는 값이라 덮어쓴다.
+        fillPlanBlock(sheet, layout.planBlock("combo"), cells, 0,
+                Set.of("combo-plan-3-", "combo-plan-5-"));
+        fillPlanBlock(sheet, layout.planBlock("jesco"), cells, 0, Set.of("jesco-plan-2-"));
+        fillPlanBlock(sheet, layout.planBlock("lng"), cells, 1, Set.of());
     }
 
-    private void fillHorizontal(Sheet sheet, Map<String, String> cells, String prefix, int row, String startCol, String endCol) {
-        fillHorizontal(sheet, cells, prefix, row, startCol, endCol, 0);
-    }
-
-    private void fillHorizontal(Sheet sheet, Map<String, String> cells, String prefix, int row, String startCol, String endCol, int keyOffset) {
-        fillHorizontal(sheet, cells, prefix, row, startCol, endCol, keyOffset, false);
-    }
-
-    private void fillHorizontal(Sheet sheet, Map<String, String> cells, String prefix, int row, String startCol, String endCol, int keyOffset, boolean overwriteFormula) {
-        int start = col(startCol);
-        int end = col(endCol);
-        for (int column = start; column <= end; column += 1) {
-            setCellValue(sheet, row, column, cells.get(prefix + (column - start + keyOffset)), overwriteFormula);
+    private void fillPlanBlock(Sheet sheet, ComboBoilerLayout.PlanBlock block, Map<String, String> cells,
+                               int keyOffset, Set<String> overwriteFormulaRows) {
+        if (block == null || !block.usable()) return;
+        for (Map.Entry<String, Integer> row : block.rows().entrySet()) {
+            boolean overwriteFormula = overwriteFormulaRows.contains(row.getKey());
+            for (int column = block.firstMonthCol(); column <= block.lastMonthCol(); column += 1) {
+                String value = cells.get(row.getKey() + (column - block.firstMonthCol() + keyOffset));
+                setCellValue(sheet, row.getValue(), column, value, overwriteFormula);
+            }
         }
     }
 
@@ -333,24 +324,15 @@ public class ComboBoilerWorkbookService {
         return value;
     }
 
-    private void validateMonthlySheet(Sheet sheet) {
-        String b41 = cellTextAllowFormula(sheet, 41, col("B"));
-        String d41 = cellTextAllowFormula(sheet, 41, col("D"));
-        String f41 = cellTextAllowFormula(sheet, 41, col("F"));
-        if (!contains(b41, "\uAD6C") || !contains(d41, "\uC2A4\uD300") || !contains(f41, "\uC5F0\uB8CC\uB2E8\uAC00")) {
+    /**
+     * \uBCF5\uD569\uBCF4\uC77C\uB7EC \uC11C\uC2DD\uC774 \uB9DE\uB294\uC9C0 \uBCF8\uB2E4 \u2014 \uC608\uC804\uC5D0\uB294 41\uD589\uC758 \uAE00\uC790\uB97C \uBD24\uC9C0\uB9CC, \uC774\uC81C\uB294
+     * <b>\uC77C\uBCC4 \uD45C\uC640 \uC5F0\uB8CC\uB2E8\uAC00 \uD45C\uB97C \uBA38\uB9AC\uAE00\uB85C \uCC3E\uC744 \uC218 \uC788\uB294\uC9C0</b>\uB85C \uD310\uB2E8\uD55C\uB2E4.
+     * \uC6D0\uBCF8\uC5D0\uC11C \uD589\uC744 \uBA87 \uAC1C \uC9C0\uC6B4 \uD30C\uC77C\uB3C4 \uD1B5\uACFC\uD574\uC57C \uD558\uAE30 \uB54C\uBB38\uC774\uB2E4.
+     */
+    private void validateMonthlySheet(Sheet sheet, ComboBoilerLayout layout) {
+        if (layout.dayRows().isEmpty() || layout.dayColumns().isEmpty() || layout.fuelPriceColumn() < 0) {
             throw new IllegalArgumentException("\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
         }
-    }
-
-    private String cellTextAllowFormula(Sheet sheet, int oneBasedRow, int zeroBasedColumn) {
-        Row row = sheet.getRow(oneBasedRow - 1);
-        if (row == null) return "";
-        Cell cell = row.getCell(zeroBasedColumn);
-        return cell == null ? "" : formatter.formatCellValue(cell).trim();
-    }
-
-    private boolean contains(String text, String keyword) {
-        return text != null && text.replace(" ", "").contains(keyword);
     }
 
     private void setCellValue(Sheet sheet, int oneBasedRow, int zeroBasedColumn, Object value) {
@@ -380,17 +362,11 @@ public class ComboBoilerWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().startsWith("3."))
-                    .filter(path -> path.getFileName().toString().endsWith(".xlsx"))
-                    .filter(path -> !path.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("Combo boiler workbook not found"));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith("3.") && name.endsWith(".xlsx"), "복합보일러");
+        cachedWorkbookPath = resolved;
+        return resolved;
     }
 
     private int sheetMonth(String sheetName) {
@@ -403,13 +379,6 @@ public class ComboBoilerWorkbookService {
         return year + "-" + String.format("%02d", month);
     }
 
-    private int col(String label) {
-        int result = 0;
-        for (int i = 0; i < label.length(); i += 1) {
-            result = result * 26 + (label.charAt(i) - 'A' + 1);
-        }
-        return result - 1;
-    }
 
     private int toInt(Object value) {
         if (value instanceof Number number) return number.intValue();

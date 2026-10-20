@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const PERIOD_KEY = "steamlog:shared-period";
   const CELL_TABLE = "table_cell_value";
   const SUMMARY_TABLE = "srf_boiler_invoice_summary";
+  // Client Invoice 저장 표 — 원본 Summary(VK) 의 ='Client Invoice'!F20 같은 참조를 여기서 계산한다.
+  const CLIENT_TABLE = "srf_boiler_invoice_client";
   const TABLES_BASE = "/tables";
   const yearSelect = document.getElementById("invoiceYear");
   const monthSelect = document.getElementById("invoiceMonth");
@@ -26,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     year: Number(saved.year) || now.getFullYear(),
     month: String(saved.month || now.getMonth() + 1).padStart(2, "0"),
     cellRows: [],
+    clientRows: [],
   };
 
   initPeriodControls();
@@ -106,14 +109,14 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const [summaryResponse, cellsResponse] = await Promise.all([
         fetch(`/tables/srf-boiler-invoice/summary?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
-        fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`),
+        fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${SUMMARY_TABLE},${CLIENT_TABLE}&month=${encodeURIComponent(monthKey())}`),
       ]);
       const payload = await summaryResponse.json();
       if (!summaryResponse.ok) throw new Error(payload.message || "\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
       const cellsPayload = cellsResponse.ok ? await cellsResponse.json() : { data: [] };
-      state.cellRows = Array.isArray(cellsPayload?.data)
-        ? cellsPayload.data.filter((row) => row.table_name === SUMMARY_TABLE)
-        : [];
+      const cellRows = Array.isArray(cellsPayload?.data) ? cellsPayload.data : [];
+      state.cellRows = cellRows.filter((row) => row.table_name === SUMMARY_TABLE);
+      state.clientRows = cellRows.filter((row) => row.table_name === CLIENT_TABLE);
       renderTable(payload);
       if (sheetLabel) sheetLabel.textContent = payload.sheet || "Summary(VK)";
     } catch (error) {
@@ -252,6 +255,35 @@ document.addEventListener("DOMContentLoaded", () => {
     ].includes(rowIndex);
   }
 
+  // 다른 페이지에서 값이 오는 칸 — 손으로 고치지 않고, 출처를 툴팁으로 알려 준다.
+  //   단가 입력 → BASE/ADDITIONAL SERVICE CHARGE (ASC 는 직접 고칠 수도 있다)
+  //   Client Invoice → 3. OTHERS / UTILITIES·OTHER DEDUCTION (원본의 ='Client Invoice'!F.. 참조)
+  const LINK_HINTS = {
+    "15:3": "단가 입력 ▸ 복합보일러 BSC 단가에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "17:3": "단가 입력 ▸ 복합보일러 BSC FACTOR 에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "21:3": "단가 입력 ▸ 복합보일러 BSC 보증량에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "26:3": "단가 입력 ▸ 복합보일러 ASC 단가에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "28:3": "단가 입력 ▸ 복합보일러 ASC FACTOR 에서 가져옵니다 (여기서 직접 고칠 수도 있습니다)",
+    "33:3": "Client Invoice ▸ 3. Other Charge (깨끗한 나라 ← 베올리아) 첫째 줄 청구금액",
+    "35:3": "Client Invoice ▸ 3. Other Charge (깨끗한 나라 ← 베올리아) 둘째 줄 청구금액",
+    "54:3": "Client Invoice ▸ 1. Utilities Sub total",
+    "56:3": "Client Invoice ▸ 2. Other Charge (깨끗한 나라 → 베올리아) 첫째 줄 청구금액",
+    "58:3": "Client Invoice ▸ 2. Other Charge (깨끗한 나라 → 베올리아) 둘째 줄 청구금액",
+  };
+
+  function linkHint(rowIndex, columnIndex) {
+    return LINK_HINTS[`${rowIndex}:${columnIndex}`] || "";
+  }
+
+  // 화면에서 계산하는 칸 — 서버는 formula 표시를 주지 않으므로(늘 false) 여기서 정한다.
+  // 이 표시가 있어야 입력칸을 고쳤을 때 renderCalculatedCells 가 다시 계산해 넣는다.
+  // (전에는 표시가 없어 1. BSC·TOTAL 같은 계산값이 새로고침 전까지 옛 값으로 남았다)
+  const CALC_CELLS = new Set(["13:3", "24:3", "39:5", "41:5", "45:5", "48:5", "59:5", "61:5", "63:5", "65:5"]);
+
+  function isCalcCell(rowIndex, columnIndex) {
+    return CALC_CELLS.has(`${rowIndex}:${columnIndex}`) || clientLinkedValue(rowIndex, columnIndex) !== null;
+  }
+
   function cellHtml(cell) {
     const rowIndex = Number(cell?.row ?? 0);
     const columnIndex = Number(cell?.col ?? 0);
@@ -259,20 +291,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const style = normalizedCellStyle(cell, rowIndex, columnIndex);
     const editable = isEditableCell(cell, rowIndex, columnIndex);
     const autoDate = autoDateCellValue(rowIndex, columnIndex) !== null;
-    const calcAttrs = cell?.formula ? ` data-calc-row="${rowIndex}" data-calc-col="${columnIndex}" data-format="${escapeAttribute(cell?.format || "")}"` : "";
+    const hint = linkHint(rowIndex, columnIndex);
+    const titleAttr = hint ? ` title="${escapeAttribute(hint)}"` : "";
+    const calc = isCalcCell(rowIndex, columnIndex);
+    const calcAttrs = calc ? ` data-calc-row="${rowIndex}" data-calc-col="${columnIndex}" data-format="${escapeAttribute(cell?.format || "")}"` : "";
     const classes = [
-      cell?.formula ? "formula-cell" : "",
+      calc ? "formula-cell" : "",
       editable ? "editable-cell" : "",
       autoDate ? "auto-date-cell" : "",
+      hint && !editable ? "linked-cell" : "",
     ].filter(Boolean).join(" ");
     if (editable) {
       return `
-        <td class="${classes}" style="${escapeAttribute(style)}">
+        <td class="${classes}" style="${escapeAttribute(style)}"${titleAttr}>
           <input class="invoice-cell-input" type="text" value="${escapeHtml(value)}" data-row="${rowIndex}" data-col="${columnIndex}" />
         </td>
       `;
     }
-    return `<td class="${classes}" style="${escapeAttribute(style)}"${calcAttrs}>${escapeHtml(value)}</td>`;
+    return `<td class="${classes}" style="${escapeAttribute(style)}"${calcAttrs}${titleAttr}>${escapeHtml(value)}</td>`;
   }
 
   function rowKey(rowIndex) {
@@ -288,8 +324,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function isMarkedInputCell(rowIndex, columnIndex) {
+    // 52:3 ASC REFUND(Annual) — 원본은 다른 칸을 곱하는 수식인데 그 칸들이 비어 있어, 여기서는 직접 넣는다.
+    // 15:3 BASE SERVICE CHARGE, 33:3·35:3 3. OTHERS, 54:3·56:3·58:3 DEDUCTION — 연동값이 기본으로 채워지고
+    // 여기서 고치면 고친 값이 우선한다(비우면 다시 연동값).
     return [
-      "17:3", "19:3", "21:3", "26:3", "28:3", "30:3", "36:3", "37:3", "43:5", "50:3",
+      "15:3", "17:3", "19:3", "21:3", "26:3", "28:3", "30:3", "33:3", "35:3", "36:3", "37:3", "43:5",
+      "50:3", "52:3", "54:3", "56:3", "58:3",
     ].includes(`${rowIndex}:${columnIndex}`);
   }
 
@@ -314,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fill = excelFillFor(rowIndex, columnIndex);
     style += `background:${fill};`;
     const autoDate = autoDateCellValue(rowIndex, columnIndex) !== null;
-    if (isEditableCell(cell, rowIndex, columnIndex) || cell?.formula || autoDate) {
+    if (isEditableCell(cell, rowIndex, columnIndex) || isCalcCell(rowIndex, columnIndex) || autoDate) {
       style = removeBorderStyles(style);
       const width = isThickBorderCell(rowIndex, columnIndex) ? 1.4 : 0.7;
       style += `border:${width}px solid #000;`;
@@ -336,9 +376,61 @@ document.addEventListener("DOMContentLoaded", () => {
     return state.cellRows.find((row) => row.row_key === rowKey(rowIndex) && Number(row.col_index || 0) === columnIndex + 1) || null;
   }
 
+  /**
+   * Client Invoice 에서 오는 칸의 값. 원본 Summary(VK) 의 참조를 그대로 옮겼다.
+   *   D34 ='Client Invoice'!F24 (3. Other Charge ← 첫째 줄)   D36 =F25 (둘째 줄)
+   *   D55 =F20 (1. Utilities Sub total)   D57 =F21 (2. Other Charge → 첫째 줄)   D59 =F22 (둘째 줄)
+   * 청구금액 = 양 × 단가 — Client Invoice 화면과 같은 계산이다. 연동 칸이 아니면 null.
+   */
+  function clientLinkedValue(rowIndex, columnIndex) {
+    if (columnIndex !== 3) return null;
+    if (rowIndex === 33) return clientAmount("other-in", 0);
+    if (rowIndex === 35) return clientAmount("other-in", 1);
+    if (rowIndex === 54) return clientSubtotal("utilities");
+    if (rowIndex === 56) return clientAmount("other-out", 0);
+    if (rowIndex === 58) return clientAmount("other-out", 1);
+    return null;
+  }
+
+  function clientField(sectionId, index, field) {
+    const row = state.clientRows.find((item) => item.row_key === `${sectionId}|${index}|${field}`);
+    return parseNumber(row ? row.cell_value : "");
+  }
+
+  function clientAmount(sectionId, index) {
+    const qty = clientField(sectionId, index, "qty");
+    const price = clientField(sectionId, index, "price");
+    return qty === null || price === null ? "" : String(qty * price);
+  }
+
+  function clientSubtotal(sectionId) {
+    let sum = 0;
+    let any = false;
+    for (let index = 0; index < 10; index += 1) {
+      const amount = clientAmount(sectionId, index);
+      if (amount === "") continue;
+      sum += Number(amount);
+      any = true;
+    }
+    return any ? String(sum) : "";
+  }
+
+  /** 저장값 — 비어 있으면 null (빈 칸으로 저장된 것은 "없음"으로 본다 → 연동값으로 돌아간다). */
+  function storedValue(rowIndex, columnIndex) {
+    const stored = storedCell(rowIndex, columnIndex);
+    if (!stored) return null;
+    const text = String(stored.cell_value ?? "").trim();
+    return text === "" ? null : text;
+  }
+
+  // 우선순위: 날짜 자동칸 → 손으로 넣은 저장값 → 다른 페이지 연동값 → 화면 계산값
   function valueForCell(rowIndex, columnIndex, fallback) {
     const autoDateValue = autoDateCellValue(rowIndex, columnIndex);
     if (autoDateValue !== null) return autoDateValue;
+    const storedText = storedValue(rowIndex, columnIndex);
+    if (storedText !== null) return storedText;
+    const linkedValue = clientLinkedValue(rowIndex, columnIndex);
+    if (linkedValue !== null) return linkedValue;
     const calculatedValue = calculatedCellValue(rowIndex, columnIndex);
     if (calculatedValue !== null) return calculatedValue;
     const stored = storedCell(rowIndex, columnIndex);
@@ -402,6 +494,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function rawCellValue(rowIndex, columnIndex) {
     const autoDateValue = autoDateCellValue(rowIndex, columnIndex);
     if (autoDateValue !== null) return autoDateValue;
+    const storedText = storedValue(rowIndex, columnIndex);
+    if (storedText !== null) return storedText;
+    const linkedValue = clientLinkedValue(rowIndex, columnIndex);
+    if (linkedValue !== null) return linkedValue;
     const stored = storedCell(rowIndex, columnIndex);
     if (stored) return String(stored.cell_value ?? "");
     const calculatedValue = calculatedCellValue(rowIndex, columnIndex);
@@ -471,6 +567,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const index = state.cellRows.findIndex((row) => row.id === saved.id);
     if (index >= 0) state.cellRows[index] = saved;
     else state.cellRows.push(saved);
+    // 연동 칸을 비우면 다시 연동값으로 돌아간다 — 칸에도 그 값을 보여 준다.
+    if (input.value.trim() === "") {
+      const linked = clientLinkedValue(rowIndex, columnIndex);
+      if (linked !== null && linked !== "") input.value = formatCellValue(linked, "", false);
+    }
     renderCalculatedCells();
   }
 

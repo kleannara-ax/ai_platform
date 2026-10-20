@@ -389,6 +389,7 @@
     </div>
   </main>
 
+  <script src="/steam/js/energy-linked-sources.js?v=20260922-client3"></script>
   <script>
   (function () {
     const SHARED_PERIOD_KEY = "steamlog:shared-period";
@@ -527,7 +528,12 @@
         await fetchSavedRows(currentYear);
         // emc 캐시 비우고 새 연도로 fetch — readEmc 가 사용
         __emcCache.year = null; __emcCache.data = null;
-        await fetchEmcCache(currentYear);
+        window.EnergyLinkedSources.resetCache();
+        await Promise.all([
+          fetchEmcCache(currentYear),
+          window.EnergyLinkedSources.fetchCompositeSteamPurchase(currentYear),
+          window.EnergyLinkedSources.fetchCompositeLngEtc(currentYear),
+        ]);
         applySavedRows();
       } catch (error) {
         console.error(error);
@@ -733,12 +739,15 @@
       const t2cols = dataMonthCount("t02");
       for (let c = 1; c <= t2cols; c++) {
         const m = efrColToEmcMonth("t02", c);
-        // row 1 복합: emc.compositeSteam - (compositeLngEtc + compositeInvest + compositeIncome + landLease)
-        const composite = readEmc("fuel", "compositeSteam", m);
-        const lngEtc    = readEmc("fuel", "compositeLngEtc", m);
+        // row 1 복합: 복합보일러 스팀구매 - (compositeLngEtc + compositeInvest + compositeIncome + landLease)
+        //   스팀구매는 SRF 인보이스 TOTAL SERVICE CHARGES 연동값, LNG·처분부담금 등은 Client Invoice 1번(전력 제외)+2번 합 연동값,
+        //   처분수익·지상권 지료는 고정값이다. (마감비교 페이지와 같은 값 — js/energy-linked-sources.js)
+        const linked    = window.EnergyLinkedSources;
+        const composite = (m >= 1 && m <= 12) ? (linked.compositeSteamPurchaseSync(currentYear)[m] ?? null) : null;
+        const lngEtc    = (m >= 1 && m <= 12) ? (linked.compositeLngEtcSync(currentYear)[m] ?? null) : null;
         const inv       = readEmc("fuel", "compositeInvest", m);
-        const inc       = readEmc("fuel", "compositeIncome", m);
-        const land      = readEmc("fuel", "landLease", m);
+        const inc       = linked.COMPOSITE_INCOME_FIXED;
+        const land      = linked.LAND_LEASE_FIXED;
         const v1 = (composite !== null) ? composite - ((lngEtc||0)+(inv||0)+(inc||0)+(land||0)) : null;
         setCalc("t02", 1, c, v1, 1);
         // row 2 폐합성: emc.pyhsynSteam

@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,19 +58,41 @@ public class EnergyFuelPlanWorkbookService {
     private static final String CELL_TABLE = "table_cell_value";
     private static final String PAGE_TABLE = "energy_fuel_plan";
 
-    private record TableMap(String tableId, int htmlRowCount, int firstExcelRow) {}
-    private static final List<TableMap> TABLE_MAPS = List.of(
-            new TableMap("t01", 14, 5),
-            new TableMap("t02",  6, 19),
-            new TableMap("t03",  3, 25),
-            new TableMap("t04",  6, 28),
-            new TableMap("t05",  6, 34),
-            new TableMap("t06", 10, 40),
-            new TableMap("t07",  5, 50),
-            new TableMap("t08",  6, 55),
-            new TableMap("t09",  8, 62),
-            new TableMap("t10",  2, 70)
+    /**
+     * @param firstExcelRow 원본 시트의 첫 행 — 라벨을 못 찾았을 때의 폴백 좌표
+     * @param labels        행 라벨 — 구분(B)이 있으면 그것을, 비어 있으면 대분류(A)
+     */
+    record TableMap(String tableId, int htmlRowCount, int firstExcelRow, List<String> labels) {}
+
+    // 이 시트는 표 제목이 따로 없고 항목이 한 줄로 이어진다. 그래서 위에서 아래 순서대로
+    // 직전에 찾은 행 다음부터 라벨을 찾는다("스팀생산량 LNG보일러" 처럼 같은 이름이 두 번 나온다).
+    static final List<TableMap> TABLE_MAPS = List.of(
+            new TableMap("t01", 14, 5,
+                    List.of("제지 생산량", "화장지 생산량", "생산량 총계", "제지 생산원단위", "화장지 생산원단위", "제지 공정 스팀량", "화장지 공정 스팀량", "공정 총 사용량", "기타 스팀사용량(제지)", "기타 스팀사용량(화장지)", "제지 총 사용량", "화장지 총 사융량", "제지 총 원단위", "화장지 총 원단위")),
+            new TableMap("t02", 6, 19,
+                    List.of("디스퍼져사용량", "환기시스템", "RO 열교환기", "TOC재생설비", "기타(난방, 취사용 등)", "총 기타 사용량")),
+            new TableMap("t03", 3, 25,
+                    List.of("스팀 총 사용량", "가동일수", "스팀 사용량")),
+            new TableMap("t04", 6, 28,
+                    List.of("LNG보일러", "폐합성소각로", "복합보일러", "외부보일러", "유동상소각로", "스팀 총 생산량")),
+            new TableMap("t05", 6, 34,
+                    List.of("LNG보일러", "폐합성소각로", "복합보일러", "외부보일러", "유동상소각로", "스팀 총 생산량")),
+            new TableMap("t06", 10, 40,
+                    List.of("LNG 보일러", "복합 LNG", "화장지3 LNG", "화장지4 LNG", "화장지5 LNG", "화장지 LNG소계", "제지3 LNG", "LNG(보일러용)소계", "LNG(버너용)소계", "LNG  총 사용량")),
+            new TableMap("t07", 5, 50,
+                    List.of("LNG 단가", "소각로", "복합(기본)", "외부(기본)", "유동상소각로")),
+            new TableMap("t08", 6, 55,
+                    List.of("LNG 비용", "소각로 운영비", "복합보일러", "외부보일러", "유동상소각로", "운영비 총 합계")),
+            new TableMap("t09", 8, 62,
+                    List.of("LNG 비용", "복합보일러", "외부보일러", "외부 선급금 차감", "외부페널티 차감", "폐합성소각로", "유동상소각로", "연료비 총 합계")),
+            new TableMap("t10", 2, 70,
+                    List.of("연료비 원단위", "연료비 원단위"))
     );
+
+    /** 라벨 열 — 구분(B)이 우선, 비어 있으면 대분류(A). */
+    static final int[] LABEL_COLS = {1, 2};
+    /** 데이터가 시작되는 행. */
+    static final int FIRST_DATA_ROW = 4;
 
     private final TableService tableService;
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
@@ -104,9 +127,11 @@ public class EnergyFuelPlanWorkbookService {
         if (sheet == null) return 0;
         tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
         int imported = 0;
+        Map<String, Integer> rows = resolveRows(sheet);
         for (TableMap map : TABLE_MAPS) {
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
-                int excelRowOneBased = map.firstExcelRow() + (htmlRow - 1);
+                Integer excelRowOneBased = rows.get(map.tableId() + "|" + htmlRow);
+                if (excelRowOneBased == null) continue;   // 원본에 없는 항목 — 건너뛴다
                 Row row = sheet.getRow(excelRowOneBased - 1);
                 if (row == null) continue;
                 for (int colIndex = 1; colIndex <= 12; colIndex += 1) {
@@ -126,9 +151,11 @@ public class EnergyFuelPlanWorkbookService {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return;
         Map<String, String> cells = loadCells(year);
+        Map<String, Integer> rows = resolveRows(sheet);
         for (TableMap map : TABLE_MAPS) {
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
-                int excelRowOneBased = map.firstExcelRow() + (htmlRow - 1);
+                Integer excelRowOneBased = rows.get(map.tableId() + "|" + htmlRow);
+                if (excelRowOneBased == null) continue;   // 원본에 없는 항목 — 건너뛴다
                 for (int colIndex = 1; colIndex <= 12; colIndex += 1) {
                     String key = rowKey(map.tableId(), htmlRow) + "|" + colIndex;
                     String value = cells.get(key);
@@ -226,17 +253,32 @@ public class EnergyFuelPlanWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .filter(p -> p.getFileName().toString().endsWith(".xlsx"))
-                    .filter(p -> !p.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("에너지 회계비용 원본 엑셀을 찾을 수 없습니다."));
-            cachedWorkbookPath = resolved;
-            return resolved;
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith(FILE_PREFIX) && name.endsWith(".xlsx"), "에너지 회계비용");
+        cachedWorkbookPath = resolved;
+        return resolved;
+    }
+
+    /**
+     * 위에서 아래 순서대로 행 라벨을 찾는다. 직전에 찾은 행 다음부터 훑으므로
+     * 같은 이름이 여러 번 나와도 섞이지 않는다.
+     * 못 찾은 항목은 넣지 않는다 — 좌표로 폴백하면 다른 제목 줄에 값이 붙기 때문이다.
+     */
+    Map<String, Integer> resolveRows(Sheet sheet) {
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, FIRST_DATA_ROW, 0);
+        Map<String, Integer> rows = new LinkedHashMap<>();
+        int cursor = FIRST_DATA_ROW;
+        for (TableMap map : TABLE_MAPS) {
+            for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
+                String label = map.labels().get(htmlRow - 1);
+                Integer found = index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
+                if (found == null) continue;
+                rows.put(map.tableId() + "|" + htmlRow, found);
+                cursor = found + 1;
+            }
         }
+        return rows;
     }
 
     private String rowKey(String tableId, int htmlRow) {

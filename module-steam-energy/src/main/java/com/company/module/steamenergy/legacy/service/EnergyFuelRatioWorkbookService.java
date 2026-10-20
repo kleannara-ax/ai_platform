@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -62,33 +63,55 @@ public class EnergyFuelRatioWorkbookService {
     private static final String CELL_TABLE = "table_cell_value";
     private static final String PAGE_TABLE = "energy_fuel_ratio";
 
-    private record TableMap(String tableId, int htmlRowCount, int firstExcelRow, int rowGap) {
-        TableMap(String t, int n, int s) { this(t, n, s, 0); }
-    }
-
     /**
-     * t11 만 r123 (header) 을 건너뛰어야 함 — htmlRow >= 4 부터 excelRow 가 +1 이동.
-     * 단순화를 위해 t11 전체에 대해 dynamic offset 처리.
+     * @param firstExcelRow 원본 시트의 첫 행 — 제목/라벨을 못 찾았을 때의 폴백 좌표
+     * @param title         표 제목(앞부분만 비교, 맨 앞 연도는 무시)
+     * @param labels        표 안 행 라벨 — A열, 비어 있으면 B열
      */
-    private static final List<TableMap> TABLE_MAPS = List.of(
-            new TableMap("t01",  9,  4),
-            new TableMap("t02",  8, 16),
-            new TableMap("t03",  6, 27),
-            new TableMap("t04", 12, 39),
-            new TableMap("t05", 12, 53),
-            new TableMap("t06",  8, 68),
-            new TableMap("t07",  8, 79),
-            new TableMap("t08",  8, 90),
-            new TableMap("t09",  8, 101),
-            new TableMap("t10",  6, 112),
-            new TableMap("t11",  9, 120), // r120,121,122,124,125,126,127,128,129 (skip r123 header)
-            new TableMap("t12",  5, 133),
-            new TableMap("t13",  5, 141),
-            new TableMap("t14",  8, 149),
-            new TableMap("t15",  7, 160),
-            new TableMap("t16",  8, 170),
-            new TableMap("t17",  7, 181)
+    record TableMap(String tableId, int htmlRowCount, int firstExcelRow, String title, List<String> labels) {}
+
+    // 제목으로 표 블록을 잡고, 그 안에서 행 라벨로 줄을 찾는다.
+    // (예전에는 firstExcelRow + (htmlRow-1) 로만 계산해 원본에 행이 끼면 통째로 밀렸다.
+    //  t11 의 "헤더 한 줄 건너뛰기" 예외도 라벨로 찾으면서 없어졌다.)
+    static final List<TableMap> TABLE_MAPS = List.of(
+            new TableMap("t01", 9, 4, "2025년 스팀생산량 (톤)",
+                    List.of("LNG 보일러", "복합보일러", "폐합성소각로", "유동상소각로", "외부보일러", "합 계", "유동상 밴트량 (톤)", "복합 페널티량", "복합 보증량")),
+            new TableMap("t02", 8, 16, "2025년 보일러 연료비 (백만원)",
+                    List.of("LNG 보일러", "복합보일러 (LNG, 페널티 포함)", "폐합성소각로", "유동상소각로 (잉여포함)", "외부보일러", "합 계", "유동상 소내사용+밴트스팀비용", "복합보일러 페널티 비용")),
+            new TableMap("t03", 6, 27, "2025년 스팀단가 (천원/톤.스팀)",
+                    List.of("LNG 보일러", "복합보일러", "폐합성소각로", "유동상소각로", "외부보일러", "합 계")),
+            new TableMap("t04", 12, 39, "2025 호기별 연료비배분 (백만원)",
+                    List.of("제지 2호기", "제지 3호기", "제지 소계", "화장지 3호기", "화장지 4호기", "화장지 5호기", "화장지 소계", "합 계", "총 에너지비용", "스팀생산량", "스팀사용단가", "제지배분비율")),
+            new TableMap("t05", 12, 53, "2025년 스팀사용량",
+                    List.of("제지 2호기", "제지 3호기", "제지 소계", "화장지 3호기", "화장지 4호기", "화장지 5호기", "화장지 소계", "합 계", "총 생산스팀량", "기타 사용량", "제지 스팀사용원가", "화장지 스팀사용원가")),
+            new TableMap("t06", 8, 68, "2025년 제품생산량 (kg)",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계", "제품생산량")),
+            new TableMap("t07", 8, 79, "2025년 스팀 연료비 (백만원) - 버너 LNG사용금액 제외",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
+            new TableMap("t08", 8, 90, "2025년 연료 원단위 (천원/톤.제품)",
+                    List.of("연료단가", "제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계")),
+            new TableMap("t09", 8, 101, "2025년 스팀 톤당 연료비(천원/톤.스팀) - 연료비/스팀사용량",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계", "합  계")),
+            new TableMap("t10", 6, 112, "2025년 버너 LNG 사용량",
+                    List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
+            new TableMap("t11", 9, 120, "2025년 버너 LNG 비용",
+                    List.of("24년 LNG 단가", "25년 LNG 단가", "증감률(%)", "제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
+            new TableMap("t12", 5, 133, "2025년 버너 LNG 사용량 원단위",
+                    List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계")),
+            new TableMap("t13", 5, 141, "2025년 버너 LNG 사용비용 원단위",
+                    List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계")),
+            new TableMap("t14", 8, 149, "2025년 총 연료단가 (천원/톤.제품) - 총 연료비/제품생산량",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계", "합  계")),
+            new TableMap("t15", 7, 160, "2025년 스팀사용량 원단위 (톤.스팀/톤.제품)",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계")),
+            new TableMap("t16", 8, 170, "2025 호기별 스팀사용비율 - 호기별 배분",
+                    List.of("제지 2호기", "제지 3호기", "제지 소계", "화장지 3호기", "화장지 4호기", "화장지 5호기", "화장지 소계", "합 계")),
+            new TableMap("t17", 7, 181, "2025년 스팀사용량 원단위 (톤.스팀/톤.제품) - 기타 스팀량 포함",
+                    List.of("제지2", "제지3", "제지 소계", "화장지3", "화장지4", "화장지5", "화장지 소계"))
     );
+
+    /** 라벨 열 — A열이 우선, 비어 있으면 B열. */
+    static final int[] LABEL_COLS = {2, 1};
 
     private final TableService tableService;
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
@@ -123,9 +146,11 @@ public class EnergyFuelRatioWorkbookService {
         if (sheet == null) return 0;
         tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
         int imported = 0;
+        Map<String, Integer> rows = resolveRows(sheet);
         for (TableMap map : TABLE_MAPS) {
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
-                int excelRowOneBased = excelRowFor(map, htmlRow);
+                Integer excelRowOneBased = rows.get(map.tableId() + "|" + htmlRow);
+                if (excelRowOneBased == null) continue;   // 원본에 없는 항목 — 건너뛴다
                 Row row = sheet.getRow(excelRowOneBased - 1);
                 if (row == null) continue;
                 for (int colIndex = 1; colIndex <= 13; colIndex += 1) {
@@ -145,9 +170,11 @@ public class EnergyFuelRatioWorkbookService {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return;
         Map<String, String> cells = loadCells(year);
+        Map<String, Integer> rows = resolveRows(sheet);
         for (TableMap map : TABLE_MAPS) {
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
-                int excelRowOneBased = excelRowFor(map, htmlRow);
+                Integer excelRowOneBased = rows.get(map.tableId() + "|" + htmlRow);
+                if (excelRowOneBased == null) continue;   // 원본에 없는 항목
                 for (int colIndex = 1; colIndex <= 13; colIndex += 1) {
                     String key = rowKey(map.tableId(), htmlRow) + "|" + colIndex;
                     String value = cells.get(key);
@@ -162,11 +189,29 @@ public class EnergyFuelRatioWorkbookService {
     /* ── helpers ─────────────────────────────────────────────── */
 
     /** t11 만 htmlRow 4 부터 excel row +1 (r123 header 건너뜀). 다른 테이블은 contiguous. */
-    private int excelRowFor(TableMap map, int htmlRow) {
-        if ("t11".equals(map.tableId()) && htmlRow >= 4) {
-            return map.firstExcelRow() + (htmlRow - 1) + 1;
+    /**
+     * 표 제목으로 블록을 잡고 그 안에서 행 라벨로 줄을 찾는다.
+     * 못 찾은 항목은 넣지 않는다 — 좌표로 폴백하면 다른 제목 줄에 값이 붙기 때문이다.
+     */
+    Map<String, Integer> resolveRows(Sheet sheet) {
+        EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, 1, 0);
+        Map<String, Integer> rows = new LinkedHashMap<>();
+        int sheetCursor = 1;
+        for (TableMap map : TABLE_MAPS) {
+            Integer titleRow = index.titleRowOrNull(sheetCursor, map.title());
+            if (titleRow == null) continue;          // 표가 통째로 없는 경우
+            sheetCursor = titleRow + 1;
+            int cursor = titleRow + 1;
+            for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
+                String label = map.labels().get(htmlRow - 1);
+                Integer found = index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
+                if (found == null) continue;
+                rows.put(map.tableId() + "|" + htmlRow, found);
+                cursor = found + 1;
+                sheetCursor = found + 1;
+            }
         }
-        return map.firstExcelRow() + (htmlRow - 1);
+        return rows;
     }
 
     private Sheet findSheetByPattern(Workbook workbook) {
@@ -254,17 +299,11 @@ public class EnergyFuelRatioWorkbookService {
     private Path resolveWorkbookPath() throws IOException {
         Path current = cachedWorkbookPath;
         if (current != null && Files.exists(current)) return current;
-        try (Stream<Path> paths = Files.walk(Path.of(ORIGINAL_DIR), 1)) {
-            Path resolved = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().startsWith(FILE_PREFIX))
-                    .filter(p -> p.getFileName().toString().endsWith(".xlsx"))
-                    .filter(p -> !p.getFileName().toString().startsWith("~$"))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("에너지 회계비용 원본 엑셀을 찾을 수 없습니다."));
-            cachedWorkbookPath = resolved;
-            return resolved;
-        }
+        // 작업 디렉터리에 기대지 않고 '원본' 폴더를 찾아 올라간다 (OriginalWorkbookFiles 주석 참고)
+        Path resolved = OriginalWorkbookFiles.find(
+                name -> name.startsWith(FILE_PREFIX) && name.endsWith(".xlsx"), "에너지 회계비용");
+        cachedWorkbookPath = resolved;
+        return resolved;
     }
 
     private String rowKey(String tableId, int htmlRow) {

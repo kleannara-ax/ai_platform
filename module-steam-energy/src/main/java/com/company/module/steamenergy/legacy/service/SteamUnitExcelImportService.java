@@ -24,8 +24,6 @@ import java.util.regex.Pattern;
 @Service
 public class SteamUnitExcelImportService {
     private static final Pattern MONTHLY_SHEET_PATTERN = Pattern.compile("^(\\d{1,2})월일지$");
-    private static final int DAILY_START_ROW = 5;
-    private static final int DAILY_END_ROW = 35;
 
     private final TableService tableService;
     private final DataFormatter dataFormatter = new DataFormatter();
@@ -52,59 +50,30 @@ public class SteamUnitExcelImportService {
                 String monthKey = String.format("%04d-%02d", year, monthNo);
                 clearImportedMonth(monthKey);
 
-                for (int rowIndex = DAILY_START_ROW; rowIndex <= DAILY_END_ROW; rowIndex += 1) {
-                    Row row = sheet.getRow(rowIndex);
-                    Integer day = readDay(row);
-                    if (day == null) {
-                        continue;
-                    }
+                // 열은 머리글(설비 + 항목) 로, 머리글 줄과 일자 줄은 "일자"·"누계" 칸으로 찾는다 —
+                // 번호를 박아 두면 원본에 줄·열이 하나만 추가돼도 값이 전부 다른 항목으로 저장된다.
+                HeaderColumnIndex headerIndex = SteamUnitSectionLayout.unitHeaderIndex(sheet);
 
-                    if (upsertUnitUsage(monthKey, year, monthNo, day, "PM-2", row, Map.of(
-                            "main_steam", 1,
-                            "coater_steam", 2,
-                            "production", 4,
-                            "production_type", 6
-                    ))) {
-                        unitRowCount += 1;
-                    }
+                if (headerIndex != null) {
+                    Map<String, Integer> pm2Cols = SteamUnitLogColumnMap.columns(headerIndex, "PM-2");
+                    Map<String, Integer> pm3Cols = SteamUnitLogColumnMap.columns(headerIndex, "PM-3");
+                    Map<String, Integer> tm3Cols = SteamUnitLogColumnMap.columns(headerIndex, "TM-3");
+                    Map<String, Integer> tm4Cols = SteamUnitLogColumnMap.columns(headerIndex, "TM-4");
+                    Map<String, Integer> tm5Cols = SteamUnitLogColumnMap.columns(headerIndex, "TM-5");
+                    Map<String, Integer> rawCols = SteamUnitLogColumnMap.rawColumns(headerIndex);
 
-                    if (upsertUnitUsage(monthKey, year, monthNo, day, "PM-3", row, Map.of(
-                            "main_steam", 7,
-                            "coater_steam", 8,
-                            "ventilation_steam", 10,
-                            "production", 12,
-                            "production_type", 14
-                    ))) {
-                        unitRowCount += 1;
-                    }
+                    for (int day = 1; day <= 31; day += 1) {
+                        Integer rowIndex = headerIndex.rowOfDay(day);
+                        if (rowIndex == null) continue;
+                        Row row = sheet.getRow(rowIndex);
+                        if (row == null) continue;
 
-                    if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-3", row, Map.of(
-                            "steam", 18,
-                            "production", 19
-                    ))) {
-                        unitRowCount += 1;
-                    }
-
-                    if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-4", row, Map.of(
-                            "steam", 21,
-                            "production", 22
-                    ))) {
-                        unitRowCount += 1;
-                    }
-
-                    if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-5", row, Map.of(
-                            "steam", 24,
-                            "production", 25
-                    ))) {
-                        unitRowCount += 1;
-                    }
-
-                    if (upsertUnitRaw(monthKey, year, monthNo, day, row, Map.of(
-                            "disperser_total", 9,
-                            "toc_steam", 34,
-                            "pica121_vent", 35
-                    ))) {
-                        rawRowCount += 1;
+                        if (upsertUnitUsage(monthKey, year, monthNo, day, "PM-2", row, pm2Cols)) unitRowCount += 1;
+                        if (upsertUnitUsage(monthKey, year, monthNo, day, "PM-3", row, pm3Cols)) unitRowCount += 1;
+                        if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-3", row, tm3Cols)) unitRowCount += 1;
+                        if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-4", row, tm4Cols)) unitRowCount += 1;
+                        if (upsertUnitUsage(monthKey, year, monthNo, day, "TM-5", row, tm5Cols)) unitRowCount += 1;
+                        if (upsertUnitRaw(monthKey, year, monthNo, day, row, rawCols)) rawRowCount += 1;
                     }
                 }
 
@@ -143,83 +112,52 @@ public class SteamUnitExcelImportService {
         ));
     }
 
+    /**
+     * 2번 호기별 가동시간당 스팀 구역 — 좌표가 아니라 설비·항목 제목으로 칸을 찾는다({@link SteamUnitSectionLayout}).
+     */
     private int importUsageSection(Sheet sheet, String monthKey, int year, int monthNo) {
-        int imported = 0;
-        for (int rowIndex = 42; rowIndex <= 72; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
-            Integer day = readDay(row);
-            if (day == null) {
-                continue;
-            }
-            String rowKey = String.format("%02d", day);
-
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm2", rowKey, 1, getCell(row, 2));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm2", rowKey, 3, getCell(row, 4));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm3a", rowKey, 1, getCell(row, 6));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm3a", rowKey, 3, getCell(row, 8));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm3b", rowKey, 1, getCell(row, 10));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_pm3b", rowKey, 5, getCell(row, 13));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_tm", rowKey, 1, getCell(row, 19));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_tm", rowKey, 4, getCell(row, 22));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_tm", rowKey, 7, getCell(row, 25));
-            imported += upsertCell(monthKey, year, monthNo, "usage_m_tissue", rowKey, 1, getCell(row, 28));
-        }
-        return imported;
+        return importSection(SteamUnitSectionLayout.usage(sheet), sheet, monthKey, year, monthNo);
     }
 
+    /**
+     * LNG 구역 — 좌표가 아니라 79행 제목으로 칸을 찾는다({@link SteamUnitLngLayout}).
+     * 복합보일러·신설소각로 열이 있는 새 양식이면 lng_m_boiler 7·8번에 넣고, 없는 옛 양식이면 건너뛴다.
+     */
     private int importLngSection(Sheet sheet, String monthKey, int year, int monthNo) {
         int imported = 0;
-        for (int rowIndex = 80; rowIndex <= 110; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
-            Integer day = readDay(row);
-            if (day == null) {
-                continue;
+        SteamUnitLngLayout layout = SteamUnitLngLayout.of(sheet);
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            Row row = sheet.getRow(day.getValue());
+            String rowKey = String.format("%02d", day.getKey());
+            for (String tableName : LNG_TABLES) {
+                for (Map.Entry<Integer, Integer> column : layout.columns(tableName).entrySet()) {
+                    imported += upsertCell(monthKey, year, monthNo, tableName, rowKey, column.getKey(), getCell(row, column.getValue()));
+                }
             }
-            String rowKey = String.format("%02d", day);
-
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_boiler", rowKey, 0, getCell(row, 1));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_boiler", rowKey, 1, getCell(row, 2));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_boiler", rowKey, 2, getCell(row, 3));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_boiler", rowKey, 3, getCell(row, 4));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_boiler", rowKey, 5, getCell(row, 6));
-
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_burner", rowKey, 0, getCell(row, 8));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_burner", rowKey, 1, getCell(row, 9));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_burner", rowKey, 2, getCell(row, 10));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_burner", rowKey, 3, getCell(row, 11));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_burner", rowKey, 6, getCell(row, 14));
-
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_mix", rowKey, 0, getCell(row, 19));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_mix", rowKey, 1, getCell(row, 20));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_mix", rowKey, 3, getCell(row, 22));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_mix", rowKey, 4, getCell(row, 23));
-            imported += upsertCell(monthKey, year, monthNo, "lng_m_mix", rowKey, 5, getCell(row, 24));
         }
         return imported;
     }
 
+    private static final List<String> LNG_TABLES = List.of("lng_m_boiler", "lng_m_burner", "lng_m_mix");
+
+    /**
+     * 4번 유동상·소각로·외부·복합 구역 — 좌표가 아니라 설비·항목 제목으로 칸을 찾는다({@link SteamUnitSectionLayout}).
+     */
     private int importFlowSection(Sheet sheet, String monthKey, int year, int monthNo) {
+        return importSection(SteamUnitSectionLayout.flow(sheet), sheet, monthKey, year, monthNo);
+    }
+
+    /** 구역 하나를 일자 × 항목으로 읽는다. 제목을 못 찾은 칸·일자는 건너뛴다. */
+    private int importSection(SteamUnitSectionLayout layout, Sheet sheet, String monthKey, int year, int monthNo) {
         int imported = 0;
-        for (int rowIndex = 119; rowIndex <= 149; rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
-            Integer day = readDay(row);
-            if (day == null) {
-                continue;
+        for (Map.Entry<Integer, Integer> day : layout.dayRows().entrySet()) {
+            Row row = sheet.getRow(day.getValue());
+            String rowKey = String.format("%02d", day.getKey());
+            for (String tableName : layout.tables()) {
+                for (Map.Entry<Integer, Integer> column : layout.columns(tableName).entrySet()) {
+                    imported += upsertCell(monthKey, year, monthNo, tableName, rowKey, column.getKey(), getCell(row, column.getValue()));
+                }
             }
-            String rowKey = String.format("%02d", day);
-
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_fluid_incinerator", rowKey, 0, getCell(row, 1));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_fluid_incinerator", rowKey, 1, getCell(row, 2));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_fluid_incinerator", rowKey, 3, getCell(row, 4));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_fluid_incinerator", rowKey, 4, getCell(row, 5));
-
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_combined", rowKey, 0, getCell(row, 7));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_combined", rowKey, 1, getCell(row, 8));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_combined", rowKey, 3, getCell(row, 10));
-
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_boiler", rowKey, 0, getCell(row, 12));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_boiler", rowKey, 1, getCell(row, 13));
-            imported += upsertCell(monthKey, year, monthNo, "flow_m_boiler", rowKey, 3, getCell(row, 15));
         }
         return imported;
     }
@@ -327,20 +265,6 @@ public class SteamUnitExcelImportService {
         return 1;
     }
 
-    private Integer readDay(Row row) {
-        Cell cell = getCell(row, 0);
-        if (cell == null || cell.getCellType() == CellType.BLANK || isFormulaCell(cell)) {
-            return null;
-        }
-
-        BigDecimal value = readNumber(cell);
-        if (value == null) {
-            return null;
-        }
-
-        int day = value.intValue();
-        return day >= 1 && day <= 31 ? day : null;
-    }
 
     private Cell getCell(Row row, int columnIndex) {
         return row == null ? null : row.getCell(columnIndex);

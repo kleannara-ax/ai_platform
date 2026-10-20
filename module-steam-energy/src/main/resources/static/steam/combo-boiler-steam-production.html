@@ -27,6 +27,8 @@
     .combo-excel-table thead th { background:#eaf6ff; font-weight:800; }
     .combo-excel-table tbody th { background:#f5fbff; font-weight:800; }
     .combo-input { width:100%; min-width:78px; border:0; background:#fffdf3; padding:4px 5px; text-align:right; font:inherit; color:#173a54; }
+    /* 도급내역에서 가져온 기본값 — 손으로 고치면 보통 입력칸 모양으로 돌아간다 */
+    .landing-body .combo-input.combo-linked { color:#0a7a5f; font-weight:600; }
     .combo-readonly { min-width:78px; background:#f1f6fa; color:#6a7d8d; }
     .combo-summary-row th, .combo-summary-row td { background:#edf8f2; font-weight:800; }
     .combo-grid { display:grid; gap:14px; }
@@ -73,7 +75,7 @@
   </main>
   <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
   <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
-  <script src="/steam/js/combo-boiler-pages.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/combo-boiler-pages.js?v=20261014-real-steam2"></script>
   <script src="/steam/js/grid-arrow-nav.js?v=20260608-sticky3"></script>
 </body>
 </html>

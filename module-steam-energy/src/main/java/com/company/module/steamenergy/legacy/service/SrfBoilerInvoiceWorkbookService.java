@@ -15,6 +15,11 @@ public class SrfBoilerInvoiceWorkbookService {
     private static final String TARGET_SHEET = "Summary(VK)";
     private static final String OPERATION_SHEET = "\uC6B4\uC601\uB0B4\uC5ED";
     private static final String COMBO_PRODUCTION_TABLE = "combo_boiler_production";
+    /**
+     * 운영내역에서 화면에 내보내지 않는 열 — '급수량-보충수' 가 셋(8·9·10열) 있는데
+     * 원본 엑셀에서 9·10열은 숨긴 채 쓰지 않는다. 8열(= 스팀생산량 x 0.7)만 쓴다.
+     */
+    private static final List<Integer> HIDDEN_OPERATION_COLUMNS = List.of(9, 10);
 
     private final TableService tableService;
     private final SheetMetadataLoader metadataLoader;
@@ -95,6 +100,7 @@ public class SrfBoilerInvoiceWorkbookService {
         for (Map<String, Object> row : rows) {
             int rowIndex = ((Number) row.get("index")).intValue();
             List<Map<String, Object>> cells = (List<Map<String, Object>>) row.get("cells");
+            cells.removeIf(cell -> HIDDEN_OPERATION_COLUMNS.contains(((Number) cell.get("col")).intValue()));
             for (Map<String, Object> cell : cells) {
                 int columnIndex = ((Number) cell.get("col")).intValue();
                 String staticValue = String.valueOf(cell.getOrDefault("value", ""));
@@ -118,7 +124,11 @@ public class SrfBoilerInvoiceWorkbookService {
         response.put("sheet", OPERATION_SHEET);
         response.put("year", year);
         response.put("month", month);
-        response.put("columns", meta.get("columns"));
+        List<Map<String, Object>> columns = new ArrayList<>();
+        for (Map<String, Object> column : (List<Map<String, Object>>) meta.get("columns")) {
+            if (!HIDDEN_OPERATION_COLUMNS.contains(((Number) column.get("index")).intValue())) columns.add(column);
+        }
+        response.put("columns", columns);
         response.put("rows", rows);
         response.put("merges", meta.get("merges"));
         return response;
@@ -152,7 +162,7 @@ public class SrfBoilerInvoiceWorkbookService {
 
     private boolean isOperationEditableCell(int rowIndex, int columnIndex) {
         // col 5(공정수), 7(탈기기급수) 는 복합보일러 페이지에서 연결되므로 편집 대상에서 제외.
-        return rowIndex >= 4 && rowIndex <= 34 && List.of(9, 10, 11).contains(columnIndex);
+        return rowIndex >= 4 && rowIndex <= 34 && columnIndex == 11;
     }
 
     private boolean isOperationFormulaCell(int rowIndex, int columnIndex) {
@@ -180,7 +190,15 @@ public class SrfBoilerInvoiceWorkbookService {
     }
 
     private boolean isMarkedInputCell(int rowIndex, int columnIndex) {
-        return (rowIndex == 19 && columnIndex == 3)
+        // 원본에서 다른 시트를 끌어오던 칸(BASE SERVICE CHARGE, 3. OTHERS, 1), UTILITIES/OTHER DEDUCTION)도
+        // 입력칸으로 연다. 연동값이 기본으로 채워지고, 여기서 고치면 고친 값이 우선한다.
+        return (rowIndex == 15 && columnIndex == 3)
+                || (rowIndex == 33 && columnIndex == 3)
+                || (rowIndex == 35 && columnIndex == 3)
+                || (rowIndex == 54 && columnIndex == 3)
+                || (rowIndex == 56 && columnIndex == 3)
+                || (rowIndex == 58 && columnIndex == 3)
+                || (rowIndex == 19 && columnIndex == 3)
                 || (rowIndex == 21 && columnIndex == 3)
                 || (rowIndex == 17 && columnIndex == 3)
                 || (rowIndex == 26 && columnIndex == 3)
@@ -189,7 +207,9 @@ public class SrfBoilerInvoiceWorkbookService {
                 || (rowIndex == 36 && columnIndex == 3)
                 || (rowIndex == 37 && columnIndex == 3)
                 || (rowIndex == 43 && columnIndex == 5)
-                || (rowIndex == 50 && columnIndex == 3);
+                || (rowIndex == 50 && columnIndex == 3)
+                // ASC REFUND(Annual) — 원본은 빈 칸끼리 곱하는 수식이라 여기서는 직접 넣는다.
+                || (rowIndex == 52 && columnIndex == 3);
     }
 
     private boolean isWideTitleRow(int rowIndex) {
