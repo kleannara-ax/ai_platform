@@ -87,7 +87,7 @@ class SteamUnitLngLayoutTest {
     }
 
     private static Path originalDir() {
-        for (Path dir : List.of(Path.of("원본"), Path.of("..", "원본"))) {
+        for (Path dir : List.of(Path.of("원본"), Path.of("..", "module-steam-energy", "원본"))) {
             if (Files.isDirectory(dir)) return dir;
         }
         return null;

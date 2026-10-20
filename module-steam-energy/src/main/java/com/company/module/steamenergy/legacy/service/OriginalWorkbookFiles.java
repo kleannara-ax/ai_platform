@@ -16,7 +16,8 @@ import java.util.stream.Stream;
  * {@code app/원본} 을 찾다가 실패하고, 업로드·다운로드가 500 으로 떨어졌다.
  * jar 로 띄우면 또 다른 자리가 되므로 작업 디렉터리에 기대면 안 된다.
  *
- * <p>그래서 작업 디렉터리에서 <b>위로 올라가며</b> {@code 원본} 폴더를 찾는다.
+ * <p>그래서 작업 디렉터리에서 <b>위로 올라가며</b> 서식 폴더를 찾는다. 서식은 모듈 안
+ * ({@code module-steam-energy/원본})에 두지만, 예전처럼 저장소 루트에 둔 환경도 그대로 찾는다.
  * 운영에서 다른 경로에 두려면 {@code -Dsteam.original-dir=/data/aiplatform/원본} 으로
  * 지정할 수 있다(지정하면 그 경로만 쓴다).
  */
@@ -26,6 +27,8 @@ public final class OriginalWorkbookFiles {
     public static final String DIR_PROPERTY = "steam.original-dir";
 
     private static final String DIR_NAME = "원본";
+    /** 찾아볼 상대 경로 — 모듈 안이 먼저, 그다음 예전 위치(저장소 루트). */
+    private static final String[] CANDIDATES = {"module-steam-energy/" + DIR_NAME, DIR_NAME};
     private static final int MAX_DEPTH = 6;
 
     /** 서식 폴더. 못 찾으면 어디를 뒤졌는지 알 수 있게 메시지에 남긴다. */
@@ -40,9 +43,12 @@ public final class OriginalWorkbookFiles {
         Path base = Path.of("").toAbsolutePath();
         StringBuilder tried = new StringBuilder();
         for (int depth = 0; depth < MAX_DEPTH && base != null; depth += 1) {
-            Path candidate = base.resolve(DIR_NAME);
-            if (Files.isDirectory(candidate)) return candidate;
-            tried.append(depth == 0 ? "" : ", ").append(candidate);
+            for (String relative : CANDIDATES) {
+                Path candidate = base.resolve(relative);
+                if (Files.isDirectory(candidate)) return candidate;
+                if (tried.length() > 0) tried.append(", ");
+                tried.append(candidate);
+            }
             base = base.getParent();
         }
         throw new IOException("'" + DIR_NAME + "' 폴더를 찾지 못했습니다. 찾아본 경로: " + tried

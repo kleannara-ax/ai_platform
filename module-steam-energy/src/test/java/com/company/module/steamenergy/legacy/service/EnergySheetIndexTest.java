@@ -164,8 +164,8 @@ class EnergySheetIndexTest {
 
     /** 저장소의 {@code 원본} 폴더에서 에너지 회계비용 워크북을 찾는다. 없으면 null. */
     private static Path findWorkbook() throws Exception {
-        Path dir = Path.of("원본");
-        if (!Files.isDirectory(dir)) dir = Path.of("..", "원본");
+        Path dir = Path.of("원본");                                  // 모듈 폴더에서 실행할 때
+        if (!Files.isDirectory(dir)) dir = Path.of("..", "module-steam-energy", "원본");
         if (!Files.isDirectory(dir)) return null;
         try (Stream<Path> paths = Files.list(dir)) {
             Optional<Path> found = paths

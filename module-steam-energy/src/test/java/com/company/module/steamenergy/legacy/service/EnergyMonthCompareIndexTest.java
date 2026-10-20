@@ -149,8 +149,8 @@ class EnergyMonthCompareIndexTest {
     }
 
     private static Path findWorkbook(String dirName, String prefix) throws Exception {
-        Path dir = Path.of(dirName);
-        if (!Files.isDirectory(dir)) dir = Path.of("..", dirName);
+        Path dir = Path.of(dirName);                                 // 모듈 폴더에서 실행할 때
+        if (!Files.isDirectory(dir)) dir = Path.of("..", "module-steam-energy", dirName);
         if (!Files.isDirectory(dir)) return null;
         try (Stream<Path> paths = Files.list(dir)) {
             Optional<Path> found = paths

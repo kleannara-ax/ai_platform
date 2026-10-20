@@ -254,8 +254,8 @@ class ComboBoilerLayoutTest {
     }
 
     private static Path findWorkbook() throws Exception {
-        Path dir = Path.of("원본");
-        if (!Files.isDirectory(dir)) dir = Path.of("..", "원본");
+        Path dir = Path.of("원본");                                  // 모듈 폴더에서 실행할 때
+        if (!Files.isDirectory(dir)) dir = Path.of("..", "module-steam-energy", "원본");
         if (!Files.isDirectory(dir)) return null;
         try (Stream<Path> paths = Files.list(dir)) {
             Optional<Path> found = paths

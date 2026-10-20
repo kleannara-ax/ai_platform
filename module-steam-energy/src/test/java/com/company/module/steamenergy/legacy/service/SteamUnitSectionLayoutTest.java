@@ -104,7 +104,7 @@ class SteamUnitSectionLayoutTest {
     }
 
     private static Path findWorkbook() throws Exception {
-        for (Path dir : List.of(Path.of("원본"), Path.of("..", "원본"))) {
+        for (Path dir : List.of(Path.of("원본"), Path.of("..", "module-steam-energy", "원본"))) {
             if (!Files.isDirectory(dir)) continue;
             try (Stream<Path> paths = Files.list(dir)) {
                 Optional<Path> found = paths

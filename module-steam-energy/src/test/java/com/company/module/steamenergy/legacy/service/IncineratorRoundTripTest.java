@@ -44,7 +44,10 @@ class IncineratorRoundTripTest {
     @DisplayName("원본 → 내려받기 → 다시 가져오기 가 모든 칸에서 같다")
     void roundTrip() throws Exception {
         SteamPoiConfig.applyLimits();
-        Path path = Path.of("..", "원본", "5. 소각로 위탁운영비 첨부자료(25년10월).xls");
+        Path path = Path.of("원본", "5. 소각로 위탁운영비 첨부자료(25년10월).xls");
+        if (!Files.exists(path)) {
+            path = Path.of("..", "module-steam-energy", "원본", "5. 소각로 위탁운영비 첨부자료(25년10월).xls");
+        }
         Assumptions.assumeTrue(Files.exists(path), "소각로 위탁운영비 원본이 없어 건너뜀");
         byte[] original = Files.readAllBytes(path);
         Store first = new Store();

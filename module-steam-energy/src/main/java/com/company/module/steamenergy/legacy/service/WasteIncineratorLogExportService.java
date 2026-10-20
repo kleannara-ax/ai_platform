@@ -199,20 +199,10 @@ public class WasteIncineratorLogExportService {
         }
     }
 
-    /** 원본 폴더 위치. 실행 위치가 app 하위일 수 있어 상위 폴더까지 훑는다. */
-    private Path resolveOriginalDir() throws IOException {
-        Path base = Path.of("").toAbsolutePath();
-        for (int depth = 0; depth < 4 && base != null; depth += 1) {
-            Path candidate = base.resolve(ORIGINAL_DIR);
-            if (Files.isDirectory(candidate)) return candidate;
-            base = base.getParent();
-        }
-        throw new IOException("'" + ORIGINAL_DIR + "' 폴더를 찾지 못했습니다.");
-    }
 
     /** 원본 폴더에서 폐합성소각로 운전일지 서식 파일을 찾는다 (백업본·임시파일 제외). */
     private Path resolveTemplatePath() throws IOException {
-        Path dir = resolveOriginalDir();
+        Path dir = OriginalWorkbookFiles.dir();
         try (Stream<Path> paths = Files.list(dir)) {
             Optional<Path> found = paths
                     .filter(Files::isRegularFile)
