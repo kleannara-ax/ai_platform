@@ -24,9 +24,9 @@ public class TableService {
     public TableService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         this.definitions = Map.of(
-                "unit_usage",
+                "steam_unit_usage",
                 new TableDefinition(
-                        "unit_usage",
+                        "steam_unit_usage",
                         List.of("month", "day", "machine_no"),
                         List.of(
                                 "id", "month", "year_no", "month_no", "day", "machine_no", "main_steam", "coater_steam",
@@ -50,9 +50,9 @@ public class TableService {
                         ),
                         "year_no, month_no, cast(day as unsigned), id"
                 ),
-                "unit_usage_raw",
+                "steam_unit_usage_raw",
                 new TableDefinition(
-                        "unit_usage_raw",
+                        "steam_unit_usage_raw",
                         List.of("month", "day"),
                         List.of(
                                 "id", "month", "year_no", "month_no", "day", "disperser_total", "toc_steam",
@@ -69,9 +69,9 @@ public class TableService {
                         ),
                         "year_no, month_no, cast(day as unsigned), id"
                 ),
-                "table_cell_value",
+                "steam_cell_value",
                 new TableDefinition(
-                        "table_cell_value",
+                        "steam_cell_value",
                         List.of("month", "table_name", "row_key", "col_index"),
                         List.of(
                                 "id", "month", "year_no", "month_no", "table_name", "row_key", "col_index",
@@ -218,7 +218,7 @@ public class TableService {
     }
 
     public List<Map<String, Object>> listCellRowsByTableNameThroughMonth(String rowTableName, String throughMonth) {
-        TableDefinition definition = getDefinition("table_cell_value");
+        TableDefinition definition = getDefinition("steam_cell_value");
         return jdbcTemplate.query(
                 "select " + String.join(", ", definition.selectColumns()) +
                         " from " + definition.tableName() +
@@ -231,7 +231,7 @@ public class TableService {
     }
 
     public List<Map<String, Object>> listCellRowsByTableNameBetweenMonths(String rowTableName, String fromMonth, String toMonth) {
-        TableDefinition definition = getDefinition("table_cell_value");
+        TableDefinition definition = getDefinition("steam_cell_value");
         return jdbcTemplate.query(
                 "select " + String.join(", ", definition.selectColumns()) +
                         " from " + definition.tableName() +
@@ -246,7 +246,7 @@ public class TableService {
 
     public Map<String, Object> deleteTableCellRowGroup(String month, String rowKey) {
         int deleted = jdbcTemplate.update(
-                "delete from table_cell_value where month = ? and row_key = ?",
+                "delete from steam_cell_value where month = ? and row_key = ?",
                 month,
                 rowKey
         );
@@ -270,7 +270,7 @@ public class TableService {
             args[index + 1] = rowKeyPrefixes.get(index) + "%";
         }
         return jdbcTemplate.update(
-                "delete from table_cell_value where month = ? and (" + conditions + ")",
+                "delete from steam_cell_value where month = ? and (" + conditions + ")",
                 args
         );
     }
@@ -287,11 +287,11 @@ public class TableService {
     public int deleteTableCellValuesByTableExcludingRowKeyPrefixes(String month, String tableName, List<String> excludedPrefixes) {
         if (excludedPrefixes == null || excludedPrefixes.isEmpty()) {
             return jdbcTemplate.update(
-                    "delete from table_cell_value where month = ? and table_name = ?",
+                    "delete from steam_cell_value where month = ? and table_name = ?",
                     month, tableName
             );
         }
-        StringBuilder sql = new StringBuilder("delete from table_cell_value where month = ? and table_name = ?");
+        StringBuilder sql = new StringBuilder("delete from steam_cell_value where month = ? and table_name = ?");
         Object[] args = new Object[2 + excludedPrefixes.size()];
         args[0] = month;
         args[1] = tableName;
@@ -313,14 +313,14 @@ public class TableService {
             args[index + 1] = tableNames.get(index);
         }
         return jdbcTemplate.update(
-                "delete from table_cell_value where month = ? and table_name in (" + placeholders + ")",
+                "delete from steam_cell_value where month = ? and table_name in (" + placeholders + ")",
                 args
         );
     }
 
     public int deleteTableCellValue(String month, String tableName, String rowKey, int colIndex) {
         return jdbcTemplate.update(
-                "delete from table_cell_value where month = ? and table_name = ? and row_key = ? and col_index = ?",
+                "delete from steam_cell_value where month = ? and table_name = ? and row_key = ? and col_index = ?",
                 month,
                 tableName,
                 rowKey,

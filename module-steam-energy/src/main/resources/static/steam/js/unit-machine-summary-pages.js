@@ -7,9 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "table_cell_value";
-  const UNIT_TABLE = "unit_usage";
-  const RAW_TABLE = "unit_usage_raw";
+  const CELL_TABLE = "steam_cell_value";
+  const UNIT_TABLE = "steam_unit_usage";
+  const RAW_TABLE = "steam_unit_usage_raw";
   const DAILY_ROW_COUNT = 31;
 
   const cellRows = [];

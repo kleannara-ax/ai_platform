@@ -49,9 +49,9 @@ public class SteamUnitExcelExportService {
     }
 
     private void fillMonthlySheet(Sheet sheet, int year, int monthNo, String monthKey) {
-        List<Map<String, Object>> unitRows = tableService.listAllByMonth("unit_usage", monthKey);
-        List<Map<String, Object>> rawRows = tableService.listAllByMonth("unit_usage_raw", monthKey);
-        List<Map<String, Object>> cellRows = tableService.listAllByMonth("table_cell_value", monthKey);
+        List<Map<String, Object>> unitRows = tableService.listAllByMonth("steam_unit_usage", monthKey);
+        List<Map<String, Object>> rawRows = tableService.listAllByMonth("steam_unit_usage_raw", monthKey);
+        List<Map<String, Object>> cellRows = tableService.listAllByMonth("steam_cell_value", monthKey);
 
         Map<String, Map<String, Object>> unitByKey = new HashMap<>();
         for (Map<String, Object> row : unitRows) {

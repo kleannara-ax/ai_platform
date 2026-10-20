@@ -95,8 +95,8 @@ public class SteamUnitExcelImportService {
     }
 
     private void clearImportedMonth(String monthKey) {
-        tableService.deleteRowsByMonth("unit_usage", monthKey);
-        tableService.deleteRowsByMonth("unit_usage_raw", monthKey);
+        tableService.deleteRowsByMonth("steam_unit_usage", monthKey);
+        tableService.deleteRowsByMonth("steam_unit_usage_raw", monthKey);
         tableService.deleteTableCellValuesByTables(monthKey, List.of(
                 "usage_m_pm2",
                 "usage_m_pm3a",
@@ -197,7 +197,7 @@ public class SteamUnitExcelImportService {
             return false;
         }
 
-        tableService.upsert("unit_usage", payload);
+        tableService.upsert("steam_unit_usage", payload);
         return true;
     }
 
@@ -232,7 +232,7 @@ public class SteamUnitExcelImportService {
             return false;
         }
 
-        tableService.upsert("unit_usage_raw", payload);
+        tableService.upsert("steam_unit_usage_raw", payload);
         return true;
     }
 
@@ -261,7 +261,7 @@ public class SteamUnitExcelImportService {
         payload.put("row_key", rowKey);
         payload.put("col_index", colIndex);
         payload.put("cell_value", value);
-        tableService.upsert("table_cell_value", payload);
+        tableService.upsert("steam_cell_value", payload);
         return 1;
     }
 

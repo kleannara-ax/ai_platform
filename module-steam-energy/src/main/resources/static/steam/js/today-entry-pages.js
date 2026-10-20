@@ -242,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!existing && !hasValue) return;
 
-    const saved = await upsert("unit_usage", payload, existing?.id);
+    const saved = await upsert("steam_unit_usage", payload, existing?.id);
     const index = unitRows.findIndex((row) => row.id === saved.id);
     if (index >= 0) unitRows[index] = saved;
     else unitRows.push(saved);
@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!existing && !hasValue) return;
 
-    const saved = await upsert("unit_usage_raw", payload, existing?.id);
+    const saved = await upsert("steam_unit_usage_raw", payload, existing?.id);
     const index = rawRows.findIndex((row) => row.id === saved.id);
     if (index >= 0) rawRows[index] = saved;
     else rawRows.push(saved);
@@ -287,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
       cell_value: cellValue,
     };
 
-    const saved = await upsert("table_cell_value", payload, existing?.id);
+    const saved = await upsert("steam_cell_value", payload, existing?.id);
     const index = cellRows.findIndex((row) => row.id === saved.id);
     if (index >= 0) cellRows[index] = saved;
     else cellRows.push(saved);
@@ -310,9 +310,9 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTodayContext();
 
     const [units, raws, cells] = await Promise.all([
-      fetchMonthRows("unit_usage"),
-      fetchMonthRows("unit_usage_raw"),
-      fetchMonthRows("table_cell_value"),
+      fetchMonthRows("steam_unit_usage"),
+      fetchMonthRows("steam_unit_usage_raw"),
+      fetchMonthRows("steam_cell_value"),
     ]);
 
     unitRows.length = 0;

@@ -2,7 +2,7 @@
   const page = window.location.pathname.split("/").pop();
   if (page !== "unit-fluidized-srf-inbound.html") return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const SRF_TABLE = "fluidized_srf_inbound";
   const TABLES_BASE = "/tables";
   const PERIOD_KEY = "steamlog:shared-period";

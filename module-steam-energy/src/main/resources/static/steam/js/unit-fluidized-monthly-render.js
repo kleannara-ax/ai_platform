@@ -1499,7 +1499,7 @@
       }));
 
       // 외부 페이지(예: energy-month-compare)에서 참조 가능하도록 DB 에 계산값 저장.
-      // table_cell_value(table_name=fluidized_monthly_cache, month=YYYY, col_index=1..12, row_key=contractCost|operatingCost).
+      // steam_cell_value(table_name=fluidized_monthly_cache, month=YYYY, col_index=1..12, row_key=contractCost|operatingCost).
       // 렌더가 자주 발생하므로 디바운스로 묶어서 1초 후 한 번만 POST.
       try {
         if (window.__fmcCacheUpsertTimer) clearTimeout(window.__fmcCacheUpsertTimer);
@@ -1513,13 +1513,13 @@
             const oc = rec.values.operatingCost;
             const baseRow = { month: String(year), year_no: Number(year), month_no: monthNum, table_name: "fluidized_monthly_cache" };
             if (Number.isFinite(cc)) {
-              tasks.push(fetch("/tables/table_cell_value", {
+              tasks.push(fetch("/tables/steam_cell_value", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...baseRow, row_key: "contractCost", col_index: monthNum, cell_value: String(cc) }),
               }));
             }
             if (Number.isFinite(oc)) {
-              tasks.push(fetch("/tables/table_cell_value", {
+              tasks.push(fetch("/tables/steam_cell_value", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...baseRow, row_key: "operatingCost", col_index: monthNum, cell_value: String(oc) }),
               }));

@@ -530,7 +530,7 @@
     document.querySelectorAll("table.inc-table").forEach((tbl) => tbl.addEventListener("input", recomputeAll));
 
     /* DB */
-    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_total_cost";
+    const TABLES_BASE = "/tables", CELL_TABLE = "steam_cell_value", T_NAME = "incinerator_total_cost";
     const storedRows = new Map();
     function rowKeyFor(section, month, field) { return `${section}|${month}|${field}`; }
     function eachInput(cb) {

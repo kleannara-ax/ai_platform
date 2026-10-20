@@ -40,7 +40,7 @@ import java.util.Set;
 @Service
 public class FluidizedDailyLogImportService {
 
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String DETAIL_TABLE = "fluidized_detail_main";
     private static final String FLOW_TABLE = "flow_m_fluid_incinerator";
     private static final String LOG_TABLE = "fluidized_daily_log";

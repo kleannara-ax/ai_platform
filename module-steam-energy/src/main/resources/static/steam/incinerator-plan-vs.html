@@ -400,7 +400,7 @@
     document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
 
     /* DB */
-    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_plan_vs";
+    const TABLES_BASE = "/tables", CELL_TABLE = "steam_cell_value", T_NAME = "incinerator_plan_vs";
     const CONTRACT_NAME = "incinerator_contract";
     const contractByMonth = {}; // 1..12: {unit1:{oper,...}, unit2:{oper,...}}
     function emptyContract() { return { unit1:{steam:0,oper:0,stop:0,runtime:0}, unit2:{steam:0,oper:0,stop:0,runtime:0} }; }

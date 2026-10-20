@@ -145,7 +145,7 @@ final class FluidizedSummaryLayout {
                     int costRow, Map<String, Integer> costColumns) {
     }
 
-    /** 일별 표의 항목 — {@code {키, 머리글}}. 키는 {@code table_cell_value.col_index} 와 짝이 맞는다. */
+    /** 일별 표의 항목 — {@code {키, 머리글}}. 키는 {@code steam_cell_value.col_index} 와 짝이 맞는다. */
     private static final String[][] CONTRACT_COLUMNS = {
             {"steam", "스팀 생산량"},
             {"price", "스팀단가"},

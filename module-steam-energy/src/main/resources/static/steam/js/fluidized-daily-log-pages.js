@@ -4,7 +4,7 @@
  *  - 세부 운영내역과 공유하는 항목(소각량·스팀·약품·전력·용수)은 세부 운영내역 셀
  *    (fluidized_detail_main / flow_m_fluid_incinerator) 을 직접 읽고 쓴다. DETAIL_MAP 참고.
  *    → 기존 세부 운영내역 데이터가 그대로 보이고, 운전일지 입력은 세부 운영내역에 즉시 반영된다.
- *  - 나머지(근무자·결재·전일지침·소각재·특이사항)만 table_cell_value
+ *  - 나머지(근무자·결재·전일지침·소각재·특이사항)만 steam_cell_value
  *    (table_name="fluidized_daily_log", row_key=일, col_index=항목번호) 에 저장한다.
  *  - col_index 는 항목 고정 번호이므로 절대 재배치하지 말 것 (COL 참고).
  */
@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "fluidized-daily-log.html") return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const LOG_TABLE = "fluidized_daily_log";
   // 세부 운영내역과 공유하는 저장소
   //  - fluidized_detail_main    : row_key = 셀 참조("C18"), col_index = 0. 열 = 일자+2 (C=1일 … AG=31일)

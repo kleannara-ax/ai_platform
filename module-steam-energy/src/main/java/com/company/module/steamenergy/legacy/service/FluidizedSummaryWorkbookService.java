@@ -60,12 +60,12 @@ public class FluidizedSummaryWorkbookService {
     /** 서식에만 있고 파일에는 빠져 있기도 한 "KNE지급비용 / 추가비용" 줄(서식 기준). */
     private static final int DETAIL_EXTRA_COST_ROW = 16;
 
-    /** 일별 도급비용: 머리글 키 → {@code table_cell_value.col_index}. 순서가 화면 열 순서다. */
+    /** 일별 도급비용: 머리글 키 → {@code steam_cell_value.col_index}. 순서가 화면 열 순서다. */
     private static final Map<String, Integer> CONTRACT_COL_INDEX = new LinkedHashMap<>(Map.of(
             "steam", 0, "price", 2, "stopHours", 4, "fixedCost", 5
     ));
 
-    /** 지급현황: 머리글 키 → {@code table_cell_value.col_index}. */
+    /** 지급현황: 머리글 키 → {@code steam_cell_value.col_index}. */
     private static final Map<String, Integer> COST_COL_INDEX = Map.of(
             "labor", 0, "operating", 1, "improvement", 2
     );
@@ -104,7 +104,7 @@ public class FluidizedSummaryWorkbookService {
             Sheet monthlySummarySheet = FluidizedSummaryLayout.sheetByName(workbook, 3, "3-1.");
             String monthKey = monthKey(year, month);
             Map<String, Object> annualCells = buildCellMap(loadCellsForYear(year));
-            Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("table_cell_value", monthKey));
+            Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("steam_cell_value", monthKey));
             Map<String, String> detailCells = renderDetailCells(monthKey);
             Map<String, Map<String, String>> annualDetailCells = renderAnnualDetailCells(year);
 
@@ -251,7 +251,7 @@ public class FluidizedSummaryWorkbookService {
             setString(sheet, 8, 1, "특이사항");
             // 10..21행: 1~12월 노트
             Map<String, String> notes = new LinkedHashMap<>();
-            for (Map<String, Object> row : tableService.listAllByMonth("table_cell_value", anchorMonth)) {
+            for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", anchorMonth)) {
                 if (!NOTE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
                 if (toInt(row.get("col_index")) != 0) continue;
                 notes.put(String.valueOf(row.get("row_key")), String.valueOf(row.get("cell_value")));
@@ -276,7 +276,7 @@ public class FluidizedSummaryWorkbookService {
     public byte[] exportContractWorkbook(int year, int month) throws IOException {
         String monthKey = monthKey(year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("table_cell_value", monthKey));
+        Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("steam_cell_value", monthKey));
         try (Workbook workbook = WorkbookFactory.create(true);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("도급비용");
@@ -719,7 +719,7 @@ public class FluidizedSummaryWorkbookService {
      * 업로드(import)는 main grid 의 cellRef 기반이라 inline 행은 자동 무시.
      */
     private void appendDetailCustomRows(Sheet sheet, int year, int month, String monthKey) {
-        List<Map<String, Object>> rows = tableService.listAllByMonth("table_cell_value", monthKey);
+        List<Map<String, Object>> rows = tableService.listAllByMonth("steam_cell_value", monthKey);
         Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
         for (Map<String, Object> row : rows) {
@@ -1028,12 +1028,12 @@ public class FluidizedSummaryWorkbookService {
             String usage = cellText(sheet, row, monthly, "usage");
             if (currentMonth.isBlank() && payment.isBlank() && spent.isBlank() && vendor.isBlank() && usage.isBlank()) continue;
             String rowKey = IMPROVEMENT_MONTHLY_PREFIX + "xlsx-r" + (row + 1);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, currentMonth.isBlank() ? "01" : currentMonth);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, payment);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, spent);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 4, vendor);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 5, usage);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, String.valueOf(monthlySort++));
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 1, currentMonth.isBlank() ? "01" : currentMonth);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 2, payment);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 3, spent);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 4, vendor);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 5, usage);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 6, String.valueOf(monthlySort++));
         }
 
         FluidizedSummaryLayout.LabeledTable items = FluidizedSummaryLayout.improvementItemOf(sheet);
@@ -1051,14 +1051,14 @@ public class FluidizedSummaryWorkbookService {
             if (currentCategory.isBlank() && no.isBlank() && item.isBlank() && planCost.isBlank() && actualCost.isBlank() && status.isBlank() && note.isBlank()) continue;
             if (isImprovementSummaryRow(currentCategory)) continue;
             String rowKey = IMPROVEMENT_ITEM_PREFIX + "xlsx-r" + (row + 1);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, currentCategory.isBlank() ? "설비개선" : currentCategory);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, no);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, item);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 4, planCost);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 5, actualCost);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, status);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 7, note);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 8, String.valueOf(itemSort++));
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 1, currentCategory.isBlank() ? "설비개선" : currentCategory);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 2, no);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 3, item);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 4, planCost);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 5, actualCost);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 6, status);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 7, note);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 8, String.valueOf(itemSort++));
         }
         return imported;
     }
@@ -1103,15 +1103,15 @@ public class FluidizedSummaryWorkbookService {
             String note = cellText(sheet, row, table, "note");
             if (date.isBlank() && reason.isBlank() && action.isBlank() && downtime.isBlank() && loss.isBlank() && note.isBlank()) continue;
             String rowKey = prefix + "xlsx-r" + (row + 1);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 1, date);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 2, reason);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 3, action);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 4, downtime);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 1, date);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 2, reason);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 3, action);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 4, downtime);
             if ("accident".equals(kind)) {
-                imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 5, loss);
+                imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 5, loss);
             }
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 6, note);
-            imported += upsertCell(monthKey, year, 0, "table_cell_value", rowKey, 7, String.valueOf(sortOrder++));
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 6, note);
+            imported += upsertCell(monthKey, year, 0, "steam_cell_value", rowKey, 7, String.valueOf(sortOrder++));
         }
         return imported;
     }
@@ -1205,7 +1205,7 @@ public class FluidizedSummaryWorkbookService {
     private List<Map<String, Object>> loadCellsForYear(int year) {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int month = 1; month <= 12; month += 1) {
-            rows.addAll(tableService.listAllByMonth("table_cell_value", monthKey(year, month)));
+            rows.addAll(tableService.listAllByMonth("steam_cell_value", monthKey(year, month)));
         }
         return rows;
     }
@@ -1243,7 +1243,7 @@ public class FluidizedSummaryWorkbookService {
         payload.put("row_key", rowKey);
         payload.put("col_index", colIndex);
         payload.put("cell_value", normalizedValue);
-        tableService.upsert("table_cell_value", payload);
+        tableService.upsert("steam_cell_value", payload);
         return 1;
     }
 

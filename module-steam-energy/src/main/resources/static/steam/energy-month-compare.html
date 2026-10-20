@@ -169,7 +169,7 @@
     let showZesco = false;
     const PAGE_TABLE_NAME = "energy_month_compare";
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
 
     const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
     const sumArr = (arr) => arr.reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
@@ -181,7 +181,7 @@
     // === 외부 페이지에서 가져오기 ===
     // unit-fluidized-monthly 의 도급비용 (contractCost = 가동시간 운영비 + 운휴 고정비 + 설비개선비 - 차감비 + 추가지급분)
     //   원본 단위: 천원 → 백만원으로 변환
-    // 저장소: DB table_cell_value (table_name=fluidized_monthly_cache, row_key=contractCost, col_index=1..12)
+    // 저장소: DB steam_cell_value (table_name=fluidized_monthly_cache, row_key=contractCost, col_index=1..12)
     const __fmcCache = { year: null, data: null };
     async function fetchFluidizedContract(year) {
       if (__fmcCache.year === year && __fmcCache.data) return __fmcCache.data;
@@ -189,7 +189,7 @@
         const params = new URLSearchParams({
           month: String(year), tableNames: "fluidized_monthly_cache", limit: "1000",
         });
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) { __fmcCache.year = year; __fmcCache.data = {}; return {}; }
         const payload = await resp.json();
         const out = {};
@@ -222,7 +222,7 @@
         const params = new URLSearchParams({
           month: String(year), tableNames: "energy_fuel_ratio", limit: "10000",
         });
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) return null;
         const payload = await resp.json();
         const map = new Map();
@@ -353,7 +353,7 @@
     let computed = { fuel:{} };
     let notes = {}; // notes[section][rowKey]
 
-    /* ── DB 저장소 (table_cell_value / table_name=energy_month_compare) ─
+    /* ── DB 저장소 (steam_cell_value / table_name=energy_month_compare) ─
      *  row_key 형식:
      *    데이터: `${section}|${rowKey}`  예: "fuel|compositeSteam"
      *    비고  : `note|${section}|${cat}` 예: "note|fuel|연료비"

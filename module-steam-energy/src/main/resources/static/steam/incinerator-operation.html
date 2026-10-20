@@ -248,7 +248,7 @@
     document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
 
     /* DB */
-    const TABLES_BASE = "/tables", CELL_TABLE = "table_cell_value", T_NAME = "incinerator_operation";
+    const TABLES_BASE = "/tables", CELL_TABLE = "steam_cell_value", T_NAME = "incinerator_operation";
     function monthKey() { return String(currentYear); }
     const storedRows = new Map();
     function rowKeyFor(section, month, field) { return `${section}|${month}|${field}`; }

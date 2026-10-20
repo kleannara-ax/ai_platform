@@ -11,8 +11,8 @@
   const unitExcelFileInput = document.getElementById("unitExcelFileInput");
   if (!yearSelect || !monthSelect) return;
 
-  const DB_TABLE_UNIT = "unit_usage";
-  const DB_TABLE_UNIT_RAW = "unit_usage_raw";
+  const DB_TABLE_UNIT = "steam_unit_usage";
+  const DB_TABLE_UNIT_RAW = "steam_unit_usage_raw";
   const unitRows = [];
   const rawRows = [];
   let loaded = false;

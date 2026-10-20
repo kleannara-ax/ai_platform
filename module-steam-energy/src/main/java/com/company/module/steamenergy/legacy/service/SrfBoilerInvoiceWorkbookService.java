@@ -173,7 +173,7 @@ public class SrfBoilerInvoiceWorkbookService {
     private Map<String, Object> comboSteamValues(String monthKey) {
         // 복합보일러 스팀생산실적의 동일 일자 값을 운영내역 셀에 연결하기 위해 필요한 prefix 만 수집.
         Map<String, Object> values = new LinkedHashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("table_cell_value", monthKey)) {
+        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
             if (!COMBO_PRODUCTION_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rowKey = String.valueOf(row.get("row_key"));
             if (rowKey.startsWith("comboSteam-")

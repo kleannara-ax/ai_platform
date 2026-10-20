@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page !== "srf-boiler-invoice-operation.html") return;
 
   const PERIOD_KEY = "steamlog:shared-period";
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const OPERATION_TABLE = "srf_boiler_invoice_operation";
   const TABLES_BASE = "/tables";
   const yearSelect = document.getElementById("invoiceYear");

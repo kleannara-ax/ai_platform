@@ -394,7 +394,7 @@
   (function () {
     const SHARED_PERIOD_KEY = "steamlog:shared-period";
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const PAGE_TABLE_NAME = "energy_fuel_ratio";
     const yearSel = document.getElementById("invoiceYear");
     const searchBtn = document.getElementById("invoiceSearch");
@@ -589,7 +589,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 엑셀 수식 구현 — 외부 참조는 energy-month-compare DB (table_cell_value),
+    // 엑셀 수식 구현 — 외부 참조는 energy-month-compare DB (steam_cell_value),
     // 내부 수식은 다른 셀 값에서 계산.
     // ─────────────────────────────────────────────────────────────
     const EMC_TABLE = "energy_month_compare";
@@ -598,7 +598,7 @@
       if (__emcCache.year === year && __emcCache.data) return __emcCache.data;
       try {
         const params = new URLSearchParams({ month: String(year), tableNames: EMC_TABLE, limit: "10000" });
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) return null;
         const payload = await resp.json();
         const map = new Map();

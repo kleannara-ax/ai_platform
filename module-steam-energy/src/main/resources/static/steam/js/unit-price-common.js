@@ -1,6 +1,6 @@
 /*
  * 설비별 단가(연/월별) 공용 모듈.
- *  - 등록 단가는 table_cell_value 에 저장: table_name="unit_price",
+ *  - 등록 단가는 steam_cell_value 에 저장: table_name="unit_price",
  *    month=연도(String), row_key=항목코드, col_index=월(1~12), cell_value=단가.
  *  - daily 페이지(unit-lng-cost / unit-flow-daily)의 단가 셀은
  *    month="YYYY-MM", row_key="01".."31"(일), col_index=단가컬럼 에 일자별 동일값 저장.
@@ -10,7 +10,7 @@
   "use strict";
 
   var TABLES_BASE = "/tables";
-  var CELL_TABLE = "table_cell_value";
+  var CELL_TABLE = "steam_cell_value";
   var REGISTRY_TABLE = "unit_price";
 
   // 연료 단가 6종. table/col = daily 그리드 셀 위치, todayInput = today-entry 입력 id.

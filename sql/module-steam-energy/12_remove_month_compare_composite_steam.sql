@@ -8,6 +8,6 @@
 --
 --   그래서 예전에 손으로 넣거나 엑셀로 올린 fuel|compositeSteam 값은 읽는 곳이 없다.
 
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'energy_month_compare'
    AND row_key = 'fuel|compositeSteam';

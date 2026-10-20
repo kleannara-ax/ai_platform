@@ -1,6 +1,6 @@
-# module-steam-energy: table_cell_value 네임스페이스 / col_index 규약
+# module-steam-energy: steam_cell_value 네임스페이스 / col_index 규약
 
-> 실행하는 SQL 이 아니라 **문서**다. 스팀 화면들이 `table_cell_value` 한 표를 나눠 쓰기 때문에,
+> 실행하는 SQL 이 아니라 **문서**다. 스팀 화면들이 `steam_cell_value` 한 표를 나눠 쓰기 때문에,
 > 어떤 화면이 어떤 `table_name` 과 `col_index` 를 쓰는지 여기에 적어 둔다.
 > `col_index` 는 화면 항목의 고정 번호라 **재배치하면 기존 데이터가 어긋난다.**
 > 항목을 추가·변경하면 이 문서도 같이 고칠 것.
@@ -58,7 +58,7 @@
 
 ```sql
 SELECT month, col_index, COUNT(*) AS cnt
-  FROM table_cell_value
+  FROM steam_cell_value
  WHERE table_name = 'waste_incin_log'
    AND col_index NOT IN (1,2,3,4,5,11,12,13,14,15,21,
                          100,101,102,103,104,

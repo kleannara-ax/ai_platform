@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page !== "srf-boiler-invoice.html") return;
 
   const PERIOD_KEY = "steamlog:shared-period";
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const SUMMARY_TABLE = "srf_boiler_invoice_summary";
   // Client Invoice 저장 표 — 원본 Summary(VK) 의 ='Client Invoice'!F20 같은 참조를 여기서 계산한다.
   const CLIENT_TABLE = "srf_boiler_invoice_client";

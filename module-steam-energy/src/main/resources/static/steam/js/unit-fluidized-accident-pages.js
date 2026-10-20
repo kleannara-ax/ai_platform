@@ -1,12 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   // \uC138 \uD398\uC774\uC9C0\uC5D0\uC11C \uB3D9\uC77C \uB85C\uC9C1 \uC0AC\uC6A9 \u2014 \uC720\uB3D9\uC0C1 \uC0AC\uACE0\uC774\uB825 / SRF Invoice \uC0AC\uACE0\uC774\uB825 / \uC18C\uAC01\uB85C \uC704\uD0C1\uC6B4\uC601 \uC0AC\uACE0\uC774\uB825.
-  // RECORD_TYPES \uC811\uB450\uC5B4\uB97C \uB2E4\uB974\uAC8C \uD574\uC11C \uB3D9\uC77C table_cell_value \uC548\uC5D0\uC11C \uBD84\uB9AC \uC800\uC7A5.
+  // RECORD_TYPES \uC811\uB450\uC5B4\uB97C \uB2E4\uB974\uAC8C \uD574\uC11C \uB3D9\uC77C steam_cell_value \uC548\uC5D0\uC11C \uBD84\uB9AC \uC800\uC7A5.
   const IS_SRF = page === "srf-boiler-invoice-accident.html";
   const IS_INCINERATOR = page === "incinerator-accident.html";
   if (page !== "unit-fluidized-accident.html" && !IS_SRF && !IS_INCINERATOR) return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const TABLES_BASE = "/tables";
   const MONTH_SUFFIX = "00";
   const PERIOD_KEY = "steamlog:shared-period";

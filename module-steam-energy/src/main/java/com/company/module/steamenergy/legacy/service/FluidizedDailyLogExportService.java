@@ -207,7 +207,7 @@ public class FluidizedDailyLogExportService {
     // ── DB 읽기 ─────────────────────────────────────────────────────
     private Map<String, String> loadMonthCells(String monthKey) {
         Map<String, String> cells = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("table_cell_value", monthKey)) {
+        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
             String tableName = String.valueOf(row.get("table_name"));
             if (!DETAIL_TABLE.equals(tableName) && !FLOW_TABLE.equals(tableName) && !LOG_TABLE.equals(tableName)) {
                 continue;

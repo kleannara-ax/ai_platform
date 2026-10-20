@@ -1,6 +1,6 @@
 /*
  * 폐합성소각로 운전일지 — 원본 엑셀 "폐합성소각로운전일지(YYYY년 MM월).xlsx" 의 시트별 월 표.
- *  - 저장소: table_cell_value (table_name="waste_incin_log", row_key=일, col_index=항목 고정번호)
+ *  - 저장소: steam_cell_value (table_name="waste_incin_log", row_key=일, col_index=항목 고정번호)
  *  - col_index 는 항목 고정 번호이므로 재배치 금지. 시트별 구간:
  *      소각량 1~29 / 스팀량 100~ / 급수량 200~ / 전력 300~ / 폐기물 400~ /
  *      약품 500~ / TMS 600~ / 외부반입 700~ / 폐기물발생 800~
@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "waste-incinerator-log.html") return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const LOG_TABLE = "waste_incin_log";
   // 다른 스팀 페이지와 동일 (platform-iframe-compat.js 가 /steam/api/tables 로 재작성)
   const TABLES_BASE = "/tables";

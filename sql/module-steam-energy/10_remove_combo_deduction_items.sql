@@ -10,7 +10,7 @@
 SET NAMES utf8mb4;
 
 -- 1) 등록 단가 (연/월 그리드 값)
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('comb_lng_cost', 'comb_disposal', 'comb_depreciation');
 
@@ -20,4 +20,4 @@ DELETE FROM steam_price
 
 -- 확인용
 -- SELECT FACILITY, ITEM_CODE FROM steam_price WHERE FACILITY = '복합보일러';
--- SELECT row_key FROM table_cell_value WHERE table_name='unit_price_detail' AND row_key LIKE 'comb_%';
+-- SELECT row_key FROM steam_cell_value WHERE table_name='unit_price_detail' AND row_key LIKE 'comb_%';

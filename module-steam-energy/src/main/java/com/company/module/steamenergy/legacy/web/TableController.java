@@ -142,7 +142,7 @@ public class TableController {
         return Map.of("ok", true, "deleted", affected);
     }
 
-    @DeleteMapping("/table_cell_value/row-group")
+    @DeleteMapping("/steam_cell_value/row-group")
     public Map<String, Object> deleteTableCellRowGroup(
             @RequestParam("month") String month,
             @RequestParam("rowKey") String rowKey
@@ -155,7 +155,7 @@ public class TableController {
         return result;
     }
 
-    @DeleteMapping("/table_cell_value/by-table")
+    @DeleteMapping("/steam_cell_value/by-table")
     public Map<String, Object> deleteTableCellByTable(
             @RequestParam("month") String month,
             @RequestParam("tableName") String tableName

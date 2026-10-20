@@ -14,7 +14,7 @@
   if (!isSummaryPage) return;
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const cellRows = [];
   const detailCellsByMonth = new Map();
   let loaded = false;

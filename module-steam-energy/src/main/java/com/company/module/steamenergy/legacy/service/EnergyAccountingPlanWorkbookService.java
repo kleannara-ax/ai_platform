@@ -43,7 +43,7 @@ public class EnergyAccountingPlanWorkbookService {
     // 시트명 패턴: "25년 회계비용 계획", "26년 회계비용 계획", "2025년 회계비용 계획" 등 모두 매칭
     private static final java.util.regex.Pattern SHEET_NAME_PATTERN =
             java.util.regex.Pattern.compile("\\d+년\\s*회계비용\\s*계획");
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_accounting_plan";
     private static final int HTML_ROW_COUNT = 32;
     private static final int HTML_TO_EXCEL_ROW_OFFSET = 2; // HTML r01 → Excel row 3 (이름을 못 찾을 때의 폴백)

@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 @Service
 public class ComboBoilerWorkbookService {
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PRODUCTION_TABLE = "combo_boiler_production";
     private static final String DOWNTIME_TABLE = "combo_boiler_downtime";
     private static final String RECOVERY_TABLE = "combo_boiler_recovery";

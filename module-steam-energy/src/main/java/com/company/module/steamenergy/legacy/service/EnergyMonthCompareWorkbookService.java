@@ -43,7 +43,7 @@ public class EnergyMonthCompareWorkbookService {
     private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
     private static final Pattern SHEET_NAME_PATTERN = Pattern.compile("회계비용\\s*마감과\\s*실마감\\s*비교");
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_month_compare";
 
     /**
