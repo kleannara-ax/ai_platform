@@ -158,7 +158,7 @@
            history : Accumulated = 이번달까지 Steam Supply 누적
                      TOTAL/AVERAGE 행 = 12개월 합/평균
        - 기본 데이터 없음 — 입력 칸은 빈 칸으로 시작
-       - 저장 : table_cell_value 에 row_key = "{section}|{month_index}|{field}" 로
+       - 저장 : steam_cell_value 에 row_key = "{section}|{month_index}|{field}" 로
                 month = "static" 고정 키. */
 
     /* 계약 연도는 JUN 시작. 선택연도 X 이면 X년 JUN ~ (X+1)년 MAY */
@@ -303,7 +303,7 @@
 
     /* ───────── DB 저장 / 로딩 (연도별 키) ───────── */
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const ACC_TABLE_NAME = "srf_boiler_invoice_accumulated";
     function accMonthKey() { return String(currentYear); }
     const storedRows = new Map();

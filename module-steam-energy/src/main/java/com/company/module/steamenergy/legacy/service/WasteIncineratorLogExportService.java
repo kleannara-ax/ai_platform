@@ -147,7 +147,7 @@ public class WasteIncineratorLogExportService {
     // ── DB 읽기 ─────────────────────────────────────────────────────
     private Map<String, String> loadMonthCells(String monthKey) {
         Map<String, String> cells = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("table_cell_value", monthKey)) {
+        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
             if (!LOG_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             Object value = row.get("cell_value");
             if (value == null) continue;

@@ -7,9 +7,9 @@
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "table_cell_value";
-  const UNIT_TABLE = "unit_usage";
-  const RAW_TABLE = "unit_usage_raw";
+  const CELL_TABLE = "steam_cell_value";
+  const UNIT_TABLE = "steam_unit_usage";
+  const RAW_TABLE = "steam_unit_usage_raw";
   const DAILY_ROW_COUNT = 31;
 
   const cellRows = [];
@@ -1531,16 +1531,15 @@
 
   window.UnitPageSaveCoordinator?.registerFlush(flushDirtyInputs);
 
-  yearSelect.addEventListener("change", async () => {
-    await flushDirtyInputs();
-  });
-  monthSelect.addEventListener("change", async () => {
-    await flushDirtyInputs();
-  });
-  submitButton?.addEventListener("click", async () => {
+  // 조회 연도·월을 바꾸면 버튼을 누르지 않아도 바로 조회한다.
+  // (입력 중이던 값은 먼저 저장하고 넘어간다 — 바꾸기 전 달의 수정분이 사라지지 않게)
+  async function applyPeriod() {
     await flushDirtyInputs();
     await render();
-  });
+  }
+  yearSelect.addEventListener("change", applyPeriod);
+  monthSelect.addEventListener("change", applyPeriod);
+  submitButton?.addEventListener("click", applyPeriod);
   document.querySelectorAll(".period-tab-button, .machine-tab-button, .yearly-machine-tab-button").forEach((button) => {
     button.addEventListener("click", () => {
       window.setTimeout(() => {

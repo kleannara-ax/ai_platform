@@ -16,17 +16,17 @@
 
 SET NAMES utf8mb4;
 
--- 1) 등록 단가(table_cell_value / unit_price_detail): 옛 코드 → 1호기 코드로 복사
+-- 1) 등록 단가(steam_cell_value / unit_price_detail): 옛 코드 → 1호기 코드로 복사
 --    이미 1호기 값이 있으면 그대로 둔다(IGNORE).
-INSERT IGNORE INTO table_cell_value (month, year_no, month_no, table_name, row_key, col_index, cell_value)
+INSERT IGNORE INTO steam_cell_value (month, year_no, month_no, table_name, row_key, col_index, cell_value)
 SELECT month, year_no, month_no, table_name,
        CONCAT('waste1_', SUBSTRING(row_key, 7)), col_index, cell_value
-  FROM table_cell_value
+  FROM steam_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('waste_steam', 'waste_fixed_hr', 'waste_fixed_cost');
 
 -- 2) 옮겨 담은 옛 코드 정리 (화면에서 더 이상 쓰지 않는다)
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('waste_steam', 'waste_fixed_hr', 'waste_fixed_cost');
 
@@ -35,6 +35,6 @@ DELETE FROM steam_price
  WHERE ITEM_CODE IN ('waste_steam', 'waste_fixed_hr', 'waste_fixed_cost');
 
 -- 확인용
--- SELECT row_key, COUNT(*) FROM table_cell_value
+-- SELECT row_key, COUNT(*) FROM steam_cell_value
 --  WHERE table_name='unit_price_detail' AND row_key LIKE 'waste%' GROUP BY row_key;
 -- SELECT FACILITY, ITEM_CODE FROM steam_price WHERE ITEM_CODE LIKE 'waste%' ORDER BY ITEM_CODE;

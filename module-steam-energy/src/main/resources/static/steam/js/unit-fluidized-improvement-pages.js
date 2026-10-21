@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "unit-fluidized-improvement.html") return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const TABLES_BASE = "/tables";
   const MONTH_SUFFIX = "00";
   const PERIOD_KEY = "steamlog:shared-period";

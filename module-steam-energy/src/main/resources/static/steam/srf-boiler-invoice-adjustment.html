@@ -560,7 +560,7 @@
          col_index  = 1 (사용 안 함, 단일 슬롯)
        입력 blur 시점에 PATCH/POST 저장. 로딩 시 한 번 GET 으로 일괄 적용. */
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const ADJ_TABLE_NAME = "srf_boiler_invoice_adjustment";
     const __sharedPeriod = (() => { try { return JSON.parse(localStorage.getItem('steamlog:shared-period') || '{}'); } catch (e) { return {}; } })();
     let currentYear = Number(__sharedPeriod.year) || new Date().getFullYear();

@@ -128,8 +128,8 @@ class IncineratorTitleImportTest {
     @DisplayName("사고이력·도급내역 인건비 — 머리글과 집계 줄로 범위를 잡는다")
     void accidentAndContract() throws Exception {
         Recording store = importOriginal();
-        assertEquals(10.8, store.number("table_cell_value incinerator-accident-record:1 #4"), 1e-6);   // 1번 사고 운휴시간
-        assertEquals(63.0, store.number("table_cell_value incinerator-accident-record:9 #4"), 1e-6);
+        assertEquals(10.8, store.number("steam_cell_value incinerator-accident-record:1 #4"), 1e-6);   // 1번 사고 운휴시간
+        assertEquals(63.0, store.number("steam_cell_value incinerator-accident-record:9 #4"), 1e-6);
         assertEquals(96380000, store.number("incinerator_contract summary|0|labor"), 1e-6);
     }
 

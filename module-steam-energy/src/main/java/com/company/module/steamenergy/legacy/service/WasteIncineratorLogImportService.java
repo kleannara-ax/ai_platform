@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 @Service
 public class WasteIncineratorLogImportService {
 
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String LOG_TABLE = "waste_incin_log";
     /** 제목의 "(07월)" 에서 월을 읽는다. */
     private static final Pattern TITLE_MONTH = Pattern.compile("(\\d{1,2})\\s*월");

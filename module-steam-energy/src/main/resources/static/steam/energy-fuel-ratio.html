@@ -394,7 +394,7 @@
   (function () {
     const SHARED_PERIOD_KEY = "steamlog:shared-period";
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const PAGE_TABLE_NAME = "energy_fuel_ratio";
     const yearSel = document.getElementById("invoiceYear");
     const searchBtn = document.getElementById("invoiceSearch");
@@ -569,6 +569,59 @@
       input.dataset.rawValue = String(saved.cell_value || "");
     }
 
+    // ── 계산 표를 DB 에도 저장 ─────────────────────────────────────
+    // 자동 계산 칸(setCalc)은 원래 화면에만 그리고 저장하지 않았다. 그래서 DB 의 t17 값은
+    // 엑셀 업로드 때 들어온 수식 결과 스냅샷뿐이라, 화면에서 입력값을 고치면 DB 가 옛 값으로 남았고
+    // 다른 페이지가 이 표를 읽을 수 없었다. 이제 계산이 끝날 때마다 바뀐 칸만 DB 에 반영한다.
+    //   · 저장 단위는 입력칸과 같다 — table_name=energy_fuel_ratio, row_key=tNN|rNN, col_index=월 열
+    //   · 합계/평균 열은 저장하지 않는다 (엑셀 업/다운로드 형식과 맞춘다: 1~13 월 열만)
+    //   · 값이 같으면 보내지 않고, 순서대로 한 번에 하나의 묶음만 보낸다
+    let __persistQueue = Promise.resolve();
+    function persistCalcTable(tblKey, rowIdxs) {
+      if (!currentYear) return;
+      const table = getTable(tblKey);
+      if (!table) return;
+      const monthCols = dataMonthCount(tblKey);
+      const jobs = [];
+      rowIdxs.forEach((rowIdx) => {
+        const tr = table.tBodies[0]?.rows[rowIdx];
+        if (!tr) return;
+        const key = rowKey(table, rowIdx);
+        for (let c = 1; c <= monthCols; c += 1) {
+          const span = tr.cells[c]?.querySelector("span.efr-calc");
+          if (!span) continue;
+          const raw = span.dataset.raw || "";
+          const stored = storedRows.get(cellMapKey(key, c));
+          const storedValue = stored?.cell_value == null ? "" : String(stored.cell_value);
+          // 숫자로 같으면 저장하지 않는다 (문자열 표기 차이 무시)
+          if (raw === storedValue) continue;
+          if (raw !== "" && storedValue !== "" && Number(raw) === Number(storedValue)) continue;
+          if (raw === "" && !stored) continue;   // 계산값도 없고 저장된 것도 없음
+          jobs.push({ row_key: key, col_index: c, cell_value: raw === "" ? null : raw });
+        }
+      });
+      if (!jobs.length) return;
+      const year = currentYear;
+      __persistQueue = __persistQueue.then(async () => {
+        for (const job of jobs) {
+          const payload = {
+            month: year, year_no: Number(year), month_no: 0,
+            table_name: PAGE_TABLE_NAME, row_key: job.row_key, col_index: job.col_index, cell_value: job.cell_value,
+          };
+          try {
+            const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const saved = await response.json();
+            storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
+          } catch (error) {
+            console.error(`[efr] ${tblKey} 계산값 저장 실패 (${job.row_key}/${job.col_index}):`, error);
+          }
+        }
+      });
+    }
+
     function bindInputs() {
       document.addEventListener("blur", (event) => {
         const input = event.target.closest?.(".energy-table-input");
@@ -589,7 +642,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 엑셀 수식 구현 — 외부 참조는 energy-month-compare DB (table_cell_value),
+    // 엑셀 수식 구현 — 외부 참조는 energy-month-compare DB (steam_cell_value),
     // 내부 수식은 다른 셀 값에서 계산.
     // ─────────────────────────────────────────────────────────────
     const EMC_TABLE = "energy_month_compare";
@@ -598,7 +651,7 @@
       if (__emcCache.year === year && __emcCache.data) return __emcCache.data;
       try {
         const params = new URLSearchParams({ month: String(year), tableNames: EMC_TABLE, limit: "10000" });
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) return null;
         const payload = await resp.json();
         const map = new Map();
@@ -664,6 +717,8 @@
         cell.appendChild(span);
       }
       const d = (digits === undefined) ? 1 : digits;
+      // 저장용 원값 — 화면에는 반올림해 보이지만 DB 에는 계산값 그대로 넣는다
+      span.dataset.raw = (value === null || !Number.isFinite(value)) ? "" : String(value);
       if (value === null || !Number.isFinite(value)) {
         span.textContent = "—";
         span.style.color = "#94a3b8";
@@ -986,6 +1041,8 @@
         setCalc("t17", 6, c, safeDiv((getCell("t05",6,c)||0) + (etcUse||0) * (getCell("t16",6,c)||0), (getCell("t06",6,c)||0)/1000), 3);
       }
       finalizeSumAvg("t17", [0,1,2,3,4,5,6], { avgOnly: true });
+      // t17 은 다른 페이지에서도 쓰므로 계산값을 DB 에 남긴다 (월 열만)
+      persistCalcTable("t17", [0,1,2,3,4,5,6]);
     }
 
     function finalizeSumAvg(tblKey, rowIdxs, opts) {

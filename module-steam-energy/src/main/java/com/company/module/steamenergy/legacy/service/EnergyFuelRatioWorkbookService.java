@@ -60,7 +60,7 @@ public class EnergyFuelRatioWorkbookService {
     private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
     private static final Pattern SHEET_NAME_PATTERN = Pattern.compile("\\d{4}\\s*연료비\\s*배분비율");
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_fuel_ratio";
 
     /**

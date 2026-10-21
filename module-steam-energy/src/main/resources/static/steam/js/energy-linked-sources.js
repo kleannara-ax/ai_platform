@@ -17,7 +17,7 @@
   const COMPOSITE_INCOME_FIXED = 63.2; // 복합보일러 처분수익 연료비 차감분
 
   // ── SRF Boiler 인보이스 Summary(VK) ─────────────────────────────────────
-  // 저장: table_cell_value (table_name=srf_boiler_invoice_summary, month="YYYY-MM")
+  // 저장: steam_cell_value (table_name=srf_boiler_invoice_summary, month="YYYY-MM")
   //       row_key = "summary-vk-r{행번호}", col_index = 열번호(0-based) + 1
   // 계산식은 js/srf-boiler-invoice-pages.js 의 calculatedCellValue 와 같아야 한다.
   const SRF_TABLE = "srf_boiler_invoice_summary";
@@ -73,7 +73,7 @@
   }
 
   // ── SRF Boiler Client Invoice ───────────────────────────────────────────
-  // 저장: table_cell_value (table_name=srf_boiler_invoice_client, month="YYYY-MM")
+  // 저장: steam_cell_value (table_name=srf_boiler_invoice_client, month="YYYY-MM")
   //       row_key = "{구역}|{순번}|{qty|price|…}", 청구금액 = 양 × 단가 (화면 srf-boiler-invoice-client.html 과 같다)
   // 복합 LNG 사용량, 처분부담금 등 = 1. Utilities(전력 제외) + 2. Other Charge(깨끗한 나라 → 베올리아) 청구금액 합.
   //   3. Other Charge(베올리아 → 깨끗한 나라)는 넣지 않는다.
@@ -116,7 +116,7 @@
       const params = new URLSearchParams({
         fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12`, tableNames: CLIENT_TABLE, limit: "10000",
       });
-      const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+      const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
       if (resp.ok) {
         const payload = await resp.json();
         const byMonth = new Map();
@@ -156,7 +156,7 @@
       const params = new URLSearchParams({
         fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12`, tableNames: SRF_TABLE, limit: "10000",
       });
-      const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+      const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
       if (resp.ok) {
         const payload = await resp.json();
         const byMonth = new Map();

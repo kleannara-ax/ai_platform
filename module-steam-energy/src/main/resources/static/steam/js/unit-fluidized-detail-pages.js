@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "unit-fluidized-detail.html") return;
 
-  const CELL_TABLE = "table_cell_value";
+  const CELL_TABLE = "steam_cell_value";
   const MAIN_TABLE = "fluidized_detail_main";
   const SUMMARY_TABLE = "fluidized_detail_summary";
   const TABLES_BASE = "/tables";

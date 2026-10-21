@@ -13,7 +13,7 @@ SET NAMES utf8mb4;
 
 -- 1) 등록 단가 (자동계산 칸이라 값이 없어야 정상이지만, 다른 환경에 남아 있을 수 있어 정리)
 --    waste_fixed_cost 는 09 에서 1호기로 옮기기 전 옛 코드
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key IN ('waste1_fixed_cost', 'waste2_fixed_cost', 'fluid_fixed_cost', 'waste_fixed_cost');
 
@@ -23,4 +23,4 @@ DELETE FROM steam_price
 
 -- 확인용
 -- SELECT FACILITY, ITEM_CODE FROM steam_price WHERE ITEM_CODE LIKE '%fixed_cost';
--- SELECT row_key FROM table_cell_value WHERE table_name='unit_price_detail' AND row_key LIKE '%fixed_cost';
+-- SELECT row_key FROM steam_cell_value WHERE table_name='unit_price_detail' AND row_key LIKE '%fixed_cost';

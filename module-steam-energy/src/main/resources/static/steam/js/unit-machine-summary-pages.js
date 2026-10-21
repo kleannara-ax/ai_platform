@@ -7,9 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "table_cell_value";
-  const UNIT_TABLE = "unit_usage";
-  const RAW_TABLE = "unit_usage_raw";
+  const CELL_TABLE = "steam_cell_value";
+  const UNIT_TABLE = "steam_unit_usage";
+  const RAW_TABLE = "steam_unit_usage_raw";
   const DAILY_ROW_COUNT = 31;
 
   const cellRows = [];
@@ -487,6 +487,9 @@ document.addEventListener("DOMContentLoaded", () => {
     renderDailyTable(buildDailyFuelRows());
   }
 
+  // 조회 연도·월을 바꾸면 버튼을 누르지 않아도 바로 조회한다.
+  yearSelect.addEventListener("change", render);
+  monthSelect.addEventListener("change", render);
   submitButton?.addEventListener("click", render);
   render();
 });

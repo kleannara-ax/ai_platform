@@ -169,10 +169,10 @@ A monthly charge (the Base Service Charge) shall be payable in respect of each m
 
        저장/로딩:
        BSC 는 월별 데이터가 아닌 계약 단가이므로 month="static" 으로 고정 키 저장.
-       table_cell_value 의 (table_name=srf_boiler_invoice_bsc, row_key=rate, col_index=1) 로 식별. */
+       steam_cell_value 의 (table_name=srf_boiler_invoice_bsc, row_key=rate, col_index=1) 로 식별. */
     const VOLUME = 475200;
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const BSC_TABLE = "srf_boiler_invoice_bsc";
     const BSC_ROW_KEY = "rate";
     const BSC_COL_INDEX = 1;

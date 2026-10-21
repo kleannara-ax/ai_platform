@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 동작:
  * - 시트 템플릿(정적 셀/수식/스타일/머지/폭/높이)을 classpath JSON 에서 로드.
  *   (개발 시 tools/extract-detail-sheet.py 로 추출 — 원본 Excel 변경 시 재실행)
- * - DB 의 table_cell_value 입력값을 시트 모델에 적용.
+ * - DB 의 steam_cell_value 입력값을 시트 모델에 적용.
  * - SUM/AVERAGE/IFERROR/산술 수식은 자바 평가기로 평가.
  * - 응답은 평가된 셀 텍스트 (정수/소수 포맷팅 포함) + 머지 정보.
  */
@@ -84,7 +84,7 @@ public class FluidizedDetailWorkbookService {
 
     private Map<String, Object> renderMonthUncached(String monthKey, String viewKey) {
         SheetData sheet = sheetTemplate.snapshot();
-        List<Map<String, Object>> rows = tableService.listAllByMonth("table_cell_value", monthKey);
+        List<Map<String, Object>> rows = tableService.listAllByMonth("steam_cell_value", monthKey);
         String mainRange = resolveMainRange(viewKey);
         boolean includeSummary = shouldIncludeSummary(viewKey);
 

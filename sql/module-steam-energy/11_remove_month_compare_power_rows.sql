@@ -14,20 +14,20 @@
 --   total|* 는 원래 전부 계산식이라 저장된 적이 없다.
 
 -- 1) 전력비 섹션 데이터 + 비고
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'energy_month_compare'
    AND (row_key LIKE 'power|%' OR row_key LIKE 'note|power|%');
 
 -- 2) 에너지 합산 섹션 비고 (데이터는 없고 비고만 남아 있을 수 있다)
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'energy_month_compare'
    AND row_key LIKE 'note|total|%';
 
 -- 3) 고정값으로 바뀐 차감비 두 항목
-DELETE FROM table_cell_value
+DELETE FROM steam_cell_value
  WHERE table_name = 'energy_month_compare'
    AND row_key IN ('fuel|landLease', 'fuel|compositeIncome');
 
 -- 확인용
--- SELECT row_key, COUNT(*) FROM table_cell_value
+-- SELECT row_key, COUNT(*) FROM steam_cell_value
 --  WHERE table_name = 'energy_month_compare' GROUP BY row_key ORDER BY row_key;

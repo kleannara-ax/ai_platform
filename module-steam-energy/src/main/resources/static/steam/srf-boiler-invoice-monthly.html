@@ -211,7 +211,7 @@
                     합계 = 특약미달 + BSC정산금 − SRF분배 − 검사수수료 − 단가초과 − 대기부과금 − 폐기물처분
          [총지급내역] 스팀구매 + 운영 + 기타. 스팀운영단가 = 총지급 / 스팀구매량
 
-       저장 : table_cell_value(month="YYYY", table_name="srf_boiler_invoice_monthly",
+       저장 : steam_cell_value(month="YYYY", table_name="srf_boiler_invoice_monthly",
                               row_key="{section}|{monthIdx}|{field}", col_index=1) */
 
     // 회계연도 12개월: 6월, 7월, ..., 12월, 1월, ..., 5월
@@ -495,7 +495,7 @@
 
     /* DB 저장 / 로딩 */
     const TABLES_BASE = "/tables";
-    const CELL_TABLE = "table_cell_value";
+    const CELL_TABLE = "steam_cell_value";
     const MON_TABLE_NAME = "srf_boiler_invoice_monthly";
     const storedRows = new Map();
 

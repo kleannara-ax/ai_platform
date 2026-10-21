@@ -39,7 +39,7 @@ import java.util.Map;
  *   "3. 전년대비"              — incinerator_yoy,         monthKey=YYYY,   row_key={form}|{rk}-m{N}
  *   "4. 가동실적"              — incinerator_operation,   monthKey=YYYY,   row_key={section}|{month}|{field}
  *   "5. 총 운영비용"           — incinerator_total_cost,  monthKey=YYYY,   row_key={section}|{month}|{field}
- *   "6. 사고이력"              — table_cell_value,        monthKey=YYYY-00, row_key={prefix}:{id}
+ *   "6. 사고이력"              — steam_cell_value,        monthKey=YYYY-00, row_key={prefix}:{id}
  *
  * 도급내역은 한 시트 안에 1월~12월 블록을 세로로 누적해 표현한다 (block-per-month).
  * 시트는 원본 엑셀과 비교하면 단순화된 레이아웃이지만 round-trip 가능한 형태로 설계되어 있다.
@@ -51,7 +51,7 @@ public class IncineratorWorkbookService {
     private static final String YOY_TABLE = "incinerator_yoy";
     private static final String OPERATION_TABLE = "incinerator_operation";
     private static final String TOTAL_COST_TABLE = "incinerator_total_cost";
-    private static final String CELL_TABLE = "table_cell_value";
+    private static final String CELL_TABLE = "steam_cell_value";
     private static final String ACCIDENT_PREFIX = "incinerator-accident-record:";
     private static final String MAINTENANCE_PREFIX = "incinerator-maintenance-record:";
 

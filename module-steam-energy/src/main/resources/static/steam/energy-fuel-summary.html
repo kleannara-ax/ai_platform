@@ -614,7 +614,7 @@
         limit: "10000",
       });
       try {
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) return;
         const payload = await resp.json();
         (payload.data || []).forEach((row) => {
@@ -655,7 +655,7 @@
       efsStore.clear();
       const params = new URLSearchParams({ month: String(year), tableNames: PAGE_TABLE, limit: "10000" });
       try {
-        const resp = await fetch(`/tables/table_cell_value?${params.toString()}`);
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) return;
         const payload = await resp.json();
         (payload.data || []).forEach((row) => {
@@ -668,7 +668,7 @@
       const k = `${dbKey}|${month}`;
       if (value === "" || value === null) efsStore.delete(k); else efsStore.set(k, value);
       try {
-        await fetch(`/tables/table_cell_value`, {
+        await fetch(`/tables/steam_cell_value`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             month: String(currentYear), year_no: Number(currentYear), month_no: 0,
