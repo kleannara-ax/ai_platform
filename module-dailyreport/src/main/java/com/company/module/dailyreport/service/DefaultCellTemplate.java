@@ -432,7 +432,8 @@ public final class DefaultCellTemplate {
 
         // ── Row 8: 슬러지원단위 - 제지 ──
         Map<YearMonth, String> fb13 = anchorFallbackMap("94", "99", "104", "96", "84", "82", "84");
-        ro(t, 8, 0, "B13", "슬러지원단위", 2, 2);
+        // ★★ 2026-10 추가 — 라벨 아래에 단위 "(Kg/톤)" 표기 추가 (사용자 요청)
+        ro(t, 8, 0, "B13", "슬러지원단위\n(Kg/톤)", 2, 2);
         ro(t, 8, 2, "D13", "제   지", 1, 1);
         d(t,  8, 3, "E13", "daily", "매일");
         ro(t, 8, 4, "F13", yearlyAverage(lookup, tableCode, 8, liveCol, prevYear2, fb13, "89"));
