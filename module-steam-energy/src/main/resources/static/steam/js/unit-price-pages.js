@@ -256,14 +256,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (bulk && e.key === "Enter") { e.preventDefault(); applyBulk(bulk); }
   });
 
-  reloadBtn.addEventListener("click", () => {
+  // 조회 연도를 바꾸면 [조회] 를 누르지 않아도 바로 불러온다.
+  function applyYear() {
     currentYear = Number(yearSelect.value) || new Date().getFullYear();
     try {
       const prev = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
       localStorage.setItem(SHARED_PERIOD_KEY, JSON.stringify({ year: currentYear, month: prev.month || "01" }));
     } catch (e) {}
     load();
-  });
+  }
+  yearSelect.addEventListener("change", applyYear);
+  reloadBtn.addEventListener("click", applyYear);
 
   buildTable();
   load();

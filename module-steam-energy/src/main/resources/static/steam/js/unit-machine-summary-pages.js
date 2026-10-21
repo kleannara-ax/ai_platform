@@ -487,6 +487,9 @@ document.addEventListener("DOMContentLoaded", () => {
     renderDailyTable(buildDailyFuelRows());
   }
 
+  // 조회 연도·월을 바꾸면 버튼을 누르지 않아도 바로 조회한다.
+  yearSelect.addEventListener("change", render);
+  monthSelect.addEventListener("change", render);
   submitButton?.addEventListener("click", render);
   render();
 });
