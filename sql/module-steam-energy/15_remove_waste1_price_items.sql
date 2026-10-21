@@ -14,6 +14,6 @@ DELETE FROM steam_cell_value
  WHERE table_name = 'unit_price_detail'
    AND row_key = 'waste1_steam';
 
--- 2) steam_price 샘플 행 (04_seed_data.sql 에서도 뺐다)
+-- 2) steam_price 샘플 행 (05_seed_data.sql 에서도 뺐다)
 DELETE FROM steam_price
  WHERE ITEM_CODE = 'waste1_steam';
