@@ -445,6 +445,14 @@
       return `${table.dataset.efrTableKey}|r${String(rowIndex + 1).padStart(2, "0")}`;
     }
 
+    // 화면 열 → DB col_index.
+    // DB 규약은 엑셀 B~N열 그대로 1=전년12월, 2=1월 … 13=12월 이고, 요약·마감비교 페이지와 엑셀 업/다운로드가
+    // 모두 이 규약으로 읽는다. 그런데 화면에서 전년 12월 열이 있는 표는 t01~t03 뿐이라, 나머지 표는
+    // 화면 1열(1월)이 DB 2열이다. 예전엔 화면 열 번호를 그대로 col_index 로 써서 t04 이후 표가 한 달씩 밀려 보였다.
+    function dbColIndex(table, domCol) {
+      return table.querySelector("th[data-prev-dec]") ? domCol : domCol + 1;
+    }
+
     function getDataColumnCount(table) {
       const headerRow = table.tHead?.rows?.[0];
       if (!headerRow) return 0;
@@ -460,7 +468,7 @@
       input.autocomplete = "off";
       input.value = value === "—" ? "" : String(value || "");
       input.dataset.rowKey = rowKey(table, rowIndex);
-      input.dataset.colIndex = String(colIndex);
+      input.dataset.colIndex = String(dbColIndex(table, colIndex));
       input.dataset.rawValue = input.value;
       td.appendChild(input);
       return td;
@@ -573,7 +581,7 @@
     // 자동 계산 칸(setCalc)은 원래 화면에만 그리고 저장하지 않았다. 그래서 DB 의 t17 값은
     // 엑셀 업로드 때 들어온 수식 결과 스냅샷뿐이라, 화면에서 입력값을 고치면 DB 가 옛 값으로 남았고
     // 다른 페이지가 이 표를 읽을 수 없었다. 이제 계산이 끝날 때마다 바뀐 칸만 DB 에 반영한다.
-    //   · 저장 단위는 입력칸과 같다 — table_name=energy_fuel_ratio, row_key=tNN|rNN, col_index=월 열
+    //   · 저장 단위는 입력칸과 같다 — table_name=energy_fuel_ratio, row_key=tNN|rNN, col_index=dbColIndex(월 열)
     //   · 합계/평균 열은 저장하지 않는다 (엑셀 업/다운로드 형식과 맞춘다: 1~13 월 열만)
     //   · 값이 같으면 보내지 않고, 순서대로 한 번에 하나의 묶음만 보낸다
     let __persistQueue = Promise.resolve();
@@ -591,13 +599,17 @@
           const span = tr.cells[c]?.querySelector("span.efr-calc");
           if (!span) continue;
           const raw = span.dataset.raw || "";
-          const stored = storedRows.get(cellMapKey(key, c));
+          const dbCol = dbColIndex(table, c);
+          const stored = storedRows.get(cellMapKey(key, dbCol));
           const storedValue = stored?.cell_value == null ? "" : String(stored.cell_value);
           // 숫자로 같으면 저장하지 않는다 (문자열 표기 차이 무시)
           if (raw === storedValue) continue;
           if (raw !== "" && storedValue !== "" && Number(raw) === Number(storedValue)) continue;
           if (raw === "" && !stored) continue;   // 계산값도 없고 저장된 것도 없음
-          jobs.push({ row_key: key, col_index: c, cell_value: raw === "" ? null : raw });
+          const cellValue = raw === "" ? null : raw;
+          jobs.push({ row_key: key, col_index: dbCol, cell_value: cellValue });
+          // 보내기로 한 값은 바로 기억해 둔다 — 응답이 오기 전에 계산이 한 번 더 돌아도 같은 칸을 다시 보내지 않게
+          storedRows.set(cellMapKey(key, dbCol), { ...(stored || {}), table_name: PAGE_TABLE_NAME, row_key: key, col_index: dbCol, cell_value: cellValue });
         }
       });
       if (!jobs.length) return;
