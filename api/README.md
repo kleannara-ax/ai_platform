@@ -57,6 +57,12 @@
 |------|------|------------|------|
 | 16 | [PS 지분 검사](./16_PS점검.md) | `/ps-insp-api/inspections`, `/ps-insp-api/mes`, `/ps-insp-api/config` | 검사 CRUD, MES 전송, PPM 설정 |
 
+### Module-Steam-Energy (스팀에너지관리) (`/steam/api/tables/*`, `/steam-energy-api/*`)
+
+| 번호 | 문서 | URL Prefix | 설명 |
+|------|------|------------|------|
+| 19 | [스팀에너지 공유 데이터](./19_스팀에너지_공유데이터.md) | `/steam/api/tables/steam_cell_value` | 단가 입력 · 스팀사용량 원단위(기타 스팀량 포함) 조회/저장 규약, DB 직접 조회 |
+
 ### 헬스체크
 
 | 번호 | 문서 | URL Prefix | 설명 |
