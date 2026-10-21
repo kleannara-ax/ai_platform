@@ -2346,7 +2346,13 @@
           const tableCode = input.dataset.tableCode || guessTableCode(row);
           if (!tableGroups[tableCode]) tableGroups[tableCode] = [];
           // ★ 서식(천 단위 콤마)은 화면 표시용일 뿐 — 서버에는 콤마 없는 원본 값으로 저장
-          const rawValue = String(input.value || '').replace(/,/g, '');
+          // ★★ 2026-10 수정: 단, 비고(textarea, cell-input-remark) 칸은 숫자 서식 대상이
+          // 아니라 자유 텍스트이므로, 사용자가 입력한 콤마(",")를 그대로 보존해야 한다.
+          // (표1~4 공용 — 콤마 제거 로직은 숫자 입력(input.cell-input)에만 적용)
+          const isRemarkInput = input.classList && input.classList.contains('cell-input-remark');
+          const rawValue = isRemarkInput
+            ? String(input.value || '')
+            : String(input.value || '').replace(/,/g, '');
           tableGroups[tableCode].push({ rowIndex: row, colIndex: col, cellValue: rawValue });
         });
 
