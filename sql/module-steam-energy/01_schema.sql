@@ -5,8 +5,6 @@
 -- ddl-auto=none 이므로 반드시 본 스크립트로 테이블을 생성한다.
 -- ============================================================
 
--- 기존 테이블 존재 시 DROP (최초 설치만 해당, 운영 환경에서는 주석 처리)
-
 -- ────────────────────────────────────────────────
 -- 1) 스팀 설비 마스터
 -- ────────────────────────────────────────────────
@@ -31,7 +29,8 @@ CREATE TABLE IF NOT EXISTS steam_equipment (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='[module-steam-energy] 스팀 설비 마스터';
 
-CREATE INDEX IF NOT EXISTS IDX_STEAM_EQUIPMENT_CATEGORY ON steam_equipment (CATEGORY);
+CREATE INDEX IF NOT EXISTS IDX_STEAM_EQUIPMENT_CATEGORY   ON steam_equipment (CATEGORY);
+CREATE INDEX IF NOT EXISTS IDX_STEAM_EQUIPMENT_DELETED_YN ON steam_equipment (DELETED_YN);
 
 -- ────────────────────────────────────────────────
 -- 2) 시설별 계약·구매 단가 (연/월별)
@@ -62,6 +61,7 @@ CREATE TABLE IF NOT EXISTS steam_price (
 
 CREATE INDEX IF NOT EXISTS IDX_STEAM_PRICE_YEAR     ON steam_price (YEAR_NO);
 CREATE INDEX IF NOT EXISTS IDX_STEAM_PRICE_FACILITY ON steam_price (FACILITY);
+CREATE INDEX IF NOT EXISTS IDX_STEAM_PRICE_DELETED_YN ON steam_price (DELETED_YN);
 
 -- ────────────────────────────────────────────────
 -- 3) 일일 스팀 사용 실적 (설비별 일자)
@@ -92,3 +92,4 @@ CREATE TABLE IF NOT EXISTS steam_daily_usage (
 
 CREATE INDEX IF NOT EXISTS IDX_STEAM_USAGE_DATE  ON steam_daily_usage (USAGE_DATE);
 CREATE INDEX IF NOT EXISTS IDX_STEAM_USAGE_EQUIP ON steam_daily_usage (EQUIPMENT_ID);
+CREATE INDEX IF NOT EXISTS IDX_STEAM_USAGE_DELETED_YN ON steam_daily_usage (DELETED_YN);
