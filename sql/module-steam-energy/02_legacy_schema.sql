@@ -1,8 +1,13 @@
 -- ============================================================
--- module-steam-energy: 레거시 스팀 대시보드 스키마 (이관)
--- steam 표준 대시보드가 사용하는 범용 steam_cell_value 및 steam_unit_usage 등.
--- 플랫폼 DB(ddl-auto=none)에 수동 실행. 01_schema.sql 이후 실행 권장.
+-- module-steam-energy: 이관 대시보드 스키마
+--   steam_unit_usage      원단위 일지 (설비·일자별)
+--   steam_unit_usage_raw  원단위 일지 원시값 (디스퍼져·TOC·PICA)
+--   steam_cell_value      화면별 셀 저장소 — table_name 으로 논리 표를 나눈다 (CELL_CONVENTIONS.md)
+-- 플랫폼 DB(ddl-auto=none)에 수동 실행. 01_schema.sql 다음.
+-- 재실행 안전 (CREATE TABLE / CREATE INDEX 모두 IF NOT EXISTS).
 -- ============================================================
+
+SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS steam_unit_usage (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -24,24 +29,6 @@ CREATE TABLE IF NOT EXISTS steam_unit_usage (
     UNIQUE KEY uk_steam_unit_usage_month_day_machine (month, day, machine_no)
 );
 
-ALTER TABLE steam_unit_usage
-    ADD COLUMN IF NOT EXISTS year_no INT NULL AFTER month,
-    ADD COLUMN IF NOT EXISTS month_no INT NULL AFTER year_no,
-    ADD COLUMN IF NOT EXISTS disperser_steam DECIMAL(18,10) NULL AFTER coater_steam,
-    MODIFY COLUMN main_steam DECIMAL(18,10) NULL,
-    MODIFY COLUMN coater_steam DECIMAL(18,10) NULL,
-    MODIFY COLUMN disperser_steam DECIMAL(18,10) NULL,
-    MODIFY COLUMN ventilation_steam DECIMAL(18,10) NULL,
-    MODIFY COLUMN production DECIMAL(18,10) NULL,
-    MODIFY COLUMN steam DECIMAL(18,10) NULL;
-
-UPDATE steam_unit_usage
-SET
-    year_no = CAST(SUBSTRING(month, 1, 4) AS UNSIGNED),
-    month_no = CAST(SUBSTRING(month, 6, 2) AS UNSIGNED)
-WHERE month IS NOT NULL
-  AND month <> ''
-  AND (year_no IS NULL OR month_no IS NULL);
 
 CREATE TABLE IF NOT EXISTS steam_unit_usage_raw (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -58,20 +45,6 @@ CREATE TABLE IF NOT EXISTS steam_unit_usage_raw (
     UNIQUE KEY uk_steam_unit_usage_raw_month_day (month, day)
 );
 
-ALTER TABLE steam_unit_usage_raw
-    ADD COLUMN IF NOT EXISTS year_no INT NULL AFTER month,
-    ADD COLUMN IF NOT EXISTS month_no INT NULL AFTER year_no,
-    MODIFY COLUMN disperser_total DECIMAL(18,10) NULL,
-    MODIFY COLUMN toc_steam DECIMAL(18,10) NULL,
-    MODIFY COLUMN pica121_vent DECIMAL(18,10) NULL;
-
-UPDATE steam_unit_usage_raw
-SET
-    year_no = CAST(SUBSTRING(month, 1, 4) AS UNSIGNED),
-    month_no = CAST(SUBSTRING(month, 6, 2) AS UNSIGNED)
-WHERE month IS NOT NULL
-  AND month <> ''
-  AND (year_no IS NULL OR month_no IS NULL);
 
 CREATE TABLE IF NOT EXISTS steam_cell_value (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -88,17 +61,6 @@ CREATE TABLE IF NOT EXISTS steam_cell_value (
     UNIQUE KEY uk_steam_cell_value_month_table_row_col (month, table_name, row_key, col_index)
 );
 
-ALTER TABLE steam_cell_value
-    ADD COLUMN IF NOT EXISTS year_no INT NULL AFTER month,
-    ADD COLUMN IF NOT EXISTS month_no INT NULL AFTER year_no;
-
-UPDATE steam_cell_value
-SET
-    year_no = CAST(SUBSTRING(month, 1, 4) AS UNSIGNED),
-    month_no = CAST(SUBSTRING(month, 6, 2) AS UNSIGNED)
-WHERE month IS NOT NULL
-  AND month <> ''
-  AND (year_no IS NULL OR month_no IS NULL);
 
 CREATE INDEX IF NOT EXISTS ix_steam_cell_value_table_month
     ON steam_cell_value (table_name, month);
