@@ -253,6 +253,57 @@
       return __cbpCache.get(String(year)) || {};
     }
 
+    // 폐합성소각로 도급내역(incinerator_contract) → 월별 결산 기준 총 운영비용(원).
+    //   row_key = `${section}|${day}|${field}` (section unit1/unit2), month = 'YYYY-MM'.
+    //   도급내역 페이지와 같은 식: 호기별 (스팀량×운영단가) + (운휴시간×시간당 고정비) 를 날마다 더한다.
+    //   1호기 운휴시간이 비어 있는 날은 그 페이지처럼 24 로 본다. 값이 하나도 없는 달은 비워 둔다.
+    const __incCache = new Map();   // year → { 1: 백만원, … }
+    async function fetchIncineratorContractTotal(year) {
+      const yk = String(year);
+      if (__incCache.has(yk)) return __incCache.get(yk);
+      const out = {};
+      try {
+        const params = new URLSearchParams({
+          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
+        });
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (resp.ok) {
+          const payload = await resp.json();
+          const byMonth = new Map();   // monthNo → Map("unit1|5|steam" → 값)
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== "incinerator_contract") return;
+            const monthNo = Number(String(row.month).split("-")[1]);
+            if (!(monthNo >= 1 && monthNo <= 12)) return;
+            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(v)) return;
+            if (!byMonth.has(monthNo)) byMonth.set(monthNo, new Map());
+            byMonth.get(monthNo).set(String(row.row_key), v);
+          });
+          byMonth.forEach((cells, monthNo) => {
+            const days = new Date(Number(yk), monthNo, 0).getDate();
+            let total = 0, has = false;
+            ["unit1", "unit2"].forEach((unit) => {
+              for (let day = 1; day <= days; day += 1) {
+                const g = (field) => cells.get(`${unit}|${day}|${field}`);
+                const steam = g("steam"), price = g("unit"), fixed = g("fixed");
+                let runtime = g("runtime");
+                if (unit === "unit1" && runtime === undefined) runtime = 24;
+                const oper = (steam !== undefined && price !== undefined) ? steam * price : null;
+                const stop = (runtime !== undefined && fixed !== undefined) ? runtime * fixed : null;
+                if (oper !== null || stop !== null) { total += (oper || 0) + (stop || 0); has = true; }
+              }
+            });
+            if (has) out[monthNo] = total / 1000000;   // 원 → 백만원
+          });
+        }
+      } catch (e) { console.error("[emc fetchIncineratorContractTotal]", e); }
+      __incCache.set(yk, out);
+      return out;
+    }
+    function importIncineratorContractTotal(year) {
+      return __incCache.get(String(year)) || {};
+    }
+
     // 외부 import 디스패치 — row.importSource 에 따라 호출
     // energy_fuel_ratio DB 캐시 — 한 번만 fetch
     const __efrDataCache = new Map();   // year → Map("t04|r03|2" → 값)
@@ -306,6 +357,7 @@
       if (importSource === "srf-client-non-power") return window.EnergyLinkedSources.compositeLngEtcSync(year);
       if (importSource === "fluidized-monthly") return importFluidizedContract(year);
       if (importSource === "combo-production-total") return importComboProductionTotal(year);
+      if (importSource === "incinerator-contract-total") return importIncineratorContractTotal(year);
       if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
       if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
       if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
@@ -338,7 +390,9 @@
       // 제스코(zesco:true) 행은 없어진 업체라 기본으로 숨긴다 — 값·수식은 그대로 두고 화면에서만 뺀다.
       { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input", zesco:true },
       { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
-      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"input" },
+      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"imported",
+        importSource:"incinerator-contract-total", importLabel:"폐합성소각로 도급내역 → 결산 기준 총 운영비용 월 합계 (1호기 소계 + 2호기 소계, 원 → 백만원). 도급내역이 없는 달은 저장된 값",
+        fallbackStored:true },
       { key:"fluidSteam",      label:"유동상소각로 스팀구매",        cat:"연료비",    kind:"imported",
         importSource:"fluidized-monthly", importLabel:"유동상 운영내역 → 도급비용" },
       { key:"fuelMonthlySum",  label:"연료비 월별 (소계)",           cat:"연료비",    kind:"sum",
@@ -578,6 +632,11 @@
           for (let m = 0; m <= 13; m++) {
             if (m >= 1 && m <= 12) {
               out[row.key][m] = imported[m] !== undefined ? imported[m] : null;
+              // fallbackStored 행: 가져올 데이터가 없는 달은 저장된 값(엑셀 업로드·예전 수기 입력)을 쓴다
+              if (out[row.key][m] === null && row.fallbackStored) {
+                const v = secStore[row.key]?.[m];
+                out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+              }
             } else {
               const v = secStore[row.key]?.[m];
               out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
@@ -890,6 +949,7 @@
       __fmcCache.clear();
       __efrDataCache.clear();
       __cbpCache.clear();
+      __incCache.clear();
       __prevDec.year = null; __prevDec.values = {};
       window.EnergyLinkedSources.resetCache();
       // 인보이스 연동(공용 js)은 한 해만 캐시 → 작년 것을 먼저 받아 복사해 두고 나서 올해 것을 받는다
@@ -911,6 +971,8 @@
         fetchFluidizedContract(prevYear).catch(() => {}),
         fetchComboProductionTotal(currentYear).catch(() => {}),
         fetchComboProductionTotal(prevYear).catch(() => {}),
+        fetchIncineratorContractTotal(currentYear).catch(() => {}),
+        fetchIncineratorContractTotal(prevYear).catch(() => {}),
       ]);
       renderAll();
       fitTableHeight();
