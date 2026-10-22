@@ -165,7 +165,7 @@
     /* 전년 12월 열 — 작년 데이터에서 자동으로 채운 값 */
     .emc-calc.prev-dec { color: #475569; font-style: italic; }
   </style>
-  <script src="/steam/js/energy-linked-sources.js?v=20260922-client3"></script>
+  <script src="/steam/js/energy-linked-sources.js?v=20261022-invest"></script>
   <script>
   (function () {
     const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -332,7 +332,7 @@
       const v = map.get(`${rowKey}|${col}`);
       return (typeof v === "number" && Number.isFinite(v)) ? v : null;
     }
-    function importFuelRatioRow(year, rowKey) {
+    function importFuelRatioRow(year, rowKey, scale) {
       // rowKey 예: "t04|r03" (호기별 연료비배분 / 제지 소계)
       // 결과: { 1: value, ..., 12: value }
       // col_index 매핑: efr col 1 = 24.12월, 2 = 1월, ..., 13 = 12월
@@ -341,7 +341,7 @@
       const out = {};
       for (let m = 1; m <= 12; m++) {
         const v = getEfrSync(year, rowKey, m + 1);
-        if (v !== null) out[m] = v;
+        if (v !== null) out[m] = scale ? v * scale : v;
       }
       return out;
     }
@@ -361,6 +361,8 @@
       if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
       if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
       if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
+      if (importSource === "fuel-ratio-paper-prod") return importFuelRatioRow(year, "t06|r03", 1 / 1000);   // 제품생산량 / 제지 소계 (kg → 톤)
+      if (importSource === "fuel-ratio-tissue-prod") return importFuelRatioRow(year, "t06|r07", 1 / 1000);  // 제품생산량 / 화장지 소계 (kg → 톤)
       return {};
     }
 
@@ -374,7 +376,7 @@
     //   cls: 'subtotal' | 'total'
     //   note: 비고 표시 여부 (기본 true). 비고는 같은 카테고리의 첫 row 에서만 rowspan
     // 월마다 바뀌지 않는 차감비 — 연료비 배분비율 페이지도 같은 값을 써서 js/energy-linked-sources.js 에 둔다.
-    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED } = window.EnergyLinkedSources;
+    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED, COMPOSITE_INVEST_FIXED } = window.EnergyLinkedSources;
 
     // (당월 원단위 − 전월 원단위) × 당월 생산량 ÷ 1000 — 두 달 원단위가 모두 있어야 계산한다.
     function unitDeltaProfit(unitRow, prodRow, m) {
@@ -402,8 +404,9 @@
       { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input", zesco:true },
       { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"imported",
         importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 1. Utilities(전력 제외) + 2. Other Charge 청구금액 합 (원 → 백만원)" },
-      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"input" },
-      // 아래 둘은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      // 아래 셋은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"formula",
+        formula:() => COMPOSITE_INVEST_FIXED },
       { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"formula",
         formula:() => COMPOSITE_INCOME_FIXED },
       { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"formula",
@@ -426,8 +429,11 @@
 
       { key:"prodTotal",       label:"생산량",                       cat:"생산량",    kind:"formula",
         formula:(r,m) => (r.paperProd[m] ?? 0) + (r.tissueProd[m] ?? 0) },
-      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"input" },
-      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"input" },
+      // 연료비 배분비율 '제품생산량 (kg)' 표의 소계 — kg 을 톤으로
+      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-paper-prod", importLabel:"연료비 배분비율 → 제품생산량 / 제지 소계 (kg → 톤)" },
+      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-tissue-prod", importLabel:"연료비 배분비율 → 제품생산량 / 화장지 소계 (kg → 톤)" },
 
       { key:"totalUnit",       label:"총 원단위 (연료비/생산량)",    cat:"원단위",    kind:"formula",
         formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.prodTotal[m] ?? 0) },

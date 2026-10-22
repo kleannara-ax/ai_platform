@@ -67,25 +67,25 @@
       <section class="inc-section" data-section="settle">
         <div class="inc-card">
           <h3 class="inc-section-title">결산 기준 — 1호기 + 2호기</h3>
-          <p class="inc-muted">1호기 스팀량·운영단가·운영비용(가동분)은 쓰지 않아 숨겼습니다. 저장된 값은 그대로 두고 소계 계산에는 들어갑니다.</p>
+          <p class="inc-muted">1호기 스팀량·운영단가·운영비용은 쓰지 않아 숨겼습니다(운휴 운영비용 = 소계라 소계 하나만 둠). 저장된 값은 그대로 두고 소계 계산에는 들어갑니다.</p>
           <div class="inc-table-wrap">
             <table class="data-table inc-table" data-form="settle">
               <colgroup>
                 <col class="c-day">
-                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq"><col class="c-eq">
                 <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
                 <col class="c-eq"><col class="c-eq">
               </colgroup>
               <thead>
                 <tr>
                   <th rowspan="2">일별</th>
-                  <th colspan="4">1호기</th>
+                  <th colspan="3">1호기</th>
                   <th colspan="7">2호기</th>
                   <th rowspan="2" class="both">스팀량 합계(ton)</th>
                   <th rowspan="2" class="both">총 운영비용(원)</th>
                 </tr>
                 <tr>
-                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th><th>1호기 소계(원)</th>
+                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>1호기 소계(원)</th>
                   <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
                   <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th><th>2호기 소계(원)</th>
                 </tr>
@@ -224,14 +224,14 @@
 
     /* 숨긴 1호기 항목 — 화면에는 없지만 값은 hidden input 으로 들고 있어 저장·계산(소계)에는 그대로 들어간다.
        다시 보이게 하려면 이 목록에서 빼고 머리글 열을 넣으면 된다. */
-    const HIDDEN_UNIT1_FIELDS = ["steam", "unit"];          // + 계산칸 oper 는 그리지 않는다
+    const HIDDEN_UNIT1_FIELDS = ["steam", "unit"];          // + 계산칸 oper·stop(=소계) 는 그리지 않는다
     const HIDDEN_REAL_FIELDS = ["steam-1", "unit-1"];        // + 계산칸 oper-1
     function hiddenInput(section, day, field) {
       return `<input type="hidden" data-section="${section}" data-day="${day}" data-field="${field}" />`;
     }
 
     /* 표 생성 */
-    const SETTLE_FIELDS = ["runtime", "fixed", "stop", "sub"];                                  // 1호기 보이는 열
+    const SETTLE_FIELDS = ["runtime", "fixed", "sub"];                                          // 1호기 보이는 열 (운휴 운영비용 = 소계)
     const UNIT2_FIELDS = ["steam", "unit", "oper", "runtime", "fixed", "stop", "sub"];
     function buildSettleTable() {
       const tbody = document.querySelector('table[data-form="settle"] tbody');
@@ -242,7 +242,6 @@
         return `<tr${trClass}><th class="col-day">${day}일</th>
           <td class="input-cell">${HIDDEN_UNIT1_FIELDS.map((f) => hiddenInput("unit1", day, f)).join("")}<input data-section="unit1" data-day="${day}" data-field="runtime" /></td>
           <td class="input-cell"><input data-section="unit1" data-day="${day}" data-field="fixed" /></td>
-          <td class="computed" data-section="unit1" data-day="${day}" data-field="stop">—</td>
           <td class="computed" data-section="unit1" data-day="${day}" data-field="sub">—</td>
           <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="steam" /></td>
           <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="unit" /></td>
