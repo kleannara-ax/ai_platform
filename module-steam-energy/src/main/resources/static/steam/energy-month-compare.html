@@ -218,6 +218,41 @@
       return __fmcCache.get(String(year)) || {};
     }
 
+    // 스팀생산실적(combo_boiler_production) → 월별 스팀총계.
+    //   row_key = `${field}-${day}`, month = 'YYYY-MM'. 스팀총계는 그 페이지의 totalSteam 과 같은 7개 항목의 합이다.
+    //   한 달에 값이 하나도 없으면 그 달은 비워 둔다(0 이 아니라 null).
+    const STEAM_TOTAL_FIELDS = ["comboSteam", "externalSteam", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam"];
+    const __cbpCache = new Map();   // year → { 1: 값, … }
+    async function fetchComboProductionTotal(year) {
+      const yk = String(year);
+      if (__cbpCache.has(yk)) return __cbpCache.get(yk);
+      const out = {};
+      try {
+        const params = new URLSearchParams({
+          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "combo_boiler_production", limit: "20000",
+        });
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (resp.ok) {
+          const payload = await resp.json();
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== "combo_boiler_production") return;
+            const field = String(row.row_key).split("-")[0];
+            if (!STEAM_TOTAL_FIELDS.includes(field)) return;
+            const monthNo = Number(String(row.month).split("-")[1]);
+            if (!(monthNo >= 1 && monthNo <= 12)) return;
+            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(v)) return;
+            out[monthNo] = (out[monthNo] || 0) + v;
+          });
+        }
+      } catch (e) { console.error("[emc fetchComboProductionTotal]", e); }
+      __cbpCache.set(yk, out);
+      return out;
+    }
+    function importComboProductionTotal(year) {
+      return __cbpCache.get(String(year)) || {};
+    }
+
     // 외부 import 디스패치 — row.importSource 에 따라 호출
     // energy_fuel_ratio DB 캐시 — 한 번만 fetch
     const __efrDataCache = new Map();   // year → Map("t04|r03|2" → 값)
@@ -270,6 +305,7 @@
       if (importSource === "srf-invoice-total") return window.EnergyLinkedSources.compositeSteamPurchaseSync(year);
       if (importSource === "srf-client-non-power") return window.EnergyLinkedSources.compositeLngEtcSync(year);
       if (importSource === "fluidized-monthly") return importFluidizedContract(year);
+      if (importSource === "combo-production-total") return importComboProductionTotal(year);
       if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
       if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
       if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
@@ -357,10 +393,13 @@
       { key:"profitSum",       label:"손익합계 (제지+생활)",         cat:"손익",      kind:"sum",
         srcKeys:["paperProfit","livingProfit"], cls:"subtotal" },
 
-      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"input" },
+      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"imported",
+        importSource:"combo-production-total", importLabel:"스팀생산실적 → 스팀총계 월 합계 (복합 + 외부 + 폐합성 1·2호 + 깨끗한나라 20·50톤 + 유동상)" },
       { key:"lngBurner",       label:"LNG 직버너 사용 비용",         cat:"보조 분석", kind:"imported",
         importSource:"fuel-ratio-lng-burner", importLabel:"연료비 배분비율 → 버너 LNG 비용 / 합계" },
-      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"input" },
+      // 엑셀 r34 = r16 − r33
+      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"formula",
+        formula:(r,m) => (Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.lngBurner[m])) ? r.fuelActual[m] - r.lngBurner[m] : null },
       { key:"boilerSteamUnit", label:"스팀톤당 보일러 연료비 (천원/톤)", cat:"보조 분석", kind:"formula",
         formula:(r,m) => safeDiv((r.boilerFuel[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
       { key:"fuelSteamUnit",   label:"스팀톤당 연료비 (천원/톤)",    cat:"보조 분석", kind:"formula",
@@ -850,6 +889,7 @@
       const prevYear = String(Number(currentYear) - 1);
       __fmcCache.clear();
       __efrDataCache.clear();
+      __cbpCache.clear();
       __prevDec.year = null; __prevDec.values = {};
       window.EnergyLinkedSources.resetCache();
       // 인보이스 연동(공용 js)은 한 해만 캐시 → 작년 것을 먼저 받아 복사해 두고 나서 올해 것을 받는다
@@ -869,6 +909,8 @@
         fetchFuelRatio(prevYear).catch(() => {}),
         fetchFluidizedContract(currentYear).catch(() => {}),
         fetchFluidizedContract(prevYear).catch(() => {}),
+        fetchComboProductionTotal(currentYear).catch(() => {}),
+        fetchComboProductionTotal(prevYear).catch(() => {}),
       ]);
       renderAll();
       fitTableHeight();
