@@ -239,11 +239,10 @@
     const API_BASE = '/dailyreport-api';
     const AUTO_REFRESH_INTERVAL_MS = 180000; // 3분마다 자동 새로고침
 
-    // ★★ 2026-10 추가 — 사고통계 페이지도 "오늘 자 일보"에 한해 저장/수정 버튼
-    // 전환 + daily_batchjob 재업로드 요청을 지원한다(개발서버 테스트 중 요청).
-    // - index.html(표1~4)은 "디폴트 조회 날짜(=어제)"를 기준으로 전환하지만, 이
-    //   페이지는 "오늘 자 일보를 조회 중일 때"를 기준으로 전환한다(기준일 자체가
-    //   다름 — 사고통계는 당일 진행 중인 수치를 다루므로 "오늘"이 기준).
+    // ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 기준일 수정 — 사고통계 페이지도
+    // index.html(표1~4)과 완전히 동일한 기준(저장 구간 밖 + "어제" 자 일보를
+    // 조회 중일 때)으로 저장/수정 버튼 전환 + daily_batchjob 재업로드 요청을
+    // 지원한다.
     // - 저장 구간(05:00:00~08:09:59)은 index.html/서버(DailyReportService.
     //   SAVE_WINDOW_START_TIME/SAVE_WINDOW_END_TIME)와 반드시 동일해야 한다.
     // - 이 페이지는 재업로드 대상 게시판을 고르는 라디오가 없다 — "수정"으로
@@ -266,14 +265,14 @@
     }
 
     /**
-     * ★★ 2026-10 추가 — "수정" 흐름(재업로드 요청 대상)은 시간(저장 구간 밖) +
-     * 날짜(현재 조회 중인 일보가 "오늘") 두 조건을 모두 만족할 때만 활성화한다.
-     * index.html의 isAfterBatchJobCutoff()와 동일 구조이나, 비교 기준 날짜만
-     * getYesterdayStr() 대신 getTodayStr()를 사용한다.
+     * ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 기준일 수정 — "수정" 흐름
+     * (재업로드 요청 대상)은 시간(저장 구간 밖) + 날짜(현재 조회 중인 일보가
+     * "어제") 두 조건을 모두 만족할 때만 활성화한다. index.html의
+     * isAfterBatchJobCutoff()와 완전히 동일한 기준(getYesterdayStr())을 사용한다.
      */
     function isAfterBatchJobCutoff() {
       if (isWithinSaveWindow()) return false;
-      return currentReportDate === getTodayStr();
+      return currentReportDate === getYesterdayStr();
     }
 
     /**
@@ -1624,9 +1623,10 @@
       if (!currentUser.permissions.canWriteInput) { showToast('쓰기 권한이 없습니다.'); return; }
       if (!currentReportId) { showToast('데이터가 로드되지 않았습니다.'); return; }
 
-      // ★★ 2026-10 추가 — index.html과 동일하게 저장 구간 밖 + "오늘" 조회 중일
-      // 때는 "수정" 확인 문구로 전환한다. 단, 이 페이지는 재업로드 대상 게시판을
-      // 고르는 라디오가 없다(batchType은 항상 '1'로 고정되므로 선택받을 필요 없음).
+      // ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 기준일 수정 — index.html과
+      // 완전히 동일하게 저장 구간 밖 + "어제" 조회 중일 때는 "수정" 확인 문구로
+      // 전환한다. 단, 이 페이지는 재업로드 대상 게시판을 고르는 라디오가 없다
+      // (batchType은 항상 '1'로 고정되므로 선택받을 필요 없음).
       const dateLabel = formatDateDots(currentReportDate);
       const isBatchJobFlow = isAfterBatchJobCutoff();
       const confirmMessage = isBatchJobFlow
