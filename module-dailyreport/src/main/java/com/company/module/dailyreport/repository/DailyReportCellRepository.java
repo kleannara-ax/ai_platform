@@ -22,6 +22,19 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
     Optional<DailyReportCell> findByReportTable_TableIdAndRowIndexAndColIndex(
             Long tableId, Integer rowIndex, Integer colIndex);
 
+    /**
+     * ★★ 2026-10 추가 — 리포트ID + 표코드 + 좌표로 단건 조회.
+     * "특이사항 > 사고/안전사고" 행에 표5/표6 당월 합계(R10) 안내 문구를
+     * 표시하기 위해 DailyReportService.getRemarksForUser()가 사용한다.
+     */
+    @Query("SELECT c FROM DailyReportCell c " +
+           "WHERE c.reportTable.dailyReport.reportId = :reportId " +
+           "AND c.reportTable.tableCode = :tableCode " +
+           "AND c.rowIndex = :rowIndex AND c.colIndex = :colIndex")
+    Optional<DailyReportCell> findByReportIdAndTableCodeAndRowIndexAndColIndex(
+            @Param("reportId") Long reportId, @Param("tableCode") String tableCode,
+            @Param("rowIndex") Integer rowIndex, @Param("colIndex") Integer colIndex);
+
     /** 표 ID + 행 범위로 셀 조회 */
     @Query("SELECT c FROM DailyReportCell c " +
            "WHERE c.reportTable.tableId = :tableId " +
