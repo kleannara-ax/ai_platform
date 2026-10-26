@@ -78,6 +78,17 @@ public class DailyReportService {
         SPECIAL_NOTE_CATEGORIES.put("ETC", "기타");
     }
 
+    /**
+     * ★★ 2026-10 추가 — 특이사항 "사고/안전사고"(SAFETY) 행 안내 문구용
+     * 사고통계 표5(발생건수)/표6(손실금액)의 "합계" 행(ROW_INDEX) / "당월 소계" 열
+     * (COL_INDEX) 좌표. DefaultCellTemplate.addSafetyIncidentTable()의
+     * SAFETY_INCIDENT_TOTAL_ROW(9)/SAFETY_INCIDENT_SUBTOTAL_COL(17)과 반드시
+     * 동일해야 한다(값 자체를 공식으로 재계산하지 않고 이미 저장되어 있는
+     * R10 셀 값을 그대로 읽어오는 방식이므로, 좌표가 어긋나면 엉뚱한 셀을 읽게 된다).
+     */
+    private static final int SAFETY_SUMMARY_ROW_INDEX = 9;
+    private static final int SAFETY_SUMMARY_COL_INDEX = 17;
+
     /** ★★ 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE) 카테고리 — 제지/화장지/패드 3행
      *  (2026-09 신규). TBL_SPECIAL_NOTE의 PAPER/TISSUE/PAD와 같은 코드값을 재사용하지만,
      *  모든 조회/검증/이어받기 로직이 TABLE_CODE로 먼저 스코프되므로 값이 서로 섞이지 않는다. */
@@ -475,6 +486,14 @@ public class DailyReportService {
     public List<RemarkResponse> getRemarksForUser(Long reportId, Long userId, String tableCode) {
         Map<String, String> categories = specialNoteSpec(tableCode).categories();
 
+        // ★★ 2026-10 추가 — TBL_SPECIAL_NOTE(특이사항)의 SAFETY(사고/안전사고) 행에만
+        // 쓰이는 안내 문구. 다른 표(TBL_SAFETY_AMOUNT_NOTE 등)나 다른 카테고리에는
+        // 영향 없음(아래 safetySummaryTextFor()가 SAFETY_NOTE_TABLE_CODE +
+        // "SAFETY" 카테고리일 때만 null이 아닌 값을 반환).
+        String safetySummaryText = SPECIAL_NOTE_TABLE_CODE.equals(tableCode)
+                ? buildSafetySummaryText(reportId)
+                : null;
+
         List<DailyReportRemark> remarks =
                 remarkRepository.findByDailyReport_ReportIdAndTableCodeOrderBySortOrderAsc(reportId, tableCode);
 
@@ -519,7 +538,8 @@ public class DailyReportService {
                     .tableCode(tableCode)
                     .category(category)
                     .editable(editable)
-                    .ownerNames(ownerNames.isBlank() ? null : ownerNames);
+                    .ownerNames(ownerNames.isBlank() ? null : ownerNames)
+                    .safetySummaryText("SAFETY".equals(category) ? safetySummaryText : null);
 
             if (existing != null) {
                 Long lastEditorId = existing.getUpdatedBy() != null ? existing.getUpdatedBy() : existing.getCreatedBy();
@@ -540,6 +560,56 @@ public class DailyReportService {
         }
 
         return result;
+    }
+
+    /**
+     * ★★ 2026-10 추가 — 특이사항 "사고/안전사고" 행에 표시할 안내 문구 계산.
+     * "{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원" 형태.
+     * - m: 이 리포트(reportId)의 REPORT_DATE 기준 월
+     * - n_1: 사고통계 표5(TBL_SAFETY_INCIDENT_COUNT) 합계 행(R10, rowIndex=9,
+     *        colIndex=17)의 "당월" 소계 값
+     * - n_2: 사고통계 표6(TBL_SAFETY_INCIDENT_AMOUNT)의 동일 좌표 값
+     * 두 셀 중 하나라도 아직 없으면(표5/6이 생성되지 않은 과거 일보 등) null을
+     * 반환해 안내 문구 자체를 표시하지 않는다(화면에서 null이면 숨김 처리).
+     * 단위는 사용자 확인에 따라 별도 환산 없이 셀에 저장된 숫자를 그대로 사용한다.
+     */
+    private String buildSafetySummaryText(Long reportId) {
+        DailyReport report = reportRepository.findById(reportId).orElse(null);
+        if (report == null) {
+            return null;
+        }
+        int month = report.getReportDate().getMonthValue();
+
+        String countValue = cellRepository.findByReportIdAndTableCodeAndRowIndexAndColIndex(
+                        reportId, "TBL_SAFETY_INCIDENT_COUNT",
+                        SAFETY_SUMMARY_ROW_INDEX, SAFETY_SUMMARY_COL_INDEX)
+                .map(DailyReportCell::getCellValue)
+                .orElse(null);
+        String amountValue = cellRepository.findByReportIdAndTableCodeAndRowIndexAndColIndex(
+                        reportId, "TBL_SAFETY_INCIDENT_AMOUNT",
+                        SAFETY_SUMMARY_ROW_INDEX, SAFETY_SUMMARY_COL_INDEX)
+                .map(DailyReportCell::getCellValue)
+                .orElse(null);
+
+        if (countValue == null || amountValue == null) {
+            return null;
+        }
+
+        // 저장 규칙상 소계/합계가 0이면 "-"로 저장되며(CellService.formatSafetyIncidentSum),
+        // 그 달에 아직 아무 입력도 없어 재계산이 한 번도 일어나지 않은 경우엔 DATA 셀
+        // 초기값인 빈 문자열("") 상태일 수도 있다 — 두 경우 모두 "0건"/"0백만원"으로
+        // 자연스럽게 표시되도록 환원한다.
+        String countDisplay = toDisplayZeroOrValue(countValue);
+        String amountDisplay = toDisplayZeroOrValue(amountValue);
+
+        return String.format("%d월 누계 사고실적 : %s건, 누계손실금액 : %s백만원",
+                month, countDisplay, amountDisplay);
+    }
+
+    /** "-" 또는 빈 문자열(공백 포함)이면 "0"으로, 그 외에는 trim된 원본 값을 그대로 반환 */
+    private String toDisplayZeroOrValue(String value) {
+        String trimmed = value.trim();
+        return (trimmed.isEmpty() || "-".equals(trimmed)) ? "0" : trimmed;
     }
 
     /**
