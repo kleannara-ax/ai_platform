@@ -35,6 +35,20 @@ public interface DailyReportCellRepository extends JpaRepository<DailyReportCell
             @Param("reportId") Long reportId, @Param("tableCode") String tableCode,
             @Param("rowIndex") Integer rowIndex, @Param("colIndex") Integer colIndex);
 
+    /**
+     * ★★ 2026-10 추가 — 리포트ID + 표코드 + 동일 colIndex(R열=17, 소계) + 여러
+     * rowIndex를 한 번에 조회. "사고/안전사고" 안내 문구에 필요한 R3(PS)/
+     * R4~R8(HL 합산)/R10(당월 총합계) 셀을 표(count/amount) 1개당 쿼리 1회로
+     * 모두 가져오기 위해 사용한다(불필요한 N+1 조회 방지).
+     */
+    @Query("SELECT c FROM DailyReportCell c " +
+           "WHERE c.reportTable.dailyReport.reportId = :reportId " +
+           "AND c.reportTable.tableCode = :tableCode " +
+           "AND c.colIndex = :colIndex AND c.rowIndex IN :rowIndexes")
+    List<DailyReportCell> findByReportIdAndTableCodeAndColIndexAndRowIndexIn(
+            @Param("reportId") Long reportId, @Param("tableCode") String tableCode,
+            @Param("colIndex") Integer colIndex, @Param("rowIndexes") List<Integer> rowIndexes);
+
     /** 표 ID + 행 범위로 셀 조회 */
     @Query("SELECT c FROM DailyReportCell c " +
            "WHERE c.reportTable.tableId = :tableId " +

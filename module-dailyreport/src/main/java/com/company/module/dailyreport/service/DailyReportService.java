@@ -14,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -88,6 +90,17 @@ public class DailyReportService {
      */
     private static final int SAFETY_SUMMARY_ROW_INDEX = 9;
     private static final int SAFETY_SUMMARY_COL_INDEX = 17;
+
+    /**
+     * ★★ 2026-10 추가(안내 문구 PS/HL 세분화) — 사고통계 표5/6의 엑셀 기준
+     * R3행(=rowIndex 2, "제지" 행 = "PS" 구분) / R4~R8행(=rowIndex 3~7,
+     * "화장지초지/화장지가공/생리대/기저귀/6호기" 5개 행 = "HL" 구분) 좌표.
+     * DefaultCellTemplate.addSafetyIncidentTable()의 행 배치(enclosing
+     * addSafetyIncidentCountCells/AmountCells)와 반드시 동일해야 한다.
+     * COL_INDEX는 위 SAFETY_SUMMARY_COL_INDEX(17, 당월 소계열)를 그대로 재사용.
+     */
+    private static final int SAFETY_PS_ROW_INDEX = 2;
+    private static final List<Integer> SAFETY_HL_ROW_INDEXES = List.of(3, 4, 5, 6, 7);
 
     /** ★★ 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE) 카테고리 — 제지/화장지/패드 3행
      *  (2026-09 신규). TBL_SPECIAL_NOTE의 PAPER/TISSUE/PAD와 같은 코드값을 재사용하지만,
@@ -563,15 +576,20 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 2026-10 추가 — 특이사항 "사고/안전사고" 행에 표시할 안내 문구 계산.
-     * "{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원" 형태.
+     * ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 PS/HL 세분화 요청으로 확장.
+     * 특이사항 "사고/안전사고" 행에 표시할 안내 문구 계산.
+     * "<{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원
+     *   (PS {n_1_ps}건 {n_2_ps}백만원, HL {n_1_hl}건 {n_2_hl}백만원)>" 형태.
      * - m: 이 리포트(reportId)의 REPORT_DATE 기준 월
      * - n_1: 사고통계 표5(TBL_SAFETY_INCIDENT_COUNT) 합계 행(R10, rowIndex=9,
      *        colIndex=17)의 "당월" 소계 값
      * - n_2: 사고통계 표6(TBL_SAFETY_INCIDENT_AMOUNT)의 동일 좌표 값
-     * 두 셀 중 하나라도 아직 없으면(표5/6이 생성되지 않은 과거 일보 등) null을
-     * 반환해 안내 문구 자체를 표시하지 않는다(화면에서 null이면 숨김 처리).
-     * 단위는 사용자 확인에 따라 별도 환산 없이 셀에 저장된 숫자를 그대로 사용한다.
+     * - n_1_ps/n_2_ps: 표5/6의 R3행(rowIndex=2, "제지"행) 소계 값 그대로 (합산 아님)
+     * - n_1_hl/n_2_hl: 표5/6의 R4~R8행(rowIndex=3~7) 소계 값을 합산한 값
+     * 총합계(n_1/n_2) 셀이 둘 중 하나라도 아직 없으면(표5/6이 생성되지 않은 과거
+     * 일보 등) null을 반환해 안내 문구 자체를 표시하지 않는다(화면에서 null이면
+     * 숨김 처리). PS/HL 개별 셀이 비어 있으면 0으로 간주한다. 단위는 사용자 확인에
+     * 따라 별도 환산 없이 셀에 저장된 숫자를 그대로 사용한다.
      */
     private String buildSafetySummaryText(Long reportId) {
         DailyReport report = reportRepository.findById(reportId).orElse(null);
@@ -580,18 +598,19 @@ public class DailyReportService {
         }
         int month = report.getReportDate().getMonthValue();
 
-        String countValue = cellRepository.findByReportIdAndTableCodeAndRowIndexAndColIndex(
-                        reportId, "TBL_SAFETY_INCIDENT_COUNT",
-                        SAFETY_SUMMARY_ROW_INDEX, SAFETY_SUMMARY_COL_INDEX)
-                .map(DailyReportCell::getCellValue)
-                .orElse(null);
-        String amountValue = cellRepository.findByReportIdAndTableCodeAndRowIndexAndColIndex(
-                        reportId, "TBL_SAFETY_INCIDENT_AMOUNT",
-                        SAFETY_SUMMARY_ROW_INDEX, SAFETY_SUMMARY_COL_INDEX)
-                .map(DailyReportCell::getCellValue)
-                .orElse(null);
+        List<Integer> neededRows = new ArrayList<>();
+        neededRows.add(SAFETY_SUMMARY_ROW_INDEX);
+        neededRows.add(SAFETY_PS_ROW_INDEX);
+        neededRows.addAll(SAFETY_HL_ROW_INDEXES);
 
-        if (countValue == null || amountValue == null) {
+        Map<Integer, String> countRows = fetchSafetyIncidentRowValues(
+                reportId, "TBL_SAFETY_INCIDENT_COUNT", neededRows);
+        Map<Integer, String> amountRows = fetchSafetyIncidentRowValues(
+                reportId, "TBL_SAFETY_INCIDENT_AMOUNT", neededRows);
+
+        String countTotalRaw = countRows.get(SAFETY_SUMMARY_ROW_INDEX);
+        String amountTotalRaw = amountRows.get(SAFETY_SUMMARY_ROW_INDEX);
+        if (countTotalRaw == null || amountTotalRaw == null) {
             return null;
         }
 
@@ -599,17 +618,89 @@ public class DailyReportService {
         // 그 달에 아직 아무 입력도 없어 재계산이 한 번도 일어나지 않은 경우엔 DATA 셀
         // 초기값인 빈 문자열("") 상태일 수도 있다 — 두 경우 모두 "0건"/"0백만원"으로
         // 자연스럽게 표시되도록 환원한다.
-        String countDisplay = toDisplayZeroOrValue(countValue);
-        String amountDisplay = toDisplayZeroOrValue(amountValue);
+        String countDisplay = toDisplayZeroOrValue(countTotalRaw);
+        String amountDisplay = toDisplayZeroOrValue(amountTotalRaw);
 
-        return String.format("%d월 누계 사고실적 : %s건, 누계손실금액 : %s백만원",
-                month, countDisplay, amountDisplay);
+        // PS(제지, R3행)는 합산이 아니라 해당 행의 소계 값을 그대로 사용
+        String countPsDisplay = toDisplayZeroOrValue(countRows.get(SAFETY_PS_ROW_INDEX));
+        String amountPsDisplay = toDisplayZeroOrValue(amountRows.get(SAFETY_PS_ROW_INDEX));
+
+        // HL(화장지초지/화장지가공/생리대/기저귀/6호기, R4~R8행)은 5개 행의 소계 값을 합산
+        String countHlDisplay = sumSafetyIncidentRows(countRows, SAFETY_HL_ROW_INDEXES);
+        String amountHlDisplay = sumSafetyIncidentRows(amountRows, SAFETY_HL_ROW_INDEXES);
+
+        return String.format(
+                "<%d월 누계 사고실적 : %s건, 누계손실금액 : %s백만원 (PS %s건 %s백만원, HL %s건 %s백만원)>",
+                month, countDisplay, amountDisplay,
+                countPsDisplay, amountPsDisplay, countHlDisplay, amountHlDisplay);
     }
 
-    /** "-" 또는 빈 문자열(공백 포함)이면 "0"으로, 그 외에는 trim된 원본 값을 그대로 반환 */
+    /**
+     * ★★ 2026-10 추가 — 사고통계 표(tableCode)의 "당월 소계"열(COL_INDEX=17,
+     * SAFETY_SUMMARY_COL_INDEX)에서 주어진 rowIndexes에 해당하는 셀 값들을
+     * 쿼리 1회로 일괄 조회해 rowIndex→원본 셀값(String) 맵으로 반환한다.
+     * (존재하지 않는 rowIndex는 맵에 포함되지 않음 — 호출측이 getOrDefault/get으로
+     * null 처리한다.)
+     */
+    private Map<Integer, String> fetchSafetyIncidentRowValues(Long reportId, String tableCode,
+                                                                List<Integer> rowIndexes) {
+        List<DailyReportCell> cells = cellRepository.findByReportIdAndTableCodeAndColIndexAndRowIndexIn(
+                reportId, tableCode, SAFETY_SUMMARY_COL_INDEX, rowIndexes);
+        Map<Integer, String> result = new HashMap<>();
+        for (DailyReportCell c : cells) {
+            result.put(c.getRowIndex(), c.getCellValue());
+        }
+        return result;
+    }
+
+    /** rowValues 맵에서 targetRows에 해당하는 값들을 숫자로 해석해 합산하고, 표시용 문자열로 변환 */
+    private String sumSafetyIncidentRows(Map<Integer, String> rowValues, List<Integer> targetRows) {
+        double sum = 0;
+        for (Integer row : targetRows) {
+            sum += parseSafetyIncidentNumberOrZero(rowValues.get(row));
+        }
+        return formatSafetyIncidentSumForDisplay(sum);
+    }
+
+    /** "-" 또는 빈 문자열(공백 포함)이면 "0"으로, 그 외에는 trim된 원본 값을 그대로 반환. null도 "0"으로 간주. */
     private String toDisplayZeroOrValue(String value) {
+        if (value == null) {
+            return "0";
+        }
         String trimmed = value.trim();
         return (trimmed.isEmpty() || "-".equals(trimmed)) ? "0" : trimmed;
+    }
+
+    /**
+     * 숫자로 해석 불가능하거나(빈 값, "-", null 등) 데이터가 없는 경우 0으로 간주.
+     * CellService.parseSafetyIncidentNumberOrZero()와 동일한 규칙(천 단위 콤마 제거 포함).
+     */
+    private double parseSafetyIncidentNumberOrZero(String raw) {
+        if (raw == null) {
+            return 0;
+        }
+        String cleaned = raw.replace(",", "").trim();
+        if (cleaned.isEmpty() || "-".equals(cleaned)) {
+            return 0;
+        }
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 안내 문구 전용 합계 표시 형식 — 소수점 1자리까지 계산한 뒤 ".0"으로 끝나면
+     * 정수 표기로 정리한다(CellService.formatSafetyIncidentSum과 동일 계산 규칙).
+     * 단, 이 메서드는 셀에 저장되는 값이 아니라 안내 줄에 표시되는 값이므로,
+     * 합계가 0이어도 "-"가 아니라 "0"으로 표시한다(toDisplayZeroOrValue와 동일 원칙).
+     */
+    private String formatSafetyIncidentSumForDisplay(double sum) {
+        BigDecimal bd = BigDecimal.valueOf(sum).setScale(1, RoundingMode.HALF_UP);
+        String s = bd.toPlainString();
+        String trimmed = s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
+        return ("0".equals(trimmed) || "-0".equals(trimmed)) ? "0" : trimmed;
     }
 
     /**

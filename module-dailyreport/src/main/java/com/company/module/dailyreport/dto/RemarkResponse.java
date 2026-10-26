@@ -38,9 +38,10 @@ public class RemarkResponse {
 
     /**
      * ★★ 2026-10 추가 — "사고/안전사고"(SAFETY) 행 전용 안내 문구.
-     * "{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원" 형태로
-     * DailyReportService가 사고통계 표5(TBL_SAFETY_INCIDENT_COUNT)/
-     * 표6(TBL_SAFETY_INCIDENT_AMOUNT)의 당월 합계 행(R10) 값을 조회해 계산한다.
+     * "<{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원 (PS {n_1_ps}건
+     * {n_2_ps}백만원, HL {n_1_hl}건 {n_2_hl}백만원)>" 형태로 DailyReportService가
+     * 사고통계 표5(TBL_SAFETY_INCIDENT_COUNT)/표6(TBL_SAFETY_INCIDENT_AMOUNT)의
+     * 당월 합계 행(R10)/PS 행(R3)/HL 합산(R4~R8) 값을 조회해 계산한다.
      * SAFETY 카테고리가 아닌 행(PAPER/TISSUE/PAD/ETC)은 항상 null.
      * 저장되는 content 텍스트 자체에는 포함되지 않으며, 화면에서 textarea
      * 위에 읽기전용 안내 줄로만 표시된다(값이 나중에 바뀌어도 항상 최신 반영).
