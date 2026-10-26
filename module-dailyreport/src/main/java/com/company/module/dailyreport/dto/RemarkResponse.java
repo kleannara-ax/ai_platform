@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 저장했는지" 화면 표시를 위해 editable/savedByName/savedAt 필드를 추가한다.
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class RemarkResponse {
 
     private Long remarkId;

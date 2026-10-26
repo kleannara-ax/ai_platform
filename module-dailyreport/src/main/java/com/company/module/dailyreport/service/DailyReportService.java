@@ -102,6 +102,17 @@ public class DailyReportService {
     private static final int SAFETY_PS_ROW_INDEX = 2;
     private static final List<Integer> SAFETY_HL_ROW_INDEXES = List.of(3, 4, 5, 6, 7);
 
+    /**
+     * ★★ 2026-10 추가(안내 문구 DB 영구 저장) — 특이사항 SAFETY 행의 content 컬럼에
+     * "고정문구 스냅샷 + 줄바꿈 + 사용자가 직접 입력한 순수 텍스트" 형태로 함께
+     * 저장할 때, 맨 앞에 붙는 고정문구 부분을 식별/분리하기 위한 패턴.
+     * buildSafetySummaryText()가 만드는 문자열은 항상 "<"로 시작해 ">"로 끝나고
+     * 그 사이에 ">" 문자가 절대 나오지 않으므로(숫자/쉼표/한글만 포함), 이 정규식
+     * 하나로 안전하게 식별할 수 있다. (바로 뒤 줄바꿈 1개까지 함께 제거)
+     */
+    private static final java.util.regex.Pattern SAFETY_SUMMARY_PREFIX_PATTERN =
+            java.util.regex.Pattern.compile("^<[^>\\n]*>\\n?");
+
     /** ★★ 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE) 카테고리 — 제지/화장지/패드 3행
      *  (2026-09 신규). TBL_SPECIAL_NOTE의 PAPER/TISSUE/PAD와 같은 코드값을 재사용하지만,
      *  모든 조회/검증/이어받기 로직이 TABLE_CODE로 먼저 스코프되므로 값이 서로 섞이지 않는다. */
@@ -499,11 +510,18 @@ public class DailyReportService {
     public List<RemarkResponse> getRemarksForUser(Long reportId, Long userId, String tableCode) {
         Map<String, String> categories = specialNoteSpec(tableCode).categories();
 
-        // ★★ 2026-10 추가 — TBL_SPECIAL_NOTE(특이사항)의 SAFETY(사고/안전사고) 행에만
-        // 쓰이는 안내 문구. 다른 표(TBL_SAFETY_AMOUNT_NOTE 등)나 다른 카테고리에는
-        // 영향 없음(아래 safetySummaryTextFor()가 SAFETY_NOTE_TABLE_CODE +
-        // "SAFETY" 카테고리일 때만 null이 아닌 값을 반환).
-        String safetySummaryText = SPECIAL_NOTE_TABLE_CODE.equals(tableCode)
+        // ★★ 2026-10 추가, 2026-10 DB 영구 저장 개편 — TBL_SPECIAL_NOTE(특이사항)의
+        // SAFETY(사고/안전사고) 행에만 쓰이는 안내 문구.
+        // - 리포트 날짜가 "오늘 이후(오늘/미래)"이면 숫자가 계속 바뀔 수 있으므로
+        //   항상 실시간 재계산(buildSafetySummaryText)해서 보여준다.
+        // - 리포트 날짜가 "어제 이전(과거)"이면 그 날짜에 저장된 DB 스냅샷(사용자
+        //   저장 시점의 값, content 컬럼 맨 앞에 함께 저장되어 있음)을 그대로
+        //   보여준다 — 나중에 표5/6 데이터가 바뀌어도 과거 조회 화면은 저장 당시
+        //   숫자를 그대로 유지해야 하기 때문.
+        // 다른 표(TBL_SAFETY_AMOUNT_NOTE 등)나 다른 카테고리에는 영향 없음.
+        boolean useLiveSafetySummary = SPECIAL_NOTE_TABLE_CODE.equals(tableCode)
+                && !isPastReportDateForSafetySummary(reportId);
+        String liveSafetySummaryText = useLiveSafetySummary
                 ? buildSafetySummaryText(reportId)
                 : null;
 
@@ -546,19 +564,32 @@ public class DailyReportService {
                     .collect(Collectors.joining(", "));
             boolean editable = userId != null && ownerIds.contains(userId);
 
+            boolean isSafetyRow = "SAFETY".equals(category);
             DailyReportRemark existing = byCategory.get(category);
+
+            // ★★ 2026-10 추가, DB 영구 저장 개편 — SAFETY 행의 DB content는
+            // "<고정문구>\n사용자텍스트" 형태로 저장되어 있을 수 있다. 화면/프론트
+            // 호환을 위해 응답 content는 항상 "사용자가 직접 입력한 순수 텍스트"만
+            // 돌려주고, 고정문구는 safetySummaryText로 분리해서 내려준다.
+            String rawContent = existing != null ? existing.getContent() : "";
+            String storedSnapshot = isSafetyRow ? extractSafetySummarySnapshot(rawContent) : null;
+            String pureContent = isSafetyRow ? stripSafetySummaryPrefix(rawContent) : rawContent;
+            String safetySummaryTextForRow = isSafetyRow
+                    ? (useLiveSafetySummary ? liveSafetySummaryText : storedSnapshot)
+                    : null;
+
             RemarkResponse.RemarkResponseBuilder builder = RemarkResponse.builder()
                     .tableCode(tableCode)
                     .category(category)
                     .editable(editable)
                     .ownerNames(ownerNames.isBlank() ? null : ownerNames)
-                    .safetySummaryText("SAFETY".equals(category) ? safetySummaryText : null);
+                    .safetySummaryText(safetySummaryTextForRow);
 
             if (existing != null) {
                 Long lastEditorId = existing.getUpdatedBy() != null ? existing.getUpdatedBy() : existing.getCreatedBy();
                 LocalDateTime savedAt = existing.getUpdatedAt() != null ? existing.getUpdatedAt() : existing.getCreatedAt();
                 builder.remarkId(existing.getRemarkId())
-                        .content(existing.getContent())
+                        .content(pureContent)
                         .sortOrder(existing.getSortOrder())
                         .createdBy(existing.getCreatedBy())
                         .updatedBy(existing.getUpdatedBy())
@@ -573,6 +604,65 @@ public class DailyReportService {
         }
 
         return result;
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — 이 reportId의 날짜가 "오늘보다 이전
+     * (과거)"인지 판정한다. true(과거)면 실시간 재계산 대신 DB에 저장된 스냅샷을
+     * 사용해야 한다. 리포트가 존재하지 않으면 과거로 취급하지 않는다(= 실시간
+     * 계산 경로로 안전하게 폴백, null 반환으로 자연 처리됨).
+     */
+    private boolean isPastReportDateForSafetySummary(Long reportId) {
+        DailyReport report = reportRepository.findById(reportId).orElse(null);
+        if (report == null || report.getReportDate() == null) {
+            return false;
+        }
+        return report.getReportDate().isBefore(LocalDate.now());
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — DB content 맨 앞에 저장된 고정문구
+     * 스냅샷("<...>")만 추출한다. 없으면 null.
+     */
+    private String extractSafetySummarySnapshot(String rawContent) {
+        if (rawContent == null) {
+            return null;
+        }
+        var matcher = SAFETY_SUMMARY_PREFIX_PATTERN.matcher(rawContent);
+        if (!matcher.find()) {
+            return null;
+        }
+        String matched = matcher.group(); // "<...>" 또는 "<...>\n"
+        return matched.endsWith("\n") ? matched.substring(0, matched.length() - 1) : matched;
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — DB content에서 맨 앞의 고정문구
+     * 스냅샷("<...>" + 뒤따르는 줄바꿈 1개)을 제거하고, 사용자가 실제로 입력한
+     * 순수 텍스트만 남긴다. 고정문구가 없으면(과거에 저장된 레코드, 다른
+     * 카테고리 등) 원본을 그대로 반환한다.
+     */
+    private String stripSafetySummaryPrefix(String rawContent) {
+        if (rawContent == null) {
+            return "";
+        }
+        return SAFETY_SUMMARY_PREFIX_PATTERN.matcher(rawContent).replaceFirst("");
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — 사용자가 입력한 순수 텍스트(userContent)
+     * 앞에, "그 reportId 날짜 기준"으로 계산한 고정문구 스냅샷을 붙여 DB에 저장할
+     * 최종 content 문자열을 만든다. 표5/6이 아직 없는 등 고정문구를 계산할 수
+     * 없으면(null) 순수 텍스트만 그대로 저장한다(기존 동작과 동일).
+     * SAFETY 카테고리가 아니면 호출하지 않는다 — 호출측에서 분기한다.
+     */
+    private String composeSafetyContentForStorage(Long reportId, String userContent) {
+        String safeUserContent = userContent == null ? "" : userContent;
+        String summary = buildSafetySummaryText(reportId);
+        if (summary == null) {
+            return safeUserContent;
+        }
+        return safeUserContent.isEmpty() ? summary : summary + "\n" + safeUserContent;
     }
 
     /**
@@ -725,7 +815,19 @@ public class DailyReportService {
         validateRemarkEditableDate(report, tableCode);
         validateSpecialNoteCategory(tableCode, request.getCategory());
         validateRemarkOwnership(tableCode, request.getCategory(), userId);
+        // ★★ 분량 제한 검증은 항상 "사용자가 직접 입력한 순수 텍스트" 기준으로
+        // 수행한다(고정문구는 사람이 입력하는 분량이 아니므로 제외) — request.getContent()는
+        // 프론트가 textarea 값 그대로 보낸 순수 텍스트다.
         validateSpecialNoteLimits(reportId, tableCode, request.getCategory(), request.getContent());
+
+        boolean isSafetyRow = SPECIAL_NOTE_TABLE_CODE.equals(tableCode) && "SAFETY".equals(request.getCategory());
+        // ★★ 2026-10 추가, DB 영구 저장 개편 — "사고/안전사고" 행은 사용자가 입력한
+        // 순수 텍스트 앞에 "이 리포트(reportId) 날짜 기준" 고정문구 스냅샷을 붙여
+        // DB에 저장한다. 그 외 행(PAPER/TISSUE/PAD/ETC, 다른 표)은 기존과 동일하게
+        // 순수 텍스트 그대로 저장한다.
+        String contentToStore = isSafetyRow
+                ? composeSafetyContentForStorage(reportId, request.getContent())
+                : request.getContent();
 
         int sortOrder = request.getSortOrder() != null
                 ? request.getSortOrder()
@@ -734,7 +836,7 @@ public class DailyReportService {
         DailyReportRemark remark = DailyReportRemark.builder()
                 .tableCode(tableCode)
                 .category(request.getCategory())
-                .content(request.getContent())
+                .content(contentToStore)
                 .sortOrder(sortOrder)
                 .createdBy(userId)
                 .build();
@@ -743,10 +845,12 @@ public class DailyReportService {
         remarkRepository.save(remark);
 
         // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
-        // 특이사항 값도 최신화
+        // 특이사항 값도 최신화 (★ SAFETY 행도 포함해 "그대로"(고정문구+텍스트) 전파되며,
+        // propagateRemarkForward 내부에서 전파 대상 미래 일보 각각의 날짜 기준으로
+        // 고정문구를 다시 계산해 갱신한다 — 아래 propagateRemarkForward 참조)
         propagateRemarkForward(report.getReportDate(), tableCode, request.getCategory(), request.getContent());
 
-        return RemarkResponse.from(remark);
+        return toRemarkResponseWithPureContent(remark);
     }
 
     /**
@@ -769,26 +873,90 @@ public class DailyReportService {
                 .orElseThrow(() -> new EntityNotFoundException("특이사항을 찾을 수 없습니다. ID: " + remarkId));
 
         String tableCode = remark.getTableCode();
+        Long reportId = remark.getDailyReport().getReportId();
+        boolean isSafetyRow = SPECIAL_NOTE_TABLE_CODE.equals(tableCode) && "SAFETY".equals(remark.getCategory());
 
         validateReportEditable(remark.getDailyReport());
         validateRemarkEditableDate(remark.getDailyReport(), tableCode);
         validateRemarkOwnership(tableCode, remark.getCategory(), userId);
 
-        boolean unchanged = Objects.equals(remark.getContent(), request.getContent())
+        // ★★ 2026-10 추가, DB 영구 저장 개편 — SAFETY 행은 DB content(고정문구+텍스트)가
+        // 아니라 "사용자가 직접 입력한 순수 텍스트"끼리 비교해야 "실제로 안 바꿨다"를
+        // 올바르게 판정할 수 있다(그렇지 않으면 고정문구 숫자가 저장 시점마다 달라
+        // 항상 true로 떨어져 unchanged 최적화/값 전파 가드가 무력화된다).
+        String existingPureContent = isSafetyRow ? stripSafetySummaryPrefix(remark.getContent()) : remark.getContent();
+        boolean unchanged = Objects.equals(existingPureContent, request.getContent())
                 && Objects.equals(remark.getCategory(), request.getCategory());
         if (unchanged) {
-            return RemarkResponse.from(remark);
+            return toRemarkResponseWithPureContent(remark);
         }
 
-        validateSpecialNoteLimits(remark.getDailyReport().getReportId(), remark.getRemarkId(),
+        validateSpecialNoteLimits(reportId, remark.getRemarkId(),
                 tableCode, remark.getCategory(), request.getContent());
-        remark.updateContent(request.getContent(), request.getCategory(), userId);
+
+        // ★★ SAFETY 행은 "이 리포트(reportId) 날짜 기준"으로 고정문구 스냅샷을 다시
+        // 계산해 사용자 텍스트 앞에 붙여 저장한다. 그 외 행은 순수 텍스트 그대로 저장.
+        String contentToStore = isSafetyRow
+                ? composeSafetyContentForStorage(reportId, request.getContent())
+                : request.getContent();
+        remark.updateContent(contentToStore, request.getCategory(), userId);
 
         // ★★ 값 전파: 이 저장으로 미래에 이미 만들어져 있는 일보의 이어받기
-        // 특이사항 값도 최신화
+        // 특이사항 값도 최신화 (SAFETY 행도 포함 — propagateRemarkForward 내부에서
+        // 전파 대상 미래 일보 각각의 날짜 기준으로 고정문구를 다시 계산한다)
         propagateRemarkForward(remark.getDailyReport().getReportDate(), tableCode, remark.getCategory(), request.getContent());
 
-        return RemarkResponse.from(remark);
+        return toRemarkResponseWithPureContent(remark);
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — 사고통계 페이지(safety-stats.html)에서
+     * 표5/6(TBL_SAFETY_INCIDENT_COUNT/AMOUNT) 셀을 저장할 때, "그 reportId(=그
+     * 날짜) 하나"의 특이사항 SAFETY 행에 저장된 고정문구 스냅샷만 즉시 재계산해
+     * 갱신한다. 사용자가 직접 입력한 순수 텍스트는 그대로 보존하고 맨 앞 고정문구
+     * 부분만 최신값으로 교체한다 — 요청사항(같은 날짜의 사고통계를 고치면 같은
+     * 날짜의 입력페이지 특이사항도 그 날짜 것만 갱신)에 따라, 다른 날짜/미래
+     * 일보로의 전파는 전혀 하지 않는다(값 전파(propagateXxxForward)와는 무관한
+     * 별개의 단일 리포트 스코프 동작).
+     * SAFETY 행 자체가 아직 없거나(레거시 일보) 표5/6 데이터가 없어 고정문구를
+     * 계산할 수 없으면 조용히 아무 것도 하지 않는다.
+     */
+    @Transactional
+    public void resyncSafetySummarySnapshotForReport(Long reportId) {
+        DailyReportRemark remark = remarkRepository
+                .findByDailyReport_ReportIdAndTableCodeAndCategory(reportId, SPECIAL_NOTE_TABLE_CODE, "SAFETY")
+                .orElse(null);
+        if (remark == null) {
+            return; // 레거시 일보 등 SAFETY 행 자체가 없으면 대상 아님
+        }
+        String pureContent = stripSafetySummaryPrefix(remark.getContent());
+        String newContent = composeSafetyContentForStorage(reportId, pureContent);
+        if (!Objects.equals(remark.getContent(), newContent)) {
+            // ★ carryOverContent 사용 — 이 자동 재계산은 "사람이 직접 입력"한 것이
+            // 아니므로 CREATED_BY/UPDATED_BY(편집자 도장)를 절대 찍지 않는다.
+            remark.carryOverContent(newContent);
+        }
+    }
+
+    /**
+     * ★★ 2026-10 추가, DB 영구 저장 개편 — addRemark/updateRemark가 즉시 반환하는
+     * RemarkResponse의 content를 "사용자가 입력한 순수 텍스트"로, safetySummaryText를
+     * "방금 저장에 사용된 고정문구 스냅샷"으로 분리해 내려준다(SAFETY 행이 아니면
+     * 기존과 동일하게 동작). 프론트는 이 응답의 content/remarkId만 사용하므로
+     * (safetySummaryText는 다음 조회 시 getRemarksForUser()가 다시 계산해 내려줌),
+     * 여기서는 저장 직후 화면 불일치를 막기 위한 최소한의 일관성만 보장한다.
+     */
+    private RemarkResponse toRemarkResponseWithPureContent(DailyReportRemark remark) {
+        RemarkResponse base = RemarkResponse.from(remark);
+        boolean isSafetyRow = SPECIAL_NOTE_TABLE_CODE.equals(remark.getTableCode())
+                && "SAFETY".equals(remark.getCategory());
+        if (!isSafetyRow) {
+            return base;
+        }
+        return base.toBuilder()
+                .content(stripSafetySummaryPrefix(remark.getContent()))
+                .safetySummaryText(extractSafetySummarySnapshot(remark.getContent()))
+                .build();
     }
 
     /**
@@ -856,7 +1024,13 @@ public class DailyReportService {
                 // 같은 카테고리(자기 자신 행) 기존 내용은 새 content로 대체되므로 건너뛴다
                 continue;
             }
-            String c = r.getContent() == null ? "" : r.getContent();
+            // ★★ 2026-10 추가, DB 영구 저장 개편 — SAFETY 행의 DB content는 고정문구
+            // 스냅샷이 앞에 붙어 있을 수 있다. 분량 제한은 "사람이 입력하는 분량"만
+            // 대상으로 해야 하므로, 다른 행(SAFETY 포함)을 합산할 때도 고정문구는
+            // 반드시 제외하고 순수 텍스트만 합산한다.
+            boolean otherRowIsSafety = SPECIAL_NOTE_TABLE_CODE.equals(tableCode) && "SAFETY".equals(cat);
+            String rawOther = r.getContent() == null ? "" : r.getContent();
+            String c = otherRowIsSafety ? stripSafetySummaryPrefix(rawOther) : rawOther;
             totalNewlines += countNewlines(c);
             totalChars += c.length();
         }
@@ -1351,6 +1525,12 @@ public class DailyReportService {
      * ※ 무한 루프/과도한 조회 방지를 위해 최대 366일(약 1년)까지만 전파한다.
      */
     private void propagateRemarkForward(LocalDate fromDate, String tableCode, String category, String newContent) {
+        // ★★ 2026-10 추가, DB 영구 저장 개편 — SAFETY 행은 전파되는 미래 일보마다
+        // "그 미래 일보 자신의 날짜" 기준으로 고정문구 스냅샷을 다시 계산해
+        // newContent(순수 텍스트) 앞에 붙여 저장해야 한다(날짜가 다르면 월이 다를 수
+        // 있고, 표5/6 값도 다르므로 같은 스냅샷을 그대로 복사하면 안 된다).
+        boolean isSafetyRow = SPECIAL_NOTE_TABLE_CODE.equals(tableCode) && "SAFETY".equals(category);
+
         LocalDate cursor = fromDate;
         for (int hop = 0; hop < 366; hop++) {
             DailyReport nextReport = reportRepository
@@ -1360,6 +1540,10 @@ public class DailyReportService {
                 break; // 더 이상 미래에 생성된 일보가 없음
             }
             cursor = nextReport.getReportDate();
+
+            String contentForThisHop = isSafetyRow
+                    ? composeSafetyContentForStorage(nextReport.getReportId(), newContent)
+                    : newContent;
 
             DailyReportRemark nextRemark = remarkRepository
                     .findByDailyReport_ReportIdAndTableCodeAndCategory(nextReport.getReportId(), tableCode, category)
@@ -1371,7 +1555,7 @@ public class DailyReportService {
                 DailyReportRemark created = DailyReportRemark.builder()
                         .tableCode(tableCode)
                         .category(category)
-                        .content(newContent)
+                        .content(contentForThisHop)
                         .sortOrder(sortOrderOfCategory(tableCode, category))
                         .createdBy(null)
                         .build();
@@ -1384,8 +1568,8 @@ public class DailyReportService {
                 break; // 이미 사람이 직접 입력해 둔 값 — 의도적 오버라이드이므로 전파 중단
             }
 
-            if (!Objects.equals(nextRemark.getContent(), newContent)) {
-                nextRemark.carryOverContent(newContent);
+            if (!Objects.equals(nextRemark.getContent(), contentForThisHop)) {
+                nextRemark.carryOverContent(contentForThisHop);
             }
             // 이 행은 여전히 "이어받기 상태" — 계속 다음 날짜로 전파
         }
