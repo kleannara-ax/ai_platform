@@ -130,7 +130,7 @@
         <button class="btn btn-outline-success btn-sm" onclick="downloadExcel()">Excel 다운로드</button>
         <input type="file" id="excelUploadInput" accept=".xlsx,.xls" class="d-none" onchange="uploadExcel(this)">
         <button id="btn-excel-upload" class="btn btn-outline-primary btn-sm d-none" onclick="document.getElementById('excelUploadInput').click()">Excel 업로드</button>
-        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ 신규 PC 등록</button>
+        <button class="btn btn-primary btn-sm" id="create-btn" onclick="openCreate()">+ 신규 PC 등록</button>
       </div>
       <!-- 검색/필터 -->
       <div class="card mb-3"><div class="card-body py-2">
@@ -263,7 +263,7 @@
       <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
     <div class="modal-body">
       <input type="hidden" id="e-ipId">
-      <div class="mb-2"><label class="form-label small mb-0">IP 주소 *</label>
+      <div class="mb-2" id="e-ip-row"><label class="form-label small mb-0">IP 주소 *</label>
         <input id="e-ip" class="form-control form-control-sm"></div>
       <ul class="nav nav-tabs mb-2" id="editTabs" style="display:none">
         <li class="nav-item"><button type="button" class="nav-link active" id="etab-pc" onclick="showEditTab('pc')">PC 변경</button></li>
@@ -271,25 +271,33 @@
       </ul>
       <div id="epane-pc">
       <div class="row g-2">
-        <div class="col"><label class="form-label small mb-0">사용자</label><input id="e-user" class="form-control form-control-sm"></div>
-        <div class="col"><label class="form-label small mb-0">부서</label><input id="e-dept" class="form-control form-control-sm"></div>
+        <div class="col"><label class="form-label small mb-0" id="e-user-label">사용자</label><input id="e-user" class="form-control form-control-sm"
+          oninput="onPcUserInput()"></div>
+        <div class="col" id="e-dept-col"><label class="form-label small mb-0">부서</label><input id="e-dept" class="form-control form-control-sm"></div>
       </div>
-      <div class="row g-2 mt-0">
-        <div class="col"><label class="form-label small mb-0">장치구분</label>
+      <!-- 서울 PC관리 신규 등록: 사용자에게 등록된 IP(IP관리에서 등록)를 골라 PC 정보를 넣는다 -->
+      <div class="row g-2 mt-0" id="e-target-row" style="display:none">
+        <div class="col"><label class="form-label small mb-0">연결할 IP *</label>
+          <select id="e-target" class="form-select form-select-sm"></select>
+          <div class="form-text" id="e-target-help">사용자명을 입력하면 IP관리에 등록된 그 사용자의 IP가 나옵니다.</div></div>
+      </div>
+      <div class="row g-2 mt-0" id="e-devloc-row">
+        <div class="col" id="e-device-col"><label class="form-label small mb-0">장치구분</label>
           <input id="e-device" class="form-control form-control-sm" list="deviceTypes" placeholder="노트북/서버/데스크탑/프린터/키오스크">
           <datalist id="deviceTypes"><option>노트북</option><option>서버</option><option>데스크탑</option><option>프린터</option><option>복합기</option><option>키오스크</option><option>임시</option></datalist></div>
-        <div class="col"><label class="form-label small mb-0">위치</label><input id="e-loc" class="form-control form-control-sm"></div>
+        <div class="col" id="e-loc-col"><label class="form-label small mb-0">위치</label><input id="e-loc" class="form-control form-control-sm"></div>
       </div>
-      <div class="row g-2 mt-0 align-items-end">
+      <div class="row g-2 mt-0 align-items-end" id="e-approval-row">
         <div class="col-auto"><div class="form-check mt-3">
           <input class="form-check-input" type="checkbox" id="e-approved"><label class="form-check-label" for="e-approved">품의 완료</label></div></div>
         <div class="col"><label class="form-label small mb-0">품의번호</label><input id="e-appno" class="form-control form-control-sm"></div>
       </div>
-      <div class="row g-2 mt-0">
+      <div class="row g-2 mt-0" id="e-remark-row">
         <div class="col"><label class="form-label small mb-0">비고 / 변경사유</label><input id="e-remark" class="form-control form-control-sm"></div>
-        <div class="col-4"><label class="form-label small mb-0">연결 요청 ID</label><input id="e-reqid" type="number" class="form-control form-control-sm" placeholder="선택"></div>
+        <div class="col-4" id="e-reqid-col"><label class="form-label small mb-0">연결 요청 ID</label><input id="e-reqid" type="number" class="form-control form-control-sm" placeholder="선택"></div>
       </div>
 
+      <div id="e-spec">
       <hr class="my-2">
       <div class="d-flex justify-content-between align-items-center mb-1">
         <div class="small text-muted">PC / 장비 상세 스펙</div>
@@ -305,6 +313,7 @@
         <div class="col"><label class="form-label small mb-0">모델</label><input id="e-model" class="form-control form-control-sm"></div>
         <div class="col"><label class="form-label small mb-0">제조번호</label><input id="e-serial" class="form-control form-control-sm"></div>
         <div class="col"><label class="form-label small mb-0">구입업체</label><input id="e-vendor" class="form-control form-control-sm"></div>
+        <div class="col" id="e-purchase-col" style="display:none"><label class="form-label small mb-0">구입일</label><input id="e-purchase" class="form-control form-control-sm" placeholder="예: 2026-10-01"></div>
       </div>
       <div class="row g-2 mt-0">
         <div class="col"><label class="form-label small mb-0">OS 버전</label><input id="e-osver" class="form-control form-control-sm"></div>
@@ -318,6 +327,7 @@
         <div class="col"><label class="form-label small mb-0">한글 버전</label><input id="e-hanver" class="form-control form-control-sm"></div>
         <div class="col"><label class="form-label small mb-0">한글 시리얼</label><input id="e-hanserial" class="form-control form-control-sm"></div>
       </div>
+      </div><!-- /e-spec -->
       </div><!-- /epane-pc -->
 
       <div id="epane-ip" style="display:none">
@@ -790,6 +800,7 @@
       GRID_COLS = gridLayout === 'full' ? ALL_GRID_COLS
         : GRID_LAYOUT_KEYS[gridLayout].map(k => ALL_GRID_COLS.find(c => c.key === k));
       renderListHead();
+      updateCreateButton();
     }
     // 표 머리글(본문 표 + 고정 영역 복제본)을 현재 열 구성으로 다시 그린다
     function renderListHead() {
@@ -1481,18 +1492,107 @@
     function isIpTabActive() { return document.getElementById('etab-ip').classList.contains('active'); }
     function onEditSave() { if (isIpTabActive()) saveMove(); else save(); }
 
+    // ---- 등록 모달 항목 구분 (서울 IP관리 / PC관리 표 열에 맞춤) ----
+    // full = 기존 전체 입력(청주·PC 목록·변경), ip = IP관리 표 항목만, pc = PC관리 표 항목만(IP는 사용자로 찾음)
+    let editMode = 'full';
+    function setEditMode(m) {
+      editMode = m;
+      const show = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
+      show('e-ip-row', m !== 'pc');
+      show('e-dept-col', m !== 'pc');
+      show('e-devloc-row', m === 'full');
+      show('e-approval-row', m === 'full');
+      show('e-remark-row', m !== 'pc');
+      show('e-spec', m !== 'ip');
+      show('e-target-row', false);   // PC관리: 같은 사용자의 IP가 여러 개일 때만 나타남
+      show('e-purchase-col', m === 'pc');
+      document.getElementById('e-user-label').textContent = m === 'pc' ? '사용자 *' : '사용자';
+    }
+    // 서울 IP관리/PC관리 탭에 따라 신규 등록 버튼 이름
+    function updateCreateButton() {
+      const btn = document.getElementById('create-btn');
+      if (btn) btn.textContent = gridLayout === 'ip' ? '+ 신규 IP 등록' : '+ 신규 PC 등록';
+    }
+
     // ---- 등록 ----
     function openCreate() {
-      document.getElementById('editTitle').textContent = '신규 PC 등록';
-      ['e-ipId','e-ip','e-user','e-dept','e-loc','e-device','e-appno','e-remark','e-reqid','e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
+      const mode = (gridLayout === 'ip' || gridLayout === 'pc') ? gridLayout : 'full';
+      document.getElementById('editTitle').textContent = mode === 'ip' ? '신규 IP 등록' : '신규 PC 등록';
+      ['e-ipId','e-ip','e-user','e-dept','e-loc','e-device','e-appno','e-remark','e-reqid','e-newip','e-movereason','e-movereqid','e-purchase'].forEach(id => document.getElementById(id).value = '');
       SPEC_FIELDS.forEach(([id]) => document.getElementById(id).value = '');
       document.getElementById('e-approved').checked = false;
       fillRentalSelect('');
       document.getElementById('e-ip').disabled = false;
       document.getElementById('editTabs').style.display = 'none';   // 등록은 PC 입력만
+      setEditMode(mode);
+      fillTargetSelect([], '');
       showEditTab('pc');
       document.getElementById('e-save-btn').textContent = '등록';
       editModal.show();
+    }
+
+    // PC관리 신규 등록: 사용자명과 똑같은 사용자의 IP(IP관리에서 등록한 것)를 찾아 고르게 한다
+    const pcHasSpec = r => !!(r && (r.model || r.serialNo || r.pcAssetNo));
+    let pcUserTimer = null, pcUserSeq = 0;
+    function onPcUserInput() {
+      if (editMode !== 'pc') return;
+      clearTimeout(pcUserTimer);
+      pcUserTimer = setTimeout(lookupPcUser, 300);
+    }
+    async function lookupPcUser() {
+      const name = document.getElementById('e-user').value.trim();
+      const seq = ++pcUserSeq;
+      if (!name) { fillTargetSelect([], ''); return; }
+      try {
+        const p = new URLSearchParams({ searchField: 'user', keyword: name, site: SITE, excludeGroup: '별도관리', size: 100 });
+        const data = await KIMS.api('/kims-api/ips?' + p.toString());
+        if (seq !== pcUserSeq) return;   // 그 사이 다시 입력함
+        fillTargetSelect((data.content || []).filter(r => (r.userName || '').trim() === name), name);
+      } catch (e) { KIMS.toast(e.message, false); }
+    }
+    let pcTargetName = '', pcTargetCount = 0;   // 지금 연결할 IP 목록이 어떤 사용자명으로 조회된 것인지, 몇 개인지
+    function fillTargetSelect(rows, name) {
+      pcTargetName = name; pcTargetCount = rows.length;
+      const sel = document.getElementById('e-target');
+      sel.innerHTML = rows.map(r => `<option value="${r.ipId}">${E(r.ipAddress)}${r.department ? ' (' + E(r.department) + ')' : ''}${pcHasSpec(r) ? ' — PC 정보 있음' : ''}</option>`).join('');
+      document.getElementById('e-target-help').textContent = `같은 사용자의 IP가 ${rows.length}개 있습니다. PC를 연결할 IP를 고르세요.`;
+      // 1개면 자동으로 그 IP에 연결, 여러 개일 때만 고르는 칸을 보여 준다
+      document.getElementById('e-target-row').style.display = (editMode === 'pc' && rows.length > 1) ? '' : 'none';
+    }
+    // PC관리 신규 등록 저장: 고른 IP 행에 PC 정보를 넣는다 (IP관리 항목은 그대로 유지)
+    async function savePcToUser() {
+      const name = document.getElementById('e-user').value.trim();
+      if (!name) { KIMS.toast('사용자를 입력하세요.', false); return; }
+      // 입력 직후 바로 등록을 누른 경우: 아직 끝나지 않은 사용자 조회를 마친 뒤 진행
+      // 입력 직후 바로 등록을 누른 경우: 아직 끝나지 않은 사용자 조회를 먼저 마친다
+      if (pcTargetName !== name) {
+        clearTimeout(pcUserTimer); await lookupPcUser();
+        if (pcTargetName !== name) return;
+        if (pcTargetCount > 1) { KIMS.toast(`'${name}' 사용자의 IP가 ${pcTargetCount}개 있습니다. 연결할 IP를 고른 뒤 다시 등록하세요.`, false); return; }
+      }
+      const ipId = document.getElementById('e-target').value;
+      if (!ipId) { KIMS.toast(`'${name}' 사용자로 등록된 IP가 없습니다. IP관리 탭에서 먼저 IP를 등록하세요.`, false); return; }
+      try {
+        const row = await KIMS.api('/kims-api/ips/' + ipId);
+        if (pcHasSpec(row) && !confirm(`${row.ipAddress} 에 이미 PC 정보(모델 ${row.model || '-'}, 제조번호 ${row.serialNo || '-'})가 있습니다.\n새로 입력한 PC 정보로 바꿀까요?`)) return;
+        const v = id => document.getElementById(id).value.trim();
+        const nv = s => s === '' ? null : s;
+        // IP관리 항목(부서·비고 등)과 장치구분은 기존 값 그대로 두고 PC 스펙만 넣는다
+        const payload = {
+          userName: name, department: row.department, location: row.location,
+          device: row.device, approved: !!row.approved, approvalNo: row.approvalNo,
+          remark: row.remark, noteDate: row.noteDate,
+          rentalCompany: document.getElementById('e-rental').value,
+          changedBy: KIMS.getUser() || 'admin',
+        };
+        SPEC_FIELDS.forEach(([id, key]) => { payload[key] = nv(v(id)); });
+        if (v('e-purchase')) payload.purchaseDate = v('e-purchase');
+        payload.reason = 'PC 등록 — ' + [['모델', payload.model], ['제조번호', payload.serialNo], ['PC자산번호', payload.pcAssetNo]]
+          .filter(([, x]) => x).map(([l, x]) => `${l}: ${x}`).join(', ');
+        await KIMS.api('/kims-api/ips/' + ipId, { method: 'PATCH', body: payload });
+        KIMS.toast(`${row.ipAddress} 에 PC가 등록되었습니다.`);
+        editModal.hide(); load();
+      } catch (e) { KIMS.toast(e.message, false); }
     }
     // ---- 변경 ----
     async function openEdit(ipId) {
@@ -1516,6 +1616,7 @@
         document.getElementById('e-curip').value = d.ipAddress;
         ['e-newip','e-movereason','e-movereqid'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('editTabs').style.display = '';      // 변경은 PC/IP 탭 노출
+        setEditMode('full');
         showEditTab('pc');
         editModal.show();
       } catch (e) { KIMS.toast(e.message, false); }
@@ -1539,6 +1640,7 @@
 
     async function save() {
       const ipId = document.getElementById('e-ipId').value;
+      if (!ipId && editMode === 'pc') { savePcToUser(); return; }
       const payload = {
         userName: document.getElementById('e-user').value.trim(),
         department: document.getElementById('e-dept').value.trim(),
