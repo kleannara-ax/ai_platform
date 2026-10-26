@@ -429,6 +429,14 @@ public class CellService {
             savedCells.add(CellResponse.from(cell));
         }
 
+        // ★★ 2026-10 추가, DB 영구 저장 개편 — 표5/6(안전사고 발생건수/손실금액) 셀을
+        // 저장했다면, "이 reportId(=이 날짜) 하나"의 특이사항 SAFETY 행에 저장된
+        // 고정문구 스냅샷만 즉시 재계산해 최신화한다. 사용자 요청사항에 따라 다른
+        // 날짜/미래 일보로는 절대 전파하지 않는다 — 보고 있는 그 날짜만 갱신.
+        if (SAFETY_INCIDENT_AUTOSUM_TABLE_CODES.contains(table.getTableCode())) {
+            dailyReportService.resyncSafetySummarySnapshotForReport(reportId);
+        }
+
         return savedCells;
     }
 
