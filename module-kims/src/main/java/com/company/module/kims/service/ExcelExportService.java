@@ -121,6 +121,67 @@ public class ExcelExportService {
             "비고"
     };
 
+    /** 서울 PC 관리 'IP관리' 표의 엑셀 컬럼 헤더 (내보내기·업로드 공용) */
+    public static final String[] IP_SHEET_HEADERS = { "IP그룹", "IP주소", "부서", "사용자", "비고" };
+
+    /** 서울 PC 관리 'PC관리' 표의 엑셀 컬럼 헤더 (내보내기·업로드 공용, 업로드는 제조번호로 기존 행을 찾음) */
+    public static final String[] PC_SHEET_HEADERS = {
+            "렌탈사", "장치구분", "제조번호", "사용자", "PC자산번호", "모니터자산번호",
+            "모델", "구입업체", "구입일",
+            "OS버전", "OS시리얼", "OFFICE버전", "OFFICE시리얼", "한글버전", "한글시리얼",
+            "비고"
+    };
+
+    /**
+     * 표 구분(layout)별 IP 목록 Excel 생성.
+     * @param layout "ip" = IP관리 표, "pc" = PC관리 표, 그 외(null) = 전체 PC 목록 표
+     */
+    public byte[] buildIpListExcel(List<IpAddress> ips, String layout) {
+        String[] headers = "ip".equals(layout) ? IP_SHEET_HEADERS : "pc".equals(layout) ? PC_SHEET_HEADERS : null;
+        if (headers == null) return buildIpListExcel(ips);
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("ip".equals(layout) ? "IP관리" : "PC관리");
+            writeHeader(sheet, headers, createHeaderStyle(workbook));
+            int rowIdx = 1;
+            for (IpAddress ip : ips) {
+                Row row = sheet.createRow(rowIdx++);
+                for (int c = 0; c < headers.length; c++) setCell(row, c, ipSheetValue(ip, headers[c]));
+            }
+            autoSize(sheet, headers.length);
+            return toByteArray(workbook);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "IP목록 Excel 생성 중 오류가 발생했습니다.");
+        }
+    }
+
+    /** IP 목록 엑셀 헤더 → 해당 행의 값 (렌탈사는 비어 있으면 '자산') */
+    public static String ipSheetValue(IpAddress ip, String header) {
+        return switch (header) {
+            case "IP그룹" -> ip.getIpGroup();
+            case "IP주소" -> ip.getIpAddress();
+            case "상태" -> ip.getStatus() != null ? ip.getStatus().getLabel() : null;
+            case "상주/임시" -> ip.getUsageType();
+            case "부서" -> ip.getDepartment();
+            case "장치구분" -> ip.getDevice();
+            case "사용자" -> ip.getUserName();
+            case "렌탈사" -> (ip.getRentalCompany() == null || ip.getRentalCompany().isBlank()) ? "자산" : ip.getRentalCompany();
+            case "PC자산번호" -> ip.getPcAssetNo();
+            case "모니터자산번호" -> ip.getMonitorAssetNo();
+            case "모델" -> ip.getModel();
+            case "제조번호" -> ip.getSerialNo();
+            case "구입업체" -> ip.getVendor();
+            case "구입일" -> ip.getPurchaseDate();
+            case "OS버전" -> ip.getOsVersion();
+            case "OS시리얼" -> ip.getOsSerial();
+            case "OFFICE버전" -> ip.getOfficeVersion();
+            case "OFFICE시리얼" -> ip.getOfficeSerial();
+            case "한글버전" -> ip.getHangulVersion();
+            case "한글시리얼" -> ip.getHangulSerial();
+            case "비고" -> ip.getRemark();
+            default -> null;
+        };
+    }
+
     /**
      * IP 목록 Excel 생성.
      */
