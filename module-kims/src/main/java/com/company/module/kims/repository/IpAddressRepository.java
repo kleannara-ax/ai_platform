@@ -12,6 +12,12 @@ public interface IpAddressRepository extends JpaRepository<IpAddress, Long> {
 
     boolean existsByIpAddress(String ipAddress);
 
+    /** IP 주소로 조회 (엑셀 업로드 — IP관리 표 갱신용) */
+    java.util.Optional<IpAddress> findFirstByIpAddress(String ipAddress);
+
+    /** 사업장 안에서 제조번호로 조회 (엑셀 업로드 — PC관리 표 갱신용, 중복 확인을 위해 목록으로) */
+    java.util.List<IpAddress> findBySerialNoAndSite(String serialNo, String site);
+
     java.util.Optional<com.company.module.kims.entity.IpAddress> findByIpAddress(String ipAddress);
 
     /**

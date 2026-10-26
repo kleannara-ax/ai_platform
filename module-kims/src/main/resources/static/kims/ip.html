@@ -108,7 +108,10 @@
 
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><button class="nav-link active" id="tab-dash" onclick="showTab('dash')">홈</button></li>
-      <li class="nav-item"><button class="nav-link" id="tab-list" onclick="showTab('list')">PC 목록</button></li>
+      <li class="nav-item" id="tab-list-item"><button class="nav-link" id="tab-list" onclick="showTab('list')">PC 목록</button></li>
+      <!-- 서울: 관리자별로 PC 목록 표를 IP관리 / PC관리 두 표로 나눠 관리 (청주는 PC 목록 하나) -->
+      <li class="nav-item d-none seoul-split"><button class="nav-link" id="tab-iplist" onclick="showTab('iplist')">IP관리</button></li>
+      <li class="nav-item d-none seoul-split"><button class="nav-link" id="tab-pclist" onclick="showTab('pclist')">PC관리</button></li>
       <li class="nav-item"><button class="nav-link" id="tab-sep" onclick="showTab('sep')">별도관리</button></li>
       <li class="nav-item"><button class="nav-link" id="tab-current" onclick="showTab('current')">당월 변경 내역</button></li>
       <li class="nav-item"><button class="nav-link" id="tab-monthly" onclick="showTab('monthly')">월별 변경 내역</button></li>
@@ -434,6 +437,11 @@
         // 엑셀 업로드 버튼 노출 (서울 대량 등록용)
         document.getElementById('btn-excel-upload')?.classList.remove('d-none');
       }
+      // 서울: 'PC 목록' 대신 'IP관리' / 'PC관리' 두 탭
+      if (SITE === '서울') {
+        document.getElementById('tab-list-item')?.classList.add('d-none');
+        document.querySelectorAll('.seoul-split').forEach(el => el.classList.remove('d-none'));
+      }
       // 기본 탭 = 홈(대시보드 + 신규요청)
       utilLoaded = true; loadUtil(); loadIpRequests();
       loadGroups();
@@ -455,16 +463,19 @@
 
     // ---- 하위 탭 전환 ----
     function showTab(t) {
-      // PC 목록/별도관리는 다시 불러오므로, 저장 안 한 표 수정이 있으면 먼저 확인
-      if ((t === 'list' || t === 'sep') && !confirmDiscardGrid()) return;
-      if (t === 'list' || t === 'sep') grid.edits.clear();
-      const paneOf = { list:'list', sep:'list', dash:'dash', current:'current', monthly:'monthly', histmgmt:'histmgmt' };
+      const isGrid = (t === 'list' || t === 'sep' || t === 'iplist' || t === 'pclist');
+      // PC 목록/별도관리/IP관리/PC관리는 다시 불러오므로, 저장 안 한 표 수정이 있으면 먼저 확인
+      if (isGrid && !confirmDiscardGrid()) return;
+      if (isGrid) grid.edits.clear();
+      const paneOf = { list:'list', sep:'list', iplist:'list', pclist:'list', dash:'dash', current:'current', monthly:'monthly', histmgmt:'histmgmt' };
       ['list','dash','current','monthly','histmgmt'].forEach(x => {
         document.getElementById('pane-' + x).style.display = (paneOf[t] === x) ? '' : 'none';
       });
-      ['list','sep','dash','current','monthly','histmgmt'].forEach(x =>
+      ['list','sep','iplist','pclist','dash','current','monthly','histmgmt'].forEach(x =>
         document.getElementById('tab-' + x).classList.toggle('active', x === t));
-      if (t === 'list' || t === 'sep') {
+      if (isGrid) {
+        // 표 구분: IP관리 / PC관리 (서울) 는 해당 열만, PC 목록·별도관리는 전체 열
+        setGridLayout(t === 'iplist' ? 'ip' : t === 'pclist' ? 'pc' : 'full');
         sepMode = (t === 'sep');
         document.getElementById('sep-hint').style.display = sepMode ? '' : 'none';
         page = 0; load();
@@ -742,7 +753,7 @@
     //  · 선택된 칸 위에 투명한 입력칸(#grid-editor)을 미리 포커스해 둔다 → 한글 첫 글자 조합이 끊기지 않는다
     // =====================================================================
     // 표 컬럼 정의 (순서 = 화면 열 순서). editable=false 는 복사만 가능
-    const GRID_COLS = [
+    const ALL_GRID_COLS = [
       { key: 'ipGroup',        label: 'IP그룹',        editable: false },
       { key: 'ipAddress',      label: 'IP주소',        editable: false, html: r => `<b>${E(octet(r.ipAddress))}</b>` },
       { key: 'status',         label: '상태',          editable: false, html: r => statusBadge(r.status), text: r => r.statusLabel || r.status || '' },
@@ -765,6 +776,33 @@
       { key: 'hangulSerial',   label: '한글시리얼',    editable: true },
       { key: 'remark',         label: '비고',          editable: true, cls: 'remark-cell' },
     ];
+    // 서울 PC 관리: 관리자별로 표를 나눠 보는 열 구성 (엑셀 다운로드·업로드 양식도 같은 열)
+    const GRID_LAYOUT_KEYS = {
+      ip: ['ipGroup', 'ipAddress', 'department', 'userName', 'remark'],
+      pc: ['rentalCompany', 'device', 'serialNo', 'userName', 'pcAssetNo', 'monitorAssetNo', 'model',
+           'vendor', 'purchaseDate', 'osVersion', 'osSerial', 'officeVersion', 'officeSerial',
+           'hangulVersion', 'hangulSerial', 'remark'],
+    };
+    let gridLayout = 'full';          // full = 전체 열(PC 목록·별도관리), ip = IP관리, pc = PC관리
+    let GRID_COLS = ALL_GRID_COLS;
+    function setGridLayout(l) {
+      gridLayout = GRID_LAYOUT_KEYS[l] ? l : 'full';
+      GRID_COLS = gridLayout === 'full' ? ALL_GRID_COLS
+        : GRID_LAYOUT_KEYS[gridLayout].map(k => ALL_GRID_COLS.find(c => c.key === k));
+      renderListHead();
+    }
+    // 표 머리글(본문 표 + 고정 영역 복제본)을 현재 열 구성으로 다시 그린다
+    function renderListHead() {
+      const tr = document.querySelector('#list-table thead tr');
+      if (!tr) return;
+      tr.innerHTML = GRID_COLS.map(c => `<th>${E(c.label)}</th>`).join('') + '<th style="width:210px">관리</th>';
+      const head = document.getElementById('list-head');
+      if (head && head.querySelector('thead tr')) {
+        head.querySelector('thead').innerHTML = '';
+        head.querySelector('thead').appendChild(tr.cloneNode(true));
+        head.querySelector('colgroup').innerHTML = [...tr.children].map(() => '<col>').join('');
+      }
+    }
     const grid = {
       rows: [],            // 현재 표에 표시된 PC 데이터(서버 원본)
       edits: new Map(),    // "r:c" → 수정값 (원본과 다른 칸만)
@@ -800,7 +838,7 @@
       grid.rows = list || []; grid.edits.clear(); grid.errors.clear(); grid.undo = []; grid.redo = [];
       grid.anchor = grid.focus = null; grid.editing = null;
       gridUpdateToolbar();
-      if (!grid.rows.length) { tb.innerHTML = '<tr><td colspan="22" class="text-center text-muted">데이터가 없습니다.</td></tr>'; return; }
+      if (!grid.rows.length) { tb.innerHTML = `<tr><td colspan="${GRID_COLS.length + 1}" class="text-center text-muted">데이터가 없습니다.</td></tr>`; return; }
       tb.innerHTML = grid.rows.map((r, ri) => `
         <tr>
           ${GRID_COLS.map((col, ci) => `<td data-r="${ri}" data-c="${ci}" class="gc ${col.editable ? '' : 'ro'} ${col.options ? 'opt' : ''} ${col.cls || ''}"${col.key === 'remark' ? ` title="${E(r.remark)}"` : ''}><span class="gv">${cellHtml(ri, ci)}</span></td>`).join('')}
@@ -1328,16 +1366,17 @@
       const head = document.getElementById('list-head');
       if (!sticky || !top || !cont || !table || !head) return;
       // 본문 표의 머리글 행을 복제해 고정 영역에 넣는다
-      const srcRow = table.querySelector('thead tr');
-      head.querySelector('thead').appendChild(srcRow.cloneNode(true));
-      head.querySelector('colgroup').innerHTML = [...srcRow.children].map(() => '<col>').join('');
-      const cols = head.querySelectorAll('col');
+      const srcRow0 = table.querySelector('thead tr');
+      head.querySelector('thead').appendChild(srcRow0.cloneNode(true));
+      head.querySelector('colgroup').innerHTML = [...srcRow0.children].map(() => '<col>').join('');
       const apply = () => {
         const t = top.scrollLeft ? `translateX(${-top.scrollLeft}px)` : '';
         table.style.transform = t; head.style.transform = t;
       };
       const sync = () => {
         // 보이는 머리글 열 너비 = 본문 표(데이터 기준) 열 너비
+        // 열 구성(IP관리/PC관리/전체)이 바뀌면 머리글이 다시 그려지므로 매번 새로 찾는다
+        const srcRow = table.querySelector('thead tr'), cols = head.querySelectorAll('col');
         [...srcRow.children].forEach((th, i) => { if (cols[i]) cols[i].style.width = th.getBoundingClientRect().width + 'px'; });
         head.style.width = table.getBoundingClientRect().width + 'px';
         // 보조 스크롤바 폭 = 표 전체 폭 + (스크롤바 영역과 표 영역의 폭 차이)
@@ -1706,7 +1745,11 @@
         const p = filters(); p.set('site', SITE);
         if (sepMode) p.set('ipGroup', '별도관리');
         else { const g = document.getElementById('f-group').value; if (g) p.set('ipGroup', g); }
-        await KIMS.download('/kims-api/ips/excel?' + p.toString(), 'ip_addresses.xlsx');
+        // 서울 IP관리/PC관리 표는 해당 표의 열만 내려받는다 (업로드 양식과 같음)
+        const layout = sepMode ? 'full' : gridLayout;
+        if (layout !== 'full') p.set('layout', layout);
+        const fname = layout === 'ip' ? 'ip_management.xlsx' : layout === 'pc' ? 'pc_management.xlsx' : 'ip_addresses.xlsx';
+        await KIMS.download('/kims-api/ips/excel?' + p.toString(), fname);
       } catch (e) { KIMS.toast(e.message, false); }
     }
 
@@ -1716,9 +1759,18 @@
       input.value = '';                       // 같은 파일 재선택 허용
       if (!file) return;
       try {
-        const r = await KIMS.uploadFile('/kims-api/ips/excel/upload?site=' + encodeURIComponent(SITE), file);
+        // 서울 IP관리/PC관리 표는 표별 양식으로 업로드 (기존 행도 갱신: IP관리=IP주소, PC관리=제조번호로 찾음)
+        const layout = sepMode ? 'full' : gridLayout;
+        const url = '/kims-api/ips/excel/upload?site=' + encodeURIComponent(SITE) + (layout !== 'full' ? '&layout=' + layout : '');
+        const r = await KIMS.uploadFile(url, file);
         if (r && r.ok) {
-          KIMS.toast(r.message || '업로드되었습니다.');
+          if (r.skipReasons && r.skipReasons.length) {
+            KIMS.alertModal('업로드 완료 — 일부 제외', `<div class="mb-2">${E(r.message)}</div>
+              <div class="small text-muted mb-1">제외된 행${r.skipped > r.skipReasons.length ? ' (앞 ' + r.skipReasons.length + '건)' : ''}</div>
+              <ul class="small mb-0" style="max-height:260px;overflow:auto">${r.skipReasons.map(s => `<li>${E(s)}</li>`).join('')}</ul>`, 'warning');
+          } else {
+            KIMS.toast(r.message || '업로드되었습니다.');
+          }
           loadUtil(); page = 0; load();       // 대시보드·목록 갱신
         } else {
           const exp = (r && r.expectedHeaders) || [];
