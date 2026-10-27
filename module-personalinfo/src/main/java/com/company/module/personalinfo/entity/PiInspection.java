@@ -108,12 +108,16 @@ public class PiInspection extends PiBaseEntity {
     @Column(name = "REMARK", length = 2000)
     private String remark;
 
+    /** 업체별 일괄 업로드 묶음 ID (같은 체크리스트 파일로 여러 계약에 등록한 경우 동일 값, 개별 업로드는 NULL) */
+    @Column(name = "UPLOAD_GROUP_ID", length = 36)
+    private String uploadGroupId;
+
     @Builder
     private PiInspection(Long contractId, InspectionType inspectionType, LocalDate inspectionDate, String inspectorName,
                          String sheetCompanyName, String sheetTaskName, String systemOwnedYn, String systemName,
                          int totalCount, int yCount, int nCount, int naCount, int blankCount, InspectionResult result,
                          LocalDate actionDueDate, String originalName, String storedPath, String contentType,
-                         Long fileSize, String fileHash, String remark, Long createdBy) {
+                         Long fileSize, String fileHash, String remark, String uploadGroupId, Long createdBy) {
         this.contractId = contractId;
         this.inspectionType = inspectionType == null ? InspectionType.REGULAR : inspectionType;
         this.inspectionDate = inspectionDate == null ? LocalDate.now() : inspectionDate;
@@ -137,6 +141,7 @@ public class PiInspection extends PiBaseEntity {
         this.fileSize = fileSize;
         this.fileHash = fileHash;
         this.remark = remark;
+        this.uploadGroupId = uploadGroupId;
         markCreatedBy(createdBy);
     }
 

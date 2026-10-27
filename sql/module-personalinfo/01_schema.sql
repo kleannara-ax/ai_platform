@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS pi_inspection (
     FILE_SIZE              BIGINT        NOT NULL DEFAULT 0      COMMENT '파일 크기 (byte)',
     FILE_HASH              VARCHAR(64)   NULL                    COMMENT '파일 SHA-256 해시',
     REMARK                 VARCHAR(2000) NULL                    COMMENT '비고',
+    UPLOAD_GROUP_ID        VARCHAR(36)   NULL                    COMMENT '업체별 일괄 업로드 묶음 ID (같은 체크리스트로 여러 계약에 등록 시 동일, 개별 업로드는 NULL)',
 
     CREATED_AT             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY             BIGINT        NULL                    COMMENT '생성자 사용자 ID',
@@ -138,6 +139,7 @@ CREATE TABLE IF NOT EXISTS pi_inspection (
     PRIMARY KEY (INSPECTION_ID),
     INDEX IDX_PI_INSPECTION_CONTRACT (CONTRACT_ID, DELETED_YN, INSPECTION_DATE),
     INDEX IDX_PI_INSPECTION_YEAR (INSPECTION_YEAR, DELETED_YN),
+    INDEX IDX_PI_INSPECTION_UPLOAD_GROUP (UPLOAD_GROUP_ID),
     CONSTRAINT FK_PI_INSPECTION_CONTRACT FOREIGN KEY (CONTRACT_ID) REFERENCES pi_contract (CONTRACT_ID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='개인정보 위수탁 점검 이력 (체크리스트 업로드)';

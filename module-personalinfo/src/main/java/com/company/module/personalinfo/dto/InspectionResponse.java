@@ -41,11 +41,24 @@ public class InspectionResponse {
     private String originalName;
     private Long fileSize;
     private String remark;
+    /** 업체별 일괄 업로드 묶음 ID (개별 업로드는 null) */
+    private String uploadGroupId;
+    /** 계약 수탁업체명 / 관련 서비스 (업체별 일괄 업로드 결과 표시용) */
+    private String vendorName;
+    private String serviceName;
     private Long createdBy;
     private LocalDateTime createdAt;
     /** 업로드 시 파서가 남긴 안내 (예: 업체명 불일치) */
     private List<String> warnings;
     private List<InspectionItemResponse> items;
+
+    /** 일괄 업로드 결과: 계약 정보(업체명/서비스)를 함께 담는다 */
+    public static InspectionResponse withContract(PiInspection i, String vendorName, String serviceName) {
+        InspectionResponse r = of(i, null, null);
+        r.vendorName = vendorName;
+        r.serviceName = serviceName;
+        return r;
+    }
 
     public static InspectionResponse from(PiInspection i) {
         return of(i, null, null);
@@ -77,6 +90,7 @@ public class InspectionResponse {
                 .originalName(i.getOriginalName())
                 .fileSize(i.getFileSize())
                 .remark(i.getRemark())
+                .uploadGroupId(i.getUploadGroupId())
                 .createdBy(i.getCreatedBy())
                 .createdAt(i.getCreatedAt())
                 .warnings(warnings)

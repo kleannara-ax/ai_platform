@@ -90,5 +90,8 @@ const PI_API = (() => {
     deleteInspection: (inspectionId) => request('/inspections/' + inspectionId, { method: 'DELETE' }),
     sendAlert: (id, body) => request('/contracts/' + id + '/alerts', { method: 'POST', body }),
     runAlerts: () => request('/alerts/run', { method: 'POST' }),
+    listVendors: (params) => request('/vendors' + qs(params)),
+    previewVendorChecklist: (form) => request('/vendors/checklist-preview', { method: 'POST', form }),
+    uploadVendorChecklist: (form) => request('/vendors/checklist', { method: 'POST', form }),
   };
 })();

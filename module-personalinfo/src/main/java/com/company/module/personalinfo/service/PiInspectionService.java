@@ -88,20 +88,28 @@ public class PiInspectionService {
         PiFileStorage.StoredFile stored = storage.store(file, "checklist", PiFileStorage.CHECKLIST_EXTENSIONS,
                 MAX_CHECKLIST_BYTES);
 
+        Registered reg = register(contract, type, parsed, stored, inspectionDate, inspectorName, actionDueDate,
+                remark, null, userId);
         List<String> warnings = new ArrayList<>(parsed.warnings());
-        if (StringUtils.hasText(parsed.companyName()) && !looksPlaceholder(parsed.companyName())
-                && !sameCompany(parsed.companyName(), contract.getVendorName())) {
-            warnings.add(0, "체크리스트 회사명('" + parsed.companyName() + "')이 계약 수탁업체명('"
-                    + contract.getVendorName() + "')과 다릅니다. 올바른 계약에 업로드했는지 확인하세요.");
-        }
+        companyMismatchWarning(parsed, contract).ifPresent(w -> warnings.add(0, w));
+        return InspectionResponse.of(reg.inspection(),
+                reg.items().stream().map(InspectionItemResponse::from).toList(), warnings);
+    }
 
+    /**
+     * 파싱한 체크리스트를 계약 1건의 점검 이력으로 저장한다 (개별/업체별 업로드 공통).
+     * 업체별 업로드는 같은 원본 파일(stored)과 묶음 ID(uploadGroupId)를 여러 계약에 공유한다.
+     */
+    Registered register(PiContract contract, InspectionType type, ChecklistExcelParser.ParsedChecklist parsed,
+                        PiFileStorage.StoredFile stored, LocalDate inspectionDate, String inspectorName,
+                        LocalDate actionDueDate, String remark, String uploadGroupId, Long userId) {
         LocalDate date = inspectionDate != null ? inspectionDate
                 : (parsed.evaluationDate() != null ? parsed.evaluationDate() : LocalDate.now());
         String inspector = StringUtils.hasText(inspectorName) ? inspectorName.trim()
                 : (looksPlaceholder(parsed.evaluator()) ? null : parsed.evaluator());
 
         PiInspection inspection = inspectionRepository.save(PiInspection.builder()
-                .contractId(contractId)
+                .contractId(contract.getContractId())
                 .inspectionType(type)
                 .inspectionDate(date)
                 .inspectorName(PiExcelSupport.truncate(inspector, 100))
@@ -122,6 +130,7 @@ public class PiInspectionService {
                 .fileSize(stored.size())
                 .fileHash(stored.sha256())
                 .remark(PiContractService.trim(remark))
+                .uploadGroupId(uploadGroupId)
                 .createdBy(userId)
                 .build());
 
@@ -147,8 +156,20 @@ public class PiInspectionService {
         itemRepository.saveAll(items);
 
         refreshLatest(contract, userId);
+        return new Registered(inspection, items);
+    }
 
-        return InspectionResponse.of(inspection, items.stream().map(InspectionItemResponse::from).toList(), warnings);
+    /** 체크리스트 회사명이 계약 업체명과 다르면 안내 문구 */
+    java.util.Optional<String> companyMismatchWarning(ChecklistExcelParser.ParsedChecklist parsed, PiContract contract) {
+        if (StringUtils.hasText(parsed.companyName()) && !looksPlaceholder(parsed.companyName())
+                && !sameCompany(parsed.companyName(), contract.getVendorName())) {
+            return java.util.Optional.of("체크리스트 회사명('" + parsed.companyName() + "')이 계약 수탁업체명('"
+                    + contract.getVendorName() + "')과 다릅니다. 올바른 계약에 업로드했는지 확인하세요.");
+        }
+        return java.util.Optional.empty();
+    }
+
+    record Registered(PiInspection inspection, List<PiInspectionItem> items) {
     }
 
     @Transactional
@@ -182,7 +203,7 @@ public class PiInspectionService {
     }
 
     /** 계약의 최근 점검(점검일 최신) 정보를 다시 계산한다 */
-    private void refreshLatest(PiContract contract, Long userId) {
+    void refreshLatest(PiContract contract, Long userId) {
         inspectionRepository.flush();
         inspectionRepository
                 .findFirstByContractIdAndDeletedYnOrderByInspectionDateDescInspectionIdDesc(contract.getContractId(), N)
@@ -202,7 +223,7 @@ public class PiInspectionService {
                 .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId));
     }
 
-    private static InspectionType parseType(String value) {
+    static InspectionType parseType(String value) {
         if (!StringUtils.hasText(value)) {
             return InspectionType.REGULAR;
         }
@@ -213,7 +234,7 @@ public class PiInspectionService {
         }
     }
 
-    private static boolean looksPlaceholder(String s) {
+    static boolean looksPlaceholder(String s) {
         if (!StringUtils.hasText(s)) {
             return true;
         }
@@ -223,14 +244,6 @@ public class PiInspectionService {
 
     /** ㈜, (주), 주식회사, 공백 차이는 같은 회사로 본다 */
     static boolean sameCompany(String a, String b) {
-        String x = normalizeCompany(a);
-        String y = normalizeCompany(b);
-        return !x.isEmpty() && !y.isEmpty() && (x.contains(y) || y.contains(x));
-    }
-
-    private static String normalizeCompany(String s) {
-        return s == null ? "" : s.replaceAll("\\s+", "")
-                .replace("㈜", "").replace("(주)", "").replace("（주）", "").replace("주식회사", "")
-                .toLowerCase(Locale.ROOT);
+        return PiVendorNames.similar(a, b);
     }
 }
