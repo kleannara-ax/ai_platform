@@ -4,7 +4,8 @@
  *   #/contracts/new        등록 화면
  *   #/contracts/{id}       상세 화면 (계약서 업로드, 체크리스트 다운로드/업로드, 메일 발송)
  *   #/contracts/{id}/edit  수정 화면
- *   #/vendor-checklist     업체별 점검 체크리스트 업로드 (체크리스트 1건 → 업체의 여러 계약에 등록)
+ * 업체별 점검 체크리스트 업로드는 팝업(vendor-checklist-modal)으로 연다:
+ *   목록의 업체명 클릭, 또는 상세의 [업체 계약 일괄 업로드] 버튼
  * 버튼 노출은 /personalinfo-api/me/permissions 결과로 제어하고,
  * 실제 권한 판정은 서버(@PreAuthorize)가 한다.
  * ========================================================================= */
@@ -45,7 +46,6 @@
     try {
       if (hash === '#/contracts' || hash === '#/' || hash === '') return await renderList();
       if (hash === '#/contracts/new') return renderForm(null);
-      if (hash === '#/vendor-checklist') return await renderVendorChecklist();
       if ((m = hash.match(/^#\/contracts\/(\d+)\/edit$/))) return renderForm(await PI_API.getContract(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)$/))) return await renderDetail(m[1]);
       go('#/contracts');
@@ -94,7 +94,6 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-template"><i class="fas fa-file-excel me-1"></i>점검 체크리스트 양식</button>
               <button type="button" class="btn btn-sm btn-outline-success" id="btn-excel"><i class="fas fa-download me-1"></i>엑셀 다운로드</button>
               ${perm.canDelete ? '<button type="button" class="btn btn-sm btn-outline-warning" id="btn-run-alert"><i class="fas fa-bell me-1"></i>만료 알림 실행</button>' : ''}
-              ${perm.canWrite ? '<button type="button" class="btn btn-sm btn-outline-primary" id="btn-vendor-checklist"><i class="fas fa-building me-1"></i>업체별 체크리스트 업로드</button>' : ''}
               ${perm.canWrite ? '<button type="button" class="btn btn-sm btn-primary" id="btn-new"><i class="fas fa-plus me-1"></i>계약 등록</button>' : ''}
             </div>
           </div>
@@ -129,7 +128,6 @@
     document.getElementById('btn-template').onclick = () => PI_API.downloadBlankTemplate().catch(fail);
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
-    document.getElementById('btn-vendor-checklist')?.addEventListener('click', () => go('#/vendor-checklist'));
     document.getElementById('btn-run-alert')?.addEventListener('click', runAlerts);
 
     loadDashboard();
@@ -179,7 +177,9 @@
           <tr data-id="${r.contractId}">
             <td>${page.page * page.size + i + 1}</td>
             <td>${yn(r.ismsScopeYn)}</td>
-            <td class="fw-semibold">${esc(r.vendorName)}</td>
+            <td class="fw-semibold">${perm.canWrite
+              ? `<button type="button" class="pi-vendor-link" data-vendor="${esc(r.vendorName)}" title="업체별 점검 체크리스트 업로드">${esc(r.vendorName)}</button>`
+              : esc(r.vendorName)}</td>
             <td>${esc(r.serviceName || '-')}</td>
             <td class="pi-ellipsis" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
             <td>${esc(r.deptName || '-')}</td>
@@ -191,6 +191,10 @@
             <td class="text-nowrap">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
           </tr>`).join('');
         tbody.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => go('#/contracts/' + tr.dataset.id)));
+        tbody.querySelectorAll('.pi-vendor-link').forEach((b) => b.addEventListener('click', (e) => {
+          e.stopPropagation();   // 행 클릭(상세 이동) 대신 팝업
+          openVendorChecklist(b.dataset.vendor);
+        }));
       }
       renderPager(page);
     } catch (e) {
@@ -448,10 +452,7 @@
 
     // 체크리스트
     document.getElementById('btn-dl-template').onclick = () => PI_API.downloadTemplate(id).catch(fail);
-    document.getElementById('btn-vendor-upload')?.addEventListener('click', () => {
-      vendorState.presetVendorName = c.vendorName;
-      go('#/vendor-checklist');
-    });
+    document.getElementById('btn-vendor-upload')?.addEventListener('click', () => openVendorChecklist(c.vendorName));
     document.getElementById('btn-upload-inspection')?.addEventListener('click', () => {
       const f = document.getElementById('inspection-form');
       f.reset();
@@ -520,127 +521,42 @@
   }
 
 
-  // ──────────────── 5. 업체별 체크리스트 업로드 화면 ────────────────
-  const vendorState = { vendors: [], selectedKey: null, preview: null, file: null, presetVendorName: null };
+  // ──────────────── 5. 업체별 체크리스트 업로드 팝업 ────────────────
+  // 업체명(목록) 또는 [업체 계약 일괄 업로드](상세) → 해당 업체를 고정한 팝업을 연다.
+  const vendorState = { vendor: null, preview: null, file: null, changed: false };
+  const normalizeVendor = (n) => String(n || '').replace(/\s+/g, '').replace(/㈜|\(주\)|（주）|\(株\)|주식회사/g, '').toLowerCase();
+  const vEl = (id) => document.getElementById(id);
 
-  async function renderVendorChecklist() {
-    if (!perm.canWrite) { notify('업로드 권한이 없습니다.', 'warning'); go('#/contracts'); return; }
-    crumb.innerHTML = '<a href="#/contracts">계약 목록</a> &gt; 업체별 체크리스트 업로드';
-    vendorState.preview = null; vendorState.file = null; vendorState.selectedKey = null;
-    view.innerHTML = `
-      <section class="pi-card" id="vendor-checklist-guide">
-        <h2><i class="fas fa-building"></i>업체별 점검 체크리스트 업로드</h2>
-        <p class="text-muted small mb-0">협력사가 업체 단위로 작성한 체크리스트 1건을 그 업체의 여러 계약(예: 자사몰 배송·임직원몰 배송)에 한 번에 점검 이력으로 등록합니다.
-          체크리스트의 <b>회사명</b>으로 업체를 자동으로 찾고, 업체명은 ㈜·(주)·공백 차이를 무시하고 묶습니다.</p>
-      </section>
-      <div class="row g-3">
-        <div class="col-lg-4">
-          <section class="pi-card h-100" id="vendor-list-section">
-            <h2><span class="pi-step">1</span>업체 선택</h2>
-            <div class="input-group input-group-sm mb-2">
-              <input class="form-control" id="vendor-keyword" placeholder="업체명 검색" aria-label="업체명 검색">
-              <div class="input-group-text"><input class="form-check-input mt-0 me-1" type="checkbox" id="vendor-include-terminated" aria-label="종료 포함">종료 포함</div>
-            </div>
-            <div class="pi-vendor-list" id="vendor-list"><div class="pi-empty">불러오는 중...</div></div>
-          </section>
-        </div>
-        <div class="col-lg-8">
-          <section class="pi-card" id="vendor-file-section">
-            <h2><span class="pi-step">2</span>체크리스트 파일</h2>
-            <form id="vendor-file-form" class="row g-2 align-items-end">
-              <div class="col-md-5"><label class="form-label small" for="v-type">점검 구분</label>
-                <select class="form-select form-select-sm" id="v-type" name="inspectionType">
-                  <option value="REGULAR">정기 점검 (1.관리체계 / 2.개인정보처리시스템)</option>
-                  <option value="TERMINATION">계약변경·만료 점검 (3.계약변경 만료시 체크)</option></select></div>
-              <div class="col-md-7"><label class="form-label small" for="v-file">작성된 체크리스트 (.xlsx)</label>
-                <input type="file" class="form-control form-control-sm" id="v-file" accept=".xlsx"></div>
-            </form>
-            <div id="vendor-preview" class="mt-3"></div>
-          </section>
-          <section class="pi-card" id="vendor-contract-section">
-            <h2><span class="pi-step">3</span>등록할 계약 <small class="text-muted fw-normal" id="vendor-selected-name"></small></h2>
-            <div id="vendor-contracts"><div class="pi-empty">왼쪽에서 업체를 선택하거나 체크리스트를 올리면 업체가 자동 선택됩니다.</div></div>
-          </section>
-          <section class="pi-card" id="vendor-submit-section">
-            <h2><span class="pi-step">4</span>점검 정보 및 등록</h2>
-            <form id="vendor-submit-form" class="row g-2 align-items-end">
-              <div class="col-md-3"><label class="form-label small" for="v-date">점검일 <small class="text-muted">(비우면 엑셀 평가일)</small></label>
-                <input type="date" class="form-control form-control-sm" id="v-date" name="inspectionDate"></div>
-              <div class="col-md-3"><label class="form-label small" for="v-inspector">평가자</label>
-                <input class="form-control form-control-sm" id="v-inspector" name="inspectorName" maxlength="100"></div>
-              <div class="col-md-3"><label class="form-label small" for="v-due">조치 예정일</label>
-                <input type="date" class="form-control form-control-sm" id="v-due" name="actionDueDate"></div>
-              <div class="col-md-3"><label class="form-label small" for="v-remark">비고</label>
-                <input class="form-control form-control-sm" id="v-remark" name="remark" maxlength="2000"></div>
-              <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                <button type="button" class="btn btn-light btn-sm" id="v-cancel">목록으로</button>
-                <button type="submit" class="btn btn-primary btn-sm" id="v-submit" disabled><i class="fas fa-upload me-1"></i>선택한 계약에 등록</button>
-              </div>
-            </form>
-            <div id="vendor-result" class="mt-3"></div>
-          </section>
-        </div>
-      </div>`;
-
-    document.getElementById('v-cancel').onclick = () => go('#/contracts');
-    let timer;
-    document.getElementById('vendor-keyword').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(loadVendors, 250); });
-    document.getElementById('vendor-include-terminated').addEventListener('change', loadVendors);
-    document.getElementById('v-file').addEventListener('change', previewVendorFile);
-    document.getElementById('v-type').addEventListener('change', () => { if (vendorState.file) previewVendorFile(); });
-    document.getElementById('vendor-submit-form').addEventListener('submit', submitVendorChecklist);
-
-    await loadVendors();
-    if (vendorState.presetVendorName) {
-      const preset = vendorState.vendors.find((v) => normalizeVendor(v.vendorName) === normalizeVendor(vendorState.presetVendorName));
-      vendorState.presetVendorName = null;
-      if (preset) selectVendor(preset.vendorKey);
+  async function openVendorChecklist(vendorName) {
+    if (!perm.canWrite) { notify('업로드 권한이 없습니다.', 'warning'); return; }
+    Object.assign(vendorState, { vendor: null, preview: null, file: null, changed: false });
+    vEl('vendor-modal-form').reset();
+    vEl('vendor-modal-title').textContent = vendorName;
+    vEl('vendor-modal-preview').innerHTML = '';
+    vEl('vendor-modal-result').innerHTML = '';
+    vEl('vendor-modal-contracts').innerHTML = '<div class="pi-empty">불러오는 중...</div>';
+    updateSubmitState();
+    modal('vendor-checklist-modal').show();
+    try {
+      // 업체 키 기준으로 같은 업체의 계약을 모두 가져온다 (종료 계약 포함, 기본 선택은 미종료만)
+      const list = await PI_API.listVendors({ keyword: vendorName, includeTerminated: true });
+      const key = normalizeVendor(vendorName);
+      vendorState.vendor = list.find((v) => v.vendorKey === key) || list[0] || null;
+      renderVendorContracts();
+    } catch (e) {
+      vEl('vendor-modal-contracts').innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
     }
   }
 
-  const normalizeVendor = (n) => String(n || '').replace(/\s+/g, '').replace(/㈜|\(주\)|（주）|\(株\)|주식회사/g, '').toLowerCase();
-
-  async function loadVendors() {
-    const list = document.getElementById('vendor-list');
-    if (!list) return;
-    try {
-      vendorState.vendors = await PI_API.listVendors({
-        keyword: document.getElementById('vendor-keyword').value.trim(),
-        includeTerminated: document.getElementById('vendor-include-terminated').checked,
-      });
-      renderVendorList();
-      if (vendorState.selectedKey) renderVendorContracts();
-    } catch (e) { list.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`; }
-  }
-
-  function renderVendorList() {
-    const list = document.getElementById('vendor-list');
-    if (!vendorState.vendors.length) { list.innerHTML = '<div class="pi-empty">업체가 없습니다.</div>'; return; }
-    list.innerHTML = vendorState.vendors.map((v) => `
-      <div class="pi-vendor-item ${v.vendorKey === vendorState.selectedKey ? 'active' : ''}" data-key="${esc(v.vendorKey)}" role="button" tabindex="0">
-        <div class="d-flex justify-content-between"><b>${esc(v.vendorName)}</b>${badge(v.lastInspectionResult || 'NONE', v.lastInspectionResultLabel)}</div>
-        <div class="meta">계약 ${v.contractCount}건 (진행 ${v.activeContractCount}) · 올해 미점검 ${v.notInspectedThisYearCount}건${v.lastInspectionDate ? ' · 최근 ' + fmtDate(v.lastInspectionDate) : ''}</div>
-      </div>`).join('');
-    list.querySelectorAll('.pi-vendor-item').forEach((el) => {
-      el.addEventListener('click', () => selectVendor(el.dataset.key));
-      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') selectVendor(el.dataset.key); });
-    });
-  }
-
-  function selectVendor(key) {
-    vendorState.selectedKey = key;
-    renderVendorList();
-    renderVendorContracts();
-    document.querySelector(`.pi-vendor-item[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
-  }
-
   function renderVendorContracts() {
-    const box = document.getElementById('vendor-contracts');
-    const v = vendorState.vendors.find((x) => x.vendorKey === vendorState.selectedKey);
-    document.getElementById('vendor-selected-name').textContent = v ? '— ' + v.vendorName : '';
-    if (!v) { box.innerHTML = '<div class="pi-empty">선택한 업체가 목록에 없습니다. (종료 포함을 확인하세요)</div>'; updateSubmitState(); return; }
+    const box = vEl('vendor-modal-contracts');
+    const v = vendorState.vendor;
+    if (!v) { box.innerHTML = '<div class="pi-empty">업체의 계약을 찾을 수 없습니다.</div>'; updateSubmitState(); return; }
+    vEl('vendor-modal-title').textContent = v.vendorName;
+    vEl('vendor-modal-summary').innerHTML =
+      `계약 ${v.contractCount}건 (진행 ${v.activeContractCount}) · 올해 미점검 ${v.notInspectedThisYearCount}건 · 최근 점검 ${badge(v.lastInspectionResult || 'NONE', v.lastInspectionResultLabel)}${v.lastInspectionDate ? ' ' + fmtDate(v.lastInspectionDate) : ''}`;
     box.innerHTML = `
-      <table class="pi-table" id="vendor-contract-table"><thead><tr>
+      <div class="table-responsive"><table class="pi-table" id="vendor-contract-table"><thead><tr>
         <th style="width:36px"><input type="checkbox" class="form-check-input" id="v-check-all" aria-label="전체 선택"></th>
         <th>업체명</th><th>관련 서비스</th><th>위탁업무 내용</th><th>담당</th><th>종료일</th><th>상태</th><th>최근 점검</th></tr></thead>
         <tbody>${v.contracts.map((c) => `
@@ -650,58 +566,56 @@
             <td class="pi-ellipsis" title="${esc(c.entrustedTask)}">${esc(c.entrustedTask)}</td>
             <td>${esc([c.deptName, c.managerName].filter(Boolean).join(' / ') || '-')}</td>
             <td>${fmtDate(c.contractEndDate)}</td><td>${badge(c.status, c.statusLabel)}</td>
-            <td>${badge(c.lastInspectionResult || 'NONE', c.lastInspectionResultLabel)} <small class="text-muted">${c.lastInspectionDate ? fmtDate(c.lastInspectionDate) : ''}</small></td>
-          </tr>`).join('')}</tbody></table>
+            <td class="text-nowrap">${badge(c.lastInspectionResult || 'NONE', c.lastInspectionResultLabel)} <small class="text-muted">${c.lastInspectionDate ? fmtDate(c.lastInspectionDate) : ''}</small></td>
+          </tr>`).join('')}</tbody></table></div>
       <small class="text-muted">기본으로 종료되지 않은 계약이 선택됩니다. 계약변경·만료 점검이면 종료 계약도 선택할 수 있습니다.</small>`;
-    const all = document.getElementById('v-check-all');
+    const all = vEl('v-check-all');
     const checks = () => [...box.querySelectorAll('.v-check')];
-    all.checked = checks().every((x) => x.checked);
+    all.checked = checks().length > 0 && checks().every((x) => x.checked);
     all.addEventListener('change', () => { checks().forEach((x) => { x.checked = all.checked; }); updateSubmitState(); });
     checks().forEach((x) => x.addEventListener('change', () => { all.checked = checks().every((y) => y.checked); updateSubmitState(); }));
     updateSubmitState();
   }
 
   function selectedContractIds() {
-    return [...document.querySelectorAll('#vendor-contracts .v-check:checked')].map((x) => x.value);
+    return [...document.querySelectorAll('#vendor-modal-contracts .v-check:checked')].map((x) => x.value);
   }
 
   function updateSubmitState() {
-    const btn = document.getElementById('v-submit');
-    if (!btn) return;
+    const btn = vEl('v-submit');
     const n = selectedContractIds().length;
-    btn.disabled = !(vendorState.file && vendorState.selectedKey && n > 0);
+    btn.disabled = !(vendorState.file && vendorState.vendor && n > 0);
     btn.innerHTML = `<i class="fas fa-upload me-1"></i>선택한 계약 ${n}건에 등록`;
   }
 
   async function previewVendorFile() {
-    const input = document.getElementById('v-file');
-    const box = document.getElementById('vendor-preview');
-    vendorState.file = input.files[0] || null;
+    const box = vEl('vendor-modal-preview');
+    vendorState.file = vEl('v-file').files[0] || null;
     vendorState.preview = null;
+    vEl('vendor-modal-result').innerHTML = '';
     if (!vendorState.file) { box.innerHTML = ''; updateSubmitState(); return; }
     box.innerHTML = '<div class="pi-preview">체크리스트를 읽는 중...</div>';
     const fd = new FormData();
     fd.append('file', vendorState.file);
-    fd.append('inspectionType', document.getElementById('v-type').value);
+    fd.append('inspectionType', vEl('v-type').value);
     try {
       const p = await PI_API.previewVendorChecklist(fd);
       vendorState.preview = p;
-      const matched = p.matchedVendors || [];
+      const v = vendorState.vendor;
+      const mismatch = v && p.sheetCompanyName && normalizeVendor(p.sheetCompanyName) !== v.vendorKey;
+      const warnings = (p.warnings || []).filter((w) => !w.includes('업체를 직접 선택') && !w.includes('같은 업체의 계약이 없습니다'));
+      if (mismatch) warnings.unshift(`체크리스트 회사명('${p.sheetCompanyName}')이 이 업체('${v.vendorName}')와 다릅니다. 파일을 확인하세요.`);
       box.innerHTML = `
         <div class="pi-preview">
-          <div class="d-flex flex-wrap gap-3 align-items-center mb-1">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
             <span>회사명 <b>${esc(p.sheetCompanyName || '(없음)')}</b></span>
             <span>평가일 <b>${fmtDate(p.evaluationDate)}</b></span>
             <span>평가자 <b>${esc(p.evaluator || '-')}</b></span>
             <span>${badge(p.result, p.resultLabel)} Y <span class="pi-eval-Y">${p.yCount}</span> · N <span class="pi-eval-N">${p.nCount}</span> · NA ${p.naCount} · 미기재 ${p.blankCount} (총 ${p.totalCount})</span>
           </div>
-          ${matched.length ? `<div class="small">찾은 업체: ${matched.map((v) => `<a href="#" class="me-2" data-pick="${esc(v.vendorKey)}">${esc(v.vendorName)}</a>`).join('')}</div>` : ''}
-          ${(p.warnings || []).length ? `<ul class="small text-warning-emphasis mb-0 mt-1">${p.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+          ${warnings.length ? `<ul class="small text-warning-emphasis mb-0 mt-1">${warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
         </div>`;
-      box.querySelectorAll('[data-pick]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); ensureVendorVisible(a.dataset.pick); }));
-      if (p.evaluator && !document.getElementById('v-inspector').value) document.getElementById('v-inspector').value = p.evaluator;
-      // 정확히 일치하는 업체가 1곳이면 자동 선택 (이미 다른 업체를 골랐으면 유지)
-      if (matched.length && !vendorState.selectedKey) ensureVendorVisible(matched[0].vendorKey);
+      if (p.evaluator && !vEl('v-inspector').value) vEl('v-inspector').value = p.evaluator;
     } catch (e) {
       vendorState.file = null;
       box.innerHTML = `<div class="pi-preview text-danger">${esc(e.message)}</div>`;
@@ -709,51 +623,62 @@
     updateSubmitState();
   }
 
-  async function ensureVendorVisible(key) {
-    if (!vendorState.vendors.some((v) => v.vendorKey === key)) {
-      document.getElementById('vendor-keyword').value = '';
-      document.getElementById('vendor-include-terminated').checked = true;
-      await loadVendors();
-    }
-    selectVendor(key);
-  }
-
   async function submitVendorChecklist(e) {
     e.preventDefault();
     const ids = selectedContractIds();
-    const v = vendorState.vendors.find((x) => x.vendorKey === vendorState.selectedKey);
+    const v = vendorState.vendor;
     if (!vendorState.file || !v || !ids.length) return;
     const p = vendorState.preview;
-    if (p && p.sheetCompanyName && normalizeVendor(p.sheetCompanyName) !== normalizeVendor(v.vendorName)
-        && !confirm(`체크리스트 회사명('${p.sheetCompanyName}')과 선택한 업체('${v.vendorName}')가 다릅니다. 그래도 등록할까요?`)) return;
+    if (p && p.sheetCompanyName && normalizeVendor(p.sheetCompanyName) !== v.vendorKey
+        && !confirm(`체크리스트 회사명('${p.sheetCompanyName}')과 업체('${v.vendorName}')가 다릅니다. 그래도 등록할까요?`)) return;
     if (!confirm(`'${v.vendorName}' 계약 ${ids.length}건에 체크리스트를 점검 이력으로 등록합니다.`)) return;
 
-    const fd = new FormData(e.target);
-    ['inspectionDate', 'actionDueDate', 'inspectorName', 'remark'].forEach((k) => { if (!fd.get(k)) fd.delete(k); });
+    const fd = new FormData();
+    ['inspectionDate', 'actionDueDate', 'inspectorName', 'remark'].forEach((k) => {
+      const val = vEl('vendor-modal-form').elements[k].value.trim();
+      if (val) fd.append(k, val);
+    });
     fd.append('vendorKey', v.vendorKey);
-    fd.append('inspectionType', document.getElementById('v-type').value);
+    fd.append('inspectionType', vEl('v-type').value);
     ids.forEach((id) => fd.append('contractIds', id));
     fd.append('file', vendorState.file);
-    const btn = document.getElementById('v-submit');
+    const btn = vEl('v-submit');
     btn.disabled = true;
     try {
       const r = await PI_API.uploadVendorChecklist(fd);
-      document.getElementById('vendor-result').innerHTML = `
+      vendorState.changed = true;
+      vEl('vendor-modal-result').innerHTML = `
         <div class="alert alert-${r.result === 'PASS' ? 'success' : 'warning'} mb-2">
           <b>${esc(r.vendorName)}</b> 계약 ${r.registeredCount}건에 등록했습니다. 판정: ${esc(r.resultLabel)}
           ${(r.warnings || []).length ? `<ul class="mb-0 small mt-1">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
         </div>
         <table class="pi-table"><thead><tr><th>계약</th><th>관련 서비스</th><th>점검일</th><th>결과</th><th></th></tr></thead>
-          <tbody>${r.inspections.map((i) => `<tr data-go="${i.contractId}"><td>${esc(i.vendorName)}</td><td>${esc(i.serviceName || '-')}</td>
+          <tbody>${r.inspections.map((i) => `<tr data-go="${i.contractId}" title="계약 상세로 이동"><td>${esc(i.vendorName)}</td><td>${esc(i.serviceName || '-')}</td>
             <td>${fmtDate(i.inspectionDate)}</td><td>${badge(i.result, i.resultLabel)}</td><td class="text-end"><i class="fas fa-chevron-right text-muted"></i></td></tr>`).join('')}</tbody></table>`;
-      document.querySelectorAll('#vendor-result tr[data-go]').forEach((tr) => tr.addEventListener('click', () => go('#/contracts/' + tr.dataset.go)));
-      notify(`업체별 업로드 완료: ${r.registeredCount}건`);
-      document.getElementById('v-file').value = '';
+      vEl('vendor-modal-result').querySelectorAll('tr[data-go]').forEach((tr) => tr.addEventListener('click', () => {
+        const target = '#/contracts/' + tr.dataset.go;
+        modal('vendor-checklist-modal').hide();
+        if (location.hash === target) route(); else go(target);
+      }));
+      vEl('v-file').value = '';
       vendorState.file = null;
-      document.getElementById('vendor-preview').innerHTML = '';
-      await loadVendors();
+      vendorState.preview = null;
+      vEl('vendor-modal-preview').innerHTML = '';
+      // 팝업 안의 계약 목록(최근 점검)도 갱신
+      const list = await PI_API.listVendors({ keyword: v.vendorName, includeTerminated: true });
+      vendorState.vendor = list.find((x) => x.vendorKey === v.vendorKey) || v;
+      renderVendorContracts();
+      vEl('vendor-modal-result').scrollIntoView({ block: 'nearest' });
     } catch (err) { fail(err); } finally { updateSubmitState(); }
   }
+
+  vEl('v-file').addEventListener('change', previewVendorFile);
+  vEl('v-type').addEventListener('change', () => { if (vendorState.file) previewVendorFile(); });
+  vEl('vendor-modal-form').addEventListener('submit', submitVendorChecklist);
+  // 등록한 뒤 팝업을 닫으면 현재 화면(목록/상세)의 최근 점검을 다시 불러온다
+  vEl('vendor-checklist-modal').addEventListener('hidden.bs.modal', () => {
+    if (vendorState.changed) { vendorState.changed = false; route(); }
+  });
 
   // ──────────────── 모달 폼 ────────────────
   document.getElementById('inspection-form').addEventListener('submit', async (e) => {
