@@ -29,7 +29,7 @@
 | 4 | 위수탁 점검 체크리스트 다운로드·업로드 | **다운로드**: 보안팀 양식 원본 또는 회사명·수탁업무를 미리 채운 양식. **업로드**: 협력사가 작성한 엑셀을 읽어 항목별 결과를 저장하고 Y/N/NA 를 집계해 점검 결과(적합/조치 필요/평가 미완료)를 자동 판정합니다. 원본 파일도 보관합니다. |
 | 5 | **업체별 점검 체크리스트 업로드** | 같은 업체가 서비스별로 계약이 여러 건이어도, 협력사가 업체 단위로 작성한 체크리스트 **1건을 업로드해 그 업체의 선택한 계약 전체에 점검 이력으로 한 번에 등록**합니다. 업로드 전 미리보기로 체크리스트 회사명에 맞는 업체를 자동 선택하고, 원본 파일은 1번만 저장합니다. |
 | - | 목록에서 Y/N 바로 변경 | 계약 목록의 **ISMS 인증 여부**와 **재위탁 여부**를 스위치로 바로 바꿉니다(등록 권한 필요, 조회 사용자는 Y/N 글자만 보임). 해당 항목만 저장하고 다른 계약 정보는 건드리지 않습니다. 재위탁을 N 으로 바꿔도 재위탁 업체명·업무는 지우지 않습니다. |
-| - | **협력사 담당자 이력** | 계약 상세의 기본정보 바로 아래에 담당자 변경 이력을 보여줍니다. 당사 담당부서·담당자·이메일, 수탁사 담당자·이메일·연락처 중 하나라도 바뀌면 변경 후 값과 바뀐 항목, 변경자·변경일시를 남깁니다. 기본은 **같은 업체의 모든 계약** 이력을 함께 보여주고(㈜·(주)·공백 차이 무시), "이 계약만"으로 좁힐 수 있습니다. 이력은 추가만 되고 수정되지 않습니다. |
+| - | **협력사 담당자 이력** | 계약 상세의 기본정보 바로 아래에 **위탁사(당사) 담당자** 변경 이력을 보여줍니다. 위탁사 담당부서·담당자·이메일 중 하나라도 바뀌면 변경 후 값, **그 시점의 계약기간**, 변경자·변경일시를 남깁니다(바뀐 항목은 노란색 강조). **수탁사 담당자·연락처·이메일 변경은 이력을 남기지 않습니다.** 기본은 **같은 업체의 모든 계약** 이력을 함께 보여주고(㈜·(주)·공백 차이 무시), "이 계약만"으로 좁힐 수 있습니다. 이력은 추가만 되고 수정되지 않습니다. |
 | - | 계약 종료 처리 | 종료 처리하면 만료 알림이 멈춥니다. "계약변경·만료 점검"(양식 3번 시트) 업로드를 지원합니다. |
 | - | 점검 후속조치 | 조치 예정일과 조치 완료 여부를 관리합니다. |
 
@@ -69,10 +69,10 @@
 | `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 | FK → `pi_contract` |
 | `pi_inspection` | 점검 이력 (체크리스트 업로드 1건 × 계약) | FK → `pi_contract`, IDX `UPLOAD_GROUP_ID`(업체별 일괄 업로드 묶음, 개별 업로드는 NULL) |
 | `pi_inspection_item` | 점검 체크리스트 항목별 결과 | FK → `pi_inspection` |
-| `pi_contact_history` | 협력사 담당자 변경 이력 (`04_contact_history.sql`) | FK → `pi_contract`, IDX 계약+삭제여부+일시 |
+| `pi_contact_history` | 위탁사 담당자 변경 이력 + 기록 시점 계약기간 (`04`, `05`) | FK → `pi_contract`, IDX 계약+삭제여부+일시 |
 | `pi_alert_log` | 만료 알림 발송 이력 | FK → `pi_contract`, `UK_PI_ALERT_LOG_DEDUP` |
 
-- 모든 테이블에 공통 컬럼(`CREATED_AT/BY`, `UPDATED_AT/BY`, `DELETED_YN/AT/BY`)이 있습니다. 모든 테이블·컬럼에 COMMENT 가 있습니다(6개 테이블 151개 컬럼, 누락 0건 검증).
+- 모든 테이블에 공통 컬럼(`CREATED_AT/BY`, `UPDATED_AT/BY`, `DELETED_YN/AT/BY`)이 있습니다. 모든 테이블·컬럼에 COMMENT 가 있습니다(6개 테이블 154개 컬럼, 누락 0건 검증).
 - FK 는 업무 테이블 사이에만 있습니다. `CREATED_BY` 같은 사용자 컬럼은 core_user ID 값만 저장하고 **core 테이블 FK 는 없습니다.**
 - 삭제는 모두 소프트 삭제(`DELETED_YN='Y'`)입니다. 업로드한 실제 파일도 감사 증적으로 지우지 않습니다.
 
@@ -91,7 +91,7 @@
 | GET | `/contracts/{id}` | 계약 상세 (첨부/점검/알림 이력 포함) | READ |
 | POST | `/contracts` | 계약 등록 | WRITE |
 | PUT | `/contracts/{id}` | 계약 수정 | WRITE |
-| GET | `/contracts/{id}/contact-history?vendorWide=true` | 협력사 담당자 변경 이력. `vendorWide=false` 면 이 계약만 | READ |
+| GET | `/contracts/{id}/contact-history?vendorWide=true` | 위탁사 담당자 변경 이력(계약기간 포함). `vendorWide=false` 면 이 계약만 | READ |
 | PATCH | `/contracts/{id}/flags` | 목록에서 Y/N 바로 변경 `{ismsScopeYn?, subcontractYn?}` — 보낸 항목만 변경, 값은 Y/N 만 허용 | WRITE |
 | POST | `/contracts/{id}/terminate` | 계약 종료 처리 `{terminatedDate, reason}` | WRITE |
 | POST | `/contracts/{id}/reopen` | 종료 취소 | WRITE |
@@ -171,12 +171,14 @@
 | 2 | `02_seed_data.sql` | 역할 코드 3개(공통코드 ROLE), 메뉴 2개, 역할-메뉴 매핑. upsert / NOT EXISTS / INSERT IGNORE 사용. 업무 데이터는 넣지 않음 |
 | 3 | `03_vendor_checklist_upload.sql` | **업체별 업로드용 컬럼 추가** — `pi_inspection.UPLOAD_GROUP_ID` + 인덱스. `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` (MariaDB 10.0.2+). 이미 01 을 받은 운영 DB 에만 필요하지만, 새로 설치할 때 실행해도 아무 변화 없이 통과합니다 |
 | 4 | `04_contact_history.sql` | **협력사 담당자 이력 테이블** `pi_contact_history` 추가 + 이력이 없는 기존 계약의 현재 담당자 값을 "기존 데이터 이관"으로 1건 기록. `CREATE TABLE IF NOT EXISTS` / `INSERT ... WHERE NOT EXISTS` 로 재실행해도 중복되지 않습니다 |
+| 5 | `05_contact_history_contract_period.sql` | **담당자 이력에 계약기간 추가** — `pi_contact_history` 에 `CONTRACT_START_DATE` / `CONTRACT_END_DATE` / `CONTRACT_PERIOD_NOTE` 컬럼 추가(`ADD COLUMN IF NOT EXISTS`), 계약기간이 비어 있는 기존 이력만 현재 계약 값으로 채움. 04 의 수탁사 담당자 컬럼은 더 이상 쓰지 않지만 DROP 금지 규칙에 따라 남겨둡니다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/02_seed_data.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/03_vendor_checklist_upload.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/04_contact_history.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/05_contact_history_contract_period.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
@@ -262,7 +264,7 @@ module-personalinfo/
     └── resources/
         ├── personalinfo/checklist-template.xlsx      보안팀 점검 체크리스트 원본 양식
         └── static/personalinfo/                      화면 (index.html, css, js)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, README.md
 ```
 
 ---
@@ -282,7 +284,7 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_u
 | 　- 소프트 삭제: DELETED_YN/BY 기록, 항목 33건 함께 소프트 삭제, 최근 점검 다시 계산 | 통과 |
 | 　- 업체별 업로드: 표기 다른 업체명 3건 → 1개 업체, 미리보기 자동 매칭·저장 없음, 조회자 403, 타 업체 계약 섞이면 400·저장 0, 미종료 2건 등록(묶음ID 동일·파일 1개·항목 66건), 계약별 최근 점검 반영, 종료 계약 명시 등록, xlsx 아님 400, 없는 업체 404 | 통과 |
 | 　- 목록 Y/N 변경: ISMS만/재위탁만/둘 다 변경, 다른 컬럼·재위탁 업체명 보존, UPDATED_BY 기록, 잘못된 값·빈 요청 400, 조회자 403, 없는 계약 404 | 통과 |
-| 　- 담당자 이력: 등록 시 1건, 담당자 외 항목 수정·이메일 대소문자만 변경 시 추가 없음, 담당자 변경 시 바뀐 항목·변경자 ID/이름 기록, 같은 업체 다른 계약 포함·다른 업체 제외, 이 계약만 조회, 외부 역할 403, 없는 계약 404 | 통과 |
+| 　- 담당자 이력: 등록 시 1건, 담당자 외 항목 수정·**수탁사 담당자/연락처/이메일만 변경**·이메일 대소문자만 변경 시 추가 없음, 위탁사 담당자 변경 시 바뀐 항목·변경자·**그 시점 계약기간** 기록(등록 이력은 등록 시점 기간 유지), 이전 버전의 수탁사 전용 변경 행 조회 제외, 같은 업체 다른 계약 포함·다른 업체 제외, 이 계약만 조회, 외부 역할 403, 없는 계약 404 | 통과 |
 | 브라우저 E2E (목록 → 등록+파일 → 체크리스트 업로드 → 점검 상세 → 수정, 역할별 버튼 노출) | 통과, 콘솔 오류 0 |
 | SQL 2회 실행(재실행 안전), COMMENT 누락 0, core FK 0 | 통과 |
 

@@ -177,17 +177,20 @@ public class PiContractService {
         } else {
             ids = List.of(contractId);
         }
+        // 위탁사 담당자 항목이 바뀌지 않은 '담당자 변경' 건(예: 이전 버전에서 수탁사 담당자만 바뀌어 남은 이력)은 보여주지 않는다
         return contactHistoryRepository.findByContractIdInAndDeletedYnOrderByCreatedAtDescHistoryIdDesc(ids, N)
-                .stream().map(h -> ContactHistoryResponse.of(h, contractId)).toList();
+                .stream()
+                .filter(h -> h.getChangeType() != ContactChangeType.UPDATE
+                        || !ContactHistoryResponse.changedTrackedFields(h).isEmpty())
+                .map(h -> ContactHistoryResponse.of(h, contractId)).toList();
     }
 
+    /** 이력 대상: 위탁사(당사) 담당부서·담당자·이메일. 수탁사 담당자·연락처는 대상 아님 */
     private static final String[] CONTACT_FIELDS = {
-            PiContactHistory.F_DEPT, PiContactHistory.F_MANAGER, PiContactHistory.F_MANAGER_EMAIL,
-            PiContactHistory.F_VENDOR_CONTACT, PiContactHistory.F_VENDOR_EMAIL, PiContactHistory.F_VENDOR_PHONE};
+            PiContactHistory.F_DEPT, PiContactHistory.F_MANAGER, PiContactHistory.F_MANAGER_EMAIL};
 
     private static String[] contactValues(PiContract c) {
-        return new String[]{c.getDeptName(), c.getManagerName(), c.getManagerEmail(),
-                c.getVendorContactName(), c.getVendorContactEmail(), c.getVendorContactPhone()};
+        return new String[]{c.getDeptName(), c.getManagerName(), c.getManagerEmail()};
     }
 
     private static boolean hasAnyContact(PiContract c) {
@@ -199,7 +202,7 @@ public class PiContractService {
         return false;
     }
 
-    /** 담당자 항목이 하나라도 바뀌면 변경 후 스냅샷 1건 기록 (대소문자·앞뒤 공백만 다른 경우는 변경 아님) */
+    /** 위탁사 담당자 항목이 하나라도 바뀌면 변경 후 스냅샷(+계약기간) 1건 기록 (대소문자·앞뒤 공백만 다른 경우는 변경 아님) */
     private void recordContactChange(PiContract c, String[] before, String userName, Long userId) {
         String[] after = contactValues(c);
         List<String> changed = new java.util.ArrayList<>();
