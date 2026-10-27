@@ -75,6 +75,7 @@ const PI_API = (() => {
     getContract: (id) => request('/contracts/' + id),
     createContract: (body) => request('/contracts', { method: 'POST', body }),
     updateContract: (id, body) => request('/contracts/' + id, { method: 'PUT', body }),
+    updateContractFlags: (id, body) => request('/contracts/' + id + '/flags', { method: 'PATCH', body }),
     terminateContract: (id, body) => request('/contracts/' + id + '/terminate', { method: 'POST', body }),
     reopenContract: (id) => request('/contracts/' + id + '/reopen', { method: 'POST' }),
     deleteContract: (id) => request('/contracts/' + id, { method: 'DELETE' }),

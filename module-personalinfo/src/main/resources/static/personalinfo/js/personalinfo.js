@@ -176,7 +176,7 @@
         tbody.innerHTML = page.content.map((r, i) => `
           <tr data-id="${r.contractId}">
             <td>${page.page * page.size + i + 1}</td>
-            <td>${yn(r.ismsScopeYn)}</td>
+            <td class="pi-flag-cell">${flagCell(r, 'ismsScopeYn', 'ISMS 인증 여부')}</td>
             <td class="fw-semibold">${perm.canWrite
               ? `<button type="button" class="pi-vendor-link" data-vendor="${esc(r.vendorName)}" title="업체별 점검 체크리스트 업로드">${esc(r.vendorName)}</button>`
               : esc(r.vendorName)}</td>
@@ -187,10 +187,14 @@
             <td class="text-nowrap">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
             <td class="text-nowrap">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}</td>
             <td>${badge(r.status, r.statusLabel)}</td>
-            <td>${r.subcontractYn === 'Y' ? `<span title="${esc(r.subcontractorName)}">Y</span>` : 'N'}</td>
+            <td class="pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
             <td class="text-nowrap">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
           </tr>`).join('');
         tbody.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => go('#/contracts/' + tr.dataset.id)));
+        tbody.querySelectorAll('.pi-flag').forEach((el) => {
+          el.addEventListener('click', (e) => e.stopPropagation());   // 행 클릭(상세 이동) 막기
+          el.addEventListener('change', () => toggleFlag(el));
+        });
         tbody.querySelectorAll('.pi-vendor-link').forEach((b) => b.addEventListener('click', (e) => {
           e.stopPropagation();   // 행 클릭(상세 이동) 대신 팝업
           openVendorChecklist(b.dataset.vendor);
@@ -199,6 +203,41 @@
       renderPager(page);
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="12" class="pi-empty">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  // ISMS 인증 여부 / 재위탁 여부: 등록 권한이 있으면 목록에서 바로 Y/N 전환
+  function flagCell(r, field, label) {
+    const v = r[field] === 'Y';
+    const tip = field === 'subcontractYn' && v && r.subcontractorName ? ` title="재위탁: ${esc(r.subcontractorName)}"` : '';
+    if (!perm.canWrite) return `<span${tip}>${yn(r[field])}</span>`;
+    return `<label class="pi-flag form-check form-switch mb-0"${tip}>
+        <input class="form-check-input" type="checkbox" role="switch" data-id="${r.contractId}" data-field="${field}"
+          data-vendor="${esc(r.vendorName)}" data-label="${label}" ${v ? 'checked' : ''} aria-label="${esc(r.vendorName)} ${label}">
+        <span class="pi-flag-text">${v ? 'Y' : 'N'}</span></label>`;
+  }
+
+  async function toggleFlag(label) {
+    const input = label.querySelector('input');
+    const value = input.checked ? 'Y' : 'N';
+    const text = label.querySelector('.pi-flag-text');
+    input.disabled = true;
+    try {
+      const r = await PI_API.updateContractFlags(input.dataset.id, { [input.dataset.field]: value });
+      text.textContent = value;
+      notify(`${input.dataset.vendor} · ${input.dataset.label}: ${value} 로 변경했습니다.`);
+      if (input.dataset.field === 'subcontractYn') {
+        if (value === 'Y' && !r.subcontractorName) {
+          notify(`${input.dataset.vendor}: 재위탁 업체명·업무가 비어 있습니다. 계약 수정 화면에서 입력하세요.`, 'warning');
+        }
+        label.title = value === 'Y' && r.subcontractorName ? '재위탁: ' + r.subcontractorName : '';
+      }
+    } catch (e) {
+      input.checked = !input.checked;   // 실패하면 원래 값으로 되돌림
+      text.textContent = input.checked ? 'Y' : 'N';
+      fail(e);
+    } finally {
+      input.disabled = false;
     }
   }
 

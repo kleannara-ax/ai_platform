@@ -201,6 +201,21 @@ public class PiContract extends PiBaseEntity {
         markUpdatedBy(updatedBy);
     }
 
+    /** ISMS 인증 범위 여부 변경 (목록 화면 Y/N 바로 변경) */
+    public void changeIsmsScope(String ismsScopeYn, Long updatedBy) {
+        this.ismsScopeYn = yn(ismsScopeYn, this.ismsScopeYn);
+        markUpdatedBy(updatedBy);
+    }
+
+    /**
+     * 재위탁 여부 변경 (목록 화면 Y/N 바로 변경).
+     * 재위탁 업체명·업무·동의 여부는 지우지 않는다(N → Y 로 되돌릴 때 다시 쓰고, 이력도 남긴다).
+     */
+    public void changeSubcontract(String subcontractYn, Long updatedBy) {
+        this.subcontractYn = yn(subcontractYn, this.subcontractYn);
+        markUpdatedBy(updatedBy);
+    }
+
     /** 계약 종료 처리 (위탁업무 종료) */
     public void terminate(LocalDate terminatedDate, String reason, Long updatedBy) {
         this.terminatedYn = "Y";
