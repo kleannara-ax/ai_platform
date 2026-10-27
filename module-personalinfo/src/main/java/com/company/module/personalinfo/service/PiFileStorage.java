@@ -113,7 +113,7 @@ public class PiFileStorage {
         return resolved;
     }
 
-    static String sanitizeOriginalName(String name) {
+    public static String sanitizeOriginalName(String name) {
         String cleaned = StringUtils.getFilename(StringUtils.cleanPath(name == null ? "" : name.replace('\\', '/')));
         if (cleaned == null || cleaned.isBlank()) {
             return "file";
@@ -122,7 +122,7 @@ public class PiFileStorage {
         return cleaned.length() > 200 ? cleaned.substring(cleaned.length() - 200) : cleaned;
     }
 
-    static String extensionOf(String name) {
+    public static String extensionOf(String name) {
         int dot = name.lastIndexOf('.');
         return dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
     }

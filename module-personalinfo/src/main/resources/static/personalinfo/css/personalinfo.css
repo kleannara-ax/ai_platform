@@ -45,3 +45,11 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-eval-NA{color:#6b7280;font-weight:700;}
 .pi-empty{padding:40px;text-align:center;color:var(--pi-muted);}
 .pi-actions{display:flex;gap:6px;flex-wrap:wrap;}
+
+.pi-vendor-list{max-height:560px;overflow:auto;border:1px solid var(--pi-line);border-radius:10px;}
+.pi-vendor-item{padding:10px 12px;border-bottom:1px solid var(--pi-line);cursor:pointer;}
+.pi-vendor-item:hover{background:#f5f7ff;}
+.pi-vendor-item.active{background:#eef2ff;border-left:3px solid var(--pi-brand);}
+.pi-vendor-item .meta{font-size:.78rem;color:var(--pi-muted);}
+.pi-step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--pi-brand);color:#fff;font-size:.75rem;font-weight:700;margin-right:6px;}
+.pi-preview{background:#f8fafc;border:1px dashed var(--pi-line);border-radius:10px;padding:12px;}
