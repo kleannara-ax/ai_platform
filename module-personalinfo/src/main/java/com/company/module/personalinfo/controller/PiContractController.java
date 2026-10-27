@@ -2,6 +2,7 @@ package com.company.module.personalinfo.controller;
 
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
+import com.company.module.personalinfo.dto.ContactHistoryResponse;
 import com.company.module.personalinfo.dto.ContractDetailResponse;
 import com.company.module.personalinfo.dto.ContractFlagUpdateRequest;
 import com.company.module.personalinfo.dto.ContractSaveRequest;
@@ -30,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 개인정보 위수탁 계약 API.
@@ -90,8 +93,9 @@ public class PiContractController {
     @PreAuthorize(PiRoles.CAN_WRITE)
     public ResponseEntity<ApiResponse<ContractDetailResponse>> create(
             @Valid @RequestBody ContractSaveRequest request,
-            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
-        return ResponseEntity.ok(ApiResponse.created(contractService.create(request, currentUserId)));
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
+            @AuthenticationPrincipal(expression = "userDisplayName") String currentUserName) {
+        return ResponseEntity.ok(ApiResponse.created(contractService.create(request, currentUserId, currentUserName)));
     }
 
     /** 계약 수정 */
@@ -100,8 +104,18 @@ public class PiContractController {
     public ResponseEntity<ApiResponse<ContractDetailResponse>> update(
             @PathVariable Long contractId,
             @Valid @RequestBody ContractSaveRequest request,
-            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
-        return ResponseEntity.ok(ApiResponse.success(contractService.update(contractId, request, currentUserId)));
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId,
+            @AuthenticationPrincipal(expression = "userDisplayName") String currentUserName) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.update(contractId, request, currentUserId, currentUserName)));
+    }
+
+    /** 협력사 담당자 변경 이력 (vendorWide=true 이면 같은 업체의 모든 계약 이력) */
+    @GetMapping("/contracts/{contractId}/contact-history")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<ApiResponse<List<ContactHistoryResponse>>> contactHistory(
+            @PathVariable Long contractId,
+            @RequestParam(defaultValue = "true") boolean vendorWide) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.getContactHistory(contractId, vendorWide)));
     }
 
     /** 목록 화면에서 ISMS 인증 여부 / 재위탁 여부 Y/N 바로 변경 (보낸 항목만 변경) */
