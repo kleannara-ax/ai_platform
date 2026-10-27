@@ -82,6 +82,61 @@
   </div></div>
 </div>
 
+<!-- 업체별 점검 체크리스트 업로드 팝업 (목록의 업체명 클릭 / 상세의 [업체 계약 일괄 업로드]) -->
+<div class="modal fade" id="vendor-checklist-modal" tabindex="-1" aria-labelledby="vendor-modal-heading" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header">
+      <div>
+        <h5 class="modal-title" id="vendor-modal-heading"><i class="fas fa-building me-2 text-primary"></i><span id="vendor-modal-title"></span> — 업체별 점검 체크리스트 업로드</h5>
+        <div class="small text-muted mt-1" id="vendor-modal-summary"></div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+    </div>
+    <form id="vendor-modal-form" class="modal-body">
+      <p class="text-muted small">협력사가 업체 단위로 작성한 체크리스트 1건을 이 업체의 여러 계약(예: 자사몰·임직원몰)에 한 번에 점검 이력으로 등록합니다.
+        업체명은 ㈜·(주)·공백 차이를 무시하고 묶습니다.</p>
+
+      <section class="mb-3" id="vendor-modal-contract-section">
+        <h6 class="fw-bold"><span class="pi-step">1</span>등록할 계약</h6>
+        <div id="vendor-modal-contracts"></div>
+      </section>
+
+      <section class="mb-3" id="vendor-modal-file-section">
+        <h6 class="fw-bold"><span class="pi-step">2</span>체크리스트 파일</h6>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5"><label class="form-label small" for="v-type">점검 구분</label>
+            <select class="form-select form-select-sm" id="v-type" name="inspectionType">
+              <option value="REGULAR">정기 점검 (1.관리체계 / 2.개인정보처리시스템)</option>
+              <option value="TERMINATION">계약변경·만료 점검 (3.계약변경 만료시 체크)</option></select></div>
+          <div class="col-md-7"><label class="form-label small" for="v-file">작성된 체크리스트 (.xlsx) *</label>
+            <input type="file" class="form-control form-control-sm" id="v-file" accept=".xlsx"></div>
+        </div>
+        <div id="vendor-modal-preview" class="mt-2"></div>
+      </section>
+
+      <section id="vendor-modal-info-section">
+        <h6 class="fw-bold"><span class="pi-step">3</span>점검 정보</h6>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label small" for="v-date">점검일 <small class="text-muted">(비우면 엑셀 평가일)</small></label>
+            <input type="date" class="form-control form-control-sm" id="v-date" name="inspectionDate"></div>
+          <div class="col-md-3"><label class="form-label small" for="v-inspector">평가자</label>
+            <input class="form-control form-control-sm" id="v-inspector" name="inspectorName" maxlength="100"></div>
+          <div class="col-md-3"><label class="form-label small" for="v-due">조치 예정일</label>
+            <input type="date" class="form-control form-control-sm" id="v-due" name="actionDueDate"></div>
+          <div class="col-md-3"><label class="form-label small" for="v-remark">비고</label>
+            <input class="form-control form-control-sm" id="v-remark" name="remark" maxlength="2000"></div>
+        </div>
+      </section>
+
+      <div id="vendor-modal-result" class="mt-3"></div>
+    </form>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-light" data-bs-dismiss="modal">닫기</button>
+      <button type="submit" form="vendor-modal-form" class="btn btn-primary" id="v-submit" disabled><i class="fas fa-upload me-1"></i>선택한 계약에 등록</button>
+    </div>
+  </div></div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/personalinfo-api.js"></script>
 <script src="js/personalinfo.js"></script>
