@@ -72,3 +72,7 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-col-resizer:focus-visible{outline:none;}
 .pi-resizing,.pi-resizing *{cursor:col-resize !important;user-select:none !important;}
 .pi-col-hint{font-size:.75rem;}
+/* 관리(삭제) 열: 가로 스크롤해도 오른쪽에 고정 */
+.pi-resizable .pi-col-sticky-end{position:sticky;right:0;z-index:3;background:#fff;box-shadow:-6px 0 6px -6px rgba(15,23,42,.25);}
+.pi-resizable thead .pi-col-sticky-end{background:#f8fafc;z-index:4;}
+.pi-resizable tbody tr:hover .pi-col-sticky-end{background:#f5f7ff;}

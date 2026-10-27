@@ -114,9 +114,9 @@
         </div>
         <p class="pi-col-hint text-muted mb-1"><i class="fas fa-circle-info me-1"></i>열 제목 오른쪽 경계를 끌어서 너비를 조정할 수 있습니다. 경계를 더블클릭하면 해당 열만 기본값으로 돌아갑니다. 조정한 너비는 이 브라우저에 저장됩니다.</p>
         <div class="table-responsive pi-resizable-wrap"><table class="pi-table pi-resizable" id="contract-table">
-          <colgroup>${CONTRACT_COLS.map((c) => `<col data-col="${c.key}">`).join('')}</colgroup>
-          <thead><tr>${CONTRACT_COLS.map((c) => `<th data-col="${c.key}" title="${esc(c.label)}"><span class="pi-th-label">${esc(c.label)}</span></th>`).join('')}</tr></thead>
-          <tbody><tr><td colspan="12" class="pi-empty">불러오는 중...</td></tr></tbody>
+          <colgroup>${listCols().map((c) => `<col data-col="${c.key}">`).join('')}</colgroup>
+          <thead><tr>${listCols().map((c) => `<th data-col="${c.key}" title="${esc(c.label)}"${c.key === 'action' ? ' class="pi-col-sticky-end"' : ''}><span class="pi-th-label">${esc(c.label)}</span></th>`).join('')}</tr></thead>
+          <tbody><tr><td colspan="${listCols().length}" class="pi-empty">불러오는 중...</td></tr></tbody>
         </table></div>
         <nav class="d-flex justify-content-center mt-3" id="contract-pager" aria-label="페이지"></nav>
       </section>`;
@@ -134,10 +134,10 @@
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
     document.getElementById('btn-run-alert')?.addEventListener('click', runAlerts);
-    initColumnResize(document.getElementById('contract-table'), CONTRACT_COLS, COL_WIDTH_KEY);
+    initColumnResize(document.getElementById('contract-table'), listCols(), COL_WIDTH_KEY);
     document.getElementById('btn-reset-cols').onclick = () => {
       localStorage.removeItem(COL_WIDTH_KEY);
-      applyColumnWidths(document.getElementById('contract-table'), CONTRACT_COLS, {});
+      applyColumnWidths(document.getElementById('contract-table'), listCols(), {});
       notify('열 너비를 기본값으로 되돌렸습니다.');
     };
 
@@ -192,6 +192,9 @@
     { key: 'sub', label: '재위탁', width: 78, min: 64 },
     { key: 'insp', label: '최근 점검', width: 160, min: 80 },
   ];
+  /** 삭제 권한(관리자)에게만 보이는 '관리' 열 */
+  const DELETE_COL = { key: 'action', label: '관리', width: 64, min: 56 };
+  const listCols = () => (perm.canDelete ? CONTRACT_COLS.concat(DELETE_COL) : CONTRACT_COLS);
   const COL_WIDTH_KEY = 'personalinfo.contractList.colWidths.v1';
 
   function loadColumnWidths(storageKey) {
@@ -285,7 +288,7 @@
       const page = await PI_API.listContracts({ ...listState.cond, page: listState.page, size: listState.size, sort: listState.sort });
       document.getElementById('list-count').textContent = `(총 ${page.totalElements}건)`;
       if (!page.content.length) {
-        tbody.innerHTML = '<tr><td colspan="12" class="pi-empty">조회된 계약이 없습니다.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${listCols().length}" class="pi-empty">조회된 계약이 없습니다.</td></tr>`;
       } else {
         tbody.innerHTML = page.content.map((r, i) => `
           <tr data-id="${r.contractId}">
@@ -303,8 +306,15 @@
             <td class="pi-cell">${badge(r.status, r.statusLabel)}</td>
             <td class="pi-cell pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
             <td class="pi-cell">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
+            ${perm.canDelete ? `<td class="pi-cell text-center pi-col-sticky-end"><button type="button" class="btn btn-sm btn-light text-danger pi-row-delete"
+                data-id="${r.contractId}" data-vendor="${esc(r.vendorName)}" data-service="${esc(r.serviceName || '')}"
+                title="계약 삭제" aria-label="${esc(r.vendorName)} 계약 삭제"><i class="fas fa-trash"></i></button></td>` : ''}
           </tr>`).join('');
         tbody.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => go('#/contracts/' + tr.dataset.id)));
+        tbody.querySelectorAll('.pi-row-delete').forEach((btn) => btn.addEventListener('click', (e) => {
+          e.stopPropagation();   // 행 클릭(상세 이동) 막기
+          deleteContractFromList(btn);
+        }));
         tbody.querySelectorAll('.pi-flag').forEach((el) => {
           el.addEventListener('click', (e) => e.stopPropagation());   // 행 클릭(상세 이동) 막기
           el.addEventListener('change', () => toggleFlag(el));
@@ -316,7 +326,23 @@
       }
       renderPager(page);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="12" class="pi-empty">${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${listCols().length}" class="pi-empty">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  // 목록에서 계약 삭제 (삭제 권한자만 버튼 노출, 서버도 CAN_DELETE 로 재확인)
+  async function deleteContractFromList(btn) {
+    const name = btn.dataset.vendor + (btn.dataset.service ? ` (${btn.dataset.service})` : '');
+    if (!confirm(`'${name}' 계약을 삭제합니다.\n첨부파일·점검 이력도 함께 숨겨지며, 목록에서 사라집니다.`)) return;
+    btn.disabled = true;
+    try {
+      await PI_API.deleteContract(btn.dataset.id);
+      notify(`'${name}' 계약을 삭제했습니다.`);
+      loadDashboard();
+      await loadList();
+    } catch (e) {
+      btn.disabled = false;
+      fail(e);
     }
   }
 
