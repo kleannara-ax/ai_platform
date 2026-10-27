@@ -60,3 +60,15 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 #contact-history-table tr.pi-ch-other .pi-ch-changed{color:#92400e;}
 #contact-history-table{font-size:.85rem;}
 #contact-history-table td,#contact-history-table th{vertical-align:middle;}
+/* ── 목록 열 너비 조정 ── */
+.pi-resizable{table-layout:fixed;}
+.pi-resizable th{position:sticky;top:0;overflow:hidden;text-overflow:ellipsis;}
+.pi-resizable th .pi-th-label{display:block;overflow:hidden;text-overflow:ellipsis;padding-right:6px;}
+.pi-resizable td.pi-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pi-resizable td.pi-cell .pi-vendor-link{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom;}
+.pi-col-resizer{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;user-select:none;z-index:2;touch-action:none;}
+.pi-col-resizer::after{content:"";position:absolute;top:25%;bottom:25%;right:3px;width:2px;border-radius:1px;background:#cbd5e1;}
+.pi-col-resizer:hover::after,.pi-col-resizer.active::after,.pi-col-resizer:focus-visible::after{top:0;bottom:0;background:var(--pi-brand);}
+.pi-col-resizer:focus-visible{outline:none;}
+.pi-resizing,.pi-resizing *{cursor:col-resize !important;user-select:none !important;}
+.pi-col-hint{font-size:.75rem;}

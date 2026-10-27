@@ -102,15 +102,20 @@
       <section class="pi-card" id="contract-list-section">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h2 class="mb-0"><i class="fas fa-list"></i>위수탁 계약 목록 <small class="text-muted fw-normal" id="list-count"></small></h2>
+          <div class="d-flex gap-2 align-items-center">
+          <button type="button" class="btn btn-sm btn-light text-nowrap" id="btn-reset-cols" title="열 너비를 기본값으로 되돌립니다">
+            <i class="fas fa-arrows-left-right me-1"></i>열 너비 초기화</button>
           <select class="form-select form-select-sm w-auto" id="s-sort" aria-label="정렬">
             ${opt('contractEndDate,asc', '종료일 빠른순', listState.sort)}${opt('contractEndDate,desc', '종료일 늦은순', listState.sort)}
             ${opt('vendorName,asc', '업체명순', listState.sort)}${opt('createdAt,desc', '최근 등록순', listState.sort)}
             ${opt('lastInspectionDate,asc', '점검일 오래된순', listState.sort)}
           </select>
+          </div>
         </div>
-        <div class="table-responsive"><table class="pi-table" id="contract-table">
-          <thead><tr><th>No</th><th>ISMS</th><th>수탁업체명</th><th>관련 서비스</th><th>위탁업무 내용</th><th>담당부서</th><th>담당자</th>
-            <th>계약기간</th><th>만료</th><th>계약상태</th><th>재위탁</th><th>최근 점검</th></tr></thead>
+        <p class="pi-col-hint text-muted mb-1"><i class="fas fa-circle-info me-1"></i>열 제목 오른쪽 경계를 끌어서 너비를 조정할 수 있습니다. 경계를 더블클릭하면 해당 열만 기본값으로 돌아갑니다. 조정한 너비는 이 브라우저에 저장됩니다.</p>
+        <div class="table-responsive pi-resizable-wrap"><table class="pi-table pi-resizable" id="contract-table">
+          <colgroup>${CONTRACT_COLS.map((c) => `<col data-col="${c.key}">`).join('')}</colgroup>
+          <thead><tr>${CONTRACT_COLS.map((c) => `<th data-col="${c.key}" title="${esc(c.label)}"><span class="pi-th-label">${esc(c.label)}</span></th>`).join('')}</tr></thead>
           <tbody><tr><td colspan="12" class="pi-empty">불러오는 중...</td></tr></tbody>
         </table></div>
         <nav class="d-flex justify-content-center mt-3" id="contract-pager" aria-label="페이지"></nav>
@@ -129,6 +134,12 @@
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
     document.getElementById('btn-run-alert')?.addEventListener('click', runAlerts);
+    initColumnResize(document.getElementById('contract-table'), CONTRACT_COLS, COL_WIDTH_KEY);
+    document.getElementById('btn-reset-cols').onclick = () => {
+      localStorage.removeItem(COL_WIDTH_KEY);
+      applyColumnWidths(document.getElementById('contract-table'), CONTRACT_COLS, {});
+      notify('열 너비를 기본값으로 되돌렸습니다.');
+    };
 
     loadDashboard();
     await loadList();
@@ -165,6 +176,109 @@
     } catch (e) { /* 요약 실패는 목록 사용에 영향 없음 */ }
   }
 
+  // ──────────────── 목록 열 너비 조정 ────────────────
+  // key: 저장 키, label: 제목, width: 기본 너비(px), min: 최소 너비(px)
+  const CONTRACT_COLS = [
+    { key: 'no', label: 'No', width: 52, min: 40 },
+    { key: 'isms', label: 'ISMS', width: 78, min: 64 },
+    { key: 'vendor', label: '수탁업체명', width: 150, min: 80 },
+    { key: 'service', label: '관련 서비스', width: 120, min: 70 },
+    { key: 'task', label: '위탁업무 내용', width: 240, min: 90 },
+    { key: 'dept', label: '담당부서', width: 110, min: 70 },
+    { key: 'manager', label: '담당자', width: 80, min: 72 },
+    { key: 'period', label: '계약기간', width: 190, min: 90 },
+    { key: 'dday', label: '만료', width: 72, min: 60 },
+    { key: 'status', label: '계약상태', width: 88, min: 70 },
+    { key: 'sub', label: '재위탁', width: 78, min: 64 },
+    { key: 'insp', label: '최근 점검', width: 160, min: 80 },
+  ];
+  const COL_WIDTH_KEY = 'personalinfo.contractList.colWidths.v1';
+
+  function loadColumnWidths(storageKey) {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (e) { return {}; }
+  }
+
+  function applyColumnWidths(table, cols, saved) {
+    let total = 0;
+    cols.forEach((c) => {
+      const w = Math.max(c.min, Number(saved[c.key]) || c.width);
+      total += w;
+      const col = table.querySelector(`col[data-col="${c.key}"]`);
+      if (col) col.style.width = w + 'px';
+    });
+    table.style.width = total + 'px';   // 고정 레이아웃: 합계 너비 지정 (넘치면 가로 스크롤)
+    table.style.minWidth = '100%';
+  }
+
+  /** 헤더 오른쪽 경계에 끌기 핸들을 붙인다. 마우스/터치 모두 지원, 결과는 localStorage 에 저장 */
+  function initColumnResize(table, cols, storageKey) {
+    if (!table) return;
+    const saved = loadColumnWidths(storageKey);
+    applyColumnWidths(table, cols, saved);
+    table.querySelectorAll('thead th[data-col]').forEach((th) => {
+      const key = th.dataset.col;
+      const def = cols.find((c) => c.key === key);
+      const handle = document.createElement('span');
+      handle.className = 'pi-col-resizer';
+      handle.setAttribute('role', 'separator');
+      handle.setAttribute('aria-orientation', 'vertical');
+      handle.setAttribute('aria-label', def.label + ' 열 너비 조정');
+      handle.tabIndex = 0;
+      handle.title = '끌어서 너비 조정 · 더블클릭: 기본값';
+      th.appendChild(handle);
+
+      const col = table.querySelector(`col[data-col="${key}"]`);
+      const current = () => parseInt(col.style.width, 10) || def.width;
+      const setWidth = (w) => {
+        const width = Math.max(def.min, Math.min(800, Math.round(w)));
+        saved[key] = width;
+        applyColumnWidths(table, cols, saved);
+        return width;
+      };
+      const persist = () => localStorage.setItem(storageKey, JSON.stringify(saved));
+
+      const start = (startX) => {
+        const startW = current();
+        table.classList.add('pi-resizing');
+        handle.classList.add('active');
+        const move = (x) => setWidth(startW + (x - startX));
+        const onMouse = (e) => { e.preventDefault(); move(e.clientX); };
+        const onTouch = (e) => { if (e.touches[0]) move(e.touches[0].clientX); };
+        const end = () => {
+          table.classList.remove('pi-resizing');
+          handle.classList.remove('active');
+          document.removeEventListener('mousemove', onMouse);
+          document.removeEventListener('mouseup', end);
+          document.removeEventListener('touchmove', onTouch);
+          document.removeEventListener('touchend', end);
+          persist();
+        };
+        document.addEventListener('mousemove', onMouse);
+        document.addEventListener('mouseup', end);
+        document.addEventListener('touchmove', onTouch, { passive: true });
+        document.addEventListener('touchend', end);
+      };
+      handle.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); start(e.clientX); });
+      handle.addEventListener('touchstart', (e) => { e.stopPropagation(); if (e.touches[0]) start(e.touches[0].clientX); }, { passive: true });
+      handle.addEventListener('click', (e) => e.stopPropagation());
+      // 더블클릭: 이 열만 기본값
+      handle.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        delete saved[key];
+        applyColumnWidths(table, cols, saved);
+        persist();
+      });
+      // 키보드: ←/→ 10px, Shift 와 함께 50px
+      handle.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const step = (e.shiftKey ? 50 : 10) * (e.key === 'ArrowLeft' ? -1 : 1);
+        setWidth(current() + step);
+        persist();
+      });
+    });
+  }
+
   async function loadList() {
     const tbody = document.querySelector('#contract-table tbody');
     try {
@@ -175,20 +289,20 @@
       } else {
         tbody.innerHTML = page.content.map((r, i) => `
           <tr data-id="${r.contractId}">
-            <td>${page.page * page.size + i + 1}</td>
-            <td class="pi-flag-cell">${flagCell(r, 'ismsScopeYn', 'ISMS 인증 여부')}</td>
-            <td class="fw-semibold">${perm.canWrite
+            <td class="pi-cell">${page.page * page.size + i + 1}</td>
+            <td class="pi-cell pi-flag-cell">${flagCell(r, 'ismsScopeYn', 'ISMS 인증 여부')}</td>
+            <td class="pi-cell fw-semibold" title="${esc(r.vendorName)}">${perm.canWrite
               ? `<button type="button" class="pi-vendor-link" data-vendor="${esc(r.vendorName)}" title="업체별 점검 체크리스트 업로드">${esc(r.vendorName)}</button>`
               : esc(r.vendorName)}</td>
-            <td>${esc(r.serviceName || '-')}</td>
-            <td class="pi-ellipsis" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
-            <td>${esc(r.deptName || '-')}</td>
-            <td>${esc(r.managerName || '-')}</td>
-            <td class="text-nowrap">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
-            <td class="text-nowrap">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}</td>
-            <td>${badge(r.status, r.statusLabel)}</td>
-            <td class="pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
-            <td class="text-nowrap">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
+            <td class="pi-cell" title="${esc(r.serviceName || '')}">${esc(r.serviceName || '-')}</td>
+            <td class="pi-cell" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
+            <td class="pi-cell" title="${esc(r.deptName || '')}">${esc(r.deptName || '-')}</td>
+            <td class="pi-cell" title="${esc(r.managerName || '')}">${esc(r.managerName || '-')}</td>
+            <td class="pi-cell">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
+            <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}</td>
+            <td class="pi-cell">${badge(r.status, r.statusLabel)}</td>
+            <td class="pi-cell pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
+            <td class="pi-cell">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
           </tr>`).join('');
         tbody.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => go('#/contracts/' + tr.dataset.id)));
         tbody.querySelectorAll('.pi-flag').forEach((el) => {
