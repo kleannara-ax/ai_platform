@@ -16,9 +16,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 위수탁 계약 담당자 변경 이력 (당사 담당부서·담당자, 수탁사 담당자).
+ * 위수탁 계약 담당자 변경 이력 (위탁사 = 당사 담당부서·담당자·이메일).
  *
- * <p>계약 등록 시 1건, 이후 담당자 항목이 바뀔 때마다 변경 후 값 전체를 스냅샷으로 1건 남긴다.
+ * <p>계약 등록 시 1건, 이후 위탁사 담당자 항목이 바뀔 때마다 변경 후 값과 그 시점 계약기간을 스냅샷으로 1건 남긴다.
+ * 수탁사 담당자·연락처 변경은 이력을 남기지 않는다.
  * 변경된 항목 코드는 {@code CHANGED_FIELDS}(쉼표 구분)에 기록한다.
  * 이력은 수정하지 않는다(추가만). 변경자 이름은 업무 모듈이 core_user 를 조회하지 않도록
  * 로그인 사용자 표시명을 함께 저장한다.
@@ -33,9 +34,8 @@ public class PiContactHistory extends PiBaseEntity {
     public static final String F_DEPT = "DEPT_NAME";
     public static final String F_MANAGER = "MANAGER_NAME";
     public static final String F_MANAGER_EMAIL = "MANAGER_EMAIL";
-    public static final String F_VENDOR_CONTACT = "VENDOR_CONTACT_NAME";
-    public static final String F_VENDOR_EMAIL = "VENDOR_CONTACT_EMAIL";
-    public static final String F_VENDOR_PHONE = "VENDOR_CONTACT_PHONE";
+    /** 이력 대상 항목 (위탁사 담당자) */
+    public static final java.util.List<String> TRACKED_FIELDS = java.util.List.of(F_DEPT, F_MANAGER, F_MANAGER_EMAIL);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,14 +65,14 @@ public class PiContactHistory extends PiBaseEntity {
     @Column(name = "MANAGER_EMAIL", length = 200)
     private String managerEmail;
 
-    @Column(name = "VENDOR_CONTACT_NAME", length = 100)
-    private String vendorContactName;
+    @Column(name = "CONTRACT_START_DATE")
+    private java.time.LocalDate contractStartDate;
 
-    @Column(name = "VENDOR_CONTACT_EMAIL", length = 200)
-    private String vendorContactEmail;
+    @Column(name = "CONTRACT_END_DATE")
+    private java.time.LocalDate contractEndDate;
 
-    @Column(name = "VENDOR_CONTACT_PHONE", length = 50)
-    private String vendorContactPhone;
+    @Column(name = "CONTRACT_PERIOD_NOTE", length = 500)
+    private String contractPeriodNote;
 
     @Column(name = "CHANGED_FIELDS", length = 300)
     private String changedFields;
@@ -83,8 +83,8 @@ public class PiContactHistory extends PiBaseEntity {
     @Builder
     private PiContactHistory(Long contractId, ContactChangeType changeType, String vendorName, String serviceName,
                              String deptName, String managerName, String managerEmail,
-                             String vendorContactName, String vendorContactEmail, String vendorContactPhone,
-                             String changedFields, String changedByName, Long createdBy) {
+                             java.time.LocalDate contractStartDate, java.time.LocalDate contractEndDate,
+                             String contractPeriodNote, String changedFields, String changedByName, Long createdBy) {
         this.contractId = contractId;
         this.changeType = changeType == null ? ContactChangeType.UPDATE : changeType;
         this.vendorName = vendorName;
@@ -92,9 +92,9 @@ public class PiContactHistory extends PiBaseEntity {
         this.deptName = deptName;
         this.managerName = managerName;
         this.managerEmail = managerEmail;
-        this.vendorContactName = vendorContactName;
-        this.vendorContactEmail = vendorContactEmail;
-        this.vendorContactPhone = vendorContactPhone;
+        this.contractStartDate = contractStartDate;
+        this.contractEndDate = contractEndDate;
+        this.contractPeriodNote = contractPeriodNote;
         this.changedFields = changedFields;
         this.changedByName = changedByName;
         markCreatedBy(createdBy);
@@ -111,9 +111,9 @@ public class PiContactHistory extends PiBaseEntity {
                 .deptName(c.getDeptName())
                 .managerName(c.getManagerName())
                 .managerEmail(c.getManagerEmail())
-                .vendorContactName(c.getVendorContactName())
-                .vendorContactEmail(c.getVendorContactEmail())
-                .vendorContactPhone(c.getVendorContactPhone())
+                .contractStartDate(c.getContractStartDate())
+                .contractEndDate(c.getContractEndDate())
+                .contractPeriodNote(c.getContractPeriodNote())
                 .changedFields(changedFields)
                 .changedByName(changedByName)
                 .createdBy(userId)
