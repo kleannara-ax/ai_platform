@@ -141,7 +141,7 @@ public class DailyReportService {
     }
 
     /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정, 2026-08 17→15 재조정,
-     *  2026-09 15→13 재조정)
+     *  2026-09 15→13 재조정, 2026-10 13→12 재조정)
      *  - 줄바꿈/전체 글자수는 같은 표 안의 사업부 행 전체를 합산한 "공유 총량"이다
      *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
      *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
@@ -152,6 +152,16 @@ public class DailyReportService {
      *    최악의 경우(구분선 4 + 각 행 기본 1줄×5) 22줄 포맷을 2줄 초과하는 문제가
      *    확인되어 13으로 재조정했다.
      *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 → 최대 안전 줄바꿈 수 = 22-5-4=13)
+     *  - ★ 2026-10 추가, DB 영구 저장 개편(사고/안전사고 안내 문구) 반영 — SAFETY 행
+     *    textarea 위에 파란 고정문구 줄이 항상 1줄 추가로 차지하게 되면서, 같은 22줄
+     *    한도를 유지하려면 그만큼 사람이 쓸 수 있는 줄바꿈 여유를 1 더 줄여야 한다.
+     *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 + SAFETY 고정문구 1줄
+     *     → 최대 안전 줄바꿈 수 = 22-5-4-1=12)
+     *    전체 글자수 한도도 같은 "(줄바꿈 수 + 행수)×67자" 공식을 유지하도록 함께
+     *    재계산했다: (12+5)×67 = 1139. (레이아웃 붕괴 방지라는 관점에서는 한 줄
+     *    67자 제한만으로도 세로 줄 수는 이미 통제되므로 이 글자수 한도 자체가
+     *    필수 안전장치는 아니지만, 설계 공식/화면 카운터 표시의 일관성을 위해
+     *    줄바꿈 조정과 함께 맞춘다.)
      *  - 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE, 3행)/안전사고 발생추이
      *    특이사항표(TBL_SAFETY_TREND_NOTE, 1행)는 줄바꿈 한도(9회/6회)는 유지한 채,
      *    글자수 한도만 2026-09 사용자 요청에 따라 486자/702자로 재지정했다
@@ -164,6 +174,8 @@ public class DailyReportService {
      *  - 2026-09-16: 표9/10 한 줄 제한을 78→130자로, 전체 글자수 한도를
      *    표9(TBL_SAFETY_AMOUNT_NOTE) 486→1170자, 표10(TBL_SAFETY_TREND_NOTE)
      *    702→780자로 재조정(사용자 요청). 줄바꿈 총량(9회/6회)은 변경 없음.
+     *    (표9/10은 SAFETY 고정문구 기능과 무관한 별도 표이므로 이번 2026-10
+     *    재조정 대상에서 제외된다.)
      *  프론트(index.html/safety-stats.html)에서도 동일한 상수로 실시간 검증을 하지만,
      *  프론트 검증은 우회 가능하므로(직접 API 호출 등) 여기 서버 측에서 반드시 재검증한다. */
     private static final int SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
@@ -171,7 +183,7 @@ public class DailyReportService {
     private static final Map<String, SpecialNoteSpec> SPECIAL_NOTE_SPECS = new LinkedHashMap<>();
     static {
         SPECIAL_NOTE_SPECS.put(SPECIAL_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 13, 1206, SPECIAL_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 12, 1139, SPECIAL_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_AMOUNT_NOTE_TABLE_CODE,
                 new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 1170, SAFETY_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_TREND_NOTE_TABLE_CODE,
