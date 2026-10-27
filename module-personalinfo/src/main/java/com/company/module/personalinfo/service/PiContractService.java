@@ -4,6 +4,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.personalinfo.dto.AlertLogResponse;
+import com.company.module.personalinfo.dto.ContactHistoryResponse;
 import com.company.module.personalinfo.dto.ContractDetailResponse;
 import com.company.module.personalinfo.dto.ContractFlagUpdateRequest;
 import com.company.module.personalinfo.dto.ContractFileResponse;
@@ -13,11 +14,14 @@ import com.company.module.personalinfo.dto.ContractSummaryResponse;
 import com.company.module.personalinfo.dto.ContractTerminateRequest;
 import com.company.module.personalinfo.dto.DashboardResponse;
 import com.company.module.personalinfo.dto.InspectionResponse;
+import com.company.module.personalinfo.entity.ContactChangeType;
 import com.company.module.personalinfo.entity.ContractStatus;
+import com.company.module.personalinfo.entity.PiContactHistory;
 import com.company.module.personalinfo.entity.InspectionResult;
 import com.company.module.personalinfo.entity.PiContract;
 import com.company.module.personalinfo.entity.PiInspection;
 import com.company.module.personalinfo.repository.PiAlertLogRepository;
+import com.company.module.personalinfo.repository.PiContactHistoryRepository;
 import com.company.module.personalinfo.repository.PiContractFileRepository;
 import com.company.module.personalinfo.repository.PiContractRepository;
 import com.company.module.personalinfo.repository.PiInspectionRepository;
@@ -65,6 +69,7 @@ public class PiContractService {
     private final PiContractFileRepository fileRepository;
     private final PiInspectionRepository inspectionRepository;
     private final PiAlertLogRepository alertLogRepository;
+    private final PiContactHistoryRepository contactHistoryRepository;
 
     public Page<ContractSummaryResponse> search(ContractSearchCondition cond, int page, int size, String sort) {
         LocalDate today = LocalDate.now();
@@ -93,6 +98,11 @@ public class PiContractService {
 
     @Transactional
     public ContractDetailResponse create(ContractSaveRequest r, Long userId) {
+        return create(r, userId, null);
+    }
+
+    @Transactional
+    public ContractDetailResponse create(ContractSaveRequest r, Long userId, String userName) {
         validate(r);
         PiContract contract = PiContract.builder()
                 .ismsScopeYn(r.getIsmsScopeYn())
@@ -123,13 +133,22 @@ public class PiContractService {
                 .createdBy(userId)
                 .build();
         PiContract saved = contractRepository.save(contract);
+        if (hasAnyContact(saved)) {
+            contactHistoryRepository.save(PiContactHistory.snapshot(saved, ContactChangeType.CREATE, null, userName, userId));
+        }
         return ContractDetailResponse.of(saved, LocalDate.now(), List.of(), List.of(), List.of());
     }
 
     @Transactional
     public ContractDetailResponse update(Long contractId, ContractSaveRequest r, Long userId) {
+        return update(contractId, r, userId, null);
+    }
+
+    @Transactional
+    public ContractDetailResponse update(Long contractId, ContractSaveRequest r, Long userId, String userName) {
         validate(r);
         PiContract c = findActive(contractId);
+        String[] before = contactValues(c);
         c.update(r.getIsmsScopeYn(), trim(r.getVendorName()), trim(r.getServiceName()), trim(r.getEntrustedTask()),
                 trim(r.getDeptName()), trim(r.getManagerName()), trim(r.getManagerEmail()),
                 trim(r.getVendorContactName()), trim(r.getVendorContactEmail()), trim(r.getVendorContactPhone()),
@@ -139,7 +158,64 @@ public class PiContractService {
                 emptyToNull(r.getSubcontractConsentYn()),
                 r.getAlertYn(), r.getAlertDaysBefore(), trim(r.getAlertExtraEmails()), trim(r.getRemark()),
                 userId);
+        recordContactChange(c, before, userName, userId);
         return getDetail(contractId);
+    }
+
+    /**
+     * 협력사(업체) 담당자 변경 이력.
+     * 같은 업체(㈜/(주)/공백 차이 무시)의 모든 계약 이력을 최신순으로 돌려준다. 삭제된 계약은 제외.
+     */
+    public List<ContactHistoryResponse> getContactHistory(Long contractId, boolean vendorWide) {
+        PiContract c = findActive(contractId);
+        List<Long> ids;
+        if (vendorWide) {
+            String key = PiVendorNames.key(c.getVendorName());
+            ids = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+                    .filter(x -> PiVendorNames.key(x.getVendorName()).equals(key))
+                    .map(PiContract::getContractId).toList();
+        } else {
+            ids = List.of(contractId);
+        }
+        return contactHistoryRepository.findByContractIdInAndDeletedYnOrderByCreatedAtDescHistoryIdDesc(ids, N)
+                .stream().map(h -> ContactHistoryResponse.of(h, contractId)).toList();
+    }
+
+    private static final String[] CONTACT_FIELDS = {
+            PiContactHistory.F_DEPT, PiContactHistory.F_MANAGER, PiContactHistory.F_MANAGER_EMAIL,
+            PiContactHistory.F_VENDOR_CONTACT, PiContactHistory.F_VENDOR_EMAIL, PiContactHistory.F_VENDOR_PHONE};
+
+    private static String[] contactValues(PiContract c) {
+        return new String[]{c.getDeptName(), c.getManagerName(), c.getManagerEmail(),
+                c.getVendorContactName(), c.getVendorContactEmail(), c.getVendorContactPhone()};
+    }
+
+    private static boolean hasAnyContact(PiContract c) {
+        for (String v : contactValues(c)) {
+            if (StringUtils.hasText(v)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 담당자 항목이 하나라도 바뀌면 변경 후 스냅샷 1건 기록 (대소문자·앞뒤 공백만 다른 경우는 변경 아님) */
+    private void recordContactChange(PiContract c, String[] before, String userName, Long userId) {
+        String[] after = contactValues(c);
+        List<String> changed = new java.util.ArrayList<>();
+        for (int i = 0; i < CONTACT_FIELDS.length; i++) {
+            if (!normalize(before[i]).equalsIgnoreCase(normalize(after[i]))) {
+                changed.add(CONTACT_FIELDS[i]);
+            }
+        }
+        if (!changed.isEmpty()) {
+            contactHistoryRepository.save(PiContactHistory.snapshot(c, ContactChangeType.UPDATE,
+                    String.join(",", changed), userName, userId));
+        }
+    }
+
+    private static String normalize(String v) {
+        return v == null ? "" : v.trim();
     }
 
     /**

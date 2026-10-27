@@ -55,3 +55,9 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-flag .form-check-input{cursor:pointer;margin-top:0;}
 .pi-flag-text{font-weight:600;min-width:1em;}
 .pi-flag .form-check-input:checked + .pi-flag-text{color:var(--pi-brand);}
+.pi-ch-changed{background:#fef3c7;border-radius:4px;padding:0 4px;font-weight:600;}
+#contact-history-table tr.pi-ch-other td{color:#6b7280;}
+#contact-history-table tr.pi-ch-other .pi-ch-changed{color:#92400e;}
+#contact-history-table{font-size:.85rem;}
+#contact-history-table td,#contact-history-table th{vertical-align:middle;}
+.pi-ch-fields{display:flex;flex-wrap:wrap;gap:3px;max-width:190px;}
