@@ -161,7 +161,11 @@
     </div>
   </main>
 
-  <script src="/steam/js/energy-linked-sources.js?v=20260922-client3"></script>
+  <style>
+    /* 전년 12월 열 — 작년 데이터에서 자동으로 채운 값 */
+    .emc-calc.prev-dec { color: #475569; font-style: italic; }
+  </style>
+  <script src="/steam/js/energy-linked-sources.js?v=20261022-invest"></script>
   <script>
   (function () {
     const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -182,15 +186,16 @@
     // unit-fluidized-monthly 의 도급비용 (contractCost = 가동시간 운영비 + 운휴 고정비 + 설비개선비 - 차감비 + 추가지급분)
     //   원본 단위: 천원 → 백만원으로 변환
     // 저장소: DB steam_cell_value (table_name=fluidized_monthly_cache, row_key=contractCost, col_index=1..12)
-    const __fmcCache = { year: null, data: null };
+    const __fmcCache = new Map();   // year → { 1: 값, … }
     async function fetchFluidizedContract(year) {
-      if (__fmcCache.year === year && __fmcCache.data) return __fmcCache.data;
+      const yk = String(year);
+      if (__fmcCache.has(yk)) return __fmcCache.get(yk);
       try {
         const params = new URLSearchParams({
           month: String(year), tableNames: "fluidized_monthly_cache", limit: "1000",
         });
         const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (!resp.ok) { __fmcCache.year = year; __fmcCache.data = {}; return {}; }
+        if (!resp.ok) { __fmcCache.set(yk, {}); return {}; }
         const payload = await resp.json();
         const out = {};
         (payload.data || []).forEach((row) => {
@@ -201,7 +206,7 @@
           const v = Number(row.cell_value);
           if (Number.isFinite(v) && v !== 0) out[m] = v / 1000; // 천원 → 백만원
         });
-        __fmcCache.year = year; __fmcCache.data = out;
+        __fmcCache.set(yk, out);
         return out;
       } catch (e) {
         console.error("[emc fetchFluidizedContract]", e);
@@ -210,14 +215,101 @@
     }
     function importFluidizedContract(year) {
       // 동기 호출용 — 캐시된 데이터 반환 (loadAndRender 에서 사전 fetch).
-      return (__fmcCache.year === year && __fmcCache.data) ? __fmcCache.data : {};
+      return __fmcCache.get(String(year)) || {};
+    }
+
+    // 스팀생산실적(combo_boiler_production) → 월별 스팀총계.
+    //   row_key = `${field}-${day}`, month = 'YYYY-MM'. 스팀총계는 그 페이지의 totalSteam 과 같은 7개 항목의 합이다.
+    //   한 달에 값이 하나도 없으면 그 달은 비워 둔다(0 이 아니라 null).
+    const STEAM_TOTAL_FIELDS = ["comboSteam", "externalSteam", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam"];
+    const __cbpCache = new Map();   // year → { 1: 값, … }
+    async function fetchComboProductionTotal(year) {
+      const yk = String(year);
+      if (__cbpCache.has(yk)) return __cbpCache.get(yk);
+      const out = {};
+      try {
+        const params = new URLSearchParams({
+          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "combo_boiler_production", limit: "20000",
+        });
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (resp.ok) {
+          const payload = await resp.json();
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== "combo_boiler_production") return;
+            const field = String(row.row_key).split("-")[0];
+            if (!STEAM_TOTAL_FIELDS.includes(field)) return;
+            const monthNo = Number(String(row.month).split("-")[1]);
+            if (!(monthNo >= 1 && monthNo <= 12)) return;
+            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(v)) return;
+            out[monthNo] = (out[monthNo] || 0) + v;
+          });
+        }
+      } catch (e) { console.error("[emc fetchComboProductionTotal]", e); }
+      __cbpCache.set(yk, out);
+      return out;
+    }
+    function importComboProductionTotal(year) {
+      return __cbpCache.get(String(year)) || {};
+    }
+
+    // 폐합성소각로 도급내역(incinerator_contract) → 월별 결산 기준 총 운영비용(원).
+    //   row_key = `${section}|${day}|${field}` (section unit1/unit2), month = 'YYYY-MM'.
+    //   도급내역 페이지와 같은 식: 호기별 (스팀량×운영단가) + (운휴시간×시간당 고정비) 를 날마다 더한다.
+    //   1호기 운휴시간이 비어 있는 날은 그 페이지처럼 24 로 본다. 값이 하나도 없는 달은 비워 둔다.
+    const __incCache = new Map();   // year → { 1: 백만원, … }
+    async function fetchIncineratorContractTotal(year) {
+      const yk = String(year);
+      if (__incCache.has(yk)) return __incCache.get(yk);
+      const out = {};
+      try {
+        const params = new URLSearchParams({
+          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
+        });
+        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (resp.ok) {
+          const payload = await resp.json();
+          const byMonth = new Map();   // monthNo → Map("unit1|5|steam" → 값)
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== "incinerator_contract") return;
+            const monthNo = Number(String(row.month).split("-")[1]);
+            if (!(monthNo >= 1 && monthNo <= 12)) return;
+            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(v)) return;
+            if (!byMonth.has(monthNo)) byMonth.set(monthNo, new Map());
+            byMonth.get(monthNo).set(String(row.row_key), v);
+          });
+          byMonth.forEach((cells, monthNo) => {
+            const days = new Date(Number(yk), monthNo, 0).getDate();
+            let total = 0, has = false;
+            ["unit1", "unit2"].forEach((unit) => {
+              for (let day = 1; day <= days; day += 1) {
+                const g = (field) => cells.get(`${unit}|${day}|${field}`);
+                const steam = g("steam"), price = g("unit"), fixed = g("fixed");
+                let runtime = g("runtime");
+                if (unit === "unit1" && runtime === undefined) runtime = 24;
+                const oper = (steam !== undefined && price !== undefined) ? steam * price : null;
+                const stop = (runtime !== undefined && fixed !== undefined) ? runtime * fixed : null;
+                if (oper !== null || stop !== null) { total += (oper || 0) + (stop || 0); has = true; }
+              }
+            });
+            if (has) out[monthNo] = total / 1000000;   // 원 → 백만원
+          });
+        }
+      } catch (e) { console.error("[emc fetchIncineratorContractTotal]", e); }
+      __incCache.set(yk, out);
+      return out;
+    }
+    function importIncineratorContractTotal(year) {
+      return __incCache.get(String(year)) || {};
     }
 
     // 외부 import 디스패치 — row.importSource 에 따라 호출
     // energy_fuel_ratio DB 캐시 — 한 번만 fetch
-    const __efrDataCache = { year: null, data: null };
+    const __efrDataCache = new Map();   // year → Map("t04|r03|2" → 값)
     async function fetchFuelRatio(year) {
-      if (__efrDataCache.year === year && __efrDataCache.data) return __efrDataCache.data;
+      const yk = String(year);
+      if (__efrDataCache.has(yk)) return __efrDataCache.get(yk);
       try {
         const params = new URLSearchParams({
           month: String(year), tableNames: "energy_fuel_ratio", limit: "10000",
@@ -230,17 +322,17 @@
           if (row.table_name !== "energy_fuel_ratio") return;
           map.set(`${row.row_key}|${row.col_index}`, Number(row.cell_value));
         });
-        __efrDataCache.year = year;
-        __efrDataCache.data = map;
+        __efrDataCache.set(yk, map);
         return map;
       } catch (e) { return null; }
     }
-    function getEfrSync(rowKey, col) {
-      if (!__efrDataCache.data) return null;
-      const v = __efrDataCache.data.get(`${rowKey}|${col}`);
+    function getEfrSync(year, rowKey, col) {
+      const map = __efrDataCache.get(String(year));
+      if (!map) return null;
+      const v = map.get(`${rowKey}|${col}`);
       return (typeof v === "number" && Number.isFinite(v)) ? v : null;
     }
-    function importFuelRatioRow(year, rowKey) {
+    function importFuelRatioRow(year, rowKey, scale) {
       // rowKey 예: "t04|r03" (호기별 연료비배분 / 제지 소계)
       // 결과: { 1: value, ..., 12: value }
       // col_index 매핑: efr col 1 = 24.12월, 2 = 1월, ..., 13 = 12월
@@ -248,19 +340,29 @@
       // → col = month + 1
       const out = {};
       for (let m = 1; m <= 12; m++) {
-        const v = getEfrSync(rowKey, m + 1);
-        if (v !== null) out[m] = v;
+        const v = getEfrSync(year, rowKey, m + 1);
+        if (v !== null) out[m] = scale ? v * scale : v;
       }
       return out;
     }
 
+    // 작년 인보이스 연동값 스냅샷 — 공용 js(EnergyLinkedSources)는 한 해만 캐시하므로 먼저 받아 복사해 둔다
+    const __linkedPrev = { year: null, srf: {}, client: {} };
     function importValues(importSource, year) {
+      if (String(year) === __linkedPrev.year) {
+        if (importSource === "srf-invoice-total") return __linkedPrev.srf;
+        if (importSource === "srf-client-non-power") return __linkedPrev.client;
+      }
       if (importSource === "srf-invoice-total") return window.EnergyLinkedSources.compositeSteamPurchaseSync(year);
       if (importSource === "srf-client-non-power") return window.EnergyLinkedSources.compositeLngEtcSync(year);
       if (importSource === "fluidized-monthly") return importFluidizedContract(year);
+      if (importSource === "combo-production-total") return importComboProductionTotal(year);
+      if (importSource === "incinerator-contract-total") return importIncineratorContractTotal(year);
       if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
       if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
       if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
+      if (importSource === "fuel-ratio-paper-prod") return importFuelRatioRow(year, "t06|r03", 1 / 1000);   // 제품생산량 / 제지 소계 (kg → 톤)
+      if (importSource === "fuel-ratio-tissue-prod") return importFuelRatioRow(year, "t06|r07", 1 / 1000);  // 제품생산량 / 화장지 소계 (kg → 톤)
       return {};
     }
 
@@ -274,7 +376,15 @@
     //   cls: 'subtotal' | 'total'
     //   note: 비고 표시 여부 (기본 true). 비고는 같은 카테고리의 첫 row 에서만 rowspan
     // 월마다 바뀌지 않는 차감비 — 연료비 배분비율 페이지도 같은 값을 써서 js/energy-linked-sources.js 에 둔다.
-    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED } = window.EnergyLinkedSources;
+    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED, COMPOSITE_INVEST_FIXED } = window.EnergyLinkedSources;
+
+    // (당월 원단위 − 전월 원단위) × 당월 생산량 ÷ 1000 — 두 달 원단위가 모두 있어야 계산한다.
+    function unitDeltaProfit(unitRow, prodRow, m) {
+      if (m < 1) return null;
+      const cur = unitRow[m], prev = unitRow[m - 1], prod = prodRow[m];
+      if (!Number.isFinite(cur) || !Number.isFinite(prev) || !Number.isFinite(prod)) return null;
+      return (cur - prev) * prod / 1000;
+    }
 
     const FUEL_ROWS = [
       { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"imported",
@@ -282,7 +392,9 @@
       // 제스코(zesco:true) 행은 없어진 업체라 기본으로 숨긴다 — 값·수식은 그대로 두고 화면에서만 뺀다.
       { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input", zesco:true },
       { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
-      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"input" },
+      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"imported",
+        importSource:"incinerator-contract-total", importLabel:"폐합성소각로 도급내역 → 결산 기준 총 운영비용 월 합계 (1호기 소계 + 2호기 소계, 원 → 백만원). 도급내역이 없는 달은 저장된 값",
+        fallbackStored:true },
       { key:"fluidSteam",      label:"유동상소각로 스팀구매",        cat:"연료비",    kind:"imported",
         importSource:"fluidized-monthly", importLabel:"유동상 운영내역 → 도급비용" },
       { key:"fuelMonthlySum",  label:"연료비 월별 (소계)",           cat:"연료비",    kind:"sum",
@@ -292,8 +404,9 @@
       { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input", zesco:true },
       { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"imported",
         importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 1. Utilities(전력 제외) + 2. Other Charge 청구금액 합 (원 → 백만원)" },
-      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"input" },
-      // 아래 둘은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      // 아래 셋은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"formula",
+        formula:() => COMPOSITE_INVEST_FIXED },
       { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"formula",
         formula:() => COMPOSITE_INCOME_FIXED },
       { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"formula",
@@ -316,8 +429,11 @@
 
       { key:"prodTotal",       label:"생산량",                       cat:"생산량",    kind:"formula",
         formula:(r,m) => (r.paperProd[m] ?? 0) + (r.tissueProd[m] ?? 0) },
-      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"input" },
-      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"input" },
+      // 연료비 배분비율 '제품생산량 (kg)' 표의 소계 — kg 을 톤으로
+      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-paper-prod", importLabel:"연료비 배분비율 → 제품생산량 / 제지 소계 (kg → 톤)" },
+      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-tissue-prod", importLabel:"연료비 배분비율 → 제품생산량 / 화장지 소계 (kg → 톤)" },
 
       { key:"totalUnit",       label:"총 원단위 (연료비/생산량)",    cat:"원단위",    kind:"formula",
         formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.prodTotal[m] ?? 0) },
@@ -326,17 +442,24 @@
       { key:"livingUnit",      label:"생활 원단위 (연료비/생산량)",  cat:"원단위",    kind:"formula",
         formula:(r,m) => safeDiv((r.livingFuel[m] ?? 0) * 1000, r.tissueProd[m] ?? 0) },
 
+      // 손익 — 엑셀 '회계비용 마감과 실마감 비교' r28~r30 과 같은 식.
+      //   (당월 원단위 − 전월 원단위) × 당월 생산량 ÷ 1000.  1월의 전월은 전년 12월(열 0, 작년 데이터).
       { key:"profitDelta",     label:"전월대비 손익증감",            cat:"손익",      kind:"formula",
-        formula:(r,m) => m > 0 && Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.fuelActual[m-1]) ? -(r.fuelActual[m] - r.fuelActual[m-1]) : null },
-      { key:"paperProfit",     label:"제지손익",                     cat:"손익",      kind:"input" },
-      { key:"livingProfit",    label:"생활손익",                     cat:"손익",      kind:"input" },
+        formula:(r,m) => unitDeltaProfit(r.totalUnit, r.prodTotal, m) },
+      { key:"paperProfit",     label:"제지손익",                     cat:"손익",      kind:"formula",
+        formula:(r,m) => unitDeltaProfit(r.paperUnit, r.paperProd, m) },
+      { key:"livingProfit",    label:"생활손익",                     cat:"손익",      kind:"formula",
+        formula:(r,m) => unitDeltaProfit(r.livingUnit, r.tissueProd, m) },
       { key:"profitSum",       label:"손익합계 (제지+생활)",         cat:"손익",      kind:"sum",
         srcKeys:["paperProfit","livingProfit"], cls:"subtotal" },
 
-      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"input" },
+      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"imported",
+        importSource:"combo-production-total", importLabel:"스팀생산실적 → 스팀총계 월 합계 (복합 + 외부 + 폐합성 1·2호 + 깨끗한나라 20·50톤 + 유동상)" },
       { key:"lngBurner",       label:"LNG 직버너 사용 비용",         cat:"보조 분석", kind:"imported",
         importSource:"fuel-ratio-lng-burner", importLabel:"연료비 배분비율 → 버너 LNG 비용 / 합계" },
-      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"input" },
+      // 엑셀 r34 = r16 − r33
+      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"formula",
+        formula:(r,m) => (Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.lngBurner[m])) ? r.fuelActual[m] - r.lngBurner[m] : null },
       { key:"boilerSteamUnit", label:"스팀톤당 보일러 연료비 (천원/톤)", cat:"보조 분석", kind:"formula",
         formula:(r,m) => safeDiv((r.boilerFuel[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
       { key:"fuelSteamUnit",   label:"스팀톤당 연료비 (천원/톤)",    cat:"보조 분석", kind:"formula",
@@ -493,27 +616,41 @@
       return sec[monthIdx];
     }
 
-    function renderSection(section) {
-      const def = SECTION_DEFS[section];
-      const body = document.getElementById(def.bodyId);
-      const ys = getYearState();
-      const secStore = ys[section];
-
-      // 데이터 배열 초기화 (input 의 raw 값을 computed[section] 에도 저장 — 계산식이 참조)
+    /* 한 해의 섹션 값을 계산한다 — 입력/가져오기 값을 깔고 합계·수식을 순서대로.
+     *   secStore : 그 해의 DB 저장값 { rowKey: { monthIdx: 값 } }
+     *   year     : 가져오기(연료비 배분비율·인보이스·유동상) 연도
+     *   prevDec  : 전년 12월 열(열 0)에 덮어쓸 값 { rowKey: 값 } — 작년 데이터에서 계산한 작년 12월
+     * 엑셀의 '24. 12월' 열이 작년 시트의 12월 값인 것과 같다. 작년 값이 없는 행은 저장된 열 0 값을 그대로 쓴다. */
+    function computeSection(def, secStore, year, prevDec, target) {
+      const out = target || {};
       def.rows.forEach((row) => {
-        if (!computed[section][row.key]) computed[section][row.key] = {};
+        if (!out[row.key]) out[row.key] = {};
         if (row.kind === "input") {
           // 0..13 (prev/12개월/next)
           for (let m = 0; m <= 13; m++) {
             const v = secStore[row.key]?.[m];
-            computed[section][row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+            out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
           }
         } else if (row.kind === "imported") {
-          // 외부 페이지에서 자동 가져오기 (1월~12월만 — prev/next 는 null)
-          const imported = importValues(row.importSource, currentYear);
+          // 외부 페이지에서 자동 가져오기 (1월~12월). 전년 12월(0)·다음해 1월(13)은 가져올 곳이 없으니
+          // 저장된 값(엑셀 업로드의 '24. 12월' 열 등)을 쓴다 — 작년 데이터가 있으면 아래에서 덮어쓴다.
+          const imported = importValues(row.importSource, year);
           for (let m = 0; m <= 13; m++) {
-            computed[section][row.key][m] = (m >= 1 && m <= 12 && imported[m] !== undefined) ? imported[m] : null;
+            if (m >= 1 && m <= 12) {
+              out[row.key][m] = imported[m] !== undefined ? imported[m] : null;
+              // fallbackStored 행: 가져올 데이터가 없는 달은 저장된 값(엑셀 업로드·예전 수기 입력)을 쓴다
+              if (out[row.key][m] === null && row.fallbackStored) {
+                const v = secStore[row.key]?.[m];
+                out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+              }
+            } else {
+              const v = secStore[row.key]?.[m];
+              out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+            }
           }
+        }
+        if (row.kind === "input" || row.kind === "imported") {
+          if (Number.isFinite(prevDec[row.key])) out[row.key][0] = prevDec[row.key];
         }
       });
 
@@ -521,18 +658,62 @@
       def.rows.forEach((row) => {
         if (row.kind === "sum") {
           for (let m = 0; m <= 13; m++) {
-            const vals = row.srcKeys.map((k) => computed[section][k]?.[m]).filter(Number.isFinite);
-            computed[section][row.key][m] = vals.length ? vals.reduce((s, v) => s + v, 0) : null;
+            const vals = row.srcKeys.map((k) => out[k]?.[m]).filter(Number.isFinite);
+            out[row.key][m] = vals.length ? vals.reduce((s, v) => s + v, 0) : null;
           }
         } else if (row.kind === "formula") {
           for (let m = 0; m <= 13; m++) {
             try {
-              const v = row.formula(computed[section], m, computed);
-              computed[section][row.key][m] = (v === null || !Number.isFinite(v)) ? null : v;
-            } catch (e) { computed[section][row.key][m] = null; }
+              const v = row.formula(out, m);
+              out[row.key][m] = (v === null || !Number.isFinite(v)) ? null : v;
+            } catch (e) { out[row.key][m] = null; }
           }
         }
+        if (row.kind === "sum" || row.kind === "formula") {
+          if (Number.isFinite(prevDec[row.key])) out[row.key][0] = prevDec[row.key];
+          // 전년 12월·다음해 1월은 전월이 없어 못 구하는 수식(손익 등)이 있다 — 엑셀처럼 저장된 상수가 있으면 그걸 보여 준다
+          [0, 13].forEach((m) => {
+            if (out[row.key][m] !== null) return;
+            const v = secStore[row.key]?.[m];
+            if (!(v === undefined || v === "" || v === null) && Number.isFinite(Number(v))) out[row.key][m] = Number(v);
+          });
+        }
       });
+      return out;
+    }
+
+    // 작년 12월 값 — 작년 저장값 + 작년 가져오기 값으로 섹션 전체를 계산해 12월 열만 뽑는다
+    const __prevDec = { year: null, values: {} };
+    function buildPrevDec(section) {
+      const def = SECTION_DEFS[section];
+      const prevYear = String(Number(currentYear) - 1);
+      const prevStore = (store[prevYear] && store[prevYear][section]) || {};
+      const prevComputed = computeSection(def, prevStore, prevYear, {}, {});
+      const values = {};
+      // 작년 12월에 입력·가져오기 값이 하나도 없으면 작년 데이터가 없는 것이다 — 수식 행이 0 으로 계산된
+      // 값을 전년 12월 열에 덮어쓰면 안 되므로 비워 둔다 (저장된 열 0 값을 그대로 쓴다).
+      const hasBase = def.rows.some((row) => (row.kind === "input" || row.kind === "imported") && Number.isFinite(prevComputed[row.key]?.[12]));
+      if (!hasBase) { __prevDec.year = currentYear; __prevDec.values = {}; return values; }
+      def.rows.forEach((row) => {
+        const v = prevComputed[row.key]?.[12];
+        if (Number.isFinite(v)) values[row.key] = v;
+      });
+      __prevDec.year = currentYear;
+      __prevDec.values = values;
+      return values;
+    }
+    function hasPrevDec(rowKey) {
+      return __prevDec.year === currentYear && Number.isFinite(__prevDec.values[rowKey]);
+    }
+
+    function renderSection(section) {
+      const def = SECTION_DEFS[section];
+      const body = document.getElementById(def.bodyId);
+      const ys = getYearState();
+      const secStore = ys[section];
+
+      const prevDec = buildPrevDec(section);
+      computeSection(def, secStore, currentYear, prevDec, computed[section]);
 
       // group rows by cat for rowspan — 숨긴 제스코 행은 그리지 않는다(계산은 위에서 이미 끝났다)
       const catGroups = [];
@@ -563,9 +744,13 @@
 
           // 0..13 monthly cells + 합계 + 평균
           for (let m = 0; m <= 13; m++) {
-            if (row.kind === "input") {
+            if (row.kind === "input" && !(m === 0 && hasPrevDec(row.key))) {
               const v = secStore[row.key]?.[m] ?? "";
               tr.push(`<td>${inputHtml(section, row.key, m, v)}</td>`);
+            } else if (row.kind === "input") {
+              // 전년 12월 — 작년 데이터에서 계산한 값 (엑셀 '24. 12월' 열과 같은 뜻)
+              const v = computed[section][row.key][0];
+              tr.push(`<td class="num"><span class="emc-calc prev-dec${v !== null && v < 0 ? " neg" : ""}" title="작년 12월 값 (작년 데이터에서 자동)">${fmt(v, 1)}</span></td>`);
             } else {
               const v = computed[section][row.key][m];
               const extraCls = row.kind === "imported" ? " imported" : "";
@@ -765,15 +950,35 @@
     }
 
     async function loadAndRender() {
-      // 캐시 무효화 후 새 연도 fetch (병렬)
-      __fmcCache.year = null; __fmcCache.data = null;
+      // 캐시 무효화 후 올해 + 작년 fetch. 작년은 전년 12월 열(열 0)을 채우는 데 쓴다.
+      const prevYear = String(Number(currentYear) - 1);
+      __fmcCache.clear();
+      __efrDataCache.clear();
+      __cbpCache.clear();
+      __incCache.clear();
+      __prevDec.year = null; __prevDec.values = {};
       window.EnergyLinkedSources.resetCache();
+      // 인보이스 연동(공용 js)은 한 해만 캐시 → 작년 것을 먼저 받아 복사해 두고 나서 올해 것을 받는다
+      const [prevSrf, prevClient] = await Promise.all([
+        window.EnergyLinkedSources.fetchCompositeSteamPurchase(prevYear).catch(() => ({})),
+        window.EnergyLinkedSources.fetchCompositeLngEtc(prevYear).catch(() => ({})),
+      ]);
+      __linkedPrev.year = prevYear;
+      __linkedPrev.srf = { ...(prevSrf || {}) };
+      __linkedPrev.client = { ...(prevClient || {}) };
       await Promise.all([
         window.EnergyLinkedSources.fetchCompositeSteamPurchase(currentYear).catch(() => {}),
         window.EnergyLinkedSources.fetchCompositeLngEtc(currentYear).catch(() => {}),
         loadStoreFromDB(currentYear).catch(() => {}),
+        loadStoreFromDB(prevYear).catch(() => {}),
         fetchFuelRatio(currentYear).catch(() => {}),
+        fetchFuelRatio(prevYear).catch(() => {}),
         fetchFluidizedContract(currentYear).catch(() => {}),
+        fetchFluidizedContract(prevYear).catch(() => {}),
+        fetchComboProductionTotal(currentYear).catch(() => {}),
+        fetchComboProductionTotal(prevYear).catch(() => {}),
+        fetchIncineratorContractTotal(currentYear).catch(() => {}),
+        fetchIncineratorContractTotal(prevYear).catch(() => {}),
       ]);
       renderAll();
       fitTableHeight();

@@ -22,16 +22,28 @@
     /* inc-card 의 overflow:hidden 이 sticky thead 를 깨뜨림 → 이 페이지에서 visible 로.
        body 가 단일 스크롤 컨테이너이므로 thead sticky(top:0) 가 동작. */
     body.landing-body[data-page-kind="incinerator-co"] .inc-card { overflow:visible; }
-    /* '실 스팀량 기준' 표는 헤더가 2행(rowspan/colspan) → 2번째 행은 1행 높이만큼 내려 고정 */
-    body.landing-body[data-page-kind="incinerator-co"] .inc-table[data-form="real"] thead tr:last-child th { top:34px; }
+    /* 머리글이 2행(rowspan/colspan)인 표 → 2번째 행은 1행 높이만큼 내려 고정 */
+    body.landing-body[data-page-kind="incinerator-co"] .inc-table thead tr + tr th { top:34px; }
     /* 셸 iframe: body 를 고정 높이의 단일 스크롤 컨테이너로 → thead sticky 동작 */
     body.platform-embedded[data-page-kind="incinerator-co"] { height:100vh !important; overflow:auto !important; }
     html.platform-embedded { overflow:hidden !important; }
+    /* 엑셀처럼 한 페이지에 모두 — 탭 없이 섹션을 전부 펼친다 */
+    body.landing-body[data-page-kind="incinerator-co"] .inc-section { display:block; }
+    body.landing-body[data-page-kind="incinerator-co"] .inc-section + .inc-section { margin-top:16px; }
+    /* 1호기 + 2호기 합계 열 — 엑셀 Q·R 열 */
+    .inc-table td.computed.both { background:#f3f7fb; font-weight:600; }
+    .inc-table thead th.both { background:#e8f0f8; }
+    /* 2호기 스팀량 — 실 스팀량 기준에서 가져온 값(336 상한). 손으로 고치면 보통 입력칸 모양으로 돌아간다 */
+    .inc-table .input-cell input.linked { color:#0a7a5f; font-weight:600; }
+    /* 월 합계 두 표를 나란히 */
+    .inc-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+    @media (max-width: 1100px) { .inc-summary-grid { grid-template-columns:1fr; } }
+    .inc-table td.computed.neg { color:#c0392b; }
+    .inc-muted { color:#64748b; font-size:12px; margin:-6px 0 10px; }
     @media print {
       body.landing-body[data-page-kind="incinerator-co"] { background:#fff; }
+      .inc-summary-grid { grid-template-columns:1fr 1fr; }
     }
-      /* 2호기 스팀량에서 가져온 값 — 손으로 고치면 보통 입력칸 모양으로 돌아간다 */
-    .inc-table .input-cell input.linked { color:#0a7a5f; font-weight:600; }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
 </head>
@@ -41,7 +53,7 @@
       <div class="inc-header">
         <div class="inc-header-title">
           <h1>1. 소각로 도급비용 (일별)</h1>
-          <p>결산 기준 1호기/2호기 + 실 스팀량 기준 비교</p>
+          <p>결산 기준 (1호기 + 2호기) · 실 스팀량 기준 · 월 합계 — 엑셀 '1. 도급내역' 시트와 같은 구성</p>
         </div>
         <div class="inc-toolbar">
           <select id="invoiceYear" aria-label="조회 연도"></select>
@@ -51,79 +63,57 @@
         </div>
       </div>
 
-      <div class="inc-tabs" role="tablist">
-        <button type="button" class="inc-tab active" data-target="unit1">1호기</button>
-        <button type="button" class="inc-tab" data-target="unit2">2호기</button>
-        <button type="button" class="inc-tab" data-target="real">실 스팀량 기준</button>
-      </div>
-
-      <!-- 1호기 -->
-      <section class="inc-section active" data-section="unit1">
+      <!-- 결산 기준 — 1호기 · 2호기 · 합계 (엑셀 B3:R39) -->
+      <section class="inc-section" data-section="settle">
         <div class="inc-card">
-          <h3 class="inc-section-title">1호기 — 결산 기준</h3>
+          <h3 class="inc-section-title">결산 기준 — 1호기 + 2호기</h3>
+          <p class="inc-muted">1호기 스팀량·운영단가·운영비용은 쓰지 않아 숨겼습니다(운휴 운영비용 = 소계라 소계 하나만 둠). 저장된 값은 그대로 두고 소계 계산에는 들어갑니다.</p>
           <div class="inc-table-wrap">
-            <table class="data-table inc-table" data-form="unit1">
+            <table class="data-table inc-table" data-form="settle">
               <colgroup>
-                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
-                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
-              </colgroup>
-              <thead>
-                <tr><th>일별</th>
-                  <th>스팀량(톤)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
-                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th>
-                  <th>1호기 소계(원)</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- 2호기 -->
-      <section class="inc-section" data-section="unit2">
-        <div class="inc-card">
-          <h3 class="inc-section-title">2호기 — 결산 기준</h3>
-          <div class="inc-table-wrap">
-            <table class="data-table inc-table" data-form="unit2">
-              <colgroup>
-                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
-                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
-              </colgroup>
-              <thead>
-                <tr><th>일별</th>
-                  <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
-                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th>
-                  <th>2호기 소계(원)</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- 실 스팀량 기준 -->
-      <section class="inc-section" data-section="real">
-        <div class="inc-card">
-          <h3 class="inc-section-title">실 스팀량 기준 — 1호기 + 2호기</h3>
-          <div class="inc-table-wrap">
-            <table class="data-table inc-table" data-form="real">
-              <colgroup>
-                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-day">
                 <col class="c-eq"><col class="c-eq"><col class="c-eq">
+                <col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
                 <col class="c-eq"><col class="c-eq">
               </colgroup>
               <thead>
                 <tr>
                   <th rowspan="2">일별</th>
                   <th colspan="3">1호기</th>
-                  <th colspan="3">2호기</th>
-                  <th rowspan="2">스팀량 합계(ton)</th>
-                  <th rowspan="2">총 운영비용(원)</th>
+                  <th colspan="7">2호기</th>
+                  <th rowspan="2" class="both">스팀량 합계(ton)</th>
+                  <th rowspan="2" class="both">총 운영비용(원)</th>
                 </tr>
                 <tr>
-                  <th>스팀량(톤)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>1호기 소계(원)</th>
+                  <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
+                  <th>운휴시간(Hr)</th><th>운휴시간당<br>고정비(원/시간)</th><th>운영비용(원)</th><th>2호기 소계(원)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 실 스팀량 기준 (엑셀 T3:AB39) -->
+      <section class="inc-section" data-section="real">
+        <div class="inc-card">
+          <h3 class="inc-section-title">실 스팀량 기준</h3>
+          <p class="inc-muted">1호기 열은 숨겼습니다. 2호기 스팀량이 결산 기준 2호기 스팀량의 원본입니다(336 이상이면 336).</p>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="real">
+              <colgroup>
+                <col class="c-day"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq"><col class="c-eq">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th rowspan="2">일별</th>
+                  <th colspan="3">2호기</th>
+                  <th rowspan="2" class="both">스팀량 합계(ton)</th>
+                  <th rowspan="2" class="both">총 운영비용(원)</th>
+                </tr>
+                <tr>
                   <th>스팀량(톤/일)</th><th>운영단가(원/톤)</th><th>운영비용(원)</th>
                 </tr>
               </thead>
@@ -133,44 +123,79 @@
         </div>
       </section>
 
-      <!-- 공통 월 합계 표 (Excel 도급내역 H42:L43 — 모든 탭 공통 표시) -->
-      <div class="inc-card" style="margin-top:16px;">
-        <h3 class="inc-section-title">월 합계 (폐합성소각로)</h3>
-        <div class="inc-table-wrap">
-          <table class="data-table inc-table" data-form="summary" style="width:100%;">
-            <colgroup>
-              <col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%">
-            </colgroup>
-            <thead>
-              <tr>
-                <th>구 분</th>
-                <th>스팀량(톤/월)</th>
-                <th>인건비(원)</th>
-                <th>운영비(원)</th>
-                <th>총 금액(원)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th class="col-day">폐합성소각로</th>
-                <td class="computed" data-section="summary" data-field="steam">—</td>
-                <td class="input-cell"><input data-section="summary" data-day="0" data-field="labor" /></td>
-                <td class="computed" data-section="summary" data-field="oper">—</td>
-                <td class="computed" data-section="summary" data-field="total">—</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- 월 합계 두 표 (엑셀 H42:L43, W42:Z45) -->
+      <div class="inc-summary-grid">
+        <div class="inc-card">
+          <h3 class="inc-section-title">월 합계 (폐합성소각로)</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="summary" style="width:100%;">
+              <colgroup>
+                <col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>구 분</th>
+                  <th>스팀량(톤/월)</th>
+                  <th>인건비(원)</th>
+                  <th>운영비(원)</th>
+                  <th>총 금액(원)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th class="col-day">폐합성소각로</th>
+                  <td class="computed" data-section="summary" data-field="steam">—</td>
+                  <td class="input-cell"><input data-section="summary" data-day="0" data-field="labor" /></td>
+                  <td class="computed" data-section="summary" data-field="oper">—</td>
+                  <td class="computed both" data-section="summary" data-field="total">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="inc-muted" style="margin:8px 0 0;">총 금액 = 1호기 소계 + 2호기 소계의 월 합계. 회계비용 실마감 차이 페이지의 "폐합성소각로 스팀구매"(백만원)가 이 값입니다.</p>
+        </div>
+        <div class="inc-card">
+          <h3 class="inc-section-title">결산 기준 vs 실 사용량 기준</h3>
+          <div class="inc-table-wrap">
+            <table class="data-table inc-table" data-form="compare" style="width:100%;">
+              <colgroup>
+                <col style="width:25%"><col style="width:25%"><col style="width:25%"><col style="width:25%">
+              </colgroup>
+              <thead>
+                <tr><th>구 분</th><th>결산기준</th><th>실 사용량 기준</th><th>증 감</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th class="col-day">스팀량(톤)</th>
+                  <td class="computed" data-section="compare" data-field="steam-settle">—</td>
+                  <td class="computed" data-section="compare" data-field="steam-real">—</td>
+                  <td class="computed" data-section="compare" data-field="steam-diff">—</td>
+                </tr>
+                <tr>
+                  <th class="col-day">스팀비용(원)</th>
+                  <td class="computed" data-section="compare" data-field="cost-settle">—</td>
+                  <td class="computed" data-section="compare" data-field="cost-real">—</td>
+                  <td class="computed" data-section="compare" data-field="cost-diff">—</td>
+                </tr>
+                <tr>
+                  <th class="col-day">실 운영비(원)</th>
+                  <td class="computed" colspan="2" style="text-align:right;color:#64748b;">총 금액 − 스팀비용 증감</td>
+                  <td class="computed both" data-section="compare" data-field="real-oper">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   </main>
 
   <script>
-    /* 도급내역 — 3개 탭:
-       - unit1: 1호기 결산 기준 [스팀량, 단가, 운영비용(자동), 운휴시간, 시간당고정비, 운휴비용(자동), 소계(자동)]
-       - unit2: 2호기 동일 구조
-       - real:  실 스팀량 기준 [1호기/2호기 각각 스팀량,단가,운영비용(자동) + 스팀량합계, 총운영비용]
-       모든 탭에 합계/평균 행. 월별 조회. */
+    /* 도급내역 — 엑셀 '1. 도급내역' 시트 구성 그대로 한 페이지에:
+       - settle(결산 기준): 1호기 [스팀량·단가·운영비용(숨김) 운휴시간 고정비 운휴비용 소계] + 2호기 [같은 7] + 스팀량 합계 + 총 운영비용
+       - real(실 스팀량 기준): 1호기(숨김) + 2호기 [스팀량 단가 운영비용] + 스팀량 합계 + 총 운영비용
+       - 월 합계 / 결산 vs 실 사용량 비교
+       저장 키는 예전 그대로 `${section}|${day}|${field}` (section = unit1 / unit2 / real / summary). */
     const yearSelect = document.getElementById("invoiceYear");
     const monthSelect = document.getElementById("invoiceMonth");
     const searchButton = document.getElementById("invoiceSearch");
@@ -197,40 +222,50 @@
     function monthKey() { return `${currentYear}-${String(currentMonth).padStart(2,"0")}`; }
     function daysInMonth() { return new Date(currentYear, currentMonth, 0).getDate(); }
 
-    /* 탭 전환 */
-    const tabs = document.querySelectorAll(".inc-tab");
-    const sections = document.querySelectorAll(".inc-section");
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const t = tab.dataset.target;
-        tabs.forEach((x) => x.classList.toggle("active", x === tab));
-        sections.forEach((s) => s.classList.toggle("active", s.dataset.section === t));
-      });
-    });
+    /* 숨긴 1호기 항목 — 화면에는 없지만 값은 hidden input 으로 들고 있어 저장·계산(소계)에는 그대로 들어간다.
+       다시 보이게 하려면 이 목록에서 빼고 머리글 열을 넣으면 된다. */
+    const HIDDEN_UNIT1_FIELDS = ["steam", "unit"];          // + 계산칸 oper·stop(=소계) 는 그리지 않는다
+    const HIDDEN_REAL_FIELDS = ["steam-1", "unit-1"];        // + 계산칸 oper-1
+    function hiddenInput(section, day, field) {
+      return `<input type="hidden" data-section="${section}" data-day="${day}" data-field="${field}" />`;
+    }
 
     /* 표 생성 */
-    function buildUnitTable(section) {
-      const tbody = document.querySelector(`table[data-form="${section}"] tbody`);
+    const SETTLE_FIELDS = ["runtime", "fixed", "sub"];                                          // 1호기 보이는 열 (운휴 운영비용 = 소계)
+    const UNIT2_FIELDS = ["steam", "unit", "oper", "runtime", "fixed", "stop", "sub"];
+    function buildSettleTable() {
+      const tbody = document.querySelector('table[data-form="settle"] tbody');
       const days = daysInMonth();
       const rows = Array.from({length: 31}, (_, i) => {
         const day = i + 1;
         const trClass = day > days ? ' style="opacity:.4"' : '';
         return `<tr${trClass}><th class="col-day">${day}일</th>
-          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="steam" /></td>
-          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="unit" /></td>
-          <td class="computed" data-section="${section}" data-day="${day}" data-field="oper">—</td>
-          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="runtime" /></td>
-          <td class="input-cell"><input data-section="${section}" data-day="${day}" data-field="fixed" /></td>
-          <td class="computed" data-section="${section}" data-day="${day}" data-field="stop">—</td>
-          <td class="computed" data-section="${section}" data-day="${day}" data-field="sub">—</td>
+          <td class="input-cell">${HIDDEN_UNIT1_FIELDS.map((f) => hiddenInput("unit1", day, f)).join("")}<input data-section="unit1" data-day="${day}" data-field="runtime" /></td>
+          <td class="input-cell"><input data-section="unit1" data-day="${day}" data-field="fixed" /></td>
+          <td class="computed" data-section="unit1" data-day="${day}" data-field="sub">—</td>
+          <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="steam" /></td>
+          <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="unit" /></td>
+          <td class="computed" data-section="unit2" data-day="${day}" data-field="oper">—</td>
+          <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="runtime" /></td>
+          <td class="input-cell"><input data-section="unit2" data-day="${day}" data-field="fixed" /></td>
+          <td class="computed" data-section="unit2" data-day="${day}" data-field="stop">—</td>
+          <td class="computed" data-section="unit2" data-day="${day}" data-field="sub">—</td>
+          <td class="computed both" data-section="both" data-day="${day}" data-field="steam-sum">—</td>
+          <td class="computed both" data-section="both" data-day="${day}" data-field="total-cost">—</td>
         </tr>`;
       }).join("");
+      const cols = [
+        ...SETTLE_FIELDS.map((f) => ["unit1", f]),
+        ...UNIT2_FIELDS.map((f) => ["unit2", f]),
+        ["both", "steam-sum"], ["both", "total-cost"],
+      ];
       const totalRow = `<tr class="summary-row"><th class="col-day">합계</th>
-        ${["steam","unit","oper","runtime","fixed","stop","sub"].map(f => `<td class="computed" data-section="${section}" data-field="${f}-sum">—</td>`).join("")}</tr>`;
+        ${cols.map(([s, f]) => `<td class="computed${s === "both" ? " both" : ""}" data-section="${s}" data-field="${f}-sum">—</td>`).join("")}</tr>`;
       const avgRow = `<tr class="summary-row"><th class="col-day">평균</th>
-        ${["steam","unit","oper","runtime","fixed","stop","sub"].map(f => `<td class="computed" data-section="${section}" data-field="${f}-avg">—</td>`).join("")}</tr>`;
+        ${cols.map(([s, f]) => `<td class="computed${s === "both" ? " both" : ""}" data-section="${s}" data-field="${f}-avg">—</td>`).join("")}</tr>`;
       tbody.innerHTML = rows + totalRow + avgRow;
     }
+    const REAL_FIELDS = ["steam-2", "unit-2", "oper-2", "steam-sum", "total-cost"];
     function buildRealTable() {
       const tbody = document.querySelector('table[data-form="real"] tbody');
       const days = daysInMonth();
@@ -238,20 +273,17 @@
         const day = i + 1;
         const trClass = day > days ? ' style="opacity:.4"' : '';
         return `<tr${trClass}><th class="col-day">${day}일</th>
-          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="steam-1" /></td>
-          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="unit-1" /></td>
-          <td class="computed" data-section="real" data-day="${day}" data-field="oper-1">—</td>
-          <td class="input-cell"><input data-section="real" data-day="${day}" data-field="steam-2" /></td>
+          <td class="input-cell">${HIDDEN_REAL_FIELDS.map((f) => hiddenInput("real", day, f)).join("")}<input data-section="real" data-day="${day}" data-field="steam-2" /></td>
           <td class="input-cell"><input data-section="real" data-day="${day}" data-field="unit-2" /></td>
           <td class="computed" data-section="real" data-day="${day}" data-field="oper-2">—</td>
-          <td class="computed" data-section="real" data-day="${day}" data-field="steam-sum">—</td>
-          <td class="computed" data-section="real" data-day="${day}" data-field="total-cost">—</td>
+          <td class="computed both" data-section="real" data-day="${day}" data-field="steam-sum">—</td>
+          <td class="computed both" data-section="real" data-day="${day}" data-field="total-cost">—</td>
         </tr>`;
       }).join("");
       const totalRow = `<tr class="summary-row"><th class="col-day">합계</th>
-        ${["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].map(f => `<td class="computed" data-section="real" data-field="${f}-sum">—</td>`).join("")}</tr>`;
+        ${REAL_FIELDS.map((f) => `<td class="computed${f === "steam-sum" || f === "total-cost" ? " both" : ""}" data-section="real" data-field="${f}-sum">—</td>`).join("")}</tr>`;
       const avgRow = `<tr class="summary-row"><th class="col-day">평균</th>
-        ${["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].map(f => `<td class="computed" data-section="real" data-field="${f}-avg">—</td>`).join("")}</tr>`;
+        ${REAL_FIELDS.map((f) => `<td class="computed${f === "steam-sum" || f === "total-cost" ? " both" : ""}" data-section="real" data-field="${f}-avg">—</td>`).join("")}</tr>`;
       tbody.innerHTML = rows + totalRow + avgRow;
     }
 
@@ -264,106 +296,137 @@
     }
     function fmt(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—"; }
     function fmtDec(n) { return Number.isFinite(n) ? n.toLocaleString("en-US", {maximumFractionDigits: 2}) : "—"; }
-
-    function recomputeUnit(section) {
-      const sums = {}; const counts = {};
-      ["steam","unit","oper","runtime","fixed","stop","sub"].forEach((f) => { sums[f] = 0; counts[f] = 0; });
-      const days = daysInMonth();
-      for (let day = 1; day <= 31; day += 1) {
-        if (day > days) {
-          ["oper","stop","sub"].forEach((f) => {
-            const el = document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="${f}"]`);
-            if (el) el.textContent = "—";
-          });
-          continue;
-        }
-        const s = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="steam"]`));
-        const u = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="unit"]`));
-        const r = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="runtime"]`));
-        const f = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="fixed"]`));
-        const oper = Number.isFinite(s) && Number.isFinite(u) ? s * u : NaN;
-        const stop = Number.isFinite(r) && Number.isFinite(f) ? r * f : NaN;
-        const sub = (Number.isFinite(oper) || Number.isFinite(stop)) ? (oper || 0) + (stop || 0) : NaN;
-        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="oper"]`).textContent = fmt(oper);
-        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="stop"]`).textContent = fmt(stop);
-        document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="sub"]`).textContent = fmt(sub);
-        const vals = { steam: s, unit: u, oper, runtime: r, fixed: f, stop, sub };
-        Object.entries(vals).forEach(([k, v]) => { if (Number.isFinite(v)) { sums[k] += v; counts[k]++; } });
-      }
-      Object.keys(sums).forEach((f) => {
-        document.querySelector(`[data-section="${section}"][data-field="${f}-sum"]`).textContent = counts[f] ? fmt(sums[f]) : "—";
-        document.querySelector(`[data-section="${section}"][data-field="${f}-avg"]`).textContent = counts[f] ? fmtDec(sums[f] / counts[f]) : "—";
-      });
+    function inputOf(section, day, field) { return document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="${field}"]`); }
+    function setCell(section, day, field, text, neg) {
+      const el = document.querySelector(`[data-section="${section}"][data-day="${day}"][data-field="${field}"]`);
+      if (!el) return;
+      el.textContent = text;
+      el.classList.toggle("neg", !!neg);
+    }
+    function setTotal(section, field, sum, count, isDec) {
+      const sumEl = document.querySelector(`[data-section="${section}"][data-field="${field}-sum"]`);
+      const avgEl = document.querySelector(`[data-section="${section}"][data-field="${field}-avg"]`);
+      if (sumEl) sumEl.textContent = count ? (isDec ? fmtDec(sum) : fmt(sum)) : "—";
+      if (avgEl) avgEl.textContent = count ? fmtDec(sum / count) : "—";
     }
 
-    function recomputeReal() {
-      const sums = {}; const counts = {};
-      ["steam-1","unit-1","oper-1","steam-2","unit-2","oper-2","steam-sum","total-cost"].forEach((f) => { sums[f] = 0; counts[f] = 0; });
+    /* 호기 하루치 계산 — 엑셀 E=C×D, H=F×G, I=E+H */
+    function unitDay(section, day) {
+      const s = parseNum(inputOf(section, day, "steam"));
+      const u = parseNum(inputOf(section, day, "unit"));
+      const r = parseNum(inputOf(section, day, "runtime"));
+      const f = parseNum(inputOf(section, day, "fixed"));
+      const oper = Number.isFinite(s) && Number.isFinite(u) ? s * u : NaN;
+      const stop = Number.isFinite(r) && Number.isFinite(f) ? r * f : NaN;
+      const sub = (Number.isFinite(oper) || Number.isFinite(stop)) ? (oper || 0) + (stop || 0) : NaN;
+      return { steam: s, unit: u, oper, runtime: r, fixed: f, stop, sub };
+    }
+
+    /* 결산 기준 표: 1호기·2호기 각각 + 합계 두 열(엑셀 Q=C+J, R=I+P) */
+    const settleTotals = { steamSum: 0, steamCnt: 0, costSum: 0, costCnt: 0, operSum: 0, operCnt: 0 };
+    function recomputeSettle() {
+      const fields = ["steam", "unit", "oper", "runtime", "fixed", "stop", "sub"];
+      const sums = { unit1: {}, unit2: {} }, counts = { unit1: {}, unit2: {} };
+      ["unit1", "unit2"].forEach((s) => fields.forEach((f) => { sums[s][f] = 0; counts[s][f] = 0; }));
+      let steamSum = 0, steamCnt = 0, costSum = 0, costCnt = 0, operSum = 0, operCnt = 0;
       const days = daysInMonth();
       for (let day = 1; day <= 31; day += 1) {
         if (day > days) {
-          ["oper-1","oper-2","steam-sum","total-cost"].forEach((f) => {
-            const el = document.querySelector(`[data-section="real"][data-day="${day}"][data-field="${f}"]`);
-            if (el) el.textContent = "—";
-          });
+          ["unit1", "unit2"].forEach((s) => ["oper", "stop", "sub"].forEach((f) => setCell(s, day, f, "—")));
+          setCell("both", day, "steam-sum", "—"); setCell("both", day, "total-cost", "—");
           continue;
         }
-        const s1 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-1"]`));
-        const u1 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="unit-1"]`));
-        const s2 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-2"]`));
-        const u2 = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="unit-2"]`));
+        const u1 = unitDay("unit1", day), u2 = unitDay("unit2", day);
+        [["unit1", u1], ["unit2", u2]].forEach(([s, v]) => {
+          setCell(s, day, "oper", fmt(v.oper)); setCell(s, day, "stop", fmt(v.stop)); setCell(s, day, "sub", fmt(v.sub));
+          fields.forEach((f) => { if (Number.isFinite(v[f])) { sums[s][f] += v[f]; counts[s][f] += 1; } });
+        });
+        const steam = (Number.isFinite(u1.steam) || Number.isFinite(u2.steam)) ? (u1.steam || 0) + (u2.steam || 0) : NaN;
+        const cost = (Number.isFinite(u1.sub) || Number.isFinite(u2.sub)) ? (u1.sub || 0) + (u2.sub || 0) : NaN;
+        const oper = (Number.isFinite(u1.oper) || Number.isFinite(u2.oper)) ? (u1.oper || 0) + (u2.oper || 0) : NaN;
+        setCell("both", day, "steam-sum", fmtDec(steam)); setCell("both", day, "total-cost", fmt(cost));
+        if (Number.isFinite(steam)) { steamSum += steam; steamCnt += 1; }
+        if (Number.isFinite(cost)) { costSum += cost; costCnt += 1; }
+        if (Number.isFinite(oper)) { operSum += oper; operCnt += 1; }
+      }
+      ["unit1", "unit2"].forEach((s) => fields.forEach((f) => setTotal(s, f, sums[s][f], counts[s][f], f === "steam" || f === "unit" || f === "runtime" || f === "fixed")));
+      setTotal("both", "steam-sum", steamSum, steamCnt, true);
+      setTotal("both", "total-cost", costSum, costCnt, false);
+      Object.assign(settleTotals, { steamSum, steamCnt, costSum, costCnt, operSum, operCnt });
+    }
+
+    /* 실 스팀량 기준 표 (1호기 열은 숨김이지만 값이 있으면 합계에는 들어간다 — 엑셀 AA=U+X, AB=W+Z) */
+    const realTotals = { steamSum: 0, steamCnt: 0, costSum: 0, costCnt: 0 };
+    function recomputeReal() {
+      const fields = ["steam-1", "unit-1", "oper-1", "steam-2", "unit-2", "oper-2", "steam-sum", "total-cost"];
+      const sums = {}, counts = {};
+      fields.forEach((f) => { sums[f] = 0; counts[f] = 0; });
+      const days = daysInMonth();
+      for (let day = 1; day <= 31; day += 1) {
+        if (day > days) {
+          ["oper-2", "steam-sum", "total-cost"].forEach((f) => setCell("real", day, f, "—"));
+          continue;
+        }
+        const s1 = parseNum(inputOf("real", day, "steam-1")), u1 = parseNum(inputOf("real", day, "unit-1"));
+        const s2 = parseNum(inputOf("real", day, "steam-2")), u2 = parseNum(inputOf("real", day, "unit-2"));
         const oper1 = Number.isFinite(s1) && Number.isFinite(u1) ? s1 * u1 : NaN;
         const oper2 = Number.isFinite(s2) && Number.isFinite(u2) ? s2 * u2 : NaN;
         const steamSum = (Number.isFinite(s1) || Number.isFinite(s2)) ? (s1 || 0) + (s2 || 0) : NaN;
         const totalCost = (Number.isFinite(oper1) || Number.isFinite(oper2)) ? (oper1 || 0) + (oper2 || 0) : NaN;
-        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="oper-1"]`).textContent = fmt(oper1);
-        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="oper-2"]`).textContent = fmt(oper2);
-        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="steam-sum"]`).textContent = fmtDec(steamSum);
-        document.querySelector(`[data-section="real"][data-day="${day}"][data-field="total-cost"]`).textContent = fmt(totalCost);
+        setCell("real", day, "oper-2", fmt(oper2));
+        setCell("real", day, "steam-sum", fmtDec(steamSum));
+        setCell("real", day, "total-cost", fmt(totalCost));
         const vals = {"steam-1": s1, "unit-1": u1, "oper-1": oper1, "steam-2": s2, "unit-2": u2, "oper-2": oper2, "steam-sum": steamSum, "total-cost": totalCost};
         Object.entries(vals).forEach(([k, v]) => { if (Number.isFinite(v)) { sums[k] += v; counts[k]++; } });
       }
-      Object.keys(sums).forEach((f) => {
-        document.querySelector(`[data-section="real"][data-field="${f}-sum"]`).textContent = counts[f] ? fmt(sums[f]) : "—";
-        document.querySelector(`[data-section="real"][data-field="${f}-avg"]`).textContent = counts[f] ? fmtDec(sums[f] / counts[f]) : "—";
-      });
+      fields.forEach((f) => setTotal("real", f, sums[f], counts[f], f.startsWith("steam") || f.startsWith("unit")));
+      Object.assign(realTotals, { steamSum: sums["steam-sum"], steamCnt: counts["steam-sum"], costSum: sums["total-cost"], costCnt: counts["total-cost"] });
     }
 
-    /* 공통 월합계 표 — Excel H42:L43 공식
-       스팀량(톤/월) = unit1.steam 합 + unit2.steam 합
-       총 금액      = (unit1.oper + unit1.stop + unit2.oper + unit2.stop) 합 (원)
-       운영비      = 총 금액 - 인건비
-       인건비      = 사용자 입력 */
+    /* 월 합계 표 — 엑셀 H42:L43
+       스팀량(톤/월) = 결산 기준 스팀량 합계(1호기 + 2호기)
+       총 금액      = 결산 기준 총 운영비용 합계 (1호기 소계 + 2호기 소계)
+       운영비      = 총 금액 − 인건비,  인건비 = 사용자 입력 */
     function recomputeSummary() {
-      let steamSum = 0, steamCnt = 0, totalSum = 0, hasTotal = false;
-      ["unit1", "unit2"].forEach((section) => {
-        for (let day = 1; day <= 31; day += 1) {
-          const s = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="steam"]`));
-          const u = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="unit"]`));
-          const r = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="runtime"]`));
-          const f = parseNum(document.querySelector(`input[data-section="${section}"][data-day="${day}"][data-field="fixed"]`));
-          if (Number.isFinite(s)) { steamSum += s; steamCnt += 1; }
-          const oper = Number.isFinite(s) && Number.isFinite(u) ? s * u : 0;
-          const stop = Number.isFinite(r) && Number.isFinite(f) ? r * f : 0;
-          if (oper > 0 || stop > 0) { totalSum += oper + stop; hasTotal = true; }
-        }
-      });
       const steamEl = document.querySelector(`[data-section="summary"][data-field="steam"]`);
       const totalEl = document.querySelector(`[data-section="summary"][data-field="total"]`);
       const operEl  = document.querySelector(`[data-section="summary"][data-field="oper"]`);
-      if (steamEl) steamEl.textContent = steamCnt > 0 ? fmtDec(steamSum) : "—";
-      if (totalEl) totalEl.textContent = hasTotal ? fmt(totalSum) : "—";
+      const hasTotal = settleTotals.costCnt > 0;
+      if (steamEl) steamEl.textContent = settleTotals.steamCnt > 0 ? fmtDec(settleTotals.steamSum) : "—";
+      if (totalEl) totalEl.textContent = hasTotal ? fmt(settleTotals.costSum) : "—";
       const labor = parseNum(document.querySelector(`input[data-section="summary"][data-field="labor"]`));
-      const operCost = (hasTotal && Number.isFinite(labor)) ? totalSum - labor : NaN;
+      const operCost = (hasTotal && Number.isFinite(labor)) ? settleTotals.costSum - labor : NaN;
       if (operEl) operEl.textContent = Number.isFinite(operCost) ? fmt(operCost) : "—";
+    }
+
+    /* 결산 기준 vs 실 사용량 기준 — 엑셀 W42:Z45
+       스팀량: 결산(C+J 합) / 실(U+X 합) / 증감 = 결산 − 실
+       스팀비용: 결산(E+L 합, 가동분 운영비용) / 실(W+Z 합) / 증감
+       실 운영비 = 총 금액 − 스팀비용 증감 */
+    function recomputeCompare() {
+      const set = (field, n, dec) => {
+        const el = document.querySelector(`[data-section="compare"][data-field="${field}"]`);
+        if (!el) return;
+        el.textContent = Number.isFinite(n) ? (dec ? fmtDec(n) : fmt(n)) : "—";
+        el.classList.toggle("neg", Number.isFinite(n) && n < 0);
+      };
+      const steamSettle = settleTotals.steamCnt > 0 ? settleTotals.steamSum : NaN;
+      const steamReal = realTotals.steamCnt > 0 ? realTotals.steamSum : NaN;
+      const costSettle = settleTotals.operCnt > 0 ? settleTotals.operSum : NaN;
+      const costReal = realTotals.costCnt > 0 ? realTotals.costSum : NaN;
+      const costDiff = (Number.isFinite(costSettle) && Number.isFinite(costReal)) ? costSettle - costReal : NaN;
+      set("steam-settle", steamSettle, true); set("steam-real", steamReal, true);
+      set("steam-diff", (Number.isFinite(steamSettle) && Number.isFinite(steamReal)) ? steamSettle - steamReal : NaN, true);
+      set("cost-settle", costSettle); set("cost-real", costReal); set("cost-diff", costDiff);
+      set("real-oper", (settleTotals.costCnt > 0 && Number.isFinite(costDiff)) ? settleTotals.costSum - costDiff : NaN);
     }
 
     function recomputeAll() {
       applyUnit2SteamLinks();   // 실 스팀량 기준 2호기 스팀량이 바뀌면 2호기(결산 기준) 칸도 따라간다
-      recomputeUnit("unit1");
-      recomputeUnit("unit2");
+      recomputeSettle();
       recomputeReal();
       recomputeSummary();
+      recomputeCompare();
     }
 
     /* DB */
@@ -375,11 +438,11 @@
         cb(i, i.dataset.section, Number(i.dataset.day), i.dataset.field));
     }
     function rebuild() {
-      buildUnitTable("unit1");
-      buildUnitTable("unit2");
+      buildSettleTable();
       buildRealTable();
       document.querySelectorAll("table.inc-table").forEach((t) => t.addEventListener("input", recomputeAll));
       eachInput((i, s, d, f) => {
+        if (i.type === "hidden") return;
         const handler = () => save(i, s, d, f);
         i.addEventListener("blur", handler);
         i.addEventListener("change", handler);
@@ -390,14 +453,14 @@
        저장된 2호기 값이 있어도 화면은 연동값을 쓰고, 실 스팀량을 저장할 때 2호기 값도 같이 저장해 DB 를 맞춘다. */
     const UNIT2_STEAM_CAP = 336;
     function linkedUnit2Steam(day) {
-      const v = parseNum(document.querySelector(`input[data-section="real"][data-day="${day}"][data-field="steam-2"]`));
+      const v = parseNum(inputOf("real", day, "steam-2"));
       if (v === null || v === undefined || Number.isNaN(v)) return null;
       return Math.min(v, UNIT2_STEAM_CAP);
     }
     function applyUnit2SteamLinks() {
       const days = daysInMonth();
       for (let day = 1; day <= 31; day += 1) {
-        const input = document.querySelector(`input[data-section="unit2"][data-day="${day}"][data-field="steam"]`);
+        const input = inputOf("unit2", day, "steam");
         if (!input) continue;
         input.readOnly = true;
         input.tabIndex = -1;
@@ -456,7 +519,7 @@
       // 엑셀 내려받기 등 DB 를 읽는 곳과 화면이 어긋나지 않게.
       if (section === "real" && field === "steam-2") {
         recomputeAll();
-        const unit2Input = document.querySelector(`input[data-section="unit2"][data-day="${day}"][data-field="steam"]`);
+        const unit2Input = inputOf("unit2", day, "steam");
         if (unit2Input) await save(unit2Input, "unit2", day, "steam");
       }
     }

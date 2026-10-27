@@ -16,6 +16,15 @@ import java.util.Optional;
  */
 public interface ExtinguisherInspectionRepository extends JpaRepository<ExtinguisherInspection, Long> {
 
+    /** Latest inspection per extinguisher, fetched in one query (no per-row lookup). */
+    @Query("SELECT i FROM ExtinguisherInspection i JOIN FETCH i.extinguisher e " +
+           "WHERE e.extinguisherId IN :ids AND NOT EXISTS (" +
+           "SELECT newer FROM ExtinguisherInspection newer " +
+           "WHERE newer.extinguisher = i.extinguisher AND (" +
+           "newer.inspectionDate > i.inspectionDate OR " +
+           "(newer.inspectionDate = i.inspectionDate AND newer.inspectionId > i.inspectionId)))")
+    List<ExtinguisherInspection> findLatestForIds(@Param("ids") List<Long> ids);
+
     boolean existsByExtinguisher_ExtinguisherIdAndInspectionDate(Long extinguisherId, LocalDate date);
     boolean existsByExtinguisher_ExtinguisherIdAndInspectionDateAndInspectionIdNot(
             Long extinguisherId, LocalDate date, Long inspectionId);

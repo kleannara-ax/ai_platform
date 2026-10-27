@@ -15,6 +15,7 @@
 
   const LAND_LEASE_FIXED = 6.7;        // 토지 지상권 지료
   const COMPOSITE_INCOME_FIXED = 63.2; // 복합보일러 처분수익 연료비 차감분
+  const COMPOSITE_INVEST_FIXED = 31.9; // 복합 투자비 감가상각 (월 고정)
 
   // ── SRF Boiler 인보이스 Summary(VK) ─────────────────────────────────────
   // 저장: steam_cell_value (table_name=srf_boiler_invoice_summary, month="YYYY-MM")
@@ -199,6 +200,7 @@
   global.EnergyLinkedSources = {
     LAND_LEASE_FIXED,
     COMPOSITE_INCOME_FIXED,
+    COMPOSITE_INVEST_FIXED,
     fetchCompositeSteamPurchase,
     compositeSteamPurchaseSync,
     fetchCompositeLngEtc,
