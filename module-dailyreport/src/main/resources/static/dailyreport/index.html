@@ -486,8 +486,15 @@
     // - 줄바꿈 총량: 5개 행 분리 전 21회 → 행 사이 구분선 4곳(5행 간격 개수)만큼 빼서 17회로 조정 → 15회로 재조정
     //   → 5개 행이 모두 채워지는 최악의 경우 22줄 포맷을 2줄 초과하는 문제가 확인되어 13으로 재조정
     //   (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 → 최대 안전 줄바꿈 수 = 22-5-4=13)
-    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 13;
-    const SPECIAL_NOTE_MAX_TOTAL_CHARS = 1206;
+    // ★ 2026-10 추가, DB 영구 저장 개편(사고/안전사고 안내 문구) 반영 — SAFETY 행
+    //   textarea 위에 파란 고정문구 줄이 항상 1줄 추가로 차지하게 되어, 같은 22줄
+    //   한도를 유지하려면 줄바꿈 여유를 1 더 줄여야 한다 (13 → 12).
+    //   (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 + SAFETY 고정문구 1줄
+    //    → 최대 안전 줄바꿈 수 = 22-5-4-1=12)
+    //   전체 글자수 한도도 "(줄바꿈 수 + 행수)×67자" 공식을 유지하도록 함께 재계산:
+    //   (12+5)×67 = 1139.
+    const SPECIAL_NOTE_MAX_TOTAL_NEWLINES = 12;
+    const SPECIAL_NOTE_MAX_TOTAL_CHARS = 1139;
     const SPECIAL_NOTE_MAX_LINE_LENGTH = 67;
     let reportData = null;         // /view/render 응답 전체
     let uploadedImages = [];
