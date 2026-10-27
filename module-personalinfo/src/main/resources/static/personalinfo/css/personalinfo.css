@@ -46,10 +46,7 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-empty{padding:40px;text-align:center;color:var(--pi-muted);}
 .pi-actions{display:flex;gap:6px;flex-wrap:wrap;}
 
-.pi-vendor-list{max-height:560px;overflow:auto;border:1px solid var(--pi-line);border-radius:10px;}
-.pi-vendor-item{padding:10px 12px;border-bottom:1px solid var(--pi-line);cursor:pointer;}
-.pi-vendor-item:hover{background:#f5f7ff;}
-.pi-vendor-item.active{background:#eef2ff;border-left:3px solid var(--pi-brand);}
-.pi-vendor-item .meta{font-size:.78rem;color:var(--pi-muted);}
+.pi-vendor-link{background:none;border:0;padding:0;font-weight:600;color:var(--pi-brand);text-align:left;text-decoration:underline dotted;text-underline-offset:3px;}
+.pi-vendor-link:hover,.pi-vendor-link:focus-visible{text-decoration:underline;}
 .pi-step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--pi-brand);color:#fff;font-size:.75rem;font-weight:700;margin-right:6px;}
 .pi-preview{background:#f8fafc;border:1px dashed var(--pi-line);border-radius:10px;padding:12px;}
