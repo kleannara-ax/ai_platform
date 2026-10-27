@@ -406,7 +406,7 @@
 
       <section class="pi-card" id="contact-history-section">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-          <h2 class="mb-0"><i class="fas fa-user-clock"></i>협력사 담당자 이력 <small class="text-muted fw-normal" id="contact-history-count"></small></h2>
+          <h2 class="mb-0"><i class="fas fa-user-clock"></i>협력사 담당자 이력 <small class="text-muted fw-normal">(위탁사 담당자)</small> <small class="text-muted fw-normal" id="contact-history-count"></small></h2>
           <div class="btn-group btn-group-sm" role="group" aria-label="이력 범위">
             <input type="radio" class="btn-check" name="ch-scope" id="ch-scope-vendor" value="vendor" checked>
             <label class="btn btn-outline-secondary" for="ch-scope-vendor">업체 전체 계약</label>
@@ -472,10 +472,9 @@
   }
 
   // ──────────────── 협력사 담당자 이력 ────────────────
-  const CONTACT_FIELD_LABEL = {
-    DEPT_NAME: '담당부서', MANAGER_NAME: '담당자', MANAGER_EMAIL: '담당자 이메일',
-    VENDOR_CONTACT_NAME: '수탁사 담당자', VENDOR_CONTACT_EMAIL: '수탁사 이메일', VENDOR_CONTACT_PHONE: '수탁사 연락처',
-  };
+  const periodText = (h) => (h.contractStartDate || h.contractEndDate)
+    ? `${fmtDate(h.contractStartDate)} ~ ${fmtDate(h.contractEndDate)}`
+    : (h.contractPeriodNote || '-');
 
   async function loadContactHistory(contractId, vendorWide) {
     const body = document.getElementById('contact-history-body');
@@ -492,21 +491,20 @@
       body.innerHTML = `
         <div class="table-responsive"><table class="pi-table" id="contact-history-table"><thead><tr>
           <th>변경일시</th><th>구분</th>${vendorWide ? '<th>계약 (관련 서비스)</th>' : ''}
-          <th>당사 담당부서<br>/ 담당자</th><th>담당자 이메일</th><th>수탁사 담당자</th><th>수탁사 연락처<br>/ 이메일</th><th>변경 항목</th><th>변경자</th></tr></thead>
+          <th>계약기간</th><th>위탁사 담당부서</th><th>위탁사 담당자</th><th>담당자 이메일</th><th>변경자</th></tr></thead>
           <tbody>${list.map((h) => `
             <tr class="${h.currentContract ? '' : 'pi-ch-other'}" style="cursor:default">
               <td class="text-nowrap">${fmtDateTime(h.changedAt)}</td>
               <td class="text-nowrap"><span class="pi-status ${h.changeType === 'UPDATE' ? 'EXPIRING' : 'NONE'}">${esc(h.changeTypeLabel)}</span></td>
               ${vendorWide ? `<td>${h.currentContract ? '<b>이 계약</b>' : `<a href="#/contracts/${h.contractId}">${esc(h.vendorName || '')}</a>`}
                 <small class="text-muted d-block">${esc(h.serviceName || '-')}</small></td>` : ''}
-              <td>${cell(h, 'DEPT_NAME', h.deptName)}<br>${cell(h, 'MANAGER_NAME', h.managerName)}</td>
+              <td class="text-nowrap">${esc(periodText(h))}${(h.contractStartDate || h.contractEndDate) && h.contractPeriodNote ? `<small class="text-muted d-block">${esc(h.contractPeriodNote)}</small>` : ''}</td>
+              <td>${cell(h, 'DEPT_NAME', h.deptName)}</td>
+              <td>${cell(h, 'MANAGER_NAME', h.managerName)}</td>
               <td>${cell(h, 'MANAGER_EMAIL', h.managerEmail)}</td>
-              <td>${cell(h, 'VENDOR_CONTACT_NAME', h.vendorContactName)}</td>
-              <td><span class="text-nowrap">${cell(h, 'VENDOR_CONTACT_PHONE', h.vendorContactPhone)}</span><br>${cell(h, 'VENDOR_CONTACT_EMAIL', h.vendorContactEmail)}</td>
-              <td>${h.changedFields.length ? `<div class="pi-ch-fields">${h.changedFields.map((f) => `<span class="badge text-bg-light border">${esc(CONTACT_FIELD_LABEL[f] || f)}</span>`).join('')}</div>` : '-'}</td>
               <td class="text-nowrap">${esc(h.changedByName || (h.changeType === 'INITIAL' ? '시스템' : '-'))}</td>
             </tr>`).join('')}</tbody></table></div>
-        <small class="text-muted">각 행은 변경 <b>후</b> 담당자 정보입니다. 노란색 표시는 그 이력에서 바뀐 항목입니다.${vendorWide ? ' 같은 업체(㈜·(주)·공백 차이 무시)의 다른 계약 이력도 함께 보여줍니다.' : ''}</small>`;
+        <small class="text-muted">위탁사(당사) 담당자가 바뀔 때만 기록합니다(수탁사 담당자·연락처 변경은 기록하지 않음). 각 행은 변경 <b>후</b> 담당자와 그 시점의 계약기간이며, <span class="pi-ch-changed">노란색</span>은 그 이력에서 바뀐 항목입니다.${vendorWide ? ' 같은 업체(㈜·(주)·공백 차이 무시)의 다른 계약 이력도 함께 보여줍니다.' : ''}</small>`;
     } catch (e) {
       body.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
     }

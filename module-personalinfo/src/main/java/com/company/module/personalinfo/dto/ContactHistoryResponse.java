@@ -4,6 +4,7 @@ import com.company.module.personalinfo.entity.PiContactHistory;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -22,10 +23,11 @@ public class ContactHistoryResponse {
     private String deptName;
     private String managerName;
     private String managerEmail;
-    private String vendorContactName;
-    private String vendorContactEmail;
-    private String vendorContactPhone;
-    /** 바뀐 항목 코드 (DEPT_NAME, MANAGER_NAME ...) — 등록/이관 건은 빈 목록 */
+    /** 이력 기록 시점의 계약기간 */
+    private LocalDate contractStartDate;
+    private LocalDate contractEndDate;
+    private String contractPeriodNote;
+    /** 바뀐 위탁사 담당자 항목 코드 (DEPT_NAME, MANAGER_NAME, MANAGER_EMAIL) — 등록/이관 건은 빈 목록 */
     private List<String> changedFields;
     private String changedByName;
     private Long changedBy;
@@ -34,7 +36,7 @@ public class ContactHistoryResponse {
     private boolean currentContract;
 
     public static ContactHistoryResponse of(PiContactHistory h, Long currentContractId) {
-        String f = h.getChangedFields();
+        List<String> fields = changedTrackedFields(h);
         return ContactHistoryResponse.builder()
                 .historyId(h.getHistoryId())
                 .contractId(h.getContractId())
@@ -45,14 +47,24 @@ public class ContactHistoryResponse {
                 .deptName(h.getDeptName())
                 .managerName(h.getManagerName())
                 .managerEmail(h.getManagerEmail())
-                .vendorContactName(h.getVendorContactName())
-                .vendorContactEmail(h.getVendorContactEmail())
-                .vendorContactPhone(h.getVendorContactPhone())
-                .changedFields(f == null || f.isBlank() ? List.of() : Arrays.asList(f.split(",")))
+                .contractStartDate(h.getContractStartDate())
+                .contractEndDate(h.getContractEndDate())
+                .contractPeriodNote(h.getContractPeriodNote())
+                .changedFields(fields)
                 .changedByName(h.getChangedByName())
                 .changedBy(h.getCreatedBy())
                 .changedAt(h.getCreatedAt())
                 .currentContract(h.getContractId().equals(currentContractId))
                 .build();
+    }
+
+    /** 기록된 변경 항목 중 이력 대상(위탁사 담당자) 항목만 */
+    public static List<String> changedTrackedFields(PiContactHistory h) {
+        String f = h.getChangedFields();
+        if (f == null || f.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(f.split(",")).map(String::trim)
+                .filter(PiContactHistory.TRACKED_FIELDS::contains).toList();
     }
 }

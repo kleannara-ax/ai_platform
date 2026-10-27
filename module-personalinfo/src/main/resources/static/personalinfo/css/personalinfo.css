@@ -60,4 +60,3 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 #contact-history-table tr.pi-ch-other .pi-ch-changed{color:#92400e;}
 #contact-history-table{font-size:.85rem;}
 #contact-history-table td,#contact-history-table th{vertical-align:middle;}
-.pi-ch-fields{display:flex;flex-wrap:wrap;gap:3px;max-width:190px;}
