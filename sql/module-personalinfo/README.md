@@ -27,6 +27,7 @@
 | 2 | 계약서 조회 | 목록(검색, 상태 필터, 정렬, 페이징, 상단 요약 카드), 상세(첨부·점검 이력·알림 이력), 엑셀 다운로드(관리대장과 같은 열 순서) |
 | 3 | 만료일 알람·메일 발송 | 계약 상태를 자동 계산합니다(계약중/만료임박/만료/종료/기간미정). **자동 메일**은 알림 기준일(기본 30일), D-7, D-1, 당일, 만료 후 단계마다 1회씩 발송됩니다. 상세 화면에서 **수동 메일**도 보낼 수 있고, 발송 이력이 남습니다. |
 | 4 | 위수탁 점검 체크리스트 다운로드·업로드 | **다운로드**: 보안팀 양식 원본 또는 회사명·수탁업무를 미리 채운 양식. **업로드**: 협력사가 작성한 엑셀을 읽어 항목별 결과를 저장하고 Y/N/NA 를 집계해 점검 결과(적합/조치 필요/평가 미완료)를 자동 판정합니다. 원본 파일도 보관합니다. |
+| 5 | **업체별 점검 체크리스트 업로드** | 같은 업체가 서비스별로 계약이 여러 건이어도, 협력사가 업체 단위로 작성한 체크리스트 **1건을 업로드해 그 업체의 선택한 계약 전체에 점검 이력으로 한 번에 등록**합니다. 업로드 전 미리보기로 체크리스트 회사명에 맞는 업체를 자동 선택하고, 원본 파일은 1번만 저장합니다. |
 | - | 계약 종료 처리 | 종료 처리하면 만료 알림이 멈춥니다. "계약변경·만료 점검"(양식 3번 시트) 업로드를 지원합니다. |
 | - | 점검 후속조치 | 조치 예정일과 조치 완료 여부를 관리합니다. |
 
@@ -38,6 +39,16 @@
 - 평가값 정규화: `Y / O / ○ / 충족` → Y, `N / X / 미충족` → N, `NA / N/A / 해당없음` → NA, 빈 값 → 미기재
 - 판정: N 이 1건 이상이면 **조치 필요**, 미기재가 있으면 **평가 미완료**, 그 외는 **적합**
 - 안내(warnings): 체크리스트 회사명이 계약 업체명과 다를 때(㈜/(주)/공백 차이는 무시), 보유여부 미선택, 해석 불가 값이 있을 때
+
+### 업체별 체크리스트 업로드 규칙
+- **업체 묶음 기준**: 업체명에서 `㈜ / (주) / （주） / (株) / 주식회사`, 공백, 대소문자 차이를 뺀 값이 같으면 같은 업체로 봅니다. 예: `㈜가나물류` = `가나 물류(주)` = `주식회사 가나물류`
+- **절차** (`#/vendor-checklist`): ① 업체 선택 → ② 작성된 체크리스트 선택(미리보기: 회사명·평가일·Y/N 집계·판정, 업체 자동 선택) → ③ 등록할 계약 체크 → ④ 점검일·평가자·조치 예정일·비고 입력 후 등록
+- **등록 대상**: 기본값은 업체의 **종료되지 않은 계약 전체**입니다. 계약변경·만료 점검처럼 종료된 계약에도 등록해야 하면 "종료 포함"을 켜고 직접 선택하세요.
+- 다른 업체의 계약 ID 가 섞이면 전체를 거부합니다(400). 한 번에 최대 100건까지 등록할 수 있습니다.
+- **한 트랜잭션**으로 처리하므로 계약 하나라도 실패하면 전부 되돌립니다.
+- 원본 파일은 1번만 저장하고, 계약별 점검 이력(`pi_inspection`)은 같은 파일 경로와 **묶음 ID(`UPLOAD_GROUP_ID`)** 를 공유합니다. 항목별 결과(`pi_inspection_item`)는 계약마다 따로 저장하므로, 계약별 후속조치·삭제는 기존과 똑같이 할 수 있습니다.
+- 계약 상세의 점검 이력에는 **"업체 일괄"** 표시가 붙습니다. 각 계약의 최근 점검 결과도 갱신됩니다.
+- 진입: 목록 화면 **[업체별 체크리스트 업로드]** 버튼, 또는 계약 상세의 **[업체 전체 계약에 업로드]** 버튼(해당 업체를 미리 선택)
 
 ### 만료 알림 규칙
 - 대상: 미삭제 + 미종료 + 알림 사용(Y) + 종료일 있음
@@ -54,11 +65,11 @@
 |---|---|---|
 | `pi_contract` | 위수탁 계약 (외부위탁 현황 1행 = 1건) | PK `CONTRACT_ID`, IDX 종료일/업체명/부서/알림 |
 | `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 | FK → `pi_contract` |
-| `pi_inspection` | 점검 이력 (체크리스트 업로드 1건) | FK → `pi_contract` |
+| `pi_inspection` | 점검 이력 (체크리스트 업로드 1건 × 계약) | FK → `pi_contract`, IDX `UPLOAD_GROUP_ID`(업체별 일괄 업로드 묶음, 개별 업로드는 NULL) |
 | `pi_inspection_item` | 점검 체크리스트 항목별 결과 | FK → `pi_inspection` |
 | `pi_alert_log` | 만료 알림 발송 이력 | FK → `pi_contract`, `UK_PI_ALERT_LOG_DEDUP` |
 
-- 모든 테이블에 공통 컬럼(`CREATED_AT/BY`, `UPDATED_AT/BY`, `DELETED_YN/AT/BY`)이 있습니다. 모든 테이블·컬럼에 COMMENT 가 있습니다(130개 컬럼, 누락 0건 검증).
+- 모든 테이블에 공통 컬럼(`CREATED_AT/BY`, `UPDATED_AT/BY`, `DELETED_YN/AT/BY`)이 있습니다. 모든 테이블·컬럼에 COMMENT 가 있습니다(131개 컬럼, 누락 0건 검증).
 - FK 는 업무 테이블 사이에만 있습니다. `CREATED_BY` 같은 사용자 컬럼은 core_user ID 값만 저장하고 **core 테이블 FK 는 없습니다.**
 - 삭제는 모두 소프트 삭제(`DELETED_YN='Y'`)입니다. 업로드한 실제 파일도 감사 증적으로 지우지 않습니다.
 
@@ -92,6 +103,9 @@
 | PUT | `/inspections/{inspectionId}` | 후속조치 수정 | WRITE |
 | GET | `/inspections/{inspectionId}/download` | 업로드 원본 다운로드 | READ |
 | DELETE | `/inspections/{inspectionId}` | 점검 이력 삭제 (소프트, 최근 점검 다시 계산) | **DELETE** |
+| GET | `/vendors` | 업체 목록(업체명 기준 묶음, 계약 목록·최근 점검 포함). `keyword, includeTerminated` | READ |
+| POST | `/vendors/checklist-preview` | 업체별 업로드 미리보기 — 저장하지 않고 집계·판정·업체 후보 반환 (multipart: `file`, `inspectionType`) | WRITE |
+| POST | `/vendors/checklist` | **업체별 체크리스트 업로드** — 1개 파일을 업체의 여러 계약에 등록 (multipart: `vendorKey`, `contractIds`(여러 개, 비우면 미종료 계약 전체), `file`, `inspectionType`, `inspectionDate`, `inspectorName`, `actionDueDate`, `remark`) | WRITE |
 | POST | `/contracts/{id}/alerts` | 만료 안내 메일 수동 발송 `{extraRecipients, message}` | WRITE |
 | POST | `/alerts/run?baseDate=` | 만료 알림 일괄 실행 (스케줄러 대체/재실행) | **DELETE(관리자)** |
 
@@ -102,6 +116,7 @@
 | 등록 | `#/contracts/new` | 계약 항목 입력, 계약서 파일 함께 업로드 |
 | 상세 | `#/contracts/{id}` | 기본정보, 계약서 업로드·다운로드, 체크리스트 양식 다운로드·작성본 업로드, 점검 결과 상세·후속조치, 메일 발송, 종료 처리, 알림 이력 |
 | 수정 | `#/contracts/{id}/edit` | 계약 정보 수정 |
+| 업체별 체크리스트 업로드 | `#/vendor-checklist` | 업체 선택 → 체크리스트 미리보기 → 계약 선택 → 일괄 등록, 결과에서 계약 상세로 이동 |
 
 버튼은 `/me/permissions` 결과에 따라 보이거나 숨겨집니다. 실제 권한 판정은 서버의 `@PreAuthorize` 가 합니다.
 
@@ -149,15 +164,17 @@
 |---|---|---|
 | 1 | `01_schema.sql` | 업무 테이블 5개. `CREATE TABLE IF NOT EXISTS` 만 사용 |
 | 2 | `02_seed_data.sql` | 역할 코드 3개(공통코드 ROLE), 메뉴 2개, 역할-메뉴 매핑. upsert / NOT EXISTS / INSERT IGNORE 사용. 업무 데이터는 넣지 않음 |
+| 3 | `03_vendor_checklist_upload.sql` | **업체별 업로드용 컬럼 추가** — `pi_inspection.UPLOAD_GROUP_ID` + 인덱스. `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` (MariaDB 10.0.2+). 이미 01 을 받은 운영 DB 에만 필요하지만, 새로 설치할 때 실행해도 아무 변화 없이 통과합니다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/02_seed_data.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/03_vendor_checklist_upload.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
 
-검증 결과: 플랫폼 core DDL(V1.0.0, V1.4.0, module-common V3/V7, V3.0.0)을 올린 빈 MariaDB 에 두 스크립트를 **두 번씩** 실행해도 오류가 없었고 중복도 생기지 않았습니다(메뉴 2, 역할 3, 매핑 8 유지). DROP / TRUNCATE / DELETE / ALTER ... DROP 은 쓰지 않습니다.
+검증 결과: 플랫폼 core DDL(V1.0.0, V1.4.0, module-common V3/V7, V3.0.0)을 올린 빈 MariaDB 에 두 스크립트를 **두 번씩** 실행해도 오류가 없었고 중복도 생기지 않았습니다(메뉴 2, 역할 3, 매핑 8 유지). DROP / TRUNCATE / DELETE / ALTER ... DROP 은 쓰지 않습니다. `03` 은 기존 테이블(컬럼 없음)과 새 테이블(01 에 컬럼 포함) 양쪽에서 각각 두 번 실행해 오류 없이 통과하는 것을 확인했습니다.
 
 ---
 
@@ -220,23 +237,25 @@ module-personalinfo/
 └── src/main/
     ├── java/com/company/module/personalinfo/
     │   ├── controller/  PiContractController, PiContractFileController, PiInspectionController,
-    │   │                PiAlertController, PiDownloads(다운로드 응답 헬퍼)
+    │   │                PiAlertController, PiVendorChecklistController, PiDownloads(다운로드 응답 헬퍼)
     │   ├── dto/         ContractSaveRequest, ContractSearchCondition, ContractTerminateRequest,
     │   │                InspectionUpdateRequest, AlertSendRequest,
     │   │                ContractSummaryResponse, ContractDetailResponse, ContractFileResponse,
     │   │                InspectionResponse, InspectionItemResponse, AlertLogResponse,
-    │   │                AlertRunResponse, DashboardResponse, PermissionResponse
+    │   │                AlertRunResponse, DashboardResponse, PermissionResponse,
+    │   │                VendorSummaryResponse, VendorChecklistPreviewResponse, VendorChecklistUploadResponse
     │   ├── entity/      PiBaseEntity(공통 컬럼), PiContract, PiContractFile, PiInspection,
     │   │                PiInspectionItem, PiAlertLog + Enum(ContractStatus, ContractFileType,
     │   │                InspectionType, InspectionResult, ChecklistSheetType, AlertSendStatus, AlertTriggerType)
     │   ├── repository/  Pi*Repository (5개)
     │   └── service/     PiContractService, PiContractFileService, PiInspectionService,
     │                    ChecklistExcelParser, PiChecklistTemplateService, PiContractExcelService,
-    │                    PiAlertMailService, PiAlertScheduler, PiFileStorage, PiExcelSupport, PiRoles
+    │                    PiAlertMailService, PiAlertScheduler, PiFileStorage, PiExcelSupport, PiRoles,
+    │                    PiVendorChecklistService(업체별 업로드), PiVendorNames(업체명 정규화)
     └── resources/
         ├── personalinfo/checklist-template.xlsx      보안팀 점검 체크리스트 원본 양식
         └── static/personalinfo/                      화면 (index.html, css, js)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, README.md
 ```
 
 ---
@@ -247,13 +266,14 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, README.md
 |---|---|
 | 컴파일 (Java 17 타깃, core compileOnly) | 통과 |
 | Hibernate `ddl-auto=validate` (Entity ↔ 01_schema.sql 컬럼·타입 일치) | 통과 |
-| 통합 테스트 10건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **10/10 통과** |
+| 통합 테스트 11건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **11/11 통과** |
 | 　- 권한: 조회자 등록 403 / 외부 역할 403 / 미로그인 401 / 일반 사용자 삭제 403 / 관리자 삭제 200 | 통과 |
 | 　- 계약서 업로드·다운로드, 금지 확장자 거부, `../` 경로 조작 파일명 무력화 | 통과 |
 | 　- 체크리스트: 33항목 집계, 병합셀 구분, 중요(●), N 항목 조치계획, "미 보유" 제외, 3번 시트 6항목, 엑셀 아닌 파일 400 | 통과 |
 | 　- 상태 필터(만료임박/계약중/기간미정), 기간미정 계약 정렬 시 맨 뒤, 대시보드, 엑셀 다운로드 | 통과 |
 | 　- 만료 알림: D-7 발송(담당자+보안팀), 같은 날 재실행 시 중복 0, 4일 뒤 D-1 발송, 수동 발송, 이력 기록 | 통과 |
 | 　- 소프트 삭제: DELETED_YN/BY 기록, 항목 33건 함께 소프트 삭제, 최근 점검 다시 계산 | 통과 |
+| 　- 업체별 업로드: 표기 다른 업체명 3건 → 1개 업체, 미리보기 자동 매칭·저장 없음, 조회자 403, 타 업체 계약 섞이면 400·저장 0, 미종료 2건 등록(묶음ID 동일·파일 1개·항목 66건), 계약별 최근 점검 반영, 종료 계약 명시 등록, xlsx 아님 400, 없는 업체 404 | 통과 |
 | 브라우저 E2E (목록 → 등록+파일 → 체크리스트 업로드 → 점검 상세 → 수정, 역할별 버튼 노출) | 통과, 콘솔 오류 0 |
 | SQL 2회 실행(재실행 안전), COMMENT 누락 0, core FK 0 | 통과 |
 
