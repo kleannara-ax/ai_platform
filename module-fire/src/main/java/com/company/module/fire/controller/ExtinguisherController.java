@@ -55,6 +55,11 @@ public class ExtinguisherController {
     private final ExtinguisherListService listService;
     private final InspectorNameResolver inspectorNameResolver;
 
+    @GetMapping("/snapshot")
+    public ResponseEntity<ApiResponse<ExtinguisherListQuery.Snapshot>> snapshot() {
+        return ResponseEntity.ok(ApiResponse.success(listService.snapshot()));
+    }
+
     /** Unified list/export query; legacy list endpoint remains compatible for other consumers. */
     @GetMapping("/query")
     public ResponseEntity<ApiResponse<ExtinguisherListQuery.Result>> query(

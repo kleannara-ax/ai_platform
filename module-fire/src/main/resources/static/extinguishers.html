@@ -536,6 +536,7 @@
             교체필요 <span id="countUrgent">(0)</span>
           </button>
         </div>
+        <button type="button" class="btn btn-light fw-bold" id="btnRefreshInventory" title="서버에서 최신 목록 다시 받기" style="border-radius:8px;padding:6px 16px;">새로고침</button>
         <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;" title="엑셀 다운로드">📥 엑셀</button>
         <button type="button" class="btn status-add-btn" id="btnExtAdd">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
       </div>
@@ -874,8 +875,13 @@ const API = (() => {
 
  // ===== 상태 =====
 let allItems = [];
-// 목록/상태 집계/엑셀은 동일한 서버 조회 정책을 사용한다.
+// 전체 목록을 처음 한 번 받고 메모리에서 조회한다. 상태 판정은 서버 값을 재사용한다.
 let listRequestSequence = 0;
+let inventorySnapshot = null;
+let inventorySnapshotPromise = null;
+let inventoryGeneration = 0;
+let buildingOptionsPromise = null;
+const inventoryCacheMs = 5 * 60 * 1000; // Per-tab only; never persisted in browser storage.
 let listSummary = { inspectCount: 0, plannedCount: 0, urgentCount: 0 };
 let allItemTotalCount = 0;
 const listPageSize = 200;
@@ -971,11 +977,11 @@ async function loadBuildingOptions() {
     floors = Array.isArray(fj?.data) ? fj.data : [];
   } catch {}
 
-  // Fallback: QR API 실패 시 현재 목록 데이터에서 건물/층 후보 구성
+  // Fallback: 마스터 API 실패 시 현재 페이지가 아니라 전체 수신 데이터에서 후보 구성
   if (!buildings.length || !floors.length) {
     const bMap = new Map();
     const fMap = new Map();
-    (allItems || []).forEach(it => {
+    (inventorySnapshot?.inventory.content || allItems || []).forEach(it => {
       if (it?.buildingId != null && !bMap.has(String(it.buildingId))) {
         bMap.set(String(it.buildingId), { buildingId: it.buildingId, buildingName: it.buildingName || String(it.buildingId) });
       }
@@ -1041,36 +1047,99 @@ function updateExtModalFloorOptions(buildingId) {
 function getSelectedBuildingIds() {
   return window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || [];
 }
-function appendBuildingIds(params, buildingIds) {
-  (Array.isArray(buildingIds) ? buildingIds : (buildingIds ? [buildingIds] : [])).forEach(id => params.append('buildingIds', id));
+function invalidateInventorySnapshot() {
+  inventoryGeneration += 1;
+  inventorySnapshot = null;
+  inventorySnapshotPromise = null;
+  buildingOptionsPromise = null;
 }
-function extinguisherQueryParams(q, buildingIds, floorId, pageNo, exportAll = false) {
-  const params = new URLSearchParams({
-    size: String(listPageSize), page: String(Math.max(0, pageNo)),
-    sort: currentSort.key, direction: currentSort.direction
-  });
-  if (q) params.set('q', q);
-  appendBuildingIds(params, buildingIds);
-  if (floorId) params.set('floorId', floorId);
-  const type = document.getElementById('filterType')?.value || '';
-  if (type) params.set('type', type);
-  if (currentStatusType) params.set('status', currentStatusType);
-  if (exportAll) params.set('exportAll', 'true');
-  return params;
+async function getInventorySnapshot(forceRefresh = false) {
+  if (forceRefresh) invalidateInventorySnapshot();
+  if (inventorySnapshot && Date.now() < inventorySnapshot.expiresAt) return inventorySnapshot;
+  if (inventorySnapshotPromise) return inventorySnapshotPromise;
+  const generation = inventoryGeneration;
+  const promise = (async () => {
+    const res = await API.req('/fire-api/extinguishers/snapshot');
+    if (!res) throw new Error('목록 조회가 취소되었습니다.');
+    const json = await res.json().catch(() => null);
+    const data = json?.data;
+    if (!res.ok || json?.success === false || !data?.inventory || !data.statuses) {
+      throw new Error(json?.message || '소화기 전체 목록을 불러오지 못했습니다.');
+    }
+    if (data.inventory.content.length !== data.inventory.totalElements) {
+      throw new Error('전체 목록 수신이 완료되지 않았습니다. 새로고침해 주세요.');
+    }
+    const now = Date.now();
+    const seoulNow = new Date(now + 9 * 60 * 60 * 1000);
+    const midnight = Date.UTC(seoulNow.getUTCFullYear(), seoulNow.getUTCMonth(), seoulNow.getUTCDate() + 1) - 9 * 60 * 60 * 1000;
+    const snapshot = { ...data, loadedAt: now, expiresAt: Math.min(now + inventoryCacheMs, midnight) };
+    if (generation === inventoryGeneration) inventorySnapshot = snapshot;
+    return snapshot;
+  })();
+  inventorySnapshotPromise = promise;
+  try { return await promise; }
+  finally { if (inventorySnapshotPromise === promise) inventorySnapshotPromise = null; }
 }
-async function fetchExtinguisherPage(q='', buildingIds=[], floorId='', pageNo = 0, exportAll = false) {
-  const params = extinguisherQueryParams(q, buildingIds, floorId, pageNo, exportAll);
-  const res = await API.req(`/fire-api/extinguishers/query?${params}`);
-  if (!res) throw new Error('목록 조회가 취소되었습니다.');
-  const json = await res.json().catch(() => null);
-  if (!res.ok || json?.success === false || !json?.data) {
-    throw new Error(json?.message || '소화기 목록을 불러오지 못했습니다.');
+
+const extCollator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
+function getExtSortValue(item, key) {
+  switch (key) {
+    case 'extinguisherId': return item.extinguisherId;
+    case 'rowNo':
+    case 'serialNumber': return item.serialNumber || '';
+    case 'lastIsFaulty': return item.lastInspectionDate == null ? '' : (item.lastIsFaulty === true ? '비정상' : '정상');
+    case 'lastFaultReason': return item.lastIsFaulty === true ? (item.lastFaultReason || '') : '';
+    default: return item[key] ?? '';
   }
-  return json.data;
+}
+function compareCachedExtinguishers(a, b) {
+  const av = String(getExtSortValue(a, currentSort.key));
+  const bv = String(getExtSortValue(b, currentSort.key));
+  const aBlank = av.trim() === '', bBlank = bv.trim() === '';
+  if (aBlank !== bBlank) return aBlank ? 1 : -1;
+  const value = extCollator.compare(av, bv);
+  if (value) return currentSort.direction === 'desc' ? -value : value;
+  return Number(a.extinguisherId) - Number(b.extinguisherId);
+}
+// Preserve existing SQL LIKE keyword semantics (% and _), including escaping.
+function extinguisherKeywordMatcher(keyword) {
+  let pattern = '';
+  const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const chars = Array.from(String(keyword || '').trim());
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    if (char === '\\' && index + 1 < chars.length) pattern += escape(chars[++index]);
+    else if (char === '%') pattern += '.*';
+    else if (char === '_') pattern += '.';
+    else pattern += escape(char);
+  }
+  return new RegExp(pattern, 'isu');
+}
+function queryCachedInventory(snapshot, q, buildingIds, floorId, pageNo, exportAll = false) {
+  const selected = new Set((buildingIds || []).map(String).filter(id => Number(id) > 0));
+  const type = document.getElementById('filterType')?.value || '';
+  const keyword = extinguisherKeywordMatcher(q);
+  const base = snapshot.inventory.content.filter(item =>
+    (!selected.size || selected.has(String(item.buildingId))) &&
+    (!floorId || Number(floorId) <= 0 || String(item.floorId) === String(floorId)) &&
+    (!type || item.extinguisherType === type) &&
+    [item.buildingName, item.floorName, item.extinguisherType, item.note].some(value => keyword.test(value || ''))
+  );
+  const summary = { inspectCount: 0, plannedCount: 0, urgentCount: 0 };
+  // Status rules and their date reference come exclusively from the server snapshot.
+  const memberships = item => snapshot.statuses[String(item.extinguisherId)] || [];
+  base.forEach(item => memberships(item).forEach(status => { summary[status + 'Count'] += 1; }));
+  const matched = base.filter(item => !currentStatusType || memberships(item).includes(currentStatusType))
+    .sort(compareCachedExtinguishers);
+  const totalPages = Math.ceil(matched.length / listPageSize);
+  const number = Math.min(Math.max(0, pageNo), Math.max(0, totalPages - 1));
+  const start = number * listPageSize;
+  return { content: exportAll ? matched : matched.slice(start, start + listPageSize),
+    totalElements: matched.length, totalMatching: base.length, totalPages, number,
+    summary, types: snapshot.inventory.types, asOfDate: snapshot.inventory.asOfDate };
 }
 async function fetchAllExtinguisherItems(q='', buildingIds=[], floorId='') {
-  // Export uses the exact same server filter, status, date and sorting policy.
-  return (await fetchExtinguisherPage(q, buildingIds, floorId, 0, true)).content;
+  return queryCachedInventory(await getInventorySnapshot(), q, buildingIds, floorId, 0, true).content;
 }
 function updateTypeOptions(types) {
   const select = document.getElementById('filterType');
@@ -1080,12 +1149,13 @@ function updateTypeOptions(types) {
   select.replaceChildren(new Option('-- 종류 전체 --', ''), ...values.map(type => new Option(type, type)));
   select.value = selected;
 }
-async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = currentListPage) {
+async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = currentListPage, forceRefresh = true) {
   const sequence = ++listRequestSequence;
   const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
   document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-muted py-4">소화기 목록을 조회하는 중...</div>';
   try {
-    const data = await fetchExtinguisherPage(q, buildingIds, floorId, requestedPage);
+    const snapshot = await getInventorySnapshot(forceRefresh);
+    const data = queryCachedInventory(snapshot, q, buildingIds, floorId, requestedPage);
     if (sequence !== listRequestSequence) return;
     allItems = Array.isArray(data.content) ? data.content : [];
     allItemTotalCount = data.totalMatching;
@@ -1094,7 +1164,10 @@ async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = curr
     currentListPage = data.number;
     listSummary = data.summary;
     updateTypeOptions(data.types);
-    await loadBuildingOptions();
+    if (!buildingOptionsPromise) {
+      buildingOptionsPromise = loadBuildingOptions().catch(error => { buildingOptionsPromise = null; throw error; });
+    }
+    await buildingOptionsPromise;
     if (sequence !== listRequestSequence) return;
     const filterFloor = document.getElementById('filterFloorId');
     if (filterFloor && Array.from(filterFloor.options).some(option => option.value === String(floorId))) {
@@ -1154,7 +1227,7 @@ function applyListSort(key) {
   }
   void loadExtinguishers(
     document.getElementById('filterQ')?.value || '', getSelectedBuildingIds(),
-    document.getElementById('filterFloorId')?.value || '', 0
+    document.getElementById('filterFloorId')?.value || '', 0, false
   );
 }
 
@@ -1199,7 +1272,7 @@ function renderTable(items) {
     wrap.innerHTML = '<div class="text-center text-muted py-4">조회 결과가 없습니다.</div>' + renderListPagination(0);
     return;
   }
-  const sortedItems = items; // Already globally sorted by the server before pagination.
+  const sortedItems = items; // The full snapshot is filtered and sorted before this page is sliced.
   let rows = '';
   sortedItems.forEach((item, index) => {
     const rowNo = currentListPage * listPageSize + index + 1;
@@ -1276,7 +1349,7 @@ async function applyStatusFilter(type) {
   const panelEl = document.getElementById('statusPanel');
   if (panelEl?.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(panelEl).hide();
   await loadExtinguishers(document.getElementById('filterQ')?.value || '',
-    getSelectedBuildingIds(), document.getElementById('filterFloorId')?.value || '', 0);
+    getSelectedBuildingIds(), document.getElementById('filterFloorId')?.value || '', 0, false);
 }
 
 function openStatus(type) {
@@ -2603,7 +2676,7 @@ document.addEventListener('click', async (ev) => {
     if (!Number.isFinite(page) || page < 0 || page >= listTotalPages || page === currentListPage) return;
     await loadExtinguishers(
       document.getElementById('filterQ')?.value || '', getSelectedBuildingIds(),
-      document.getElementById('filterFloorId')?.value || '', page
+      document.getElementById('filterFloorId')?.value || '', page, false
     );
     return;
   }
@@ -2683,11 +2756,15 @@ document.addEventListener('click', async (ev) => {
 });
 
 // ===== 버튼 이벤트 =====
+document.getElementById('btnRefreshInventory')?.addEventListener('click', () => {
+  void loadExtinguishers(document.getElementById('filterQ')?.value || '', getSelectedBuildingIds(),
+    document.getElementById('filterFloorId')?.value || '', currentListPage, true);
+});
 document.getElementById('btnSearch')?.addEventListener('click', () => {
   const q = document.getElementById('filterQ')?.value || '';
   const b = getSelectedBuildingIds();
   const f = document.getElementById('filterFloorId')?.value || '';
-  loadExtinguishers(q, b, f, 0);
+  loadExtinguishers(q, b, f, 0, false);
 });
 document.getElementById('filterQ')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btnSearch')?.click();
@@ -2699,7 +2776,7 @@ document.getElementById('btnReset')?.addEventListener('click', () => {
   document.getElementById('filterType').value = '';
   currentStatusType = null;
   syncStatusButtons();
-  loadExtinguishers('', [], '', 0);
+  loadExtinguishers('', [], '', 0, false);
 });
 document.getElementById('btnStatusInspect')?.addEventListener('click', () => { void applyStatusFilter('inspect'); });
 document.getElementById('btnStatusPlanned')?.addEventListener('click', () => { void applyStatusFilter('planned'); });
@@ -2720,7 +2797,7 @@ document.getElementById('btnExcelDownload')?.addEventListener('click', async (ev
       getSelectedBuildingIds(),
       document.getElementById('filterFloorId')?.value || ''
     );
-    const filteredItems = items; // Server applies the same status/type/sort policy as the list.
+    const filteredItems = items; // Same full snapshot, status memberships, filter and global sort as the list.
     if (!filteredItems.length) { alert('다운로드할 데이터가 없습니다.'); return; }
 
     const rows = filteredItems.map((item, i) => ({

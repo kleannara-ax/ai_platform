@@ -13,6 +13,18 @@ public final class ExtinguisherListQuery {
                          int number, int size, long totalMatching, Counts summary,
                          List<String> types, LocalDate asOfDate) {}
 
+    /** Full inventory and server-evaluated status memberships for in-tab filtering. */
+    public record Snapshot(Result inventory, Map<Long, List<String>> statuses) {}
+
+    public static Snapshot snapshot(Result inventory) {
+        Map<Long, List<String>> statuses = new LinkedHashMap<>();
+        for (ExtinguisherResponse row : inventory.content()) {
+            statuses.put(row.getExtinguisherId(), java.util.stream.Stream.of("inspect", "planned", "urgent")
+                    .filter(status -> matches(row, status, inventory.asOfDate())).toList());
+        }
+        return new Snapshot(inventory, statuses);
+    }
+
     static boolean matches(ExtinguisherResponse row, String status, LocalDate today) {
         boolean inspect = row.getLastInspectionDate() == null ||
                 !row.getLastInspectionDate().plusDays(30).isAfter(today);

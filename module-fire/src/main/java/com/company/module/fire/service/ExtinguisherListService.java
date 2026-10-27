@@ -20,6 +20,11 @@ public class ExtinguisherListService {
     private final ExtinguisherRepository repository;
     private final ExtinguisherInspectionRepository inspections;
 
+    public ExtinguisherListQuery.Snapshot snapshot() {
+        return ExtinguisherListQuery.snapshot(query(null, null, null, null, null,
+                "extinguisherId", "asc", 0, 200, true));
+    }
+
     public ExtinguisherListQuery.Result query(List<Long> buildingIds, Long floorId, String q,
             String type, String status, String sort, String direction, int page, int size, boolean exportAll) {
         List<Long> ids = buildingIds == null ? null : buildingIds.stream()

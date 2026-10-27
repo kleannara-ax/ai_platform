@@ -82,6 +82,28 @@ class ExtinguisherListQueryTest {
         assertThat(query(List.of(a,b),null,null,"extinguisherType","desc",99,false).number()).isZero();
         assertThat(query(List.of(),null,null,"serialNumber","asc",99,false).content()).isEmpty();
     }
+    @Test void snapshotCarriesServerStatusMembershipsForEveryRow() {
+        var rows = List.of(row(1,"분말소화기",TODAY.plusDays(20),null,false),
+                row(2,"분말소화기",TODAY.plusDays(90),TODAY,false),
+                row(3,"이산화탄소소화기",TODAY.plusYears(99),TODAY,false));
+        var inventory = query(rows,null,null,"serialNumber","asc",0,true);
+        var snapshot = ExtinguisherListQuery.snapshot(inventory);
+        assertThat(snapshot.statuses()).hasSize(3);
+        assertThat(snapshot.statuses().get(1L)).containsExactly("inspect", "urgent");
+        assertThat(snapshot.statuses().get(2L)).containsExactly("planned");
+        assertThat(snapshot.statuses().get(3L)).isEmpty();
+        assertThat(snapshot.inventory().asOfDate()).isEqualTo(TODAY);
+        for (String status : List.of("inspect","planned","urgent")) {
+            var fromSnapshot = inventory.content().stream()
+                    .filter(r -> snapshot.statuses().get(r.getExtinguisherId()).contains(status)).toList();
+            assertThat(fromSnapshot).containsExactlyElementsOf(query(rows,null,status,"serialNumber","asc",0,true).content());
+        }
+    }
+    @Test void emptySnapshotDoesNotInventMemberships() {
+        var snapshot = ExtinguisherListQuery.snapshot(query(List.of(),null,null,"serialNumber","asc",0,true));
+        assertThat(snapshot.statuses()).isEmpty();
+        assertThat(snapshot.inventory().content()).isEmpty();
+    }
     @Test void rejectsUnsupportedStatusSortAndDirection() {
         assertThatIllegalArgumentException().isThrownBy(() -> query(List.of(),null,"bad","serialNumber","asc",0,false));
         assertThatIllegalArgumentException().isThrownBy(() -> query(List.of(),null,null,"bad","asc",0,false));
