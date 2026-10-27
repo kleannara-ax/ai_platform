@@ -1,0 +1,31 @@
+// ============================================================
+// module-personalinfo: 개인정보 위수탁 협력사 관리 모듈
+// 패키지   : com.company.module.personalinfo
+// URL      : /personalinfo-api/** (업무 API), /personalinfo/** (화면, 플랫폼 SPA iframe)
+// DB Table : pi_contract, pi_contract_file, pi_inspection, pi_inspection_item, pi_alert_log
+// ============================================================
+
+dependencies {
+    // core 공통 클래스 참조 (ApiResponse, BusinessException 등)
+    compileOnly project(':core')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // SecurityConfig/JWT 구현 금지
+    // @PreAuthorize / @AuthenticationPrincipal 등 기존 core 권한 체계 사용을 위한 컴파일 참조만 허용
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+
+    // 모듈별 추가 라이브러리
+    // - 계약 만료 알림 메일 발송 (JavaMailSender). spring.mail.* 미설정 시 메일은 SKIPPED 처리됨
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // - 점검 체크리스트(.xlsx) 템플릿 다운로드 / 업로드 파싱, 계약 목록 엑셀 다운로드
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+}
+
+// spring-boot 플러그인 미적용 서브모듈
+// 업무 모듈은 독립 실행 애플리케이션이 아니므로 plain jar만 생성
+jar {
+    enabled = true
+}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보 위수탁 관리</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/personalinfo.css" rel="stylesheet">
+</head>
+<body>
+<main id="pi-app" class="pi-main">
+  <header class="pi-header">
+    <h1><span class="pi-badge"><i class="fas fa-file-contract"></i></span>개인정보 위수탁 관리</h1>
+    <nav class="pi-tabs" id="pi-breadcrumb"></nav>
+  </header>
+  <div id="pi-alert-area"></div>
+  <section id="pi-view" aria-live="polite"></section>
+</main>
+
+<!-- 체크리스트 업로드 모달 -->
+<div class="modal fade" id="inspection-modal" tabindex="-1" aria-labelledby="inspection-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form id="inspection-form">
+      <div class="modal-header"><h5 class="modal-title" id="inspection-modal-title">점검 체크리스트 업로드</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">협력사가 작성한 보안팀 점검 체크리스트(.xlsx)를 올리면 평가 항목(Y/N/NA)을 읽어 점검 결과를 자동 판정합니다.</p>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="ins-type">점검 구분</label>
+            <select class="form-select" id="ins-type" name="inspectionType">
+              <option value="REGULAR">정기 점검 (1.관리체계 / 2.개인정보처리시스템)</option>
+              <option value="TERMINATION">계약변경·만료 점검 (3.계약변경 만료시 체크)</option>
+            </select></div>
+          <div class="col-md-6"><label class="form-label" for="ins-date">점검일 <small class="text-muted">(비우면 엑셀 평가일)</small></label>
+            <input type="date" class="form-control" id="ins-date" name="inspectionDate"></div>
+          <div class="col-md-6"><label class="form-label" for="ins-inspector">평가자</label>
+            <input class="form-control" id="ins-inspector" name="inspectorName" maxlength="100"></div>
+          <div class="col-md-6"><label class="form-label" for="ins-due">조치 예정일 <small class="text-muted">(N 항목이 있을 때)</small></label>
+            <input type="date" class="form-control" id="ins-due" name="actionDueDate"></div>
+          <div class="col-12"><label class="form-label" for="ins-file">체크리스트 파일 (.xlsx) *</label>
+            <input type="file" class="form-control" id="ins-file" name="file" accept=".xlsx" required></div>
+          <div class="col-12"><label class="form-label" for="ins-remark">비고</label>
+            <textarea class="form-control" id="ins-remark" name="remark" rows="2" maxlength="2000"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-upload me-1"></i>업로드</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<!-- 점검 상세 모달 -->
+<div class="modal fade" id="inspection-detail-modal" tabindex="-1" aria-labelledby="inspection-detail-title" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="inspection-detail-title">점검 결과 상세</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body" id="inspection-detail-body"></div>
+  </div></div>
+</div>
+
+<!-- 메일 발송 모달 -->
+<div class="modal fade" id="mail-modal" tabindex="-1" aria-labelledby="mail-modal-title" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <form id="mail-form">
+      <div class="modal-header"><h5 class="modal-title" id="mail-modal-title">만료 안내 메일 발송</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <p class="small text-muted" id="mail-default-recipients"></p>
+        <label class="form-label" for="mail-extra">추가 수신자 <small class="text-muted">(쉼표 구분)</small></label>
+        <input class="form-control mb-3" id="mail-extra" name="extraRecipients" placeholder="a@company.com, b@company.com">
+        <label class="form-label" for="mail-message">추가 메시지</label>
+        <textarea class="form-control" id="mail-message" name="message" rows="3" maxlength="1000"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-1"></i>발송</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/personalinfo-api.js"></script>
+<script src="js/personalinfo.js"></script>
+</body>
+</html>
