@@ -1908,7 +1908,7 @@ function navigateToFirePage(path) {
   iframe.className = 'fire-iframe';
   iframe.id = 'fireIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
-  const firePageVersion = path.split('?')[0] === '/extinguishers.html' ? 'ext-full-inventory-cache-v2' : '20260625-map-zones';
+  const firePageVersion = path.split('?')[0] === '/extinguishers.html' ? 'ext-auto-refresh-v3' : '20260625-map-zones';
   const cacheBustedPath = path + (path.includes('?') ? '&' : '?') + 'v=' + firePageVersion;
   iframe.src = cacheBustedPath;
   el.innerHTML = '';

@@ -536,7 +536,6 @@
             교체필요 <span id="countUrgent">(0)</span>
           </button>
         </div>
-        <button type="button" class="btn btn-light fw-bold" id="btnRefreshInventory" title="서버에서 최신 목록 다시 받기" style="border-radius:8px;padding:6px 16px;">새로고침</button>
         <button type="button" class="btn btn-light fw-bold" id="btnExcelDownload" style="border-radius:8px;padding:6px 16px;" title="엑셀 다운로드">📥 엑셀</button>
         <button type="button" class="btn status-add-btn" id="btnExtAdd">+ &#49548;&#54868;&#44592; &#52628;&#44032;</button>
       </div>
@@ -882,6 +881,8 @@ let inventorySnapshotPromise = null;
 let inventoryGeneration = 0;
 let buildingOptionsPromise = null;
 const inventoryCacheMs = 5 * 60 * 1000; // Per-tab only; never persisted in browser storage.
+let inventoryRefreshTimer = null;
+let inventoryRefreshStopped = false;
 let listSummary = { inspectCount: 0, plannedCount: 0, urgentCount: 0 };
 let allItemTotalCount = 0;
 const listPageSize = 200;
@@ -1048,6 +1049,7 @@ function getSelectedBuildingIds() {
   return window.FireWebBuildingMultiFilter?.values('filterBuildingIds') || [];
 }
 function invalidateInventorySnapshot() {
+  clearTimeout(inventoryRefreshTimer);
   inventoryGeneration += 1;
   inventorySnapshot = null;
   inventorySnapshotPromise = null;
@@ -1073,12 +1075,37 @@ async function getInventorySnapshot(forceRefresh = false) {
     const seoulNow = new Date(now + 9 * 60 * 60 * 1000);
     const midnight = Date.UTC(seoulNow.getUTCFullYear(), seoulNow.getUTCMonth(), seoulNow.getUTCDate() + 1) - 9 * 60 * 60 * 1000;
     const snapshot = { ...data, loadedAt: now, expiresAt: Math.min(now + inventoryCacheMs, midnight) };
-    if (generation === inventoryGeneration) inventorySnapshot = snapshot;
+    if (generation === inventoryGeneration) {
+      inventorySnapshot = snapshot;
+      buildingOptionsPromise = null;
+      scheduleInventoryRefresh();
+    }
     return snapshot;
   })();
   inventorySnapshotPromise = promise;
   try { return await promise; }
   finally { if (inventorySnapshotPromise === promise) inventorySnapshotPromise = null; }
+}
+
+// Active screens refresh themselves; hidden tabs and open modals do not interrupt the user.
+function scheduleInventoryRefresh(delay = null) {
+  clearTimeout(inventoryRefreshTimer);
+  if (inventoryRefreshStopped || !inventorySnapshot) return;
+  const wait = delay ?? Math.max(0, inventorySnapshot.expiresAt - Date.now());
+  inventoryRefreshTimer = setTimeout(() => { void refreshInventoryAutomatically(); }, wait);
+}
+async function refreshInventoryAutomatically() {
+  if (inventoryRefreshStopped || !inventorySnapshot) return;
+  if (document.hidden || document.querySelector('.modal.show') || inventorySnapshotPromise) {
+    scheduleInventoryRefresh(30000);
+    return;
+  }
+  if (Date.now() < inventorySnapshot.expiresAt) {
+    scheduleInventoryRefresh();
+    return;
+  }
+  await loadExtinguishers(document.getElementById('filterQ')?.value || '', getSelectedBuildingIds(),
+    document.getElementById('filterFloorId')?.value || '', currentListPage, false, true);
 }
 
 const extCollator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
@@ -1149,10 +1176,10 @@ function updateTypeOptions(types) {
   select.replaceChildren(new Option('-- 종류 전체 --', ''), ...values.map(type => new Option(type, type)));
   select.value = selected;
 }
-async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = currentListPage, forceRefresh = true) {
+async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = currentListPage, forceRefresh = true, background = false) {
   const sequence = ++listRequestSequence;
   const requestedPage = Math.max(0, Number.parseInt(pageNo, 10) || 0);
-  document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-muted py-4">소화기 목록을 조회하는 중...</div>';
+  if (!background) document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-muted py-4">소화기 목록을 조회하는 중...</div>';
   try {
     const snapshot = await getInventorySnapshot(forceRefresh);
     const data = queryCachedInventory(snapshot, q, buildingIds, floorId, requestedPage);
@@ -1178,6 +1205,12 @@ async function loadExtinguishers(q='', buildingIds=[], floorId='', pageNo = curr
     syncStatusButtons();
   } catch (error) {
     if (sequence !== listRequestSequence) return;
+    if (background) {
+      // Keep the last valid screen on a transient network failure; retry automatically.
+      showToast('최신 목록을 가져오지 못했습니다. 현재 목록을 유지하고 5분 후 다시 시도합니다.', 'warning');
+      scheduleInventoryRefresh(inventoryCacheMs);
+      return;
+    }
     // Never present a failed request as a successful empty inventory.
     allItems = [];
     document.getElementById('mainTableWrap').innerHTML = '<div class="text-center text-danger py-4">목록 조회에 실패했습니다. 검색 버튼으로 다시 시도해 주세요.</div>';
@@ -2755,11 +2788,21 @@ document.addEventListener('click', async (ev) => {
   }
 });
 
-// ===== 버튼 이벤트 =====
-document.getElementById('btnRefreshInventory')?.addEventListener('click', () => {
-  void loadExtinguishers(document.getElementById('filterQ')?.value || '', getSelectedBuildingIds(),
-    document.getElementById('filterFloorId')?.value || '', currentListPage, true);
+// Visibility/modal transitions resume an overdue automatic refresh without user action.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void refreshInventoryAutomatically();
 });
+document.addEventListener('hidden.bs.modal', () => { void refreshInventoryAutomatically(); });
+window.addEventListener('pagehide', () => {
+  inventoryRefreshStopped = true;
+  clearTimeout(inventoryRefreshTimer);
+});
+window.addEventListener('pageshow', () => {
+  inventoryRefreshStopped = false;
+  if (inventorySnapshot) void refreshInventoryAutomatically();
+});
+
+// ===== 버튼 이벤트 =====
 document.getElementById('btnSearch')?.addEventListener('click', () => {
   const q = document.getElementById('filterQ')?.value || '';
   const b = getSelectedBuildingIds();

@@ -21,13 +21,17 @@ function environment(data = fixture()) {
   let now = Date.parse('2026-10-23T00:00:00Z'), calls = 0;
   const select = {value: ''};
   const Clock = class extends Date { static now() {return now;} };
-  const context = vm.createContext({Intl, Date: Clock, console, API: {req: async () => {
+  const timers = new Map(); let timerId = 0;
+  const context = vm.createContext({Intl, Date: Clock, console,
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id,{callback,delay}); return id; },
+    clearTimeout: id => timers.delete(id), API: {req: async () => {
     calls++; return {ok: true, json: async () => ({success:true, data})};
-  }}, document: {getElementById: () => select}});
+  }}, document: {hidden: false, querySelector: () => null, getElementById: () => select}});
   vm.runInContext(`let inventorySnapshot=null, inventorySnapshotPromise=null, inventoryGeneration=0, buildingOptionsPromise=null;
     const inventoryCacheMs=300000, listPageSize=200; let currentStatusType=null;
+    let inventoryRefreshTimer=null, inventoryRefreshStopped=false;
     let currentSort={key:'serialNumber',direction:'asc'}; ${code}`, context);
-  return {context, select, run: source => vm.runInContext(source, context), calls:()=>calls, tick:ms=>{now+=ms;}};
+  return {context, select, run: source => vm.runInContext(source, context), calls:()=>calls, tick:ms=>{now+=ms;}, timers};
 }
 test('1000 rows: full sorting occurs before page slicing, with no missing or duplicate IDs', () => {
   const e=environment(); e.context.snapshot=fixture();
@@ -84,6 +88,27 @@ test('partial or failed snapshots are not cached; retry remains possible', async
   await assert.rejects(e.run('getInventorySnapshot()'));
   assert.equal(e.run('inventorySnapshot'),null);
   broken.inventory.totalElements=1;await e.run('getInventorySnapshot()');assert.equal(e.calls(),2);
+});
+test('five-minute timer refreshes without a click and preserves the current page and query', async () => {
+  const e=environment();
+  e.run("let currentListPage=2; function getSelectedBuildingIds(){return ['1'];} async function loadExtinguishers(...args){globalThis.autoload=args; await getInventorySnapshot();}");
+  await e.run('getInventorySnapshot()');
+  assert.equal([...e.timers.values()][0].delay,300000);
+  e.tick(300000);await e.run('refreshInventoryAutomatically()');
+  assert.equal(e.calls(),2);
+  assert.deepEqual(JSON.parse(JSON.stringify(e.context.autoload)),['',['1'],'',2,false,true]);
+  assert.equal([...e.timers.values()][0].delay,300000);
+});
+test('automatic refresh defers for hidden tabs and open modals without extra requests', async () => {
+  const e=environment();await e.run('getInventorySnapshot()');e.tick(300000);
+  e.context.document.hidden=true;await e.run('refreshInventoryAutomatically()');
+  assert.equal(e.calls(),1);assert.equal([...e.timers.values()][0].delay,30000);
+  e.context.document.hidden=false;e.context.document.querySelector=()=>({});
+  await e.run('refreshInventoryAutomatically()');assert.equal(e.calls(),1);
+  e.run('inventoryRefreshStopped=true; scheduleInventoryRefresh()');assert.equal(e.timers.size,0);
+});
+test('manual refresh button is removed from the original list screen', () => {
+  assert.equal(html.includes('id="btnRefreshInventory"'),false);
 });
 test('empty inventory remains empty and page indices clamp safely', () => {
   const e=environment();e.context.snapshot=fixture(0);
