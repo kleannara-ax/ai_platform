@@ -5,6 +5,7 @@ import com.company.core.common.exception.EntityNotFoundException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.personalinfo.dto.AlertLogResponse;
 import com.company.module.personalinfo.dto.ContractDetailResponse;
+import com.company.module.personalinfo.dto.ContractFlagUpdateRequest;
 import com.company.module.personalinfo.dto.ContractFileResponse;
 import com.company.module.personalinfo.dto.ContractSaveRequest;
 import com.company.module.personalinfo.dto.ContractSearchCondition;
@@ -139,6 +140,25 @@ public class PiContractService {
                 r.getAlertYn(), r.getAlertDaysBefore(), trim(r.getAlertExtraEmails()), trim(r.getRemark()),
                 userId);
         return getDetail(contractId);
+    }
+
+    /**
+     * 목록 화면에서 ISMS 인증 여부 / 재위탁 여부를 바로 바꾼다.
+     * 보낸 항목만 바꾸며, 계약의 다른 항목은 건드리지 않는다.
+     */
+    @Transactional
+    public ContractSummaryResponse updateFlags(Long contractId, ContractFlagUpdateRequest r, Long userId) {
+        if (r == null || (r.getIsmsScopeYn() == null && r.getSubcontractYn() == null)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "변경할 항목(ismsScopeYn 또는 subcontractYn)을 보내세요.");
+        }
+        PiContract c = findActive(contractId);
+        if (r.getIsmsScopeYn() != null) {
+            c.changeIsmsScope(r.getIsmsScopeYn(), userId);
+        }
+        if (r.getSubcontractYn() != null) {
+            c.changeSubcontract(r.getSubcontractYn(), userId);
+        }
+        return ContractSummaryResponse.from(c, LocalDate.now());
     }
 
     @Transactional

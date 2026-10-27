@@ -3,6 +3,7 @@ package com.company.module.personalinfo.controller;
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
 import com.company.module.personalinfo.dto.ContractDetailResponse;
+import com.company.module.personalinfo.dto.ContractFlagUpdateRequest;
 import com.company.module.personalinfo.dto.ContractSaveRequest;
 import com.company.module.personalinfo.dto.ContractSearchCondition;
 import com.company.module.personalinfo.dto.ContractSummaryResponse;
@@ -21,6 +22,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -100,6 +102,16 @@ public class PiContractController {
             @Valid @RequestBody ContractSaveRequest request,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.success(contractService.update(contractId, request, currentUserId)));
+    }
+
+    /** 목록 화면에서 ISMS 인증 여부 / 재위탁 여부 Y/N 바로 변경 (보낸 항목만 변경) */
+    @PatchMapping("/contracts/{contractId}/flags")
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractSummaryResponse>> updateFlags(
+            @PathVariable Long contractId,
+            @Valid @RequestBody ContractFlagUpdateRequest request,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.updateFlags(contractId, request, currentUserId)));
     }
 
     /** 계약 종료 처리 */
