@@ -103,6 +103,16 @@ public class DailyReportService {
     private static final List<Integer> SAFETY_HL_ROW_INDEXES = List.of(3, 4, 5, 6, 7);
 
     /**
+     * ★★ 2026-10 추가(안내 문구 에너지 세분화) — 사고통계 표5/6의 엑셀 기준
+     * R9행(=rowIndex 8, "에너지" 행) 좌표. CellService.SAFETY_INCIDENT_CONTRIB_ROW_END(8)와
+     * 동일한 행으로, 기존에는 합계(R10) 계산의 재료로만 쓰이고 안내 문구에
+     * 별도로 노출되지 않았으나, 이번 요청으로 PS/HL과 동일한 방식(합산이 아닌
+     * 해당 행 소계 값 그대로 사용)으로 안내 문구에 추가한다.
+     * COL_INDEX는 위 SAFETY_SUMMARY_COL_INDEX(17, 당월 소계열)를 그대로 재사용.
+     */
+    private static final int SAFETY_ENERGY_ROW_INDEX = 8;
+
+    /**
      * ★★ 2026-10 추가(안내 문구 DB 영구 저장) — 특이사항 SAFETY 행의 content 컬럼에
      * "고정문구 스냅샷 + 줄바꿈 + 사용자가 직접 입력한 순수 텍스트" 형태로 함께
      * 저장할 때, 맨 앞에 붙는 고정문구 부분을 식별/분리하기 위한 패턴.
@@ -282,6 +292,24 @@ public class DailyReportService {
                     // 행을 미리 만들어둔다
                     ensureAllDefaultRemarks(report, reportDate);
                     reportRepository.save(report);
+                    // ★★ 2026-10 추가, 월경계 스냅샷 반영 버그 수정 — SAFETY 행의 content는
+                    // 바로 위 ensureAllDefaultRemarks()에서 "직전 일보의 content를 그대로"
+                    // 이어받는데(findPreviousRemarkValues), 이 이어받기 로직에는 셀 쪽
+                    // findPreviousCellValues()와 달리 월 경계 체크가 없다. 그 결과, 직전
+                    // 일보가 전달이었다면(=월이 바뀌었다면) 셀(표5/6)은 정상적으로 0으로
+                    // 리셋되었음에도 특이사항 고정문구에는 전달 숫자가 그대로 복사되어
+                    // 남아있는 상태가 된다. 신규 리포트 생성 "이 시점" 한 번만 방금
+                    // 생성된(= 월경계면 이미 리셋된) 표5/6 셀 기준으로 고정문구를 다시
+                    // 계산해 즉시 바로잡는다 — 사용자가 입력한 자유 텍스트는 보존되고
+                    // 고정문구 부분만 교체되며(resyncSafetySummarySnapshotForReport 참고),
+                    // 같은 영속성 컨텍스트의 remark 인스턴스를 그대로 수정하므로 바로 아래
+                    // DailyReportResponse.fromWithDetails(report) 응답에도 즉시 반영된다.
+                    // ※ 반드시 "신규 생성 시 1회"로 한정한다 — 위쪽 기존 리포트 조회
+                    //   분기(cellsMissing/tablesMissing 보충)에는 의도적으로 추가하지
+                    //   않는다. 그쪽에 추가하면 과거 날짜 리포트를 "열람(조회)"할 때마다
+                    //   매번 재계산되어, 과거 스냅샷은 저장 시점 그대로 보존되어야 한다는
+                    //   기존 설계 원칙(조회로 과거 기록이 바뀌면 안 됨)이 깨진다.
+                    resyncSafetySummarySnapshotForReport(report.getReportId());
                     return DailyReportResponse.fromWithDetails(report);
                 });
     }
@@ -337,6 +365,12 @@ public class DailyReportService {
         ensureAllDefaultRemarks(report, request.getReportDate());
 
         reportRepository.save(report);
+        // ★★ 2026-10 추가, 월경계 스냅샷 반영 버그 수정 — getReportByDate()의 신규 생성
+        // 분기와 동일한 이유로, 이 API로 직접 신규 리포트를 생성하는 경우에도 생성
+        // 시점에 1회 SAFETY 고정문구 스냅샷을 방금 생성된(=월경계면 이미 리셋된)
+        // 표5/6 셀 기준으로 재계산해 즉시 바로잡는다. 자세한 설명은
+        // getReportByDate()의 동일 호출부 주석 참고.
+        resyncSafetySummarySnapshotForReport(report.getReportId());
         return DailyReportResponse.fromWithDetails(report);
     }
 
@@ -678,20 +712,24 @@ public class DailyReportService {
     }
 
     /**
-     * ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 PS/HL 세분화 요청으로 확장.
+     * ★★ 2026-10 추가, 2026-10 개발서버 테스트 중 PS/HL 세분화 요청으로 확장,
+     * 이후 에너지 항목 추가 + "누계" 단어 제거(글자수 절약) 요청으로 재수정.
      * 특이사항 "사고/안전사고" 행에 표시할 안내 문구 계산.
-     * "<{m}월 누계 사고실적 : {n_1}건, 누계손실금액 : {n_2}백만원
-     *   (PS {n_1_ps}건 {n_2_ps}백만원, HL {n_1_hl}건 {n_2_hl}백만원)>" 형태.
+     * "<{m}월 사고실적 : {n_1}건, 손실금액 : {n_2}백만원
+     *   (PS {n_1_ps}건 {n_2_ps}백만원, HL {n_1_hl}건 {n_2_hl}백만원,
+     *    에너지 {n_1_e}건 {n_2_e}백만원)>" 형태.
      * - m: 이 리포트(reportId)의 REPORT_DATE 기준 월
      * - n_1: 사고통계 표5(TBL_SAFETY_INCIDENT_COUNT) 합계 행(R10, rowIndex=9,
      *        colIndex=17)의 "당월" 소계 값
      * - n_2: 사고통계 표6(TBL_SAFETY_INCIDENT_AMOUNT)의 동일 좌표 값
      * - n_1_ps/n_2_ps: 표5/6의 R3행(rowIndex=2, "제지"행) 소계 값 그대로 (합산 아님)
      * - n_1_hl/n_2_hl: 표5/6의 R4~R8행(rowIndex=3~7) 소계 값을 합산한 값
+     * - n_1_e/n_2_e: 표5/6의 R9행(rowIndex=8, "에너지"행) 소계 값 그대로 (합산 아님,
+     *   PS와 동일한 방식)
      * 총합계(n_1/n_2) 셀이 둘 중 하나라도 아직 없으면(표5/6이 생성되지 않은 과거
      * 일보 등) null을 반환해 안내 문구 자체를 표시하지 않는다(화면에서 null이면
-     * 숨김 처리). PS/HL 개별 셀이 비어 있으면 0으로 간주한다. 단위는 사용자 확인에
-     * 따라 별도 환산 없이 셀에 저장된 숫자를 그대로 사용한다.
+     * 숨김 처리). PS/HL/에너지 개별 셀이 비어 있으면 0으로 간주한다. 단위는 사용자
+     * 확인에 따라 별도 환산 없이 셀에 저장된 숫자를 그대로 사용한다.
      */
     private String buildSafetySummaryText(Long reportId) {
         DailyReport report = reportRepository.findById(reportId).orElse(null);
@@ -704,6 +742,7 @@ public class DailyReportService {
         neededRows.add(SAFETY_SUMMARY_ROW_INDEX);
         neededRows.add(SAFETY_PS_ROW_INDEX);
         neededRows.addAll(SAFETY_HL_ROW_INDEXES);
+        neededRows.add(SAFETY_ENERGY_ROW_INDEX);
 
         Map<Integer, String> countRows = fetchSafetyIncidentRowValues(
                 reportId, "TBL_SAFETY_INCIDENT_COUNT", neededRows);
@@ -731,10 +770,15 @@ public class DailyReportService {
         String countHlDisplay = sumSafetyIncidentRows(countRows, SAFETY_HL_ROW_INDEXES);
         String amountHlDisplay = sumSafetyIncidentRows(amountRows, SAFETY_HL_ROW_INDEXES);
 
+        // 에너지(R9행)는 PS와 동일하게 합산이 아니라 해당 행의 소계 값을 그대로 사용
+        String countEnergyDisplay = toDisplayZeroOrValue(countRows.get(SAFETY_ENERGY_ROW_INDEX));
+        String amountEnergyDisplay = toDisplayZeroOrValue(amountRows.get(SAFETY_ENERGY_ROW_INDEX));
+
         return String.format(
-                "<%d월 누계 사고실적 : %s건, 누계손실금액 : %s백만원 (PS %s건 %s백만원, HL %s건 %s백만원)>",
+                "<%d월 사고실적 : %s건, 손실금액 : %s백만원 (PS %s건 %s백만원, HL %s건 %s백만원, 에너지 %s건 %s백만원)>",
                 month, countDisplay, amountDisplay,
-                countPsDisplay, amountPsDisplay, countHlDisplay, amountHlDisplay);
+                countPsDisplay, amountPsDisplay, countHlDisplay, amountHlDisplay,
+                countEnergyDisplay, amountEnergyDisplay);
     }
 
     /**
