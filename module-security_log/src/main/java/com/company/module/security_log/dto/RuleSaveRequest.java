@@ -24,6 +24,9 @@ public class RuleSaveRequest {
     @Pattern(regexp = "^[A-Z0-9_]{3,50}$", message = "룰 코드는 영문 대문자/숫자/언더스코어 3~50자입니다.")
     private String ruleCode;
 
+    /** 시스템 전용 룰의 시스템 ID (비우면 공통 룰) */
+    private Long systemId;
+
     @NotBlank(message = "룰명은 필수입니다.")
     @Size(max = 200)
     private String ruleName;

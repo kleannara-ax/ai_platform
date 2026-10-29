@@ -21,6 +21,16 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .sl-tabs a{padding:10px 18px;font-weight:700;font-size:.9rem;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;margin-bottom:-2px}
 .sl-tabs a.active{color:var(--brand);border-bottom-color:var(--brand)}
 .sl-tabs a:hover{color:var(--brand)}
+.page-header h1 .crumb{display:block;font-size:.72rem;font-weight:700;color:var(--muted);line-height:1.2}
+.sl-subnav{display:flex;gap:6px;align-items:center;margin:-6px 0 16px;padding:8px 10px;background:#f8f9fd;border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
+.sl-subnav .sn-title{font-size:.76rem;font-weight:800;color:var(--muted);margin-right:6px}
+.sl-subnav a{padding:6px 14px;border-radius:8px;font-size:.84rem;font-weight:700;color:#475569;text-decoration:none}
+.sl-subnav a:hover{background:#eef0ff;color:var(--brand)}
+.sl-subnav a.active{background:var(--brand);color:#fff}
+.ip-result{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:10px;font-size:.85rem}
+.ip-result.in{border-left:4px solid #22c55e;background:#f0fdf4}
+.ip-result.out{border-left:4px solid #ef4444;background:#fef2f2}
+.ip-result.bad{border-left:4px solid #f59e0b;background:#fffbeb}
 
 /* 버튼 */
 .btn-m{border:none;border-radius:10px;padding:8px 15px;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:.15s;box-shadow:var(--shadow-sm);cursor:pointer;text-decoration:none;white-space:nowrap}
@@ -149,6 +159,274 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .modal-header{border-bottom:1px solid var(--line)}
 .modal-title{font-weight:800;font-size:1.05rem}
 
+/* 계정 판정 / 조치 */
+
+/* 월별 점검 현황 매트릭스 */
+.st-cell{display:flex;flex-direction:column;gap:3px;font-size:.78rem}
+.st-cell a{text-decoration:none}
+.st-none{background:#f1f5f9;color:#94a3b8}
+.st-warn{background:#fee2e2;color:#b91c1c}
+.cat-row td{background:#f8f9fd;font-weight:800;font-size:.78rem;color:var(--brand);padding:6px 12px}
+.progress-m{height:8px;border-radius:99px;background:#eef2ff;overflow:hidden;margin-top:6px}
+.progress-m span{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2))}
+.tbl tr.row-risk td{background:#fff7f7}
+
+/* 탭 (7개) */
+.sl-tabs{overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+.sl-tabs a{flex:0 0 auto}
+
+/* 수집 연결 상태 */
+.badge-cn{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.cn-ok{background:#dcfce7;color:#15803d}
+.cn-ready{background:#e0f2fe;color:#0369a1}
+.cn-warn{background:#fef3c7;color:#b45309}
+.cn-err{background:#fee2e2;color:#b91c1c}
+.cn-none{background:#f1f5f9;color:#64748b}
+.cn-manual{background:#ede9fe;color:#6d28d9}
+
+/* 대시보드 */
+.dash-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.dash-grid > .card-m{margin-bottom:0}
+.span-12{grid-column:span 12}.span-8{grid-column:span 8}.span-7{grid-column:span 7}.span-6{grid-column:span 6}.span-5{grid-column:span 5}.span-4{grid-column:span 4}
+@media (max-width:1100px){.span-8,.span-7,.span-6,.span-5,.span-4{grid-column:span 12}}
+.kpi-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.kpi-big .kpi{position:relative;cursor:pointer;transition:.15s;text-decoration:none;color:inherit;display:block}
+.kpi-big .kpi:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.kpi-big .kpi .k-icon{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.k-icon.i-brand{background:var(--brand-soft);color:var(--brand)}
+.k-icon.i-red{background:#fee2e2;color:#dc2626}
+.k-icon.i-orange{background:#ffedd5;color:#ea580c}
+.k-icon.i-amber{background:#fef3c7;color:#d97706}
+.k-icon.i-green{background:#dcfce7;color:#16a34a}
+.ring{--p:0;width:92px;height:92px;border-radius:50%;background:conic-gradient(var(--brand) calc(var(--p)*1%),#eef2ff 0);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.ring span{width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.25rem}
+.close-box{display:flex;gap:18px;align-items:center}
+.close-box .cb-rows{flex:1;display:flex;flex-direction:column;gap:8px;font-size:.82rem}
+.cb-row{display:flex;align-items:center;gap:10px}
+.cb-row .cb-l{width:110px;color:var(--muted);font-weight:700}
+.cb-row .progress-m{flex:1;margin-top:0}
+.cb-row .cb-v{width:60px;text-align:right;font-weight:700}
+.todo-list{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+.todo{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:10px;border:1px solid var(--line);text-decoration:none;color:inherit;font-size:.83rem}
+.todo:hover{background:#f8f9ff}
+.todo .t-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:0 0 auto}
+.todo.DANGER .t-dot{background:#dc2626}.todo.WARN .t-dot{background:#f59e0b}.todo.INFO .t-dot{background:#3b82f6}
+.todo .t-sys{font-weight:800;margin-right:6px}
+.conn-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.conn-chip{border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:5px;transition:.15s;background:#fff}
+.conn-chip:hover{box-shadow:var(--shadow-sm);border-color:#c7d2fe}
+.conn-chip .cc-name{font-weight:800;font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conn-chip .cc-sub{font-size:.7rem;color:var(--muted)}
+.conn-chip.err{border-color:#fecaca;background:#fffafa}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:.74rem;color:var(--muted)}
+.chart-box{position:relative;height:240px}
+.activity{display:flex;flex-direction:column;gap:2px;font-size:.8rem}
+.activity .a-row{display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px dashed var(--line)}
+.activity .a-row:last-child{border-bottom:none}
+.activity .a-time{width:70px;color:var(--muted);font-size:.72rem;flex:0 0 auto}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.section-title h2{margin:0}
+.section-title a{font-size:.78rem;font-weight:700;color:var(--brand);text-decoration:none}
+
+/* 수집 연결 관리 */
+.cat-title{font-weight:800;font-size:.8rem;color:var(--brand);margin:18px 0 8px;display:flex;align-items:center;gap:6px}
+.cat-title:first-child{margin-top:0}
+.flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.78rem}
+.flow .f-step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-weight:700}
+.flow i.fa-arrow-right{color:#cbd5e1}
+
 .text-muted-m{color:var(--muted)}
 .hidden{display:none !important}
 @media (max-width:768px){.sl-main{padding:12px}.page-header h1{font-size:1.15rem}}
+
+/* 점검 대상 시스템 사용여부 토글 */
+.form-switch .use-toggle{width:2.4em;height:1.3em;cursor:pointer}
+.form-switch .use-toggle:checked{background-color:var(--brand);border-color:var(--brand)}
+.use-label{font-size:.78rem;font-weight:600;color:#94a3b8;min-width:2.6em}
+.use-label.on{color:var(--brand)}
+tr.row-off td{color:#94a3b8}
+tr.row-off td b{color:#94a3b8;font-weight:600}
+
+
+/* 대시보드: 마감 D-day */
+.dday-bar{display:flex;align-items:center;gap:8px;margin-top:14px;padding:9px 12px;border-radius:10px;font-size:.8rem;flex-wrap:wrap}
+.dday-bar.ok{background:#eef2ff;color:#3730a3}
+.dday-bar.warn{background:#fef3c7;color:#92400e}
+.dday-bar.over{background:#fee2e2;color:#991b1b}
+.dday-bar .dday{font-size:1.05rem;font-weight:800;margin-right:4px}
+
+/* 대시보드: 미검토 경과 */
+.aging{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;font-size:.76rem}
+.aging .ag-title{font-weight:700;color:var(--muted);margin-right:4px}
+.ag-seg{display:flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;font-weight:600}
+.ag-seg b{font-weight:800}
+.ag-seg.g0{background:#f1f5f9;color:#475569}
+.ag-seg.g1{background:#fef3c7;color:#92400e}
+.ag-seg.g2{background:#ffedd5;color:#c2410c}
+.ag-seg.g3{background:#fee2e2;color:#b91c1c}
+
+/* 대시보드: 일별 수집 달력 */
+.cal-wrap{overflow-x:auto}
+table.cal{border-collapse:separate;border-spacing:0;width:100%;font-size:.74rem}
+table.cal th{font-weight:700;color:var(--muted);text-align:center;padding:2px 0 6px;min-width:22px}
+table.cal th span{display:block;font-size:.74rem;color:#334155}
+table.cal th small{display:block;font-size:.6rem;font-weight:600}
+table.cal th.sun span,table.cal th.sun small{color:#dc2626}
+table.cal th.sat span,table.cal th.sat small{color:#2563eb}
+table.cal th.today span{background:var(--brand);color:#fff;border-radius:6px;padding:0 3px;display:inline-block}
+table.cal td{text-align:center;padding:3px 0;border-top:1px solid #f1f5f9}
+table.cal .c-sys{text-align:left;white-space:nowrap;padding-right:10px;min-width:150px;position:sticky;left:0;background:#fff;z-index:1}
+table.cal .c-sys a{font-weight:800;color:inherit;text-decoration:none;font-size:.8rem}
+table.cal .c-sys a:hover{color:var(--brand)}
+table.cal .c-rate{min-width:58px;padding-left:8px;text-align:right}
+.cal-mode{font-size:.6rem;font-weight:800;margin-left:6px;padding:1px 5px;border-radius:5px;background:#ede9fe;color:#6d28d9;vertical-align:1px}
+.cal-mode.api{background:#dcfce7;color:#15803d}
+.cal-dot{display:inline-block;width:16px;height:16px;border-radius:4px;vertical-align:middle}
+.cal-dot.OK{background:#22c55e}
+.cal-dot.EMPTY{background:#bbf7d0}
+.cal-dot.FAIL{background:#ef4444}
+.cal-dot.MISS{background:#fde047}
+.cal-dot.FUTURE{background:#f1f5f9;border:1px dashed #cbd5e1}
+.cal-dot[data-up]{cursor:pointer}
+.cal-dot[data-up]:hover{outline:2px solid var(--brand);outline-offset:1px}
+.legend .cal-dot{width:11px;height:11px;border-radius:3px;margin-right:2px}
+.r-ok{color:#15803d}.r-warn{color:#b45309}.r-bad{color:#dc2626}
+
+/* 대시보드: 많이 탐지된 룰 */
+.rule-strip{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:.74rem}
+.rule-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 4px;background:#fff}
+
+/* 대시보드: 로그 수집 / 검토 현황 요약 */
+.sum-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+@media (max-width:1100px){.sum-strip{grid-template-columns:repeat(2,1fr)}}
+.sum-box{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;background:#fff}
+.sum-box span{font-size:.74rem;color:var(--muted);font-weight:700}
+.sum-box b{font-size:1.25rem;font-weight:800;line-height:1.3}
+.sum-box small{font-size:.7rem;color:var(--muted)}
+.sum-box.g{border-left:4px solid #22c55e}.sum-box.g b{color:#15803d}
+.sum-box.a{border-left:4px solid #f59e0b}.sum-box.a b{color:#b45309}
+.sum-box.r{border-left:4px solid #ef4444}.sum-box.r b{color:#dc2626}
+.dday-pill{display:inline-flex;gap:6px;align-items:center;padding:4px 12px;border-radius:999px;font-size:.76rem;font-weight:600}
+.dday-pill b{font-weight:800}
+.dday-pill.ok{background:#eef2ff;color:#3730a3}.dday-pill.warn{background:#fef3c7;color:#92400e}.dday-pill.over{background:#fee2e2;color:#991b1b}
+
+/* 검토 현황 표 */
+.rv-tbl th.grp{text-align:center;background:#f5f7ff;color:var(--brand)}
+.rv-tbl td a{text-decoration:none;color:inherit}
+.rv-tbl td a:hover b{color:var(--brand)}
+.rv-cell{min-width:180px}
+.rv-cell small{font-size:.7rem;color:var(--muted)}
+.rv-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:#f1f5f9;margin-bottom:2px}
+.rv-bar .s-res{background:#22c55e}.rv-bar .s-fp{background:#94a3b8}.rv-bar .s-conf{background:#ef4444}.rv-bar .s-pend{background:#fcd34d}
+.rv-next{font-size:.78rem;font-weight:700;color:var(--brand) !important}
+.rv-done{font-size:.78rem;font-weight:700;color:#16a34a}
+.st-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700}
+.st-none{background:#f1f5f9;color:#64748b}.st-wait{background:#fef3c7;color:#92400e}.st-done{background:#dcfce7;color:#166534}
+
+/* 시스템 상세 (offcanvas) */
+.sys-drawer.offcanvas-end{width:min(860px,96vw)}
+.sys-drawer .offcanvas-title{font-weight:800}
+.sd-cal{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.sd-cal-row{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:6px}
+.sd-cal-row .cal-dot{width:14px;height:14px}
+.sd-h{font-weight:800;font-size:.84rem;margin:4px 0 8px}
+.sd-h span{font-weight:600;font-size:.74rem}
+.sd-empty{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px;font-size:.82rem}
+.sd-tbl{font-size:.78rem}
+.sd-file{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-ip{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem}
+/* 로그 수집 요약: 4칸 + 수집률 클릭 → API 연결 현황 */
+.st-check{background:#ffedd5;color:#c2410c}
+.up-tbl td{vertical-align:top}
+button.sum-box.up-toggle{text-align:left;font:inherit;width:100%}
+#uploadStrip{margin-bottom:0}
+#uploadTableWrap{margin-top:12px}
+.up-sub{font-size:.7rem;color:var(--muted)}
+.up-reason{display:inline-block;margin-top:4px;margin-right:6px;font-size:.7rem;font-weight:700;color:#c2410c}
+.up-file{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}
+a.sum-box.link{text-decoration:none;color:inherit;cursor:pointer;transition:box-shadow .15s,transform .15s}
+a.sum-box.link span{display:flex;align-items:center}
+a.sum-box.link:hover{box-shadow:0 4px 14px rgba(15,23,42,.12);transform:translateY(-1px)}
+a.sum-box.link:hover small{color:#2563eb}
+/* 탐지 룰셋: 시스템별 룰셋 */
+.rs-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.rs-tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 14px;font-size:.8rem;font-weight:700;color:#475569;cursor:pointer}
+.rs-tabs button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.scope-c{background:#f1f5f9;color:#334155}.scope-s{background:#ede9fe;color:#6d28d9}
+.rs-cnt{font-size:.72rem;color:var(--muted)}
+
+/* 위험도 기준 팝오버 */
+[data-sev],[data-sev-help]{cursor:help}
+.sev-help-ic{color:#94a3b8;font-size:.82em;margin-left:4px;vertical-align:baseline}
+.sev-help-ic:hover,.sev-help-ic:focus-visible{color:var(--brand);outline:none}
+.kpi[data-sev]:focus-visible,.badge-sev[data-sev]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.sev-pop{position:fixed;z-index:2500;width:460px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 36px rgba(15,23,42,.2);padding:12px 14px;font-size:.78rem;line-height:1.5;color:#1e293b;display:none;text-align:left;white-space:normal;font-weight:400}
+.sev-pop.show{display:block}
+.sev-pop .sp-head{font-weight:800;font-size:.86rem;margin-bottom:4px}
+.sev-pop .sp-head i{color:var(--brand)}
+.sev-pop .sp-row{display:grid;grid-template-columns:78px 1fr;gap:10px;padding:8px;border-radius:10px;margin-top:4px;border:1px solid transparent}
+.sev-pop .sp-row.active{background:#f8f9ff;border-color:#c7d2fe}
+.sev-pop .sp-lv{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.sev-pop .sp-lv small{font-size:.68rem;color:var(--muted)}
+.sev-pop .sp-lv .sp-cnt{color:#334155;font-weight:700}
+.sev-pop .sp-ex{color:#475569}
+.sev-pop .sp-act{color:#334155;font-weight:600;margin-top:2px}
+.sev-pop .sp-act i{color:#94a3b8}
+.sev-pop .sp-rules{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
+.sev-pop .sp-rules-t{font-weight:700;font-size:.72rem;color:var(--muted)}
+.sev-pop .sp-rules ul{margin:2px 0 0;padding-left:16px}
+.sev-pop .sp-rules em{font-style:normal;font-size:.68rem;color:#6366f1;background:#eef2ff;border-radius:4px;padding:0 4px}
+.sev-pop .sp-foot{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:#475569;font-size:.72rem}
+.sev-pop .sp-link{display:inline-block;margin-top:4px;font-weight:700;color:var(--brand);text-decoration:none}
+.sev-guide{margin-top:6px;font-size:.76rem;border-left:3px solid #c7d2fe;padding:4px 8px;background:#f8f9ff;border-radius:6px;color:#334155}
+
+/* 룰별 탐지 건수 - 룰 단위 로그 확인 / 일괄 검토 */
+.rule-hint{font-size:.78rem;margin:-4px 0 10px}
+.rule-tbl tr.rule-active td{background:#eff6ff}
+.rule-pend{font-size:.76rem;font-weight:700;color:#b45309}
+.btn-m.btn-xs{padding:3px 8px;font-size:.74rem;gap:4px}
+.rule-filter-act{display:flex;gap:6px;align-items:flex-end;flex-direction:row !important}
+.rule-sum{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:.86rem}
+.rule-sum .rs-cnt{font-size:.8rem;margin-top:4px;color:#475569}
+.rule-sample{margin-bottom:14px}
+.rule-sample .rs-title{font-size:.8rem;font-weight:700;margin-bottom:6px}
+.rs-line{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dashed #e2e8f0}
+.rs-line .rs-no{font-size:.72rem;color:#64748b;width:56px;flex:none}
+.rs-line .log-line{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-scope{display:flex;flex-direction:column;gap:4px;font-size:.84rem;padding-top:4px}
+.rm-scope label{display:flex;align-items:center;gap:6px}
+
+/* 상세 화면 구역 제목 (① 접속 행위 분석 / ② 이상징후 탐지) - 같은 모양 */
+.sec-title{font-size:1rem;font-weight:800;margin:6px 0 10px;display:flex;align-items:center;gap:8px;scroll-margin-top:12px}
+.sec-title i{color:var(--brand);width:18px;text-align:center}
+.sec-title .sec-sub{font-size:.8rem;font-weight:600;color:var(--muted, #64748b)}
+
+/* 점검 매뉴얼 (대시보드 팝업) */
+.manual{font-size:.86rem;line-height:1.65}
+.manual .mn-lead{background:#eef2ff;color:#3730a3;border-radius:10px;padding:10px 14px;margin-bottom:12px}
+.manual .mn-toc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.manual .mn-toc a{font-size:.78rem;font-weight:700;color:var(--brand);background:#f5f6ff;border:1px solid #e0e3ff;border-radius:999px;padding:4px 11px;text-decoration:none}
+.manual .mn-toc a:hover{background:#e8eaff}
+.manual .mn-step{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;scroll-margin-top:6px}
+.manual .mn-step h6{font-size:.95rem;font-weight:800;display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.manual .mn-no{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:.78rem}
+.manual .mn-ic{color:var(--brand);width:24px;text-align:center}
+.manual .mn-key{font-size:.7rem;font-weight:700;color:#b45309;background:#fffbeb;border-radius:6px;padding:2px 7px}
+.manual ol,.manual ul{padding-left:1.25rem;margin-bottom:0}
+.manual li{margin-bottom:3px}
+.manual .tbl{font-size:.82rem}
+.manual .mn-sub{margin-top:12px}
+.manual .mn-sub-title{font-weight:800;font-size:.86rem;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.manual .mn-sub-title i{color:var(--brand)}
+.manual .mn-note{margin:10px 0 0;background:#fffbeb;color:#92400e;border-radius:8px;padding:8px 12px;display:flex;gap:8px;align-items:flex-start}
+.manual .mn-note i{margin-top:4px}
+
+/* 룰별 탐지 건수 - 0건 룰 / 룰 구분 */
+.rule-tbl tr.rule-zero td{background:#fafbfc;color:#94a3b8}
+.rule-tbl tr.rule-zero .badge-sev{opacity:.6}
+.rule-tbl tr.rule-zero td.num{font-weight:600}
+.rule-none{font-size:.76rem;color:#94a3b8}
+.rule-thr{font-size:.68rem;color:#94a3b8;font-weight:500}
+.rule-scope{display:inline-block;font-family:inherit;font-size:.64rem;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:1px}
+.rule-scope.sc-sys{background:#ede9fe;color:#6d28d9}
+.rule-scope.sc-com{background:#f1f5f9;color:#64748b}

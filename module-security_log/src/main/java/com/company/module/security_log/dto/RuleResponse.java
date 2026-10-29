@@ -14,6 +14,11 @@ import java.time.LocalDateTime;
 public class RuleResponse {
 
     private Long ruleId;
+    /** 시스템 전용 룰의 시스템 ID (NULL 이면 공통 룰) */
+    private Long systemId;
+    private String systemName;
+    /** COMMON(공통) / SYSTEM(시스템 전용) */
+    private String scope;
     private String ruleCode;
     private String ruleName;
     private String description;
@@ -33,8 +38,15 @@ public class RuleResponse {
     private Long updatedBy;
 
     public static RuleResponse from(SecLogRule rule) {
+        return from(rule, null);
+    }
+
+    public static RuleResponse from(SecLogRule rule, String systemName) {
         return RuleResponse.builder()
                 .ruleId(rule.getRuleId())
+                .systemId(rule.getSystemId())
+                .systemName(systemName)
+                .scope(rule.getSystemId() == null ? "COMMON" : "SYSTEM")
                 .ruleCode(rule.getRuleCode())
                 .ruleName(rule.getRuleName())
                 .description(rule.getDescription())

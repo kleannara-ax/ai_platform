@@ -26,17 +26,44 @@
     <div class="info-grid" id="infoGrid"></div>
   </section>
 
-  <!-- 분석 요약 -->
+  <!-- ① 접속 행위 분석 -->
+  <h2 class="sec-title" id="access"><i class="fas fa-right-to-bracket"></i>① 접속 행위 분석 <span class="sec-sub" id="accessSub"></span></h2>
+  <section class="card-m">
+    <div class="kpi-grid" id="accessKpi"></div>
+    <div class="filter-bar mb-2">
+      <div class="f-item"><label for="fRisk">표시</label>
+        <select class="form-select" id="fRisk" style="width:220px">
+          <option value="RISK">위험 표시 계정만</option><option value="">전체 계정</option>
+          <option value="FAIL_MANY">로그인 실패 5회↑</option><option value="OFF_HOUR">업무시간 외 접속</option>
+          <option value="EXTERNAL_IP">외부 IP</option><option value="MULTI_IP">다중 IP</option><option value="PRIV_ACCOUNT">특권/공용 계정</option><option value="IP_DENIED">허용 외 IP 접속 시도</option>
+        </select></div>
+      <div class="f-item"><label for="fAccQ">계정 검색</label><input class="form-control" id="fAccQ" style="width:180px" placeholder="계정 ID"></div>
+    </div>
+    <div class="tbl-wrap" style="max-height:480px;overflow:auto">
+      <table class="tbl">
+        <thead><tr><th>계정</th><th class="num">성공</th><th class="num">실패</th><th class="num">업무시간 외</th>
+          <th class="num">외부 IP 접속</th><th class="num">IP 수</th><th>접속 IP</th><th>최초 / 최종</th><th>위험 표시</th></tr></thead>
+        <tbody id="accessBody"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="form-text mt-2">업무시간 외: 22시~06시 로그인 성공(UTC 표기는 한국시간으로 환산) · 외부 IP: [관리 › 내부 IP 설정]에 등록된 대역 이외 · 특권/공용: root, admin, administrator, sa, sys, oracle, postgres, dba, guest 등 · 허용 외 IP: 장비의 '접속 IP 제한'에 걸린 로그인 시도.
+      '최초 / 최종'은 로그인 성공·실패 이벤트 기준입니다.
+      위험 표시는 참고용이며, 최종 판단은 아래 이상징후 탐지 검토와 함께 기록하세요.</div>
+  </section>
+
+  <!-- ② 이상징후 탐지 요약 -->
+  <h2 class="sec-title"><i class="fas fa-triangle-exclamation"></i>② 이상징후 탐지 (룰셋) <span class="sec-sub" id="detectSub"></span></h2>
   <section class="kpi-grid" id="kpiGrid"></section>
 
   <section class="row g-3 mb-3">
-    <div class="col-lg-7">
+    <div class="col-lg-8">
       <div class="card-m h-100 mb-0">
         <h2><i class="fas fa-list-check"></i>룰별 탐지 건수</h2>
+        <p class="text-muted-m rule-hint">룰을 눌러 해당 룰의 로그를 확인하고, 같은 사유(예: 단순 비밀번호 오입력)라면 <b>룰 일괄 검토</b>로 한 번에 조치 내용을 남길 수 있습니다. 이 로그에 적용된 룰은 <b>0건이어도 모두 표시</b>합니다(아래쪽 회색 줄).</p>
         <div id="ruleHits"></div>
       </div>
     </div>
-    <div class="col-lg-5">
+    <div class="col-lg-4">
       <div class="card-m h-100 mb-0">
         <h2><i class="fas fa-clipboard-check"></i>검토 현황</h2>
         <div id="reviewCounts"></div>
@@ -45,11 +72,15 @@
   </section>
 
   <!-- 탐지 목록 -->
-  <section class="card-m">
+  <section class="card-m" id="detSection">
     <h2><i class="fas fa-triangle-exclamation"></i>탐지 결과 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="detTotal"></span></h2>
     <div class="filter-bar mb-3">
       <div class="f-item">
-        <label for="fSev">위험도</label>
+        <label for="fRule">룰</label>
+        <select class="form-select" id="fRule" style="width:260px"><option value="">전체</option></select>
+      </div>
+      <div class="f-item">
+        <label for="fSev">위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></label>
         <select class="form-select" id="fSev" style="width:120px">
           <option value="">전체</option><option value="CRITICAL">심각</option><option value="HIGH">높음</option><option value="MEDIUM">보통</option><option value="LOW">낮음</option>
         </select>
@@ -60,6 +91,10 @@
           <option value="">전체</option><option value="PENDING">미검토</option><option value="CONFIRMED">이상징후 확인</option>
           <option value="RESOLVED">조치완료</option><option value="FALSE_POSITIVE">오탐</option>
         </select>
+      </div>
+      <div class="f-item rule-filter-act hidden" id="ruleFilterAct">
+        <button class="btn-m btn-outline-m reviewable" id="btnRuleReviewF"><i class="fas fa-layer-group"></i>이 룰 일괄 검토</button>
+        <button class="btn-m btn-gray-m" id="btnRuleClear"><i class="fas fa-xmark"></i>룰 필터 해제</button>
       </div>
     </div>
     <div class="review-panel reviewable" id="reviewPanel">
@@ -76,7 +111,7 @@
         <thead>
           <tr>
             <th class="center reviewable" style="width:40px"><input type="checkbox" class="form-check-input" id="chkAll"></th>
-            <th class="num">라인</th><th>위험도</th><th>룰</th><th>로그 원문</th><th>검토 상태</th><th>조치 내용</th><th>검토 일시</th>
+            <th class="num">라인</th><th>위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th><th>룰</th><th>로그 원문</th><th>검토 상태</th><th>조치 내용</th><th>검토 일시</th>
           </tr>
         </thead>
         <tbody id="detBody"><tr class="empty-row"><td colspan="8">불러오는 중...</td></tr></tbody>
@@ -85,6 +120,48 @@
     <div class="pager" id="pager"></div>
   </section>
 </main>
+
+<!-- 룰 일괄 검토 모달 -->
+<div class="modal fade" id="ruleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="fas fa-layer-group me-2" style="color:var(--brand)"></i>룰 일괄 검토</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="rule-sum" id="rmSummary"></div>
+        <div class="rule-sample">
+          <div class="rs-title">로그 예시 <span class="text-muted-m" id="rmSampleSub"></span></div>
+          <div id="rmSamples"></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label" for="rmStatus">검토 상태<span class="req">*</span></label>
+            <select class="form-select" id="rmStatus">
+              <option value="FALSE_POSITIVE">오탐 (정상 업무/단순 실수)</option><option value="RESOLVED">조치완료</option>
+              <option value="CONFIRMED">이상징후 확인</option><option value="PENDING">미검토로 되돌리기</option>
+            </select>
+          </div>
+          <div class="col-md-7">
+            <span class="form-label d-block">적용 대상<span class="req">*</span></span>
+            <div class="rm-scope">
+              <label><input type="radio" class="form-check-input" name="rmScope" value="PENDING" checked> 미검토 건만 <b id="rmPendCnt"></b></label>
+              <label><input type="radio" class="form-check-input" name="rmScope" value="ALL"> 전체 <b id="rmAllCnt"></b> <span class="text-muted-m">(이미 검토한 건 덮어씀)</span></label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="rmAction">검토 의견 / 조치 내용</label>
+            <textarea class="form-control" id="rmAction" rows="3" maxlength="2000" placeholder="예: 사용자 비밀번호 오입력으로 확인. 실패 후 정상 로그인 이력 있음, 별도 조치 불필요."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-m btn-outline-m" id="rmViewLogs"><i class="fas fa-magnifying-glass"></i>로그 전체 보기</button>
+        <button class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button class="btn-m btn-primary-m" id="rmSubmit"><i class="fas fa-check"></i>일괄 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- 최종 검토완료 모달 -->
 <div class="modal fade" id="completeModal" tabindex="-1">
@@ -122,6 +199,8 @@
   const loading = (on) => $('loading').classList.toggle('show', on);
   const isAdmin = SECLOG.isAdmin(), canWrite = SECLOG.canWrite();
   const completeModal = new bootstrap.Modal($('completeModal'));
+  const ruleModal = new bootstrap.Modal($('ruleModal'));
+  let ruleTarget = null;
 
   async function loadDetail() {
     const d = await api('/uploads/' + id);
@@ -142,6 +221,7 @@
     if (isAdmin && reviewed) btns += `<button class="btn-m btn-gray-m" id="btnCancelReview"><i class="fas fa-rotate-left"></i>검토취소</button>`;
     if (isAdmin) btns += `<button class="btn-m btn-danger-m" id="btnDelete"><i class="fas fa-trash"></i>삭제</button>`;
     btns += `<a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>`;
+    btns += `<a href="status.html" class="btn-m btn-gray-m"><i class="fas fa-table-cells"></i>점검 현황</a>`;
     $('headerActions').innerHTML = btns;
     bindHeader();
 
@@ -161,19 +241,55 @@
       ['비고', esc(u.remark) || '-'],
     ].map(([l, v]) => `<div class="i-item"><span class="i-label">${l}</span><span class="i-value">${v}</span></div>`).join('');
 
+    const hitRules = d.ruleHits.filter(r => r.hitCount > 0);
+    $('detectSub').textContent = `(탐지 ${fmtNum(u.detectionCount)}건 · 적용 룰 ${fmtNum(d.ruleHits.length)}개 중 ${fmtNum(hitRules.length)}개 탐지)`;
     $('kpiGrid').innerHTML = `
       <div class="kpi"><div class="k-label">분석 라인</div><div class="k-value">${fmtNum(u.totalLineCount)}</div></div>
-      <div class="kpi"><div class="k-label">탐지 합계</div><div class="k-value">${fmtNum(u.detectionCount)}</div><div class="k-sub">최고 ${u.maxSeverityLabel}</div></div>
-      <div class="kpi k-critical"><div class="k-label">심각</div><div class="k-value">${u.criticalCount}</div></div>
-      <div class="kpi k-high"><div class="k-label">높음</div><div class="k-value">${u.highCount}</div></div>
-      <div class="kpi k-medium"><div class="k-label">보통</div><div class="k-value">${u.mediumCount}</div></div>
-      <div class="kpi k-low"><div class="k-label">낮음</div><div class="k-value">${u.lowCount}</div></div>`;
+      <div class="kpi"><div class="k-label">탐지 합계</div><div class="k-value">${fmtNum(u.detectionCount)}</div><div class="k-sub">최고 위험도 ${sevBadge(u.maxSeverity)}</div></div>
+      <div class="kpi k-critical" data-sev="CRITICAL" tabindex="0"><div class="k-label">심각</div><div class="k-value">${u.criticalCount}</div></div>
+      <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">높음</div><div class="k-value">${u.highCount}</div></div>
+      <div class="kpi k-medium" data-sev="MEDIUM" tabindex="0"><div class="k-label">보통</div><div class="k-value">${u.mediumCount}</div></div>
+      <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${u.lowCount}</div></div>`;
 
+    const canRuleReview = canWrite && !reviewed;
+    const curRule = $('fRule').value;
+    const scopeBadge = (sc) => sc === 'SYSTEM' ? '<span class="rule-scope sc-sys">전용</span>'
+      : sc === 'COMMON' ? '<span class="rule-scope sc-com">공통</span>' : '';
     $('ruleHits').innerHTML = d.ruleHits.length === 0
-      ? '<p class="text-muted-m mb-0" style="font-size:.85rem">탐지된 룰이 없습니다.</p>'
-      : '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>룰 코드</th><th>룰명</th><th>위험도</th><th class="num">건수</th></tr></thead><tbody>' +
-        d.ruleHits.map(r => `<tr><td class="mono">${esc(r.ruleCode)}</td><td>${esc(r.ruleName)}</td><td>${sevBadge(r.severity)}</td><td class="num"><b>${fmtNum(r.hitCount)}</b></td></tr>`).join('') +
+      ? '<p class="text-muted-m mb-0" style="font-size:.85rem">이 업로드에 적용된 룰이 없습니다. [관리 › 탐지 룰셋 편집]에서 이 시스템의 룰셋 사용 여부를 확인하세요.</p>'
+      : '<div class="tbl-wrap"><table class="tbl rule-tbl"><thead><tr><th>룰</th><th>위험도' + SECLOG.sevHelp() + '</th><th class="num">건수</th><th style="width:150px">검토 진행</th><th class="center">로그 확인 / 검토</th></tr></thead><tbody>' +
+        d.ruleHits.map(r => {
+          if (!r.hitCount) {
+            const thr = r.thresholdCount > 1 ? ` title="${r.thresholdCount}건 이상 매칭될 때만 탐지하는 룰입니다 (그보다 적게 매칭된 경우도 0건으로 표시)"` : '';
+            return `<tr class="rule-zero" data-rule-zero="${esc(r.ruleCode)}">
+              <td><div class="mono" style="font-weight:700">${esc(r.ruleCode)} ${scopeBadge(r.scope)}</div><div style="font-size:.78rem">${esc(r.ruleName)}</div></td>
+              <td>${sevBadge(r.severity)}</td>
+              <td class="num"${thr}>0${r.thresholdCount > 1 ? `<div class="rule-thr">${r.thresholdCount}건↑ 탐지</div>` : ''}</td>
+              <td><span class="rule-none">탐지 없음</span></td>
+              <td class="center"><span class="text-muted-m" style="font-size:.76rem">-</span></td></tr>`;
+          }
+          const t = r.hitCount || 1, w = (n) => (n / t * 100).toFixed(1) + '%';
+          const prog = `<div class="rv-bar" title="조치완료 ${r.resolvedCount} · 오탐 ${r.falsePositiveCount} · 이상징후 확인 ${r.confirmedCount} · 미검토 ${r.pendingCount}">
+              <span class="s-res" style="width:${w(r.resolvedCount)}"></span><span class="s-fp" style="width:${w(r.falsePositiveCount)}"></span>
+              <span class="s-conf" style="width:${w(r.confirmedCount)}"></span><span class="s-pend" style="width:${w(r.pendingCount)}"></span></div>
+            ${r.pendingCount > 0 ? `<span class="rule-pend">미검토 ${fmtNum(r.pendingCount)}건</span>` : '<span class="rv-done"><i class="fas fa-check"></i> 검토 끝</span>'}`;
+          return `<tr class="${curRule === r.ruleCode ? 'rule-active' : ''}" data-rule="${esc(r.ruleCode)}">
+            <td><div class="mono" style="font-weight:700">${esc(r.ruleCode)} ${scopeBadge(r.scope)}</div><div style="font-size:.78rem">${esc(r.ruleName)}</div></td>
+            <td>${sevBadge(r.severity)}</td>
+            <td class="num"><b>${fmtNum(r.hitCount)}</b></td>
+            <td>${prog}</td>
+            <td class="center" style="white-space:nowrap">
+              <button class="btn-m btn-outline-m btn-xs" data-act="logs" data-rule="${esc(r.ruleCode)}"><i class="fas fa-magnifying-glass"></i>로그 보기</button>
+              ${canRuleReview ? `<button class="btn-m btn-primary-m btn-xs" data-act="review" data-rule="${esc(r.ruleCode)}"><i class="fas fa-layer-group"></i>룰 일괄 검토</button>` : ''}
+            </td></tr>`;
+        }).join('') +
         '</tbody></table></div>';
+
+    // 탐지 목록 룰 필터 옵션 (현재 선택 유지)
+    $('fRule').innerHTML = '<option value="">전체</option>' + hitRules.map(r =>
+      `<option value="${esc(r.ruleCode)}">${esc(r.ruleCode)} · ${esc(r.ruleName)} (${fmtNum(r.hitCount)})</option>`).join('');
+    $('fRule').value = hitRules.some(r => r.ruleCode === curRule) ? curRule : '';
+    syncRuleFilter();
 
     const total = Object.values(d.reviewStatusCounts).reduce((a, b) => a + b, 0);
     $('reviewCounts').innerHTML = Object.entries(d.reviewStatusCounts).map(([k, v]) => {
@@ -191,6 +307,7 @@
     const p = new URLSearchParams({ page: st.page, size: PAGE_SIZE });
     if ($('fSev').value) p.set('severity', $('fSev').value);
     if ($('fRv').value) p.set('reviewStatus', $('fRv').value);
+    if ($('fRule').value) p.set('ruleCode', $('fRule').value);
     const data = await api(`/uploads/${id}/detections?` + p.toString());
     st.selected.clear(); updateSel(); $('chkAll').checked = false;
     $('detTotal').textContent = `(${fmtNum(data.totalElements)}건)`;
@@ -228,7 +345,45 @@
     catch (e) { toast(e.message, 'error'); }
     finally { loading(false); }
   }
-  async function reload() { await loadDetail(); await loadDetections(); }
+  let accessRows = [];
+  function renderAccess() {
+    const f = $('fRisk').value, q = $('fAccQ').value.trim().toLowerCase();
+    const rows = accessRows.filter(a => (!q || a.accountId.toLowerCase().includes(q)) &&
+      (f === '' ? true : f === 'RISK' ? a.riskFlags.length > 0 : a.riskFlags.includes(f)));
+    $('accessBody').innerHTML = accessRows.length === 0
+      ? '<tr class="empty-row"><td colspan="9">로그에서 로그인(접속) 이벤트를 찾지 못했습니다. 인식 형식은 업로드 화면 안내를 참고하세요.</td></tr>'
+      : rows.length === 0 ? '<tr class="empty-row"><td colspan="9">조건에 맞는 계정이 없습니다.</td></tr>'
+      : rows.map(a => `<tr class="${a.riskFlags.length ? 'row-risk' : ''}">
+          <td class="mono"><b>${esc(a.accountId)}</b></td><td class="num">${fmtNum(a.successCount)}</td>
+          <td class="num" style="color:${a.failCount >= 5 ? '#dc2626' : 'inherit'};font-weight:${a.failCount ? 700 : 400}">${fmtNum(a.failCount)}</td>
+          <td class="num">${fmtNum(a.offHourCount)}</td><td class="num">${fmtNum(a.externalIpCount)}</td><td class="num">${fmtNum(a.ipCount)}</td>
+          <td class="mono" style="max-width:260px">${esc(a.ipList || '-')}</td>
+          <td style="font-size:.76rem;white-space:nowrap">${esc(a.firstSeen || '-')}<br>${esc(a.lastSeen || '-')}</td>
+          <td>${SECLOG.riskBadges(a.riskFlags)}</td></tr>`).join('');
+  }
+  async function loadAccess() {
+    try {
+      const r = await api(`/uploads/${id}/access`);
+      accessRows = r.accounts || [];
+      const cnt = (fl) => accessRows.filter(a => a.riskFlags.includes(fl)).length;
+      $('accessSub').textContent = `(접속 계정 ${fmtNum(r.accountCount)}개)`;
+      $('accessKpi').innerHTML = `
+        <div class="kpi"><div class="k-label">접속 계정</div><div class="k-value">${fmtNum(r.accountCount)}</div><div class="k-sub">위험 표시 ${fmtNum(r.riskAccountCount)}개</div></div>
+        <div class="kpi k-low"><div class="k-label">로그인 성공</div><div class="k-value">${fmtNum(r.successTotal)}</div></div>
+        <div class="kpi k-critical"><div class="k-label">로그인 실패</div><div class="k-value">${fmtNum(r.failTotal)}</div><div class="k-sub">5회↑ 계정 ${cnt('FAIL_MANY')}개</div></div>
+        <div class="kpi k-medium"><div class="k-label">업무시간 외</div><div class="k-value">${cnt('OFF_HOUR')}</div><div class="k-sub">계정 수</div></div>
+        <div class="kpi k-high"><div class="k-label">외부 IP 접속</div><div class="k-value">${cnt('EXTERNAL_IP')}</div><div class="k-sub">계정 수</div></div>
+        <div class="kpi k-critical"><div class="k-label">특권/공용 계정</div><div class="k-value">${cnt('PRIV_ACCOUNT')}</div><div class="k-sub">계정 수</div></div>
+        <div class="kpi k-critical"><div class="k-label">허용 외 IP 접속 시도</div><div class="k-value">${cnt('IP_DENIED')}</div><div class="k-sub">접속 IP 제한 위반 계정</div></div>`;
+      if (r.riskAccountCount === 0) $('fRisk').value = '';
+      renderAccess();
+    } catch (e) { $('accessBody').innerHTML = `<tr class="empty-row"><td colspan="9">${esc(e.message)}</td></tr>`; }
+  }
+  $('fRisk').onchange = renderAccess;
+  $('fAccQ').oninput = renderAccess;
+
+  async function reload() { await loadDetail(); await Promise.all([loadDetections(), loadAccess()]);
+    if (location.hash === '#access') $('access').scrollIntoView(); }
 
   function bindHeader() {
     $('btnDownload').onclick = async () => {
@@ -283,6 +438,64 @@
     }).then(() => { $('rvAction').value = ''; }), `${st.selected.size}건 검토 내용이 저장되었습니다.`);
   };
   $('fSev').onchange = $('fRv').onchange = () => { st.page = 0; loadDetections().catch(e => toast(e.message, 'error')); };
+
+  // ===== 룰 단위 로그 확인 / 일괄 검토 =====
+  function syncRuleFilter() {
+    const rc = $('fRule').value;
+    $('ruleFilterAct').classList.toggle('hidden', !rc);
+    document.querySelectorAll('#ruleHits tr[data-rule]').forEach(tr => tr.classList.toggle('rule-active', tr.dataset.rule === rc));
+  }
+  function showRuleLogs(rc) {
+    $('fRule').value = rc; $('fSev').value = ''; $('fRv').value = '';
+    st.page = 0; syncRuleFilter();
+    loadDetections().then(() => $('detSection').scrollIntoView({ behavior: 'smooth', block: 'start' }))
+      .catch(e => toast(e.message, 'error'));
+  }
+  async function openRuleReview(rc) {
+    const r = (st.detail.ruleHits || []).find(x => x.ruleCode === rc);
+    if (!r || !r.hitCount) return;
+    ruleTarget = r;
+    $('rmSummary').innerHTML = `<div><span class="mono" style="font-weight:800">${esc(r.ruleCode)}</span> · ${esc(r.ruleName)} ${sevBadge(r.severity)}</div>
+      <div class="rs-cnt">전체 <b>${fmtNum(r.hitCount)}</b>건 · 미검토 <b style="color:#b45309">${fmtNum(r.pendingCount)}</b>건 · 조치완료 ${fmtNum(r.resolvedCount)} · 오탐 ${fmtNum(r.falsePositiveCount)} · 이상징후 확인 ${fmtNum(r.confirmedCount)}</div>`;
+    $('rmPendCnt').textContent = `(${fmtNum(r.pendingCount)}건)`;
+    $('rmAllCnt').textContent = `(${fmtNum(r.hitCount)}건)`;
+    document.querySelector(`input[name=rmScope][value=${r.pendingCount > 0 ? 'PENDING' : 'ALL'}]`).checked = true;
+    document.querySelector('input[name=rmScope][value=PENDING]').disabled = r.pendingCount === 0;
+    $('rmStatus').value = 'FALSE_POSITIVE'; $('rmAction').value = '';
+    $('rmSamples').innerHTML = '<div class="text-muted-m" style="font-size:.8rem">불러오는 중...</div>';
+    $('rmSampleSub').textContent = '';
+    ruleModal.show();
+    try {
+      const data = await api(`/uploads/${id}/detections?` + new URLSearchParams({ ruleCode: rc, page: 0, size: 5 }));
+      $('rmSampleSub').textContent = `(${fmtNum(data.totalElements)}건 중 앞 ${data.content.length}건)`;
+      $('rmSamples').innerHTML = data.content.map(x => `<div class="rs-line"><span class="rs-no">#${x.lineNumber}</span><span class="log-line">${esc(x.logContent)}</span>${reviewBadge(x.reviewStatus)}</div>`).join('');
+    } catch (e) { $('rmSamples').innerHTML = `<div class="text-muted-m">${esc(e.message)}</div>`; }
+  }
+  $('ruleHits').onclick = (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    b.dataset.act === 'logs' ? showRuleLogs(b.dataset.rule) : openRuleReview(b.dataset.rule);
+  };
+  $('fRule').onchange = () => { syncRuleFilter(); st.page = 0; loadDetections().catch(e => toast(e.message, 'error')); };
+  $('btnRuleClear').onclick = () => { $('fRule').value = ''; $('fRule').onchange(); };
+  $('btnRuleReviewF').onclick = () => { if ($('fRule').value) openRuleReview($('fRule').value); };
+  $('rmViewLogs').onclick = () => { ruleModal.hide(); if (ruleTarget) showRuleLogs(ruleTarget.ruleCode); };
+  $('rmSubmit').onclick = () => {
+    if (!ruleTarget) return;
+    const scope = document.querySelector('input[name=rmScope]:checked').value;
+    const status = $('rmStatus').value, action = $('rmAction').value.trim();
+    if (status !== 'PENDING' && !action && !confirm('조치 내용 없이 저장할까요?')) return;
+    const n = scope === 'PENDING' ? ruleTarget.pendingCount : ruleTarget.hitCount;
+    if (scope === 'ALL' && !confirm(`이미 검토한 건을 포함해 ${fmtNum(n)}건 모두 덮어씁니다. 계속할까요?`)) return;
+    ruleModal.hide();
+    const rc = ruleTarget.ruleCode;
+    loading(true);
+    api(`/uploads/${id}/detections/review-by-rule`, {
+      method: 'PUT', body: { ruleCode: rc, reviewStatus: status, actionContent: action || null, onlyPending: scope === 'PENDING' },
+    }).then(async (res) => { toast(`[${rc}] ${fmtNum(res.updatedCount)}건 검토 내용이 저장되었습니다.`); await reload(); })
+      .catch(e => toast(e.message, 'error'))
+      .finally(() => loading(false));
+  };
   $('pager').onclick = (e) => { const b = e.target.closest('button[data-p]'); if (b && !b.disabled) { st.page = +b.dataset.p; loadDetections().catch(er => toast(er.message, 'error')); } };
 
   (async () => {

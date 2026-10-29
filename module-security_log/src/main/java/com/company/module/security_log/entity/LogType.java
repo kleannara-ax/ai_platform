@@ -19,6 +19,8 @@ public enum LogType {
     DB("DBMS 감사/접근 로그"),
     NETWORK("방화벽/네트워크 장비 로그"),
     APP("업무 애플리케이션 로그"),
+    SECURITY("정보보호솔루션 로그 (VPN/WAF/DLP/EPP 등)"),
+    CLOUD("클라우드 콘솔/감사 로그 (AWS CloudTrail 등)"),
     ETC("기타");
 
     private final String label;

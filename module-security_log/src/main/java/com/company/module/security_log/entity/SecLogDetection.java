@@ -1,5 +1,6 @@
 package com.company.module.security_log.entity;
 
+import com.company.module.security_log.support.SecLogTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -105,7 +106,7 @@ public class SecLogDetection {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SecLogTime.now();
         if (this.deletedYn == null) {
             this.deletedYn = "N";
         }
@@ -116,7 +117,7 @@ public class SecLogDetection {
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = SecLogTime.now();
     }
 
     /** 탐지 건 검토/조치 내용 등록 */
@@ -127,7 +128,7 @@ public class SecLogDetection {
             this.reviewedAt = null;
             this.reviewedBy = null;
         } else {
-            this.reviewedAt = LocalDateTime.now();
+            this.reviewedAt = SecLogTime.now();
             this.reviewedBy = reviewerId;
         }
         this.updatedBy = reviewerId;
@@ -136,7 +137,7 @@ public class SecLogDetection {
     public void delete(Long deletedBy) {
         this.deletedYn = "Y";
         this.deletedBy = deletedBy;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = SecLogTime.now();
     }
 
     public void restore(Long updatedBy) {

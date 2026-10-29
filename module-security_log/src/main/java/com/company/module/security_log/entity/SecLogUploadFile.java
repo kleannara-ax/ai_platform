@@ -1,5 +1,6 @@
 package com.company.module.security_log.entity;
 
+import com.company.module.security_log.support.SecLogTime;
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -81,7 +82,7 @@ public class SecLogUploadFile {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SecLogTime.now();
         if (this.deletedYn == null) {
             this.deletedYn = "N";
         }
@@ -89,13 +90,13 @@ public class SecLogUploadFile {
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = SecLogTime.now();
     }
 
     public void delete(Long deletedBy) {
         this.deletedYn = "Y";
         this.deletedBy = deletedBy;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = SecLogTime.now();
     }
 
     public void restore(Long updatedBy) {

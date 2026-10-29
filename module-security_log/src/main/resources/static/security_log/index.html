@@ -12,16 +12,13 @@
 <body>
 <main class="sl-main" id="listPage">
   <header class="page-header">
-    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>보안로그 이상징후 모니터링</h1>
+    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>접속·보안 로그 분석</h1>
     <div class="header-actions">
       <a href="upload.html" class="btn-m btn-primary-m hidden" id="btnNew"><i class="fas fa-upload"></i>로그 업로드</a>
     </div>
   </header>
 
-  <nav class="sl-tabs">
-    <a href="index.html" class="active"><i class="fas fa-list"></i> 로그 업로드 목록</a>
-    <a href="rules.html"><i class="fas fa-sliders"></i> 탐지 룰셋 편집</a>
-  </nav>
+  <nav class="sl-tabs" id="slTabs"></nav>
 
   <!-- 월 선택 + 필터 -->
   <section class="card-m" id="filterSection">
@@ -50,7 +47,7 @@
         </select>
       </div>
       <div class="f-item">
-        <label for="fSeverity">최고 위험도</label>
+        <label for="fSeverity">최고 위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></label>
         <select class="form-select" id="fSeverity" style="width:120px">
           <option value="">전체</option><option value="CRITICAL">심각</option><option value="HIGH">높음</option>
           <option value="MEDIUM">보통</option><option value="LOW">낮음</option>
@@ -81,7 +78,7 @@
         <thead>
           <tr>
             <th class="center">No</th><th>시스템명</th><th>로그 유형</th><th>파일명</th>
-            <th class="num">라인 수</th><th class="num">탐지</th><th>위험도 분포</th><th>최고 위험도</th>
+            <th class="num">라인 수</th><th class="num">탐지</th><th>위험도 분포<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th><th>최고 위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th>
             <th>상태</th><th>업로드 일시</th>
           </tr>
         </thead>
@@ -103,6 +100,7 @@
   const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm(), page: 0 };
 
   const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('logs');
   LOG_TYPES.forEach(([v, l]) => $('fLogType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`));
   if (SECLOG.canWrite()) $('btnNew').classList.remove('hidden');
 
@@ -127,13 +125,13 @@
       <div class="kpi"><div class="k-label">업로드 건수</div><div class="k-value">${fmtNum(s.uploadCount)}</div><div class="k-sub">시스템 ${fmtNum(s.systemCount)}개</div></div>
       <div class="kpi"><div class="k-label">검토 진행률</div><div class="k-value">${reviewRate}%</div><div class="k-sub">완료 ${s.reviewedUploadCount} / 대기 ${s.pendingUploadCount}</div></div>
       <div class="kpi k-pending"><div class="k-label">미검토 탐지</div><div class="k-value">${fmtNum(s.pendingDetectionCount)}</div><div class="k-sub">전체 탐지 ${fmtNum(s.detectionCount)}건</div></div>
-      <div class="kpi k-critical"><div class="k-label">심각</div><div class="k-value">${fmtNum(s.criticalCount)}</div><div class="k-sub">CRITICAL</div></div>
-      <div class="kpi k-high"><div class="k-label">높음</div><div class="k-value">${fmtNum(s.highCount)}</div><div class="k-sub">HIGH</div></div>
-      <div class="kpi k-medium"><div class="k-label">보통</div><div class="k-value">${fmtNum(s.mediumCount)}</div><div class="k-sub">MEDIUM</div></div>
-      <div class="kpi k-low"><div class="k-label">낮음</div><div class="k-value">${fmtNum(s.lowCount)}</div><div class="k-sub">LOW</div></div>`;
+      <div class="kpi k-critical" data-sev="CRITICAL" tabindex="0"><div class="k-label">심각</div><div class="k-value">${fmtNum(s.criticalCount)}</div><div class="k-sub">CRITICAL</div></div>
+      <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">높음</div><div class="k-value">${fmtNum(s.highCount)}</div><div class="k-sub">HIGH</div></div>
+      <div class="kpi k-medium" data-sev="MEDIUM" tabindex="0"><div class="k-label">보통</div><div class="k-value">${fmtNum(s.mediumCount)}</div><div class="k-sub">MEDIUM</div></div>
+      <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${fmtNum(s.lowCount)}</div><div class="k-sub">LOW</div></div>`;
     const top = s.topRules || [];
     $('topRules').innerHTML = top.length === 0 ? '이번 달 탐지 내역이 없습니다.' :
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="center">순위</th><th>룰 코드</th><th>룰명</th><th>위험도</th><th class="num">탐지 건수</th></tr></thead><tbody>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="center">순위</th><th>룰 코드</th><th>룰명</th><th>위험도' + SECLOG.sevHelp() + '</th><th class="num">탐지 건수</th></tr></thead><tbody>' +
       top.map((r, i) => `<tr><td class="center">${i + 1}</td><td class="mono">${esc(r.ruleCode)}</td><td>${esc(r.ruleName)}</td><td>${sevBadge(r.severity)}</td><td class="num">${fmtNum(r.hitCount)}</td></tr>`).join('') +
       '</tbody></table></div>';
   }
@@ -160,7 +158,7 @@
           <td class="mono">${esc(u.originalFileName)}</td>
           <td class="num">${fmtNum(u.totalLineCount)}</td>
           <td class="num"><b>${fmtNum(tot)}</b></td>
-          <td><div class="sev-bar" title="심각 ${u.criticalCount} / 높음 ${u.highCount} / 보통 ${u.mediumCount} / 낮음 ${u.lowCount}">
+          <td><div class="sev-bar" data-sev-help data-sev-counts="${u.criticalCount},${u.highCount},${u.mediumCount},${u.lowCount}" aria-label="심각 ${u.criticalCount} / 높음 ${u.highCount} / 보통 ${u.mediumCount} / 낮음 ${u.lowCount}">
             <span class="b-c" style="width:${pct(u.criticalCount)}%"></span><span class="b-h" style="width:${pct(u.highCount)}%"></span>
             <span class="b-m" style="width:${pct(u.mediumCount)}%"></span><span class="b-l" style="width:${pct(u.lowCount)}%"></span></div></td>
           <td>${sevBadge(u.maxSeverity)}</td>

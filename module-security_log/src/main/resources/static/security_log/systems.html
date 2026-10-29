@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>점검 대상 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-server"></i></span>점검 대상 시스템</h1>
+    <div class="header-actions">
+      <button class="btn-m btn-primary-m hidden" id="btnNew"><i class="fas fa-plus"></i>시스템 등록</button>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <div class="alert-m alert-info">
+    <i class="fas fa-circle-info mt-1"></i>
+    <div>월별 점검 현황에 표시할 시스템 목록입니다. <b>기본 로그 유형</b>은 접속 로그 업로드 시 자동 선택되고,
+      시스템별 룰셋 적용 여부는 [관리 › 탐지 룰셋 편집]에서 설정합니다. 시스템 코드는 등록 후 변경할 수 없습니다.<span id="roNote"></span></div>
+  </div>
+
+  <section class="card-m">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th class="num">순서</th><th>구분</th><th>시스템 코드</th><th>시스템명</th><th>기본 로그 유형</th>
+            <th>담당자</th><th>설명 / 로그 추출 방법</th><th>사용</th><th class="admin-only">관리</th></tr>
+        </thead>
+        <tbody id="sysBody"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="modal fade" id="sysModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <form class="modal-content" id="sysForm" novalidate>
+      <div class="modal-header"><h5 class="modal-title" id="sysModalTitle">시스템 등록</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="sCode">시스템 코드<span class="req">*</span></label>
+            <input class="form-control" id="sCode" maxlength="50" placeholder="예: SVC_HOMEPAGE"><div class="form-text">영문 대문자/숫자/_</div></div>
+          <div class="col-md-4"><label class="form-label" for="sName">시스템명<span class="req">*</span></label>
+            <input class="form-control" id="sName" maxlength="100"></div>
+          <div class="col-md-4"><label class="form-label" for="sCat">구분<span class="req">*</span></label>
+            <input class="form-control" id="sCat" maxlength="50" list="catList" placeholder="서비스 / 정보보호시스템 ...">
+            <datalist id="catList"><option value="서비스"><option value="정보보호시스템"><option value="네트워크"><option value="DBMS"><option value="서버"></datalist></div>
+          <div class="col-md-4"><label class="form-label" for="sLogType">기본 로그 유형<span class="req">*</span></label>
+            <select class="form-select" id="sLogType"></select></div>
+          <div class="col-md-4"><label class="form-label" for="sManager">담당자</label>
+            <input class="form-control" id="sManager" maxlength="100"></div>
+          <div class="col-md-8"><label class="form-label" for="sDesc">설명 / 로그 추출 방법</label>
+            <input class="form-control" id="sDesc" maxlength="500"></div>
+          <div class="col-md-2"><label class="form-label" for="sSort">정렬 순서</label>
+            <input type="number" class="form-control" id="sSort" min="0" max="99999" value="0"></div>
+          <div class="col-md-2"><label class="form-label" for="sUse">사용</label>
+            <select class="form-select" id="sUse"><option value="Y">사용</option><option value="N">미사용</option></select></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn-m btn-primary-m"><i class="fas fa-floppy-disk"></i>저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>처리 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, toast, LOG_TYPES } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('systems');
+  const isAdmin = SECLOG.isAdmin();
+  const modal = new bootstrap.Modal($('sysModal'));
+  LOG_TYPES.forEach(([v, l]) => $('sLogType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`));
+  if (isAdmin) $('btnNew').classList.remove('hidden');
+  else { $('roNote').innerHTML = ' <b>(조회 전용 · 등록/수정은 관리자만 가능)</b>'; document.querySelectorAll('.admin-only').forEach(e => e.classList.add('hidden')); }
+  let list = [], editId = null;
+
+  async function load() {
+    $('loading').classList.add('show');
+    try {
+      list = await api('/systems?activeOnly=false');
+      $('sysBody').innerHTML = list.length === 0 ? '<tr class="empty-row"><td colspan="9">등록된 시스템이 없습니다.</td></tr>'
+        : list.map(s => `<tr class="${s.useYn === 'Y' ? '' : 'row-off'}">
+          <td class="num">${s.sortOrder}</td><td><span class="badge-type">${esc(s.category)}</span></td>
+          <td class="mono">${esc(s.systemCode)}</td><td><b>${esc(s.systemName)}</b></td>
+          <td><span class="badge-type">${esc(s.defaultLogTypeLabel)}</span></td>
+          <td>${esc(s.managerName || '-')}</td><td style="font-size:.8rem">${esc(s.description || '')}</td>
+          <td style="white-space:nowrap">${isAdmin
+            ? `<div class="form-check form-switch d-inline-flex align-items-center gap-2 m-0" title="사용 / 미사용 전환">
+                 <input class="form-check-input use-toggle m-0" type="checkbox" role="switch" data-id="${s.systemId}" ${s.useYn === 'Y' ? 'checked' : ''} aria-label="${esc(s.systemName)} 사용여부">
+                 <span class="use-label ${s.useYn === 'Y' ? 'on' : ''}">${s.useYn === 'Y' ? '사용' : '미사용'}</span></div>`
+            : (s.useYn === 'Y' ? '<span class="badge-sev use-y">사용</span>' : '<span class="badge-sev use-n">미사용</span>')}</td>
+          <td class="${isAdmin ? '' : 'hidden'}" style="white-space:nowrap">
+            <button class="btn-m btn-outline-m btn-sm-m" data-edit="${s.systemId}"><i class="fas fa-pen"></i></button>
+            <button class="btn-m btn-danger-m btn-sm-m" data-del="${s.systemId}"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { $('loading').classList.remove('show'); }
+  }
+
+  function open(s) {
+    editId = s ? s.systemId : null;
+    $('sysModalTitle').textContent = s ? '시스템 수정' : '시스템 등록';
+    $('sCode').value = s?.systemCode || ''; $('sCode').disabled = !!s;
+    $('sName').value = s?.systemName || ''; $('sCat').value = s?.category || '';
+    $('sLogType').value = s?.defaultLogType || 'APP';
+    $('sManager').value = s?.managerName || ''; $('sDesc').value = s?.description || '';
+    $('sSort').value = s?.sortOrder ?? ((list.reduce((m, x) => Math.max(m, x.sortOrder), 0)) + 10);
+    $('sUse').value = s?.useYn || 'Y';
+    modal.show();
+  }
+  $('btnNew').onclick = () => open(null);
+  $('sysBody').onclick = async (e) => {
+    const ed = e.target.closest('[data-edit]'), dl = e.target.closest('[data-del]');
+    if (ed) open(list.find(s => s.systemId === +ed.dataset.edit));
+    if (dl) {
+      const s = list.find(x => x.systemId === +dl.dataset.del);
+      if (!confirm(`'${s.systemName}' 시스템을 삭제할까요? (소프트 삭제, 기존 점검 이력은 유지)`)) return;
+      try { await api('/systems/' + s.systemId, { method: 'DELETE' }); toast('삭제했습니다.'); load(); } catch (er) { toast(er.message, 'error'); }
+    }
+  };
+  $('sysBody').onchange = async (e) => {
+    const t = e.target;
+    if (!t.classList.contains('use-toggle')) return;
+    const s = list.find(x => x.systemId === +t.dataset.id);
+    const useYn = t.checked ? 'Y' : 'N';
+    if (useYn === 'N' && !confirm(`'${s.systemName}' 을(를) 미사용으로 바꿀까요?\n월별 점검 현황·대시보드 점검 대상에서 빠지며, 기존 점검 이력은 유지됩니다.`)) { t.checked = true; return; }
+    t.disabled = true;
+    try {
+      await api(`/systems/${s.systemId}/use-yn`, { method: 'PATCH', body: { useYn } });
+      s.useYn = useYn;
+      const lb = t.parentElement.querySelector('.use-label');
+      lb.textContent = useYn === 'Y' ? '사용' : '미사용'; lb.classList.toggle('on', useYn === 'Y');
+      t.closest('tr').classList.toggle('row-off', useYn === 'N');
+      toast(`${s.systemName}: ${useYn === 'Y' ? '사용' : '미사용'}으로 변경했습니다.`);
+    } catch (er) { toast(er.message, 'error'); t.checked = !t.checked; }
+    finally { t.disabled = false; }
+  };
+  $('sysForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { systemCode: $('sCode').value.trim(), systemName: $('sName').value.trim(), category: $('sCat').value.trim(),
+      defaultLogType: $('sLogType').value, managerName: $('sManager').value.trim() || null,
+      description: $('sDesc').value.trim() || null, sortOrder: +$('sSort').value || 0, useYn: $('sUse').value };
+    if (!editId && !/^[A-Z0-9_]{2,50}$/.test(body.systemCode)) return toast('시스템 코드는 영문 대문자/숫자/_ 2~50자입니다.', 'error');
+    if (!body.systemName || !body.category) return toast('시스템명과 구분은 필수입니다.', 'error');
+    try {
+      await api(editId ? '/systems/' + editId : '/systems', { method: editId ? 'PUT' : 'POST', body });
+      modal.hide(); toast('저장했습니다.'); load();
+    } catch (er) { toast(er.message, 'error'); }
+  };
+  load();
+})();
+</script>
+</body>
+</html>

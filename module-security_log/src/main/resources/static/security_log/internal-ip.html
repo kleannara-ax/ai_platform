@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리 · 내부 IP 설정</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main" id="internalIpPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-network-wired"></i></span><span><small class="crumb">관리 ›</small> 내부 IP 설정</span></h1>
+    <div class="header-actions">
+      <button class="btn-m btn-primary-m hidden" id="btnNew"><i class="fas fa-plus"></i>IP 대역 등록</button>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <div class="alert-m alert-info">
+    <i class="fas fa-circle-info mt-1"></i>
+    <div>접속 행위 분석에서 <b>여기 등록된 대역(사용 중)에 속하지 않는 IP</b>는 <b>'외부 IP'</b> 위험 표시가 붙습니다.
+      사내망·VPN·본사 공인 IP·관리 PC 처럼 정상 접속지를 등록해 두면 오탐이 줄어듭니다.<br>
+      입력 형식: <span class="mono">10.0.0.0/8</span>, <span class="mono">192.168.10.0/24</span>, 단일 IP <span class="mono">203.0.113.10</span> (IPv4, /8 이상).
+      변경은 <b>이후 업로드·재분석부터</b> 적용됩니다 (이미 분석한 결과는 상세 화면의 재분석으로 다시 계산).<span id="roNote"></span></div>
+  </div>
+
+  <section class="card-m" id="testCard">
+    <h2><i class="fas fa-magnifying-glass"></i>IP 확인 <span class="text-muted-m" style="font-size:.76rem;font-weight:600">내부 IP 인지, 어느 대역에 속하는지 확인 (저장 안 함)</span></h2>
+    <form class="filter-bar" id="testForm" novalidate>
+      <div class="f-item">
+        <label for="tIp">IP 주소</label>
+        <input type="text" class="form-control mono" id="tIp" placeholder="예: 192.1.2.88" maxlength="50" style="width:220px">
+      </div>
+      <button type="submit" class="btn-m btn-outline-m" id="btnTest"><i class="fas fa-play"></i>확인</button>
+    </form>
+    <div id="testResult" aria-live="polite"></div>
+  </section>
+
+  <section class="card-m">
+    <div class="section-title"><h2><i class="fas fa-list"></i>내부 IP 대역 <span class="text-muted-m" style="font-size:.78rem;font-weight:600" id="ipCount"></span></h2></div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th class="num">순서</th><th>IP 대역</th><th>범위</th><th class="num">IP 수</th><th>대역 이름</th><th>설명</th>
+            <th>사용</th><th>수정일</th><th class="admin-only">관리</th></tr>
+        </thead>
+        <tbody id="ipBody"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- 등록/수정 모달 -->
+<div class="modal fade" id="ipModal" tabindex="-1" aria-labelledby="ipModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="ipForm" novalidate>
+      <div class="modal-header"><h5 class="modal-title" id="ipModalTitle">IP 대역 등록</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label" for="fRange">IP 대역<span class="req">*</span></label>
+            <input class="form-control mono" id="fRange" maxlength="50" placeholder="10.20.0.0/16 또는 203.0.113.10">
+            <div class="form-text" id="rangePreview">CIDR 또는 단일 IP. 호스트 비트가 있으면 네트워크 주소로 맞춰 저장합니다.</div></div>
+          <div class="col-md-8"><label class="form-label" for="fName">대역 이름<span class="req">*</span></label>
+            <input class="form-control" id="fName" maxlength="100" placeholder="예: 본사 사내망, VPN 대역"></div>
+          <div class="col-md-4"><label class="form-label" for="fSort">정렬 순서</label>
+            <input type="number" class="form-control" id="fSort" min="0" max="99999" value="0"></div>
+          <div class="col-md-8"><label class="form-label" for="fDesc">설명</label>
+            <input class="form-control" id="fDesc" maxlength="500"></div>
+          <div class="col-md-4"><label class="form-label" for="fUse">사용</label>
+            <select class="form-select" id="fUse"><option value="Y">사용</option><option value="N">미사용</option></select></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn-m btn-primary-m"><i class="fas fa-floppy-disk"></i>저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>처리 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtDt, fmtNum, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('admin', 'internal-ip');
+  const isAdmin = SECLOG.isAdmin();
+  const modal = new bootstrap.Modal($('ipModal'));
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  if (isAdmin) $('btnNew').classList.remove('hidden');
+  else {
+    $('roNote').innerHTML = '<br><i class="fas fa-lock"></i> 등록·수정은 <b>관리자(ROLE_ADMIN)</b>만 가능합니다. 현재는 조회와 IP 확인만 할 수 있습니다.';
+    document.querySelectorAll('.admin-only').forEach(e => e.classList.add('hidden'));
+  }
+  let list = [], editId = null;
+
+  async function load() {
+    loading(true);
+    try {
+      list = await api('/internal-ips');
+      const on = list.filter(x => x.useYn === 'Y').length;
+      $('ipCount').textContent = `(${list.length}개 · 사용 ${on}개)`;
+      $('ipBody').innerHTML = list.length === 0
+        ? '<tr class="empty-row"><td colspan="9">등록된 내부 IP 대역이 없습니다. 이 경우 모든 IPv4 접속이 외부 IP 로 표시됩니다.</td></tr>'
+        : list.map(x => `<tr class="${x.useYn === 'Y' ? '' : 'row-off'}">
+          <td class="num">${x.sortOrder}</td>
+          <td class="mono"><b>${esc(x.ipRange)}</b></td>
+          <td class="mono" style="font-size:.76rem;white-space:nowrap">${esc(x.startIp)} ~ ${esc(x.endIp)}</td>
+          <td class="num">${fmtNum(x.ipCount)}</td>
+          <td><b>${esc(x.ipName)}</b></td>
+          <td style="font-size:.8rem">${esc(x.description || '')}</td>
+          <td style="white-space:nowrap">${isAdmin
+            ? `<div class="form-check form-switch d-inline-flex align-items-center gap-2 m-0" title="사용 / 미사용 전환">
+                 <input class="form-check-input use-toggle m-0" type="checkbox" role="switch" data-id="${x.internalIpId}" ${x.useYn === 'Y' ? 'checked' : ''} aria-label="${esc(x.ipName)} 사용여부">
+                 <span class="use-label ${x.useYn === 'Y' ? 'on' : ''}">${x.useYn === 'Y' ? '사용' : '미사용'}</span></div>`
+            : `<span class="badge-sev ${x.useYn === 'Y' ? 'use-y' : 'use-n'}">${x.useYn === 'Y' ? '사용' : '미사용'}</span>`}</td>
+          <td style="font-size:.76rem;white-space:nowrap">${fmtDt(x.updatedAt)}</td>
+          <td class="${isAdmin ? '' : 'hidden'}" style="white-space:nowrap">
+            <button class="btn-m btn-outline-m btn-sm-m" data-edit="${x.internalIpId}" aria-label="${esc(x.ipName)} 수정"><i class="fas fa-pen"></i></button>
+            <button class="btn-m btn-danger-m btn-sm-m" data-del="${x.internalIpId}" aria-label="${esc(x.ipName)} 삭제"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+
+  // ---- IP 확인
+  $('testForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const ip = $('tIp').value.trim();
+    if (!ip) return toast('확인할 IP 를 입력하세요.', 'error');
+    try {
+      const r = await api('/internal-ips/test', { method: 'POST', body: { ip } });
+      const cls = !r.valid ? 'bad' : r.internal ? 'in' : 'out';
+      const icon = !r.valid ? 'fa-triangle-exclamation' : r.internal ? 'fa-circle-check' : 'fa-globe';
+      const head = !r.valid ? '판정 불가' : r.internal ? '내부 IP' : '외부 IP';
+      $('testResult').innerHTML = `<div class="ip-result ${cls}"><b><i class="fas ${icon}"></i> <span class="mono">${esc(r.ip)}</span> · ${head}</b>
+        <div>${esc(r.message)}</div>${r.matched.length ? `<div class="text-muted-m" style="font-size:.78rem">속한 대역: ${r.matched.map(esc).join(', ')}</div>` : ''}</div>`;
+    } catch (er) { toast(er.message, 'error'); }
+  };
+
+  // ---- 등록 / 수정 / 삭제 / 사용 토글
+  function open(x) {
+    editId = x ? x.internalIpId : null;
+    $('ipModalTitle').textContent = x ? 'IP 대역 수정' : 'IP 대역 등록';
+    $('fRange').value = x?.ipRange || '';
+    $('fName').value = x?.ipName || '';
+    $('fDesc').value = x?.description || '';
+    $('fUse').value = x?.useYn || 'Y';
+    $('fSort').value = x?.sortOrder ?? ((list.reduce((m, v) => Math.max(m, v.sortOrder), 0)) + 10);
+    modal.show();
+  }
+  $('btnNew').onclick = () => open(null);
+  $('ipBody').onclick = async (e) => {
+    const ed = e.target.closest('[data-edit]'), dl = e.target.closest('[data-del]');
+    if (ed) open(list.find(x => x.internalIpId === +ed.dataset.edit));
+    if (dl) {
+      const x = list.find(v => v.internalIpId === +dl.dataset.del);
+      if (!confirm(`'${x.ipName} (${x.ipRange})' 대역을 삭제할까요?\n이후 업로드·재분석부터 이 대역의 IP 는 외부 IP 로 표시됩니다.`)) return;
+      try { await api('/internal-ips/' + x.internalIpId, { method: 'DELETE' }); toast('삭제했습니다.'); load(); }
+      catch (er) { toast(er.message, 'error'); }
+    }
+  };
+  $('ipBody').onchange = async (e) => {
+    const t = e.target;
+    if (!t.classList.contains('use-toggle')) return;
+    const x = list.find(v => v.internalIpId === +t.dataset.id);
+    const useYn = t.checked ? 'Y' : 'N';
+    if (useYn === 'N' && !confirm(`'${x.ipName} (${x.ipRange})' 을(를) 미사용으로 바꿀까요?\n이후 업로드·재분석부터 이 대역의 IP 는 외부 IP 로 표시됩니다.`)) { t.checked = true; return; }
+    t.disabled = true;
+    try {
+      await api(`/internal-ips/${x.internalIpId}/use-yn`, { method: 'PATCH', body: { useYn } });
+      x.useYn = useYn;
+      const lb = t.parentElement.querySelector('.use-label');
+      lb.textContent = useYn === 'Y' ? '사용' : '미사용'; lb.classList.toggle('on', useYn === 'Y');
+      t.closest('tr').classList.toggle('row-off', useYn === 'N');
+      $('ipCount').textContent = `(${list.length}개 · 사용 ${list.filter(v => v.useYn === 'Y').length}개)`;
+      toast(`${x.ipName}: ${useYn === 'Y' ? '사용' : '미사용'}으로 변경했습니다.`);
+    } catch (er) { toast(er.message, 'error'); t.checked = !t.checked; }
+    finally { t.disabled = false; }
+  };
+  $('ipForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { ipRange: $('fRange').value.trim(), ipName: $('fName').value.trim(),
+      description: $('fDesc').value.trim() || null, useYn: $('fUse').value, sortOrder: +$('fSort').value || 0 };
+    if (!body.ipRange) return toast('IP 대역을 입력하세요.', 'error');
+    if (!body.ipName) return toast('대역 이름을 입력하세요.', 'error');
+    try {
+      const r = await api(editId ? '/internal-ips/' + editId : '/internal-ips', { method: editId ? 'PUT' : 'POST', body });
+      modal.hide();
+      toast(r.ipRange !== body.ipRange ? `저장했습니다. (${r.ipRange} 로 맞춰 저장)` : '저장했습니다.');
+      load();
+    } catch (er) { toast(er.message, 'error'); }
+  };
+  load();
+})();
+</script>
+</body>
+</html>

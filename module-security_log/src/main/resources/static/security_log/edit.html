@@ -36,8 +36,9 @@
         <input type="month" class="form-control" id="targetYm" required>
       </div>
       <div class="col-md-4">
-        <label class="form-label" for="systemName">시스템명<span class="req">*</span></label>
-        <input type="text" class="form-control" id="systemName" maxlength="100" required>
+        <label class="form-label" for="systemId">점검 대상 시스템<span class="req">*</span></label>
+        <select class="form-select" id="systemId" required></select>
+        <input type="text" class="form-control mt-2 hidden" id="systemName" maxlength="100" placeholder="시스템명 직접 입력">
       </div>
       <div class="col-md-4">
         <label class="form-label" for="logType">로그 유형<span class="req">*</span></label>
@@ -92,6 +93,10 @@
       origLogType = u.logType;
       $('targetYm').value = u.targetYm.slice(0, 4) + '-' + u.targetYm.slice(4);
       $('systemName').value = u.systemName;
+      await SECLOG.fillSystemSelect($('systemId'), { selected: u.systemId });
+      if (!u.systemId) $('systemId').value = '__DIRECT__';
+      $('systemName').classList.toggle('hidden', !!u.systemId);
+      $('systemId').onchange = () => $('systemName').classList.toggle('hidden', $('systemId').value !== '__DIRECT__');
       $('logType').value = u.logType;
       $('remark').value = u.remark || '';
       $('fileChip').innerHTML = `<i class="fas fa-file-lines" style="color:var(--brand)"></i><b>${esc(u.originalFileName)}</b><span class="text-muted-m">${fmtSize(u.fileSize)}</span>`;
@@ -107,7 +112,9 @@
   $('editForm').onsubmit = async (e) => {
     e.preventDefault();
     const targetYm = $('targetYm').value.replace('-', '');
-    if (!targetYm || !$('systemName').value.trim() || !$('logType').value) return toast('필수 항목을 입력하세요.', 'error');
+    const sysVal = $('systemId').value;
+    if (!targetYm || !sysVal || !$('logType').value) return toast('필수 항목을 입력하세요.', 'error');
+    if (sysVal === '__DIRECT__' && !$('systemName').value.trim()) return toast('시스템명을 입력하세요.', 'error');
     const willReanalyze = $('reanalyze').checked;
     if (willReanalyze && !confirm('재분석하면 기존 탐지 결과와 검토 내용이 초기화됩니다. 계속할까요?')) return;
 
@@ -115,7 +122,8 @@
     try {
       await api('/uploads/' + id, {
         method: 'PUT',
-        body: { targetYm, systemName: $('systemName').value.trim(), logType: $('logType').value,
+        body: { targetYm, systemId: sysVal === '__DIRECT__' ? null : +sysVal,
+                systemName: sysVal === '__DIRECT__' ? $('systemName').value.trim() : null, logType: $('logType').value,
                 remark: $('remark').value.trim() || null, reanalyze: willReanalyze },
       });
       sessionStorage.setItem('seclog_ym', targetYm);

@@ -1,6 +1,7 @@
 package com.company.module.security_log.controller;
 
 import com.company.core.common.response.ApiResponse;
+import com.company.module.security_log.dto.AccessReportResponse;
 import com.company.module.security_log.dto.LogUploadDetailResponse;
 import com.company.module.security_log.dto.LogUploadRequest;
 import com.company.module.security_log.dto.LogUploadResponse;
@@ -120,6 +121,13 @@ public class SecLogUploadController {
     public ResponseEntity<ApiResponse<LogUploadResponse>> cancelReview(@PathVariable Long uploadId,
                                                                        @AuthenticationPrincipal(expression = "userId") Long userId) {
         return ResponseEntity.ok(ApiResponse.success(uploadService.cancelReview(uploadId, userId)));
+    }
+
+    /** 접속 행위 분석 (계정별 로그인 성공/실패, 업무시간 외, 외부 IP, 다중 IP, 특권계정) */
+    @GetMapping("/{uploadId}/access")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
+    public ResponseEntity<ApiResponse<AccessReportResponse>> getAccessReport(@PathVariable Long uploadId) {
+        return ResponseEntity.ok(ApiResponse.success(uploadService.getAccessReport(uploadId)));
     }
 
     /** 원본 로그 파일 (Base64) */

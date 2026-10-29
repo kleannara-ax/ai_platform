@@ -3,6 +3,8 @@ package com.company.module.security_log.controller;
 import com.company.core.common.response.ApiResponse;
 import com.company.module.security_log.dto.DetectionResponse;
 import com.company.module.security_log.dto.DetectionReviewRequest;
+import com.company.module.security_log.dto.RuleReviewRequest;
+import com.company.module.security_log.dto.RuleReviewResponse;
 import com.company.module.security_log.entity.ReviewStatus;
 import com.company.module.security_log.entity.Severity;
 import com.company.module.security_log.service.SecLogDetectionService;
@@ -40,11 +42,12 @@ public class SecLogDetectionController {
             @PathVariable Long uploadId,
             @RequestParam(required = false) Severity severity,
             @RequestParam(required = false) ReviewStatus reviewStatus,
+            @RequestParam(required = false) String ruleCode,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
         return ResponseEntity.ok(ApiResponse.success(
-                detectionService.getList(uploadId, severity, reviewStatus, page, size)));
+                detectionService.getList(uploadId, severity, reviewStatus, ruleCode, page, size)));
     }
 
     @GetMapping("/detections/{detectionId}")
@@ -62,5 +65,16 @@ public class SecLogDetectionController {
             @AuthenticationPrincipal(expression = "userId") Long userId) {
 
         return ResponseEntity.ok(ApiResponse.success(detectionService.review(uploadId, request, userId)));
+    }
+
+    /** 룰 단위 일괄 검토/조치 등록 (같은 룰로 탐지된 건 전체) */
+    @PutMapping("/uploads/{uploadId}/detections/review-by-rule")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<RuleReviewResponse>> reviewByRule(
+            @PathVariable Long uploadId,
+            @Valid @RequestBody RuleReviewRequest request,
+            @AuthenticationPrincipal(expression = "userId") Long userId) {
+
+        return ResponseEntity.ok(ApiResponse.success(detectionService.reviewByRule(uploadId, request, userId)));
     }
 }

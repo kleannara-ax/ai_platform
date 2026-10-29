@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class LogUploadResponse {
 
     private Long uploadId;
+    private Long systemId;
     private String targetYm;
     private String systemName;
     private LogType logType;
@@ -41,6 +42,7 @@ public class LogUploadResponse {
     public static LogUploadResponse from(SecLogUpload u) {
         return LogUploadResponse.builder()
                 .uploadId(u.getUploadId())
+                .systemId(u.getSystemId())
                 .targetYm(u.getTargetYm())
                 .systemName(u.getSystemName())
                 .logType(u.getLogType())

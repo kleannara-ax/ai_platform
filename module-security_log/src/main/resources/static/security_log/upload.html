@@ -14,13 +14,16 @@
   <header class="page-header">
     <h1><span class="icon-badge"><i class="fas fa-upload"></i></span>로그 업로드 (등록)</h1>
     <div class="header-actions">
+      <a href="status.html" class="btn-m btn-gray-m"><i class="fas fa-table-cells"></i>점검 현황</a>
       <a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>
     </div>
   </header>
 
   <div class="alert-m alert-info">
     <i class="fas fa-circle-info mt-1"></i>
-    <div>업로드하면 현재 <b>활성 탐지 룰</b>(선택한 로그 유형 + 공통 룰)로 즉시 분석합니다.
+    <div>업로드하면 <b>① 접속 행위 분석</b>(계정별 로그인 성공/실패, 업무시간 외, 외부 IP, 특권계정)과
+      <b>② 이상징후 탐지</b>(선택한 로그 유형 + 공통 룰)를 동시에 수행합니다.
+      인식 형식: <b>관리 콘솔 엑셀/CSV 감사로그</b>(머리글에 아이디·IP·일시·유형 열, 예: DLP 관리자 감사), sshd, Windows 4624/4625, AWS CloudTrail ConsoleLogin(UTC → 한국시간 보정), key=value(user=, src=), 일반 텍스트(login/로그인 + 성공/실패).<br>
       원본 파일은 SHA-256 해시와 함께 보관되며, 같은 월·시스템에 같은 파일은 중복 업로드할 수 없습니다.</div>
   </div>
 
@@ -32,9 +35,9 @@
         <input type="month" class="form-control" id="targetYm" required>
       </div>
       <div class="col-md-4">
-        <label class="form-label" for="systemName">시스템명<span class="req">*</span></label>
-        <input type="text" class="form-control" id="systemName" maxlength="100" placeholder="예: 그룹웨어" required list="systemList">
-        <datalist id="systemList"></datalist>
+        <label class="form-label" for="systemId">점검 대상 시스템<span class="req">*</span></label>
+        <select class="form-select" id="systemId" required></select>
+        <input type="text" class="form-control mt-2 hidden" id="systemName" maxlength="100" placeholder="시스템명 직접 입력">
       </div>
       <div class="col-md-4">
         <label class="form-label" for="logType">로그 유형<span class="req">*</span></label>
@@ -55,9 +58,9 @@
         <div class="dropzone" id="dropzone">
           <i class="fas fa-cloud-arrow-up"></i>
           <div class="dz-title">파일을 끌어다 놓거나 클릭해서 선택하세요</div>
-          <div class="dz-sub">허용 확장자: .log .txt .csv .json .out · 최대 50MB · 텍스트 파일만</div>
+          <div class="dz-sub">허용 확장자: .xlsx .xls .csv .tsv .log .txt .json .out · 텍스트 최대 50MB, 엑셀 최대 20MB</div>
         </div>
-        <input type="file" id="file" accept=".log,.txt,.csv,.json,.out" class="d-none">
+        <input type="file" id="file" accept=".xlsx,.xls,.csv,.tsv,.log,.txt,.json,.out" class="d-none">
         <div id="fileInfo"></div>
       </div>
     </div>
@@ -98,13 +101,18 @@
   const ym = sessionStorage.getItem('seclog_ym') || SECLOG.currentYm();
   $('targetYm').value = ym.slice(0, 4) + '-' + ym.slice(4);
 
-  // 최근 시스템명 자동완성 (이번 달 목록에서)
-  api('/uploads?size=200&targetYm=' + ym).then(d => {
-    const names = [...new Set((d.content || []).map(u => u.systemName))];
-    $('systemList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
-  }).catch(() => {});
+  // 점검 대상 시스템 (선택 시 기본 로그 유형 자동 지정)
+  SECLOG.fillSystemSelect($('systemId'), { selected: SECLOG.qs('systemId') })
+    .then(() => $('systemId').dispatchEvent(new Event('change'))).catch(e => toast(e.message, 'error'));
+  $('systemId').onchange = () => {
+    const o = $('systemId').selectedOptions[0];
+    const direct = $('systemId').value === '__DIRECT__';
+    $('systemName').classList.toggle('hidden', !direct);
+    if (o && o.dataset.logtype) $('logType').value = o.dataset.logtype;
+  };
+  if (SECLOG.qs('ym')) { const q = SECLOG.qs('ym'); $('targetYm').value = q.slice(0, 4) + '-' + q.slice(4); }
 
-  const ALLOWED = ['log', 'txt', 'csv', 'json', 'out'];
+  const ALLOWED = ['xlsx', 'xls', 'csv', 'tsv', 'log', 'txt', 'json', 'out'];
   const MAX = 50 * 1024 * 1024;
   let selected = null;
 
@@ -113,6 +121,7 @@
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     if (!ALLOWED.includes(ext)) { toast('허용되지 않는 확장자입니다: .' + ext, 'error'); return; }
     if (f.size > MAX) { toast('파일은 최대 50MB 까지 업로드할 수 있습니다.', 'error'); return; }
+    if (['xlsx', 'xls'].includes(ext) && f.size > 20 * 1024 * 1024) { toast('엑셀은 최대 20MB 까지 업로드할 수 있습니다. 더 크면 CSV 로 저장해 올려 주세요.', 'error'); return; }
     if (f.size === 0) { toast('빈 파일입니다.', 'error'); return; }
     selected = f;
     $('fileInfo').innerHTML = `<div class="file-chip"><i class="fas fa-file-lines" style="color:var(--brand)"></i>
@@ -132,14 +141,17 @@
     e.preventDefault();
     const targetYm = $('targetYm').value.replace('-', '');
     if (!targetYm) return toast('대상 연월을 선택하세요.', 'error');
-    if (!$('systemName').value.trim()) return toast('시스템명을 입력하세요.', 'error');
+    const sysVal = $('systemId').value;
+    if (!sysVal) return toast('점검 대상 시스템을 선택하세요.', 'error');
+    if (sysVal === '__DIRECT__' && !$('systemName').value.trim()) return toast('시스템명을 입력하세요.', 'error');
     if (!$('logType').value) return toast('로그 유형을 선택하세요.', 'error');
     if (!selected) return toast('로그 파일을 선택하세요.', 'error');
 
     const fd = new FormData();
     fd.append('file', selected);
     fd.append('targetYm', targetYm);
-    fd.append('systemName', $('systemName').value.trim());
+    if (sysVal === '__DIRECT__') fd.append('systemName', $('systemName').value.trim());
+    else fd.append('systemId', sysVal);
     fd.append('logType', $('logType').value);
     fd.append('fileCharset', $('fileCharset').value);
     if ($('remark').value.trim()) fd.append('remark', $('remark').value.trim());
@@ -151,7 +163,7 @@
       sessionStorage.setItem('seclog_ym', targetYm);
       $('uploadForm').classList.add('hidden');
       $('resultCard').classList.remove('hidden');
-      $('btnGoDetail').href = 'detail.html?id=' + r.uploadId;
+      $('btnGoDetail').href = 'detail.html?id=' + r.uploadId + '#access';
       $('resultBody').innerHTML = `
         <div class="info-grid mb-3">
           <div class="i-item"><span class="i-label">시스템 / 파일</span><span class="i-value">${esc(r.systemName)} · ${esc(r.originalFileName)}</span></div>
@@ -160,10 +172,10 @@
           <div class="i-item"><span class="i-label">최고 위험도</span><span class="i-value">${sevBadge(r.maxSeverity)}</span></div>
         </div>
         <div class="kpi-grid mb-0">
-          <div class="kpi k-critical"><div class="k-label">심각</div><div class="k-value">${r.criticalCount}</div></div>
-          <div class="kpi k-high"><div class="k-label">높음</div><div class="k-value">${r.highCount}</div></div>
-          <div class="kpi k-medium"><div class="k-label">보통</div><div class="k-value">${r.mediumCount}</div></div>
-          <div class="kpi k-low"><div class="k-label">낮음</div><div class="k-value">${r.lowCount}</div></div>
+          <div class="kpi k-critical" data-sev="CRITICAL" tabindex="0"><div class="k-label">심각</div><div class="k-value">${r.criticalCount}</div></div>
+          <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">높음</div><div class="k-value">${r.highCount}</div></div>
+          <div class="kpi k-medium" data-sev="MEDIUM" tabindex="0"><div class="k-label">보통</div><div class="k-value">${r.mediumCount}</div></div>
+          <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${r.lowCount}</div></div>
         </div>`;
       toast('업로드 및 분석이 완료되었습니다.');
     } catch (err) {

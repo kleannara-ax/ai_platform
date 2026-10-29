@@ -40,6 +40,6 @@ public final class SecLogConstants {
     /** 페이지 최대 크기 */
     public static final int MAX_PAGE_SIZE = 500;
 
-    /** 업로드 허용 확장자 (텍스트 로그만 허용) */
-    public static final String[] ALLOWED_EXTENSIONS = {"log", "txt", "csv", "json", "out"};
+    /** 업로드 허용 확장자 (텍스트 로그 + 관리 콘솔 엑셀 내보내기) */
+    public static final String[] ALLOWED_EXTENSIONS = {"log", "txt", "csv", "tsv", "json", "out", "xlsx", "xls"};
 }

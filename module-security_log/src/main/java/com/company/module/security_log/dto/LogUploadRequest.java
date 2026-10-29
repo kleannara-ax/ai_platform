@@ -16,11 +16,14 @@ import lombok.Setter;
 @Setter
 public class LogUploadRequest {
 
+    /** 점검 대상 시스템 ID (선택 시 시스템명은 시스템 마스터 값으로 저장) */
+    private Long systemId;
+
     @NotBlank(message = "대상 연월은 필수입니다.")
     @Pattern(regexp = "^\\d{4}(0[1-9]|1[0-2])$", message = "대상 연월은 YYYYMM 형식입니다.")
     private String targetYm;
 
-    @NotBlank(message = "시스템명은 필수입니다.")
+    /** 시스템 미선택 시 직접 입력 (systemId 와 둘 중 하나 필수, Service 에서 검증) */
     @Size(max = 100)
     private String systemName;
 

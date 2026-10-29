@@ -2,6 +2,7 @@ package com.company.module.security_log.controller;
 
 import com.company.core.common.response.ApiResponse;
 import com.company.module.security_log.dto.RuleResponse;
+import com.company.module.security_log.dto.RulesetUseRequest;
 import com.company.module.security_log.dto.RuleSaveRequest;
 import com.company.module.security_log.dto.RuleTestRequest;
 import com.company.module.security_log.dto.RuleTestResponse;
@@ -10,6 +11,8 @@ import com.company.module.security_log.entity.LogType;
 import com.company.module.security_log.service.SecLogRuleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,10 +46,29 @@ public class SecLogRuleController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) LogType logType,
             @RequestParam(required = false) String useYn,
+            @RequestParam(required = false) String scope,
+            @RequestParam(required = false) Long systemId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        return ResponseEntity.ok(ApiResponse.success(ruleService.getList(q, logType, useYn, page, size)));
+        return ResponseEntity.ok(ApiResponse.success(ruleService.getList(q, logType, useYn, scope, systemId, page, size)));
+    }
+
+    /** 시스템별 룰셋 현황 (공통 룰셋 / 시스템 전용 룰셋 사용 여부, 룰 수) */
+    @GetMapping("/rulesets")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRulesets() {
+        return ResponseEntity.ok(ApiResponse.success(ruleService.getRulesets()));
+    }
+
+    /** 시스템의 룰셋 사용/미사용 (commonRuleYn, systemRuleYn 중 보낸 값만 변경) */
+    @PatchMapping("/rulesets/{systemId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> changeRuleset(@PathVariable Long systemId,
+                                                                          @Valid @RequestBody RulesetUseRequest request,
+                                                                          @AuthenticationPrincipal(expression = "userId") Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                ruleService.changeRuleset(systemId, request.getCommonRuleYn(), request.getSystemRuleYn(), userId)));
     }
 
     @GetMapping("/{ruleId}")

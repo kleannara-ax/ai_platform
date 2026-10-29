@@ -1,5 +1,6 @@
 package com.company.module.security_log.entity;
 
+import com.company.module.security_log.support.SecLogTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,6 +31,10 @@ public class SecLogUpload {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "UPLOAD_ID")
     private Long uploadId;
+
+    /** 점검 대상 시스템 ID (sec_log_system, 미지정 시 NULL) */
+    @Column(name = "SYSTEM_ID")
+    private Long systemId;
 
     /** 대상 연월 (YYYYMM) - 월별 조회 기준 */
     @Column(name = "TARGET_YM", nullable = false, length = 6)
@@ -71,6 +76,14 @@ public class SecLogUpload {
 
     @Column(name = "LOW_COUNT", nullable = false)
     private Integer lowCount;
+
+    /** 일시를 읽지 못한 줄 수 (NULL = 아직 집계 안 함, 08 적용 전 업로드) */
+    @Column(name = "DATE_UNKNOWN_COUNT")
+    private Integer dateUnknownCount;
+
+    /** 대상 월 밖 일자의 줄 수 (NULL = 아직 집계 안 함) */
+    @Column(name = "OUT_OF_MONTH_COUNT")
+    private Integer outOfMonthCount;
 
     /** 탐지 결과 중 최고 위험도 (탐지 0건이면 NULL) */
     @Enumerated(EnumType.STRING)
@@ -118,8 +131,9 @@ public class SecLogUpload {
     private Long deletedBy;
 
     @Builder
-    private SecLogUpload(String targetYm, String systemName, LogType logType, String originalFileName,
+    private SecLogUpload(Long systemId, String targetYm, String systemName, LogType logType, String originalFileName,
                          Long fileSize, String fileHash, String fileCharset, String remark, Long createdBy) {
+        this.systemId = systemId;
         this.targetYm = targetYm;
         this.systemName = systemName;
         this.logType = logType;
@@ -141,7 +155,7 @@ public class SecLogUpload {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SecLogTime.now();
         if (this.deletedYn == null) {
             this.deletedYn = "N";
         }
@@ -149,7 +163,7 @@ public class SecLogUpload {
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = SecLogTime.now();
     }
 
     /** 분석 결과 반영 (최초 분석 / 재분석 공통) */
@@ -173,7 +187,7 @@ public class SecLogUpload {
             this.maxSeverity = null;
         }
         this.status = UploadStatus.ANALYZED;
-        this.analyzedAt = LocalDateTime.now();
+        this.analyzedAt = SecLogTime.now();
         this.reviewComment = null;
         this.reviewedAt = null;
         this.reviewedBy = null;
@@ -183,7 +197,8 @@ public class SecLogUpload {
     }
 
     /** 업로드 기본정보 수정 (파일 자체는 변경 불가) */
-    public void update(String targetYm, String systemName, LogType logType, String remark, Long updatedBy) {
+    public void update(Long systemId, String targetYm, String systemName, LogType logType, String remark, Long updatedBy) {
+        this.systemId = systemId;
         this.targetYm = targetYm;
         this.systemName = systemName;
         this.logType = logType;
@@ -191,11 +206,17 @@ public class SecLogUpload {
         this.updatedBy = updatedBy;
     }
 
+    /** 로그 일자 점검 결과 (일별 집계 시 함께 기록) */
+    public void applyDateCheck(int dateUnknownCount, int outOfMonthCount) {
+        this.dateUnknownCount = dateUnknownCount;
+        this.outOfMonthCount = outOfMonthCount;
+    }
+
     /** 정보보안팀 최종 검토 완료 */
     public void completeReview(String reviewComment, Long reviewerId) {
         this.status = UploadStatus.REVIEWED;
         this.reviewComment = reviewComment;
-        this.reviewedAt = LocalDateTime.now();
+        this.reviewedAt = SecLogTime.now();
         this.reviewedBy = reviewerId;
         this.updatedBy = reviewerId;
     }
@@ -215,7 +236,7 @@ public class SecLogUpload {
     public void delete(Long deletedBy) {
         this.deletedYn = "Y";
         this.deletedBy = deletedBy;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = SecLogTime.now();
     }
 
     public void restore(Long updatedBy) {

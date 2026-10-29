@@ -1,5 +1,6 @@
 package com.company.module.security_log.entity;
 
+import com.company.module.security_log.support.SecLogTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,6 +31,10 @@ public class SecLogRule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "RULE_ID")
     private Long ruleId;
+
+    /** 시스템 전용 룰의 시스템 ID (NULL 이면 공통 룰) */
+    @Column(name = "SYSTEM_ID")
+    private Long systemId;
 
     @Column(name = "RULE_CODE", nullable = false, length = 50, updatable = false)
     private String ruleCode;
@@ -86,9 +91,10 @@ public class SecLogRule {
     private Long deletedBy;
 
     @Builder
-    private SecLogRule(String ruleCode, String ruleName, String description, LogType logType,
+    private SecLogRule(Long systemId, String ruleCode, String ruleName, String description, LogType logType,
                        MatchType matchType, String pattern, Severity severity, Integer thresholdCount,
                        String useYn, Integer sortOrder, Long createdBy) {
+        this.systemId = systemId;
         this.ruleCode = ruleCode;
         this.ruleName = ruleName;
         this.description = description;
@@ -105,7 +111,7 @@ public class SecLogRule {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SecLogTime.now();
         if (this.deletedYn == null) {
             this.deletedYn = "N";
         }
@@ -113,12 +119,13 @@ public class SecLogRule {
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = SecLogTime.now();
     }
 
-    public void update(String ruleName, String description, LogType logType, MatchType matchType,
+    public void update(Long systemId, String ruleName, String description, LogType logType, MatchType matchType,
                        String pattern, Severity severity, Integer thresholdCount, String useYn,
                        Integer sortOrder, Long updatedBy) {
+        this.systemId = systemId;
         this.ruleName = ruleName;
         this.description = description;
         this.logType = logType;
@@ -140,7 +147,7 @@ public class SecLogRule {
         this.deletedYn = "Y";
         this.useYn = "N";
         this.deletedBy = deletedBy;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = SecLogTime.now();
     }
 
     public void restore(Long updatedBy) {
@@ -148,6 +155,11 @@ public class SecLogRule {
         this.deletedBy = null;
         this.deletedAt = null;
         this.updatedBy = updatedBy;
+    }
+
+    /** 공통 룰 여부 (시스템 전용이 아님) */
+    public boolean isCommon() {
+        return this.systemId == null;
     }
 
     public boolean isActive() {

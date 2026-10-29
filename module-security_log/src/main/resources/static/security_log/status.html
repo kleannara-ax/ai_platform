@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>월별 점검 현황</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main" id="statusPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>ISMS 로그 점검 현황</h1>
+    <div class="header-actions">
+      <div class="ym-nav">
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달"><i class="fas fa-chevron-left"></i></button>
+        <span class="ym-label" id="ymLabel"></span>
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달"><i class="fas fa-chevron-right"></i></button>
+        <input type="month" class="form-control" id="ymPicker" style="width:150px">
+      </div>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <div class="alert-m alert-info">
+    <i class="fas fa-circle-info mt-1"></i>
+    <div>매월 시스템별로 <b>접속·행위 로그</b>를 업로드하고, 시스템에 적용된 룰셋으로 분석한 결과
+      (로그인 성공/실패, 업무시간 외, 외부 IP, 특권계정, 이상징후 탐지)를 점검합니다.
+      <b>등록</b> 버튼으로 바로 업로드하고, 숫자를 누르면 상세 화면으로 이동합니다.</div>
+  </div>
+
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="card-m">
+    <h2><i class="fas fa-table-cells"></i>시스템별 점검 현황 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="ymSub"></span></h2>
+    <div class="tbl-wrap">
+      <table class="tbl" id="statusTable">
+        <thead>
+          <tr>
+            <th>시스템</th>
+            <th>접속·행위 로그</th>
+            <th class="num">접속 계정</th>
+            <th class="num">성공 / 실패</th>
+            <th class="num">위험 계정</th>
+            <th class="num">이상징후 탐지</th>
+          </tr>
+        </thead>
+        <tbody id="statusBody"><tr class="empty-row"><td colspan="6">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, fmtYm, toast, shiftYm } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('status');
+  const canWrite = SECLOG.canWrite();
+  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm() };
+
+  const stBadge = (s, warn) => {
+    if (s === 'NONE') return '<span class="badge-st st-none">미등록</span>';
+    if (s === 'REVIEWED') return '<span class="badge-st st-reviewed">검토완료</span>';
+    return `<span class="badge-st ${warn ? 'st-warn' : 'st-analyzed'}">검토대기</span>`;
+  };
+  const kpi = (label, val, sub, cls = '', pct = null) => `<div class="kpi ${cls}"><div class="k-label">${label}</div>
+    <div class="k-value">${val}</div><div class="k-sub">${sub}</div>${pct === null ? '' : `<div class="progress-m"><span style="width:${pct}%"></span></div>`}</div>`;
+
+  async function load() {
+    $('loading').classList.add('show');
+    try {
+      const d = await api('/monthly-status?targetYm=' + state.ym);
+      const rows = d.systems || [];
+      const n = d.systemCount || 0;
+      const accessReg = rows.filter(r => r.accessStatus !== 'NONE').length;
+      const riskSum = rows.reduce((a, r) => a + r.accessRiskAccounts, 0);
+      const detSum = rows.reduce((a, r) => a + r.detectionCount, 0);
+      const pct = (x) => n ? Math.round(x / n * 100) : 0;
+      $('kpiGrid').innerHTML =
+        kpi('접속 로그 등록', `${accessReg} / ${n}`, `검토완료 ${d.accessDoneCount}개 시스템`, '', pct(accessReg)) +
+        kpi('접속 로그 검토완료', pct(d.accessDoneCount) + '%', `${d.accessDoneCount} / ${n} 시스템`, '', pct(d.accessDoneCount)) +
+        kpi('위험 접속 계정', fmtNum(riskSum), '실패 다수·업무시간 외·외부 IP·특권', 'k-high') +
+        kpi('이상징후 탐지', fmtNum(detSum), '시스템별 룰셋 분석 결과', 'k-medium');
+      $('ymSub').textContent = `· ${fmtYm(state.ym)} · 점검 대상 ${n}개`;
+
+      if (rows.length === 0) {
+        $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="6">등록된 점검 대상 시스템이 없습니다. [점검 대상 시스템] 탭에서 등록하세요.</td></tr>';
+        return;
+      }
+      let cat = null, h = '';
+      rows.forEach(r => {
+        if (r.category !== cat) { cat = r.category; h += `<tr class="cat-row"><td colspan="6"><i class="fas fa-folder-open me-1"></i>${esc(cat)}</td></tr>`; }
+        const upNew = canWrite ? `<a class="btn-m btn-outline-m btn-sm-m" href="upload.html?systemId=${r.systemId}&ym=${state.ym}"><i class="fas fa-upload"></i>등록</a>` : '';
+        const accessLink = r.latestUploadId ? `detail.html?id=${r.latestUploadId}#access` : null;
+        const L = (url, txt) => url ? `<a href="${url}">${txt}</a>` : txt;
+        h += `<tr data-sys="${r.systemId}">
+          <td><b>${esc(r.systemName)}</b>${r.managerName ? `<div class="text-muted-m" style="font-size:.72rem">${esc(r.managerName)}</div>` : ''}</td>
+          <td><div class="d-flex gap-2 align-items-center">${stBadge(r.accessStatus, r.accessRiskAccounts > 0)}
+              ${r.accessUploadCount > 1 ? `<span class="text-muted-m" style="font-size:.72rem">${r.accessUploadCount}건</span>` : ''}
+              ${r.accessStatus === 'NONE' ? upNew : L(accessLink, '<i class="fas fa-arrow-up-right-from-square"></i>')}</div></td>
+          <td class="num">${r.accessStatus === 'NONE' ? '-' : fmtNum(r.accessAccountCount)}</td>
+          <td class="num">${r.accessStatus === 'NONE' ? '-' : `${fmtNum(r.accessSuccess)} / <span style="color:${r.accessFail ? '#dc2626' : 'inherit'}">${fmtNum(r.accessFail)}</span>`}</td>
+          <td class="num">${r.accessStatus === 'NONE' ? '-' : (r.accessRiskAccounts ? `<b style="color:#c2410c">${L(accessLink, fmtNum(r.accessRiskAccounts))}</b>` : '0')}</td>
+          <td class="num">${r.accessStatus === 'NONE' ? '-' : fmtNum(r.detectionCount)}</td>
+        </tr>`;
+      });
+      $('statusBody').innerHTML = h;
+    } catch (e) {
+      toast(e.message, 'error');
+      $('statusBody').innerHTML = `<tr class="empty-row"><td colspan="6">${esc(e.message)}</td></tr>`;
+    } finally { $('loading').classList.remove('show'); }
+  }
+
+  const setYm = (ym) => {
+    state.ym = ym; sessionStorage.setItem('seclog_ym', ym);
+    $('ymLabel').textContent = fmtYm(ym);
+    $('ymPicker').value = ym.slice(0, 4) + '-' + ym.slice(4);
+    load();
+  };
+  $('btnPrevYm').onclick = () => setYm(shiftYm(state.ym, -1));
+  $('btnNextYm').onclick = () => setYm(shiftYm(state.ym, 1));
+  $('ymPicker').onchange = (e) => { if (e.target.value) setYm(e.target.value.replace('-', '')); };
+  setYm(state.ym);
+})();
+</script>
+</body>
+</html>
