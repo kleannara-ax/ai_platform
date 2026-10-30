@@ -456,7 +456,8 @@
 
           <div class="pi-form-section"><h3>재위탁</h3>
             <div class="row g-3">
-              <div class="col-md-2"><label class="form-label d-block">재위탁 여부</label>${radio('subcontractYn', v.subcontractYn)}</div>
+              <div class="col-md-2"><label class="form-label d-block">재위탁 여부</label>${radio('subcontractYn', v.subcontractYn)}
+                <small class="text-muted d-block mt-1" id="subcontract-hint">Y 선택 시 입력</small></div>
               <div class="col-md-4">${input('subcontractorName', '재위탁 업체명', v.subcontractorName, 'maxlength="500"')}</div>
               <div class="col-md-4">${input('subcontractTask', '재위탁 업무', v.subcontractTask, 'maxlength="1000"')}</div>
               <div class="col-md-2"><label class="form-label" for="f-subcontractConsentYn">재위탁 동의서</label>
@@ -487,12 +488,34 @@
 
     document.getElementById('btn-cancel').onclick = () => go(isEdit ? '#/contracts/' + c.contractId : '#/contracts');
     const form = document.getElementById('contract-form');
+
+    // 재위탁 업체명·업무·동의서: 재위탁 여부가 Y 일 때만 입력 가능
+    const SUB_FIELDS = ['f-subcontractorName', 'f-subcontractTask', 'f-subcontractConsentYn'];
+    const subcontractOn = () => form.querySelector('input[name="subcontractYn"]:checked')?.value === 'Y';
+    const syncSubcontract = (focus) => {
+      const on = subcontractOn();
+      SUB_FIELDS.forEach((id) => { document.getElementById(id).disabled = !on; });
+      document.getElementById('subcontract-hint').classList.toggle('d-none', on);
+      if (on && focus && !document.getElementById('f-subcontractorName').value) document.getElementById('f-subcontractorName').focus();
+    };
+    form.querySelectorAll('input[name="subcontractYn"]').forEach((r) => r.addEventListener('change', () => syncSubcontract(true)));
+    syncSubcontract(false);
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!form.reportValidity()) return;
       const body = Object.fromEntries(new FormData(form).entries());
+      // 비활성(재위탁 N) 칸은 FormData 에 빠지므로 입력값을 그대로 보내 보존한다 (다시 Y 로 바꾸면 그대로 사용)
+      body.subcontractorName = document.getElementById('f-subcontractorName').value;
+      body.subcontractTask = document.getElementById('f-subcontractTask').value;
+      body.subcontractConsentYn = document.getElementById('f-subcontractConsentYn').value;
       Object.keys(body).forEach((k) => { if (body[k] === '') body[k] = null; });
       body.alertDaysBefore = body.alertDaysBefore ? Number(body.alertDaysBefore) : 30;
+      if (body.subcontractYn === 'Y' && !body.subcontractorName && !body.subcontractTask) {
+        notify('재위탁이 Y 이면 재위탁 업체명 또는 재위탁 업무를 입력하세요.', 'warning');
+        document.getElementById('f-subcontractorName').focus();
+        return;
+      }
       if (body.alertYn === 'Y' && !body.contractEndDate) { notify('만료 알림을 사용하려면 계약 종료일을 입력하세요. (종료일이 없으면 알림 사용 N)', 'warning'); return; }
       const btn = document.getElementById('btn-save');
       btn.disabled = true;
