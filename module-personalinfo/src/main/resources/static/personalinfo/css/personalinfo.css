@@ -80,3 +80,8 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-form-sub{border:1px solid var(--pi-line);border-radius:10px;padding:12px 14px 14px;margin-bottom:12px;background:#fcfdff;}
 .pi-form-sub h4{font-size:.85rem;font-weight:700;color:#334155;margin-bottom:10px;}
 .pi-form-sub h4 small{font-size:.75rem;margin-left:6px;}
+/* 계약서 파일에서 계약일자 자동 입력 */
+.pi-doc-result{font-size:.85rem;border-radius:8px;}
+.pi-doc-result .btn-sm{font-size:.78rem;padding:2px 8px;}
+@keyframes piAutofill{0%{box-shadow:0 0 0 3px rgba(34,197,94,.55);}100%{box-shadow:0 0 0 0 rgba(34,197,94,0);}}
+.pi-autofilled{animation:piAutofill 1.6s ease-out;}

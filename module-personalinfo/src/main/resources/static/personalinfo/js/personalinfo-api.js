@@ -81,6 +81,7 @@ const PI_API = (() => {
     reopenContract: (id) => request('/contracts/' + id + '/reopen', { method: 'POST' }),
     deleteContract: (id) => request('/contracts/' + id, { method: 'DELETE' }),
     uploadFile: (id, form) => request('/contracts/' + id + '/files', { method: 'POST', form }),
+    analyzeContractDoc: (form) => request('/contract-doc/analyze', { method: 'POST', form }),
     downloadFile: (fileId, name) => download('/files/' + fileId + '/download', name),
     deleteFile: (fileId) => request('/files/' + fileId, { method: 'DELETE' }),
     downloadBlankTemplate: () => download('/checklist-template', '점검체크리스트.xlsx'),

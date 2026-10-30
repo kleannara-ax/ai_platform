@@ -1,7 +1,9 @@
 package com.company.module.personalinfo.controller;
 
 import com.company.core.common.response.ApiResponse;
+import com.company.module.personalinfo.dto.ContractDocAnalyzeResponse;
 import com.company.module.personalinfo.dto.ContractFileResponse;
+import com.company.module.personalinfo.service.PiContractDocAnalyzer;
 import com.company.module.personalinfo.service.PiContractFileService;
 import com.company.module.personalinfo.service.PiRoles;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,17 @@ import java.util.List;
 public class PiContractFileController {
 
     private final PiContractFileService fileService;
+    private final PiContractDocAnalyzer docAnalyzer;
+
+    /**
+     * 개인정보처리 위탁계약서 분석 (multipart/form-data, file).
+     * 파일은 저장하지 않고 계약일자(체결일) 후보만 돌려준다. 등록 화면에서 계약 저장 전에도 쓸 수 있도록 계약 ID 없이 호출한다.
+     */
+    @PostMapping(value = "/contract-doc/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractDocAnalyzeResponse>> analyze(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success(docAnalyzer.analyze(file)));
+    }
 
     @GetMapping("/contracts/{contractId}/files")
     @PreAuthorize(PiRoles.CAN_READ)
