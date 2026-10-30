@@ -38,7 +38,7 @@ public class PiContractExcelService {
     private static final DateTimeFormatter D = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     private static final String[] HEADERS = {
             "번호", "ISMS\n범위", "수탁업체 명", "관련 서비스", "위탁업무 내용", "담당부서", "담당자",
-            "계약시작일", "계약종료일", "계약기간 비고", "자동연장", "위탁 계약서\n작성 여부",
+            "원계약\n시작일", "원계약\n종료일", "원계약 기간 비고", "자동연장", "개인정보처리\n위탁계약서 작성",
             "재위탁 여부", "재위탁 업체 명", "계약상태", "만료까지(일)", "최근 점검일", "최근 점검결과"
     };
     private static final int[] WIDTHS = {6, 7, 22, 16, 40, 14, 10, 12, 12, 24, 8, 10, 8, 24, 10, 10, 12, 12};

@@ -443,15 +443,23 @@
               <div class="col-md-6">${input('vendorContactEmail', '수탁사 이메일', v.vendorContactEmail, 'type="email" maxlength="200"')}</div>
             </div></div>
 
-          <div class="pi-form-section"><h3>계약 기간 / 계약서</h3>
-            <div class="row g-3">
-              <div class="col-md-3">${input('contractStartDate', '계약 시작일', v.contractStartDate, 'type="date"')}</div>
-              <div class="col-md-3">${input('contractEndDate', '계약 종료일', v.contractEndDate, 'type="date"')}</div>
-              <div class="col-md-6">${input('contractPeriodNote', '계약기간 비고', v.contractPeriodNote, 'maxlength="500" placeholder="예: 체결일로부터 1년, 이용약관"')}</div>
-              <div class="col-md-2"><label class="form-label d-block">자동연장</label>${radio('autoRenewYn', v.autoRenewYn)}</div>
-              <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 1개월 단위"')}</div>
-              <div class="col-md-3"><label class="form-label d-block">위탁 계약서 작성</label>${radio('contractDocYn', v.contractDocYn)}</div>
-              <div class="col-md-3">${input('contractSignedDate', '위수탁 계약 체결일', v.contractSignedDate, 'type="date"')}</div>
+          <div class="pi-form-section"><h3>계약</h3>
+            <div class="pi-form-sub" id="original-contract-block">
+              <h4><i class="fas fa-file-signature me-1"></i>원계약 <small class="text-muted fw-normal">계약기간·만료 알림은 원계약 기준</small></h4>
+              <div class="row g-3">
+                <div class="col-md-3">${input('contractStartDate', '계약 시작일', v.contractStartDate, 'type="date"')}</div>
+                <div class="col-md-3">${input('contractEndDate', '계약 종료일', v.contractEndDate, 'type="date"')}</div>
+                <div class="col-md-6">${input('contractPeriodNote', '계약기간 비고', v.contractPeriodNote, 'maxlength="500" placeholder="예: 체결일로부터 1년, 이용약관"')}</div>
+                <div class="col-md-2"><label class="form-label d-block">자동연장</label>${radio('autoRenewYn', v.autoRenewYn)}</div>
+                <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 1개월 단위"')}</div>
+              </div>
+            </div>
+            <div class="pi-form-sub" id="pi-entrust-contract-block">
+              <h4><i class="fas fa-user-shield me-1"></i>개인정보처리 위탁계약</h4>
+              <div class="row g-3">
+                <div class="col-md-3"><label class="form-label d-block">개인정보처리 위탁계약서 작성</label>${radio('contractDocYn', v.contractDocYn)}</div>
+                <div class="col-md-3">${input('contractSignedDate', '개인정보처리 위탁계약 체결일', v.contractSignedDate, 'type="date"')}</div>
+              </div>
             </div></div>
 
           <div class="pi-form-section"><h3>재위탁</h3>
@@ -558,8 +566,8 @@
           ${row('ISMS 범위', yn(c.ismsScopeYn))}${row('관련 서비스', esc(c.serviceName || '-'))}
           ${row('위탁업무 내용', esc(c.entrustedTask))}${row('담당부서 / 담당자', esc((c.deptName || '-') + ' / ' + (c.managerName || '-')))}
           ${row('담당자 이메일', esc(c.managerEmail || '-'))}${row('수탁사 담당자', esc([c.vendorContactName, c.vendorContactPhone, c.vendorContactEmail].filter(Boolean).join(' / ') || '-'))}
-          ${row('계약기간', fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate))}${row('계약기간 비고', esc(c.contractPeriodNote || '-'))}
-          ${row('자동연장', yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('위탁 계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
+          ${row('원계약 기간', fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate))}${row('원계약 기간 비고', esc(c.contractPeriodNote || '-'))}
+          ${row('원계약 자동연장', yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
           ${row('재위탁', c.subcontractYn === 'Y' ? esc(c.subcontractorName || '') + (c.subcontractTask ? ' — ' + esc(c.subcontractTask) : '') : 'N')}${row('재위탁 동의서', yn(c.subcontractConsentYn))}
           ${row('만료 알림', c.alertYn === 'Y' ? `사용 (만료 ${c.alertDaysBefore}일 전부터)` : '미사용')}${row('추가 수신자', esc(c.alertExtraEmails || '-'))}
           ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-')) + row('', '') : ''}

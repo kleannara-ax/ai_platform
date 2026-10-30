@@ -76,3 +76,7 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-resizable .pi-col-sticky-end{position:sticky;right:0;z-index:3;background:#fff;box-shadow:-6px 0 6px -6px rgba(15,23,42,.25);}
 .pi-resizable thead .pi-col-sticky-end{background:#f8fafc;z-index:4;}
 .pi-resizable tbody tr:hover .pi-col-sticky-end{background:#f5f7ff;}
+/* 계약 영역: 원계약 / 개인정보처리 위탁계약 구분 */
+.pi-form-sub{border:1px solid var(--pi-line);border-radius:10px;padding:12px 14px 14px;margin-bottom:12px;background:#fcfdff;}
+.pi-form-sub h4{font-size:.85rem;font-weight:700;color:#334155;margin-bottom:10px;}
+.pi-form-sub h4 small{font-size:.75rem;margin-left:6px;}

@@ -63,10 +63,10 @@ public class ContractSaveRequest {
     @Size(max = 50)
     private String vendorContactPhone;
 
-    /** 계약 시작일 */
+    /** 원계약 시작일 */
     private LocalDate contractStartDate;
 
-    /** 계약 종료일 (만료 알림 기준) */
+    /** 원계약 종료일 (만료 알림 기준) */
     private LocalDate contractEndDate;
 
     /** 계약기간 비고 (예: 체결일로부터 1년, 이용약관) */
@@ -81,11 +81,11 @@ public class ContractSaveRequest {
     @Size(max = 200)
     private String autoRenewNote;
 
-    /** 위탁 계약서 작성 여부 */
+    /** 개인정보처리 위탁계약서 작성 여부 */
     @Pattern(regexp = YN)
     private String contractDocYn = "N";
 
-    /** 위수탁 계약 체결일 */
+    /** 개인정보처리 위탁계약 체결일 */
     private LocalDate contractSignedDate;
 
     /** 재위탁 여부 */
