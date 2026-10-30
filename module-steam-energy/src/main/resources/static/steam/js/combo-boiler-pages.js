@@ -92,7 +92,8 @@
   }
 
   function parseNumber(value) {
-    const text = String(value ?? "").replace(/,/g, "").trim();
+    // 화면 글자(계산칸)를 되읽을 때 음수 표기 △ 를 - 로 (steam-negative-sign.js)
+    const text = (window.SteamNegativeSign ? window.SteamNegativeSign.normalize(value) : String(value ?? "")).replace(/,/g, "").trim();
     if (!text) return null;
     const parsed = Number(text);
     return Number.isFinite(parsed) ? parsed : null;

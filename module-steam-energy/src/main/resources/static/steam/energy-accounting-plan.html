@@ -49,6 +49,7 @@
     .efr-calc { display:block; font-weight:600; color:#1f3b57; text-align:center; }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-accounting-plan">
   <main class="landing-main">
@@ -343,7 +344,9 @@
     const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
     function num(v) {
       if (v === null || v === undefined || v === "") return null;
-      const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
+      // 화면 글자(계산칸)를 되읽을 때 음수 표기 △ 를 - 로 (steam-negative-sign.js)
+      const text = window.SteamNegativeSign ? window.SteamNegativeSign.normalize(v) : String(v);
+      const n = typeof v === "number" ? v : Number(text.replace(/,/g, ""));
       return Number.isFinite(n) ? n : null;
     }
     const tbody = () => document.querySelector("#eapTable tbody");

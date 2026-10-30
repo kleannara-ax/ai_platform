@@ -68,7 +68,8 @@
   }
 
   function asNumber(value) {
-    const cleaned = String(value ?? "").replace(/,/g, "").trim();
+    // 화면 글자(계산칸)를 되읽을 때 음수 표기 △ 를 - 로 (steam-negative-sign.js)
+    const cleaned = (window.SteamNegativeSign ? window.SteamNegativeSign.normalize(value) : String(value ?? "")).replace(/,/g, "").trim();
     if (!cleaned) return null;
     const num = Number(cleaned);
     return Number.isFinite(num) ? num : null;
