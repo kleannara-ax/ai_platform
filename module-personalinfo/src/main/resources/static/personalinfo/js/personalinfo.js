@@ -459,6 +459,9 @@
               <div class="row g-3">
                 <div class="col-md-3"><label class="form-label d-block">개인정보처리 위탁계약서 작성</label>${radio('contractDocYn', v.contractDocYn)}</div>
                 <div class="col-md-3">${input('contractSignedDate', '개인정보처리 위탁계약 체결일', v.contractSignedDate, 'type="date"')}</div>
+                <div class="col-md-6 d-flex align-items-end"><small class="text-muted" id="doc-analyze-guide">
+                  <i class="fas fa-wand-magic-sparkles me-1"></i>아래 <b>위수탁 계약서 파일</b>을 선택하면 파일 안 계약일자를 찾아 체결일을 채우고, 올해 계약서이면 작성 여부를 Y 로 바꿉니다. 직접 입력해도 됩니다.</small></div>
+                <div class="col-12 d-none" id="doc-analyze-result" role="status" aria-live="polite"></div>
               </div>
             </div></div>
 
@@ -483,8 +486,8 @@
 
           <div class="pi-form-section"><h3>비고</h3>
             <textarea class="form-control" id="f-remark" name="remark" rows="3" maxlength="2000" aria-label="비고">${esc(v.remark)}</textarea>
-            ${isEdit ? '' : `<div class="mt-3"><label class="form-label" for="f-contractFile">위수탁 계약서 파일 <small class="text-muted">(선택, 등록 후 상세 화면에서도 추가 가능)</small></label>
-              <input type="file" class="form-control" id="f-contractFile" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip"></div>`}
+            <div class="mt-3"><label class="form-label" for="f-contractFile">위수탁 계약서 파일 <small class="text-muted">(선택, 저장 시 첨부됩니다. 상세 화면에서도 추가 가능 · 계약일자 자동 읽기: pdf, docx, doc, hwp, hwpx, xlsx, xls)</small></label>
+              <input type="file" class="form-control" id="f-contractFile" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip"></div>
           </div>
 
           <div class="d-flex justify-content-end gap-2 mt-4">
@@ -508,6 +511,9 @@
     };
     form.querySelectorAll('input[name="subcontractYn"]').forEach((r) => r.addEventListener('change', () => syncSubcontract(true)));
     syncSubcontract(false);
+
+    // 위수탁 계약서 파일 선택 → 계약일자 읽기 → 체결일 채우기, 올해 계약서이면 작성 여부 Y
+    initContractDocAnalyze(form);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -538,6 +544,80 @@
         notify(isEdit ? '수정되었습니다.' : '등록되었습니다.');
         go('#/contracts/' + saved.contractId);
       } catch (err) { fail(err); } finally { btn.disabled = false; }
+    });
+  }
+
+  /**
+   * 위수탁 계약서 파일을 고르면 서버에서 글자를 읽어 계약일자를 찾는다(파일은 이 단계에서 저장하지 않음).
+   *  - 찾은 날짜를 '개인정보처리 위탁계약 체결일'에 넣는다.
+   *  - 올해 계약서이면 '개인정보처리 위탁계약서 작성'을 Y 로 바꾼다. 올해가 아니면 바꾸지 않고 [그래도 Y 로 변경] 버튼을 보여준다.
+   *  - [되돌리기] 로 파일 선택 전 값으로 돌아가고, 다른 날짜 후보를 고르거나 직접 입력할 수 있다.
+   */
+  function initContractDocAnalyze(form) {
+    const fileInput = document.getElementById('f-contractFile');
+    const box = document.getElementById('doc-analyze-result');
+    const dateInput = document.getElementById('f-contractSignedDate');
+    if (!fileInput || !box || !dateInput) return;
+    const docYn = () => form.querySelector('input[name="contractDocYn"]:checked')?.value || 'N';
+    const setDocYn = (val) => { const r = document.getElementById('contractDocYn-' + val); if (r) r.checked = true; };
+    const flash = (el) => { el.classList.remove('pi-autofilled'); void el.offsetWidth; el.classList.add('pi-autofilled'); };
+    let seq = 0;
+
+    const show = (cls, html) => { box.className = 'col-12 pi-doc-result alert py-2 px-3 mb-0 ' + cls; box.innerHTML = html; };
+    const hide = () => { box.className = 'col-12 d-none'; box.innerHTML = ''; };
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      const my = ++seq;
+      if (!file) { hide(); return; }
+      if (!perm.canWrite) return;
+      const before = { date: dateInput.value, yn: docYn() };
+      show('alert-secondary', '<i class="fas fa-spinner fa-spin me-1"></i>계약서에서 계약일자를 찾는 중입니다…');
+      let r;
+      try {
+        const fd = new FormData(); fd.append('file', file);
+        r = await PI_API.analyzeContractDoc(fd);
+      } catch (err) {
+        if (my !== seq) return;
+        show('alert-warning', `<i class="fas fa-triangle-exclamation me-1"></i>계약서를 읽지 못했습니다: ${esc(err.message)} <span class="text-muted">· 체결일과 작성 여부를 직접 입력하세요.</span>`);
+        return;
+      }
+      if (my !== seq) return; // 그 사이 다른 파일을 고른 경우 이전 결과는 버린다
+
+      const apply = (date, forceY) => {
+        const year = Number(String(date).slice(0, 4));
+        dateInput.value = date; flash(dateInput);
+        const isCurrent = year === r.baseYear;
+        if (isCurrent || forceY) { setDocYn('Y'); flash(document.querySelector('label[for="contractDocYn-Y"]')); }
+        render(date, isCurrent, isCurrent || forceY);
+      };
+      const render = (date, isCurrent, changedY) => {
+        const others = (r.candidates || []).filter((c) => c.date !== date);
+        const head = isCurrent
+          ? `<i class="fas fa-circle-check me-1"></i>계약일자 <b>${fmtDate(date)}</b> 를 체결일에 넣고, 올해(${r.baseYear}년) 계약서라서 <b>작성 여부를 Y</b>로 바꿨습니다.`
+          : `<i class="fas fa-circle-info me-1"></i>계약일자 <b>${fmtDate(date)}</b> 를 체결일에 넣었습니다. <b>${String(date).slice(0, 4)}년 계약서</b>로 올해(${r.baseYear}년) 계약서가 아니어서 작성 여부는 ${changedY ? '<b>Y 로 직접 바꿨습니다</b>' : '바꾸지 않았습니다'}.`;
+        show(isCurrent ? 'alert-success' : 'alert-warning', `
+          <div>${head}</div>
+          <div class="small text-muted mt-1">근거: ${esc(r.candidates?.find((c) => c.date === date)?.kindLabel || '직접 선택')}${r.candidates?.find((c) => c.date === date)?.context ? ` · "${esc(r.candidates.find((c) => c.date === date).context)}"` : ''} · 파일: ${esc(r.fileName)}</div>
+          <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+            ${!isCurrent && !changedY && docYn() !== 'Y' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-act="force-y">그래도 Y 로 변경</button>' : ''}
+            ${others.length ? `<span class="small text-muted">다른 날짜:</span>${others.map((c) => `<button type="button" class="btn btn-sm btn-light border" data-act="pick" data-date="${esc(c.date)}" title="${esc(c.kindLabel)} · ${esc(c.context)}">${fmtDate(c.date)} <small class="text-muted">${esc(c.kindLabel)}</small></button>`).join('')}` : ''}
+            <button type="button" class="btn btn-sm btn-link text-secondary" data-act="undo"><i class="fas fa-rotate-left me-1"></i>되돌리기</button>
+          </div>`);
+        box.querySelector('[data-act="force-y"]')?.addEventListener('click', () => apply(date, true));
+        box.querySelectorAll('[data-act="pick"]').forEach((b) => b.addEventListener('click', () => { setDocYn(before.yn); apply(b.dataset.date, false); }));
+        box.querySelector('[data-act="undo"]').addEventListener('click', () => {
+          dateInput.value = before.date; setDocYn(before.yn);
+          show('alert-secondary', '<i class="fas fa-rotate-left me-1"></i>파일을 고르기 전 값으로 되돌렸습니다. 첨부할 파일은 그대로 저장됩니다. 체결일과 작성 여부를 직접 입력하세요.');
+        });
+      };
+
+      if (r.detectedDate) { apply(r.detectedDate, false); return; }
+      const cands = (r.candidates || []);
+      show(r.textReadable ? 'alert-warning' : 'alert-secondary', `
+        <div><i class="fas fa-circle-info me-1"></i>${esc(r.message)}</div>
+        ${cands.length ? `<div class="d-flex flex-wrap gap-2 mt-2 align-items-center"><span class="small text-muted">문서 안 날짜:</span>${cands.map((c) => `<button type="button" class="btn btn-sm btn-light border" data-act="pick" data-date="${esc(c.date)}" title="${esc(c.context)}">${fmtDate(c.date)} <small class="text-muted">${esc(c.kindLabel)}</small></button>`).join('')}</div>` : ''}`);
+      box.querySelectorAll('[data-act="pick"]').forEach((b) => b.addEventListener('click', () => apply(b.dataset.date, false)));
     });
   }
 
