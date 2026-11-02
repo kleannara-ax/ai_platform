@@ -472,13 +472,20 @@
     // 특이사항 각 사업부 textarea의 "직전 유효 값" — 분량 제한 검증 시 이번 입력으로
     // 새로 추가된 부분(삽입분)만 골라내기 위한 기준값으로 사용한다 (사업부 코드별 관리).
     let specialNoteLastValue = {};
-    // 특이사항 사업부 표시 순서/라벨 (백엔드 DailyReportService.SPECIAL_NOTE_CATEGORIES와 동일)
+    // 특이사항 사업부 표시 순서/라벨
+    // ★★ 2026-11 변경 — 화면 표시 순서만 "기타"↔"사고/안전사고" 맞바꿈
+    // (제지-화장지-패드-기타-사고/안전사고). 백엔드 DailyReportService의
+    // SPECIAL_NOTE_CATEGORIES(DB sortOrder 기준, 제지-화장지-패드-사고/안전사고-기타)는
+    // 의도적으로 그대로 둔다 — 이 배열은 "화면에 그릴 순서"만 결정할 뿐, 각 칸은
+    // code별로 remarksByCategory[code]를 찾아 매핑하고 저장 시에도 category 값을
+    // 명시해서 보내므로, 이 순서를 바꿔도 DB에 저장되는 카테고리/내용 매핑에는
+    // 전혀 영향이 없다 (칸 순서 ≠ DB sortOrder).
     const SPECIAL_NOTE_CATEGORIES = [
       { code: 'PAPER',  label: '제지' },
       { code: 'TISSUE', label: '화장지' },
       { code: 'PAD',    label: '패드' },
-      { code: 'SAFETY', label: '사고/안전사고' },
       { code: 'ETC',    label: '기타' },
+      { code: 'SAFETY', label: '사고/안전사고' },
     ];
     // ★★ 특이사항 분량 제한 (백엔드 DailyReportService의 동일 상수와 반드시 일치시킬 것)
     // - 줄바꿈/전체 글자수: 5개 사업부 행 "전체 합산" 공유 총량
