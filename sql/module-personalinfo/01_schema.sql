@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS pi_contract_file (
     FILE_SIZE      BIGINT        NOT NULL DEFAULT 0      COMMENT '파일 크기 (byte)',
     FILE_HASH      VARCHAR(64)   NULL                    COMMENT '파일 SHA-256 해시 (위변조 확인용)',
     DESCRIPTION    VARCHAR(500)  NULL                    COMMENT '파일 설명',
+    SIGNED_DATE    DATE          NULL                    COMMENT '계약서상 체결일 (위수탁 계약서만 사용. 체결일 표기가 없으면 계약기간 시작일)',
 
     CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY     BIGINT        NULL                    COMMENT '생성자 사용자 ID',

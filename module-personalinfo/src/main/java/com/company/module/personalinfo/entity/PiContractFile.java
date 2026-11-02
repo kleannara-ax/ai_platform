@@ -15,6 +15,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * 계약 첨부파일 (위수탁 계약서, 재위탁 동의서, 확약서 등).
  * 실제 파일은 업로드 디렉토리에 저장하고 DB 에는 메타데이터만 보관한다.
@@ -56,9 +58,14 @@ public class PiContractFile extends PiBaseEntity {
     @Column(name = "DESCRIPTION", length = 500)
     private String description;
 
+    /** 계약서상 체결일 (위수탁 계약서만 사용. 체결일 표기가 없으면 계약기간 시작일) */
+    @Column(name = "SIGNED_DATE")
+    private LocalDate signedDate;
+
     @Builder
     private PiContractFile(Long contractId, ContractFileType fileType, String originalName, String storedPath,
-                           String contentType, Long fileSize, String fileHash, String description, Long createdBy) {
+                           String contentType, Long fileSize, String fileHash, String description, LocalDate signedDate,
+                           Long createdBy) {
         this.contractId = contractId;
         this.fileType = fileType == null ? ContractFileType.CONTRACT : fileType;
         this.originalName = originalName;
@@ -67,7 +74,18 @@ public class PiContractFile extends PiBaseEntity {
         this.fileSize = fileSize;
         this.fileHash = fileHash;
         this.description = description;
+        this.signedDate = this.fileType == ContractFileType.CONTRACT ? signedDate : null;
         markCreatedBy(createdBy);
+    }
+
+    /** 계약서상 체결일 변경 (위수탁 계약서만 가능, null 이면 비움) */
+    public void changeSignedDate(LocalDate signedDate, Long updatedBy) {
+        this.signedDate = signedDate;
+        markUpdatedBy(updatedBy);
+    }
+
+    public boolean isContractDoc() {
+        return fileType == ContractFileType.CONTRACT;
     }
 
     public void delete(Long deletedBy) {

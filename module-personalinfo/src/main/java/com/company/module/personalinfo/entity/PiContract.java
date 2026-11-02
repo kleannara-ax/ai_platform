@@ -201,6 +201,19 @@ public class PiContract extends PiBaseEntity {
         markUpdatedBy(updatedBy);
     }
 
+    /**
+     * 개인정보처리 위탁계약 체결일을 최신 위수탁 계약서의 체결일로 맞춘다.
+     * 계약서가 있다는 뜻이므로 개인정보처리 위탁계약서 작성 여부도 Y 로 바꾼다.
+     */
+    public void applyLatestContractDocDate(LocalDate latestSignedDate, Long updatedBy) {
+        if (latestSignedDate == null) {
+            return;
+        }
+        this.contractSignedDate = latestSignedDate;
+        this.contractDocYn = "Y";
+        markUpdatedBy(updatedBy);
+    }
+
     /** ISMS 인증 범위 여부 변경 (목록 화면 Y/N 바로 변경) */
     public void changeIsmsScope(String ismsScopeYn, Long updatedBy) {
         this.ismsScopeYn = yn(ismsScopeYn, this.ismsScopeYn);

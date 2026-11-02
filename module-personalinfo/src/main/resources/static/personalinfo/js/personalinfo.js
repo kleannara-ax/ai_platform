@@ -460,7 +460,7 @@
                 <div class="col-md-3"><label class="form-label d-block">개인정보처리 위탁계약서 작성</label>${radio('contractDocYn', v.contractDocYn)}</div>
                 <div class="col-md-3">${input('contractSignedDate', '개인정보처리 위탁계약 체결일', v.contractSignedDate, 'type="date"')}</div>
                 <div class="col-md-6 d-flex align-items-end"><small class="text-muted" id="doc-analyze-guide">
-                  <i class="fas fa-wand-magic-sparkles me-1"></i>아래 <b>위수탁 계약서 파일</b>을 선택하면 파일에 적힌 계약일자를 체결일에 넣고 작성 여부를 Y 로 바꿉니다. 직접 입력해도 됩니다.</small></div>
+                  <i class="fas fa-wand-magic-sparkles me-1"></i>아래 <b>위수탁 계약서 파일</b>을 선택하면 파일에 적힌 계약일자(없으면 계약기간 시작일)를 체결일에 넣고 작성 여부를 Y 로 바꿉니다. 위수탁 계약서가 여러 건이면 <b>가장 최근 계약서의 날짜</b>가 체결일입니다. 직접 입력해도 됩니다.</small></div>
                 <div class="col-12 d-none" id="doc-analyze-result" role="status" aria-live="polite"></div>
               </div>
             </div></div>
@@ -513,7 +513,8 @@
     syncSubcontract(false);
 
     // 위수탁 계약서 파일 선택 → 파일에 적힌 계약일자를 체결일에 넣고 작성 여부 Y
-    initContractDocAnalyze(form);
+    const latestDoc = isEdit ? (c.files || []).find((f) => f.latestContractDoc) : null;
+    const docState = initContractDocAnalyze(form, latestDoc ? latestDoc.signedDate : null);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -539,6 +540,7 @@
         if (file) {
           const fd = new FormData();
           fd.append('file', file); fd.append('fileType', 'CONTRACT');
+          if (docState && docState.docDate) fd.append('signedDate', docState.docDate);
           try { await PI_API.uploadFile(saved.contractId, fd); } catch (err) { notify('계약은 저장되었으나 파일 업로드 실패: ' + err.message, 'warning'); }
         }
         notify(isEdit ? '수정되었습니다.' : '등록되었습니다.');
@@ -553,11 +555,12 @@
    *    (개인정보처리 위탁계약은 원계약과 따로 체결될 수 있으므로 원계약·올해 날짜와 비교하지 않는다)
    *  - [되돌리기] 로 파일 선택 전 값으로 돌아가고, 다른 날짜 후보를 고르거나 직접 입력할 수 있다.
    */
-  function initContractDocAnalyze(form) {
+  function initContractDocAnalyze(form, existingLatest) {
+    const state = { docDate: null }; // 새로 고른 계약서 파일의 체결일 (저장 시 첨부 파일에 함께 저장)
     const fileInput = document.getElementById('f-contractFile');
     const box = document.getElementById('doc-analyze-result');
     const dateInput = document.getElementById('f-contractSignedDate');
-    if (!fileInput || !box || !dateInput) return;
+    if (!fileInput || !box || !dateInput) return state;
     const docYn = () => form.querySelector('input[name="contractDocYn"]:checked')?.value || 'N';
     const setDocYn = (val) => { const r = document.getElementById('contractDocYn-' + val); if (r) r.checked = true; };
     const flash = (el) => { el.classList.remove('pi-autofilled'); void el.offsetWidth; el.classList.add('pi-autofilled'); };
@@ -569,6 +572,7 @@
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0];
       const my = ++seq;
+      state.docDate = null;
       if (!file) { hide(); return; }
       if (!perm.canWrite) return;
       const before = { date: dateInput.value, yn: docYn() };
@@ -585,14 +589,21 @@
       if (my !== seq) return; // 그 사이 다른 파일을 고른 경우 이전 결과는 버린다
 
       const apply = (date) => {
-        dateInput.value = date; flash(dateInput);
+        state.docDate = date;
+        // 이미 등록된 위수탁 계약서가 더 최근이면 체결일은 그대로 (체결일 = 가장 최근 계약서 날짜)
+        const older = existingLatest && String(date) < String(existingLatest);
+        if (!older) { dateInput.value = date; flash(dateInput); }
         setDocYn('Y'); flash(document.querySelector('label[for="contractDocYn-Y"]'));
-        render(date);
+        render(date, older);
       };
-      const render = (date) => {
+      const render = (date, older) => {
         const others = (r.candidates || []).filter((c) => c.date !== date);
-        const head = `<i class="fas fa-circle-check me-1"></i>계약서에 적힌 계약일자 <b>${fmtDate(date)}</b> 를 체결일에 넣고 <b>작성 여부를 Y</b>로 바꿨습니다.`;
-        show('alert-success', `
+        const fromStart = r.candidates?.find((c) => c.date === date)?.kind === 'PERIOD';
+        const what = fromStart ? '체결일 표기가 없어 계약기간 시작일' : '계약서에 적힌 계약일자';
+        const head = older
+          ? `<i class="fas fa-circle-info me-1"></i>이 계약서의 체결일은 <b>${fmtDate(date)}</b>(${what})입니다. 이미 등록된 위수탁 계약서(<b>${fmtDate(existingLatest)}</b>)가 더 최근이라 계약의 체결일은 그대로 둡니다.`
+          : `<i class="fas fa-circle-check me-1"></i>${what} <b>${fmtDate(date)}</b> 를 체결일에 넣고 <b>작성 여부를 Y</b>로 바꿨습니다.`;
+        show(older ? 'alert-info' : 'alert-success', `
           <div>${head}</div>
           <div class="small text-muted mt-1">근거: ${esc(r.candidates?.find((c) => c.date === date)?.kindLabel || '직접 선택')}${r.candidates?.find((c) => c.date === date)?.context ? ` · "${esc(r.candidates.find((c) => c.date === date).context)}"` : ''} · 파일: ${esc(r.fileName)}</div>
           <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
@@ -601,8 +612,8 @@
           </div>`);
         box.querySelectorAll('[data-act="pick"]').forEach((b) => b.addEventListener('click', () => apply(b.dataset.date)));
         box.querySelector('[data-act="undo"]').addEventListener('click', () => {
-          dateInput.value = before.date; setDocYn(before.yn);
-          show('alert-secondary', '<i class="fas fa-rotate-left me-1"></i>파일을 고르기 전 값으로 되돌렸습니다. 첨부할 파일은 그대로 저장됩니다. 체결일과 작성 여부를 직접 입력하세요.');
+          dateInput.value = before.date; setDocYn(before.yn); state.docDate = null;
+          show('alert-secondary', '<i class="fas fa-rotate-left me-1"></i>파일을 고르기 전 값으로 되돌렸습니다. 첨부할 파일은 그대로 저장되며, 파일의 체결일은 상세 화면 첨부 목록에서 고칠 수 있습니다.');
         });
       };
 
@@ -613,6 +624,21 @@
         ${cands.length ? `<div class="d-flex flex-wrap gap-2 mt-2 align-items-center"><span class="small text-muted">문서 안 날짜:</span>${cands.map((c) => `<button type="button" class="btn btn-sm btn-light border" data-act="pick" data-date="${esc(c.date)}" title="${esc(c.context)}">${fmtDate(c.date)} <small class="text-muted">${esc(c.kindLabel)}</small></button>`).join('')}</div>` : ''}`);
       box.querySelectorAll('[data-act="pick"]').forEach((b) => b.addEventListener('click', () => apply(b.dataset.date)));
     });
+    return state;
+  }
+
+  /** 첨부 정렬: 위수탁 계약서(체결일 최신순, 날짜 없는 것은 뒤) → 그 밖의 파일(최근 등록순) */
+  function sortFiles(files) {
+    const docs = files.filter((f) => f.fileType === 'CONTRACT')
+      .sort((a, b) => String(b.signedDate || '').localeCompare(String(a.signedDate || '')) || b.fileId - a.fileId);
+    return docs.concat(files.filter((f) => f.fileType !== 'CONTRACT'));
+  }
+
+  function signedDateCell(f) {
+    const d = f.signedDate ? `<b>${fmtDate(f.signedDate)}</b>` : '<span class="text-muted">미입력</span>';
+    const latest = f.latestContractDoc ? ' <span class="badge text-bg-primary" title="계약의 개인정보처리 위탁계약 체결일로 표시되는 계약서">최신</span>' : '';
+    const edit = perm.canWrite ? ` <button class="btn btn-sm btn-link p-0 ms-1" data-edit-signed="${f.fileId}" data-date="${esc(f.signedDate || '')}" title="체결일 수정" aria-label="체결일 수정"><i class="fas fa-pen fa-xs"></i></button>` : '';
+    return d + latest + edit;
   }
 
   // ──────────────── 3. 상세 화면 ────────────────
@@ -671,15 +697,19 @@
               <option value="SECURITY_PLEDGE">정보보호 및 비밀유지 확약서</option><option value="DESTRUCTION_CONFIRM">개인정보 파기 확인서</option>
               <option value="ETC">기타</option></select>
             <input type="file" class="form-control form-control-sm" name="file" required aria-label="파일" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip">
+            <input type="date" class="form-control form-control-sm w-auto" name="signedDate" id="upload-signed-date" title="계약서 체결일 (위수탁 계약서만, 파일을 고르면 자동 입력)" aria-label="계약서 체결일">
             <button class="btn btn-sm btn-primary text-nowrap" type="submit"><i class="fas fa-upload me-1"></i>업로드</button></form>` : ''}
         </div>
-        <table class="pi-table"><thead><tr><th>구분</th><th>파일명</th><th>크기</th><th>설명</th><th>등록일시</th><th></th></tr></thead>
-          <tbody>${c.files.length ? c.files.map((f) => `
-            <tr><td>${esc(f.fileTypeLabel)}</td><td>${esc(f.originalName)}</td><td>${fmtSize(f.fileSize)}</td><td>${esc(f.description || '')}</td>
+        <p class="small text-muted mb-2" id="contract-doc-rule"><i class="fas fa-circle-info me-1"></i>위수탁 계약서는 체결일자별로 여러 건 올릴 수 있으며, 계약의 <b>개인정보처리 위탁계약 체결일</b>은 <b>체결일이 가장 최근인 위수탁 계약서</b>의 날짜로 표시됩니다. 업로드할 때 계약서에서 날짜를 읽고(체결일 표기가 없으면 계약기간 시작일), 직접 고칠 수도 있습니다.</p>
+        <table class="pi-table"><thead><tr><th>구분</th><th>파일명</th><th>계약서 체결일</th><th>크기</th><th>설명</th><th>등록일시</th><th></th></tr></thead>
+          <tbody>${c.files.length ? sortFiles(c.files).map((f) => `
+            <tr class="${f.latestContractDoc ? 'pi-latest-doc' : ''}"><td>${esc(f.fileTypeLabel)}</td><td>${esc(f.originalName)}</td>
+              <td class="text-nowrap">${f.fileType === 'CONTRACT' ? signedDateCell(f) : '<span class="text-muted">-</span>'}</td>
+              <td>${fmtSize(f.fileSize)}</td><td>${esc(f.description || '')}</td>
               <td>${fmtDateTime(f.createdAt)}</td>
               <td class="text-end text-nowrap"><button class="btn btn-sm btn-light" data-dl-file="${f.fileId}" data-name="${esc(f.originalName)}"><i class="fas fa-download"></i></button>
                 ${perm.canDelete ? `<button class="btn btn-sm btn-light text-danger" data-del-file="${f.fileId}" aria-label="삭제"><i class="fas fa-trash"></i></button>` : ''}</td></tr>`).join('')
-            : '<tr><td colspan="6" class="pi-empty">등록된 계약서가 없습니다.</td></tr>'}</tbody></table>
+            : '<tr><td colspan="7" class="pi-empty">등록된 계약서가 없습니다.</td></tr>'}</tbody></table>
       </section>
 
       <section class="pi-card" id="inspection-section">
@@ -779,10 +809,46 @@
 
     // 계약서 업로드
     const fileForm = document.getElementById('file-upload-form');
-    fileForm?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try { await PI_API.uploadFile(id, new FormData(fileForm)); notify('업로드되었습니다.'); reload(); } catch (err) { fail(err); }
-    });
+    if (fileForm) {
+      const typeSel = fileForm.querySelector('[name="fileType"]');
+      const fileSel = fileForm.querySelector('[name="file"]');
+      const dateSel = document.getElementById('upload-signed-date');
+      const syncDateBox = () => { const on = typeSel.value === 'CONTRACT'; dateSel.disabled = !on; if (!on) dateSel.value = ''; };
+      typeSel.addEventListener('change', syncDateBox); syncDateBox();
+      // 위수탁 계약서를 고르면 파일에서 체결일을 읽어 채움 (직접 고칠 수 있음)
+      let aseq = 0;
+      fileSel.addEventListener('change', async () => {
+        const f = fileSel.files?.[0]; const my = ++aseq;
+        if (!f || typeSel.value !== 'CONTRACT') return;
+        dateSel.value = ''; dateSel.placeholder = '읽는 중';
+        try {
+          const fd = new FormData(); fd.append('file', f);
+          const r = await PI_API.analyzeContractDoc(fd);
+          if (my !== aseq) return;
+          if (r.detectedDate) { dateSel.value = r.detectedDate; dateSel.classList.remove('pi-autofilled'); void dateSel.offsetWidth; dateSel.classList.add('pi-autofilled'); }
+          notify(r.detectedDate ? `${r.message} (업로드 전에 고칠 수 있습니다)` : r.message, r.detectedDate ? 'info' : 'warning');
+        } catch (err) { if (my === aseq) notify('계약서 날짜를 읽지 못했습니다. 체결일을 직접 입력하세요.', 'warning'); }
+      });
+      fileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(fileForm);
+        if (!fd.get('signedDate')) fd.delete('signedDate');
+        try { await PI_API.uploadFile(id, fd); notify('업로드되었습니다.'); reload(); } catch (err) { fail(err); }
+      });
+    }
+    // 위수탁 계약서 체결일 수정
+    document.querySelectorAll('[data-edit-signed]').forEach((b) => b.addEventListener('click', () => {
+      const td = b.closest('td'); const cur = b.dataset.date || '';
+      td.innerHTML = `<div class="d-flex gap-1 align-items-center"><input type="date" class="form-control form-control-sm pi-signed-edit" value="${esc(cur)}" aria-label="계약서 체결일 수정" style="width:150px">
+        <button class="btn btn-sm btn-primary" data-act="save" aria-label="저장"><i class="fas fa-check"></i></button>
+        <button class="btn btn-sm btn-light" data-act="cancel" aria-label="취소"><i class="fas fa-xmark"></i></button></div>`;
+      const inp = td.querySelector('input'); inp.focus();
+      td.querySelector('[data-act="cancel"]').onclick = () => reload();
+      td.querySelector('[data-act="save"]').onclick = async () => {
+        try { await PI_API.updateFileSignedDate(b.dataset.editSigned, inp.value || null); notify('계약서 체결일을 저장했습니다. 계약 체결일은 가장 최근 계약서 기준으로 다시 맞췄습니다.'); reload(); }
+        catch (err) { fail(err); }
+      };
+    }));
     document.querySelectorAll('[data-dl-file]').forEach((b) => b.addEventListener('click', () => PI_API.downloadFile(b.dataset.dlFile, b.dataset.name).catch(fail)));
     document.querySelectorAll('[data-del-file]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('첨부파일을 삭제합니다.')) return;
