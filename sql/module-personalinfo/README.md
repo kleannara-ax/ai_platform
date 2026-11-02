@@ -30,7 +30,8 @@
 | 5 | **업체별 점검 체크리스트 업로드** | 같은 업체가 서비스별로 계약이 여러 건이어도, 협력사가 업체 단위로 작성한 체크리스트 **1건을 업로드해 그 업체의 선택한 계약 전체에 점검 이력으로 한 번에 등록**합니다. 업로드 전 미리보기로 체크리스트 회사명에 맞는 업체를 자동 선택하고, 원본 파일은 1번만 저장합니다. |
 | - | 재위탁 입력 제어 | 등록·수정 화면에서 **재위탁 여부가 Y 일 때만** 재위탁 업체명·재위탁 업무·재위탁 동의서를 입력할 수 있습니다(N 이면 회색 비활성). N 으로 바꿔도 입력해 둔 값은 지우지 않고 저장해 두며, 다시 Y 로 바꾸면 그대로 쓸 수 있습니다. Y 인데 업체명·업무가 모두 비어 있으면 저장 전에 안내합니다(서버도 같은 검증). |
 | - | **원계약 / 개인정보처리 위탁계약 구분** | 등록·수정 화면의 계약 영역을 두 칸으로 나눴습니다. 위 칸 **원계약**에는 계약 시작일·종료일·계약기간 비고·자동연장·자동연장 비고가 있고, 아래 칸 **개인정보처리 위탁계약**에는 개인정보처리 위탁계약서 작성(Y/N)과 체결일이 있습니다. **계약기간, 계약 상태, 만료 알림은 모두 원계약 시작일·종료일을 기준으로 합니다.** 상세 화면 항목명(원계약 기간 / 원계약 자동연장 / 개인정보처리 위탁계약서 작성·체결일)과 엑셀 헤더(원계약 시작일·종료일, 개인정보처리 위탁계약서 작성)도 같이 바꿨습니다. DB 컬럼은 그대로 쓰므로 SQL 변경은 없습니다(`CONTRACT_START_DATE`/`CONTRACT_END_DATE` = 원계약, `CONTRACT_DOC_YN`/`CONTRACT_SIGNED_DATE` = 개인정보처리 위탁계약). |
-| - | **계약서 파일에서 계약일자 자동 입력** | 등록·수정 화면에서 **위수탁 계약서 파일**을 고르면 서버가 파일 글자를 읽어 계약일자를 찾고, **계약서에 적힌 계약일자를 그대로 개인정보처리 위탁계약 체결일에 넣고 작성 여부를 Y** 로 바꿉니다. 개인정보처리 위탁계약은 원계약과 따로 체결될 수 있으므로 **원계약 기간이나 올해 날짜와 비교하지 않습니다.** 날짜 판단 순서: ① 같은 줄의 '체결일·계약일·작성일·서명일' 표기 옆 날짜(표 형태로 윗줄이 '체결일'인 경우 포함) ② 문서 안 날짜(뒤쪽 서명란일수록 우선) — 계약기간(부터·까지·~) 날짜는 체결일로 단정하지 않고 후보로만 보여줍니다(이때 체결일·작성 여부는 바꾸지 않음). 다른 후보 날짜 선택, **[되돌리기]**(파일 고르기 전 값으로), **직접 입력**이 모두 가능하고, 최종 값은 저장 버튼을 눌러야 반영됩니다. 읽는 형식은 pdf·docx·doc·hwp·hwpx·xlsx·xls 이고, 이미지(jpg·png)·zip·스캔 PDF·암호 파일은 글자를 읽을 수 없어 직접 입력 안내만 합니다. 분석 단계에서는 파일을 저장하지 않으며, 저장 시 기존처럼 '위수탁 계약서' 첨부로 올라갑니다(수정 화면에서도 첨부 가능). DB 변경 없음. |
+| - | **계약서 파일에서 계약일자 자동 입력** | 위수탁 계약서 파일을 고르면 서버가 파일 글자를 읽어 계약일자를 찾고 **개인정보처리 위탁계약 체결일**에 넣고 작성 여부를 **Y** 로 바꿉니다. 원계약 기간이나 올해 날짜와 비교하지 않습니다. 날짜 판단 순서: ① 같은 줄의 '체결일·계약일·작성일·서명일' 표기 옆 날짜(표 형태로 윗줄이 '체결일'인 경우 포함) ② 문서 안 날짜(뒤쪽 서명란일수록 우선) ③ **체결일 표기가 없으면 계약기간 시작일**('부터'·'~' 앞 날짜). 다른 후보 날짜 선택, **[되돌리기]**, **직접 입력**이 모두 가능합니다. 읽는 형식은 pdf·docx·doc·hwp·hwpx·xlsx·xls 이고, 이미지(jpg·png)·zip·스캔 PDF·암호 파일은 글자를 읽을 수 없어 직접 입력 안내만 합니다. 분석 단계에서는 파일을 저장하지 않습니다. |
+| - | **위수탁 계약서 여러 건 · 최신 체결일** | 위수탁 계약서는 **체결일자별로 여러 건** 올릴 수 있고, 파일마다 **계약서 체결일**(`pi_contract_file.SIGNED_DATE`)을 저장합니다(업로드 시 자동으로 읽고, 상세 화면 첨부 목록의 연필 버튼으로 고칠 수 있음). 계약의 **개인정보처리 위탁계약 체결일 = 삭제되지 않은 위수탁 계약서 중 체결일이 가장 최근인 날짜**이며, 계약서 업로드·체결일 수정·삭제 때마다 서버가 다시 맞춥니다(같은 날짜면 나중에 올린 파일). 그 파일은 첨부 목록에서 **최신** 배지와 파란 배경으로 표시되고, 위수탁 계약서는 체결일 최신순으로 정렬됩니다. 더 오래된 계약서를 올리면 계약 체결일은 바뀌지 않습니다. 재위탁 동의서·확약서 등 다른 파일은 체결일을 저장하지 않습니다. 체결일이 있는 계약서가 하나도 없으면 계약 화면에서 직접 입력한 값을 그대로 둡니다. |
 | - | 목록에서 계약 삭제 | 계약 목록 오른쪽 끝 **관리** 열의 휴지통 버튼으로 바로 삭제합니다(확인 창 후 소프트 삭제). 관리 열은 **삭제 권한자에게만** 보이고, 가로 스크롤해도 오른쪽에 고정됩니다. 권한 부여 방법은 4장 참고. |
 | - | 목록 열 너비 조정 | 계약 목록의 열 제목 오른쪽 경계를 끌어 열 너비를 바꿉니다(최소 너비 보호, 넘치면 가로 스크롤). 경계 더블클릭은 그 열만 기본값, **[열 너비 초기화]** 는 전체 기본값입니다. 키보드(경계에 포커스 후 ←/→ 10px, Shift 50px)와 터치도 지원합니다. 너비는 브라우저 `localStorage`(`personalinfo.contractList.colWidths.v1`)에 사용자별로 저장되며 서버·DB 변경은 없습니다. 좁아진 칸은 말줄임(…)으로 표시하고 마우스를 올리면 전체 내용이 보입니다. |
 | - | 목록에서 Y/N 바로 변경 | 계약 목록의 **ISMS 인증 여부**와 **재위탁 여부**를 스위치로 바로 바꿉니다(등록 권한 필요, 조회 사용자는 Y/N 글자만 보임). 해당 항목만 저장하고 다른 계약 정보는 건드리지 않습니다. 재위탁을 N 으로 바꿔도 재위탁 업체명·업무는 지우지 않습니다. |
@@ -98,12 +99,13 @@
 | PUT | `/contracts/{id}` | 계약 수정 | WRITE |
 | GET | `/contracts/{id}/contact-history?vendorWide=true` | 위탁사 담당자 변경 이력(계약기간 포함). `vendorWide=false` 면 이 계약만 | READ |
 | PATCH | `/contracts/{id}/flags` | 목록에서 Y/N 바로 변경 `{ismsScopeYn?, subcontractYn?}` — 보낸 항목만 변경, 값은 Y/N 만 허용 | WRITE |
-| POST | `/contract-doc/analyze` | 위수탁 계약서 분석 (multipart `file`). 계약일자와 후보를 돌려주며 **파일은 저장하지 않음**. 응답: `fileName, textReadable, detectedDate, detectedReason, candidates[{date, kind(SIGNED/DOC/PERIOD), kindLabel, context}], message` | WRITE |
+| PATCH | `/files/{fileId}/signed-date` | 위수탁 계약서 체결일 수정 `{"signedDate":"yyyy-MM-dd"}` (빈 값이면 비움). 위수탁 계약서가 아니면 400. 수정 후 계약 체결일을 최신 계약서 기준으로 다시 맞춤 | WRITE |
+| POST | `/contract-doc/analyze` | 위수탁 계약서 분석 (multipart `file`). 계약일자와 후보를 돌려주며 **파일은 저장하지 않음**. 응답: `fileName, textReadable, detectedDate(체결일 표기가 없으면 계약기간 시작일), detectedReason, candidates[{date, kind(SIGNED/DOC/PERIOD), kindLabel, context}], message` | WRITE |
 | POST | `/contracts/{id}/terminate` | 계약 종료 처리 `{terminatedDate, reason}` | WRITE |
 | POST | `/contracts/{id}/reopen` | 종료 취소 | WRITE |
 | DELETE | `/contracts/{id}` | 계약 삭제 (소프트) | **DELETE** |
 | GET | `/contracts/{id}/files` | 첨부 목록 | READ |
-| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) | WRITE |
+| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) — 위수탁 계약서는 `signedDate`(선택, 없으면 파일에서 읽음)를 함께 저장하고 계약 체결일을 최신 계약서 기준으로 맞춤 | WRITE |
 | GET | `/files/{fileId}/download` | 첨부 다운로드 | READ |
 | DELETE | `/files/{fileId}` | 첨부 삭제 (소프트) | **DELETE** |
 | GET | `/checklist-template` | 점검 체크리스트 빈 양식 다운로드 | READ |
@@ -189,6 +191,7 @@
 | 3 | `03_vendor_checklist_upload.sql` | **업체별 업로드용 컬럼 추가** — `pi_inspection.UPLOAD_GROUP_ID` + 인덱스. `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` (MariaDB 10.0.2+). 이미 01 을 받은 운영 DB 에만 필요하지만, 새로 설치할 때 실행해도 아무 변화 없이 통과합니다 |
 | 4 | `04_contact_history.sql` | **협력사 담당자 이력 테이블** `pi_contact_history` 추가 + 이력이 없는 기존 계약의 현재 담당자 값을 "기존 데이터 이관"으로 1건 기록. `CREATE TABLE IF NOT EXISTS` / `INSERT ... WHERE NOT EXISTS` 로 재실행해도 중복되지 않습니다 |
 | 5 | `05_contact_history_contract_period.sql` | **담당자 이력에 계약기간 추가** — `pi_contact_history` 에 `CONTRACT_START_DATE` / `CONTRACT_END_DATE` / `CONTRACT_PERIOD_NOTE` 컬럼 추가(`ADD COLUMN IF NOT EXISTS`), 계약기간이 비어 있는 기존 이력만 현재 계약 값으로 채움. 04 의 수탁사 담당자 컬럼은 더 이상 쓰지 않지만 DROP 금지 규칙에 따라 남겨둡니다 |
+| 6 | `06_contract_file_signed_date.sql` | **위수탁 계약서 파일별 체결일** — `pi_contract_file.SIGNED_DATE` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함)과 인덱스(`CREATE INDEX IF NOT EXISTS`) 추가. 이미 올라가 있는 계약서 파일은 체결일이 비어 있으므로 필요하면 상세 화면에서 입력합니다. 기존 계약 체결일 값은 바꾸지 않습니다. 새로 설치할 때는 01 에 컬럼이 이미 있어 아무 변화 없이 통과합니다 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
@@ -196,6 +199,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/03_vendor_checklist_upload.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/04_contact_history.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/05_contact_history_contract_period.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/06_contract_file_signed_date.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
@@ -284,7 +288,7 @@ module-personalinfo/
     └── resources/
         ├── personalinfo/checklist-template.xlsx      보안팀 점검 체크리스트 원본 양식
         └── static/personalinfo/                      화면 (index.html, css, js)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, README.md
 ```
 
 ---
@@ -295,14 +299,16 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_u
 |---|---|
 | 컴파일 (Java 17 타깃, core compileOnly) | 통과 |
 | Hibernate `ddl-auto=validate` (Entity ↔ 01_schema.sql 컬럼·타입 일치) | 통과 |
-| 통합 테스트 14건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **14/14 통과** |
+| 통합 테스트 15건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **15/15 통과** |
 | 　- 권한: 조회자 등록 403 / 외부 역할 403 / 미로그인 401 / 일반 사용자 삭제 403 / 관리자 삭제 200 | 통과 |
 | 　- 계약서 업로드·다운로드, 금지 확장자 거부, `../` 경로 조작 파일명 무력화 | 통과 |
 | 　- 체크리스트: 33항목 집계, 병합셀 구분, 중요(●), N 항목 조치계획, "미 보유" 제외, 3번 시트 6항목, 엑셀 아닌 파일 400 | 통과 |
 | 　- 상태 필터(만료임박/계약중/기간미정), 기간미정 계약 정렬 시 맨 뒤, 대시보드, 엑셀 다운로드 | 통과 |
 | 　- 만료 알림: D-7 발송(담당자+보안팀), 같은 날 재실행 시 중복 0, 4일 뒤 D-1 발송, 수동 발송, 이력 기록 | 통과 |
 | 　- 소프트 삭제: DELETED_YN/BY 기록, 항목 33건 함께 소프트 삭제, 최근 점검 다시 계산 | 통과 |
-| 　- 계약서 계약일자 읽기: docx(계약기간보다 '계약체결일' 우선), pdf(한글 글꼴·서명란 작년 날짜도 그대로 계약일자로 반환, 올해 비교 없음), hwpx('작성일'), hwp(한글 바이너리), 윗줄 계약기간 조항 아래 서명 날짜, 표 형태(윗줄 '체결일'), 계약기간만 있으면 체결일 미판정·후보 2개, 이미지·깨진 pdf → 읽기 불가 안내, 2월 30일 같은 잘못된 날짜 제외, 조회자 403, 금지 확장자 400, 분석 후 첨부 건수 변화 없음 | 통과 |
+| 　- 계약서 계약일자 읽기: docx(계약기간보다 '계약체결일' 우선), pdf(한글 글꼴·서명란 작년 날짜도 그대로 계약일자로 반환, 올해 비교 없음), hwpx('작성일'), hwp(한글 바이너리), 윗줄 계약기간 조항 아래 서명 날짜, 표 형태(윗줄 '체결일'), 체결일 표기 없으면 계약기간 시작일('~'·'부터' 모두), 이미지·깨진 pdf → 읽기 불가 안내, 2월 30일 같은 잘못된 날짜 제외, 조회자 403, 금지 확장자 400, 분석 후 첨부 건수 변화 없음 | 통과 |
+| 　- 위수탁 계약서 여러 건: 2024(파일에서 읽음)→2026(계약기간 시작일)→나중에 올린 2025(직접 입력) 순 업로드 시 계약 체결일 2024-01-05→2026-01-01→유지, 최신 배지 1건, 기타 파일은 체결일 저장 안 함·수정 400, 2025 계약서를 2026-06-30 으로 고치면 계약 체결일 갱신, 최신 계약서 삭제 시 그다음 최신으로 복귀, 조회자 403, 잘못된 날짜 400, 없는 파일 404, DB SIGNED_DATE 확인 | 통과 |
+| 　- SQL 06: 기존 DB 두 번 실행 오류 없음, 01 로 새로 만든 DB 에서도 통과, Hibernate validate 통과 | 통과 |
 | 　- 업체별 업로드: 표기 다른 업체명 3건 → 1개 업체, 미리보기 자동 매칭·저장 없음, 조회자 403, 타 업체 계약 섞이면 400·저장 0, 미종료 2건 등록(묶음ID 동일·파일 1개·항목 66건), 계약별 최근 점검 반영, 종료 계약 명시 등록, xlsx 아님 400, 없는 업체 404 | 통과 |
 | 　- 목록 Y/N 변경: ISMS만/재위탁만/둘 다 변경, 다른 컬럼·재위탁 업체명 보존, UPDATED_BY 기록, 잘못된 값·빈 요청 400, 조회자 403, 없는 계약 404 | 통과 |
 | 　- 담당자 이력: 등록 시 1건, 담당자 외 항목 수정·**수탁사 담당자/연락처/이메일만 변경**·이메일 대소문자만 변경 시 추가 없음, 위탁사 담당자 변경 시 바뀐 항목·변경자·**그 시점 계약기간** 기록(등록 이력은 등록 시점 기간 유지), 이전 버전의 수탁사 전용 변경 행 조회 제외, 같은 업체 다른 계약 포함·다른 업체 제외, 이 계약만 조회, 외부 역할 403, 없는 계약 404 | 통과 |

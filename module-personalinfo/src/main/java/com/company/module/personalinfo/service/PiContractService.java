@@ -86,8 +86,12 @@ public class PiContractService {
 
     public ContractDetailResponse getDetail(Long contractId) {
         PiContract c = findActive(contractId);
+        Long latestDocId = fileRepository
+                .findFirstByContractIdAndFileTypeAndDeletedYnAndSignedDateIsNotNullOrderBySignedDateDescFileIdDesc(
+                        contractId, com.company.module.personalinfo.entity.ContractFileType.CONTRACT, N)
+                .map(com.company.module.personalinfo.entity.PiContractFile::getFileId).orElse(null);
         List<ContractFileResponse> files = fileRepository.findByContractIdAndDeletedYnOrderByFileIdDesc(contractId, N)
-                .stream().map(ContractFileResponse::from).toList();
+                .stream().map(f -> ContractFileResponse.from(f, latestDocId)).toList();
         List<InspectionResponse> inspections = inspectionRepository
                 .findByContractIdAndDeletedYnOrderByInspectionDateDescInspectionIdDesc(contractId, N)
                 .stream().map(InspectionResponse::from).toList();

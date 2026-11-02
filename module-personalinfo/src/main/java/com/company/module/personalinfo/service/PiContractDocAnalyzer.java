@@ -52,7 +52,8 @@ import java.util.zip.ZipInputStream;
  * <ul>
  *   <li>파일은 저장하지 않는다. 글자만 읽어 날짜 후보를 돌려준다(저장은 계약 저장 시 첨부 업로드로 따로 처리).</li>
  *   <li>읽는 형식: pdf, docx, doc, hwp, hwpx, xlsx, xls. 이미지(jpg·png)·zip·스캔 PDF·암호 파일은 글자를 읽을 수 없어 직접 입력 안내.</li>
- *   <li>날짜 판단: '체결일·계약일·작성일' 등 표기 옆 날짜 &gt; 문서 안 날짜(뒤쪽 서명란일수록 우선) &gt; 계약기간(부터·까지·~) 날짜.</li>
+ *   <li>날짜 판단: '체결일·계약일·작성일' 등 표기 옆 날짜 &gt; 문서 안 날짜(뒤쪽 서명란일수록 우선)
+ *       &gt; 체결일 표기가 없으면 계약기간 시작일(부터·~ 앞 날짜).</li>
  *   <li>개인정보처리 위탁계약은 원계약과 따로 체결될 수 있으므로 원계약·오늘 날짜와 비교하지 않고, 계약서에 적힌 계약일자를 그대로 돌려준다.</li>
  * </ul>
  */
@@ -123,19 +124,30 @@ public class PiContractDocAnalyzer {
         List<Scored> found = findDates(normalize(text), maxYear);
         List<ContractDocAnalyzeResponse.Candidate> candidates = found.stream().limit(MAX_CANDIDATES)
                 .map(Scored::toCandidate).toList();
-        Scored best = found.stream().filter(s -> !"PERIOD".equals(s.kind)).findFirst().orElse(null);
         res.textReadable(true).candidates(candidates);
-
+        Scored best = pickSignedDate(found);
         if (best == null) {
-            return res.message(found.isEmpty()
-                            ? "계약서에서 계약일자를 찾지 못했습니다. 체결일을 직접 입력하세요."
-                            : "계약기간 날짜만 있고 체결일은 찾지 못했습니다. 아래 후보에서 고르거나 직접 입력하세요.")
-                    .build();
+            return res.message("계약서에서 계약일자를 찾지 못했습니다. 체결일을 직접 입력하세요.").build();
         }
         return res.detectedDate(best.date)
                 .detectedReason(best.reason())
-                .message("계약서에서 계약일자 " + best.date.format(DOT) + " 을(를) 찾았습니다.")
+                .message(best.periodStart
+                        ? "계약서에 체결일 표기가 없어 계약기간 시작일 " + best.date.format(DOT) + " 을(를) 체결일로 사용합니다."
+                        : "계약서에서 계약일자 " + best.date.format(DOT) + " 을(를) 찾았습니다.")
                 .build();
+    }
+
+    /**
+     * 체결일 선택: 체결일 표기 옆 날짜 / 문서 안 날짜가 있으면 그것(점수 높은 순),
+     * 없으면 계약기간 시작일(부터·~ 앞 날짜, 여러 개면 문서 뒤쪽), 시작일 표시가 없으면 가장 이른 계약기간 날짜.
+     */
+    static Scored pickSignedDate(List<Scored> found) {
+        Scored signed = found.stream().filter(s -> !"PERIOD".equals(s.kind)).findFirst().orElse(null);
+        if (signed != null) return signed;
+        Scored start = found.stream().filter(s -> "PERIOD".equals(s.kind) && s.periodStart).findFirst()
+                .orElseGet(() -> found.stream().filter(s -> "PERIOD".equals(s.kind))
+                        .min(Comparator.comparing(Scored::date)).orElse(null));
+        return start == null ? null : new Scored(start.date, start.kind, start.score, start.context, true);
     }
 
     // ───────────── 날짜 찾기 ─────────────
@@ -168,8 +180,11 @@ public class PiContractDocAnalyzer {
                 default -> 100 + position / 10;
             };
             String context = oneLine(before.substring(Math.max(0, before.length() - 25)) + m.group() + after);
+            boolean start = "PERIOD".equals(kind) && isPeriodStart(after);
             Scored prev = best.get(date);
-            if (prev == null || prev.score < score) best.put(date, new Scored(date, kind, score, context));
+            if (prev == null || prev.score < score || (prev.score == score && start && !prev.periodStart)) {
+                best.put(date, new Scored(date, kind, score, context, start));
+            }
         }
     }
 
@@ -199,6 +214,13 @@ public class PiContractDocAnalyzer {
             }
         }
         return "DOC";
+    }
+
+    /** 계약기간 시작일인지: 날짜 바로 뒤가 '부터' 또는 '~' 이면 시작일 */
+    static boolean isPeriodStart(String after) {
+        String a = after.stripLeading();
+        return a.startsWith("부터") || a.startsWith("~") || a.startsWith("∼") || a.startsWith("～")
+                || a.startsWith("-") && !a.startsWith("--");
     }
 
     private static int lastIndexOfAny(String s, List<String> keywords) {
@@ -310,12 +332,12 @@ public class PiContractDocAnalyzer {
         return sb.toString();
     }
 
-    record Scored(LocalDate date, String kind, int score, String context) {
+    record Scored(LocalDate date, String kind, int score, String context, boolean periodStart) {
         String reason() {
             return switch (kind) {
                 case "SIGNED" -> "체결일·계약일 표기 옆 날짜";
                 case "DOC" -> "문서 안 날짜(서명란 추정)";
-                default -> "계약기간 날짜";
+                default -> periodStart ? "계약기간 시작일(체결일 표기 없음)" : "계약기간 날짜";
             };
         }
 

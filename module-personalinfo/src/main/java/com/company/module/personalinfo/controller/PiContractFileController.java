@@ -12,7 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 위수탁 계약서/증빙 파일 API.
@@ -55,6 +60,7 @@ public class PiContractFileController {
      *   <li>file : 파일 (pdf, doc(x), hwp(x), xls(x), jpg, png, zip)</li>
      *   <li>fileType : CONTRACT / SUBCONTRACT_CONSENT / SECURITY_PLEDGE / DESTRUCTION_CONFIRM / ETC (기본 CONTRACT)</li>
      *   <li>description : 설명 (선택)</li>
+     *   <li>signedDate : 계약서상 체결일 yyyy-MM-dd (선택, 위수탁 계약서만. 없으면 파일에서 읽음)</li>
      * </ul>
      */
     @PostMapping(value = "/contracts/{contractId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -64,9 +70,28 @@ public class PiContractFileController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "fileType", required = false) String fileType,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
-                fileService.upload(contractId, file, fileType, description, currentUserId)));
+                fileService.upload(contractId, file, fileType, description, signedDate, currentUserId)));
+    }
+
+    /** 위수탁 계약서 체결일 변경 {"signedDate":"yyyy-MM-dd"} (빈 값이면 비움). 계약 체결일은 최신 계약서 기준으로 다시 맞춘다. */
+    @PatchMapping("/files/{fileId}/signed-date")
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractFileResponse>> changeSignedDate(
+            @PathVariable Long fileId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+        String v = body == null ? null : body.get("signedDate");
+        LocalDate date;
+        try {
+            date = v == null || v.isBlank() ? null : LocalDate.parse(v.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new com.company.core.common.exception.BusinessException(
+                    com.company.core.common.exception.ErrorCode.INVALID_INPUT_VALUE, "체결일 형식이 올바르지 않습니다. (yyyy-MM-dd)");
+        }
+        return ResponseEntity.ok(ApiResponse.success(fileService.changeSignedDate(fileId, date, currentUserId)));
     }
 
     @GetMapping("/files/{fileId}/download")
