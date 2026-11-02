@@ -151,7 +151,7 @@ public class DailyReportService {
     }
 
     /** ★★ 특이사항 분량 제한 (2026-07 추가, 2026-08 줄바꿈 21→17 조정, 2026-08 17→15 재조정,
-     *  2026-09 15→13 재조정, 2026-10 13→12 재조정)
+     *  2026-09 15→13 재조정, 2026-10 13→12 재조정, 2026-11 12→11 재조정)
      *  - 줄바꿈/전체 글자수는 같은 표 안의 사업부 행 전체를 합산한 "공유 총량"이다
      *    (한 사업부가 많이 쓰면 다른 사업부가 쓸 수 있는 여유가 줄어든다).
      *  - 한 줄(개행으로 구분되는 한 문단) 글자수는 각 행 자신만의 독립된 제한이다.
@@ -167,8 +167,13 @@ public class DailyReportService {
      *    한도를 유지하려면 그만큼 사람이 쓸 수 있는 줄바꿈 여유를 1 더 줄여야 한다.
      *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 + SAFETY 고정문구 1줄
      *     → 최대 안전 줄바꿈 수 = 22-5-4-1=12)
+     *  - ★ 2026-11 추가 — SAFETY 행 고정문구 아래 한 칸(빈 줄)을 띄워서 사용자 텍스트를
+     *    가져가도록 변경되면서, 고정문구가 차지하는 줄 수가 1줄(문구)에서 2줄(문구+빈 줄)로
+     *    늘었다. 같은 22줄 한도를 유지하려면 줄바꿈 여유를 1 더 줄여야 한다 (12 → 11).
+     *    (22줄 = 줄바꿈 수 + 5개 행 기본 1줄 + 구분선 4곳 + SAFETY 고정문구 2줄(문구+빈 줄)
+     *     → 최대 안전 줄바꿈 수 = 22-5-4-2=11)
      *    전체 글자수 한도도 같은 "(줄바꿈 수 + 행수)×67자" 공식을 유지하도록 함께
-     *    재계산했다: (12+5)×67 = 1139. (레이아웃 붕괴 방지라는 관점에서는 한 줄
+     *    재계산했다: (11+5)×67 = 1072. (레이아웃 붕괴 방지라는 관점에서는 한 줄
      *    67자 제한만으로도 세로 줄 수는 이미 통제되므로 이 글자수 한도 자체가
      *    필수 안전장치는 아니지만, 설계 공식/화면 카운터 표시의 일관성을 위해
      *    줄바꿈 조정과 함께 맞춘다.)
@@ -193,7 +198,7 @@ public class DailyReportService {
     private static final Map<String, SpecialNoteSpec> SPECIAL_NOTE_SPECS = new LinkedHashMap<>();
     static {
         SPECIAL_NOTE_SPECS.put(SPECIAL_NOTE_TABLE_CODE,
-                new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 12, 1139, SPECIAL_NOTE_MAX_LINE_LENGTH));
+                new SpecialNoteSpec(SPECIAL_NOTE_CATEGORIES, 11, 1072, SPECIAL_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_AMOUNT_NOTE_TABLE_CODE,
                 new SpecialNoteSpec(SAFETY_AMOUNT_NOTE_CATEGORIES, 9, 1170, SAFETY_NOTE_MAX_LINE_LENGTH));
         SPECIAL_NOTE_SPECS.put(SAFETY_TREND_NOTE_TABLE_CODE,
