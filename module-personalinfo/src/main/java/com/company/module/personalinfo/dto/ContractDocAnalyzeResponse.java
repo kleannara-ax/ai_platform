@@ -9,7 +9,8 @@ import java.util.List;
 /**
  * 개인정보처리 위탁계약서 파일 분석 결과.
  * <p>파일은 저장하지 않고 글자만 읽어 계약일자(체결일) 후보를 돌려준다.
- * 화면은 이 값으로 체결일을 채우고, 기준연도(올해) 계약서이면 작성 여부를 Y 로 바꾼다.</p>
+ * 화면은 찾은 계약일자를 '개인정보처리 위탁계약 체결일'에 그대로 넣고 작성 여부를 Y 로 바꾼다.
+ * (개인정보처리 위탁계약은 원계약과 따로 체결될 수 있으므로 원계약·올해 날짜와 비교하지 않는다)</p>
  */
 @Getter
 @Builder
@@ -22,10 +23,6 @@ public class ContractDocAnalyzeResponse {
     private LocalDate detectedDate;
     /** 판단 근거 (예: '체결일' 표기 옆 날짜) */
     private String detectedReason;
-    /** 기준연도 (서버 오늘 날짜의 연도) */
-    private int baseYear;
-    /** detectedDate 가 기준연도인지 (detectedDate 가 없으면 null) */
-    private Boolean currentYear;
     /** 문서에서 찾은 날짜 후보 (가능성 높은 순, 최대 5개) */
     private List<Candidate> candidates;
     /** 화면 안내 문구 */
@@ -40,6 +37,5 @@ public class ContractDocAnalyzeResponse {
         private String kindLabel;
         /** 날짜 앞뒤 문장 일부 */
         private String context;
-        private boolean currentYear;
     }
 }

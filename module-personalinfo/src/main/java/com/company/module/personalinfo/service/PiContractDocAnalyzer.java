@@ -53,7 +53,7 @@ import java.util.zip.ZipInputStream;
  *   <li>파일은 저장하지 않는다. 글자만 읽어 날짜 후보를 돌려준다(저장은 계약 저장 시 첨부 업로드로 따로 처리).</li>
  *   <li>읽는 형식: pdf, docx, doc, hwp, hwpx, xlsx, xls. 이미지(jpg·png)·zip·스캔 PDF·암호 파일은 글자를 읽을 수 없어 직접 입력 안내.</li>
  *   <li>날짜 판단: '체결일·계약일·작성일' 등 표기 옆 날짜 &gt; 문서 안 날짜(뒤쪽 서명란일수록 우선) &gt; 계약기간(부터·까지·~) 날짜.</li>
- *   <li>기준연도는 서버 오늘 날짜의 연도. 찾은 날짜가 기준연도이면 currentYear=true.</li>
+ *   <li>개인정보처리 위탁계약은 원계약과 따로 체결될 수 있으므로 원계약·오늘 날짜와 비교하지 않고, 계약서에 적힌 계약일자를 그대로 돌려준다.</li>
  * </ul>
  */
 @Slf4j
@@ -98,9 +98,9 @@ public class PiContractDocAnalyzer {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "허용되지 않는 파일 형식입니다. (허용: " + String.join(", ", PiFileStorage.CONTRACT_EXTENSIONS) + ")");
         }
-        int baseYear = LocalDate.now().getYear();
+        int maxYear = LocalDate.now().getYear() + 5; // 오타·문서번호 등 비정상 연도 제외용
         ContractDocAnalyzeResponse.ContractDocAnalyzeResponseBuilder res = ContractDocAnalyzeResponse.builder()
-                .fileName(name).baseYear(baseYear).candidates(List.of());
+                .fileName(name).candidates(List.of());
 
         if (!TEXT_EXTENSIONS.contains(ext)) {
             return res.textReadable(false)
@@ -120,9 +120,9 @@ public class PiContractDocAnalyzer {
                     .build();
         }
 
-        List<Scored> found = findDates(normalize(text), baseYear);
+        List<Scored> found = findDates(normalize(text), maxYear);
         List<ContractDocAnalyzeResponse.Candidate> candidates = found.stream().limit(MAX_CANDIDATES)
-                .map(s -> s.toCandidate(baseYear)).toList();
+                .map(Scored::toCandidate).toList();
         Scored best = found.stream().filter(s -> !"PERIOD".equals(s.kind)).findFirst().orElse(null);
         res.textReadable(true).candidates(candidates);
 
@@ -132,29 +132,24 @@ public class PiContractDocAnalyzer {
                             : "계약기간 날짜만 있고 체결일은 찾지 못했습니다. 아래 후보에서 고르거나 직접 입력하세요.")
                     .build();
         }
-        boolean current = best.date.getYear() == baseYear;
         return res.detectedDate(best.date)
                 .detectedReason(best.reason())
-                .currentYear(current)
-                .message(current
-                        ? "계약일자 " + best.date.format(DOT) + " 을(를) 찾았습니다. 올해(" + baseYear + "년) 계약서입니다."
-                        : "계약일자 " + best.date.format(DOT) + " 을(를) 찾았습니다. " + best.date.getYear()
-                          + "년 계약서로 올해(" + baseYear + "년) 계약서가 아닙니다.")
+                .message("계약서에서 계약일자 " + best.date.format(DOT) + " 을(를) 찾았습니다.")
                 .build();
     }
 
     // ───────────── 날짜 찾기 ─────────────
 
-    static List<Scored> findDates(String text, int baseYear) {
+    static List<Scored> findDates(String text, int maxYear) {
         Map<LocalDate, Scored> best = new LinkedHashMap<>();
-        collect(text, KOREAN_DATE.matcher(text), 1, 2, 3, best, baseYear);
-        collect(text, NUMERIC_DATE.matcher(text), 1, 3, 4, best, baseYear);
+        collect(text, KOREAN_DATE.matcher(text), 1, 2, 3, best, maxYear);
+        collect(text, NUMERIC_DATE.matcher(text), 1, 3, 4, best, maxYear);
         List<Scored> list = new ArrayList<>(best.values());
         list.sort(Comparator.comparingInt((Scored s) -> s.score).reversed());
         return list;
     }
 
-    private static void collect(String text, Matcher m, int gy, int gm, int gd, Map<LocalDate, Scored> best, int baseYear) {
+    private static void collect(String text, Matcher m, int gy, int gm, int gd, Map<LocalDate, Scored> best, int maxYear) {
         while (m.find()) {
             LocalDate date;
             try {
@@ -162,7 +157,7 @@ public class PiContractDocAnalyzer {
             } catch (DateTimeException | NumberFormatException e) {
                 continue;
             }
-            if (date.getYear() < 1990 || date.getYear() > baseYear + 5) continue;
+            if (date.getYear() < 1990 || date.getYear() > maxYear) continue;
             String before = text.substring(Math.max(0, m.start() - 40), m.start());
             String after = text.substring(m.end(), Math.min(text.length(), m.end() + 15));
             String kind = classify(before, after);
@@ -324,10 +319,9 @@ public class PiContractDocAnalyzer {
             };
         }
 
-        ContractDocAnalyzeResponse.Candidate toCandidate(int baseYear) {
+        ContractDocAnalyzeResponse.Candidate toCandidate() {
             return ContractDocAnalyzeResponse.Candidate.builder()
-                    .date(date).kind(kind).kindLabel(reason()).context(context)
-                    .currentYear(date.getYear() == baseYear).build();
+                    .date(date).kind(kind).kindLabel(reason()).context(context).build();
         }
     }
 }
