@@ -82,15 +82,121 @@ public class SecLogUploadService {
 
     // ------------------------------------------------------------------ 조회
 
-    /** 목록 화면 - 월별 조회 */
+    /** 목록 정렬: 최신 업로드 순 / 최고 위험도 순 / 미검토 많은 순 */
+    public static final List<String> LIST_SORTS = List.of("LATEST", "SEVERITY", "PENDING");
+
+    /**
+     * 목록 화면 - 월별 조회
+     * - 업로드마다 검토 상태별 탐지 건수(미검토 포함)와 로그 기간 확인 결과를 붙인다.
+     * - 한 달 업로드 수는 시스템 수 × 몇 건 수준이라, 조건에 맞는 업로드를 모두 읽어 정렬한 뒤 페이지를 자른다.
+     *   (최고 위험도·미검토 건수는 DB 컬럼 정렬로 순서를 맞출 수 없음: 위험도는 문자열, 미검토는 집계 값)
+     */
     public Page<LogUploadResponse> getList(String targetYm, String systemName, LogType logType,
-                                           UploadStatus status, Severity maxSeverity, int page, int size) {
+                                           UploadStatus status, Severity maxSeverity, String sort,
+                                           int page, int size) {
+        return getList(targetYm, systemName, logType, status, maxSeverity, sort, false, page, size);
+    }
+
+    /**
+     * 목록 화면 - 월별 조회
+     *
+     * @param activeOnly true 면 [점검 대상 시스템]에서 '사용'으로 표시한 시스템의 업로드만 반환
+     *                   (사용 안 함 시스템, 시스템 목록에 없는 직접 입력 업로드는 제외)
+     */
+    public Page<LogUploadResponse> getList(String targetYm, String systemName, LogType logType,
+                                           UploadStatus status, Severity maxSeverity, String sort,
+                                           boolean activeOnly, int page, int size) {
         validateYm(targetYm);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), clampSize(size),
-                Sort.by(Sort.Order.desc("uploadId")));
+        String sortKey = StringUtils.hasText(sort) ? sort.trim().toUpperCase(Locale.ROOT) : "LATEST";
+        if (!LIST_SORTS.contains(sortKey)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "정렬은 LATEST, SEVERITY, PENDING 중 하나입니다.");
+        }
         String sys = StringUtils.hasText(systemName) ? systemName.trim() : null;
-        return uploadRepository.search(targetYm, sys, logType, status, maxSeverity, pageable)
-                .map(LogUploadResponse::from);
+        List<SecLogUpload> uploads = uploadRepository.search(targetYm, sys, logType, status, maxSeverity,
+                Pageable.unpaged(Sort.by(Sort.Order.desc("uploadId")))).getContent();
+        if (activeOnly) {
+            java.util.Set<Long> activeIds = new java.util.HashSet<>();
+            systemService.getList(true).forEach(s -> activeIds.add(s.getSystemId()));
+            uploads = uploads.stream()
+                    .filter(u -> u.getSystemId() != null && activeIds.contains(u.getSystemId()))
+                    .toList();
+        }
+
+        List<LogUploadResponse> rows = withListInfo(targetYm, uploads);
+        java.util.Comparator<LogUploadResponse> latest =
+                java.util.Comparator.comparing(LogUploadResponse::getUploadId, java.util.Comparator.reverseOrder());
+        java.util.Comparator<LogUploadResponse> bySeverity =
+                java.util.Comparator.comparingInt((LogUploadResponse r) -> -severityLevel(r.getMaxSeverity()));
+        java.util.Comparator<LogUploadResponse> byPending =
+                java.util.Comparator.comparingLong((LogUploadResponse r) -> -r.getPendingCount());
+        java.util.Comparator<LogUploadResponse> order = switch (sortKey) {
+            case "SEVERITY" -> bySeverity.thenComparing(byPending).thenComparing(latest);
+            case "PENDING" -> byPending.thenComparing(bySeverity).thenComparing(latest);
+            default -> latest;
+        };
+        rows = rows.stream().sorted(order).toList();
+
+        int pageSize = clampSize(size);
+        int pageNo = Math.max(page, 0);
+        int from = Math.min(pageNo * pageSize, rows.size());
+        int to = Math.min(from + pageSize, rows.size());
+        return new org.springframework.data.domain.PageImpl<>(rows.subList(from, to),
+                PageRequest.of(pageNo, pageSize), rows.size());
+    }
+
+    private static int severityLevel(Severity s) {
+        return s == null ? 0 : s.getLevel();
+    }
+
+    /** 업로드 목록에 검토 상태별 탐지 건수 + 로그 기간 확인 결과를 붙임 */
+    private List<LogUploadResponse> withListInfo(String targetYm, List<SecLogUpload> uploads) {
+        if (uploads.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = uploads.stream().map(SecLogUpload::getUploadId).toList();
+
+        Map<Long, Map<ReviewStatus, Long>> review = new java.util.HashMap<>();
+        for (Object[] r : detectionRepository.countByUploadAndReview(ids)) {
+            review.computeIfAbsent((Long) r[0], k -> new java.util.EnumMap<>(ReviewStatus.class))
+                    .put((ReviewStatus) r[1], (Long) r[2]);
+        }
+
+        java.time.YearMonth month = java.time.YearMonth.parse(targetYm, java.time.format.DateTimeFormatter.ofPattern("yyyyMM"));
+        boolean monthOver = month.isBefore(SecLogTime.yearMonth());
+        Map<Long, java.time.LocalDate[]> range = new java.util.HashMap<>();
+        for (Object[] r : accessDailyRepository.rangeInPeriodByUploads(ids, month.atDay(1), month.atEndOfMonth().plusDays(1))) {
+            range.put((Long) r[0], new java.time.LocalDate[]{(java.time.LocalDate) r[1], (java.time.LocalDate) r[2]});
+        }
+
+        List<LogUploadResponse> result = new ArrayList<>();
+        for (SecLogUpload u : uploads) {
+            Map<ReviewStatus, Long> rc = review.getOrDefault(u.getUploadId(), Map.of());
+            java.time.LocalDate[] fl = range.get(u.getUploadId());
+            java.time.LocalDate first = fl == null ? null : fl[0];
+            java.time.LocalDate last = fl == null ? null : fl[1];
+
+            String periodStatus;
+            List<String> reasons = new ArrayList<>();
+            if (u.getDateUnknownCount() == null) {
+                periodStatus = "UNCHECKED";
+            } else {
+                reasons.addAll(LogPeriodCheck.coverageReasons(month, monthOver, first, last));
+                reasons.addAll(LogPeriodCheck.lineReasons(u.getTotalLineCount(), u.getDateUnknownCount(),
+                        u.getOutOfMonthCount() == null ? 0 : u.getOutOfMonthCount()));
+                periodStatus = reasons.isEmpty() ? "OK" : "CHECK";
+            }
+            result.add(LogUploadResponse.from(u).toBuilder()
+                    .pendingCount(rc.getOrDefault(ReviewStatus.PENDING, 0L))
+                    .confirmedCount(rc.getOrDefault(ReviewStatus.CONFIRMED, 0L))
+                    .resolvedCount(rc.getOrDefault(ReviewStatus.RESOLVED, 0L))
+                    .falsePositiveCount(rc.getOrDefault(ReviewStatus.FALSE_POSITIVE, 0L))
+                    .periodStatus(periodStatus)
+                    .periodReasons(reasons)
+                    .firstLogDate(first == null ? null : first.toString())
+                    .lastLogDate(last == null ? null : last.toString())
+                    .build());
+        }
+        return result;
     }
 
     /** 상세 화면 */

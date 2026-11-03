@@ -8,10 +8,11 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 업로드 목록/등록 결과 응답 */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class LogUploadResponse {
 
     private Long uploadId;
@@ -38,6 +39,22 @@ public class LogUploadResponse {
     private String remark;
     private LocalDateTime createdAt;
     private Long createdBy;
+
+    // ---- 목록 화면 전용 (업로드 상세·등록 응답에서는 null)
+
+    /** 검토 상태별 탐지 건수 */
+    private Long pendingCount;
+    private Long confirmedCount;
+    private Long resolvedCount;
+    private Long falsePositiveCount;
+
+    /** 로그 기간 확인: OK / CHECK(확인 필요) / UNCHECKED(일자 점검 전) */
+    private String periodStatus;
+    /** 기간 확인 사유 (예: "9/5부터 시작", "대상 월 밖 줄 79") */
+    private List<String> periodReasons;
+    /** 대상 월 안의 첫/마지막 로그일 (yyyy-MM-dd) */
+    private String firstLogDate;
+    private String lastLogDate;
 
     public static LogUploadResponse from(SecLogUpload u) {
         return LogUploadResponse.builder()

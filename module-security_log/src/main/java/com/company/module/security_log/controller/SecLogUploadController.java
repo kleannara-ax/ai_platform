@@ -57,11 +57,13 @@ public class SecLogUploadController {
             @RequestParam(required = false) LogType logType,
             @RequestParam(required = false) UploadStatus status,
             @RequestParam(required = false) Severity maxSeverity,
+            @RequestParam(defaultValue = "LATEST") String sort,
+            @RequestParam(defaultValue = "false") boolean activeOnly,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
         return ResponseEntity.ok(ApiResponse.success(
-                uploadService.getList(targetYm, systemName, logType, status, maxSeverity, page, size)));
+                uploadService.getList(targetYm, systemName, logType, status, maxSeverity, sort, activeOnly, page, size)));
     }
 
     /** 월별 모니터링 요약 */

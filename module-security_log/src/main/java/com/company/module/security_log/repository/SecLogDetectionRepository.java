@@ -44,6 +44,14 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
                                      @Param("ruleCode") String ruleCode,
                                      @Param("reviewStatus") ReviewStatus reviewStatus);
 
+    /** 여러 업로드의 검토상태별 건수 [uploadId, reviewStatus, count] (업로드 목록 화면) */
+    @Query("""
+            SELECT d.uploadId, d.reviewStatus, COUNT(d) FROM SecLogDetection d
+             WHERE d.deletedYn = 'N' AND d.uploadId IN :uploadIds
+             GROUP BY d.uploadId, d.reviewStatus
+            """)
+    List<Object[]> countByUploadAndReview(@Param("uploadIds") java.util.Collection<Long> uploadIds);
+
     /** 업로드별 룰 x 검토상태 건수 [ruleCode, reviewStatus, count] */
     @Query("""
             SELECT d.ruleCode, d.reviewStatus, COUNT(d) FROM SecLogDetection d

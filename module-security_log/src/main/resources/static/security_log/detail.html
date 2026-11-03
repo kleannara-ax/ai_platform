@@ -18,6 +18,44 @@
     </div>
   </header>
 
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <!-- 분석 결과 고르기 (메뉴에서 바로 들어온 경우) -->
+  <section id="pickView" class="hidden">
+    <div class="guide-box">
+      <i class="fas fa-circle-info"></i>
+      <div><b>볼 로그를 하나 고르세요.</b> [점검 대상 시스템]에서 <b>사용</b>으로 표시한 시스템의 로그만 보입니다. 고른 로그의 <b>① 접속 행위 분석</b>(누가 언제 어디서 접속했는지)과
+        <b>② 이상징후 탐지</b>(룰셋에 걸린 행위)를 한 화면에서 봅니다. 위험도가 높은 로그부터 보여 드립니다.</div>
+    </div>
+    <section class="card-m">
+      <div class="section-title">
+        <h2><i class="fas fa-folder-open"></i>분석한 로그 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="pickCount"></span></h2>
+        <div class="ym-nav">
+          <button class="btn-m btn-gray-m btn-sm-m" id="pkPrev" title="이전 달"><i class="fas fa-chevron-left"></i></button>
+          <span class="ym-label" id="pkYm"></span>
+          <button class="btn-m btn-gray-m btn-sm-m" id="pkNext" title="다음 달"><i class="fas fa-chevron-right"></i></button>
+        </div>
+      </div>
+      <div id="pickLast"></div>
+      <div class="pick-grid" id="pickList"><div class="text-muted-m">불러오는 중...</div></div>
+    </section>
+  </section>
+
+  <div id="resultView">
+  <!-- 다른 결과로 바로 이동 + 화면 안 바로가기 -->
+  <section class="res-bar" id="resBar">
+    <div class="rb-pick">
+      <label for="rbSelect"><i class="fas fa-right-left"></i> 다른 로그 보기</label>
+      <select class="form-select" id="rbSelect"></select>
+      <a class="rb-month" id="rbMonth" href="detail.html"><i class="fas fa-calendar"></i> 다른 달에서 고르기</a>
+    </div>
+    <nav class="rb-jump" aria-label="화면 안 바로가기">
+      <a href="#access"><i class="fas fa-right-to-bracket"></i> ① 접속 행위 분석</a>
+      <a href="#detect"><i class="fas fa-triangle-exclamation"></i> ② 이상징후 탐지</a>
+      <a href="#detSection"><i class="fas fa-list"></i> 탐지 결과 목록</a>
+    </nav>
+  </section>
+
   <div id="reviewAlert"></div>
 
   <!-- 기본 정보 -->
@@ -52,14 +90,14 @@
   </section>
 
   <!-- ② 이상징후 탐지 요약 -->
-  <h2 class="sec-title"><i class="fas fa-triangle-exclamation"></i>② 이상징후 탐지 (룰셋) <span class="sec-sub" id="detectSub"></span></h2>
+  <h2 class="sec-title" id="detect"><i class="fas fa-triangle-exclamation"></i>② 이상징후 탐지 (룰셋) <span class="sec-sub" id="detectSub"></span></h2>
   <section class="kpi-grid" id="kpiGrid"></section>
 
   <section class="row g-3 mb-3">
     <div class="col-lg-8">
       <div class="card-m h-100 mb-0">
         <h2><i class="fas fa-list-check"></i>룰별 탐지 건수</h2>
-        <p class="text-muted-m rule-hint">룰을 눌러 해당 룰의 로그를 확인하고, 같은 사유(예: 단순 비밀번호 오입력)라면 <b>룰 일괄 검토</b>로 한 번에 조치 내용을 남길 수 있습니다. 이 로그에 적용된 룰은 <b>0건이어도 모두 표시</b>합니다(아래쪽 회색 줄).</p>
+        <p class="text-muted-m rule-hint">룰을 눌러 해당 룰의 로그를 확인하고, 같은 사유(예: 단순 비밀번호 오입력)라면 <b>룰 일괄 검토</b>로 한 번에 조치 내용을 남길 수 있습니다. <b>탐지된 룰만 표시</b>하며, 탐지 없는 룰은 아래 버튼으로 펼쳐 볼 수 있습니다.</p>
         <div id="ruleHits"></div>
       </div>
     </div>
@@ -119,6 +157,7 @@
     </div>
     <div class="pager" id="pager"></div>
   </section>
+  </div>
 </main>
 
 <!-- 룰 일괄 검토 모달 -->
@@ -192,10 +231,83 @@
   const { api, esc, fmtDt, fmtNum, fmtSize, fmtYm, sevBadge, reviewBadge, statusBadge, toast, REVIEW } = SECLOG;
   const $ = (id) => document.getElementById(id);
   const id = SECLOG.qs('id');
-  if (!id) { location.href = 'index.html'; return; }
+  SECLOG.renderTabs('result');
+
+  // ---- 상단 메뉴 [분석 결과]로 바로 들어온 경우: 볼 로그 고르기 ----
+  if (!id) { initPick(); return; }
+  try { localStorage.setItem('seclog_last_result', String(id)); } catch (e) { /* 저장 불가 무시 */ }
+
+  function initPick() {
+    $('pickView').classList.remove('hidden');
+    $('resultView').classList.add('hidden');
+    $('pageTitle').textContent = '분석 결과 (접속 행위·이상징후)';
+    $('headerActions').innerHTML = SECLOG.canWrite() ? '<a href="upload.html" class="btn-m btn-primary-m"><i class="fas fa-upload"></i>로그 올리기</a>' : '';
+    let ym = SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm();
+    const last = localStorage.getItem('seclog_last_result');
+    const card = (u) => {
+      const pend = u.pendingCount || 0;
+      const sev = u.maxSeverity ? sevBadge(u.maxSeverity) : '<span class="badge-sev sev-none">탐지 없음</span>';
+      const period = u.firstLogDate ? `${+u.firstLogDate.slice(5, 7)}/${+u.firstLogDate.slice(8)} ~ ${+u.lastLogDate.slice(5, 7)}/${+u.lastLogDate.slice(8)}` : '';
+      return `<a class="pick-card sev-${(u.maxSeverity || 'none').toLowerCase()}" href="detail.html?id=${u.uploadId}">
+          <div class="pc-top"><b class="pc-sys">${esc(u.systemName)}</b>${sev}</div>
+          <div class="pc-file" title="${esc(u.originalFileName)}"><i class="fas fa-file-lines"></i> ${esc(u.originalFileName)}</div>
+          <div class="pc-nums"><span>로그 <b>${fmtNum(u.totalLineCount)}</b>줄</span><span>탐지 <b>${fmtNum(u.detectionCount)}</b>건</span>
+            <span class="${pend ? 'pc-pend' : 'pc-done'}">${pend ? `미검토 <b>${fmtNum(pend)}</b>건` : (u.detectionCount ? '<i class="fas fa-check"></i> 검토 끝' : '탐지 없음')}</span></div>
+          <div class="pc-foot">${period ? `<span><i class="fas fa-calendar-day"></i> ${period}</span>` : ''}${statusBadge(u.status)}<span class="pc-go">결과 보기 <i class="fas fa-angle-right"></i></span></div>
+        </a>`;
+    };
+    async function loadPick() {
+      sessionStorage.setItem('seclog_ym', ym);
+      $('pkYm').textContent = fmtYm(ym);
+      $('pickList').innerHTML = '<div class="text-muted-m">불러오는 중...</div>';
+      try {
+        const d = await api(`/uploads?targetYm=${ym}&sort=SEVERITY&activeOnly=true&page=0&size=200`);
+        const rows = d.content || [];
+        $('pickCount').textContent = `(${fmtYm(ym)} · ${fmtNum(d.totalElements)}건)`;
+        $('pickList').innerHTML = rows.length ? rows.map(card).join('')
+          : `<div class="pick-empty"><i class="fas fa-inbox"></i><div>${fmtYm(ym)}에 사용 중인 점검 대상 시스템의 분석 로그가 없습니다.</div>
+              <div class="text-muted-m">왼쪽 화살표로 이전 달을 보거나, ${SECLOG.canWrite() ? '<a href="upload.html">로그를 먼저 올려 주세요</a>' : '로그가 올라오면 여기에 나타납니다'}.</div></div>`;
+      } catch (e) { $('pickList').innerHTML = `<div class="pick-empty">${esc(e.message)}</div>`; }
+    }
+    if (last) {
+      Promise.all([api('/uploads/' + last), api('/systems?activeOnly=true')]).then(([x, systems]) => {
+        const u = x.upload;
+        if (!systems.some(sy => sy.systemId === u.systemId)) return; // 사용 안 함 시스템이면 표시 안 함
+        $('pickLast').innerHTML = `<a class="pick-last" href="detail.html?id=${u.uploadId}"><i class="fas fa-clock-rotate-left"></i>
+          마지막으로 본 결과: <b>${esc(u.systemName)}</b> · ${fmtYm(u.targetYm)} · ${esc(u.originalFileName)} <span>이어서 보기 <i class="fas fa-angle-right"></i></span></a>`;
+      }).catch(() => { /* 삭제된 업로드면 표시 안 함 */ });
+    }
+    $('pkPrev').onclick = () => { ym = SECLOG.shiftYm(ym, -1); loadPick(); };
+    $('pkNext').onclick = () => { ym = SECLOG.shiftYm(ym, 1); loadPick(); };
+    loadPick();
+  }
+
+  // ---- 다른 로그로 바로 이동 (같은 달, 위험도 높은 순) ----
+  async function fillResBar(u) {
+    $('rbMonth').href = `detail.html?ym=${u.targetYm}`;
+    try {
+      const d = await api(`/uploads?targetYm=${u.targetYm}&sort=SEVERITY&activeOnly=true&page=0&size=200`);
+      const rows = d.content || [];
+      const opt = (r, sel, tail = '') => {
+        const sevL = r.maxSeverity ? SECLOG.SEVERITY[r.maxSeverity].label : '탐지 없음';
+        return `<option value="${r.uploadId}" ${sel ? 'selected' : ''}>${esc(r.systemName)} · ${esc(r.originalFileName)} (${sevL} · 탐지 ${fmtNum(r.detectionCount)}건)${tail}</option>`;
+      };
+      // 지금 보는 로그가 '사용 안 함' 시스템이면 목록 맨 위에 따로 표시 (다른 로그로는 사용 중 시스템만 이동)
+      const inList = rows.some(r => String(r.uploadId) === String(id));
+      $('rbSelect').innerHTML = (inList ? '' : opt(u, true, ' - 사용 안 함 시스템'))
+        + rows.map(r => opt(r, String(r.uploadId) === String(id))).join('');
+    } catch (e) { $('rbSelect').innerHTML = `<option>${esc(u.systemName)}</option>`; }
+  }
+  $('rbSelect').onchange = () => { if ($('rbSelect').value && $('rbSelect').value !== String(id)) SECLOG.go('detail.html', { id: $('rbSelect').value }); };
+  document.querySelector('#resBar .rb-jump').onclick = (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const PAGE_SIZE = 50;
-  const st = { page: 0, detail: null, selected: new Set() };
+  const st = { page: 0, detail: null, selected: new Set(), zeroOpen: false };
   const loading = (on) => $('loading').classList.toggle('show', on);
   const isAdmin = SECLOG.isAdmin(), canWrite = SECLOG.canWrite();
   const completeModal = new bootstrap.Modal($('completeModal'));
@@ -208,6 +320,7 @@
     const u = d.upload;
     const reviewed = u.status === 'REVIEWED';
     $('pageTitle').textContent = `${u.systemName} · ${fmtYm(u.targetYm)}`;
+    if (!st.barDone) { st.barDone = true; fillResBar(u); }
     document.title = u.systemName + ' - 보안로그 상세';
 
     // 상단 버튼 (권한 + 상태별)
@@ -220,8 +333,7 @@
     if (isAdmin && !reviewed) btns += `<button class="btn-m btn-success-m" id="btnComplete"><i class="fas fa-stamp"></i>최종 검토완료</button>`;
     if (isAdmin && reviewed) btns += `<button class="btn-m btn-gray-m" id="btnCancelReview"><i class="fas fa-rotate-left"></i>검토취소</button>`;
     if (isAdmin) btns += `<button class="btn-m btn-danger-m" id="btnDelete"><i class="fas fa-trash"></i>삭제</button>`;
-    btns += `<a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>`;
-    btns += `<a href="status.html" class="btn-m btn-gray-m"><i class="fas fa-table-cells"></i>점검 현황</a>`;
+    btns += `<a href="index.html?ym=${u.targetYm}" class="btn-m btn-gray-m"><i class="fas fa-list"></i>로그 목록</a>`;
     $('headerActions').innerHTML = btns;
     bindHeader();
 
@@ -252,6 +364,7 @@
       <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${u.lowCount}</div></div>`;
 
     const canRuleReview = canWrite && !reviewed;
+    const zeroCount = d.ruleHits.length - hitRules.length;
     const curRule = $('fRule').value;
     const scopeBadge = (sc) => sc === 'SYSTEM' ? '<span class="rule-scope sc-sys">전용</span>'
       : sc === 'COMMON' ? '<span class="rule-scope sc-com">공통</span>' : '';
@@ -261,7 +374,7 @@
         d.ruleHits.map(r => {
           if (!r.hitCount) {
             const thr = r.thresholdCount > 1 ? ` title="${r.thresholdCount}건 이상 매칭될 때만 탐지하는 룰입니다 (그보다 적게 매칭된 경우도 0건으로 표시)"` : '';
-            return `<tr class="rule-zero" data-rule-zero="${esc(r.ruleCode)}">
+            return `<tr class="rule-zero" data-rule-zero="${esc(r.ruleCode)}"${st.zeroOpen ? '' : ' hidden'}>
               <td><div class="mono" style="font-weight:700">${esc(r.ruleCode)} ${scopeBadge(r.scope)}</div><div style="font-size:.78rem">${esc(r.ruleName)}</div></td>
               <td>${sevBadge(r.severity)}</td>
               <td class="num"${thr}>0${r.thresholdCount > 1 ? `<div class="rule-thr">${r.thresholdCount}건↑ 탐지</div>` : ''}</td>
@@ -283,7 +396,10 @@
               ${canRuleReview ? `<button class="btn-m btn-primary-m btn-xs" data-act="review" data-rule="${esc(r.ruleCode)}"><i class="fas fa-layer-group"></i>룰 일괄 검토</button>` : ''}
             </td></tr>`;
         }).join('') +
-        '</tbody></table></div>';
+        (hitRules.length === 0 ? '<tr class="rule-empty"><td colspan="5">이 로그에서 탐지된 룰이 없습니다.</td></tr>' : '') +
+        '</tbody></table></div>' +
+        (zeroCount > 0 ? `<button type="button" class="rule-zero-toggle" id="btnZeroToggle" aria-expanded="${st.zeroOpen}">
+            <i class="fas fa-chevron-${st.zeroOpen ? 'up' : 'down'}"></i>${st.zeroOpen ? '탐지 없는 룰 숨기기' : `탐지 없는 룰 ${fmtNum(zeroCount)}개 보기`}</button>` : '');
 
     // 탐지 목록 룰 필터 옵션 (현재 선택 유지)
     $('fRule').innerHTML = '<option value="">전체</option>' + hitRules.map(r =>
@@ -383,7 +499,8 @@
   $('fAccQ').oninput = renderAccess;
 
   async function reload() { await loadDetail(); await Promise.all([loadDetections(), loadAccess()]);
-    if (location.hash === '#access') $('access').scrollIntoView(); }
+    const h = location.hash;
+    if (!st.scrolled && ['#access', '#detect', '#detSection'].includes(h)) { st.scrolled = true; document.querySelector(h).scrollIntoView(); } }
 
   function bindHeader() {
     $('btnDownload').onclick = async () => {
@@ -472,6 +589,15 @@
     } catch (e) { $('rmSamples').innerHTML = `<div class="text-muted-m">${esc(e.message)}</div>`; }
   }
   $('ruleHits').onclick = (e) => {
+    const tg = e.target.closest('#btnZeroToggle');
+    if (tg) {
+      st.zeroOpen = !st.zeroOpen;
+      document.querySelectorAll('#ruleHits tr.rule-zero').forEach(tr => { tr.hidden = !st.zeroOpen; });
+      const n = document.querySelectorAll('#ruleHits tr.rule-zero').length;
+      tg.setAttribute('aria-expanded', st.zeroOpen);
+      tg.innerHTML = `<i class="fas fa-chevron-${st.zeroOpen ? 'up' : 'down'}"></i>${st.zeroOpen ? '탐지 없는 룰 숨기기' : `탐지 없는 룰 ${fmtNum(n)}개 보기`}`;
+      return;
+    }
     const b = e.target.closest('button[data-act]');
     if (!b) return;
     b.dataset.act === 'logs' ? showRuleLogs(b.dataset.rule) : openRuleReview(b.dataset.rule);

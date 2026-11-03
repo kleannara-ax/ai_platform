@@ -126,6 +126,7 @@ const SECLOG = (() => {
     ['dashboard', 'dashboard.html', 'fa-gauge-high', '대시보드'],
     ['status', 'status.html', 'fa-table-cells', '월별 점검 현황'],
     ['logs', 'index.html', 'fa-list', '접속·보안 로그'],
+    ['result', 'detail.html', 'fa-magnifying-glass-chart', '분석 결과 (접속 행위·이상징후)'],
     ['systems', 'systems.html', 'fa-server', '점검 대상 시스템'],
     ['admin', 'rules.html', 'fa-gear', '관리'],
   ];

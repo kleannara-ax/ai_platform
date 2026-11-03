@@ -12,45 +12,48 @@
 <body>
 <main class="sl-main" id="statusPage">
   <header class="page-header">
-    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>ISMS 로그 점검 현황</h1>
+    <h1><span class="icon-badge"><i class="fas fa-table-cells"></i></span>월별 점검 현황</h1>
     <div class="header-actions">
       <div class="ym-nav">
-        <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달"><i class="fas fa-chevron-left"></i></button>
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달" aria-label="이전 달"><i class="fas fa-chevron-left"></i></button>
         <span class="ym-label" id="ymLabel"></span>
-        <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달"><i class="fas fa-chevron-right"></i></button>
-        <input type="month" class="form-control" id="ymPicker" style="width:150px">
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달" aria-label="다음 달"><i class="fas fa-chevron-right"></i></button>
+        <input type="month" class="form-control" id="ymPicker" style="width:150px" aria-label="연월 선택">
       </div>
     </div>
   </header>
 
   <nav class="sl-tabs" id="slTabs"></nav>
 
-  <div class="alert-m alert-info">
-    <i class="fas fa-circle-info mt-1"></i>
-    <div>매월 시스템별로 <b>접속·행위 로그</b>를 업로드하고, 시스템에 적용된 룰셋으로 분석한 결과
-      (로그인 성공/실패, 업무시간 외, 외부 IP, 특권계정, 이상징후 탐지)를 점검합니다.
-      <b>등록</b> 버튼으로 바로 업로드하고, 숫자를 누르면 상세 화면으로 이동합니다.</div>
+  <div class="guide-box">
+    <i class="fas fa-circle-info"></i>
+    <div>시스템마다 <b>이번 달 점검이 어디까지 왔는지</b> 봅니다. 점검은 세 단계입니다.
+      <div class="guide-steps"><span>① 로그 올리기</span><span>② 분석 결과 검토</span><span>③ 검토 완료(마감)</span></div>
+      각 줄 맨 오른쪽 <b>[다음 할 일]</b> 버튼을 누르면 그 작업 화면으로 바로 갑니다.</div>
   </div>
 
-  <section class="kpi-grid" id="kpiGrid"></section>
+  <section class="flow3" id="flow3"></section>
 
   <section class="card-m">
-    <h2><i class="fas fa-table-cells"></i>시스템별 점검 현황 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="ymSub"></span></h2>
+    <div class="section-title">
+      <h2><i class="fas fa-list-check"></i>시스템별 진행 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="ymSub"></span></h2>
+    </div>
+    <div class="st-filter" id="stFilter" role="group" aria-label="진행 상태로 거르기"></div>
     <div class="tbl-wrap">
-      <table class="tbl" id="statusTable">
+      <table class="tbl step-tbl" id="statusTable">
         <thead>
           <tr>
             <th>시스템</th>
-            <th>접속·행위 로그</th>
-            <th class="num">접속 계정</th>
-            <th class="num">성공 / 실패</th>
-            <th class="num">위험 계정</th>
-            <th class="num">이상징후 탐지</th>
+            <th>① 로그 올리기</th>
+            <th>② 분석 결과 검토</th>
+            <th>③ 검토 완료</th>
+            <th>다음 할 일</th>
           </tr>
         </thead>
-        <tbody id="statusBody"><tr class="empty-row"><td colspan="6">불러오는 중...</td></tr></tbody>
+        <tbody id="statusBody"><tr class="empty-row"><td colspan="5">불러오는 중...</td></tr></tbody>
       </table>
     </div>
+    <div class="form-text mt-2">② 의 '위험 계정'은 로그인 실패 5회 이상·업무시간 외·외부 IP·특권 계정 등 접속 행위 분석에서 표시된 계정 수, '미검토'는 아직 검토하지 않은 이상징후 탐지 건수입니다.</div>
   </section>
 </main>
 
@@ -63,62 +66,127 @@
   const { api, esc, fmtNum, fmtYm, toast, shiftYm } = SECLOG;
   const $ = (id) => document.getElementById(id);
   SECLOG.renderTabs('status');
-  const canWrite = SECLOG.canWrite();
-  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm() };
+  const canWrite = SECLOG.canWrite(), isAdmin = SECLOG.isAdmin();
+  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm(), filter: SECLOG.qs('f') || 'ALL', rows: [] };
+  const md = (x) => x ? `${+x.slice(5, 7)}/${+x.slice(8)}` : '';
 
-  const stBadge = (s, warn) => {
-    if (s === 'NONE') return '<span class="badge-st st-none">미등록</span>';
-    if (s === 'REVIEWED') return '<span class="badge-st st-reviewed">검토완료</span>';
-    return `<span class="badge-st ${warn ? 'st-warn' : 'st-analyzed'}">검토대기</span>`;
-  };
-  const kpi = (label, val, sub, cls = '', pct = null) => `<div class="kpi ${cls}"><div class="k-label">${label}</div>
-    <div class="k-value">${val}</div><div class="k-sub">${sub}</div>${pct === null ? '' : `<div class="progress-m"><span style="width:${pct}%"></span></div>`}</div>`;
+  // 시스템 한 줄의 단계 상태 계산
+  function stepOf(s, up, rv) {
+    const has = s.accessStatus !== 'NONE';
+    const pend = rv ? rv.detectionPending : 0;
+    const reviewed = s.accessStatus === 'REVIEWED';
+    const id = s.latestUploadId;
+    const many = (s.accessUploadCount || 0) > 1;
+    const listLink = `index.html?ym=${state.ym}&system=${encodeURIComponent(s.systemName)}`;
+    const resLink = many ? listLink : `detail.html?id=${id}`;
+    let group, next;
+    if (!has) {
+      group = 'NONE';
+      next = canWrite ? `<a class="next-btn up" href="upload.html?systemId=${s.systemId}&ym=${state.ym}"><i class="fas fa-upload"></i>로그 올리기</a>`
+        : '<span class="next-btn muted"><i class="fas fa-hourglass"></i>로그 올라오길 기다리는 중</span>';
+    } else if (reviewed) {
+      group = 'DONE';
+      next = `<a class="next-btn ok" href="${resLink}"><i class="fas fa-circle-check"></i>완료 · 결과 보기</a>`;
+    } else if (pend > 0 || s.accessRiskAccounts > 0 && pend > 0) {
+      group = 'REVIEW';
+      next = `<a class="next-btn go" href="${many ? listLink : resLink + '#detect'}"><i class="fas fa-magnifying-glass"></i>검토하기 (미검토 ${fmtNum(pend)}건)</a>`;
+    } else {
+      group = 'CLOSE';
+      next = isAdmin ? `<a class="next-btn go" href="${resLink}"><i class="fas fa-stamp"></i>마감하기</a>`
+        : `<a class="next-btn up" href="${resLink}"><i class="fas fa-hourglass-half"></i>관리자 마감 대기</a>`;
+    }
+    // ① 로그 올리기
+    let s1;
+    if (!has) s1 = '<span class="stp no"><i class="far fa-circle"></i>아직 안 올림</span>';
+    else {
+      const check = up && up.status === 'CHECK';
+      const period = up && up.firstLogDate ? `${md(up.firstLogDate)} ~ ${md(up.lastLogDate)}` : '';
+      s1 = `<span class="stp ${check ? 'wait' : 'ok'}"><i class="fas ${check ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>${check ? '올림 · 기간 확인' : '올림'}</span>
+        <span class="stp-sub">${period ? '로그 ' + period : ''}${many ? ` · 파일 ${s.accessUploadCount}개` : ''}</span>
+        ${check ? (up.checkReasons || []).map(r => `<span class="up-reason"><i class="fas fa-triangle-exclamation"></i> ${esc(r)}</span>`).join('') : ''}`;
+    }
+    // ② 분석 결과 검토
+    let s2;
+    if (!has) s2 = '<span class="stp no"><i class="far fa-circle"></i>-</span>';
+    else if (reviewed || pend === 0) s2 = `<span class="stp ok"><i class="fas fa-circle-check"></i>${s.detectionCount ? '검토 끝' : '탐지 없음'}</span>
+        <span class="stp-sub">접속 계정 ${fmtNum(s.accessAccountCount)}개 · 위험 계정 ${fmtNum(s.accessRiskAccounts)}개 · 탐지 ${fmtNum(s.detectionCount)}건</span>`;
+    else s2 = `<span class="stp wait"><i class="fas fa-hourglass-half"></i>미검토 ${fmtNum(pend)}건</span>
+        <span class="stp-sub">접속 계정 ${fmtNum(s.accessAccountCount)}개 · <b style="color:${s.accessRiskAccounts ? '#c2410c' : 'inherit'}">위험 계정 ${fmtNum(s.accessRiskAccounts)}개</b> · 탐지 ${fmtNum(s.detectionCount)}건</span>`;
+    // ③ 검토 완료
+    const s3 = reviewed ? '<span class="stp ok"><i class="fas fa-circle-check"></i>마감</span>'
+      : has && pend === 0 ? '<span class="stp wait"><i class="fas fa-hourglass-half"></i>마감 가능</span>'
+      : '<span class="stp no"><i class="far fa-circle"></i>아직</span>';
+    return { group, next, s1, s2, s3 };
+  }
+
+  const FILTERS = [['ALL', '전체'], ['TODO', '할 일 남음'], ['NONE', '로그 미등록'], ['REVIEW', '검토 중'], ['CLOSE', '마감 가능'], ['DONE', '마감 완료']];
+  function renderTable() {
+    const rows = state.rows;
+    const cnt = (g) => g === 'ALL' ? rows.length : g === 'TODO' ? rows.filter(r => r.step.group !== 'DONE').length : rows.filter(r => r.step.group === g).length;
+    $('stFilter').innerHTML = FILTERS.map(([k, l]) => `<button type="button" data-f="${k}" class="${state.filter === k ? 'active' : ''}" aria-pressed="${state.filter === k}">${l}<b>${cnt(k)}</b></button>`).join('');
+    const list = rows.filter(r => state.filter === 'ALL' || (state.filter === 'TODO' ? r.step.group !== 'DONE' : r.step.group === state.filter));
+    if (rows.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="5">사용 중인 점검 대상 시스템이 없습니다. [점검 대상 시스템] 메뉴에서 등록하세요.</td></tr>'; return; }
+    if (list.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="5">이 조건에 해당하는 시스템이 없습니다.</td></tr>'; return; }
+    let cat = null, h = '';
+    list.forEach(r => {
+      const s = r.sys;
+      if (s.category !== cat) { cat = s.category; h += `<tr class="cat-row"><td colspan="5"><i class="fas fa-folder-open me-1"></i>${esc(cat)}</td></tr>`; }
+      h += `<tr data-sys="${s.systemId}">
+        <td class="sys-cell"><b>${esc(s.systemName)}</b>${s.managerName ? `<small>담당 ${esc(s.managerName)}</small>` : ''}</td>
+        <td>${r.step.s1}</td><td>${r.step.s2}</td><td>${r.step.s3}</td><td>${r.step.next}</td></tr>`;
+    });
+    $('statusBody').innerHTML = h;
+  }
+
+  function renderFlow(d, rows) {
+    const n = rows.length;
+    const up = rows.filter(r => r.sys.accessStatus !== 'NONE').length;
+    const rc = d.reviewCounts || {};
+    const tot = Object.values(rc).reduce((a, b) => a + b, 0), pend = rc.PENDING || 0;
+    const done = rows.filter(r => r.step.group === 'DONE').length;
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    const dd = d.closeDDay;
+    const ddTxt = d.closed ? '마감 완료' : dd < 0 ? `${-dd}일 지남` : `마감까지 D-${dd}`;
+    const step = (no, cls, title, val, sub, p, cta, f) => `<button type="button" class="f3-step ${cls}" data-f="${f}">
+        <div class="f3-head"><span class="f3-no">${cls === 'done' ? '<i class="fas fa-check"></i>' : no}</span>${title}</div>
+        <div class="f3-val">${val}</div><div class="f3-sub">${sub}</div>
+        <div class="progress-m"><span style="width:${p}%"></span></div><div class="f3-cta">${cta}</div></button>`;
+    $('flow3').innerHTML =
+      step(1, up === n && n ? 'done' : 'todo', '로그 올리기', `${up} <small>/ ${n}개 시스템</small>`,
+        up === n ? '모든 시스템 로그가 올라왔습니다' : `아직 안 올린 시스템 ${n - up}개`, pct(up, n),
+        up === n ? '완료' : '안 올린 시스템 보기 <i class="fas fa-angle-right"></i>', up === n ? 'ALL' : 'NONE') +
+      step(2, tot && !pend ? 'done' : pend ? 'todo' : '', '분석 결과 검토', tot ? `${pct(tot - pend, tot)}<small>%</small>` : '-',
+        tot ? `전체 탐지 ${fmtNum(tot)}건 중 미검토 ${fmtNum(pend)}건` : '검토할 탐지가 없습니다', pct(tot - pend, tot),
+        pend ? '검토할 시스템 보기 <i class="fas fa-angle-right"></i>' : '완료', 'REVIEW') +
+      step(3, done === n && n ? 'done' : 'todo', '검토 완료(마감)', `${done} <small>/ ${n}개 시스템</small>`,
+        `${ddTxt} · 기준일 ${d.closeDueDate ? d.closeDueDate.slice(5).replace('-', '/') : '-'}`, pct(done, n),
+        done === n && n ? '완료' : '마감할 시스템 보기 <i class="fas fa-angle-right"></i>', done === n ? 'DONE' : 'TODO');
+  }
 
   async function load() {
     $('loading').classList.add('show');
     try {
-      const d = await api('/monthly-status?targetYm=' + state.ym);
-      const rows = d.systems || [];
-      const n = d.systemCount || 0;
-      const accessReg = rows.filter(r => r.accessStatus !== 'NONE').length;
-      const riskSum = rows.reduce((a, r) => a + r.accessRiskAccounts, 0);
-      const detSum = rows.reduce((a, r) => a + r.detectionCount, 0);
-      const pct = (x) => n ? Math.round(x / n * 100) : 0;
-      $('kpiGrid').innerHTML =
-        kpi('접속 로그 등록', `${accessReg} / ${n}`, `검토완료 ${d.accessDoneCount}개 시스템`, '', pct(accessReg)) +
-        kpi('접속 로그 검토완료', pct(d.accessDoneCount) + '%', `${d.accessDoneCount} / ${n} 시스템`, '', pct(d.accessDoneCount)) +
-        kpi('위험 접속 계정', fmtNum(riskSum), '실패 다수·업무시간 외·외부 IP·특권', 'k-high') +
-        kpi('이상징후 탐지', fmtNum(detSum), '시스템별 룰셋 분석 결과', 'k-medium');
-      $('ymSub').textContent = `· ${fmtYm(state.ym)} · 점검 대상 ${n}개`;
-
-      if (rows.length === 0) {
-        $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="6">등록된 점검 대상 시스템이 없습니다. [점검 대상 시스템] 탭에서 등록하세요.</td></tr>';
-        return;
-      }
-      let cat = null, h = '';
-      rows.forEach(r => {
-        if (r.category !== cat) { cat = r.category; h += `<tr class="cat-row"><td colspan="6"><i class="fas fa-folder-open me-1"></i>${esc(cat)}</td></tr>`; }
-        const upNew = canWrite ? `<a class="btn-m btn-outline-m btn-sm-m" href="upload.html?systemId=${r.systemId}&ym=${state.ym}"><i class="fas fa-upload"></i>등록</a>` : '';
-        const accessLink = r.latestUploadId ? `detail.html?id=${r.latestUploadId}#access` : null;
-        const L = (url, txt) => url ? `<a href="${url}">${txt}</a>` : txt;
-        h += `<tr data-sys="${r.systemId}">
-          <td><b>${esc(r.systemName)}</b>${r.managerName ? `<div class="text-muted-m" style="font-size:.72rem">${esc(r.managerName)}</div>` : ''}</td>
-          <td><div class="d-flex gap-2 align-items-center">${stBadge(r.accessStatus, r.accessRiskAccounts > 0)}
-              ${r.accessUploadCount > 1 ? `<span class="text-muted-m" style="font-size:.72rem">${r.accessUploadCount}건</span>` : ''}
-              ${r.accessStatus === 'NONE' ? upNew : L(accessLink, '<i class="fas fa-arrow-up-right-from-square"></i>')}</div></td>
-          <td class="num">${r.accessStatus === 'NONE' ? '-' : fmtNum(r.accessAccountCount)}</td>
-          <td class="num">${r.accessStatus === 'NONE' ? '-' : `${fmtNum(r.accessSuccess)} / <span style="color:${r.accessFail ? '#dc2626' : 'inherit'}">${fmtNum(r.accessFail)}</span>`}</td>
-          <td class="num">${r.accessStatus === 'NONE' ? '-' : (r.accessRiskAccounts ? `<b style="color:#c2410c">${L(accessLink, fmtNum(r.accessRiskAccounts))}</b>` : '0')}</td>
-          <td class="num">${r.accessStatus === 'NONE' ? '-' : fmtNum(r.detectionCount)}</td>
-        </tr>`;
-      });
-      $('statusBody').innerHTML = h;
+      const [ms, d] = await Promise.all([api('/monthly-status?targetYm=' + state.ym), api('/dashboard?targetYm=' + state.ym)]);
+      const upBy = {}, rvBy = {};
+      (d.uploadRows || []).forEach(r => upBy[r.systemId] = r);
+      (d.reviews || []).forEach(r => rvBy[r.systemId] = r);
+      state.rows = (ms.systems || []).map(s => ({ sys: s, step: stepOf(s, upBy[s.systemId], rvBy[s.systemId]) }));
+      $('ymSub').textContent = `· ${fmtYm(state.ym)} · 점검 대상 ${state.rows.length}개`;
+      renderFlow(d, state.rows);
+      renderTable();
     } catch (e) {
       toast(e.message, 'error');
-      $('statusBody').innerHTML = `<tr class="empty-row"><td colspan="6">${esc(e.message)}</td></tr>`;
+      $('statusBody').innerHTML = `<tr class="empty-row"><td colspan="5">${esc(e.message)}</td></tr>`;
     } finally { $('loading').classList.remove('show'); }
   }
 
+  $('stFilter').onclick = (e) => { const b = e.target.closest('button[data-f]'); if (b) { state.filter = b.dataset.f; renderTable(); } };
+  $('flow3').onclick = (e) => {
+    const b = e.target.closest('button[data-f]');
+    if (!b) return;
+    state.filter = b.dataset.f; renderTable();
+    $('statusTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const setYm = (ym) => {
     state.ym = ym; sessionStorage.setItem('seclog_ym', ym);
     $('ymLabel').textContent = fmtYm(ym);

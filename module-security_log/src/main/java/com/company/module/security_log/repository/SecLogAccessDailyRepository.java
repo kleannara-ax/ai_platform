@@ -47,6 +47,19 @@ public interface SecLogAccessDailyRepository extends JpaRepository<SecLogAccessD
                                  @Param("systemIds") Collection<Long> systemIds);
 
     /** 재분석/삭제 시 소프트 삭제 (WHERE UPLOAD_ID 필수) */
+    /** 업로드별 대상 기간 안의 첫/마지막 로그일 [uploadId, min(logDate), max(logDate)] (업로드 목록 기간 확인) */
+    @Query("""
+            SELECT d.uploadId, MIN(d.logDate), MAX(d.logDate)
+              FROM SecLogAccessDaily d
+             WHERE d.deletedYn = 'N' AND d.uploadId IN :uploadIds
+               AND d.logDate >= :fromDate AND d.logDate < :toDate
+               AND d.lineCount > 0
+             GROUP BY d.uploadId
+            """)
+    List<Object[]> rangeInPeriodByUploads(@Param("uploadIds") Collection<Long> uploadIds,
+                                          @Param("fromDate") LocalDate fromDate,
+                                          @Param("toDate") LocalDate toDate);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE SecLogAccessDaily d

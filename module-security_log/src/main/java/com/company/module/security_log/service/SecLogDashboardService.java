@@ -352,10 +352,7 @@ public class SecLogDashboardService {
 
     // ================================================================== 1. 로그 업로드 현황
 
-    /** 로그 기간 확인 기준: 첫 로그일이 이 날짜보다 늦거나, 마지막 로그일이 말일 - 이 일수보다 이르면 확인 필요 */
-    static final int PERIOD_EDGE_DAYS = 3;
-    /** 일시를 읽지 못한 줄이 전체의 이 비율(%) 이상이면 확인 필요 */
-    static final int DATE_UNKNOWN_PERCENT = 10;
+    // 로그 기간 확인 기준은 LogPeriodCheck (접속·보안 로그 목록과 공통)
 
     private List<DashboardResponse.UploadRow> uploadRows(String ym, List<MonthlyStatusResponse.Row> rows) {
         YearMonth m = YearMonth.parse(ym, YM);
@@ -376,7 +373,6 @@ public class SecLogDashboardService {
                 }
             }
         }
-        LocalDate end = m.atEndOfMonth();
         List<DashboardResponse.UploadRow> list = new ArrayList<>();
         for (MonthlyStatusResponse.Row r : rows) {
             List<SecLogUpload> us = ups.getOrDefault(r.getSystemId(), List.of());
@@ -398,23 +394,8 @@ public class SecLogDashboardService {
 
             List<String> reasons = new ArrayList<>();
             if (!unchecked) {
-                if (first == null) {
-                    reasons.add("대상 월 로그 없음");
-                } else {
-                    if (first.getDayOfMonth() > 1 + PERIOD_EDGE_DAYS) {
-                        reasons.add(first.getMonthValue() + "/" + first.getDayOfMonth() + "부터 시작");
-                    }
-                    // 끝 확인은 대상 월이 끝난 뒤에만 (진행 중인 달은 아직 다 올 수 없음)
-                    if (monthOver && last.isBefore(end.minusDays(PERIOD_EDGE_DAYS))) {
-                        reasons.add(last.getMonthValue() + "/" + last.getDayOfMonth() + "까지만 있음");
-                    }
-                }
-                if (lines > 0 && unknown * 100 >= lines * DATE_UNKNOWN_PERCENT) {
-                    reasons.add("일시 인식 안 된 줄 " + unknown);
-                }
-                if (outside > 0) {
-                    reasons.add("대상 월 밖 줄 " + outside);
-                }
+                reasons.addAll(LogPeriodCheck.coverageReasons(m, monthOver, first, last));
+                reasons.addAll(LogPeriodCheck.lineReasons(lines, unknown, outside));
             }
             String status = unchecked ? "UNCHECKED" : reasons.isEmpty() ? "OK" : "CHECK";
             list.add(b.status(status).checkReasons(reasons).fileCount(us.size())

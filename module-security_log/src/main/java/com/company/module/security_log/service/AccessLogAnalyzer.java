@@ -104,7 +104,7 @@ public class AccessLogAnalyzer {
     private static final List<String> H_ACCOUNT_CONTAINS = List.of("아이디", "account id", "user id", "userid", "login id", "계정id", "계정 id");
     private static final List<String> H_TIME_CONTAINS = List.of("일시", "시각", "시간", "일자", "time", "date");
     private static final List<String> H_TYPE_EXACT = List.of("유형", "구분", "이벤트", "행위", "동작", "작업", "작업 유형", "이벤트 유형",
-            "로그 유형", "action", "event", "type", "event type", "event name", "eventname", "activity");
+            "로그 유형", "수행업무", "수행 업무", "action", "event", "type", "event type", "event name", "eventname", "activity");
     private static final List<String> H_RESULT_CONTAINS = List.of("결과", "성공여부", "성공 여부", "result", "outcome");
     private static final List<String> H_CONTENT_EXACT = List.of("내용", "메시지", "message", "msg", "description", "설명",
             "로그 내용", "이벤트 내용", "작업 내용");

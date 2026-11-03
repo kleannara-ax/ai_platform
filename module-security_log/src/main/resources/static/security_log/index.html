@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>보안로그 업로드 목록</title>
+<title>접속·보안 로그</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -12,81 +12,100 @@
 <body>
 <main class="sl-main" id="listPage">
   <header class="page-header">
-    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>접속·보안 로그 분석</h1>
+    <h1><span class="icon-badge"><i class="fas fa-list"></i></span>접속·보안 로그</h1>
     <div class="header-actions">
-      <a href="upload.html" class="btn-m btn-primary-m hidden" id="btnNew"><i class="fas fa-upload"></i>로그 업로드</a>
+      <a href="upload.html" class="btn-m btn-primary-m hidden" id="btnNew"><i class="fas fa-upload"></i>로그 올리기</a>
     </div>
   </header>
 
   <nav class="sl-tabs" id="slTabs"></nav>
 
-  <!-- 월 선택 + 필터 -->
+  <div class="guide-box">
+    <i class="fas fa-circle-info"></i>
+    <div>이번 달 <b>올린 로그 파일 목록</b>입니다. 위험도가 높은 로그부터 보이도록 정렬되어 있습니다.
+      줄을 누르거나 <b>[결과 보기]</b>를 누르면 그 로그의 <b>접속 행위 분석 · 이상징후 탐지</b> 결과로 갑니다.</div>
+  </div>
+
+  <!-- 월 선택 + 간단 필터 -->
   <section class="card-m" id="filterSection">
-    <div class="filter-bar">
-      <div class="f-item">
+    <div class="quick-filter">
+      <div class="f-item filter-bar">
         <label>대상 연월</label>
         <div class="ym-nav">
-          <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달"><i class="fas fa-chevron-left"></i></button>
+          <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달" aria-label="이전 달"><i class="fas fa-chevron-left"></i></button>
           <span class="ym-label" id="ymLabel"></span>
-          <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달"><i class="fas fa-chevron-right"></i></button>
-          <input type="month" class="form-control" id="ymPicker" style="width:150px">
+          <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달" aria-label="다음 달"><i class="fas fa-chevron-right"></i></button>
+          <input type="month" class="form-control" id="ymPicker" style="width:150px" aria-label="연월 선택">
         </div>
       </div>
-      <div class="f-item">
-        <label for="fSystem">시스템명</label>
-        <input type="text" class="form-control" id="fSystem" placeholder="시스템명 검색" style="width:170px">
+      <div class="f-item filter-bar">
+        <label for="fSystem">시스템</label>
+        <input type="search" class="form-control" id="fSystem" placeholder="시스템 이름" style="width:170px">
       </div>
-      <div class="f-item">
+      <div class="f-item filter-bar">
+        <label for="fSort">보는 순서</label>
+        <select class="form-select" id="fSort" style="width:170px">
+          <option value="SEVERITY">위험도 높은 순</option>
+          <option value="PENDING">미검토 많은 순</option>
+          <option value="LATEST">최근 올린 순</option>
+        </select>
+      </div>
+      <button class="btn-m btn-primary-m" id="btnSearch"><i class="fas fa-search"></i>조회</button>
+      <button type="button" class="btn-link-m" id="btnMore" aria-expanded="false" aria-controls="moreFilter"><i class="fas fa-sliders"></i> 상세 조건<span class="cnt hidden" id="moreCnt"></span></button>
+      <button type="button" class="btn-link-m" id="btnReset"><i class="fas fa-rotate-left"></i> 초기화</button>
+    </div>
+    <div class="more-filter" id="moreFilter">
+      <div class="f-item filter-bar">
         <label for="fLogType">로그 유형</label>
-        <select class="form-select" id="fLogType" style="width:160px"><option value="">전체</option></select>
+        <select class="form-select" id="fLogType" style="width:200px"><option value="">전체</option></select>
       </div>
-      <div class="f-item">
+      <div class="f-item filter-bar">
         <label for="fStatus">검토 상태</label>
-        <select class="form-select" id="fStatus" style="width:120px">
+        <select class="form-select" id="fStatus" style="width:130px">
           <option value="">전체</option><option value="ANALYZED">검토대기</option><option value="REVIEWED">검토완료</option>
         </select>
       </div>
-      <div class="f-item">
+      <div class="f-item filter-bar">
         <label for="fSeverity">최고 위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></label>
         <select class="form-select" id="fSeverity" style="width:120px">
           <option value="">전체</option><option value="CRITICAL">심각</option><option value="HIGH">높음</option>
           <option value="MEDIUM">보통</option><option value="LOW">낮음</option>
         </select>
       </div>
-      <button class="btn-m btn-primary-m" id="btnSearch"><i class="fas fa-search"></i>조회</button>
-      <button class="btn-m btn-gray-m" id="btnReset"><i class="fas fa-rotate-left"></i>초기화</button>
     </div>
   </section>
 
-  <!-- 월별 요약 -->
+  <!-- 월별 요약 (4칸) -->
   <section class="kpi-grid" id="kpiGrid"></section>
-
-  <section class="row g-3 mb-3">
-    <div class="col-lg-12">
-      <div class="card-m h-100 mb-0">
-        <h2><i class="fas fa-ranking-star"></i>이번 달 많이 탐지된 룰 TOP 10</h2>
-        <div id="topRules" class="text-muted-m" style="font-size:.85rem">-</div>
-      </div>
-    </div>
-  </section>
 
   <!-- 목록 -->
   <section class="card-m">
-    <h2><i class="fas fa-file-lines"></i>업로드 목록 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="totalCount"></span></h2>
+    <h2><i class="fas fa-file-lines"></i>올린 로그 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="totalCount"></span></h2>
     <div class="tbl-wrap">
       <table class="tbl" id="uploadTable">
         <thead>
           <tr>
-            <th class="center">No</th><th>시스템명</th><th>로그 유형</th><th>파일명</th>
-            <th class="num">라인 수</th><th class="num">탐지</th><th>위험도 분포<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th><th>최고 위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th>
-            <th>상태</th><th>업로드 일시</th>
+            <th>시스템 / 파일</th>
+            <th>최고 위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th>
+            <th class="num">탐지</th>
+            <th style="min-width:140px">검토 진행</th>
+            <th>로그 기간</th>
+            <th>상태</th>
+            <th>올린 날</th>
+            <th></th>
           </tr>
         </thead>
-        <tbody id="uploadBody"><tr class="empty-row"><td colspan="10">불러오는 중...</td></tr></tbody>
+        <tbody id="uploadBody"><tr class="empty-row"><td colspan="8">불러오는 중...</td></tr></tbody>
       </table>
     </div>
     <div class="pager" id="pager"></div>
   </section>
+
+  <!-- 많이 탐지된 룰 (접어 둠) -->
+  <details class="fold" id="topFold">
+    <summary><i class="fas fa-ranking-star"></i>이번 달 많이 탐지된 룰 TOP 10 <span class="fold-sub">어떤 룰이 많이 걸렸는지 참고용</span><i class="fas fa-chevron-down"></i></summary>
+    <div class="fold-body"><div id="topRules" class="text-muted-m" style="font-size:.85rem">-</div></div>
+  </details>
 </main>
 
 <div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
@@ -98,11 +117,25 @@
   const { api, esc, fmtDt, fmtNum, fmtYm, sevBadge, statusBadge, toast, LOG_TYPES } = SECLOG;
   const PAGE_SIZE = 20;
   const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm(), page: 0 };
+  const DEFAULT_SORT = 'SEVERITY';
 
   const $ = (id) => document.getElementById(id);
   SECLOG.renderTabs('logs');
   LOG_TYPES.forEach(([v, l]) => $('fLogType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`));
   if (SECLOG.canWrite()) $('btnNew').classList.remove('hidden');
+  if (SECLOG.qs('system')) $('fSystem').value = SECLOG.qs('system');
+  if (['SEVERITY', 'PENDING', 'LATEST'].includes(SECLOG.qs('sort'))) $('fSort').value = SECLOG.qs('sort');
+  // 상세 조건 펼치기 + 적용 개수 표시
+  const moreIds = ['fLogType', 'fStatus', 'fSeverity'];
+  const syncMore = () => {
+    const n = moreIds.filter(i => $(i).value).length;
+    $('moreCnt').textContent = n; $('moreCnt').classList.toggle('hidden', !n);
+  };
+  $('btnMore').onclick = () => {
+    const open = !$('moreFilter').classList.contains('open');
+    $('moreFilter').classList.toggle('open', open); $('btnMore').setAttribute('aria-expanded', open);
+  };
+  moreIds.forEach(i => $(i).addEventListener('change', () => { syncMore(); $('btnSearch').click(); }));
 
   const loading = (on) => $('loading').classList.toggle('show', on);
   const shiftYm = (ym, d) => {
@@ -121,14 +154,12 @@
   async function loadSummary() {
     const s = await api('/uploads/summary?targetYm=' + state.ym);
     const reviewRate = s.uploadCount ? Math.round(s.reviewedUploadCount / s.uploadCount * 100) : 0;
+    const sevTxt = s.criticalCount ? `심각 ${fmtNum(s.criticalCount)} · 높음 ${fmtNum(s.highCount)}` : `높음 ${fmtNum(s.highCount)} · 보통 ${fmtNum(s.mediumCount)}`;
     $('kpiGrid').innerHTML = `
-      <div class="kpi"><div class="k-label">업로드 건수</div><div class="k-value">${fmtNum(s.uploadCount)}</div><div class="k-sub">시스템 ${fmtNum(s.systemCount)}개</div></div>
-      <div class="kpi"><div class="k-label">검토 진행률</div><div class="k-value">${reviewRate}%</div><div class="k-sub">완료 ${s.reviewedUploadCount} / 대기 ${s.pendingUploadCount}</div></div>
+      <div class="kpi"><div class="k-label">올린 로그</div><div class="k-value">${fmtNum(s.uploadCount)}<small style="font-size:.8rem;color:var(--muted)">개 파일</small></div><div class="k-sub">시스템 ${fmtNum(s.systemCount)}개</div></div>
+      <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">먼저 볼 탐지 (심각·높음)</div><div class="k-value">${fmtNum((s.criticalCount || 0) + (s.highCount || 0))}</div><div class="k-sub">${sevTxt}</div></div>
       <div class="kpi k-pending"><div class="k-label">미검토 탐지</div><div class="k-value">${fmtNum(s.pendingDetectionCount)}</div><div class="k-sub">전체 탐지 ${fmtNum(s.detectionCount)}건</div></div>
-      <div class="kpi k-critical" data-sev="CRITICAL" tabindex="0"><div class="k-label">심각</div><div class="k-value">${fmtNum(s.criticalCount)}</div><div class="k-sub">CRITICAL</div></div>
-      <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">높음</div><div class="k-value">${fmtNum(s.highCount)}</div><div class="k-sub">HIGH</div></div>
-      <div class="kpi k-medium" data-sev="MEDIUM" tabindex="0"><div class="k-label">보통</div><div class="k-value">${fmtNum(s.mediumCount)}</div><div class="k-sub">MEDIUM</div></div>
-      <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${fmtNum(s.lowCount)}</div><div class="k-sub">LOW</div></div>`;
+      <div class="kpi"><div class="k-label">검토 완료(마감)</div><div class="k-value">${reviewRate}%</div><div class="k-sub">완료 ${s.reviewedUploadCount} / 대기 ${s.pendingUploadCount}개 파일</div><div class="progress-m"><span style="width:${reviewRate}%"></span></div></div>`;
     const top = s.topRules || [];
     $('topRules').innerHTML = top.length === 0 ? '이번 달 탐지 내역이 없습니다.' :
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="center">순위</th><th>룰 코드</th><th>룰명</th><th>위험도' + SECLOG.sevHelp() + '</th><th class="num">탐지 건수</th></tr></thead><tbody>' +
@@ -142,31 +173,54 @@
     if ($('fLogType').value) p.set('logType', $('fLogType').value);
     if ($('fStatus').value) p.set('status', $('fStatus').value);
     if ($('fSeverity').value) p.set('maxSeverity', $('fSeverity').value);
+    p.set('sort', $('fSort').value);
     const data = await api('/uploads?' + p.toString());
     const rows = data.content || [];
     $('totalCount').textContent = `(총 ${fmtNum(data.totalElements)}건)`;
     if (rows.length === 0) {
-      $('uploadBody').innerHTML = `<tr class="empty-row"><td colspan="10"><i class="fas fa-inbox fa-2x mb-2" style="color:#cbd5e1"></i><br>${fmtYm(state.ym)}에 업로드된 로그가 없습니다.</td></tr>`;
+      $('uploadBody').innerHTML = `<tr class="empty-row"><td colspan="8"><i class="fas fa-inbox fa-2x mb-2" style="color:#cbd5e1"></i><br>${fmtYm(state.ym)}에 조건에 맞는 로그가 없습니다.${SECLOG.canWrite() ? ' <a href="upload.html">로그 올리기</a>' : ''}</td></tr>`;
     } else {
-      $('uploadBody').innerHTML = rows.map((u, i) => {
+      $('uploadBody').innerHTML = rows.map((u) => {
         const tot = u.detectionCount || 0;
         const pct = (n) => tot ? (n / tot * 100) : 0;
         return `<tr class="clickable" data-id="${u.uploadId}">
-          <td class="center">${data.totalElements - (state.page * PAGE_SIZE) - i}</td>
-          <td><b>${esc(u.systemName)}</b></td>
-          <td><span class="badge-type">${esc(u.logTypeLabel)}</span></td>
-          <td class="mono">${esc(u.originalFileName)}</td>
-          <td class="num">${fmtNum(u.totalLineCount)}</td>
-          <td class="num"><b>${fmtNum(tot)}</b></td>
-          <td><div class="sev-bar" data-sev-help data-sev-counts="${u.criticalCount},${u.highCount},${u.mediumCount},${u.lowCount}" aria-label="심각 ${u.criticalCount} / 높음 ${u.highCount} / 보통 ${u.mediumCount} / 낮음 ${u.lowCount}">
-            <span class="b-c" style="width:${pct(u.criticalCount)}%"></span><span class="b-h" style="width:${pct(u.highCount)}%"></span>
-            <span class="b-m" style="width:${pct(u.mediumCount)}%"></span><span class="b-l" style="width:${pct(u.lowCount)}%"></span></div></td>
+          <td class="sys-cell"><b>${esc(u.systemName)}</b><small class="mono" title="${esc(u.originalFileName)}">${esc(u.originalFileName)}</small>
+            <small>${esc(u.logTypeLabel)} · ${fmtNum(u.totalLineCount)}줄</small></td>
           <td>${sevBadge(u.maxSeverity)}</td>
+          <td class="num"><b>${fmtNum(tot)}</b>${tot ? `<div class="sev-bar mt-1" data-sev-help data-sev-counts="${u.criticalCount},${u.highCount},${u.mediumCount},${u.lowCount}" aria-label="심각 ${u.criticalCount} / 높음 ${u.highCount} / 보통 ${u.mediumCount} / 낮음 ${u.lowCount}">
+            <span class="b-c" style="width:${pct(u.criticalCount)}%"></span><span class="b-h" style="width:${pct(u.highCount)}%"></span>
+            <span class="b-m" style="width:${pct(u.mediumCount)}%"></span><span class="b-l" style="width:${pct(u.lowCount)}%"></span></div>` : ''}</td>
+          <td>${reviewCell(u)}</td>
+          <td>${periodCell(u)}</td>
           <td>${statusBadge(u.status)}</td>
-          <td>${fmtDt(u.createdAt)}</td></tr>`;
+          <td style="white-space:nowrap;font-size:.8rem">${fmtDt(u.createdAt).slice(0, 10)}</td>
+          <td><a class="go-result" href="detail.html?id=${u.uploadId}">결과 보기 <i class="fas fa-angle-right"></i></a></td></tr>`;
       }).join('');
     }
     renderPager(data.totalPages || 0);
+  }
+
+  // 검토 진행: 조치완료·오탐·이상징후 확인·미검토 막대 + 미검토 건수
+  function reviewCell(u) {
+    const t = u.detectionCount || 0;
+    if (!t) return '<span class="text-muted-m" style="font-size:.76rem">탐지 없음</span>';
+    const w = (n) => ((n || 0) / t * 100).toFixed(1) + '%';
+    const pend = u.pendingCount || 0;
+    return `<div class="rv-bar" title="조치완료 ${u.resolvedCount || 0} · 오탐 ${u.falsePositiveCount || 0} · 이상징후 확인 ${u.confirmedCount || 0} · 미검토 ${pend}">
+        <span class="s-res" style="width:${w(u.resolvedCount)}"></span><span class="s-fp" style="width:${w(u.falsePositiveCount)}"></span>
+        <span class="s-conf" style="width:${w(u.confirmedCount)}"></span><span class="s-pend" style="width:${w(pend)}"></span></div>
+      ${pend ? `<span class="rule-pend">미검토 ${fmtNum(pend)}건</span>` : '<span class="rv-done"><i class="fas fa-check"></i> 검토 끝</span>'}`;
+  }
+  // 로그 기간: 대상 월 안의 첫~마지막 로그일 + 기간 확인 배지/사유 (대시보드 로그 업로드 현황과 같은 기준)
+  const md = (x) => x ? `${+x.slice(5, 7)}/${+x.slice(8)}` : '';
+  function periodCell(u) {
+    const range = u.firstLogDate ? `<span style="white-space:nowrap">${md(u.firstLogDate)} ~ ${md(u.lastLogDate)}</span>` : '<span class="text-muted-m">일자 없음</span>';
+    if (u.periodStatus === 'UNCHECKED') return '<span class="st-badge st-none" title="로그 일자 점검 전에 올린 파일입니다. 대시보드 [로그 일자 점검 다시 하기]로 점검할 수 있습니다.">일자 점검 전</span>';
+    if (u.periodStatus === 'CHECK') {
+      const rs = (u.periodReasons || []).map(x => `<span class="up-reason"><i class="fas fa-triangle-exclamation"></i> ${esc(x)}</span>`).join('');
+      return `${range}<div><span class="st-badge st-check">기간 확인</span></div><div>${rs}</div>`;
+    }
+    return range;
   }
 
   function renderPager(totalPages) {
@@ -181,7 +235,7 @@
   async function load() {
     loading(true);
     try { await Promise.all([loadSummary(), loadList()]); }
-    catch (e) { toast(e.message, 'error'); $('uploadBody').innerHTML = `<tr class="empty-row"><td colspan="10">${esc(e.message)}</td></tr>`; }
+    catch (e) { toast(e.message, 'error'); $('uploadBody').innerHTML = `<tr class="empty-row"><td colspan="8">${esc(e.message)}</td></tr>`; }
     finally { loading(false); }
   }
 
@@ -190,9 +244,10 @@
   $('ymPicker').onchange = (e) => { if (e.target.value) setYm(e.target.value.replace('-', '')); };
   $('btnSearch').onclick = () => { state.page = 0; loadList().catch(e => toast(e.message, 'error')); };
   $('fSystem').onkeydown = (e) => { if (e.key === 'Enter') $('btnSearch').click(); };
-  $('btnReset').onclick = () => { ['fSystem', 'fLogType', 'fStatus', 'fSeverity'].forEach(id => $(id).value = ''); $('btnSearch').click(); };
+  $('fSort').onchange = () => { state.page = 0; loadList().catch(e => toast(e.message, 'error')); };
+  $('btnReset').onclick = () => { ['fSystem', 'fLogType', 'fStatus', 'fSeverity'].forEach(id => $(id).value = ''); $('fSort').value = DEFAULT_SORT; syncMore(); $('btnSearch').click(); };
   $('pager').onclick = (e) => { const b = e.target.closest('button[data-p]'); if (b && !b.disabled) { state.page = +b.dataset.p; loadList().catch(er => toast(er.message, 'error')); } };
-  $('uploadBody').onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) SECLOG.go('detail.html', { id: tr.dataset.id }); };
+  $('uploadBody').onclick = (e) => { if (e.target.closest('a')) return; const tr = e.target.closest('tr[data-id]'); if (tr) SECLOG.go('detail.html', { id: tr.dataset.id }); };
 
   setYm(state.ym);
 })();
