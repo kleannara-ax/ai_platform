@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CCKB 후면 색상 검사</title>
+  <style>
+    /* =====================================================================
+     * CCKB 후면 색상 검사 — 스타일 시트
+     * PS 후면 지분 검사 도구(module-ps-insp)의 라이트 카드 테마를 그대로 채용.
+     * (색상 변수 체계, 카드/버튼/배지/테이블/페이지네이션 패턴을 동일하게 맞춤)
+     * ===================================================================== */
+    :root {
+      --bg: #f1f5f9;
+      --panel: #ffffff;
+      --panel2: #f8fafc;
+      --line: #e2e8f0;
+      --line2: #cbd5e1;
+      --text: #0f172a;
+      --muted: #475569;
+      --muted2: #94a3b8;
+      --accent: #3b82f6;
+      --accent-light: #dbeafe;
+      --accent-hover: #2563eb;
+      --accent-dark: #1e40af;
+      --accent2: #0ea5e9;
+      --good: #16a34a;
+      --good-light: #dcfce7;
+      --warn: #ca8a04;
+      --warn-light: #fef9c3;
+      --bad: #dc2626;
+      --bad-light: #fee2e2;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow: 0 1px 3px rgba(15,23,42,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1500px; margin: 0 auto; padding: 20px 20px 40px; }
+    .hero { margin-bottom: 18px; }
+    .hero h1 { margin: 0 0 8px; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.6; }
+
+    /* ===== Tabs ===== */
+    .tabbar {
+      display:flex;
+      gap:4px;
+      border-bottom:2px solid var(--line);
+      margin-bottom:20px;
+    }
+    .tab-btn {
+      background:transparent;
+      border:0;
+      border-radius:0;
+      padding:10px 20px;
+      font-size:14px;
+      font-weight:700;
+      color:var(--muted2);
+      cursor:pointer;
+      position:relative;
+      margin-bottom:-2px;
+      border-bottom:2px solid transparent;
+      transition:0.15s;
+    }
+    .tab-btn:hover { color:var(--muted); }
+    .tab-btn.active {
+      color:var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .grid {
+      display:grid;
+      grid-template-columns: 390px 1fr;
+      gap:18px;
+      align-items:start;
+    }
+    .panel {
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      margin-bottom:18px;
+    }
+    .head { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .head h2 { margin:0 0 6px; font-size:15px; font-weight:700; color:var(--text); }
+    .head p { margin:0; font-size:13px; line-height:1.55; color:var(--muted); }
+    .body { padding:20px; }
+    .controls { display:flex; flex-direction:column; gap:16px; }
+    .field label { display:block; margin-bottom:8px; font-weight:700; font-size:13px; color:var(--text); }
+    .field small { display:block; margin-top:6px; color:var(--muted); line-height:1.45; }
+    .stat, .canvas-card, .notice, .delta-card, .table-wrap, .threshold-grid, .upload-card {
+      background: var(--panel2);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      color:var(--text);
+    }
+    .threshold-grid {
+      padding:14px;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    .threshold-box {
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:12px;
+    }
+    .threshold-box strong {
+      display:block;
+      font-size:12px;
+      margin-bottom:10px;
+      color:var(--accent-hover);
+      letter-spacing:0.02em;
+    }
+    .threshold-row {
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:8px;
+      align-items:center;
+      margin-bottom:8px;
+    }
+    .threshold-row:last-child { margin-bottom:0; }
+    .threshold-row span {
+      font-size:12px;
+      color:var(--muted);
+    }
+    .threshold-value {
+      font-size:13px;
+      font-weight:800;
+      color:var(--text);
+    }
+
+    /* ===== Product info form ===== */
+    .form-field label { display:block; margin-bottom:8px; font-weight:700; font-size:13px; color:var(--text); }
+    input[type="text"] {
+      width:100%;
+      padding:10px 14px;
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      background: var(--panel2);
+      color: var(--text);
+      font-size:14px;
+      font-family: inherit;
+    }
+    input[type="text"]::placeholder { color:var(--muted2); }
+    input[type="text"]:focus { outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
+
+    /* ===== Image upload ===== */
+    .upload-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .upload-card {
+      padding:22px 14px;
+      border-style:dashed;
+      border-width:2px;
+      border-color: var(--line2);
+      text-align:center;
+      cursor:pointer;
+      display:block;
+      transition:0.18s;
+    }
+    .upload-card:hover { background: var(--accent-light); border-color: var(--accent); }
+    .upload-icon { font-size:26px; margin-bottom:8px; }
+    .upload-card strong { display:block; margin-bottom:4px; font-size:14px; color:var(--text); }
+    .upload-card span { font-size:12px; color:var(--muted); }
+    input[type="file"] { display:none; }
+
+    .btn-row {
+      display:grid;
+      gap:10px;
+      grid-template-columns:1fr 1fr;
+    }
+    button {
+      border:0;
+      border-radius:var(--radius);
+      padding:12px 14px;
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform 0.15s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      font-family: inherit;
+    }
+    button:hover { transform: translateY(-1px); }
+    button.primary { background: var(--accent); color:#fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.secondary { background: var(--panel2); color:var(--text); border:1px solid var(--line2); }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    button.ghost { background: transparent; color:var(--muted); border:1px solid var(--line); }
+    button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+    button:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+
+    .main { display:grid; gap:18px; }
+    .canvas-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    .canvas-card { padding:14px; }
+    .canvas-card h3 { margin:0 0 10px; font-size:15px; color:var(--text); }
+    .canvas-wrap {
+      position:relative;
+      background: var(--panel2);
+      border-radius:var(--radius);
+      overflow:hidden;
+      border:1px solid var(--line);
+      min-height:420px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    canvas {
+      width:100%;
+      height:420px;
+      display:block;
+      cursor: default;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .canvas-note {
+      margin-top:10px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+    .stats {
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap:12px;
+    }
+    .stat { padding:14px 16px; }
+    .k { font-size:12px; color:var(--muted); margin-bottom:8px; }
+    .v { font-size:26px; font-weight:900; letter-spacing:-0.02em; color:var(--text); }
+    .s { margin-top:7px; font-size:12px; color:var(--muted); }
+    .good .v { color: var(--good); }
+    .warn .v { color: var(--warn); }
+    .bad .v { color: var(--bad); }
+    .neutral .v { color: var(--text); }
+    .delta-grid {
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+    .delta-card { padding:16px; }
+    .delta-card h4 { margin:0 0 10px; font-size:14px; color:var(--text); }
+    .delta-value {
+      font-size:28px;
+      font-weight:900;
+      letter-spacing:-0.03em;
+      margin-bottom:8px;
+      color:var(--text);
+    }
+    .delta-zero { color: var(--text); }
+    .delta-alert { color: var(--bad); }
+    .delta-desc { font-size:13px; color:var(--muted); line-height:1.55; }
+    .status-normal .v { color: var(--good); }
+    .status-boundary .v { color: var(--warn); }
+    .status-defect .v { color: var(--bad); }
+    .table-wrap { padding:0; overflow:auto; background: var(--panel); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td {
+      padding:12px 10px;
+      border-bottom:1px solid var(--line);
+      text-align:center;
+      white-space:nowrap;
+    }
+    th { color:var(--muted); font-size:12px; letter-spacing:0.02em; font-weight:600; background: var(--panel2); }
+    td:first-child, th:first-child { text-align:left; }
+    .notice { padding:14px 16px; font-size:13px; color:var(--muted); line-height:1.6; }
+    .footer-tip { margin-top:14px; font-size:12px; color:var(--muted); line-height:1.6; }
+
+    /* ===== select / date / number inputs ===== */
+    select, input[type="date"], input[type="number"] {
+      padding:10px 14px;
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      background: var(--panel2);
+      color: var(--text);
+      font-size:14px;
+      font-family: inherit;
+    }
+    select:focus, input[type="date"]:focus, input[type="number"]:focus {
+      outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15);
+    }
+    input[type="number"]:disabled, select:disabled { opacity:0.6; cursor:not-allowed; background:#eef1f5; color:var(--muted2); }
+
+    /* ===== 검사 이력 탭 ===== */
+    .history-filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+    .history-filter-bar select { flex:0 0 140px; }
+    .history-filter-bar input[type="text"] { flex:1 1 200px; min-width:160px; }
+    .history-filter-bar input[type="date"] { flex:0 0 160px; }
+    .hist-tilde { color:var(--muted); }
+    .hist-list { display:flex; flex-direction:column; gap:16px; margin-top:18px; }
+    .hist-card {
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius-lg);
+      overflow:hidden;
+      display:grid;
+      grid-template-columns: 220px 1fr;
+      box-shadow: var(--shadow);
+      transition: box-shadow .2s;
+    }
+    .hist-card:hover { box-shadow: 0 2px 8px rgba(15,23,42,0.12); }
+    .hist-media { display:grid; grid-template-columns:1fr; gap:1px; background: var(--line); }
+    .hist-media-col { background: var(--panel2); padding:10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .hist-thumb {
+      width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px;
+      border:1px solid var(--line); background:#eef1f5;
+    }
+    .hist-media-label { font-size:11px; color:var(--muted); text-align:center; }
+    .hist-body { padding:16px 18px; }
+    .hist-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .hist-title { font-size:15px; font-weight:800; color:var(--text); }
+    .hist-badge { font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; }
+    .hist-badge-good { background: var(--good-light); color: var(--good); }
+    .hist-badge-warn { background: var(--warn-light); color: var(--warn); }
+    .hist-badge-bad { background: var(--bad-light); color: var(--bad); }
+    .hist-row { font-size:13px; color:var(--muted); line-height:1.9; }
+    .hist-row span { color:var(--muted2); margin-right:6px; }
+    .hist-row strong { color: var(--text); font-size:14px; }
+    .hist-metric strong { color: var(--accent2); font-size:15px; }
+    .hist-time { margin-top:6px; color:var(--muted2); font-size:12px; }
+
+    /* ===== ⚙ 기준값 설정 탭 ===== */
+    .settings-user-row { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted); margin-bottom:16px; }
+    .settings-user-row strong { color:var(--text); font-size:15px; }
+    .role-badge { font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; }
+    .role-badge.role-edit { background: var(--good-light); color: var(--good); }
+    .role-badge.role-readonly { background: var(--panel2); color: var(--muted); border:1px solid var(--line); }
+    .settings-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:14px; }
+
+    /* ===== 재검사 배너 ===== */
+    .reinspect-banner {
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:10px 16px;
+      background: var(--accent-light);
+      border:1px solid var(--accent);
+      color:var(--accent-dark);
+      padding:14px 18px;
+      border-radius:var(--radius-lg);
+      font-size:13px;
+      margin-bottom:18px;
+    }
+    .reinspect-banner strong { color:var(--text); }
+    .reinspect-banner button { margin-left:auto; padding:8px 14px; font-size:12px; }
+
+    /* ===== 검사 이력 - 재검사 뱃지/버튼 ===== */
+    .hist-reinspect-tag {
+      display:inline-block;
+      font-size:11px;
+      font-weight:800;
+      padding:3px 9px;
+      border-radius:999px;
+      background: var(--accent-light);
+      color: var(--accent);
+      margin-left:8px;
+    }
+    .hist-actions { margin-top:12px; display:flex; justify-content:flex-end; }
+    .hist-actions button { padding:8px 14px; font-size:12px; }
+
+    /* ===== 검사 이력 - 페이지네이션 ===== */
+    .pagination {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      margin-top:20px;
+      flex-wrap:wrap;
+    }
+    .pagination button {
+      padding:8px 13px;
+      font-size:12px;
+      background: var(--panel);
+      color:var(--text);
+      border:1px solid var(--line);
+    }
+    .pagination button.active { background: var(--accent); color:#fff; border-color:var(--accent); }
+    .pagination button:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+    .pagination-info { font-size:12px; color:var(--muted); margin-left:10px; }
+
+    /* ===== ⚙ 기준값 설정 - 섹션 구분 ===== */
+    .settings-section-title { font-size:13px; font-weight:800; color:var(--accent-hover); margin:24px 0 12px; }
+    .settings-section-title:first-of-type { margin-top:0; }
+
+    /* ===== 플랫폼 공용 알림 바 ===== */
+    #msg {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 2000; min-width: 280px; max-width: min(560px, calc(100vw - 32px));
+      text-align: center; border-radius: var(--radius-lg); font-size: 13px; font-weight: 700;
+      padding: 12px 16px; box-shadow: 0 10px 30px rgba(15,23,42,0.15);
+    }
+    #msg.alert-success { background: var(--good-light); color: var(--good); border:1px solid rgba(22,163,74,0.35); }
+    #msg.alert-danger { background: var(--bad-light); color: var(--bad); border:1px solid rgba(220,38,38,0.35); }
+    #msg.d-none { display:none; }
+
+    @media (max-width: 1180px) {
+      .grid { grid-template-columns:1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 860px) {
+      .delta-grid, .btn-row, .threshold-grid, .upload-grid, .settings-grid { grid-template-columns:1fr; }
+      .threshold-row { grid-template-columns: 1fr auto; }
+      .stats { grid-template-columns:1fr; }
+      canvas { height:360px; }
+      .canvas-wrap { min-height:360px; }
+      .tab-btn { padding:10px 14px; font-size:13px; }
+      .hist-card { grid-template-columns:1fr; }
+      .history-filter-bar select, .history-filter-bar input[type="date"] { flex:1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="msg" class="alert d-none"></div>
+  <div class="wrap">
+    <div class="hero">
+      <h1>CCKB 후면 색상 검사</h1>
+      <p><strong>색상 검사</strong> 탭에서 사진 1장을 업로드하면 이미지 전체 평균 <strong>L*</strong>, <strong>a*</strong>, <strong>b*</strong> 값을 자동 계산하고, 고정된 <strong>기준값(<span id="heroRefVal">불러오는 중...</span>)</strong>과 비교하여 <strong>정상 / 경계 / 불량</strong>으로 자동 판정합니다. 판정 결과는 <strong>검사 이력</strong> 탭에 검사번호와 함께 자동 기록되고, 기준값은 <strong>⚙ 기준값 설정</strong> 탭에서 변경할 수 있습니다.</p>
+    </div>
+
+    <div class="tabbar">
+      <button class="tab-btn active" data-tab="inspect">색상 검사</button>
+      <button class="tab-btn" data-tab="history">검사 이력</button>
+      <button class="tab-btn" data-tab="settings">⚙ 기준값 설정</button>
+    </div>
+
+    <!-- ===================== TAB 1: 색상 검사 ===================== -->
+    <div id="tab-inspect" class="tab-panel active">
+      <div id="reinspectBanner" class="reinspect-banner" style="display:none;">
+        <span>🔁 검사번호 <strong id="reinspectTargetNo">-</strong>에 대한 <strong>재검사</strong>를 진행 중입니다. 사진을 업로드하고 판정을 실행하면 재검사 결과로 기록됩니다.</span>
+        <button id="reinspectCancelBtn" class="ghost">재검사 취소</button>
+      </div>
+      <div class="grid">
+        <div class="panel" style="margin-bottom:0;">
+          <div class="head">
+            <div>
+              <h2>1. 입력 & 설정</h2>
+              <p>검사 사진을 업로드하면 이미지 전체를 기준으로 자동 계산됩니다. </p>
+            </div>
+          </div>
+          <div class="body controls">
+            <div class="field">
+              <label>검사 사진 업로드</label>
+              <div class="upload-grid" style="grid-template-columns:1fr;">
+                <label for="galleryInput" id="galleryUploadCard" class="upload-card">
+                  <div class="upload-icon">🗂️</div>
+                  <strong>이미지 업로드</strong>
+                  <span>저장된 이미지를 불러옵니다</span>
+                </label>
+              </div>
+              <input id="galleryInput" type="file" accept="image/*" />
+              <div id="uploadedFileInfo" class="canvas-note">아직 업로드된 이미지가 없습니다.</div>
+
+            </div>
+
+            <div class="field">
+              <label>고정 기준값 (Fixed Reference LAB)</label>
+              <div class="threshold-grid">
+                <div class="threshold-box" style="grid-column: 1 / -1;">
+                  <strong>기준 L* / a* / b*</strong>
+                  <div class="threshold-row"><span>L*</span><div class="threshold-value" id="refBoxL">-</div></div>
+                  <div class="threshold-row"><span>a*</span><div class="threshold-value" id="refBoxA">-</div></div>
+                  <div class="threshold-row"><span>b*</span><div class="threshold-value" id="refBoxB">-</div></div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="field">
+              <label>검사 제어</label>
+              <div class="btn-row">
+                <button id="resetImageBtn" class="secondary">이미지 초기화</button>
+                <button id="analyzeBtn" class="primary">판정 실행</button>
+              </div>
+              <small>업로드된 이미지 전체가 분석 대상입니다. </small>
+            </div>
+
+            <div class="field">
+              <label>판정 기준 안내</label>
+              <div class="threshold-grid">
+                <div class="threshold-box">
+                  <strong>정상 판정 조건</strong>
+                  <div class="threshold-row"><span>ΔE00</span><div class="threshold-value" id="infoNormalDE">-</div></div>
+                  <div class="threshold-row"><span>|ΔL*|</span><div class="threshold-value" id="infoNormalL">-</div></div>
+                  <div class="threshold-row"><span>|Δa*|</span><div class="threshold-value" id="infoNormalA">-</div></div>
+                  <div class="threshold-row"><span>|Δb*|</span><div class="threshold-value" id="infoNormalB">-</div></div>
+                </div>
+                <div class="threshold-box">
+                  <strong>불량 판정 조건</strong>
+                  <div class="threshold-row"><span>ΔE00</span><div class="threshold-value" id="infoDefectDE">-</div></div>
+                  <div class="threshold-row"><span>|ΔL*|</span><div class="threshold-value" id="infoDefectL">-</div></div>
+                  <div class="threshold-row"><span>|Δa*|</span><div class="threshold-value" id="infoDefectA">-</div></div>
+                  <div class="threshold-row"><span>|Δb*|</span><div class="threshold-value" id="infoDefectB">-</div></div>
+                </div>
+              </div>
+              <small>위 값은 <strong>⚙ 기준값 설정</strong> 탭에서 변경할 수 있습니다. 정상 조건을 벗어났지만 불량 조건에 도달하지 않으면 자동으로 경계 판정됩니다.</small>
+            </div>
+
+            <div class="notice">
+              결과의 <strong>ΔL*</strong>, <strong>Δa*</strong>, <strong>Δb*</strong>는 모두 <strong>검사 사진 - 고정 기준값</strong> 입니다.<br>
+              예: ΔL*가 +면 검사 사진이 더 밝고, Δa*가 -면 검사 사진이 더 녹색 방향입니다. 최종 판정은 <strong>ΔE00 + 채널 한계</strong>를 함께 사용합니다.
+            </div>
+          </div>
+        </div>
+
+        <div class="main">
+          <div class="panel">
+            <div class="head">
+              <div>
+                <h2>2. 이미지 미리보기</h2>
+                <p>업로드한 검사 사진을 확인할 수 있습니다. 전체 이미지가 자동으로 분석에 사용됩니다.</p>
+              </div>
+            </div>
+            <div class="body">
+              <div class="canvas-grid">
+                <div class="canvas-card">
+                  <h3>검사 사진</h3>
+                  <div class="canvas-wrap"><canvas id="cmpCanvas" width="900" height="420"></canvas></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="head">
+              <div>
+                <h2>3. 분석 결과</h2>
+                <p>고정 기준 LAB, 검사 사진 평균 LAB, 채널별 차이, ΔE00/ΔE76, 그리고 정상·경계·불량 판정을 한 번에 확인할 수 있습니다.</p>
+              </div>
+            </div>
+            <div class="body">
+              <div class="stats">
+                <div class="stat neutral">
+                  <div class="k">고정 기준 LAB</div>
+                  <div id="refLabCard" class="v">-</div>
+                  <div class="s" id="refLabCardSub">L*, a*, b*</div>
+                </div>
+                <div class="stat neutral">
+                  <div class="k">검사 사진 평균 LAB</div>
+                  <div id="cmpLabCard" class="v">-</div>
+                  <div class="s">L*, a*, b*</div>
+                </div>
+                <div class="stat warn">
+                  <div class="k">주 판정값 ΔE00</div>
+                  <div id="deltaE00Card" class="v">-</div>
+                  <div class="s">사람 눈 체감에 더 가까운 색차</div>
+                </div>
+                <div id="statusStat" class="stat status-normal">
+                  <div class="k">최종 판정</div>
+                  <div id="statusCard" class="v" style="font-size:24px; line-height:1.25;">대기 중</div>
+                  <div id="statusDesc" class="s">기준을 적용하면 정상/경계/불량이 표시됩니다</div>
+                </div>
+              </div>
+
+              <div class="delta-grid">
+                <div class="delta-card">
+                  <h4>ΔL*</h4>
+                  <div id="deltaL" class="delta-value delta-zero">-</div>
+                  <div id="deltaLDesc" class="delta-desc">검사 사진이 기준값보다 얼마나 더 밝거나 어두운지 표시합니다.</div>
+                </div>
+                <div class="delta-card">
+                  <h4>Δa*</h4>
+                  <div id="deltaA" class="delta-value delta-zero">-</div>
+                  <div id="deltaADesc" class="delta-desc">+는 더 붉은 방향, -는 더 녹색 방향입니다.</div>
+                </div>
+                <div class="delta-card">
+                  <h4>Δb*</h4>
+                  <div id="deltaB" class="delta-value delta-zero">-</div>
+                  <div id="deltaBDesc" class="delta-desc">+는 더 노란 방향, -는 더 파란 방향입니다.</div>
+                </div>
+              </div>
+
+              <div style="height:14px"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>항목</th>
+                      <th>고정 기준값</th>
+                      <th>검사 사진</th>
+                      <th>차이 (검사 - 기준)</th>
+                      <th>해석</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>L*</td>
+                      <td id="refL">-</td>
+                      <td id="cmpL">-</td>
+                      <td id="diffL">-</td>
+                      <td id="interpL">-</td>
+                    </tr>
+                    <tr>
+                      <td>a*</td>
+                      <td id="refA">-</td>
+                      <td id="cmpA">-</td>
+                      <td id="diffA">-</td>
+                      <td id="interpA">-</td>
+                    </tr>
+                    <tr>
+                      <td>b*</td>
+                      <td id="refB">-</td>
+                      <td id="cmpB">-</td>
+                      <td id="diffB">-</td>
+                      <td id="interpB">-</td>
+                    </tr>
+                    <tr>
+                      <td>ΔE00</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td id="diffE00">-</td>
+                      <td id="interpE00">최종 판정 기준</td>
+                    </tr>
+                    <tr>
+                      <td>ΔE76</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td id="diffE76">-</td>
+                      <td id="interpE76">참고용 직선 거리</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="footer-tip">※ 평균 LAB는 서버에서 검사 사진 전체 픽셀을 샘플링해서 계산합니다. 해상도가 매우 커도 서버에서 무리 없이 계산되도록 자동 샘플링이 적용되며 판정 결과는 자동으로 <strong>검사 이력</strong> 탭(DB)에 저장됩니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== TAB 2: 검사 이력 ===================== -->
+    <div id="tab-history" class="tab-panel">
+      <div class="panel" style="margin-bottom:0;">
+        <div class="head">
+          <div>
+            <h2>검사 이력 조회</h2>
+            <p>판정을 실행할 때마다 서버(DB)에 자동으로 기록됩니다. 검사번호(일자+일련번호) 또는 기간으로 검색할 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="history-filter-bar">
+            <input type="text" id="histKeyword" placeholder="검사번호 검색 (예: 2611060001)" />
+            <input type="date" id="histFrom" />
+            <span class="hist-tilde">~</span>
+            <input type="date" id="histTo" />
+            <button id="histSearchBtn" class="primary">검색</button>
+            <button id="histResetBtn" class="ghost">초기화</button>
+          </div>
+          <div id="histEmpty" class="notice" style="margin-top:16px; display:none;">검사 이력이 없습니다. <strong>색상 검사</strong> 탭에서 판정을 실행하면 이곳에 자동으로 기록됩니다.</div>
+          <div id="histList" class="hist-list"></div>
+          <div id="histPagination" class="pagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== TAB 3: ⚙ 기준값 설정 ===================== -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="panel" style="margin-bottom:0; max-width:680px;">
+        <div class="head">
+          <div>
+            <h2>⚙ 기준값 설정</h2>
+            <p>판정에 사용되는 고정 기준 LAB 값을 변경합니다. </p>
+          </div>
+        </div>
+        <div class="body">
+          <div class="settings-user-row">
+            <span id="curUserBadge" class="role-badge role-readonly">권한 확인 중...</span>
+          </div>
+
+          <div class="settings-section-title">기준 L* / a* / b*</div>
+          <div class="settings-grid">
+            <div class="form-field">
+              <label>기준 L*</label>
+              <input type="number" step="0.1" id="setRefL" />
+            </div>
+            <div class="form-field">
+              <label>기준 a*</label>
+              <input type="number" step="0.1" id="setRefA" />
+            </div>
+            <div class="form-field">
+              <label>기준 b*</label>
+              <input type="number" step="0.1" id="setRefB" />
+            </div>
+          </div>
+
+          <div class="settings-section-title">정상 판정 조건 (이 값 이내면 정상)</div>
+          <div class="settings-grid">
+            <div class="form-field">
+              <label>정상 ΔE00 미만</label>
+              <input type="number" step="0.1" id="setNormalDE" />
+            </div>
+            <div class="form-field">
+              <label>정상 |ΔL*| 이하</label>
+              <input type="number" step="0.1" id="setNormalL" />
+            </div>
+            <div class="form-field">
+              <label>정상 |Δa*| 이하</label>
+              <input type="number" step="0.1" id="setNormalA" />
+            </div>
+            <div class="form-field">
+              <label>정상 |Δb*| 이하</label>
+              <input type="number" step="0.1" id="setNormalB" />
+            </div>
+          </div>
+
+          <div class="settings-section-title">불량 판정 조건 (이 값 초과면 불량)</div>
+          <div class="settings-grid">
+            <div class="form-field">
+              <label>불량 ΔE00 초과</label>
+              <input type="number" step="0.1" id="setDefectDE" />
+            </div>
+            <div class="form-field">
+              <label>불량 |ΔL*| 초과</label>
+              <input type="number" step="0.1" id="setDefectL" />
+            </div>
+            <div class="form-field">
+              <label>불량 |Δa*| 초과</label>
+              <input type="number" step="0.1" id="setDefectA" />
+            </div>
+            <div class="form-field">
+              <label>불량 |Δb*| 초과</label>
+              <input type="number" step="0.1" id="setDefectB" />
+            </div>
+          </div>
+
+          <button id="saveRefBtn" class="primary" style="margin-top:20px; width:100%;">저장</button>
+
+          <div class="notice" style="margin-top:16px;">
+            검사 결과의 ΔL*/Δa*/Δb*, ΔE00은 모두 이 기준값과 검사 사진 측정값의 차이로 계산됩니다. 정상/불량 판정 조건도 이 탭에서 함께 변경할 수 있으며, 저장하면 이후 모든 판정에 즉시 적용됩니다. (기준값 수정은 공통코드 그룹 <strong>CCKB_PERM</strong>에 등록된 관리자만 가능하며, 서버에서 권한을 검증합니다. 변경 이력은 모두 감사 로그(standard_audit_log)에 기록됩니다.)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/cckb.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>
