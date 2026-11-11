@@ -35,8 +35,14 @@ public class ContractSummaryResponse {
     private LocalDate lastInspectionDate;
     private String lastInspectionResult;
     private String lastInspectionResultLabel;
+    /** 계약종결 체크(계약변경·만료 점검) 업로드 여부 Y/N */
+    private String terminationCheckYn;
 
     public static ContractSummaryResponse from(PiContract c, LocalDate today) {
+        return from(c, today, null);
+    }
+
+    public static ContractSummaryResponse from(PiContract c, LocalDate today, Boolean terminationCheck) {
         ContractStatus status = ContractStatus.of(c, today);
         return ContractSummaryResponse.builder()
                 .contractId(c.getContractId())
@@ -59,6 +65,7 @@ public class ContractSummaryResponse {
                 .lastInspectionDate(c.getLastInspectionDate())
                 .lastInspectionResult(c.getLastInspectionResult())
                 .lastInspectionResultLabel(resultLabel(c.getLastInspectionResult()))
+                .terminationCheckYn(terminationCheck == null ? null : (terminationCheck ? "Y" : "N"))
                 .build();
     }
 

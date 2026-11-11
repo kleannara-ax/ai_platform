@@ -32,4 +32,17 @@ public class ContractSearchCondition {
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate endDateTo;
+
+    /** 기준 연도 (요약 카드에서 선택). 있으면 원계약 기간이 이 연도에 걸친 계약만 */
+    private Integer baseYear;
+
+    /** 기준 연도 구분: ACTIVE(계약중) / ENDED(종료). baseYear 가 있을 때만 적용 */
+    private String yearStatus;
+
+    /**
+     * 기준 연도 점검 조건 (baseYear 가 있을 때만 적용)
+     * INSPECTED / NOT_INSPECTED : 기준 연도 수탁사 정기 점검 완료 / 미완료
+     * TERM_UPLOADED / TERM_MISSING : 계약종결 체크(계약변경·만료 점검) 업로드 / 미업로드
+     */
+    private String yearCheck;
 }

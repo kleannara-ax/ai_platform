@@ -16,7 +16,7 @@
   const crumb = document.getElementById('pi-breadcrumb');
   const alertArea = document.getElementById('pi-alert-area');
   let perm = { canRead: false, canWrite: false, canDelete: false, canSendMail: false };
-  let listState = { page: 0, size: 50, sort: 'contractEndDate,asc', cond: {} };
+  let listState = { page: 0, size: 50, sort: 'contractEndDate,asc', cond: {}, baseYear: new Date().getFullYear() };
   let currentContract = null;
 
   // ──────────────── 공통 유틸 ────────────────
@@ -101,7 +101,7 @@
       </section>
       <section class="pi-card" id="contract-list-section">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h2 class="mb-0"><i class="fas fa-list"></i>위수탁 계약 목록 <small class="text-muted fw-normal" id="list-count"></small></h2>
+          <h2 class="mb-0"><i class="fas fa-list"></i>위수탁 계약 목록 <span class="pi-year-filter" id="list-year-filter">${esc(yearFilterLabel())}</span> <small class="text-muted fw-normal" id="list-count"></small></h2>
           <div class="d-flex gap-2 align-items-center">
           <button type="button" class="btn btn-sm btn-light text-nowrap" id="btn-reset-cols" title="열 너비를 기본값으로 되돌립니다">
             <i class="fas fa-arrows-left-right me-1"></i>열 너비 초기화</button>
@@ -124,12 +124,13 @@
     const form = document.getElementById('contract-search-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      listState.cond = Object.fromEntries(new FormData(form).entries());
+      const keep = { yearStatus: listState.cond.yearStatus, yearCheck: listState.cond.yearCheck };
+      listState.cond = { ...Object.fromEntries(new FormData(form).entries()), ...keep };
       listState.page = 0;
       loadList();
     });
     document.getElementById('btn-reset').onclick = () => { listState.cond = {}; listState.page = 0; renderList(); };
-    document.getElementById('btn-excel').onclick = () => PI_API.downloadExcel({ ...listState.cond, sort: listState.sort }).catch(fail);
+    document.getElementById('btn-excel').onclick = () => PI_API.downloadExcel({ ...listState.cond, baseYear: listState.baseYear, sort: listState.sort }).catch(fail);
     document.getElementById('btn-template').onclick = () => PI_API.downloadBlankTemplate().catch(fail);
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
@@ -149,31 +150,72 @@
     return `<option value="${esc(value)}" ${String(selected ?? '') === value ? 'selected' : ''}>${esc(label)}</option>`;
   }
 
+  /**
+   * 목록 상단 요약 (기준 연도 기준)
+   *  - 전체 계약 : 원계약 기간이 기준 연도에 걸친 계약
+   *  - 계약중   : 그중 기준 연도에 끝나지 않은 계약 + 수탁사 정기 점검 완료 건수
+   *  - 종료     : 그중 기준 연도 안에 종료 처리·만료된 계약 + 계약종결 체크(계약변경·만료 점검) 업로드 여부
+   * 카드·작은 숫자를 누르면 그 조건으로 목록을 거른다.
+   */
   async function loadDashboard() {
     try {
-      const d = await PI_API.dashboard();
-      const card = (label, value, color, status, extra) =>
-        `<div class="pi-stat" data-status="${status || ''}" data-extra="${extra || ''}" role="button" tabindex="0">
-           <div class="label">${esc(label)}</div><div class="value" style="color:${color}">${value}</div></div>`;
+      const d = await PI_API.dashboard({ baseYear: listState.baseYear });
       const el = document.getElementById('pi-dashboard');
       if (!el) return;
-      el.innerHTML =
-        card('전체 계약', d.totalCount, '#111827', '') +
-        card('계약중', d.activeCount, '#166534', 'ACTIVE') +
-        card('만료임박', d.expiringCount, '#b45309', 'EXPIRING') +
-        card('만료', d.expiredCount, '#b91c1c', 'EXPIRED') +
-        card('종료', d.terminatedCount, '#374151', 'TERMINATED') +
-        card(`${d.year}년 점검완료`, d.inspectedThisYearCount, '#4f46e5', '', '') +
-        card(`${d.year}년 미점검`, d.notInspectedThisYearCount, '#9333ea', '', 'NONE') +
-        card('조치 필요', d.needActionCount, '#dc2626', '', 'NEED_ACTION');
-      el.querySelectorAll('.pi-stat').forEach((s) => s.addEventListener('click', () => {
+      const cur = listState.cond;
+      const on = (ys, yc) => (cur.yearStatus || '') === ys && (cur.yearCheck || '') === yc && !cur.status && !cur.inspectionResult;
+      const years = (d.availableYears || [d.baseYear]);
+      el.className = 'pi-stats pi-year-stats';
+      el.innerHTML = `
+        <div class="pi-stat pi-year-select" id="base-year-card">
+          <label class="label" for="base-year">기준 연도</label>
+          <select class="form-select form-select-sm fw-bold" id="base-year" aria-label="기준 연도">
+            ${years.map((y) => `<option value="${y}" ${y === d.baseYear ? 'selected' : ''}>${y}년</option>`).join('')}</select>
+          <div class="pi-sub text-muted">원계약 기간이 ${d.baseYear}년에 걸친 계약</div>
+        </div>
+        <div class="pi-stat ${on('', '') ? 'active' : ''}" data-ys="" data-yc="" role="button" tabindex="0" id="stat-year-total">
+          <div class="label">전체 계약</div><div class="value" style="color:#111827">${d.yearTotalCount}</div>
+          <div class="pi-sub text-muted">계약중 ${d.yearActiveCount} · 종료 ${d.yearEndedCount}</div>
+        </div>
+        <div class="pi-stat ${on('ACTIVE', '') ? 'active' : ''}" data-ys="ACTIVE" data-yc="" role="button" tabindex="0" id="stat-year-active">
+          <div class="label">계약중</div><div class="value" style="color:#166534">${d.yearActiveCount}</div>
+          <div class="pi-sub"><button type="button" class="pi-sub-link ${on('ACTIVE', 'INSPECTED') ? 'active' : ''}" data-ys="ACTIVE" data-yc="INSPECTED"
+              title="${d.baseYear}년 수탁사 정기 점검을 완료한 계약">수탁사 점검완료 <b>${d.yearActiveInspectedCount}</b>건</button>
+            <span class="text-muted">/ ${d.yearActiveCount}</span>
+            ${d.yearActiveCount - d.yearActiveInspectedCount > 0 ? `<button type="button" class="pi-sub-link warn ${on('ACTIVE', 'NOT_INSPECTED') ? 'active' : ''}" data-ys="ACTIVE" data-yc="NOT_INSPECTED" title="${d.baseYear}년 수탁사 정기 점검 미완료">미점검 ${d.yearActiveCount - d.yearActiveInspectedCount}</button>` : ''}</div>
+        </div>
+        <div class="pi-stat ${on('ENDED', '') ? 'active' : ''}" data-ys="ENDED" data-yc="" role="button" tabindex="0" id="stat-year-ended">
+          <div class="label">종료</div><div class="value" style="color:#374151">${d.yearEndedCount}</div>
+          <div class="pi-sub">계약종결 체크
+            <button type="button" class="pi-sub-link ok ${on('ENDED', 'TERM_UPLOADED') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_UPLOADED" title="계약종결 체크(계약변경·만료 점검) 업로드">업로드 <b>${d.yearEndedTermCheckCount}</b></button>
+            <button type="button" class="pi-sub-link ${d.yearEndedTermMissingCount ? 'warn' : ''} ${on('ENDED', 'TERM_MISSING') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_MISSING" title="계약종결 체크(계약변경·만료 점검) 미업로드">미업로드 <b>${d.yearEndedTermMissingCount}</b></button></div>
+        </div>`;
+      const apply = (ys, yc) => {
         listState.cond = {};
-        if (s.dataset.status) listState.cond.status = s.dataset.status;
-        if (s.dataset.extra) listState.cond.inspectionResult = s.dataset.extra;
+        if (ys) listState.cond.yearStatus = ys;
+        if (yc) listState.cond.yearCheck = yc;
         listState.page = 0;
         renderList();
-      }));
+      };
+      el.querySelectorAll('.pi-stat[data-ys]').forEach((card) => {
+        card.addEventListener('click', () => apply(card.dataset.ys, card.dataset.yc));
+        card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(card.dataset.ys, card.dataset.yc); } });
+      });
+      el.querySelectorAll('.pi-sub-link').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); apply(b.dataset.ys, b.dataset.yc); }));
+      document.getElementById('base-year').addEventListener('change', (e) => {
+        listState.baseYear = Number(e.target.value);
+        listState.page = 0;
+        renderList();
+      });
     } catch (e) { /* 요약 실패는 목록 사용에 영향 없음 */ }
+  }
+
+  /** 현재 카드 필터 안내 (목록 제목 옆) */
+  function yearFilterLabel() {
+    const c = listState.cond; const y = listState.baseYear;
+    const map = { '': '전체', ACTIVE: '계약중', ENDED: '종료' };
+    const check = { INSPECTED: '수탁사 점검완료', NOT_INSPECTED: '수탁사 미점검', TERM_UPLOADED: '계약종결 체크 업로드', TERM_MISSING: '계약종결 체크 미업로드' };
+    return `${y}년 · ${map[c.yearStatus || '']}${c.yearCheck ? ' · ' + check[c.yearCheck] : ''}`;
   }
 
   // ──────────────── 목록 열 너비 조정 ────────────────
@@ -285,7 +327,7 @@
   async function loadList() {
     const tbody = document.querySelector('#contract-table tbody');
     try {
-      const page = await PI_API.listContracts({ ...listState.cond, page: listState.page, size: listState.size, sort: listState.sort });
+      const page = await PI_API.listContracts({ ...listState.cond, baseYear: listState.baseYear, page: listState.page, size: listState.size, sort: listState.sort });
       document.getElementById('list-count').textContent = `(총 ${page.totalElements}건)`;
       if (!page.content.length) {
         tbody.innerHTML = `<tr><td colspan="${listCols().length}" class="pi-empty">조회된 계약이 없습니다.</td></tr>`;
@@ -303,7 +345,11 @@
             <td class="pi-cell" title="${esc(r.managerName || '')}">${esc(r.managerName || '-')}</td>
             <td class="pi-cell">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
             <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}</td>
-            <td class="pi-cell">${badge(r.status, r.statusLabel)}</td>
+            <td class="pi-cell">${badge(r.status, r.statusLabel)}${(r.status === 'TERMINATED' || r.status === 'EXPIRED') && r.terminationCheckYn
+              ? (r.terminationCheckYn === 'Y'
+                ? ' <span class="pi-term-chip ok" title="계약종결 체크(계약변경·만료 점검) 업로드됨"><i class="fas fa-check"></i>종결체크</span>'
+                : ' <span class="pi-term-chip miss" title="계약종결 체크(계약변경·만료 점검) 미업로드"><i class="fas fa-xmark"></i>종결체크</span>')
+              : ''}</td>
             <td class="pi-cell pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
             <td class="pi-cell">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
             ${perm.canDelete ? `<td class="pi-cell text-center pi-col-sticky-end"><button type="button" class="btn btn-sm btn-light text-danger pi-row-delete"

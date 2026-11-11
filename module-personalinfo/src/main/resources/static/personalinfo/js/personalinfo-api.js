@@ -69,7 +69,7 @@ const PI_API = (() => {
   return {
     requireAuth,
     permissions: () => request('/me/permissions'),
-    dashboard: () => request('/dashboard'),
+    dashboard: (params) => request('/dashboard' + qs(params)),
     listContracts: (params) => request('/contracts' + qs(params)),
     downloadExcel: (params) => download('/contracts/excel' + qs(params), '외부위탁현황.xlsx'),
     getContract: (id) => request('/contracts/' + id),

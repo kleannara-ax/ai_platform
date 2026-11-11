@@ -18,6 +18,7 @@ import com.company.module.personalinfo.entity.ContactChangeType;
 import com.company.module.personalinfo.entity.ContractStatus;
 import com.company.module.personalinfo.entity.PiContactHistory;
 import com.company.module.personalinfo.entity.InspectionResult;
+import com.company.module.personalinfo.entity.InspectionType;
 import com.company.module.personalinfo.entity.PiContract;
 import com.company.module.personalinfo.entity.PiInspection;
 import com.company.module.personalinfo.repository.PiAlertLogRepository;
@@ -74,14 +75,35 @@ public class PiContractService {
     public Page<ContractSummaryResponse> search(ContractSearchCondition cond, int page, int size, String sort) {
         LocalDate today = LocalDate.now();
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), toSort(sort));
-        return contractRepository.search(
+        Integer by = cond.getBaseYear();
+        if (by != null && (by < 1990 || by > 2100)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "기준 연도가 올바르지 않습니다: " + by);
+        }
+        int year = by == null ? today.getYear() : by;
+        String yearStatus = by == null ? "" : upperOrEmpty(cond.getYearStatus(), Set.of("ACTIVE", "ENDED"));
+        String yearCheck = by == null ? "" : upperOrEmpty(cond.getYearCheck(),
+                Set.of("INSPECTED", "NOT_INSPECTED", "TERM_UPLOADED", "TERM_MISSING"));
+        Page<PiContract> result = contractRepository.search(
                 nz(cond.getKeyword()), nz(cond.getDeptName()), nz(cond.getManagerName()),
                 upperOrEmpty(cond.getIsmsScopeYn(), Set.of("Y", "N")),
                 upperOrEmpty(cond.getInspectionResult(), Set.of("PASS", "NEED_ACTION", "INCOMPLETE", "NONE")),
                 cond.getEndDateFrom(), cond.getEndDateTo(),
                 upperOrEmpty(cond.getStatus(), Set.of("ACTIVE", "EXPIRING", "EXPIRED", "TERMINATED", "NO_END_DATE")),
-                today, pageable
-        ).map(c -> ContractSummaryResponse.from(c, today));
+                today,
+                by == null ? 0 : 1, year, PiYearScope.yearStart(year), PiYearScope.yearEnd(year),
+                yearStatus, yearCheck, InspectionType.REGULAR, InspectionType.TERMINATION,
+                pageable);
+        Set<Long> termChecked = termCheckedIds(result.getContent().stream().map(PiContract::getContractId).toList());
+        return result.map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId())));
+    }
+
+    /** 계약종결 체크(계약변경·만료 점검)를 업로드한 계약 ID */
+    private Set<Long> termCheckedIds(List<Long> contractIds) {
+        if (contractIds.isEmpty()) {
+            return Set.of();
+        }
+        return inspectionRepository.findByContractIdInAndInspectionTypeAndDeletedYn(contractIds, InspectionType.TERMINATION, N)
+                .stream().map(PiInspection::getContractId).collect(Collectors.toSet());
     }
 
     public ContractDetailResponse getDetail(Long contractId) {
@@ -265,7 +287,20 @@ public class PiContractService {
     }
 
     public DashboardResponse dashboard() {
+        return dashboard(null);
+    }
+
+    /**
+     * 목록 상단 요약. 기준 연도(baseYear, 없으면 올해) 기준으로
+     * 전체 = 원계약 기간이 그 연도에 걸친 계약, 계약중 / 종료(그 연도 안에 종료 처리·만료) 로 나눈다.
+     * 계약중은 그 연도 수탁사 정기 점검 완료 건수, 종료는 계약종결 체크(계약변경·만료 점검) 업로드 여부를 함께 센다.
+     */
+    public DashboardResponse dashboard(Integer baseYear) {
         LocalDate today = LocalDate.now();
+        if (baseYear != null && (baseYear < 1990 || baseYear > 2100)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "기준 연도가 올바르지 않습니다: " + baseYear);
+        }
+        int by = baseYear == null ? today.getYear() : baseYear;
         int year = today.getYear();
         List<PiContract> all = contractRepository.findByDeletedYnOrderByContractIdAsc(N);
         Map<ContractStatus, Long> byStatus = all.stream()
@@ -286,7 +321,38 @@ public class PiContractService {
                 .limit(10)
                 .map(c -> ContractSummaryResponse.from(c, today))
                 .toList();
+        // ── 기준 연도 요약 ──
+        List<PiContract> inYear = all.stream().filter(c -> PiYearScope.inYear(c, by)).toList();
+        List<PiContract> ended = inYear.stream().filter(c -> PiYearScope.endedInYear(c, by, today)).toList();
+        List<PiContract> activeInYear = inYear.stream().filter(c -> !PiYearScope.endedInYear(c, by, today)).toList();
+        Set<Long> regularInspected = inspectionRepository.findByInspectionYearAndDeletedYn(by, N).stream()
+                .filter(i -> i.getInspectionType() == InspectionType.REGULAR)
+                .map(PiInspection::getContractId).collect(Collectors.toSet());
+        Set<Long> termChecked = inspectionRepository.findByInspectionTypeAndDeletedYn(InspectionType.TERMINATION, N).stream()
+                .map(PiInspection::getContractId).collect(Collectors.toSet());
+        long endedChecked = ended.stream().filter(c -> termChecked.contains(c.getContractId())).count();
+        // 선택 가능한 연도: 계약 시작·종료 연도 범위 + 올해 (최근 연도부터)
+        java.util.TreeSet<Integer> years = new java.util.TreeSet<>(Comparator.reverseOrder());
+        years.add(year);
+        years.add(by);
+        all.forEach(c -> {
+            if (c.getContractStartDate() != null) years.add(c.getContractStartDate().getYear());
+            if (c.getContractEndDate() != null && c.getContractEndDate().getYear() <= year + 1) years.add(c.getContractEndDate().getYear());
+        });
+        int minY = years.last();
+        int maxY = years.first();
+        List<Integer> available = new ArrayList<>();
+        for (int y = maxY; y >= Math.max(minY, maxY - 15); y--) available.add(y);
+
         return DashboardResponse.builder()
+                .baseYear(by)
+                .availableYears(available)
+                .yearTotalCount(inYear.size())
+                .yearActiveCount(activeInYear.size())
+                .yearActiveInspectedCount(activeInYear.stream().filter(c -> regularInspected.contains(c.getContractId())).count())
+                .yearEndedCount(ended.size())
+                .yearEndedTermCheckCount(endedChecked)
+                .yearEndedTermMissingCount(ended.size() - endedChecked)
                 .year(year)
                 .totalCount(all.size())
                 .activeCount(byStatus.getOrDefault(ContractStatus.ACTIVE, 0L))

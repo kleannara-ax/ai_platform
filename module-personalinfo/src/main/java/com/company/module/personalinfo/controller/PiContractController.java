@@ -54,11 +54,12 @@ public class PiContractController {
         return ResponseEntity.ok(ApiResponse.success(PiRoles.permissionsOf(authentication)));
     }
 
-    /** 목록 상단 요약 */
+    /** 목록 상단 요약 (baseYear: 기준 연도, 없으면 올해) */
     @GetMapping("/dashboard")
     @PreAuthorize(PiRoles.CAN_READ)
-    public ResponseEntity<ApiResponse<DashboardResponse>> dashboard() {
-        return ResponseEntity.ok(ApiResponse.success(contractService.dashboard()));
+    public ResponseEntity<ApiResponse<DashboardResponse>> dashboard(
+            @RequestParam(value = "baseYear", required = false) Integer baseYear) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.dashboard(baseYear)));
     }
 
     /** 계약 목록 (검색 + 페이징) */

@@ -87,3 +87,19 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-autofilled{animation:piAutofill 1.6s ease-out;}
 /* 위수탁 계약서: 체결일이 가장 최근인 계약서 강조 */
 .pi-table tr.pi-latest-doc td{background:#eef4ff;}
+/* 기준 연도 요약 카드 */
+.pi-year-stats{grid-template-columns:minmax(170px,.8fr) repeat(3,minmax(200px,1fr));}
+@media (max-width:900px){.pi-year-stats{grid-template-columns:repeat(2,minmax(160px,1fr));}}
+.pi-stat.active{border-color:#4f46e5;box-shadow:0 0 0 2px rgba(79,70,229,.18);}
+.pi-stat.pi-year-select{cursor:default;background:#f8faff;}
+.pi-stat.pi-year-select select{max-width:140px;margin:4px 0 2px;font-size:1rem;}
+.pi-stat .pi-sub{font-size:.78rem;margin-top:4px;line-height:1.6;}
+.pi-sub-link{border:1px solid var(--pi-line);background:#fff;border-radius:999px;padding:0 8px;font-size:.76rem;color:#334155;cursor:pointer;}
+.pi-sub-link:hover{border-color:#4f46e5;color:#4f46e5;}
+.pi-sub-link.ok{color:#166534;border-color:#bbf7d0;background:#f0fdf4;}
+.pi-sub-link.warn{color:#b45309;border-color:#fde68a;background:#fffbeb;}
+.pi-sub-link.active{outline:2px solid #4f46e5;outline-offset:0;}
+.pi-year-filter{font-size:.78rem;font-weight:600;color:#4f46e5;background:#eef2ff;border-radius:999px;padding:2px 10px;margin-left:6px;vertical-align:middle;}
+.pi-term-chip{display:inline-flex;align-items:center;gap:3px;font-size:.7rem;font-weight:600;border-radius:999px;padding:1px 7px;white-space:nowrap;}
+.pi-term-chip.ok{background:#dcfce7;color:#166534;}
+.pi-term-chip.miss{background:#fee2e2;color:#991b1b;}

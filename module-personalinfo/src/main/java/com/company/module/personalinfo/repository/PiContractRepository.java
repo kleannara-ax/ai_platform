@@ -1,5 +1,6 @@
 package com.company.module.personalinfo.repository;
 
+import com.company.module.personalinfo.entity.InspectionType;
 import com.company.module.personalinfo.entity.PiContract;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +25,9 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
      * 계약 상태는 DB 컬럼이 아니라 종료일/종료여부/알림기준일로 계산한다.
      * ({@link com.company.module.personalinfo.entity.ContractStatus} 와 같은 규칙)
      * DATEDIFF 는 MariaDB 함수이다(플랫폼 DB 고정).
+     *
+     * <p>기준 연도 조건(yearOn=1)은 {@link com.company.module.personalinfo.service.PiYearScope} 와 같은 규칙이다.
+     * 연도 대상 = 원계약 기간이 기준 연도에 걸친 계약, ENDED = 그 연도 안에 종료 처리 또는 만료, ACTIVE = 그 밖.</p>
      */
     @Query("""
             select c from PiContract c
@@ -48,6 +52,26 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                                                 and function('DATEDIFF', c.contractEndDate, :today) <= c.alertDaysBefore)
                     or (:status = 'ACTIVE'      and c.terminatedYn = 'N' and c.contractEndDate >= :today
                                                 and function('DATEDIFF', c.contractEndDate, :today) > c.alertDaysBefore))
+               and (:yearOn = 0 or (
+                        (c.contractStartDate is null or c.contractStartDate <= :yEnd)
+                    and (c.contractEndDate is null or c.contractEndDate >= :yStart)
+                    and (c.terminatedYn = 'N' or c.terminatedDate is null or c.terminatedDate >= :yStart)))
+               and (:yearStatus = ''
+                    or (:yearStatus = 'ENDED' and ((c.terminatedYn = 'Y' and (c.terminatedDate is null or c.terminatedDate <= :yEnd))
+                              or (c.terminatedYn = 'N' and c.contractEndDate is not null
+                                  and c.contractEndDate <= :yEnd and c.contractEndDate < :today)))
+                    or (:yearStatus = 'ACTIVE' and not ((c.terminatedYn = 'Y' and (c.terminatedDate is null or c.terminatedDate <= :yEnd))
+                              or (c.terminatedYn = 'N' and c.contractEndDate is not null
+                                  and c.contractEndDate <= :yEnd and c.contractEndDate < :today))))
+               and (:yearCheck = ''
+                    or (:yearCheck = 'INSPECTED' and exists (select 1 from PiInspection i where i.contractId = c.contractId
+                            and i.deletedYn = 'N' and i.inspectionType = :regularType and i.inspectionYear = :baseYear))
+                    or (:yearCheck = 'NOT_INSPECTED' and not exists (select 1 from PiInspection i where i.contractId = c.contractId
+                            and i.deletedYn = 'N' and i.inspectionType = :regularType and i.inspectionYear = :baseYear))
+                    or (:yearCheck = 'TERM_UPLOADED' and exists (select 1 from PiInspection i where i.contractId = c.contractId
+                            and i.deletedYn = 'N' and i.inspectionType = :terminationType))
+                    or (:yearCheck = 'TERM_MISSING' and not exists (select 1 from PiInspection i where i.contractId = c.contractId
+                            and i.deletedYn = 'N' and i.inspectionType = :terminationType)))
             """)
     Page<PiContract> search(@Param("keyword") String keyword,
                             @Param("deptName") String deptName,
@@ -58,6 +82,14 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                             @Param("endTo") LocalDate endTo,
                             @Param("status") String status,
                             @Param("today") LocalDate today,
+                            @Param("yearOn") int yearOn,
+                            @Param("baseYear") int baseYear,
+                            @Param("yStart") LocalDate yStart,
+                            @Param("yEnd") LocalDate yEnd,
+                            @Param("yearStatus") String yearStatus,
+                            @Param("yearCheck") String yearCheck,
+                            @Param("regularType") InspectionType regularType,
+                            @Param("terminationType") InspectionType terminationType,
                             Pageable pageable);
 
     /** 알림 대상 후보: 미종료 + 알림 사용 + 종료일이 기간 안에 있는 계약 */
