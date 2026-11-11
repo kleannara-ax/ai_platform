@@ -118,10 +118,17 @@ public class DailyReportService {
      * 저장할 때, 맨 앞에 붙는 고정문구 부분을 식별/분리하기 위한 패턴.
      * buildSafetySummaryText()가 만드는 문자열은 항상 "<"로 시작해 ">"로 끝나고
      * 그 사이에 ">" 문자가 절대 나오지 않으므로(숫자/쉼표/한글만 포함), 이 정규식
-     * 하나로 안전하게 식별할 수 있다. (바로 뒤 줄바꿈 1개까지 함께 제거)
+     * 하나로 안전하게 식별할 수 있다.
+     * ★★ 2026-11 추가 — 고정문구 바로 아래 "강제 빈 줄 1개"를 CSS가 아니라 DB
+     *   저장값 자체에 포함시키도록 변경되어(사용자 입장에서 엔터를 2번 친 것과
+     *   동일한 결과물이 PPT 캡처/다른 조회 화면 등 textarea 바깥 어디서
+     *   렌더링되어도 그대로 보존되어야 하므로), 신규 저장분은 고정문구 뒤에
+     *   줄바꿈이 2개(\n\n) 붙는다. 다만 이 기능 배포 이전에 저장된 기존 레코드는
+     *   줄바꿈이 1개(\n)뿐이므로, 두 경우 모두 안전하게 식별/제거할 수 있도록
+     *   뒤따르는 줄바꿈을 0~2개까지 허용한다(과거 데이터 호환).
      */
     private static final java.util.regex.Pattern SAFETY_SUMMARY_PREFIX_PATTERN =
-            java.util.regex.Pattern.compile("^<[^>\\n]*>\\n?");
+            java.util.regex.Pattern.compile("^<[^>\\n]*>\\n{0,2}");
 
     /** ★★ 사고 금액 특이사항표(TBL_SAFETY_AMOUNT_NOTE) 카테고리 — 제지/화장지/패드 3행
      *  (2026-09 신규). TBL_SPECIAL_NOTE의 PAPER/TISSUE/PAD와 같은 코드값을 재사용하지만,
@@ -683,15 +690,20 @@ public class DailyReportService {
         if (!matcher.find()) {
             return null;
         }
-        String matched = matcher.group(); // "<...>" 또는 "<...>\n"
-        return matched.endsWith("\n") ? matched.substring(0, matched.length() - 1) : matched;
+        String matched = matcher.group(); // "<...>", "<...>\n" 또는 "<...>\n\n"
+        // 뒤따르는 줄바꿈(0~2개)을 전부 제거하고 "<...>" 고정문구 자체만 반환한다.
+        int gt = matched.lastIndexOf('>');
+        return gt >= 0 ? matched.substring(0, gt + 1) : matched;
     }
 
     /**
      * ★★ 2026-10 추가, DB 영구 저장 개편 — DB content에서 맨 앞의 고정문구
-     * 스냅샷("<...>" + 뒤따르는 줄바꿈 1개)을 제거하고, 사용자가 실제로 입력한
+     * 스냅샷("<...>" + 뒤따르는 줄바꿈 0~2개)을 제거하고, 사용자가 실제로 입력한
      * 순수 텍스트만 남긴다. 고정문구가 없으면(과거에 저장된 레코드, 다른
      * 카테고리 등) 원본을 그대로 반환한다.
+     * ★★ 2026-11 추가 — 신규 저장분(줄바꿈 2개)과 과거 저장분(줄바꿈 1개) 모두
+     *   SAFETY_SUMMARY_PREFIX_PATTERN이 한 번에 흡수하므로 이 메서드는 그대로
+     *   둘 다 올바르게 처리한다(별도 분기 불필요).
      */
     private String stripSafetySummaryPrefix(String rawContent) {
         if (rawContent == null) {
@@ -706,6 +718,14 @@ public class DailyReportService {
      * 최종 content 문자열을 만든다. 표5/6이 아직 없는 등 고정문구를 계산할 수
      * 없으면(null) 순수 텍스트만 그대로 저장한다(기존 동작과 동일).
      * SAFETY 카테고리가 아니면 호출하지 않는다 — 호출측에서 분기한다.
+     * ★★ 2026-11 추가 — 고정문구와 사용자 텍스트 사이에 "강제 빈 줄 1개"가
+     *   들어가야 한다는 요구사항에 따라, 구분자를 줄바꿈 1개("\n")에서 2개
+     *   ("\n\n")로 변경한다. 이렇게 DB 저장값 자체에 빈 줄을 포함시켜야,
+     *   입력 화면(textarea)뿐 아니라 PPT 캡처·다른 조회 화면 등 content를
+     *   그대로 렌더링하는 모든 곳에서 빈 줄이 동일하게 보존된다(순수 CSS
+     *   margin만으로는 입력 화면 바깥에서 간격이 재현되지 않는 문제가 있었음).
+     *   사용자 텍스트가 비어 있으면(아직 아무도 안 썼음) 고정문구만 저장하고
+     *   불필요한 꼬리 빈 줄은 붙이지 않는다(기존 동작 유지).
      */
     private String composeSafetyContentForStorage(Long reportId, String userContent) {
         String safeUserContent = userContent == null ? "" : userContent;
@@ -713,7 +733,7 @@ public class DailyReportService {
         if (summary == null) {
             return safeUserContent;
         }
-        return safeUserContent.isEmpty() ? summary : summary + "\n" + safeUserContent;
+        return safeUserContent.isEmpty() ? summary : summary + "\n\n" + safeUserContent;
     }
 
     /**
