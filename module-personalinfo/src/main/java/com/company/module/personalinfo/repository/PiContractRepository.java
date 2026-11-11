@@ -27,7 +27,8 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
      * DATEDIFF 는 MariaDB 함수이다(플랫폼 DB 고정).
      *
      * <p>기준 연도 조건(yearOn=1)은 {@link com.company.module.personalinfo.service.PiYearScope} 와 같은 규칙이다.
-     * 연도 대상 = 원계약 기간이 기준 연도에 걸친 계약, ENDED = 그 연도 안에 종료 처리 또는 만료, ACTIVE = 그 밖.</p>
+     * 대상 = 시작일 ≤ 연말 이고 종료 기준일(종료 처리일 또는 원계약 종료일) ≥ 전년도 12/31,
+     * ENDED = 종료 기준일 &lt; 기준일(오늘을 그 연도 안으로 맞춘 날), ACTIVE = 그 밖.</p>
      */
     @Query("""
             select c from PiContract c
@@ -54,15 +55,16 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                                                 and function('DATEDIFF', c.contractEndDate, :today) > c.alertDaysBefore))
                and (:yearOn = 0 or (
                         (c.contractStartDate is null or c.contractStartDate <= :yEnd)
-                    and (c.contractEndDate is null or c.contractEndDate >= :yStart)
-                    and (c.terminatedYn = 'N' or c.terminatedDate is null or c.terminatedDate >= :yStart)))
+                    and ((c.terminatedYn = 'N' and (c.contractEndDate is null or c.contractEndDate >= :prevEnd))
+                         or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate >= :prevEnd)
+                              or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate >= :prevEnd)))))))
                and (:yearStatus = ''
-                    or (:yearStatus = 'ENDED' and ((c.terminatedYn = 'Y' and (c.terminatedDate is null or c.terminatedDate <= :yEnd))
-                              or (c.terminatedYn = 'N' and c.contractEndDate is not null
-                                  and c.contractEndDate <= :yEnd and c.contractEndDate < :today)))
-                    or (:yearStatus = 'ACTIVE' and not ((c.terminatedYn = 'Y' and (c.terminatedDate is null or c.terminatedDate <= :yEnd))
-                              or (c.terminatedYn = 'N' and c.contractEndDate is not null
-                                  and c.contractEndDate <= :yEnd and c.contractEndDate < :today))))
+                    or (:yearStatus = 'ENDED' and ((c.terminatedYn = 'N' and c.contractEndDate is not null and c.contractEndDate < :refDate)
+                              or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate < :refDate)
+                                   or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate < :refDate))))))
+                    or (:yearStatus = 'ACTIVE' and not ((c.terminatedYn = 'N' and c.contractEndDate is not null and c.contractEndDate < :refDate)
+                              or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate < :refDate)
+                                   or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate < :refDate)))))))
                and (:yearCheck = ''
                     or (:yearCheck = 'INSPECTED' and exists (select 1 from PiInspection i where i.contractId = c.contractId
                             and i.deletedYn = 'N' and i.inspectionType = :regularType and i.inspectionYear = :baseYear))
@@ -84,8 +86,9 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                             @Param("today") LocalDate today,
                             @Param("yearOn") int yearOn,
                             @Param("baseYear") int baseYear,
-                            @Param("yStart") LocalDate yStart,
+                            @Param("prevEnd") LocalDate prevEnd,
                             @Param("yEnd") LocalDate yEnd,
+                            @Param("refDate") LocalDate refDate,
                             @Param("yearStatus") String yearStatus,
                             @Param("yearCheck") String yearCheck,
                             @Param("regularType") InspectionType regularType,

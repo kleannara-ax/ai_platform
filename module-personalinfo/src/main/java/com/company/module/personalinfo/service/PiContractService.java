@@ -90,7 +90,8 @@ public class PiContractService {
                 cond.getEndDateFrom(), cond.getEndDateTo(),
                 upperOrEmpty(cond.getStatus(), Set.of("ACTIVE", "EXPIRING", "EXPIRED", "TERMINATED", "NO_END_DATE")),
                 today,
-                by == null ? 0 : 1, year, PiYearScope.yearStart(year), PiYearScope.yearEnd(year),
+                by == null ? 0 : 1, year, PiYearScope.prevYearEnd(year), PiYearScope.yearEnd(year),
+                PiYearScope.refDate(year, today),
                 yearStatus, yearCheck, InspectionType.REGULAR, InspectionType.TERMINATION,
                 pageable);
         Set<Long> termChecked = termCheckedIds(result.getContent().stream().map(PiContract::getContractId).toList());
@@ -269,7 +270,13 @@ public class PiContractService {
     @Transactional
     public ContractDetailResponse terminate(Long contractId, ContractTerminateRequest r, Long userId) {
         PiContract c = findActive(contractId);
-        c.terminate(r == null ? null : r.getTerminatedDate(), r == null ? null : trim(r.getReason()), userId);
+        // 종료일 기본값 = 원계약 종료일 (없으면 오늘)
+        LocalDate date = r != null && r.getTerminatedDate() != null ? r.getTerminatedDate()
+                : (c.getContractEndDate() != null ? c.getContractEndDate() : LocalDate.now());
+        if (c.getContractStartDate() != null && date.isBefore(c.getContractStartDate())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "종료일은 원계약 시작일보다 빠를 수 없습니다.");
+        }
+        c.terminate(date, r == null ? null : trim(r.getReason()), userId);
         return getDetail(contractId);
     }
 
@@ -346,6 +353,7 @@ public class PiContractService {
 
         return DashboardResponse.builder()
                 .baseYear(by)
+                .refDate(PiYearScope.refDate(by, today))
                 .availableYears(available)
                 .yearTotalCount(inYear.size())
                 .yearActiveCount(activeInYear.size())

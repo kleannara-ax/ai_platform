@@ -152,9 +152,11 @@
 
   /**
    * 목록 상단 요약 (기준 연도 기준)
-   *  - 전체 계약 : 원계약 기간이 기준 연도에 걸친 계약
-   *  - 계약중   : 그중 기준 연도에 끝나지 않은 계약 + 수탁사 정기 점검 완료 건수
-   *  - 종료     : 그중 기준 연도 안에 종료 처리·만료된 계약 + 계약종결 체크(계약변경·만료 점검) 업로드 여부
+   *  - 기준일   : 지난 연도 12/31, 올해는 오늘(조회 시점), 앞으로 올 연도 1/1
+   *  - 전체 계약 : 시작일 ≤ 연말, 종료 기준일(종료 처리일 또는 원계약 종료일) ≥ 전년도 12/31
+   *  - 계약중   : 기준일에 계약기간 안 + 수탁사 정기 점검 완료 건수
+   *  - 종료     : 기준일에 계약기간 밖 + 계약종결 체크(계약변경·만료 점검) 업로드 여부
+   *    (예: 2025.12.31 종료 → 2025년 계약중, 2026년 종료)
    * 카드·작은 숫자를 누르면 그 조건으로 목록을 거른다.
    */
   async function loadDashboard() {
@@ -171,7 +173,7 @@
           <label class="label" for="base-year">기준 연도</label>
           <select class="form-select form-select-sm fw-bold" id="base-year" aria-label="기준 연도">
             ${years.map((y) => `<option value="${y}" ${y === d.baseYear ? 'selected' : ''}>${y}년</option>`).join('')}</select>
-          <div class="pi-sub text-muted">원계약 기간이 ${d.baseYear}년에 걸친 계약</div>
+          <div class="pi-sub text-muted" title="지난 연도는 12월 31일, 올해는 오늘 기준으로 계약기간 안이면 계약중, 밖이면 종료">기준일 ${fmtDate(d.refDate)} · 계약기간 안이면 계약중</div>
         </div>
         <div class="pi-stat ${on('', '') ? 'active' : ''}" data-ys="" data-yc="" role="button" tabindex="0" id="stat-year-total">
           <div class="label">전체 계약</div><div class="value" style="color:#111827">${d.yearTotalCount}</div>
@@ -843,10 +845,17 @@
       if (!confirm(`'${c.vendorName}' 계약을 삭제합니다. (첨부/점검 이력도 함께 숨겨집니다)`)) return;
       try { await PI_API.deleteContract(id); notify('삭제되었습니다.'); go('#/contracts'); } catch (e) { fail(e); }
     });
-    document.getElementById('btn-terminate')?.addEventListener('click', async () => {
-      const reason = prompt('계약 종료 사유를 입력하세요. (종료 처리하면 만료 알림이 중단됩니다)\n종료 시 "계약변경·만료 점검" 체크리스트 업로드를 권장합니다.', '계약 만료');
-      if (reason === null) return;
-      try { await PI_API.terminateContract(id, { reason }); notify('계약 종료 처리되었습니다.'); reload(); } catch (e) { fail(e); }
+    document.getElementById('btn-terminate')?.addEventListener('click', () => {
+      // 종료일 기본값 = 원계약 종료일 (없으면 오늘)
+      const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      const dateEl = document.getElementById('term-date');
+      dateEl.value = c.contractEndDate || today;
+      dateEl.min = c.contractStartDate || '';
+      document.getElementById('term-reason').value = '계약 만료';
+      document.getElementById('term-date-hint').textContent = c.contractEndDate
+        ? `기본값은 원계약 종료일(${fmtDate(c.contractEndDate)})입니다. 중도 해지 등은 실제 종료일로 바꾸세요.`
+        : '원계약 종료일이 없어 오늘 날짜를 기본값으로 넣었습니다.';
+      modal('terminate-modal').show();
     });
     document.getElementById('btn-reopen')?.addEventListener('click', async () => {
       if (!confirm('계약 종료 처리를 취소합니다.')) return;
@@ -1144,6 +1153,21 @@
       notify(`업로드 완료: ${r.resultLabel} (Y ${r.yCount} / N ${r.nCount} / NA ${r.naCount} / 미기재 ${r.blankCount})${warn}`, r.result === 'PASS' && !warn ? 'success' : 'warning');
       renderDetail(currentContract.contractId);
     } catch (err) { fail(err); } finally { if (btn) btn.disabled = false; }
+  });
+
+  document.getElementById('terminate-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    if (!f.reportValidity()) return;
+    const body = { terminatedDate: f.terminatedDate.value, reason: f.reason.value || null };
+    const btn = document.getElementById('btn-term-save');
+    btn.disabled = true;
+    try {
+      await PI_API.terminateContract(currentContract.contractId, body);
+      modal('terminate-modal').hide();
+      notify(`계약 종료 처리되었습니다. (종료일 ${fmtDate(body.terminatedDate)})`);
+      renderDetail(currentContract.contractId);
+    } catch (err) { fail(err); } finally { btn.disabled = false; }
   });
 
   document.getElementById('mail-form').addEventListener('submit', async (e) => {

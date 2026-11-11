@@ -82,6 +82,31 @@
   </div></div>
 </div>
 
+<!-- 계약 종료 처리 -->
+<div class="modal fade" id="terminate-modal" tabindex="-1" aria-labelledby="terminate-modal-title" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <form id="terminate-form" novalidate>
+      <div class="modal-header"><h5 class="modal-title" id="terminate-modal-title">계약 종료 처리</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <label class="form-label pi-required" for="term-date">종료일</label>
+        <input type="date" class="form-control" id="term-date" name="terminatedDate" required>
+        <small class="text-muted d-block mt-1" id="term-date-hint"></small>
+        <label class="form-label mt-3" for="term-reason">종료 사유</label>
+        <input class="form-control" id="term-reason" name="reason" maxlength="500" value="계약 만료">
+        <div class="alert alert-light border small mt-3 mb-0">
+          <i class="fas fa-circle-info me-1"></i>종료 처리하면 만료 알림이 중단됩니다. 기준 연도 요약에서는 <b>종료일이 지난 해부터 '종료'</b>로 잡힙니다
+          (예: 2025.12.31 종료 → 2025년 계약중, 2026년 종료).<br>종료 시 <b>계약변경·만료 점검(계약종결 체크)</b> 체크리스트 업로드를 권장합니다.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary" id="btn-term-save"><i class="fas fa-ban me-1"></i>종료 처리</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
 <!-- 업체별 점검 체크리스트 업로드 팝업 (목록의 업체명 클릭 / 상세의 [업체 계약 일괄 업로드]) -->
 <div class="modal fade" id="vendor-checklist-modal" tabindex="-1" aria-labelledby="vendor-modal-heading" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
