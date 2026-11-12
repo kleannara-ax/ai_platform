@@ -103,3 +103,14 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-term-chip{display:inline-flex;align-items:center;gap:3px;font-size:.7rem;font-weight:600;border-radius:999px;padding:1px 7px;white-space:nowrap;}
 .pi-term-chip.ok{background:#dcfce7;color:#166534;}
 .pi-term-chip.miss{background:#fee2e2;color:#991b1b;}
+/* 담당자 이력: 행 클릭 → 내역 팝업 */
+#contact-history-table tr.pi-ch-row{cursor:pointer;}
+#contact-history-table tr.pi-ch-row:hover td{background:#f5f7ff;}
+#contact-history-table tr.pi-ch-row:focus-visible{outline:2px solid #4f46e5;outline-offset:-2px;}
+.pi-ch-contract-link{color:#4f46e5;text-decoration:underline;text-underline-offset:2px;}
+.pi-ch-diff th{background:#f8fafc;font-weight:600;font-size:.82rem;}
+.pi-ch-diff tbody th{color:#475569;}
+.pi-ch-diff tr.pi-ch-diff-changed td{background:#fffbeb;}
+.pi-dl-compact{display:grid;grid-template-columns:200px 1fr;gap:6px 12px;margin:0;font-size:.88rem;}
+.pi-dl-compact dt{color:#475569;font-weight:600;}
+.pi-dl-compact dd{margin:0;}

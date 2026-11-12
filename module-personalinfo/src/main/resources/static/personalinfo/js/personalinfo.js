@@ -814,12 +814,12 @@
       body.innerHTML = `
         <div class="table-responsive"><table class="pi-table" id="contact-history-table"><thead><tr>
           <th>변경일시</th><th>구분</th>${vendorWide ? '<th>계약 (관련 서비스)</th>' : ''}
-          <th>계약기간</th><th>위탁사 담당부서</th><th>위탁사 담당자</th><th>담당자 이메일</th><th>변경자</th></tr></thead>
-          <tbody>${list.map((h) => `
-            <tr class="${h.currentContract ? '' : 'pi-ch-other'}" style="cursor:default">
+          <th>계약기간</th><th>담당부서</th><th>담당자</th><th>담당자 이메일</th><th>변경자</th></tr></thead>
+          <tbody>${list.map((h, i) => `
+            <tr class="pi-ch-row ${h.currentContract ? '' : 'pi-ch-other'}" data-idx="${i}" tabindex="0" role="button" title="클릭하면 이 이력의 내역을 봅니다">
               <td class="text-nowrap">${fmtDateTime(h.changedAt)}</td>
               <td class="text-nowrap"><span class="pi-status ${h.changeType === 'UPDATE' ? 'EXPIRING' : 'NONE'}">${esc(h.changeTypeLabel)}</span></td>
-              ${vendorWide ? `<td>${h.currentContract ? '<b>이 계약</b>' : `<a href="#/contracts/${h.contractId}">${esc(h.vendorName || '')}</a>`}
+              ${vendorWide ? `<td>${h.currentContract ? '<b>이 계약</b>' : `<span class="pi-ch-contract-link">${esc(h.vendorName || '')}</span>`}
                 <small class="text-muted d-block">${esc(h.serviceName || '-')}</small></td>` : ''}
               <td class="text-nowrap">${esc(periodText(h))}${(h.contractStartDate || h.contractEndDate) && h.contractPeriodNote ? `<small class="text-muted d-block">${esc(h.contractPeriodNote)}</small>` : ''}</td>
               <td>${cell(h, 'DEPT_NAME', h.deptName)}</td>
@@ -827,9 +827,77 @@
               <td>${cell(h, 'MANAGER_EMAIL', h.managerEmail)}</td>
               <td class="text-nowrap">${esc(h.changedByName || (h.changeType === 'INITIAL' ? '시스템' : '-'))}</td>
             </tr>`).join('')}</tbody></table></div>
-        <small class="text-muted">위탁사(당사) 담당자가 바뀔 때만 기록합니다(수탁사 담당자·연락처 변경은 기록하지 않음). 각 행은 변경 <b>후</b> 담당자와 그 시점의 계약기간이며, <span class="pi-ch-changed">노란색</span>은 그 이력에서 바뀐 항목입니다.${vendorWide ? ' 같은 업체(㈜·(주)·공백 차이 무시)의 다른 계약 이력도 함께 보여줍니다.' : ''}</small>`;
+        <small class="text-muted">위탁사(당사) 담당자가 바뀔 때만 기록합니다(수탁사 담당자·연락처 변경은 기록하지 않음). 각 행은 변경 <b>후</b> 담당자와 그 시점의 계약기간이며, <span class="pi-ch-changed">노란색</span>은 그 이력에서 바뀐 항목입니다.${vendorWide ? ' 같은 업체(㈜·(주)·공백 차이 무시)의 다른 계약 이력도 함께 보여줍니다.' : ''} <b>행을 누르면 그 시점의 내역(변경 전·후, 계약 정보)을 팝업으로 봅니다.</b></small>`;
+      body.querySelectorAll('tr.pi-ch-row').forEach((tr) => {
+        const open = () => openContactHistoryDetail(list, Number(tr.dataset.idx));
+        tr.addEventListener('click', open);
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+      });
     } catch (e) {
       body.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
+    }
+  }
+
+  /**
+   * 담당자 이력 행 클릭 → 그 시점 내역 팝업
+   *  - 변경 전 → 변경 후 (같은 계약의 바로 이전 이력과 비교)
+   *  - 그 시점의 계약기간·변경자·변경일시
+   *  - 해당 계약의 현재 정보 (이전/다른 계약이면 [이 계약 상세로 이동])
+   */
+  const contractCache = new Map();
+  async function openContactHistoryDetail(list, idx) {
+    const h = list[idx];
+    if (!h) return;
+    const prev = list.slice(idx + 1).find((x) => x.contractId === h.contractId) || null;
+    const body = document.getElementById('contact-history-modal-body');
+    const gotoBtn = document.getElementById('btn-ch-goto');
+    const isCurrent = h.currentContract;
+    gotoBtn.classList.toggle('d-none', isCurrent);
+    gotoBtn.onclick = () => { modal('contact-history-modal').hide(); go('#/contracts/' + h.contractId); };
+    document.getElementById('contact-history-modal-title').innerHTML =
+      `<i class="fas fa-clock-rotate-left me-2 text-primary"></i>담당자 이력 내역 <small class="text-muted fw-normal ms-1">${fmtDateTime(h.changedAt)} · ${esc(h.changeTypeLabel)}</small>`;
+
+    const rows = [
+      ['계약기간', prev ? periodText(prev) : null, periodText(h)],
+      ['계약기간 비고', prev ? prev.contractPeriodNote : null, h.contractPeriodNote],
+      ['담당부서', prev ? prev.deptName : null, h.deptName],
+      ['담당자', prev ? prev.managerName : null, h.managerName],
+      ['담당자 이메일', prev ? prev.managerEmail : null, h.managerEmail],
+    ];
+    const diffTable = `
+      <table class="pi-table pi-ch-diff mb-2"><thead><tr><th style="width:140px">항목</th><th>변경 전</th><th></th><th>변경 후 (이 이력)</th></tr></thead>
+        <tbody>${rows.map(([k, b, a]) => {
+          const changed = prev && String(b || '') !== String(a || '');
+          return `<tr class="${changed ? 'pi-ch-diff-changed' : ''}"><th>${esc(k)}</th>
+            <td class="text-muted">${prev ? esc(b || '-') : '<span class="text-muted">(처음 기록)</span>'}</td>
+            <td class="text-center">${changed ? '<i class="fas fa-arrow-right text-warning"></i>' : ''}</td>
+            <td>${changed ? `<span class="pi-ch-changed">${esc(a || '-')}</span>` : esc(a || '-')}</td></tr>`;
+        }).join('')}</tbody></table>
+      <p class="small text-muted mb-3">변경자 <b>${esc(h.changedByName || (h.changeType === 'INITIAL' ? '시스템' : '-'))}</b> · 변경일시 ${fmtDateTime(h.changedAt)}
+        ${prev ? ` · 비교 대상: ${fmtDateTime(prev.changedAt)} 이력` : ' · 이 계약의 첫 이력입니다'}</p>`;
+    body.innerHTML = diffTable + '<div id="ch-modal-contract"><div class="pi-empty">계약 정보를 불러오는 중...</div></div>';
+    modal('contact-history-modal').show();
+
+    try {
+      let c = contractCache.get(h.contractId);
+      if (!c) { c = await PI_API.getContract(h.contractId); contractCache.set(h.contractId, c); }
+      const row = (k, v) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
+      const docs = (c.files || []).filter((f) => f.fileType === 'CONTRACT');
+      const latestDoc = docs.find((f) => f.latestContractDoc);
+      document.getElementById('ch-modal-contract').innerHTML = `
+        <h6 class="fw-bold mb-2"><i class="fas fa-building me-1"></i>${isCurrent ? '이 계약' : '해당 계약'} 정보
+          <small class="text-muted fw-normal">(현재 기준)</small> ${badge(c.status, c.statusLabel)}</h6>
+        <dl class="pi-dl pi-dl-compact">
+          ${row('수탁업체 / 관련 서비스', esc(c.vendorName) + ' / ' + esc(c.serviceName || '-'))}
+          ${row('위탁업무 내용', esc(c.entrustedTask || '-'))}
+          ${row('원계약 기간', (c.contractStartDate || c.contractEndDate) ? fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate) : esc(c.contractPeriodNote || '-'))}
+          ${row('현재 담당부서 / 담당자', esc(c.deptName || '-') + ' / ' + esc(c.managerName || '-') + (c.managerEmail ? ' <small class="text-muted">(' + esc(c.managerEmail) + ')</small>' : ''))}
+          ${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate) + (docs.length ? ` <small class="text-muted">(위수탁 계약서 ${docs.length}건${latestDoc ? ', 최신 ' + esc(latestDoc.originalName) : ''})</small>` : ''))}
+          ${row('최근 점검', badge(c.lastInspectionResult || 'NONE', c.lastInspectionResultLabel) + (c.lastInspectionDate ? ' ' + fmtDate(c.lastInspectionDate) : ''))}
+          ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-')) : ''}
+        </dl>`;
+    } catch (e) {
+      document.getElementById('ch-modal-contract').innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
     }
   }
 
