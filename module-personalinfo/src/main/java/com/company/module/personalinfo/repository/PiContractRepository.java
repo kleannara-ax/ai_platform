@@ -34,6 +34,7 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
             select c from PiContract c
              where c.deletedYn = 'N'
                and (:keyword = '' or c.vendorName like concat('%', :keyword, '%')
+                                  or c.contractName like concat('%', :keyword, '%')
                                   or c.serviceName like concat('%', :keyword, '%')
                                   or c.entrustedTask like concat('%', :keyword, '%')
                                   or c.subcontractorName like concat('%', :keyword, '%'))

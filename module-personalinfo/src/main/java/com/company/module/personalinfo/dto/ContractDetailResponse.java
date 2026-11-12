@@ -17,6 +17,7 @@ public class ContractDetailResponse {
     private Long contractId;
     private String ismsScopeYn;
     private String vendorName;
+    private String contractName;
     private String serviceName;
     private String entrustedTask;
     private String deptName;
@@ -70,6 +71,7 @@ public class ContractDetailResponse {
                 .contractId(c.getContractId())
                 .ismsScopeYn(c.getIsmsScopeYn())
                 .vendorName(c.getVendorName())
+                .contractName(c.getContractName())
                 .serviceName(c.getServiceName())
                 .entrustedTask(c.getEntrustedTask())
                 .deptName(c.getDeptName())

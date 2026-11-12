@@ -111,6 +111,20 @@ public class PiContractController {
     }
 
     /** 협력사 담당자 변경 이력 (vendorWide=true 이면 같은 업체의 모든 계약 이력) */
+    /** 같은 업체의 계약 목록 (이 계약 포함, 업체명 정규화 기준) */
+    @GetMapping("/contracts/{contractId}/same-vendor")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<ApiResponse<List<ContractSummaryResponse>>> sameVendor(@PathVariable Long contractId) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.getSameVendorContracts(contractId)));
+    }
+
+    /** 업체명으로 그 업체의 계약 목록 (등록 화면에서 같은 업체 계약 안내용) */
+    @GetMapping("/vendor-contracts")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<ApiResponse<List<ContractSummaryResponse>>> vendorContracts(@RequestParam("vendorName") String vendorName) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.findVendorContracts(vendorName)));
+    }
+
     @GetMapping("/contracts/{contractId}/contact-history")
     @PreAuthorize(PiRoles.CAN_READ)
     public ResponseEntity<ApiResponse<List<ContactHistoryResponse>>> contactHistory(

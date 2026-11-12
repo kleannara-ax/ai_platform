@@ -298,6 +298,7 @@ public class PiAlertMailService {
             default -> "계약 만료 " + stage.replace("D-", "") + "일 전";
         };
         return subjectPrefix + " " + when + " - " + c.getVendorName()
+                + (StringUtils.hasText(c.getContractName()) ? " / " + c.getContractName() : "")
                 + (c.getContractEndDate() == null ? "" : " (" + c.getContractEndDate().format(D) + ")");
     }
 
@@ -307,6 +308,9 @@ public class PiAlertMailService {
                 : (daysLeft == 0 ? "오늘 만료" : daysLeft + "일 남음"));
         List<String[]> rows = new ArrayList<>();
         rows.add(new String[]{"수탁업체명", c.getVendorName()});
+        if (StringUtils.hasText(c.getContractName())) {
+            rows.add(new String[]{"계약명", c.getContractName()});
+        }
         rows.add(new String[]{"관련 서비스", c.getServiceName()});
         rows.add(new String[]{"위탁업무 내용", c.getEntrustedTask()});
         rows.add(new String[]{"담당부서 / 담당자", nz(c.getDeptName()) + " / " + nz(c.getManagerName())});

@@ -20,6 +20,8 @@ public class ContactHistoryResponse {
     private String changeTypeLabel;
     private String vendorName;
     private String serviceName;
+    /** 해당 계약의 현재 계약명 (이력에는 저장하지 않고 조회 시 채움) */
+    private String contractName;
     private String deptName;
     private String managerName;
     private String managerEmail;
@@ -59,6 +61,11 @@ public class ContactHistoryResponse {
     }
 
     /** 기록된 변경 항목 중 이력 대상(위탁사 담당자) 항목만 */
+    public ContactHistoryResponse withContractName(String name) {
+        this.contractName = name;
+        return this;
+    }
+
     public static List<String> changedTrackedFields(PiContactHistory h) {
         String f = h.getChangedFields();
         if (f == null || f.isBlank()) {

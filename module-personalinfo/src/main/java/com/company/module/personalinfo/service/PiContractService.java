@@ -58,6 +58,7 @@ public class PiContractService {
     private static final Map<String, String> SORTABLE = Map.of(
             "contractEndDate", "contractEndDate",
             "vendorName", "vendorName",
+            "contractName", "contractName",
             "serviceName", "serviceName",
             "deptName", "deptName",
             "lastInspectionDate", "lastInspectionDate",
@@ -95,7 +96,42 @@ public class PiContractService {
                 yearStatus, yearCheck, InspectionType.REGULAR, InspectionType.TERMINATION,
                 pageable);
         Set<Long> termChecked = termCheckedIds(result.getContent().stream().map(PiContract::getContractId).toList());
-        return result.map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId())));
+        Map<String, Long> vendorCounts = result.isEmpty() ? Map.of() : vendorContractCounts();
+        return result.map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId()),
+                vendorCounts.getOrDefault(PiVendorNames.key(c.getVendorName()), 1L).intValue()));
+    }
+
+    /** 업체(업체명 정규화 키)별 계약 수 (삭제 제외, 종료 포함) */
+    private Map<String, Long> vendorContractCounts() {
+        return contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+                .collect(Collectors.groupingBy(c -> PiVendorNames.key(c.getVendorName()), Collectors.counting()));
+    }
+
+    /**
+     * 같은 업체의 계약 목록 (이 계약 포함). 업체명 정규화 규칙(㈜·(주)·주식회사·공백·대소문자 무시)으로 묶는다.
+     * 계약중(종료 아님) → 원계약 시작일 순으로 정렬.
+     */
+    public List<ContractSummaryResponse> getSameVendorContracts(Long contractId) {
+        PiContract base = findActive(contractId);
+        return findVendorContracts(base.getVendorName());
+    }
+
+    /** 업체명으로 그 업체의 계약 목록 (업체명 정규화 기준, 삭제 제외) */
+    public List<ContractSummaryResponse> findVendorContracts(String vendorName) {
+        LocalDate today = LocalDate.now();
+        String key = PiVendorNames.key(vendorName);
+        if (key.isEmpty()) {
+            return List.of();
+        }
+        List<PiContract> list = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+                .filter(c -> PiVendorNames.key(c.getVendorName()).equals(key))
+                .sorted(Comparator.comparing((PiContract c) -> "Y".equals(c.getTerminatedYn()))
+                        .thenComparing(PiContract::getContractStartDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(PiContract::getContractId))
+                .toList();
+        Set<Long> termChecked = termCheckedIds(list.stream().map(PiContract::getContractId).toList());
+        int n = list.size();
+        return list.stream().map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId()), n)).toList();
     }
 
     /** 계약종결 체크(계약변경·만료 점검)를 업로드한 계약 ID */
@@ -134,6 +170,7 @@ public class PiContractService {
         PiContract contract = PiContract.builder()
                 .ismsScopeYn(r.getIsmsScopeYn())
                 .vendorName(trim(r.getVendorName()))
+                .contractName(trim(r.getContractName()))
                 .serviceName(trim(r.getServiceName()))
                 .entrustedTask(trim(r.getEntrustedTask()))
                 .deptName(trim(r.getDeptName()))
@@ -176,7 +213,8 @@ public class PiContractService {
         validate(r);
         PiContract c = findActive(contractId);
         String[] before = contactValues(c);
-        c.update(r.getIsmsScopeYn(), trim(r.getVendorName()), trim(r.getServiceName()), trim(r.getEntrustedTask()),
+        c.update(r.getIsmsScopeYn(), trim(r.getVendorName()), trim(r.getContractName()), trim(r.getServiceName()),
+                trim(r.getEntrustedTask()),
                 trim(r.getDeptName()), trim(r.getManagerName()), trim(r.getManagerEmail()),
                 trim(r.getVendorContactName()), trim(r.getVendorContactEmail()), trim(r.getVendorContactPhone()),
                 r.getContractStartDate(), r.getContractEndDate(), trim(r.getContractPeriodNote()),
@@ -196,12 +234,15 @@ public class PiContractService {
     public List<ContactHistoryResponse> getContactHistory(Long contractId, boolean vendorWide) {
         PiContract c = findActive(contractId);
         List<Long> ids;
+        Map<Long, String> names = new java.util.HashMap<>();
         if (vendorWide) {
             String key = PiVendorNames.key(c.getVendorName());
-            ids = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
-                    .filter(x -> PiVendorNames.key(x.getVendorName()).equals(key))
-                    .map(PiContract::getContractId).toList();
+            List<PiContract> same = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+                    .filter(x -> PiVendorNames.key(x.getVendorName()).equals(key)).toList();
+            same.forEach(x -> { if (x.getContractName() != null) names.put(x.getContractId(), x.getContractName()); });
+            ids = same.stream().map(PiContract::getContractId).toList();
         } else {
+            if (c.getContractName() != null) names.put(contractId, c.getContractName());
             ids = List.of(contractId);
         }
         // 위탁사 담당자 항목이 바뀌지 않은 '담당자 변경' 건(예: 이전 버전에서 수탁사 담당자만 바뀌어 남은 이력)은 보여주지 않는다
@@ -209,7 +250,7 @@ public class PiContractService {
                 .stream()
                 .filter(h -> h.getChangeType() != ContactChangeType.UPDATE
                         || !ContactHistoryResponse.changedTrackedFields(h).isEmpty())
-                .map(h -> ContactHistoryResponse.of(h, contractId)).toList();
+                .map(h -> ContactHistoryResponse.of(h, contractId).withContractName(names.get(h.getContractId()))).toList();
     }
 
     /** 이력 대상: 위탁사(당사) 담당부서·담당자·이메일. 수탁사 담당자·연락처는 대상 아님 */

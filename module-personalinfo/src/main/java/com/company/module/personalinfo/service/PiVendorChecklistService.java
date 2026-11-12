@@ -231,6 +231,7 @@ public class PiVendorChecklistService {
             return VendorSummaryResponse.VendorContractItem.builder()
                     .contractId(c.getContractId())
                     .vendorName(c.getVendorName())
+                    .contractName(c.getContractName())
                     .serviceName(c.getServiceName())
                     .entrustedTask(c.getEntrustedTask())
                     .deptName(c.getDeptName())

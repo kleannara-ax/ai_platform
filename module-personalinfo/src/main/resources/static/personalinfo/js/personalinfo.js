@@ -26,6 +26,8 @@
   const yn = (v) => (v === 'Y' ? 'Y' : v === 'N' ? 'N' : '-');
   const fmtSize = (n) => (n == null ? '-' : n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
   const badge = (code, label) => `<span class="pi-status ${esc(code || 'NONE')}">${esc(label || code || '-')}</span>`;
+  /** 계약 표시 이름: 계약명 → 없으면 관련 서비스 */
+  const contractLabel = (r) => r.contractName || r.serviceName || '-';
   const dLabel = (days) => (days == null ? '-' : days < 0 ? `만료 ${-days}일 경과` : days === 0 ? '오늘 만료' : `D-${days}`);
 
   function notify(message, type = 'success') {
@@ -46,6 +48,7 @@
     try {
       if (hash === '#/contracts' || hash === '#/' || hash === '') return await renderList();
       if (hash === '#/contracts/new') return renderForm(null);
+      if ((m = hash.match(/^#\/contracts\/new\?vendor=(.*)$/))) return renderForm(null, decodeURIComponent(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)\/edit$/))) return renderForm(await PI_API.getContract(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)$/))) return await renderDetail(m[1]);
       go('#/contracts');
@@ -63,7 +66,7 @@
       <section class="pi-card" id="contract-search-section">
         <form id="contract-search-form" class="row g-2 align-items-end">
           <div class="col-md-3"><label class="form-label small" for="s-keyword">통합검색</label>
-            <input class="form-control form-control-sm" id="s-keyword" name="keyword" placeholder="수탁업체/서비스/위탁업무/재위탁업체" value="${esc(c.keyword)}"></div>
+            <input class="form-control form-control-sm" id="s-keyword" name="keyword" placeholder="수탁업체/계약명/서비스/위탁업무/재위탁업체" value="${esc(c.keyword)}"></div>
           <div class="col-md-2"><label class="form-label small" for="s-dept">담당부서</label>
             <input class="form-control form-control-sm" id="s-dept" name="deptName" value="${esc(c.deptName)}"></div>
           <div class="col-md-1"><label class="form-label small" for="s-manager">담당자</label>
@@ -107,7 +110,7 @@
             <i class="fas fa-arrows-left-right me-1"></i>열 너비 초기화</button>
           <select class="form-select form-select-sm w-auto" id="s-sort" aria-label="정렬">
             ${opt('contractEndDate,asc', '종료일 빠른순', listState.sort)}${opt('contractEndDate,desc', '종료일 늦은순', listState.sort)}
-            ${opt('vendorName,asc', '업체명순', listState.sort)}${opt('createdAt,desc', '최근 등록순', listState.sort)}
+            ${opt('vendorName,asc', '업체명순', listState.sort)}${opt('contractName,asc', '계약명순', listState.sort)}${opt('createdAt,desc', '최근 등록순', listState.sort)}
             ${opt('lastInspectionDate,asc', '점검일 오래된순', listState.sort)}
           </select>
           </div>
@@ -225,8 +228,9 @@
   const CONTRACT_COLS = [
     { key: 'no', label: 'No', width: 52, min: 40 },
     { key: 'isms', label: 'ISMS', width: 78, min: 64 },
-    { key: 'vendor', label: '수탁업체명', width: 150, min: 80 },
-    { key: 'service', label: '관련 서비스', width: 120, min: 70 },
+    { key: 'vendor', label: '수탁업체명', width: 170, min: 90 },
+    { key: 'cname', label: '계약명', width: 170, min: 80 },
+    { key: 'service', label: '관련 서비스', width: 110, min: 70 },
     { key: 'task', label: '위탁업무 내용', width: 240, min: 90 },
     { key: 'dept', label: '담당부서', width: 110, min: 70 },
     { key: 'manager', label: '담당자', width: 80, min: 72 },
@@ -338,9 +342,11 @@
           <tr data-id="${r.contractId}">
             <td class="pi-cell">${page.page * page.size + i + 1}</td>
             <td class="pi-cell pi-flag-cell">${flagCell(r, 'ismsScopeYn', 'ISMS 인증 여부')}</td>
-            <td class="pi-cell fw-semibold" title="${esc(r.vendorName)}">${perm.canWrite
+            <td class="pi-cell fw-semibold" title="${esc(r.vendorName)}"><div class="pi-vendor-cell">${perm.canWrite
               ? `<button type="button" class="pi-vendor-link" data-vendor="${esc(r.vendorName)}" title="업체별 점검 체크리스트 업로드">${esc(r.vendorName)}</button>`
-              : esc(r.vendorName)}</td>
+              : `<span class="pi-vendor-name">${esc(r.vendorName)}</span>`}${r.sameVendorContractCount > 1
+              ? `<button type="button" class="pi-vendor-count" data-vendor="${esc(r.vendorName)}" title="이 업체의 계약 ${r.sameVendorContractCount}건 보기">계약 ${r.sameVendorContractCount}건</button>` : ''}</div></td>
+            <td class="pi-cell" title="${esc(r.contractName || '')}">${r.contractName ? esc(r.contractName) : '<span class="text-muted">-</span>'}</td>
             <td class="pi-cell" title="${esc(r.serviceName || '')}">${esc(r.serviceName || '-')}</td>
             <td class="pi-cell" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
             <td class="pi-cell" title="${esc(r.deptName || '')}">${esc(r.deptName || '-')}</td>
@@ -370,6 +376,10 @@
         tbody.querySelectorAll('.pi-vendor-link').forEach((b) => b.addEventListener('click', (e) => {
           e.stopPropagation();   // 행 클릭(상세 이동) 대신 팝업
           openVendorChecklist(b.dataset.vendor);
+        }));
+        tbody.querySelectorAll('.pi-vendor-count').forEach((b) => b.addEventListener('click', (e) => {
+          e.stopPropagation();   // 같은 업체 계약 목록 팝업
+          openVendorContracts(b.dataset.vendor);
         }));
       }
       renderPager(page);
@@ -455,10 +465,10 @@
   }
 
   // ──────────────── 2·4. 등록 / 수정 화면 ────────────────
-  function renderForm(c) {
+  function renderForm(c, presetVendor) {
     if (!perm.canWrite) { notify('등록/수정 권한이 없습니다.', 'warning'); go(c ? '#/contracts/' + c.contractId : '#/contracts'); return; }
     const isEdit = !!c;
-    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30 };
+    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
     crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${isEdit ? `<a href="#/contracts/${c.contractId}">${esc(c.vendorName)}</a> &gt; 수정` : '계약 등록'}`;
     const radio = (name, value) => `
       <div class="btn-group btn-group-sm" role="group" aria-label="${name}">
@@ -475,8 +485,10 @@
         <form id="contract-form" novalidate>
           <div class="row g-3">
             <div class="col-md-4">${input('vendorName', '수탁업체명', v.vendorName, 'required maxlength="200"')}</div>
-            <div class="col-md-3">${input('serviceName', '관련 서비스', v.serviceName, 'maxlength="200" placeholder="예: 자사몰, 임직원몰, OMS"')}</div>
+            <div class="col-md-4">${input('contractName', '계약명', v.contractName, 'maxlength="200" placeholder="예: 본사 물류 위탁계약, 부산지사 물류 위탁계약"')}</div>
+            <div class="col-md-2">${input('serviceName', '관련 서비스', v.serviceName, 'maxlength="200" placeholder="예: 자사몰, OMS"')}</div>
             <div class="col-md-2"><label class="form-label d-block">ISMS 범위</label>${radio('ismsScopeYn', v.ismsScopeYn)}</div>
+            <div class="col-12 d-none" id="same-vendor-hint" role="status" aria-live="polite"></div>
             <div class="col-12"><label class="form-label pi-required" for="f-entrustedTask">위탁업무 내용</label>
               <textarea class="form-control" id="f-entrustedTask" name="entrustedTask" rows="2" maxlength="1000" required>${esc(v.entrustedTask)}</textarea></div>
           </div>
@@ -559,6 +571,10 @@
     };
     form.querySelectorAll('input[name="subcontractYn"]').forEach((r) => r.addEventListener('change', () => syncSubcontract(true)));
     syncSubcontract(false);
+
+    // 같은 업체 계약 안내: 업체명을 입력하면 이미 등록된 그 업체의 계약을 보여준다 (한 업체 여러 계약)
+    initSameVendorHint(isEdit ? c.contractId : null);
+    if (!isEdit && presetVendor) document.getElementById('f-contractName').focus();
 
     // 위수탁 계약서 파일 선택 → 파일에 적힌 계약일자를 체결일에 넣고 작성 여부 Y
     const latestDoc = isEdit ? (c.files || []).find((f) => f.latestContractDoc) : null;
@@ -689,16 +705,109 @@
     return d + latest + edit;
   }
 
+  /** 같은 업체 계약 표 (상세 섹션·팝업·등록 안내 공통) */
+  function sameVendorTable(list, currentId, opts = {}) {
+    return `<div class="table-responsive"><table class="pi-table pi-same-vendor-table"><thead><tr>
+        <th>계약명</th><th>관련 서비스</th><th>위탁업무 내용</th><th>담당부서 / 담당자</th><th>원계약 기간</th><th>상태</th><th>최근 점검</th></tr></thead>
+      <tbody>${list.map((r) => `
+        <tr data-id="${r.contractId}" class="${r.contractId === currentId ? 'pi-same-current' : ''}" tabindex="0" role="button" title="${r.contractId === currentId ? '지금 보고 있는 계약' : '이 계약 상세로 이동'}">
+          <td class="fw-semibold">${esc(r.contractName || '-')}${r.contractId === currentId ? ' <span class="badge text-bg-primary">이 계약</span>' : ''}${r.vendorName && opts.showVendor ? `<small class="text-muted d-block">${esc(r.vendorName)}</small>` : ''}</td>
+          <td>${esc(r.serviceName || '-')}</td>
+          <td class="pi-ellipsis" style="max-width:260px" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
+          <td>${esc([r.deptName, r.managerName].filter(Boolean).join(' / ') || '-')}</td>
+          <td class="text-nowrap">${r.contractStartDate || r.contractEndDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
+          <td class="text-nowrap">${badge(r.status, r.statusLabel)}</td>
+          <td class="text-nowrap">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
+        </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function bindSameVendorRows(root, currentId, onGo) {
+    root.querySelectorAll('.pi-same-vendor-table tr[data-id]').forEach((tr) => {
+      const id = Number(tr.dataset.id);
+      if (id === currentId) { tr.style.cursor = 'default'; return; }
+      const open = () => { if (onGo) onGo(); go('#/contracts/' + id); };
+      tr.addEventListener('click', open);
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); open(); } });
+    });
+  }
+
+  /** 상세: 같은 업체 계약 섹션 */
+  async function loadSameVendor(c) {
+    const body = document.getElementById('same-vendor-body');
+    if (!body) return;
+    try {
+      const list = await PI_API.sameVendorContracts(c.contractId);
+      const active = list.filter((r) => r.status !== 'TERMINATED').length;
+      document.getElementById('same-vendor-count').textContent = `(${list.length}건 · 진행 ${active})`;
+      body.innerHTML = sameVendorTable(list, c.contractId) +
+        `<small class="text-muted">업체명이 같은(㈜·(주)·주식회사·공백 차이 무시) 계약을 모두 보여줍니다. 본사·지사처럼 날짜나 업무 범위가 다른 계약은 <b>계약명</b>으로 구분해 각각 등록하세요. 행을 누르면 그 계약으로 이동합니다.</small>`;
+      bindSameVendorRows(body, c.contractId);
+    } catch (e) {
+      body.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
+    }
+  }
+
+  /** 목록 '계약 N건' → 같은 업체 계약 팝업 */
+  async function openVendorContracts(vendorName) {
+    const body = document.getElementById('vendor-contracts-modal-body');
+    document.getElementById('vendor-contracts-modal-title').innerHTML =
+      `<i class="fas fa-layer-group me-2 text-primary"></i>${esc(vendorName)} <small class="text-muted fw-normal">업체 계약 목록</small>`;
+    body.innerHTML = '<div class="pi-empty">불러오는 중...</div>';
+    const addBtn = document.getElementById('btn-vc-add');
+    const ckBtn = document.getElementById('btn-vc-checklist');
+    addBtn.classList.toggle('d-none', !perm.canWrite);
+    ckBtn.classList.toggle('d-none', !perm.canWrite);
+    addBtn.onclick = () => { modal('vendor-contracts-modal').hide(); go('#/contracts/new?vendor=' + encodeURIComponent(vendorName)); };
+    ckBtn.onclick = () => { modal('vendor-contracts-modal').hide(); openVendorChecklist(vendorName); };
+    modal('vendor-contracts-modal').show();
+    try {
+      const list = await PI_API.vendorContracts(vendorName);
+      const active = list.filter((r) => r.status !== 'TERMINATED').length;
+      body.innerHTML = `<p class="small text-muted mb-2">계약 ${list.length}건 (진행 ${active}) · 행을 누르면 계약 상세로 이동합니다.</p>` +
+        sameVendorTable(list, null, { showVendor: true });
+      bindSameVendorRows(body, null, () => modal('vendor-contracts-modal').hide());
+    } catch (e) {
+      body.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`;
+    }
+  }
+
+  /** 등록/수정 폼: 업체명 입력 시 같은 업체의 기존 계약 안내 */
+  function initSameVendorHint(currentId) {
+    const inp = document.getElementById('f-vendorName');
+    const box = document.getElementById('same-vendor-hint');
+    if (!inp || !box) return;
+    let timer = null; let seq = 0;
+    const check = async () => {
+      const name = inp.value.trim(); const my = ++seq;
+      if (!name) { box.className = 'col-12 d-none'; return; }
+      try {
+        const list = (await PI_API.vendorContracts(name)).filter((r) => r.contractId !== currentId);
+        if (my !== seq) return;
+        if (!list.length) { box.className = 'col-12 d-none'; return; }
+        box.className = 'col-12 pi-same-vendor-hint alert alert-info py-2 px-3 mb-0';
+        box.innerHTML = `<div class="mb-1"><i class="fas fa-layer-group me-1"></i><b>${esc(list[0].vendorName)}</b> 업체에 이미 계약이 <b>${list.length}건</b> 있습니다.
+            같은 업체의 다른 계약(본사·지사 등)이면 그대로 저장하고, <b>계약명</b>으로 구분해 주세요.</div>
+          <div class="d-flex flex-wrap gap-1">${list.map((r) => `<a class="pi-same-chip" href="#/contracts/${r.contractId}" target="_self" title="${esc(r.entrustedTask)}">${esc(contractLabel(r))}
+            <small>${r.contractStartDate || r.contractEndDate ? fmtDate(r.contractStartDate) + '~' + fmtDate(r.contractEndDate) : ''}</small> ${badge(r.status, r.statusLabel)}</a>`).join('')}</div>`;
+        box.querySelectorAll('a.pi-same-chip').forEach((a) => a.addEventListener('click', (e) => {
+          if (!confirm('입력 중인 내용은 저장되지 않습니다. 이 계약으로 이동할까요?')) e.preventDefault();
+        }));
+      } catch (e) { box.className = 'col-12 d-none'; }
+    };
+    inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(check, 350); });
+    if (inp.value.trim()) check();
+  }
+
   // ──────────────── 3. 상세 화면 ────────────────
   async function renderDetail(id) {
     const c = await PI_API.getContract(id);
     currentContract = c;
-    crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${esc(c.vendorName)}`;
+    crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${esc(c.vendorName)}${c.contractName ? ' &gt; ' + esc(c.contractName) : ''}`;
     const row = (k, v) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
     view.innerHTML = `
       <section class="pi-card" id="contract-detail-section">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-          <h2 class="mb-0"><i class="fas fa-building"></i>${esc(c.vendorName)} ${badge(c.status, c.statusLabel)}
+          <h2 class="mb-0"><i class="fas fa-building"></i>${esc(c.vendorName)}${c.contractName ? ` <span class="pi-contract-name">${esc(c.contractName)}</span>` : ''} ${badge(c.status, c.statusLabel)}
             <small class="text-muted fw-normal ms-1">${c.status === 'TERMINATED' ? '' : dLabel(c.daysLeft)}</small></h2>
           <div class="pi-actions">
             <button class="btn btn-sm btn-light" id="btn-back"><i class="fas fa-list me-1"></i>목록</button>
@@ -711,7 +820,8 @@
           </div>
         </div>
         <dl class="pi-dl two">
-          ${row('ISMS 범위', yn(c.ismsScopeYn))}${row('관련 서비스', esc(c.serviceName || '-'))}
+          ${row('계약명', esc(c.contractName || '-'))}${row('관련 서비스', esc(c.serviceName || '-'))}
+          ${row('ISMS 범위', yn(c.ismsScopeYn))}${row('', '')}
           ${row('위탁업무 내용', esc(c.entrustedTask))}${row('담당부서 / 담당자', esc((c.deptName || '-') + ' / ' + (c.managerName || '-')))}
           ${row('담당자 이메일', esc(c.managerEmail || '-'))}${row('수탁사 담당자', esc([c.vendorContactName, c.vendorContactPhone, c.vendorContactEmail].filter(Boolean).join(' / ') || '-'))}
           ${row('원계약 기간', fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate))}${row('원계약 기간 비고', esc(c.contractPeriodNote || '-'))}
@@ -721,6 +831,14 @@
           ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-')) + row('', '') : ''}
           ${row('비고', esc(c.remark || '-'))}${row('등록 / 수정', fmtDateTime(c.createdAt) + ' / ' + fmtDateTime(c.updatedAt))}
         </dl>
+      </section>
+
+      <section class="pi-card" id="same-vendor-section">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <h2 class="mb-0"><i class="fas fa-layer-group"></i>같은 업체 계약 <small class="text-muted fw-normal" id="same-vendor-count"></small></h2>
+          ${perm.canWrite ? '<button class="btn btn-sm btn-outline-primary" id="btn-add-same-vendor"><i class="fas fa-plus me-1"></i>이 업체로 계약 추가</button>' : ''}
+        </div>
+        <div id="same-vendor-body"><div class="pi-empty">불러오는 중...</div></div>
       </section>
 
       <section class="pi-card" id="contact-history-section">
@@ -820,7 +938,7 @@
               <td class="text-nowrap">${fmtDateTime(h.changedAt)}</td>
               <td class="text-nowrap"><span class="pi-status ${h.changeType === 'UPDATE' ? 'EXPIRING' : 'NONE'}">${esc(h.changeTypeLabel)}</span></td>
               ${vendorWide ? `<td>${h.currentContract ? '<b>이 계약</b>' : `<span class="pi-ch-contract-link">${esc(h.vendorName || '')}</span>`}
-                <small class="text-muted d-block">${esc(h.serviceName || '-')}</small></td>` : ''}
+                <small class="text-muted d-block">${esc(contractLabel(h))}</small></td>` : ''}
               <td class="text-nowrap">${esc(periodText(h))}${(h.contractStartDate || h.contractEndDate) && h.contractPeriodNote ? `<small class="text-muted d-block">${esc(h.contractPeriodNote)}</small>` : ''}</td>
               <td>${cell(h, 'DEPT_NAME', h.deptName)}</td>
               <td>${cell(h, 'MANAGER_NAME', h.managerName)}</td>
@@ -888,7 +1006,7 @@
         <h6 class="fw-bold mb-2"><i class="fas fa-building me-1"></i>${isCurrent ? '이 계약' : '해당 계약'} 정보
           <small class="text-muted fw-normal">(현재 기준)</small> ${badge(c.status, c.statusLabel)}</h6>
         <dl class="pi-dl pi-dl-compact">
-          ${row('수탁업체 / 관련 서비스', esc(c.vendorName) + ' / ' + esc(c.serviceName || '-'))}
+          ${row('수탁업체 / 계약명', esc(c.vendorName) + ' / ' + esc(contractLabel(c)))}
           ${row('위탁업무 내용', esc(c.entrustedTask || '-'))}
           ${row('원계약 기간', (c.contractStartDate || c.contractEndDate) ? fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate) : esc(c.contractPeriodNote || '-'))}
           ${row('현재 담당부서 / 담당자', esc(c.deptName || '-') + ' / ' + esc(c.managerName || '-') + (c.managerEmail ? ' <small class="text-muted">(' + esc(c.managerEmail) + ')</small>' : ''))}
@@ -903,6 +1021,8 @@
 
   function bindDetail(c) {
     const id = c.contractId;
+    loadSameVendor(c);
+    document.getElementById('btn-add-same-vendor')?.addEventListener('click', () => go('#/contracts/new?vendor=' + encodeURIComponent(c.vendorName)));
     loadContactHistory(id, true);
     document.querySelectorAll('input[name="ch-scope"]').forEach((r) =>
       r.addEventListener('change', () => loadContactHistory(id, document.getElementById('ch-scope-vendor').checked)));
@@ -1086,11 +1206,11 @@
     box.innerHTML = `
       <div class="table-responsive"><table class="pi-table" id="vendor-contract-table"><thead><tr>
         <th style="width:36px"><input type="checkbox" class="form-check-input" id="v-check-all" aria-label="전체 선택"></th>
-        <th>업체명</th><th>관련 서비스</th><th>위탁업무 내용</th><th>담당</th><th>종료일</th><th>상태</th><th>최근 점검</th></tr></thead>
+        <th>업체명</th><th>계약명</th><th>관련 서비스</th><th>위탁업무 내용</th><th>담당</th><th>종료일</th><th>상태</th><th>최근 점검</th></tr></thead>
         <tbody>${v.contracts.map((c) => `
           <tr style="cursor:default">
             <td><input type="checkbox" class="form-check-input v-check" value="${c.contractId}" ${c.status !== 'TERMINATED' ? 'checked' : ''} aria-label="선택"></td>
-            <td>${esc(c.vendorName)}</td><td>${esc(c.serviceName || '-')}</td>
+            <td>${esc(c.vendorName)}</td><td>${esc(c.contractName || '-')}</td><td>${esc(c.serviceName || '-')}</td>
             <td class="pi-ellipsis" title="${esc(c.entrustedTask)}">${esc(c.entrustedTask)}</td>
             <td>${esc([c.deptName, c.managerName].filter(Boolean).join(' / ') || '-')}</td>
             <td>${fmtDate(c.contractEndDate)}</td><td>${badge(c.status, c.statusLabel)}</td>

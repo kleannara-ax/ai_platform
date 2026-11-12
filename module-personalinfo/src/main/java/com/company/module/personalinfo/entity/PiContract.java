@@ -39,6 +39,10 @@ public class PiContract extends PiBaseEntity {
     @Column(name = "VENDOR_NAME", nullable = false, length = 200)
     private String vendorName;
 
+    /** 계약명 (한 업체의 여러 계약 구분. 예: 본사 물류 위탁계약, 부산지사 물류 위탁계약) */
+    @Column(name = "CONTRACT_NAME", length = 200)
+    private String contractName;
+
     @Column(name = "SERVICE_NAME", length = 200)
     private String serviceName;
 
@@ -127,7 +131,7 @@ public class PiContract extends PiBaseEntity {
     private String remark;
 
     @Builder
-    private PiContract(String ismsScopeYn, String vendorName, String serviceName, String entrustedTask,
+    private PiContract(String ismsScopeYn, String vendorName, String contractName, String serviceName, String entrustedTask,
                        String deptName, String managerName, String managerEmail,
                        String vendorContactName, String vendorContactEmail, String vendorContactPhone,
                        LocalDate contractStartDate, LocalDate contractEndDate, String contractPeriodNote,
@@ -137,6 +141,7 @@ public class PiContract extends PiBaseEntity {
                        Long createdBy) {
         this.ismsScopeYn = yn(ismsScopeYn, "Y");
         this.vendorName = vendorName;
+        this.contractName = contractName;
         this.serviceName = serviceName;
         this.entrustedTask = entrustedTask;
         this.deptName = deptName;
@@ -165,7 +170,7 @@ public class PiContract extends PiBaseEntity {
     }
 
     /** 계약 정보 수정 */
-    public void update(String ismsScopeYn, String vendorName, String serviceName, String entrustedTask,
+    public void update(String ismsScopeYn, String vendorName, String contractName, String serviceName, String entrustedTask,
                        String deptName, String managerName, String managerEmail,
                        String vendorContactName, String vendorContactEmail, String vendorContactPhone,
                        LocalDate contractStartDate, LocalDate contractEndDate, String contractPeriodNote,
@@ -175,6 +180,7 @@ public class PiContract extends PiBaseEntity {
                        Long updatedBy) {
         this.ismsScopeYn = yn(ismsScopeYn, this.ismsScopeYn);
         this.vendorName = vendorName;
+        this.contractName = contractName;
         this.serviceName = serviceName;
         this.entrustedTask = entrustedTask;
         this.deptName = deptName;

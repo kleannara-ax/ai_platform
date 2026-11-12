@@ -30,6 +30,7 @@ public class VendorSummaryResponse {
     public static class VendorContractItem {
         private Long contractId;
         private String vendorName;
+        private String contractName;
         private String serviceName;
         private String entrustedTask;
         private String deptName;

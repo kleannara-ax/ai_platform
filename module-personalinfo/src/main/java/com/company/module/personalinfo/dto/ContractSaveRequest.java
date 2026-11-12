@@ -30,6 +30,10 @@ public class ContractSaveRequest {
     @Size(max = 200)
     private String vendorName;
 
+    /** 계약명 (한 업체의 여러 계약 구분. 예: 본사 물류 위탁계약, 부산지사 물류 위탁계약) */
+    @Size(max = 200)
+    private String contractName;
+
     /** 관련 서비스 (예: 자사몰, 임직원몰, OMS) */
     @Size(max = 200)
     private String serviceName;

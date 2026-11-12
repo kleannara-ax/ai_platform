@@ -73,6 +73,8 @@ const PI_API = (() => {
     listContracts: (params) => request('/contracts' + qs(params)),
     downloadExcel: (params) => download('/contracts/excel' + qs(params), '외부위탁현황.xlsx'),
     getContract: (id) => request('/contracts/' + id),
+    sameVendorContracts: (id) => request('/contracts/' + id + '/same-vendor'),
+    vendorContracts: (vendorName) => request('/vendor-contracts' + qs({ vendorName })),
     contactHistory: (id, vendorWide) => request('/contracts/' + id + '/contact-history' + qs({ vendorWide })),
     createContract: (body) => request('/contracts', { method: 'POST', body }),
     updateContract: (id, body) => request('/contracts/' + id, { method: 'PUT', body }),

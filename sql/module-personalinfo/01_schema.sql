@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS pi_contract (
     CONTRACT_ID             BIGINT        NOT NULL AUTO_INCREMENT COMMENT '위수탁 계약 ID',
     ISMS_SCOPE_YN           CHAR(1)       NOT NULL DEFAULT 'Y'    COMMENT 'ISMS 인증 범위 여부 (Y/N)',
     VENDOR_NAME             VARCHAR(200)  NOT NULL                COMMENT '수탁업체명',
+    CONTRACT_NAME           VARCHAR(200)  NULL                    COMMENT '계약명 (한 업체의 여러 계약 구분. 예: 본사 물류 위탁계약, 부산지사 물류 위탁계약)',
     SERVICE_NAME            VARCHAR(200)  NULL                    COMMENT '관련 서비스 (예: 자사몰, 임직원몰, OMS)',
     ENTRUSTED_TASK          VARCHAR(1000) NOT NULL                COMMENT '위탁업무 내용',
     DEPT_NAME               VARCHAR(100)  NULL                    COMMENT '당사 담당부서',
