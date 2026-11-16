@@ -16,7 +16,9 @@
   const crumb = document.getElementById('pi-breadcrumb');
   const alertArea = document.getElementById('pi-alert-area');
   let perm = { canRead: false, canWrite: false, canDelete: false, canSendMail: false };
-  let listState = { page: 0, size: 50, sort: 'contractEndDate,asc', cond: {}, baseYear: new Date().getFullYear() };
+  /** 목록 기본 조건: 처음 들어오면(또는 초기화하면) [계약중] 카드가 선택된 상태 */
+  const defaultCond = () => ({ yearStatus: 'ACTIVE' });
+  let listState = { page: 0, size: 50, sort: 'contractEndDate,asc', cond: defaultCond(), baseYear: new Date().getFullYear() };
   let currentContract = null;
 
   // ──────────────── 공통 유틸 ────────────────
@@ -143,7 +145,7 @@
       listState.page = 0;
       loadList();
     });
-    document.getElementById('btn-reset').onclick = () => { listState.cond = {}; listState.page = 0; renderList(); };
+    document.getElementById('btn-reset').onclick = () => { listState.cond = defaultCond(); listState.page = 0; renderList(); };
     document.getElementById('btn-excel').onclick = () => PI_API.downloadExcel({ ...listState.cond, baseYear: listState.baseYear, sort: listState.sort }).catch(fail);
     document.getElementById('btn-template').onclick = () => PI_API.downloadBlankTemplate().catch(fail);
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
@@ -185,16 +187,16 @@
             ${years.map((y) => `<option value="${y}" ${y === d.baseYear ? 'selected' : ''}>${y}년</option>`).join('')}</select>
           <div class="pi-sub text-muted" title="지난 연도는 12월 31일, 올해는 오늘 기준으로 계약기간 안이면 계약중, 밖이면 종료">기준일 ${fmtDate(d.refDate)} · 계약기간 안이면 계약중</div>
         </div>
-        <div class="pi-stat ${on('', '') ? 'active' : ''}" data-ys="" data-yc="" role="button" tabindex="0" id="stat-year-total">
-          <div class="label">전체 계약</div><div class="value" style="color:#111827">${d.yearTotalCount}</div>
-          <div class="pi-sub text-muted">계약중 ${d.yearActiveCount} · 종료 ${d.yearEndedCount}</div>
-        </div>
         <div class="pi-stat ${on('ACTIVE', '') ? 'active' : ''}" data-ys="ACTIVE" data-yc="" role="button" tabindex="0" id="stat-year-active">
           <div class="label">계약중</div><div class="value" style="color:#166534">${d.yearActiveCount}</div>
           <div class="pi-sub"><button type="button" class="pi-sub-link ${on('ACTIVE', 'INSPECTED') ? 'active' : ''}" data-ys="ACTIVE" data-yc="INSPECTED"
               title="${d.baseYear}년 수탁사 정기 점검을 완료한 계약">수탁사 점검완료 <b>${d.yearActiveInspectedCount}</b>건</button>
             <span class="text-muted">/ ${d.yearActiveCount}</span>
             ${d.yearActiveCount - d.yearActiveInspectedCount > 0 ? `<button type="button" class="pi-sub-link warn ${on('ACTIVE', 'NOT_INSPECTED') ? 'active' : ''}" data-ys="ACTIVE" data-yc="NOT_INSPECTED" title="${d.baseYear}년 수탁사 정기 점검 미완료">미점검 ${d.yearActiveCount - d.yearActiveInspectedCount}</button>` : ''}</div>
+        </div>
+        <div class="pi-stat ${on('', '') ? 'active' : ''}" data-ys="" data-yc="" role="button" tabindex="0" id="stat-year-total">
+          <div class="label">전체 계약</div><div class="value" style="color:#111827">${d.yearTotalCount}</div>
+          <div class="pi-sub text-muted">계약중 ${d.yearActiveCount} · 종료 ${d.yearEndedCount}</div>
         </div>
         <div class="pi-stat ${on('ENDED', '') ? 'active' : ''}" data-ys="ENDED" data-yc="" role="button" tabindex="0" id="stat-year-ended">
           <div class="label">종료</div><div class="value" style="color:#374151">${d.yearEndedCount}</div>
