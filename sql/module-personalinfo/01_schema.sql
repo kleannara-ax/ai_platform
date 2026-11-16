@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS pi_inspection (
     FILE_HASH              VARCHAR(64)   NULL                    COMMENT '파일 SHA-256 해시',
     REMARK                 VARCHAR(2000) NULL                    COMMENT '비고',
     UPLOAD_GROUP_ID        VARCHAR(36)   NULL                    COMMENT '업체별 일괄 업로드 묶음 ID (같은 체크리스트로 여러 계약에 등록 시 동일, 개별 업로드는 NULL)',
+    FORM_VERSION           VARCHAR(50)   NULL                    COMMENT '점검 업로드 시점에 사용 중이던 체크리스트 양식 버전 (예: v2, 기본)',
 
     CREATED_AT             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY             BIGINT        NULL                    COMMENT '생성자 사용자 ID',
@@ -198,6 +199,7 @@ CREATE TABLE IF NOT EXISTS pi_alert_log (
     SENT_AT         DATETIME      NULL                    COMMENT '발송 완료일시',
     RETRY_COUNT     INT           NOT NULL DEFAULT 0      COMMENT '재시도 횟수',
     ERROR_MESSAGE   VARCHAR(1000) NULL                    COMMENT '실패/미발송 사유',
+    FORM_VERSIONS   VARCHAR(300)  NULL                    COMMENT '만료 알림 메일에 첨부한 양식 버전 (예: 체크리스트 v2 / 확약서 기본 / 파기 확인서 v1)',
 
     CREATED_AT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY      BIGINT        NULL                    COMMENT '생성자 사용자 ID (자동 발송은 NULL)',

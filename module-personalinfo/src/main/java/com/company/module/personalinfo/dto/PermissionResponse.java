@@ -12,6 +12,8 @@ public class PermissionResponse {
     private boolean canWrite;
     private boolean canDelete;
     private boolean canSendMail;
+    /** 양식 관리(보안팀 양식 등록·교체) 가능 - 관리자 */
+    private boolean canManageForms;
     /** 전체 부서 계약 조회 가능 (관리자) */
     private boolean allDepartments;
     /** 비관리자의 소속부서 (없으면 null → 볼 수 있는 계약 없음) */

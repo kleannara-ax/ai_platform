@@ -112,12 +112,17 @@ public class PiInspection extends PiBaseEntity {
     @Column(name = "UPLOAD_GROUP_ID", length = 36)
     private String uploadGroupId;
 
+    /** 점검 업로드 시점에 사용 중이던 체크리스트 양식 버전 (예: v2, 기본) */
+    @Column(name = "FORM_VERSION", length = 50)
+    private String formVersion;
+
     @Builder
     private PiInspection(Long contractId, InspectionType inspectionType, LocalDate inspectionDate, String inspectorName,
                          String sheetCompanyName, String sheetTaskName, String systemOwnedYn, String systemName,
                          int totalCount, int yCount, int nCount, int naCount, int blankCount, InspectionResult result,
                          LocalDate actionDueDate, String originalName, String storedPath, String contentType,
-                         Long fileSize, String fileHash, String remark, String uploadGroupId, Long createdBy) {
+                         Long fileSize, String fileHash, String remark, String uploadGroupId, String formVersion,
+                         Long createdBy) {
         this.contractId = contractId;
         this.inspectionType = inspectionType == null ? InspectionType.REGULAR : inspectionType;
         this.inspectionDate = inspectionDate == null ? LocalDate.now() : inspectionDate;
@@ -142,6 +147,7 @@ public class PiInspection extends PiBaseEntity {
         this.fileHash = fileHash;
         this.remark = remark;
         this.uploadGroupId = uploadGroupId;
+        this.formVersion = formVersion;
         markCreatedBy(createdBy);
     }
 

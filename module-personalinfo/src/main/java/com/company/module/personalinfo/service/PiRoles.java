@@ -35,6 +35,9 @@ public final class PiRoles {
     /** 등록/수정 권한 (PERSONALINFO_WRITE) */
     public static final String CAN_WRITE =
             "hasAnyAuthority('ROLE_ADMIN','ROLE_PI_ADMIN','ROLE_PI_USER')";
+    /** 양식 관리 권한 - 보안팀 관리자·플랫폼 관리자 전용 (CAN_DELETE 와 같은 역할) */
+    public static final String CAN_MANAGE_FORMS =
+            "hasAnyAuthority('ROLE_ADMIN','ROLE_PI_ADMIN')";
     /** 삭제·일괄작업 권한 (PERSONALINFO_DELETE) - 관리자 전용 */
     public static final String CAN_DELETE =
             "hasAnyAuthority('ROLE_ADMIN','ROLE_PI_ADMIN')";
@@ -55,6 +58,7 @@ public final class PiRoles {
                 .canWrite(write)
                 .canDelete(admin)
                 .canSendMail(write)
+                .canManageForms(admin)
                 .build();
     }
 }

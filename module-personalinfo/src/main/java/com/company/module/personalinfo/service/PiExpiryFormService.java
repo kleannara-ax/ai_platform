@@ -2,6 +2,7 @@ package com.company.module.personalinfo.service;
 
 import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
+import com.company.module.personalinfo.entity.FormTemplateType;
 import com.company.module.personalinfo.entity.PiContract;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,6 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,7 +26,6 @@ import org.springframework.util.StringUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -61,15 +60,14 @@ public class PiExpiryFormService {
     @Getter
     @RequiredArgsConstructor
     public enum FormType {
-        CHECKLIST("checklist", "계약만료시 점검 체크리스트", "xlsx", XLSX, null),
-        SECURITY_PLEDGE("security-pledge", "정보보호 및 비밀유지 확약서", "docx", DOCX, "personalinfo/security-pledge-template.docx"),
-        DESTRUCTION_CONFIRM("destruction-confirm", "개인정보 파기 확인서", "docx", DOCX, "personalinfo/destruction-confirm-template.docx");
+        CHECKLIST("checklist", "계약만료시 점검 체크리스트", FormTemplateType.CHECKLIST),
+        SECURITY_PLEDGE("security-pledge", "정보보호 및 비밀유지 확약서", FormTemplateType.SECURITY_PLEDGE),
+        DESTRUCTION_CONFIRM("destruction-confirm", "개인정보 파기 확인서", FormTemplateType.DESTRUCTION_CONFIRM);
 
         private final String path;
         private final String label;
-        private final String ext;
-        private final String contentType;
-        private final String resource;
+        /** 양식 관리의 양식 종류 (사용 중 양식 원본) */
+        private final FormTemplateType templateType;
 
         public static FormType of(String value) {
             String v = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
@@ -84,7 +82,7 @@ public class PiExpiryFormService {
     }
 
     private final PiContractService contractService;
-    private final PiChecklistTemplateService checklistTemplateService;
+    private final PiFormTemplateService formTemplates;
 
     @Value("${personalinfo.company-name:}")
     private String companyName;
@@ -112,19 +110,69 @@ public class PiExpiryFormService {
         return list;
     }
 
+    /** 만료 알림 메일에 첨부하는 양식의 버전 요약 (발송 이력 기록용). 예: 체크리스트 v2 / 확약서 기본 / 파기 확인서 v1 */
+    public String versionSummary() {
+        List<String> parts = new ArrayList<>();
+        for (FormType t : FormType.values()) {
+            parts.add(t.getTemplateType().getShortLabel() + " " + formTemplates.currentVersionLabel(t.getTemplateType()));
+        }
+        return String.join(" / ", parts);
+    }
+
     PiFileStorage.DownloadFile build(FormType type, PiContract c) {
-        String vendor = c == null ? null : PiChecklistTemplateService.safeFileName(c.getVendorName());
-        String name = type.getLabel() + (vendor == null ? "" : "_" + vendor
+        return build(type, formTemplates.current(type.getTemplateType()), c, null);
+    }
+
+    /**
+     * 양식 관리 미리보기: 이 양식 원본에 샘플 계약 정보를 채워 내려준다.
+     * 체크리스트는 만료 점검 시트가 열린 상태(계약만료시 점검 첨부와 같은 모양)로 만든다.
+     */
+    public PiFileStorage.DownloadFile preview(PiFormTemplateService.Source source) {
+        FormType type = switch (source.type()) {
+            case CHECKLIST -> FormType.CHECKLIST;
+            case SECURITY_PLEDGE -> FormType.SECURITY_PLEDGE;
+            case DESTRUCTION_CONFIRM -> FormType.DESTRUCTION_CONFIRM;
+        };
+        return build(type, source, sampleContract(), "미리보기_" + source.versionLabel());
+    }
+
+    /**
+     * 양식 원본(source)으로 파일 생성.
+     * 체크리스트(xlsx)와 docx 는 계약 정보를 채우고, hwp·hwpx·doc·pdf 는 올린 파일 그대로 준다.
+     */
+    private PiFileStorage.DownloadFile build(FormType type, PiFormTemplateService.Source source, PiContract c, String suffix) {
+        String vendor = c == null || suffix != null ? null : PiChecklistTemplateService.safeFileName(c.getVendorName());
+        String name = type.getLabel() + (suffix != null ? "_" + suffix : vendor == null ? "" : "_" + vendor
                 + (type == FormType.CHECKLIST ? "_" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) : ""))
-                + "." + type.getExt();
-        byte[] data = type == FormType.CHECKLIST ? checklist(c) : document(type, c);
-        return new PiFileStorage.DownloadFile(name, type.getContentType(), data);
+                + "." + source.ext();
+        byte[] data;
+        if (type == FormType.CHECKLIST) {
+            data = checklist(source.data(), c);
+        } else if ("docx".equals(source.ext())) {
+            data = document(type, source.data(), c);
+        } else {
+            data = source.data();
+        }
+        return new PiFileStorage.DownloadFile(name, source.contentType(), data);
+    }
+
+    /** 미리보기용 샘플 계약 (저장하지 않음) */
+    private static PiContract sampleContract() {
+        LocalDate start = LocalDate.now().withDayOfYear(1);
+        return PiContract.builder()
+                .vendorName("(샘플)협력사㈜")
+                .contractName("샘플 물류 위탁계약")
+                .entrustedTask("고객 상품 배송 및 반품 처리")
+                .contractStartDate(start)
+                .contractEndDate(start.plusYears(1).minusDays(1))
+                .subcontractYn("Y")
+                .subcontractorName("(샘플)재위탁택배")
+                .build();
     }
 
     // ───────── 체크리스트 (.xlsx) ─────────
 
-    private byte[] checklist(PiContract c) {
-        byte[] template = checklistTemplateService.readTemplate();
+    private byte[] checklist(byte[] template, PiContract c) {
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(template));
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             if (c != null) {
@@ -200,10 +248,9 @@ public class PiExpiryFormService {
 
     // ───────── 확약서 / 파기 확인서 (.docx) ─────────
 
-    private byte[] document(FormType type, PiContract c) {
+    private byte[] document(FormType type, byte[] template, PiContract c) {
         Map<String, String> values = placeholders(c);
-        try (InputStream in = new ClassPathResource(type.getResource()).getInputStream();
-             XWPFDocument doc = new XWPFDocument(in);
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(template));
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             doc.getParagraphs().forEach(p -> fill(p, values));
             for (XWPFTable t : doc.getTables()) {
@@ -216,7 +263,7 @@ public class PiExpiryFormService {
             doc.write(out);
             return out.toByteArray();
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, type.getLabel() + " 양식 파일을 찾을 수 없습니다.");
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, type.getLabel() + " 양식(docx)을 열 수 없습니다. 양식 관리에서 파일을 확인하세요.");
         }
     }
 
@@ -254,12 +301,19 @@ public class PiExpiryFormService {
         }
     }
 
+    private static final java.util.regex.Pattern PH = java.util.regex.Pattern.compile("\\{\\{\\s*([^{}]+?)\\s*}}");
+
+    /** 자리표시자 바꾸기. {{ 수탁업체명 }} 처럼 안쪽 공백이 있어도 같은 자리표시자로 본다. 모르는 자리표시자는 그대로 둔다 */
     private static String apply(String s, Map<String, String> values) {
-        String out = s;
-        for (Map.Entry<String, String> e : values.entrySet()) {
-            out = out.replace(e.getKey(), e.getValue());
+        java.util.regex.Matcher m = PH.matcher(s);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String key = "{{" + m.group(1).replace(" ", "") + "}}";
+            String v = values.get(key);
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(v != null ? v : m.group()));
         }
-        return out;
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     private static String period(PiContract c) {

@@ -4,6 +4,7 @@
  *   #/contracts/new        등록 화면
  *   #/contracts/{id}       상세 화면 (계약서 업로드, 체크리스트 다운로드/업로드, 메일 발송)
  *   #/contracts/{id}/edit  수정 화면
+ *   #/forms                양식 관리 (보안팀 관리자·플랫폼 관리자: 체크리스트·확약서·파기 확인서 버전 관리)
  * 업체별 점검 체크리스트 업로드는 팝업(vendor-checklist-modal)으로 연다:
  *   목록의 업체명 클릭, 또는 상세의 [업체 계약 일괄 업로드] 버튼
  * 버튼 노출은 /personalinfo-api/me/permissions 결과로 제어하고,
@@ -64,6 +65,7 @@
       if ((m = hash.match(/^#\/contracts\/new\?vendor=(.*)$/))) return renderForm(null, decodeURIComponent(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)\/edit$/))) return renderForm(await PI_API.getContract(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)$/))) return await renderDetail(m[1]);
+      if (hash === '#/forms') return await renderForms();
       go('#/contracts');
     } catch (e) {
       view.innerHTML = `<div class="pi-card pi-empty"><i class="fas fa-triangle-exclamation me-1"></i>${esc(e.message)}</div>`;
@@ -110,6 +112,7 @@
             </div>
             <div class="pi-actions">
               <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-template"><i class="fas fa-file-excel me-1"></i>점검 체크리스트 양식</button>
+              ${perm.canManageForms ? '<button type="button" class="btn btn-sm btn-outline-dark" id="btn-forms" title="보안팀 양식(체크리스트·확약서·파기 확인서) 등록·교체"><i class="fas fa-folder-tree me-1"></i>양식 관리</button>' : ''}
               <button type="button" class="btn btn-sm btn-outline-success" id="btn-excel"><i class="fas fa-download me-1"></i>엑셀 다운로드</button>
               ${perm.canDelete ? '<button type="button" class="btn btn-sm btn-outline-warning" id="btn-run-alert"><i class="fas fa-bell me-1"></i>만료 알림 실행</button>' : ''}
               ${canCreate() ? '<button type="button" class="btn btn-sm btn-primary" id="btn-new"><i class="fas fa-plus me-1"></i>계약 등록</button>' : ''}
@@ -151,6 +154,7 @@
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
     document.getElementById('btn-run-alert')?.addEventListener('click', runAlerts);
+    document.getElementById('btn-forms')?.addEventListener('click', () => go('#/forms'));
     PiTable.enhance(document.getElementById('contract-table'),
       { id: 'contracts', cols: listCols(), tools: 'contract-col-tools', legacyWidthKey: COL_WIDTH_KEY });
 
@@ -734,6 +738,159 @@
   }
 
   // ──────────────── 3. 상세 화면 ────────────────
+  // ──────────────── 양식 관리 (#/forms) ────────────────
+  const FORM_ICON = { checklist: 'fa-file-excel text-success', 'security-pledge': 'fa-file-signature text-primary', 'destruction-confirm': 'fa-file-shield text-danger' };
+  let formGroups = [];
+
+  async function renderForms() {
+    crumb.innerHTML = '<a href="#/contracts">계약 목록</a> &gt; 양식 관리';
+    if (!perm.canManageForms) {
+      view.innerHTML = '<div class="pi-card pi-empty"><i class="fas fa-lock me-1"></i>양식 관리는 보안팀 관리자(ROLE_PI_ADMIN)와 플랫폼 관리자만 사용할 수 있습니다.</div>';
+      return;
+    }
+    formGroups = await PI_API.listFormTemplates();
+    view.innerHTML = `
+      <section class="pi-card" id="form-guide-section">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <h2 class="mb-1"><i class="fas fa-folder-tree"></i>양식 관리 <small class="text-muted fw-normal">보안팀 양식 버전 관리</small></h2>
+          <button class="btn btn-sm btn-light" id="btn-forms-back"><i class="fas fa-list me-1"></i>계약 목록</button>
+        </div>
+        <ul class="small text-muted mb-0 ps-3">
+          <li><b>사용 중</b>인 양식이 계약 화면의 양식 다운로드, 계약별 자동 입력 양식, <b>만료 알림 메일 첨부</b>에 모두 쓰입니다. 배포 없이 바로 반영됩니다.</li>
+          <li>새 버전을 올리면 형식을 검사합니다. <b>체크리스트</b>는 협력사 작성본 자동 판정이 깨지지 않도록 시스템이 실제로 읽어 보고, 읽지 못하면 등록하지 않습니다.</li>
+          <li><b>확약서·파기 확인서</b>는 docx·doc·hwp·hwpx·pdf 를 올릴 수 있습니다. <b>docx 만 계약 정보가 자동으로 채워지고</b>, 나머지 형식은 올린 파일 그대로 나갑니다.</li>
+          <li>이전 버전은 남아 있어 언제든 <b>[사용 지정]</b>으로 되돌릴 수 있고, <b>[기본 양식 사용]</b>을 누르면 시스템 기본 양식으로 돌아갑니다. 점검 이력과 메일 발송 이력에 사용한 양식 버전이 기록됩니다.</li>
+        </ul>
+      </section>
+      ${formGroups.map(formGroupCard).join('')}`;
+    formGroups.forEach((g) => PiTable.enhance(document.getElementById('form-versions-' + g.formType), { id: 'formVersions' }));
+    bindForms();
+  }
+
+  function formGroupCard(g) {
+    const vrow = (v) => `
+      <tr class="${v.active ? 'pi-latest-doc' : ''}" style="cursor:default">
+        <td class="text-nowrap"><b>${esc(v.versionLabel)}</b> ${v.active ? '<span class="pi-status PASS ms-1">사용 중</span>' : ''}</td>
+        <td class="pi-ellipsis" style="max-width:240px" title="${esc(v.originalName)}">${esc(v.originalName)}
+          <small class="d-block text-muted">${esc((v.fileExt || '').toUpperCase())} · ${fmtSize(v.fileSize)} · ${v.autofill ? '자동 입력' : '<span class="text-warning-emphasis">원본 그대로</span>'}</small></td>
+        <td class="pi-ellipsis" style="max-width:260px" title="${esc(v.changeNote)}">${esc(v.changeNote || '-')}</td>
+        <td class="small" style="max-width:300px;white-space:pre-line">${esc(v.validationNote || '-')}</td>
+        <td class="text-nowrap small">${fmtDateTime(v.createdAt)}<span class="d-block text-muted">${esc(v.createdByName || '-')}</span></td>
+        <td class="text-nowrap small">${v.activatedAt ? fmtDateTime(v.activatedAt) + `<span class="d-block text-muted">${esc(v.activatedByName || '-')}</span>` : '-'}</td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-sm btn-light" data-ft-dl="${v.formTemplateId}" title="원본 다운로드" aria-label="${esc(v.versionLabel)} 원본 다운로드"><i class="fas fa-download"></i></button>
+          ${v.autofill ? `<button class="btn btn-sm btn-light" data-ft-preview="${v.formTemplateId}" title="샘플 계약 정보로 채운 미리보기" aria-label="${esc(v.versionLabel)} 미리보기"><i class="fas fa-eye"></i></button>` : ''}
+          ${v.active ? '' : `<button class="btn btn-sm btn-outline-primary" data-ft-activate="${v.formTemplateId}" data-label="${esc(v.versionLabel)}" data-type="${esc(g.label)}"><i class="fas fa-check me-1"></i>사용 지정</button>
+            <button class="btn btn-sm btn-light text-danger" data-ft-del="${v.formTemplateId}" data-label="${esc(v.versionLabel)}" aria-label="${esc(v.versionLabel)} 삭제"><i class="fas fa-trash"></i></button>`}
+        </td></tr>`;
+    const ph = Object.entries(g.placeholders || {});
+    return `
+      <section class="pi-card pi-form-group" id="form-group-${esc(g.formType)}">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+          <div>
+            <h2 class="mb-1"><i class="fas ${FORM_ICON[g.formType] || 'fa-file'}"></i>${esc(g.label)}</h2>
+            <div class="small">사용 중: <b class="pi-form-current">${esc(g.currentVersionLabel)}</b>
+              ${g.usingDefault ? '<span class="pi-status NONE ms-1">시스템 기본 양식</span>' : ''}
+              <span class="text-muted ms-1">${esc(g.currentOriginalName)}</span>
+              ${g.currentAutofill ? '' : '<span class="pi-status INCOMPLETE ms-1" title="계약 정보가 자동으로 채워지지 않습니다">원본 그대로 사용</span>'}</div>
+          </div>
+          <div class="pi-actions">
+            <button class="btn btn-sm btn-outline-secondary" data-ft-default-dl="${esc(g.formType)}" title="시스템 기본 양식 원본"><i class="fas fa-download me-1"></i>기본 양식</button>
+            <button class="btn btn-sm btn-outline-secondary" data-ft-default-preview="${esc(g.formType)}" title="기본 양식에 샘플 계약 정보를 채운 미리보기"><i class="fas fa-eye me-1"></i>기본 미리보기</button>
+            ${g.usingDefault ? '' : `<button class="btn btn-sm btn-outline-warning" data-ft-use-default="${esc(g.formType)}" data-type="${esc(g.label)}"><i class="fas fa-rotate-left me-1"></i>기본 양식 사용</button>`}
+            <button class="btn btn-sm btn-primary" data-ft-upload="${esc(g.formType)}"><i class="fas fa-upload me-1"></i>새 버전 등록</button>
+          </div>
+        </div>
+        <p class="small text-muted mb-2">${esc(g.description)} <span class="text-nowrap">허용 형식: <b>${esc(g.extensions.join(', '))}</b></span></p>
+        ${g.rules && g.rules.length ? `<details class="small mb-2"><summary class="text-primary">체크리스트 양식이 지켜야 하는 구조</summary>
+          <ul class="mb-0 mt-1">${g.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>` : ''}
+        ${ph.length ? `<details class="small mb-2"><summary class="text-primary">docx 자리표시자 (양식 문서에 그대로 적으면 계약 정보로 바뀝니다)</summary>
+          <table class="table table-sm mt-1 mb-0 pi-ph-table"><tbody>${ph.map(([k, d]) => `<tr><td class="text-nowrap"><code>${esc(k)}</code></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table></details>` : ''}
+        <div class="table-responsive"><table class="pi-table" id="form-versions-${esc(g.formType)}"><thead><tr>
+          <th>버전</th><th>파일</th><th>변경 메모</th><th>검사 결과</th><th>등록</th><th>사용 지정</th><th></th></tr></thead>
+          <tbody>${g.versions.length ? g.versions.map(vrow).join('')
+            : '<tr><td colspan="7" class="pi-empty">등록한 양식이 없어 시스템 기본 양식을 쓰고 있습니다. [새 버전 등록]으로 보안팀 양식을 올리세요.</td></tr>'}</tbody></table></div>
+      </section>`;
+  }
+
+  function bindForms() {
+    const reload = () => renderForms().catch(fail);
+    document.getElementById('btn-forms-back').onclick = () => go('#/contracts');
+    view.querySelectorAll('[data-ft-dl]').forEach((b) => b.addEventListener('click', () => PI_API.downloadFormTemplate(b.dataset.ftDl).catch(fail)));
+    view.querySelectorAll('[data-ft-preview]').forEach((b) => b.addEventListener('click', () => PI_API.previewFormTemplate(b.dataset.ftPreview).catch(fail)));
+    view.querySelectorAll('[data-ft-default-dl]').forEach((b) => b.addEventListener('click', () => PI_API.downloadDefaultFormTemplate(b.dataset.ftDefaultDl).catch(fail)));
+    view.querySelectorAll('[data-ft-default-preview]').forEach((b) => b.addEventListener('click', () => PI_API.previewDefaultFormTemplate(b.dataset.ftDefaultPreview).catch(fail)));
+    view.querySelectorAll('[data-ft-activate]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm(`${b.dataset.type} ${b.dataset.label} 을(를) 사용 중 양식으로 지정합니다.\n계약 화면 다운로드와 만료 알림 메일 첨부에 바로 반영됩니다.`)) return;
+      try { await PI_API.activateFormTemplate(b.dataset.ftActivate); notify(`${b.dataset.type} ${b.dataset.label} 을(를) 사용 중으로 지정했습니다.`); reload(); } catch (e) { fail(e); }
+    }));
+    view.querySelectorAll('[data-ft-use-default]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm(`${b.dataset.type}을(를) 시스템 기본 양식으로 되돌립니다.\n등록한 버전은 지워지지 않아 다시 사용 지정할 수 있습니다.`)) return;
+      try { await PI_API.useDefaultFormTemplate(b.dataset.ftUseDefault); notify('기본 양식으로 되돌렸습니다.'); reload(); } catch (e) { fail(e); }
+    }));
+    view.querySelectorAll('[data-ft-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm(`${b.dataset.label} 버전을 삭제합니다. (이력에서 숨겨지며 다시 사용할 수 없습니다)`)) return;
+      try { await PI_API.deleteFormTemplate(b.dataset.ftDel); notify('양식 버전을 삭제했습니다.'); reload(); } catch (e) { fail(e); }
+    }));
+    view.querySelectorAll('[data-ft-upload]').forEach((b) => b.addEventListener('click', () => openFormUpload(b.dataset.ftUpload)));
+  }
+
+  function openFormUpload(type) {
+    const g = formGroups.find((x) => x.formType === type);
+    const f = document.getElementById('form-template-form');
+    f.reset();
+    document.getElementById('ft-type').value = type;
+    document.getElementById('form-template-modal-title').innerHTML = `<i class="fas ${FORM_ICON[type] || 'fa-file'} me-2"></i>${esc(g.label)} — 새 버전 등록`;
+    document.getElementById('ft-guide').textContent = g.description;
+    document.getElementById('ft-ext').textContent = '(' + g.extensions.join(', ') + ')';
+    document.getElementById('ft-file').accept = g.extensions.map((e) => '.' + e).join(',');
+    document.getElementById('ft-check').innerHTML = '';
+    document.getElementById('ft-submit').disabled = true;
+    modal('form-template-modal').show();
+  }
+
+  /** 파일을 고르면 저장 전에 검사 결과를 보여주고, 통과해야 [등록] 버튼이 켜진다 */
+  let ftSeq = 0;
+  document.getElementById('ft-file').addEventListener('change', async (e) => {
+    const box = document.getElementById('ft-check');
+    const submit = document.getElementById('ft-submit');
+    const file = e.target.files?.[0]; const my = ++ftSeq;
+    submit.disabled = true;
+    if (!file) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="pi-preview small"><i class="fas fa-spinner fa-spin me-1"></i>양식을 검사하는 중...</div>';
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const r = await PI_API.checkFormTemplate(document.getElementById('ft-type').value, fd);
+      if (my !== ftSeq) return;
+      box.innerHTML = `<div class="pi-preview small" id="ft-check-result">
+        <div class="fw-bold text-success mb-1"><i class="fas fa-circle-check me-1"></i>등록할 수 있는 양식입니다${r.autofill ? ' (계약 정보 자동 입력)' : ' (원본 그대로 사용)'}</div>
+        ${r.info.length ? `<ul class="mb-1">${r.info.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        ${r.warnings.length ? `<div class="text-warning-emphasis fw-bold mt-1"><i class="fas fa-triangle-exclamation me-1"></i>확인하세요</div>
+          <ul class="mb-0 text-warning-emphasis">${r.warnings.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+      submit.disabled = false;
+    } catch (err) {
+      if (my !== ftSeq) return;
+      box.innerHTML = `<div class="alert alert-danger small mb-0" id="ft-check-result" style="white-space:pre-line"><i class="fas fa-circle-xmark me-1"></i>${esc(err.message)}</div>`;
+    }
+  });
+
+  document.getElementById('form-template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const fd = new FormData();
+    fd.append('file', document.getElementById('ft-file').files[0]);
+    if (f.changeNote.value.trim()) fd.append('changeNote', f.changeNote.value.trim());
+    fd.append('activate', document.getElementById('ft-activate').checked ? 'true' : 'false');
+    const btn = document.getElementById('ft-submit'); btn.disabled = true;
+    try {
+      const r = await PI_API.uploadFormTemplate(document.getElementById('ft-type').value, fd);
+      modal('form-template-modal').hide();
+      notify(`${r.versionLabel} 양식을 등록했습니다${r.active ? ' (사용 중으로 지정)' : ''}.` + ((r.warnings || []).length ? '\n' + r.warnings.join('\n') : ''),
+        (r.warnings || []).length ? 'warning' : 'success');
+      renderForms().catch(fail);
+    } catch (err) { fail(err); btn.disabled = false; }
+  });
+
   // ──────────────── 계약만료시 점검 ────────────────
   // 만료 점검 결과(엑셀) = TERMINATION 점검 이력, 확약서/파기확인서 = 첨부파일(fileType)
   const EXPIRY_ITEMS = [
@@ -915,12 +1072,13 @@
 
       <section class="pi-card" id="alert-log-section">
         <h2><i class="fas fa-bell"></i>만료 알림 발송 이력 <small class="text-muted fw-normal">(최근 20건)</small></h2>
-        <div class="table-responsive"><table class="pi-table" id="alert-log-table"><thead><tr><th>일시</th><th>경로</th><th>단계</th><th>수신자</th><th>상태</th><th>사유</th></tr></thead>
+        <div class="table-responsive"><table class="pi-table" id="alert-log-table"><thead><tr><th>일시</th><th>경로</th><th>단계</th><th>수신자</th><th>상태</th><th>첨부 양식</th><th>사유</th></tr></thead>
           <tbody>${c.alerts.length ? c.alerts.map((a) => `
             <tr style="cursor:default"><td>${fmtDateTime(a.sentAt || a.createdAt)}</td><td>${a.triggerType === 'AUTO' ? '자동' : '수동'}</td><td>${esc(a.alertStage)}</td>
               <td class="pi-ellipsis" title="${esc(a.recipients)}">${esc(a.recipients || '-')}</td><td>${badge(a.sendStatus, a.sendStatus)}</td>
+              <td class="pi-ellipsis small" title="${esc(a.formVersions)}">${esc(a.formVersions || '-')}</td>
               <td class="pi-ellipsis" title="${esc(a.errorMessage)}">${esc(a.errorMessage || '')}</td></tr>`).join('')
-            : '<tr><td colspan="6" class="pi-empty">발송 이력이 없습니다.</td></tr>'}</tbody></table></div>
+            : '<tr><td colspan="7" class="pi-empty">발송 이력이 없습니다.</td></tr>'}</tbody></table></div>
       </section>`;
 
     PiTable.enhance(document.getElementById('file-table'), { id: 'files' });

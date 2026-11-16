@@ -2,6 +2,7 @@ package com.company.module.personalinfo.service;
 
 import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
+import com.company.module.personalinfo.entity.FormTemplateType;
 import com.company.module.personalinfo.entity.PiContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,20 +10,19 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 /**
  * 보안팀 점검 체크리스트 양식 다운로드.
  *
- * <p>양식 원본은 모듈 jar 의 {@code personalinfo/checklist-template.xlsx} 에 포함되어 있다.
+ * <p>양식 원본은 양식 관리 화면에서 보안팀이 사용 지정한 버전이며, 없으면 모듈 jar 의
+ * {@code personalinfo/checklist-template.xlsx}(기본 양식)를 쓴다.
  * 계약을 지정하면 '1. 관리체계' 시트의 회사명/수행(수탁) 업무를 미리 채워서 내려준다.
  */
 @Slf4j
@@ -36,8 +36,9 @@ public class PiChecklistTemplateService {
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private final PiContractService contractService;
+    private final PiFormTemplateService formTemplates;
 
-    /** 빈 양식 */
+    /** 빈 양식 (양식 관리에서 사용 중인 버전, 없으면 기본 양식) */
     public PiFileStorage.DownloadFile blankTemplate() {
         return new PiFileStorage.DownloadFile(TEMPLATE_FILE_NAME, XLSX, readTemplate());
     }
@@ -71,13 +72,9 @@ public class PiChecklistTemplateService {
         }
     }
 
+    /** 사용 중 체크리스트 양식 원본 (양식 관리에서 등록·지정한 버전, 없으면 모듈 내장 기본 양식) */
     byte[] readTemplate() {
-        ClassPathResource resource = new ClassPathResource(TEMPLATE_PATH);
-        try (InputStream in = resource.getInputStream()) {
-            return in.readAllBytes();
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "점검 체크리스트 양식 파일을 찾을 수 없습니다.");
-        }
+        return formTemplates.current(FormTemplateType.CHECKLIST).data();
     }
 
     static Sheet findSheet(XSSFWorkbook wb, String keyword) {

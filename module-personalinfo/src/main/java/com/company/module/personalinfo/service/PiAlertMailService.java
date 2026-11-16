@@ -247,6 +247,7 @@ public class PiAlertMailService {
         Set<String> recipients = recipientsOf(c, extra);
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         String error = null;
+        String formVersions = null;
         AlertSendStatus result;
 
         if (recipients.isEmpty()) {
@@ -259,6 +260,7 @@ public class PiAlertMailService {
             try {
                 // 계약만료시 점검 양식 3종(체크리스트·확약서·파기 확인서)을 계약 정보로 채워 첨부
                 List<PiFileStorage.DownloadFile> attachments = expiryForms.mailAttachments(c);
+                formVersions = attachments.isEmpty() ? null : expiryForms.versionSummary();
                 MimeMessage message = sender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(message, !attachments.isEmpty(), StandardCharsets.UTF_8.name());
                 helper.setEncodeFilenames(true);   // 한글 파일명 (RFC 2047)
@@ -283,7 +285,9 @@ public class PiAlertMailService {
 
         final AlertSendStatus finalResult = result;
         final String finalError = error;
+        final String finalVersions = formVersions;
         newTx.executeWithoutResult(status -> alertLogRepository.findById(alertId).ifPresent(row -> {
+            row.recordFormVersions(finalVersions);
             if (finalResult == AlertSendStatus.SENT) {
                 row.markSent();
             } else if (finalResult == AlertSendStatus.FAILED) {

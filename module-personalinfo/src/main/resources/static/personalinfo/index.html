@@ -189,6 +189,31 @@
   </div></div>
 </div>
 
+<!-- 양식 관리: 새 버전 등록 팝업 (#/forms) -->
+<div class="modal fade" id="form-template-modal" tabindex="-1" aria-labelledby="form-template-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+    <form id="form-template-form">
+      <div class="modal-header"><h5 class="modal-title" id="form-template-modal-title">새 양식 등록</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="formType" id="ft-type">
+        <p class="small text-muted mb-3" id="ft-guide"></p>
+        <div class="mb-3"><label class="form-label" for="ft-file">양식 파일 * <small class="text-muted" id="ft-ext"></small></label>
+          <input type="file" class="form-control" id="ft-file" name="file" required></div>
+        <div id="ft-check" class="mb-3" aria-live="polite"></div>
+        <div class="mb-3"><label class="form-label" for="ft-note">변경 메모 <small class="text-muted">(무엇을 바꿨는지, 이력에 남습니다)</small></label>
+          <textarea class="form-control" id="ft-note" name="changeNote" rows="2" maxlength="1000" placeholder="예: 2027년 보안 점검 항목 3건 추가"></textarea></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="ft-activate" name="activate" value="true" checked>
+          <label class="form-check-label" for="ft-activate">등록 후 바로 <b>사용 중 양식</b>으로 지정 (계약 화면 다운로드·만료 알림 메일 첨부에 바로 반영)</label></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary" id="ft-submit" disabled><i class="fas fa-upload me-1"></i>등록</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/personalinfo-api.js"></script>
 <script src="js/personalinfo-table.js"></script>

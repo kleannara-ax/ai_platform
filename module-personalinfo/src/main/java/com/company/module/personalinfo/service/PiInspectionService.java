@@ -51,6 +51,7 @@ public class PiInspectionService {
     private final ChecklistExcelParser parser;
     private final PiFileStorage storage;
     private final PiAccessScopeResolver accessScope;
+    private final PiFormTemplateService formTemplates;
 
     public List<InspectionResponse> getList(Long contractId) {
         findContract(contractId);
@@ -132,6 +133,7 @@ public class PiInspectionService {
                 .fileHash(stored.sha256())
                 .remark(PiContractService.trim(remark))
                 .uploadGroupId(uploadGroupId)
+                .formVersion(formTemplates.currentVersionLabel(com.company.module.personalinfo.entity.FormTemplateType.CHECKLIST))
                 .createdBy(userId)
                 .build());
 

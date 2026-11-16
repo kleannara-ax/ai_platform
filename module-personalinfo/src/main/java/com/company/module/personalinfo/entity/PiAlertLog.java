@@ -75,6 +75,10 @@ public class PiAlertLog extends PiBaseEntity {
     @Column(name = "ERROR_MESSAGE", length = 1000)
     private String errorMessage;
 
+    /** 메일에 첨부한 양식 버전 (예: 체크리스트 v2 / 확약서 기본 / 파기 확인서 v1) */
+    @Column(name = "FORM_VERSIONS", length = 300)
+    private String formVersions;
+
     @Builder
     private PiAlertLog(Long contractId, AlertTriggerType triggerType, String alertStage, LocalDate targetEndDate,
                        String dedupKey, String recipients, String subject, Long createdBy) {
@@ -97,6 +101,12 @@ public class PiAlertLog extends PiBaseEntity {
         this.sendStatus = AlertSendStatus.PENDING;
         this.retryCount = this.retryCount + 1;
         this.errorMessage = null;
+    }
+
+    /** 첨부한 양식 버전 기록 */
+    public void recordFormVersions(String formVersions) {
+        this.formVersions = formVersions == null ? null
+                : (formVersions.length() > 300 ? formVersions.substring(0, 300) : formVersions);
     }
 
     public void markSent() {

@@ -22,6 +22,8 @@ public class AlertLogResponse {
     private LocalDateTime sentAt;
     private Integer retryCount;
     private String errorMessage;
+    /** 첨부한 양식 버전 */
+    private String formVersions;
     private Long createdBy;
     private LocalDateTime createdAt;
 
@@ -38,6 +40,7 @@ public class AlertLogResponse {
                 .sentAt(a.getSentAt())
                 .retryCount(a.getRetryCount())
                 .errorMessage(a.getErrorMessage())
+                .formVersions(a.getFormVersions())
                 .createdBy(a.getCreatedBy())
                 .createdAt(a.getCreatedAt())
                 .build();

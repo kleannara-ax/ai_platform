@@ -97,6 +97,17 @@ const PI_API = (() => {
     // 계약만료시 점검 양식: checklist | security-pledge | destruction-confirm
     downloadBlankExpiryForm: (type) => download('/expiry-forms/' + type, type + '.docx'),
     downloadExpiryForm: (id, type) => download('/contracts/' + id + '/expiry-forms/' + type, type + (type === 'checklist' ? '.xlsx' : '.docx')),
+    // 양식 관리 (보안팀 관리자·플랫폼 관리자)
+    listFormTemplates: () => request('/form-templates'),
+    checkFormTemplate: (type, form) => request('/form-templates/' + type + '/check', { method: 'POST', form }),
+    uploadFormTemplate: (type, form) => request('/form-templates/' + type, { method: 'POST', form }),
+    activateFormTemplate: (versionId) => request('/form-templates/versions/' + versionId + '/activate', { method: 'POST' }),
+    useDefaultFormTemplate: (type) => request('/form-templates/' + type + '/use-default', { method: 'POST' }),
+    deleteFormTemplate: (versionId) => request('/form-templates/versions/' + versionId, { method: 'DELETE' }),
+    downloadFormTemplate: (versionId) => download('/form-templates/versions/' + versionId + '/download', '양식'),
+    previewFormTemplate: (versionId) => download('/form-templates/versions/' + versionId + '/preview', '양식_미리보기'),
+    downloadDefaultFormTemplate: (type) => download('/form-templates/' + type + '/default/download', '기본양식'),
+    previewDefaultFormTemplate: (type) => download('/form-templates/' + type + '/default/preview', '기본양식_미리보기'),
     uploadInspection: (id, form) => request('/contracts/' + id + '/inspections', { method: 'POST', form }),
     getInspection: (inspectionId) => request('/inspections/' + inspectionId),
     updateInspection: (inspectionId, body) => request('/inspections/' + inspectionId, { method: 'PUT', body }),

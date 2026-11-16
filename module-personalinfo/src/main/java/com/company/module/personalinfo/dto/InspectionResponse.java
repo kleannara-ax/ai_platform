@@ -43,6 +43,8 @@ public class InspectionResponse {
     private String remark;
     /** 업체별 일괄 업로드 묶음 ID (개별 업로드는 null) */
     private String uploadGroupId;
+    /** 업로드 시점 체크리스트 양식 버전 */
+    private String formVersion;
     /** 계약 수탁업체명 / 관련 서비스 (업체별 일괄 업로드 결과 표시용) */
     private String vendorName;
     private String serviceName;
@@ -91,6 +93,7 @@ public class InspectionResponse {
                 .fileSize(i.getFileSize())
                 .remark(i.getRemark())
                 .uploadGroupId(i.getUploadGroupId())
+                .formVersion(i.getFormVersion())
                 .createdBy(i.getCreatedBy())
                 .createdAt(i.getCreatedAt())
                 .warnings(warnings)
