@@ -4,6 +4,7 @@ import com.company.core.common.response.ApiResponse;
 import com.company.module.personalinfo.dto.InspectionResponse;
 import com.company.module.personalinfo.dto.InspectionUpdateRequest;
 import com.company.module.personalinfo.service.PiChecklistTemplateService;
+import com.company.module.personalinfo.service.PiExpiryFormService;
 import com.company.module.personalinfo.service.PiInspectionService;
 import com.company.module.personalinfo.service.PiRoles;
 import jakarta.validation.Valid;
@@ -37,6 +38,7 @@ public class PiInspectionController {
 
     private final PiInspectionService inspectionService;
     private final PiChecklistTemplateService templateService;
+    private final PiExpiryFormService expiryFormService;
 
     /** 점검 체크리스트 빈 양식 다운로드 */
     @GetMapping("/checklist-template")
@@ -50,6 +52,23 @@ public class PiInspectionController {
     @PreAuthorize(PiRoles.CAN_READ)
     public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long contractId) {
         return PiDownloads.of(templateService.templateFor(contractId));
+    }
+
+    /**
+     * 계약만료시 점검 빈 양식 다운로드.
+     * formType: checklist(만료 점검 체크리스트 .xlsx) / security-pledge(정보보호 및 비밀유지 확약서 .docx) / destruction-confirm(개인정보 파기 확인서 .docx)
+     */
+    @GetMapping("/expiry-forms/{formType}")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<byte[]> downloadBlankExpiryForm(@PathVariable String formType) {
+        return PiDownloads.of(expiryFormService.blank(formType));
+    }
+
+    /** 계약 정보(수탁업체명·계약명·위탁업무·계약기간·재위탁 업체)를 채운 계약만료시 점검 양식 다운로드 */
+    @GetMapping("/contracts/{contractId}/expiry-forms/{formType}")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<byte[]> downloadExpiryForm(@PathVariable Long contractId, @PathVariable String formType) {
+        return PiDownloads.of(expiryFormService.forContract(contractId, formType));
     }
 
     @GetMapping("/contracts/{contractId}/inspections")

@@ -44,7 +44,12 @@ public class PiChecklistTemplateService {
 
     /** 계약 정보를 미리 채운 양식 */
     public PiFileStorage.DownloadFile templateFor(Long contractId) {
-        PiContract c = contractService.findActive(contractId);
+        return templateFor(contractService.findActive(contractId));
+    }
+
+    /** 계약 정보를 미리 채운 양식 (계약 조회·권한 확인은 호출한 쪽에서) */
+    PiFileStorage.DownloadFile templateFor(PiContract c) {
+        Long contractId = c.getContractId();
         byte[] template = readTemplate();
         try (XSSFWorkbook wb = new XSSFWorkbook(new java.io.ByteArrayInputStream(template));
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -66,7 +71,7 @@ public class PiChecklistTemplateService {
         }
     }
 
-    private byte[] readTemplate() {
+    byte[] readTemplate() {
         ClassPathResource resource = new ClassPathResource(TEMPLATE_PATH);
         try (InputStream in = resource.getInputStream()) {
             return in.readAllBytes();
@@ -75,7 +80,7 @@ public class PiChecklistTemplateService {
         }
     }
 
-    private static Sheet findSheet(XSSFWorkbook wb, String keyword) {
+    static Sheet findSheet(XSSFWorkbook wb, String keyword) {
         for (int i = 0; i < wb.getNumberOfSheets(); i++) {
             if (PiExcelSupport.compact(wb.getSheetName(i)).contains(keyword)) {
                 return wb.getSheetAt(i);
@@ -84,7 +89,7 @@ public class PiChecklistTemplateService {
         return null;
     }
 
-    private static void fillRightOfLabel(Sheet sheet, String label, String value) {
+    static void fillRightOfLabel(Sheet sheet, String label, String value) {
         String target = PiExcelSupport.compact(label);
         for (int r = 0; r <= Math.min(sheet.getLastRowNum(), 12); r++) {
             Row row = sheet.getRow(r);

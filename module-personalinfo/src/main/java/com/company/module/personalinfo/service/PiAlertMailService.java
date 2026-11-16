@@ -7,14 +7,19 @@ import com.company.module.personalinfo.dto.AlertRunResponse;
 import com.company.module.personalinfo.dto.AlertSendRequest;
 import com.company.module.personalinfo.entity.AlertSendStatus;
 import com.company.module.personalinfo.entity.AlertTriggerType;
+import com.company.module.personalinfo.entity.ContractFileType;
+import com.company.module.personalinfo.entity.InspectionType;
 import com.company.module.personalinfo.entity.PiAlertLog;
 import com.company.module.personalinfo.entity.PiContract;
 import com.company.module.personalinfo.repository.PiAlertLogRepository;
+import com.company.module.personalinfo.repository.PiContractFileRepository;
 import com.company.module.personalinfo.repository.PiContractRepository;
+import com.company.module.personalinfo.repository.PiInspectionRepository;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -72,6 +77,9 @@ public class PiAlertMailService {
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final TransactionTemplate newTx;
     private final PiAccessScopeResolver accessScope;
+    private final PiExpiryFormService expiryForms;
+    private final PiContractFileRepository fileRepository;
+    private final PiInspectionRepository inspectionRepository;
 
     private final String mailFrom;
     private final String defaultRecipients;
@@ -83,6 +91,9 @@ public class PiAlertMailService {
                               ObjectProvider<JavaMailSender> mailSenderProvider,
                               PlatformTransactionManager transactionManager,
                               PiAccessScopeResolver accessScope,
+                              PiExpiryFormService expiryForms,
+                              PiContractFileRepository fileRepository,
+                              PiInspectionRepository inspectionRepository,
                               @Value("${personalinfo.alert.mail-from:${spring.mail.username:}}") String mailFrom,
                               @Value("${personalinfo.alert.default-recipients:}") String defaultRecipients,
                               @Value("${personalinfo.alert.base-url:}") String baseUrl,
@@ -91,6 +102,9 @@ public class PiAlertMailService {
         this.alertLogRepository = alertLogRepository;
         this.mailSenderProvider = mailSenderProvider;
         this.accessScope = accessScope;
+        this.expiryForms = expiryForms;
+        this.fileRepository = fileRepository;
+        this.inspectionRepository = inspectionRepository;
         this.newTx = new TransactionTemplate(transactionManager);
         this.newTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.mailFrom = mailFrom;
@@ -243,14 +257,21 @@ public class PiAlertMailService {
             error = "메일 서버 미설정 (spring.mail.host)";
         } else {
             try {
+                // 계약만료시 점검 양식 3종(체크리스트·확약서·파기 확인서)을 계약 정보로 채워 첨부
+                List<PiFileStorage.DownloadFile> attachments = expiryForms.mailAttachments(c);
                 MimeMessage message = sender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+                MimeMessageHelper helper = new MimeMessageHelper(message, !attachments.isEmpty(), StandardCharsets.UTF_8.name());
+                helper.setEncodeFilenames(true);   // 한글 파일명 (RFC 2047)
                 if (StringUtils.hasText(mailFrom)) {
                     helper.setFrom(mailFrom);
                 }
                 helper.setTo(recipients.toArray(String[]::new));
                 helper.setSubject(subjectOf(c, stage));
-                helper.setText(bodyOf(c, stage, today, manual == null ? null : manual.getMessage()), true);
+                helper.setText(bodyOf(c, stage, today, manual == null ? null : manual.getMessage(),
+                        attachments.stream().map(PiFileStorage.DownloadFile::fileName).toList(), expiryStatus(c)), true);
+                for (PiFileStorage.DownloadFile f : attachments) {
+                    helper.addAttachment(f.fileName(), new ByteArrayResource(f.data()), f.contentType());
+                }
                 sender.send(message);
                 result = AlertSendStatus.SENT;
             } catch (Exception e) {
@@ -306,7 +327,23 @@ public class PiAlertMailService {
                 + (c.getContractEndDate() == null ? "" : " (" + c.getContractEndDate().format(D) + ")");
     }
 
+    /** 계약만료시 점검 자료 수취 여부: [만료 점검 체크리스트, 비밀유지 확약서, 파기 확인서] */
+    boolean[] expiryStatus(PiContract c) {
+        Long id = c.getContractId();
+        boolean checklist = !inspectionRepository
+                .findByContractIdInAndInspectionTypeAndDeletedYn(List.of(id), InspectionType.TERMINATION, "N").isEmpty();
+        var files = fileRepository.findByContractIdAndDeletedYnOrderByFileIdDesc(id, "N");
+        boolean pledge = files.stream().anyMatch(f -> f.getFileType() == ContractFileType.SECURITY_PLEDGE);
+        boolean destruction = files.stream().anyMatch(f -> f.getFileType() == ContractFileType.DESTRUCTION_CONFIRM);
+        return new boolean[]{checklist, pledge, destruction};
+    }
+
     String bodyOf(PiContract c, String stage, LocalDate today, String extraMessage) {
+        return bodyOf(c, stage, today, extraMessage, List.of(), null);
+    }
+
+    String bodyOf(PiContract c, String stage, LocalDate today, String extraMessage,
+                  List<String> attachmentNames, boolean[] received) {
         Long daysLeft = c.getContractEndDate() == null ? null : ChronoUnit.DAYS.between(today, c.getContractEndDate());
         String dLabel = daysLeft == null ? "-" : (daysLeft < 0 ? "만료 " + (-daysLeft) + "일 경과"
                 : (daysLeft == 0 ? "오늘 만료" : daysLeft + "일 남음"));
@@ -328,8 +365,8 @@ public class PiAlertMailService {
         sb.append("<div style=\"font-family:'Malgun Gothic',sans-serif;font-size:14px;color:#111\">");
         sb.append("<h3 style=\"margin:0 0 12px\">개인정보 위수탁 계약 만료 안내</h3>");
         sb.append("<p>아래 개인정보 처리 위탁 계약의 만료일이 다가왔습니다(또는 만료되었습니다).<br>")
-          .append("계약 갱신 여부를 확인하고, 계약을 종료하는 경우 <b>계약변경·만료 체크리스트</b>")
-          .append("(정보보호 및 비밀유지 확약서, 개인정보 파기 확인서 수취 등)를 진행해 주세요.</p>");
+          .append("계약 갱신 여부를 확인하고, 계약을 종료하는 경우 <b>만료일 전에</b> 협력사로부터 ")
+          .append("<b>계약만료시 점검 체크리스트, 정보보호 및 비밀유지 확약서, 개인정보 파기 확인서</b>를 받아 주세요.</p>");
         if (StringUtils.hasText(extraMessage)) {
             sb.append("<p style=\"padding:8px 12px;background:#f3f4f6;border-left:3px solid #4f46e5\">")
               .append(esc(extraMessage).replace("\n", "<br>")).append("</p>");
@@ -341,6 +378,7 @@ public class PiAlertMailService {
               .append(esc(nz(r[1]))).append("</td></tr>");
         }
         sb.append("</table>");
+        appendExpiryForms(sb, attachmentNames, received);
         if (StringUtils.hasText(baseUrl)) {
             String link = baseUrl + "/personalinfo/index.html#/contracts/" + c.getContractId();
             sb.append("<p style=\"margin-top:16px\"><a href=\"").append(esc(link)).append("\">시스템에서 계약 상세 보기</a></p>");
@@ -348,6 +386,33 @@ public class PiAlertMailService {
         sb.append("<p style=\"color:#6b7280;font-size:12px;margin-top:16px\">본 메일은 개인정보 위수탁 협력사 관리 시스템에서 자동 발송되었습니다.</p>");
         sb.append("</div>");
         return sb.toString();
+    }
+
+    /** 계약만료시 점검 자료 안내 (첨부 양식 + 수취 현황) */
+    private static void appendExpiryForms(StringBuilder sb, List<String> attachmentNames, boolean[] received) {
+        String[][] items = {
+                {"계약만료시 점검 체크리스트 (엑셀)", "체크리스트의 '3.계약변경 만료시 체크' 시트 작성"},
+                {"정보보호 및 비밀유지 확약서", "대표자 날인 / 개인정보 보호책임자 서명"},
+                {"개인정보 파기 확인서", "파기 내역 작성 + 파기 증빙 첨부"},
+        };
+        sb.append("<h4 style=\"margin:20px 0 8px\">계약 만료 시 협력사 제출 자료</h4>");
+        if (attachmentNames != null && !attachmentNames.isEmpty()) {
+            sb.append("<p style=\"margin:0 0 8px\">이 메일에 <b>양식 ").append(attachmentNames.size())
+              .append("종</b>이 첨부되어 있습니다(계약 정보가 미리 채워져 있음). 협력사에 전달하여 작성본을 받은 뒤, ")
+              .append("시스템 계약 상세의 <b>[계약만료시 점검]</b>에 업로드해 주세요.</p>");
+        }
+        sb.append("<table style=\"border-collapse:collapse;min-width:480px\"><tr>")
+          .append("<th style=\"text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f8fafc\">제출 자료</th>")
+          .append("<th style=\"text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f8fafc\">작성 안내</th>")
+          .append("<th style=\"text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f8fafc\">수취 현황</th></tr>");
+        for (int i = 0; i < items.length; i++) {
+            boolean ok = received != null && received.length > i && received[i];
+            sb.append("<tr><td style=\"padding:6px 10px;border:1px solid #ddd\">").append(esc(items[i][0]))
+              .append("</td><td style=\"padding:6px 10px;border:1px solid #ddd;color:#4b5563\">").append(esc(items[i][1]))
+              .append("</td><td style=\"padding:6px 10px;border:1px solid #ddd;font-weight:700;color:")
+              .append(ok ? "#166534\">수취 완료" : "#b91c1c\">미수취").append("</td></tr>");
+        }
+        sb.append("</table>");
     }
 
     private static String esc(String s) {

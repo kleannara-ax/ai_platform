@@ -734,6 +734,83 @@
   }
 
   // ──────────────── 3. 상세 화면 ────────────────
+  // ──────────────── 계약만료시 점검 ────────────────
+  // 만료 점검 결과(엑셀) = TERMINATION 점검 이력, 확약서/파기확인서 = 첨부파일(fileType)
+  const EXPIRY_ITEMS = [
+    { key: 'checklist', label: '만료 점검 결과 (엑셀)', icon: 'fa-file-excel text-success', form: '만료 점검 체크리스트', accept: '.xlsx' },
+    { key: 'security-pledge', fileType: 'SECURITY_PLEDGE', label: '정보보호 및 비밀유지 확약서', icon: 'fa-file-signature text-primary', form: '확약서 양식', accept: '.pdf,.doc,.docx,.hwp,.hwpx,.jpg,.jpeg,.png,.zip' },
+    { key: 'destruction-confirm', fileType: 'DESTRUCTION_CONFIRM', label: '개인정보 파기 확인서', icon: 'fa-file-shield text-danger', form: '파기 확인서 양식', accept: '.pdf,.doc,.docx,.hwp,.hwpx,.jpg,.jpeg,.png,.zip' },
+  ];
+
+  function expirySection(c) {
+    const byDateDesc = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    const rows = EXPIRY_ITEMS.map((it) => {
+      let status; let latest = ''; let count = 0;
+      if (it.key === 'checklist') {
+        const list = c.inspections.filter((i) => i.inspectionType === 'TERMINATION');
+        count = list.length;
+        const i = list[0];
+        status = i ? `${badge(i.result, i.resultLabel)} <small class="text-muted ms-1">${fmtDate(i.inspectionDate)}</small>` : '<span class="pi-status NONE">미수취</span>';
+        if (i) latest = `<button class="btn btn-link btn-sm p-0 text-truncate pi-expiry-file" data-dl-ins="${i.inspectionId}" data-name="${esc(i.originalName)}" title="${esc(i.originalName)}"><i class="fas fa-download me-1"></i>${esc(i.originalName)}</button>`;
+      } else {
+        const list = c.files.filter((f) => f.fileType === it.fileType).sort(byDateDesc);
+        count = list.length;
+        const f = list[0];
+        status = f ? `<span class="pi-status PASS">수취 완료</span> <small class="text-muted ms-1">${fmtDate(f.createdAt)}</small>` : '<span class="pi-status NONE">미수취</span>';
+        if (f) latest = `<button class="btn btn-link btn-sm p-0 text-truncate pi-expiry-file" data-dl-file="${f.fileId}" data-name="${esc(f.originalName)}" title="${esc(f.originalName)}"><i class="fas fa-download me-1"></i>${esc(f.originalName)}</button>`;
+      }
+      return `<tr data-expiry="${it.key}" style="cursor:default">
+        <td class="text-nowrap"><i class="fas ${it.icon} me-2"></i><b>${esc(it.label)}</b></td>
+        <td class="text-nowrap"><button class="btn btn-sm btn-outline-secondary" data-expiry-form="${it.key}" title="이 계약 정보가 채워진 양식"><i class="fas fa-download me-1"></i>${esc(it.form)}</button></td>
+        <td class="text-nowrap">${status}${count > 1 ? ` <small class="text-muted">(총 ${count}건)</small>` : ''}</td>
+        <td class="pi-ellipsis" style="max-width:260px">${latest || '<span class="text-muted">-</span>'}</td>
+        <td class="text-end text-nowrap">${perm.canWrite ? `<button class="btn btn-sm btn-primary" data-expiry-upload="${it.key}"><i class="fas fa-upload me-1"></i>업로드</button>
+          ${it.fileType ? `<input type="file" class="d-none" data-expiry-input="${it.key}" accept="${it.accept}" aria-label="${esc(it.label)} 파일">` : ''}` : ''}</td></tr>`;
+    });
+    const done = EXPIRY_ITEMS.filter((it) => it.key === 'checklist'
+      ? c.inspections.some((i) => i.inspectionType === 'TERMINATION')
+      : c.files.some((f) => f.fileType === it.fileType)).length;
+    return `
+      <section class="pi-card" id="expiry-check-section">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <h2 class="mb-0"><i class="fas fa-file-circle-check"></i>계약만료시 점검
+            <small class="fw-normal ${done === 3 ? 'text-success' : 'text-muted'}">(수취 ${done} / 3)</small></h2>
+          <button class="btn btn-sm btn-outline-success" id="btn-expiry-forms-all"><i class="fas fa-file-arrow-down me-1"></i>양식 3종 모두 다운로드</button>
+        </div>
+        <p class="small text-muted mb-2"><i class="fas fa-circle-info me-1"></i>계약 만료 전에 협력사로부터 아래 3가지 자료를 받아 올려 주세요. 만료 알림 메일에는 이 3가지 양식이 계약 정보가 채워진 상태로 첨부되어 담당자에게 발송됩니다.
+          만료 점검 결과는 체크리스트의 <b>3.계약변경 만료시 체크</b> 시트를 읽어 판정합니다.</p>
+        <div class="table-responsive"><table class="pi-table" id="expiry-check-table"><thead><tr><th>점검 항목</th><th>양식</th><th>제출 현황</th><th>최근 제출 파일</th><th></th></tr></thead>
+          <tbody>${rows.join('')}</tbody></table></div>
+      </section>`;
+  }
+
+  function bindExpiry(c, reload) {
+    const id = c.contractId;
+    const sec = document.getElementById('expiry-check-section');
+    if (!sec) return;
+    sec.querySelectorAll('[data-expiry-form]').forEach((b) => b.addEventListener('click', () => PI_API.downloadExpiryForm(id, b.dataset.expiryForm).catch(fail)));
+    document.getElementById('btn-expiry-forms-all').onclick = async () => {
+      try { for (const it of EXPIRY_ITEMS) await PI_API.downloadExpiryForm(id, it.key); } catch (e) { fail(e); }
+    };
+    sec.querySelectorAll('[data-expiry-upload]').forEach((b) => b.addEventListener('click', () => {
+      const key = b.dataset.expiryUpload;
+      if (key === 'checklist') {
+        document.getElementById('inspection-form').reset();
+        document.getElementById('ins-type').value = 'TERMINATION';
+        modal('inspection-modal').show();
+        return;
+      }
+      sec.querySelector(`[data-expiry-input="${key}"]`).click();
+    }));
+    sec.querySelectorAll('[data-expiry-input]').forEach((inp) => inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      const it = EXPIRY_ITEMS.find((x) => x.key === inp.dataset.expiryInput);
+      const fd = new FormData();
+      fd.append('file', f); fd.append('fileType', it.fileType); fd.append('description', '계약만료시 점검 제출');
+      try { await PI_API.uploadFile(id, fd); notify(`${it.label}을(를) 업로드했습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
+    }));
+  }
+
   async function renderDetail(id) {
     const c = await PI_API.getContract(id);
     currentContract = c;
@@ -834,6 +911,8 @@
             : '<tr><td colspan="9" class="pi-empty">점검 이력이 없습니다. 체크리스트 양식을 내려받아 협력사에 전달한 뒤, 작성본을 업로드하세요.</td></tr>'}</tbody></table></div>
       </section>
 
+      ${expirySection(c)}
+
       <section class="pi-card" id="alert-log-section">
         <h2><i class="fas fa-bell"></i>만료 알림 발송 이력 <small class="text-muted fw-normal">(최근 20건)</small></h2>
         <div class="table-responsive"><table class="pi-table" id="alert-log-table"><thead><tr><th>일시</th><th>경로</th><th>단계</th><th>수신자</th><th>상태</th><th>사유</th></tr></thead>
@@ -846,6 +925,7 @@
 
     PiTable.enhance(document.getElementById('file-table'), { id: 'files' });
     PiTable.enhance(document.getElementById('inspection-table'), { id: 'inspections' });
+    PiTable.enhance(document.getElementById('expiry-check-table'), { id: 'expiryCheck' });
     PiTable.enhance(document.getElementById('alert-log-table'), { id: 'alerts' });
     bindDetail(c);
   }
@@ -1053,6 +1133,7 @@
       try { await PI_API.deleteInspection(b.dataset.delIns); notify('삭제되었습니다.'); reload(); } catch (err) { fail(err); }
     }));
     document.querySelectorAll('tr[data-ins]').forEach((tr) => tr.addEventListener('click', () => showInspection(tr.dataset.ins)));
+    bindExpiry(c, reload);
 
     // 메일
     document.getElementById('btn-mail')?.addEventListener('click', () => {

@@ -94,6 +94,9 @@ const PI_API = (() => {
     deleteFile: (fileId) => request('/files/' + fileId, { method: 'DELETE' }),
     downloadBlankTemplate: () => download('/checklist-template', '점검체크리스트.xlsx'),
     downloadTemplate: (id) => download('/contracts/' + id + '/checklist-template', '점검체크리스트.xlsx'),
+    // 계약만료시 점검 양식: checklist | security-pledge | destruction-confirm
+    downloadBlankExpiryForm: (type) => download('/expiry-forms/' + type, type + '.docx'),
+    downloadExpiryForm: (id, type) => download('/contracts/' + id + '/expiry-forms/' + type, type + (type === 'checklist' ? '.xlsx' : '.docx')),
     uploadInspection: (id, form) => request('/contracts/' + id + '/inspections', { method: 'POST', form }),
     getInspection: (inspectionId) => request('/inspections/' + inspectionId),
     updateInspection: (inspectionId, body) => request('/inspections/' + inspectionId, { method: 'PUT', body }),
