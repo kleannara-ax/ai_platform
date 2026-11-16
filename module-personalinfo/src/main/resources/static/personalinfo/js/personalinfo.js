@@ -499,7 +499,7 @@
         <form id="contract-form" novalidate>
           <div class="row g-3">
             <div class="col-md-4">${input('vendorName', '수탁업체명', v.vendorName, 'required maxlength="200"')}</div>
-            <div class="col-md-4">${input('contractName', '계약명', v.contractName, 'maxlength="200" placeholder="예: 본사 물류 위탁계약, 부산지사 물류 위탁계약"')}</div>
+            <div class="col-md-4">${input('contractName', '계약명', v.contractName, 'required maxlength="200" placeholder="예: 본사 물류 위탁계약, 부산지사 물류 위탁계약"')}</div>
             <div class="col-md-2">${input('serviceName', '관련 서비스', v.serviceName, 'maxlength="200" placeholder="예: 자사몰, OMS"')}</div>
             <div class="col-md-2"><label class="form-label d-block">ISMS 범위</label>${radio('ismsScopeYn', v.ismsScopeYn)}</div>
             <div class="col-12 d-none" id="same-vendor-hint" role="status" aria-live="polite"></div>
@@ -524,8 +524,8 @@
             <div class="pi-form-sub" id="original-contract-block">
               <h4><i class="fas fa-file-signature me-1"></i>원계약 <small class="text-muted fw-normal">계약기간·만료 알림은 원계약 기준</small></h4>
               <div class="row g-3">
-                <div class="col-md-3">${input('contractStartDate', '계약 시작일', v.contractStartDate, 'type="date"')}</div>
-                <div class="col-md-3">${input('contractEndDate', '계약 종료일', v.contractEndDate, 'type="date"')}</div>
+                <div class="col-md-3">${input('contractStartDate', '계약 시작일', v.contractStartDate, 'type="date" required')}</div>
+                <div class="col-md-3">${input('contractEndDate', '계약 종료일', v.contractEndDate, 'type="date" required')}</div>
                 <div class="col-md-6">${input('contractPeriodNote', '계약기간 비고', v.contractPeriodNote, 'maxlength="500" placeholder="예: 체결일로부터 1년, 이용약관"')}</div>
                 <div class="col-md-2"><label class="form-label d-block">자동연장</label>${radio('autoRenewYn', v.autoRenewYn)}</div>
                 <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 1개월 단위"')}</div>
@@ -611,6 +611,9 @@
         notify('재위탁이 Y 이면 재위탁 업체명 또는 재위탁 업무를 입력하세요.', 'warning');
         document.getElementById('f-subcontractorName').focus();
         return;
+      }
+      if (body.contractStartDate && body.contractEndDate && body.contractEndDate < body.contractStartDate) {
+        notify('원계약 종료일은 시작일보다 빠를 수 없습니다.', 'warning'); document.getElementById('f-contractEndDate').focus(); return;
       }
       if (body.alertYn === 'Y' && !body.contractEndDate) { notify('만료 알림을 사용하려면 계약 종료일을 입력하세요. (종료일이 없으면 알림 사용 N)', 'warning'); return; }
       const btn = document.getElementById('btn-save');

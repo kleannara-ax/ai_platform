@@ -3,6 +3,7 @@ package com.company.module.personalinfo.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -30,7 +31,8 @@ public class ContractSaveRequest {
     @Size(max = 200)
     private String vendorName;
 
-    /** 계약명 (한 업체의 여러 계약 구분. 예: 본사 물류 위탁계약, 부산지사 물류 위탁계약) */
+    /** 계약명 (필수. 한 업체의 여러 계약 구분. 예: 본사 물류 위탁계약, 부산지사 물류 위탁계약) */
+    @NotBlank(message = "계약명은 필수입니다.")
     @Size(max = 200)
     private String contractName;
 
@@ -67,10 +69,12 @@ public class ContractSaveRequest {
     @Size(max = 50)
     private String vendorContactPhone;
 
-    /** 원계약 시작일 */
+    /** 원계약 시작일 (필수) */
+    @NotNull(message = "원계약 시작일은 필수입니다.")
     private LocalDate contractStartDate;
 
-    /** 원계약 종료일 (만료 알림 기준) */
+    /** 원계약 종료일 (필수, 만료 알림 기준) */
+    @NotNull(message = "원계약 종료일은 필수입니다.")
     private LocalDate contractEndDate;
 
     /** 계약기간 비고 (예: 체결일로부터 1년, 이용약관) */
