@@ -29,10 +29,14 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
      * <p>기준 연도 조건(yearOn=1)은 {@link com.company.module.personalinfo.service.PiYearScope} 와 같은 규칙이다.
      * 대상 = 시작일 ≤ 연말 이고 종료 기준일(종료 처리일 또는 원계약 종료일) ≥ 전년도 12/31,
      * ENDED = 종료 기준일 &lt; 기준일(오늘을 그 연도 안으로 맞춘 날), ACTIVE = 그 밖.</p>
+     *
+     * <p>부서 범위(deptOn=1)는 비관리자용: 계약 담당부서(공백 제거·소문자)가 deptKeys 안에 있는 계약만.
+     * 규칙은 {@link com.company.module.personalinfo.service.PiAccessScope} 와 같다.</p>
      */
     @Query("""
             select c from PiContract c
              where c.deletedYn = 'N'
+               and (:deptOn = 0 or (c.deptName is not null and lower(replace(c.deptName, ' ', '')) in :deptKeys))
                and (:keyword = '' or c.vendorName like concat('%', :keyword, '%')
                                   or c.contractName like concat('%', :keyword, '%')
                                   or c.serviceName like concat('%', :keyword, '%')
@@ -94,6 +98,8 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                             @Param("yearCheck") String yearCheck,
                             @Param("regularType") InspectionType regularType,
                             @Param("terminationType") InspectionType terminationType,
+                            @Param("deptOn") int deptOn,
+                            @Param("deptKeys") List<String> deptKeys,
                             Pageable pageable);
 
     /** 알림 대상 후보: 미종료 + 알림 사용 + 종료일이 기간 안에 있는 계약 */

@@ -50,6 +50,7 @@ public class PiInspectionService {
     private final PiContractRepository contractRepository;
     private final ChecklistExcelParser parser;
     private final PiFileStorage storage;
+    private final PiAccessScopeResolver accessScope;
 
     public List<InspectionResponse> getList(Long contractId) {
         findContract(contractId);
@@ -218,9 +219,10 @@ public class PiInspectionService {
                 .orElseThrow(() -> new EntityNotFoundException("위수탁 점검", inspectionId));
     }
 
+    /** 계약 존재 + 현재 사용자 부서 범위 확인 */
     private PiContract findContract(Long contractId) {
-        return contractRepository.findByContractIdAndDeletedYn(contractId, N)
-                .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId));
+        return accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
+                .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId)));
     }
 
     static InspectionType parseType(String value) {

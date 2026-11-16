@@ -72,6 +72,7 @@ public class PiContractService {
     private final PiInspectionRepository inspectionRepository;
     private final PiAlertLogRepository alertLogRepository;
     private final PiContactHistoryRepository contactHistoryRepository;
+    private final PiAccessScopeResolver accessScope;
 
     public Page<ContractSummaryResponse> search(ContractSearchCondition cond, int page, int size, String sort) {
         LocalDate today = LocalDate.now();
@@ -84,6 +85,7 @@ public class PiContractService {
         String yearStatus = by == null ? "" : upperOrEmpty(cond.getYearStatus(), Set.of("ACTIVE", "ENDED"));
         String yearCheck = by == null ? "" : upperOrEmpty(cond.getYearCheck(),
                 Set.of("INSPECTED", "NOT_INSPECTED", "TERM_UPLOADED", "TERM_MISSING"));
+        PiAccessScope scope = accessScope.current();
         Page<PiContract> result = contractRepository.search(
                 nz(cond.getKeyword()), nz(cond.getDeptName()), nz(cond.getManagerName()),
                 upperOrEmpty(cond.getIsmsScopeYn(), Set.of("Y", "N")),
@@ -94,16 +96,17 @@ public class PiContractService {
                 by == null ? 0 : 1, year, PiYearScope.prevYearEnd(year), PiYearScope.yearEnd(year),
                 PiYearScope.refDate(year, today),
                 yearStatus, yearCheck, InspectionType.REGULAR, InspectionType.TERMINATION,
+                scope.deptOn(), scope.deptKeyList(),
                 pageable);
         Set<Long> termChecked = termCheckedIds(result.getContent().stream().map(PiContract::getContractId).toList());
-        Map<String, Long> vendorCounts = result.isEmpty() ? Map.of() : vendorContractCounts();
+        Map<String, Long> vendorCounts = result.isEmpty() ? Map.of() : vendorContractCounts(scope);
         return result.map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId()),
                 vendorCounts.getOrDefault(PiVendorNames.key(c.getVendorName()), 1L).intValue()));
     }
 
-    /** 업체(업체명 정규화 키)별 계약 수 (삭제 제외, 종료 포함) */
-    private Map<String, Long> vendorContractCounts() {
-        return contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+    /** 업체(업체명 정규화 키)별 계약 수 (삭제 제외, 종료 포함, 현재 사용자가 볼 수 있는 계약만) */
+    private Map<String, Long> vendorContractCounts(PiAccessScope scope) {
+        return visibleContracts(scope).stream()
                 .collect(Collectors.groupingBy(c -> PiVendorNames.key(c.getVendorName()), Collectors.counting()));
     }
 
@@ -123,7 +126,7 @@ public class PiContractService {
         if (key.isEmpty()) {
             return List.of();
         }
-        List<PiContract> list = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+        List<PiContract> list = visibleContracts(accessScope.current()).stream()
                 .filter(c -> PiVendorNames.key(c.getVendorName()).equals(key))
                 .sorted(Comparator.comparing((PiContract c) -> "Y".equals(c.getTerminatedYn()))
                         .thenComparing(PiContract::getContractStartDate, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -132,6 +135,12 @@ public class PiContractService {
         Set<Long> termChecked = termCheckedIds(list.stream().map(PiContract::getContractId).toList());
         int n = list.size();
         return list.stream().map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId()), n)).toList();
+    }
+
+    /** 삭제되지 않은 계약 중 현재 사용자(부서 범위)가 볼 수 있는 계약 */
+    List<PiContract> visibleContracts(PiAccessScope scope) {
+        List<PiContract> all = contractRepository.findByDeletedYnOrderByContractIdAsc(N);
+        return scope.all() ? all : all.stream().filter(scope::allows).toList();
     }
 
     /** 계약종결 체크(계약변경·만료 점검)를 업로드한 계약 ID */
@@ -173,7 +182,7 @@ public class PiContractService {
                 .contractName(trim(r.getContractName()))
                 .serviceName(trim(r.getServiceName()))
                 .entrustedTask(trim(r.getEntrustedTask()))
-                .deptName(trim(r.getDeptName()))
+                .deptName(accessScope.current().deptForSave(trim(r.getDeptName())))
                 .managerName(trim(r.getManagerName()))
                 .managerEmail(trim(r.getManagerEmail()))
                 .vendorContactName(trim(r.getVendorContactName()))
@@ -215,7 +224,7 @@ public class PiContractService {
         String[] before = contactValues(c);
         c.update(r.getIsmsScopeYn(), trim(r.getVendorName()), trim(r.getContractName()), trim(r.getServiceName()),
                 trim(r.getEntrustedTask()),
-                trim(r.getDeptName()), trim(r.getManagerName()), trim(r.getManagerEmail()),
+                accessScope.current().deptForSave(trim(r.getDeptName())), trim(r.getManagerName()), trim(r.getManagerEmail()),
                 trim(r.getVendorContactName()), trim(r.getVendorContactEmail()), trim(r.getVendorContactPhone()),
                 r.getContractStartDate(), r.getContractEndDate(), trim(r.getContractPeriodNote()),
                 r.getAutoRenewYn(), trim(r.getAutoRenewNote()), r.getContractDocYn(), r.getContractSignedDate(),
@@ -237,7 +246,7 @@ public class PiContractService {
         Map<Long, String> names = new java.util.HashMap<>();
         if (vendorWide) {
             String key = PiVendorNames.key(c.getVendorName());
-            List<PiContract> same = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+            List<PiContract> same = visibleContracts(accessScope.current()).stream()
                     .filter(x -> PiVendorNames.key(x.getVendorName()).equals(key)).toList();
             same.forEach(x -> { if (x.getContractName() != null) names.put(x.getContractId(), x.getContractName()); });
             ids = same.stream().map(PiContract::getContractId).toList();
@@ -350,7 +359,7 @@ public class PiContractService {
         }
         int by = baseYear == null ? today.getYear() : baseYear;
         int year = today.getYear();
-        List<PiContract> all = contractRepository.findByDeletedYnOrderByContractIdAsc(N);
+        List<PiContract> all = visibleContracts(accessScope.current());
         Map<ContractStatus, Long> byStatus = all.stream()
                 .collect(Collectors.groupingBy(c -> ContractStatus.of(c, today), Collectors.counting()));
         Set<Long> inspectedThisYear = inspectionRepository.findByInspectionYearAndDeletedYn(year, N).stream()
@@ -432,9 +441,10 @@ public class PiContractService {
         return rows;
     }
 
+    /** 삭제되지 않은 계약 + 현재 사용자 부서 범위 확인 (다른 부서 계약이면 403) */
     PiContract findActive(Long contractId) {
-        return contractRepository.findByContractIdAndDeletedYn(contractId, N)
-                .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId));
+        return accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
+                .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId)));
     }
 
     private void validate(ContractSaveRequest r) {

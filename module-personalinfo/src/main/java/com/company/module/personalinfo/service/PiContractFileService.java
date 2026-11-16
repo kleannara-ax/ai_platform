@@ -34,6 +34,7 @@ public class PiContractFileService {
     private final PiContractRepository contractRepository;
     private final PiFileStorage storage;
     private final PiContractDocAnalyzer docAnalyzer;
+    private final PiAccessScopeResolver accessScope;
 
     public List<ContractFileResponse> getList(Long contractId) {
         ensureContract(contractId);
@@ -146,6 +147,7 @@ public class PiContractFileService {
     @Transactional
     public void delete(Long fileId, Long userId) {
         PiContractFile f = findActive(fileId);
+        ensureContract(f.getContractId());
         f.delete(userId);
         if (f.isContractDoc()) {
             syncContractSignedDate(f.getContractId(), userId); // 최신 계약서를 지우면 그다음 최신 날짜로
@@ -157,10 +159,10 @@ public class PiContractFileService {
                 .orElseThrow(() -> new EntityNotFoundException("계약 첨부파일", fileId));
     }
 
+    /** 계약 존재 + 현재 사용자 부서 범위 확인 */
     private void ensureContract(Long contractId) {
-        if (contractRepository.findByContractIdAndDeletedYn(contractId, N).isEmpty()) {
-            throw new EntityNotFoundException("위수탁 계약", contractId);
-        }
+        accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
+                .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId)));
     }
 
     private static ContractFileType parseType(String fileType) {

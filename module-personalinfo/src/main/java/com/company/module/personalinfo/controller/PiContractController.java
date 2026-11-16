@@ -11,6 +11,8 @@ import com.company.module.personalinfo.dto.ContractSummaryResponse;
 import com.company.module.personalinfo.dto.ContractTerminateRequest;
 import com.company.module.personalinfo.dto.DashboardResponse;
 import com.company.module.personalinfo.dto.PermissionResponse;
+import com.company.module.personalinfo.service.PiAccessScope;
+import com.company.module.personalinfo.service.PiAccessScopeResolver;
 import com.company.module.personalinfo.service.PiContractExcelService;
 import com.company.module.personalinfo.service.PiContractService;
 import com.company.module.personalinfo.service.PiRoles;
@@ -47,11 +49,16 @@ public class PiContractController {
 
     private final PiContractService contractService;
     private final PiContractExcelService excelService;
+    private final PiAccessScopeResolver accessScope;
 
     /** 현재 사용자 권한 (화면 버튼 노출용) */
     @GetMapping("/me/permissions")
     public ResponseEntity<ApiResponse<PermissionResponse>> myPermissions(Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(PiRoles.permissionsOf(authentication)));
+        PiAccessScope scope = accessScope.current();
+        return ResponseEntity.ok(ApiResponse.success(PiRoles.permissionsOf(authentication).toBuilder()
+                .allDepartments(scope.all())
+                .deptName(scope.all() ? null : scope.deptName())
+                .build()));
     }
 
     /** 목록 상단 요약 (baseYear: 기준 연도, 없으면 올해) */

@@ -28,6 +28,17 @@
   const badge = (code, label) => `<span class="pi-status ${esc(code || 'NONE')}">${esc(label || code || '-')}</span>`;
   /** 계약 표시 이름: 계약명 → 없으면 관련 서비스 */
   const contractLabel = (r) => r.contractName || r.serviceName || '-';
+  /** 비관리자: 소속부서 계약만 조회 가능. 소속부서가 없으면 볼 수 있는 계약 없음 */
+  const deptScoped = () => !perm.allDepartments;
+  const canCreate = () => perm.canWrite && (perm.allDepartments || !!perm.deptName);
+  const deptScopeBanner = () => {
+    if (!deptScoped()) return '';
+    return perm.deptName
+      ? `<div class="pi-dept-scope alert alert-info py-2 px-3 mb-3" id="dept-scope-banner" role="status"><i class="fas fa-building-user me-1"></i>
+          <b>${esc(perm.deptName)}</b> 소속부서의 계약만 표시됩니다. 다른 부서 계약은 보안팀(관리자)에게 문의하세요.</div>`
+      : `<div class="pi-dept-scope alert alert-warning py-2 px-3 mb-3" id="dept-scope-banner" role="alert"><i class="fas fa-triangle-exclamation me-1"></i>
+          사용자 정보에 <b>소속부서</b>가 지정되지 않아 볼 수 있는 계약이 없습니다. 관리자에게 사용자 관리에서 부서 지정을 요청하세요.</div>`;
+  };
   const dLabel = (days) => (days == null ? '-' : days < 0 ? `만료 ${-days}일 경과` : days === 0 ? '오늘 만료' : `D-${days}`);
 
   function notify(message, type = 'success') {
@@ -61,14 +72,16 @@
   async function renderList() {
     crumb.innerHTML = '계약 목록';
     const c = listState.cond;
-    view.innerHTML = `
+    view.innerHTML = `${deptScopeBanner()}
       <section id="pi-dashboard" class="pi-stats"></section>
       <section class="pi-card" id="contract-search-section">
         <form id="contract-search-form" class="row g-2 align-items-end">
           <div class="col-md-3"><label class="form-label small" for="s-keyword">통합검색</label>
             <input class="form-control form-control-sm" id="s-keyword" name="keyword" placeholder="수탁업체/계약명/서비스/위탁업무/재위탁업체" value="${esc(c.keyword)}"></div>
           <div class="col-md-2"><label class="form-label small" for="s-dept">담당부서</label>
-            <input class="form-control form-control-sm" id="s-dept" name="deptName" value="${esc(c.deptName)}"></div>
+            ${deptScoped()
+              ? `<input class="form-control form-control-sm" id="s-dept" value="${esc(perm.deptName || '-')}" disabled title="소속부서 계약만 조회됩니다">`
+              : `<input class="form-control form-control-sm" id="s-dept" name="deptName" value="${esc(c.deptName)}">`}</div>
           <div class="col-md-1"><label class="form-label small" for="s-manager">담당자</label>
             <input class="form-control form-control-sm" id="s-manager" name="managerName" value="${esc(c.managerName)}"></div>
           <div class="col-md-1"><label class="form-label small" for="s-status">계약상태</label>
@@ -97,7 +110,7 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-template"><i class="fas fa-file-excel me-1"></i>점검 체크리스트 양식</button>
               <button type="button" class="btn btn-sm btn-outline-success" id="btn-excel"><i class="fas fa-download me-1"></i>엑셀 다운로드</button>
               ${perm.canDelete ? '<button type="button" class="btn btn-sm btn-outline-warning" id="btn-run-alert"><i class="fas fa-bell me-1"></i>만료 알림 실행</button>' : ''}
-              ${perm.canWrite ? '<button type="button" class="btn btn-sm btn-primary" id="btn-new"><i class="fas fa-plus me-1"></i>계약 등록</button>' : ''}
+              ${canCreate() ? '<button type="button" class="btn btn-sm btn-primary" id="btn-new"><i class="fas fa-plus me-1"></i>계약 등록</button>' : ''}
             </div>
           </div>
         </form>
@@ -467,6 +480,7 @@
   // ──────────────── 2·4. 등록 / 수정 화면 ────────────────
   function renderForm(c, presetVendor) {
     if (!perm.canWrite) { notify('등록/수정 권한이 없습니다.', 'warning'); go(c ? '#/contracts/' + c.contractId : '#/contracts'); return; }
+    if (!canCreate()) { notify('소속부서가 지정되지 않아 계약을 등록·수정할 수 없습니다. 관리자에게 부서 지정을 요청하세요.', 'warning'); go('#/contracts'); return; }
     const isEdit = !!c;
     const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
     crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${isEdit ? `<a href="#/contracts/${c.contractId}">${esc(c.vendorName)}</a> &gt; 수정` : '계약 등록'}`;
@@ -495,7 +509,10 @@
 
           <div class="pi-form-section mt-3"><h3>당사 담당 / 수탁사 담당</h3>
             <div class="row g-3">
-              <div class="col-md-3">${input('deptName', '담당부서', v.deptName, 'maxlength="100"')}</div>
+              <div class="col-md-3">${deptScoped()
+                ? input('deptName', '담당부서', v.deptName || perm.deptName, 'maxlength="100" readonly aria-describedby="dept-lock-help"')
+                  + '<div class="form-text" id="dept-lock-help"><i class="fas fa-lock fa-xs me-1"></i>소속부서로 고정됩니다. 다른 부서 계약은 관리자에게 요청하세요.</div>'
+                : input('deptName', '담당부서', v.deptName, 'maxlength="100"')}</div>
               <div class="col-md-3">${input('managerName', '계약 담당자', v.managerName, 'maxlength="100"')}</div>
               <div class="col-md-6">${input('managerEmail', '담당자 이메일 (만료 알림 수신)', v.managerEmail, 'type="email" maxlength="200"')}</div>
               <div class="col-md-3">${input('vendorContactName', '수탁사 담당자', v.vendorContactName, 'maxlength="100"')}</div>
@@ -755,7 +772,7 @@
     body.innerHTML = '<div class="pi-empty">불러오는 중...</div>';
     const addBtn = document.getElementById('btn-vc-add');
     const ckBtn = document.getElementById('btn-vc-checklist');
-    addBtn.classList.toggle('d-none', !perm.canWrite);
+    addBtn.classList.toggle('d-none', !canCreate());
     ckBtn.classList.toggle('d-none', !perm.canWrite);
     addBtn.onclick = () => { modal('vendor-contracts-modal').hide(); go('#/contracts/new?vendor=' + encodeURIComponent(vendorName)); };
     ckBtn.onclick = () => { modal('vendor-contracts-modal').hide(); openVendorChecklist(vendorName); };
@@ -836,7 +853,7 @@
       <section class="pi-card" id="same-vendor-section">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
           <h2 class="mb-0"><i class="fas fa-layer-group"></i>같은 업체 계약 <small class="text-muted fw-normal" id="same-vendor-count"></small></h2>
-          ${perm.canWrite ? '<button class="btn btn-sm btn-outline-primary" id="btn-add-same-vendor"><i class="fas fa-plus me-1"></i>이 업체로 계약 추가</button>' : ''}
+          ${canCreate() ? '<button class="btn btn-sm btn-outline-primary" id="btn-add-same-vendor"><i class="fas fa-plus me-1"></i>이 업체로 계약 추가</button>' : ''}
         </div>
         <div id="same-vendor-body"><div class="pi-empty">불러오는 중...</div></div>
       </section>

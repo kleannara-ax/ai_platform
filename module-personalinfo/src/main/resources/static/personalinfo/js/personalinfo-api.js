@@ -20,7 +20,12 @@ const PI_API = (() => {
 
   async function parse(res) {
     if (res.status === 401) throw new Error('로그인이 만료되었습니다. 다시 로그인하세요.');
-    if (res.status === 403) throw new Error('이 기능을 사용할 권한이 없습니다.');
+    if (res.status === 403) {
+      // 서버가 이유를 보내면 그대로 보여준다 (예: 소속부서 계약만 볼 수 있습니다)
+      let m = null;
+      try { const j = await res.json(); m = j && j.message; } catch (e) { /* 본문 없음 */ }
+      throw new Error(m && !/^(Forbidden|Access Denied)$/i.test(m) ? m : '이 기능을 사용할 권한이 없습니다.');
+    }
     let json = null;
     try { json = await res.json(); } catch (e) { /* 본문 없음 */ }
     if (!res.ok || (json && json.success === false)) {

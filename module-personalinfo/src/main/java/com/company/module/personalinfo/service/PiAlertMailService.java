@@ -71,6 +71,7 @@ public class PiAlertMailService {
     private final PiAlertLogRepository alertLogRepository;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final TransactionTemplate newTx;
+    private final PiAccessScopeResolver accessScope;
 
     private final String mailFrom;
     private final String defaultRecipients;
@@ -81,6 +82,7 @@ public class PiAlertMailService {
                               PiAlertLogRepository alertLogRepository,
                               ObjectProvider<JavaMailSender> mailSenderProvider,
                               PlatformTransactionManager transactionManager,
+                              PiAccessScopeResolver accessScope,
                               @Value("${personalinfo.alert.mail-from:${spring.mail.username:}}") String mailFrom,
                               @Value("${personalinfo.alert.default-recipients:}") String defaultRecipients,
                               @Value("${personalinfo.alert.base-url:}") String baseUrl,
@@ -88,6 +90,7 @@ public class PiAlertMailService {
         this.contractRepository = contractRepository;
         this.alertLogRepository = alertLogRepository;
         this.mailSenderProvider = mailSenderProvider;
+        this.accessScope = accessScope;
         this.newTx = new TransactionTemplate(transactionManager);
         this.newTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.mailFrom = mailFrom;
@@ -199,6 +202,7 @@ public class PiAlertMailService {
     public AlertLogResponse sendManual(Long contractId, AlertSendRequest request, Long userId) {
         PiContract c = contractRepository.findByContractIdAndDeletedYn(contractId, "N")
                 .orElseThrow(() -> new com.company.core.common.exception.EntityNotFoundException("위수탁 계약", contractId));
+        accessScope.check(c);
         String extra = request == null ? null : request.getExtraRecipients();
         Set<String> recipients = recipientsOf(c, extra);
         if (recipients.isEmpty()) {

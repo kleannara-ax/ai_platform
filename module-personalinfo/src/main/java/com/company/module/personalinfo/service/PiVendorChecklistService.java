@@ -59,12 +59,13 @@ public class PiVendorChecklistService {
     private final PiInspectionService inspectionService;
     private final ChecklistExcelParser parser;
     private final PiFileStorage storage;
+    private final PiAccessScopeResolver accessScope;
 
     /** 업체 목록 (계약 업체명 기준 묶음). keyword 는 업체명 부분 검색 */
     public List<VendorSummaryResponse> getVendors(String keyword, boolean includeTerminated) {
         LocalDate today = LocalDate.now();
         String kw = PiVendorNames.key(keyword);
-        Map<String, List<PiContract>> groups = groupByVendor(contractRepository.findByDeletedYnOrderByContractIdAsc(N));
+        Map<String, List<PiContract>> groups = groupByVendor(visibleContracts());
         Set<Long> inspectedThisYear = inspectionRepository.findByInspectionYearAndDeletedYn(today.getYear(), N).stream()
                 .map(PiInspection::getContractId).collect(Collectors.toSet());
         return groups.entrySet().stream()
@@ -132,7 +133,7 @@ public class PiVendorChecklistService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업체를 선택하세요.");
         }
         String key = PiVendorNames.key(vendorKey);
-        List<PiContract> vendorContracts = contractRepository.findByDeletedYnOrderByContractIdAsc(N).stream()
+        List<PiContract> vendorContracts = visibleContracts().stream()
                 .filter(c -> PiVendorNames.key(c.getVendorName()).equals(key))
                 .toList();
         if (vendorContracts.isEmpty()) {
@@ -192,6 +193,13 @@ public class PiVendorChecklistService {
     }
 
     // ─────────────────────────────────────────────────────────────
+
+    /** 현재 사용자(부서 범위)가 볼 수 있는 계약 */
+    private List<PiContract> visibleContracts() {
+        PiAccessScope scope = accessScope.current();
+        List<PiContract> all = contractRepository.findByDeletedYnOrderByContractIdAsc(N);
+        return scope.all() ? all : all.stream().filter(scope::allows).toList();
+    }
 
     private ChecklistExcelParser.ParsedChecklist parse(MultipartFile file, InspectionType type) {
         if (file == null || file.isEmpty()) {
