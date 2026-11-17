@@ -38,10 +38,10 @@ public class PiContractExcelService {
     private static final DateTimeFormatter D = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     private static final String[] HEADERS = {
             "번호", "ISMS\n범위", "수탁업체 명", "계약명", "관련 서비스", "위탁업무 내용", "담당부서", "담당자",
-            "원계약\n시작일", "원계약\n종료일", "원계약 기간 비고", "자동연장", "개인정보처리\n위탁계약서 작성",
+            "원계약\n시작일", "원계약\n종료일", "현재 계약\n종료일", "원계약 기간 비고", "자동연장", "개인정보처리\n위탁계약서 작성",
             "재위탁 여부", "재위탁 업체 명", "계약상태", "만료까지(일)", "최근 점검일", "최근 점검결과"
     };
-    private static final int[] WIDTHS = {6, 7, 22, 24, 16, 40, 14, 10, 12, 12, 24, 8, 10, 8, 24, 10, 10, 12, 12};
+    private static final int[] WIDTHS = {6, 7, 22, 24, 16, 40, 14, 10, 12, 12, 12, 24, 10, 10, 8, 24, 10, 10, 12, 12};
 
     private final PiContractService contractService;
     private final PiAccessLogService accessLog;
@@ -107,6 +107,7 @@ public class PiContractExcelService {
                 set(row, col++, x.getManagerName(), center);
                 set(row, col++, fmt(x.getContractStartDate()), center);
                 set(row, col++, fmt(x.getContractEndDate()), center);
+                set(row, col++, fmt(x.getCurrentEndDate()), center);   // 자동연장 반영 (연장 없으면 원계약 종료일과 같음)
                 set(row, col++, x.getContractPeriodNote(), body);
                 set(row, col++, "Y".equals(x.getAutoRenewYn()) && x.getAutoRenewPeriodMonths() != null
                         ? "Y (" + com.company.module.personalinfo.entity.PiContract.renewPeriodLabel(x.getAutoRenewPeriodMonths()) + ")"

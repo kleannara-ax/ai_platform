@@ -305,8 +305,11 @@
             <td class="pi-cell" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
             <td class="pi-cell" title="${esc(r.deptName || '')}">${esc(r.deptName || '-')}</td>
             <td class="pi-cell" title="${esc(r.managerName || '')}">${esc(r.managerName || '-')}</td>
-            <td class="pi-cell">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
-            <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}${r.autoRenewing && !r.autoRenewCount ? ' <small class="text-info-emphasis" title="원계약 종료 후 자동연장 — 만료 대상 아님">자동연장</small>' : ''}</td>
+            <td class="pi-cell" ${r.autoRenewing && r.autoRenewCount > 0 ? `title="원계약 기간 ${fmtDate(r.contractStartDate)} ~ ${fmtDate(r.contractEndDate)} · ${renewLabel(r.autoRenewPeriodMonths)} 단위 자동연장 ${r.autoRenewCount}회"` : ''}>${r.contractEndDate || r.contractStartDate
+              ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.currentEndDate || r.contractEndDate)
+                + (r.autoRenewing && r.autoRenewCount > 0 ? ` <span class="pi-term-chip renew" title="자동연장 ${r.autoRenewCount}회 반영"><i class="fas fa-rotate"></i>연장${r.autoRenewCount}</span>` : '')
+              : esc(r.contractPeriodNote || '-')}</td>
+            <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}${r.autoRenewing ? ' <small class="text-info-emphasis" title="다음 자동연장일까지 — 만료 대상 아님">자동연장</small>' : ''}</td>
             <td class="pi-cell">${badge(r.status, r.statusLabel)}${(r.status === 'TERMINATED' || r.status === 'EXPIRED') && r.terminationCheckYn
               ? (r.terminationCheckYn === 'Y'
                 ? ' <span class="pi-term-chip ok" title="계약종결 체크(계약변경·만료 점검) 업로드됨"><i class="fas fa-check"></i>종결체크</span>'
@@ -346,7 +349,6 @@
   /** 목록 상태 칸의 확인 필요 표시 */
   function followUpChips(r) {
     const out = [];
-    if (r.autoRenewing && r.autoRenewCount > 0) out.push(`<span class="pi-term-chip renew" title="원계약 종료일 ${fmtDate(r.contractEndDate)} 이후 ${renewLabel(r.autoRenewPeriodMonths)} 단위 자동연장 ${r.autoRenewCount}회 — 현재 계약기간 ~ ${fmtDate(r.currentEndDate)}"><i class="fas fa-rotate"></i>자동연장 ~${fmtDate(r.currentEndDate)}</span>`);
     if (r.expiryDocsNeeded && r.expiryDocsReceived != null) {
       out.push(r.expiryDocsReceived >= 3
         ? '<span class="pi-term-chip ok" title="만료 서류 3종(만료 점검 체크리스트·확약서·파기 확인서) 모두 수취"><i class="fas fa-check"></i>만료서류 3/3</span>'
@@ -459,6 +461,15 @@
   function renewParts(months) {
     const m = Number(months) || 12;
     return m % 12 === 0 ? { value: m / 12, unit: 'Y' } : { value: m, unit: 'M' };
+  }
+  /** 상세 '현재 계약기간' (자동연장 반영) */
+  function currentPeriodText(c) {
+    if (!c.contractEndDate) return '<span class="text-muted">-</span>';
+    const p = `${fmtDate(c.contractStartDate)} ~ <b>${fmtDate(c.currentEndDate || c.contractEndDate)}</b>`;
+    if (c.terminatedYn === 'Y') return p + ` <small class="text-muted">(종료 처리 ${fmtDate(c.terminatedDate)})</small>`;
+    if (c.autoRenewing && c.autoRenewCount > 0) return p + ` <span class="pi-term-chip renew"><i class="fas fa-rotate"></i>자동연장 ${c.autoRenewCount}회 반영</span>`;
+    if (c.autoRenewing) return p + ` <small class="text-muted">(원계약 기간과 같음 · ${fmtDate(c.contractEndDate)} 이후 ${renewLabel(c.autoRenewPeriodMonths)} 단위 자동연장)</small>`;
+    return p + ' <small class="text-muted">(원계약 기간과 같음)</small>';
   }
   /** 자동연장 기간 표시 (예: 1년, 6개월) */
   function renewLabel(months) {
@@ -1281,10 +1292,11 @@
           ${row('위탁업무 내용', esc(c.entrustedTask))}${row('담당부서 / 담당자', esc((c.deptName || '-') + ' / ' + (c.managerName || '-')))}
           ${row('담당자 이메일', esc(c.managerEmail || '-'))}${row('수탁사 담당자', esc([c.vendorContactName, c.vendorContactPhone, c.vendorContactEmail].filter(Boolean).join(' / ') || '-'))}
           ${row('원계약 기간', fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate))}${row('원계약 기간 비고', esc(c.contractPeriodNote || '-'))}
+          ${row('현재 계약기간', currentPeriodText(c))}${row('', '')}
           ${row('원계약 자동연장', c.autoRenewYn === 'Y'
             ? `Y · <b>${renewLabel(c.autoRenewPeriodMonths)} 단위</b>${c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''}${c.autoRenewing
               ? (c.autoRenewCount > 0
-                ? `<br><span class="pi-term-chip renew"><i class="fas fa-rotate"></i>자동연장 ${c.autoRenewCount}회</span> <small>현재 계약기간 ~ <b>${fmtDate(c.currentEndDate)}</b></small>`
+                ? `<br><span class="pi-term-chip renew"><i class="fas fa-rotate"></i>자동연장 ${c.autoRenewCount}회</span>`
                 : '<br><small class="text-muted">원계약 종료 후 자동연장 — 만료 대상 아님</small>')
                 + (c.alertYn === 'Y' ? `<br><small class="text-muted"><i class="fas fa-envelope me-1"></i>연장일 ${c.alertDaysBefore}일 전 담당자에게 유지 여부 확인 메일</small>` : '<br><small class="text-warning-emphasis">만료 알림 미사용 — 자동연장 확인 메일도 보내지 않음</small>')
               : ''}`
