@@ -24,4 +24,6 @@ public class AlertRunResponse {
     private int regularInspectionCount;
     /** 정기 점검 대상 요약 메일(관리자) 발송 건수 */
     private int regularSummaryCount;
+    /** 자동연장 예정 확인 메일 발송 건수 */
+    private int autoRenewNoticeCount;
 }

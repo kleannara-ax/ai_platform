@@ -11,7 +11,8 @@ public enum AlertType {
     EXPIRY_DOCS("만료 서류 독촉"),
     ACTION_OVERDUE("조치 지연"),
     REGULAR_INSPECTION("정기 점검 요청"),
-    REGULAR_SUMMARY("정기 점검 요약");
+    REGULAR_SUMMARY("정기 점검 요약"),
+    AUTO_RENEW_NOTICE("자동연장 확인");
 
     private final String label;
 }

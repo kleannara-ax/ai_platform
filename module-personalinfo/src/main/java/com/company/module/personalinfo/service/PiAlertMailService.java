@@ -182,11 +182,13 @@ public class PiAlertMailService {
         int[] docs = safeRun("만료 서류 독촉", () -> runExpiryDocsReminders(today));
         int[] overdue = safeRun("조치 지연", () -> runActionOverdueAlerts(today));
         int[] regular = safeRun("정기 점검", () -> runRegularInspectionAlerts(today));
+        int[] renew = safeRun("자동연장 확인", () -> runAutoRenewNotices(today));
         return AlertRunResponse.builder()
                 .baseDate(today).candidateCount(considered)
                 .sentCount(sent).failedCount(failed).skippedCount(skipped).alreadySentCount(already)
                 .docsReminderCount(docs[0]).actionOverdueCount(overdue[0])
                 .regularInspectionCount(regular[0]).regularSummaryCount(regular[1])
+                .autoRenewNoticeCount(renew[0])
                 .build();
     }
 
@@ -472,6 +474,71 @@ public class PiAlertMailService {
         }
         log.info("[personalinfo] 정기 점검 알림 year={} 대상={} 담당자 발송={} 요약={}", year, targets.size(), sent, summary);
         return new int[]{sent, summary};
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  4) 자동연장 예정 확인 (연장일 N일 전, 연장 주기마다 1회)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * 자동연장 중인 계약(자동연장 Y + 미종료 + 만료 알림 사용)의 현재 계약 종료일이 만료 알림 기준일(기본 30일) 안에 들어오면
+     * 담당자(+ 추가 수신자 + 보안팀)에게 "자동연장 예정 — 계속 유지하는지 확인" 메일을 보낸다.
+     * 중복 방지 키 = RENEW:계약ID:현재 종료일 → 연장 주기마다 1회. 자동연장 계약은 만료 알림 대상이 아니므로 이 메일이 유일한 확인 창구다.
+     * @return [발송 건수]
+     */
+    int[] runAutoRenewNotices(LocalDate today) {
+        int sent = 0;
+        for (PiContract c : contractRepository.findByDeletedYnOrderByContractIdAsc("N")) {
+            if (!c.isAutoRenewing() || !"Y".equals(c.getAlertYn())) {
+                continue;
+            }
+            LocalDate end = c.currentEndDate(today);
+            int alertDays = c.getAlertDaysBefore() == null ? PiContract.DEFAULT_ALERT_DAYS : c.getAlertDaysBefore();
+            long left = ChronoUnit.DAYS.between(today, end);
+            if (left < 0 || left > alertDays) {
+                continue;
+            }
+            LocalDate next = c.getContractEndDate().plusMonths((long) (c.autoRenewCount(today) + 1) * c.autoRenewMonths());
+            Set<String> recipients = recipientsOf(c, null);
+            String subject = subjectPrefix + " 자동연장 예정 확인 - " + c.getVendorName()
+                    + (StringUtils.hasText(c.getContractName()) ? " / " + c.getContractName() : "")
+                    + " (" + fmt(end) + " 이후 " + PiContract.renewPeriodLabel(c.autoRenewMonths()) + " 연장)";
+            Optional<Long> id = claimOther(c.getContractId(), AlertType.AUTO_RENEW_NOTICE, "RENEW-" + end, end,
+                    "RENEW:" + c.getContractId() + ":" + end, recipients, subject);
+            if (id.isEmpty()) {
+                continue;
+            }
+            if (sendAndRecord(id.get(), recipients, subject, autoRenewBody(c, today, end, next, left), List.of(), null) == AlertSendStatus.SENT) {
+                sent++;
+            }
+        }
+        return new int[]{sent, 0};
+    }
+
+    private String autoRenewBody(PiContract c, LocalDate today, LocalDate end, LocalDate next, long left) {
+        String unit = PiContract.renewPeriodLabel(c.autoRenewMonths());
+        StringBuilder sb = mailHead("위수탁 계약 자동연장 예정 안내");
+        sb.append("<p>아래 개인정보 처리 위탁 계약은 자동연장 조건에 따라 <b>").append(fmt(end)).append("</b> 이후 추가 계약 없이 <b>")
+          .append(esc(unit)).append("</b> 연장되어 <b>").append(fmt(next)).append("</b>까지 이어집니다. ")
+          .append("<b>계약을 계속 유지하는지 확인</b>해 주세요.</p>");
+        sb.append(infoTable(List.of(
+                new String[]{"수탁업체명", c.getVendorName()},
+                new String[]{"계약명", StringUtils.hasText(c.getContractName()) ? c.getContractName() : nz(c.getServiceName())},
+                new String[]{"위탁업무 내용", c.getEntrustedTask()},
+                new String[]{"담당부서 / 담당자", nz(c.getDeptName()) + " / " + nz(c.getManagerName())},
+                new String[]{"원계약 기간", fmt(c.getContractStartDate()) + " ~ " + fmt(c.getContractEndDate())},
+                new String[]{"자동연장", unit + " 단위" + (c.autoRenewCount(today) > 0 ? " (지금까지 " + c.autoRenewCount(today) + "회 연장)" : "")
+                        + (StringUtils.hasText(c.getAutoRenewNote()) ? " · " + c.getAutoRenewNote() : "")},
+                new String[]{"현재 계약 종료일", fmt(end) + (left == 0 ? " (오늘)" : " (" + left + "일 남음)")},
+                new String[]{"연장 후 종료일", fmt(next)})));
+        sb.append("<ul style=\"margin-top:12px;padding-left:20px\">")
+          .append("<li><b>계속 유지</b>: 별도 조치가 필요 없습니다. 연장 후에도 정기 점검 대상으로 관리됩니다.</li>")
+          .append("<li><b>해지·종료</b>: 협력사와 해지를 확정한 뒤 시스템 계약 상세에서 <b>[계약 종료 처리]</b>를 하고, ")
+          .append("계약 만료 시 서류 3종(만료 점검 체크리스트, 정보보호 및 비밀유지 확약서, 개인정보 파기 확인서)을 받아 올려 주세요.</li>")
+          .append("<li><b>조건 변경</b>: 자동연장 해제·연장 기간 변경은 계약 상세의 <b>[수정]</b>에서 고쳐 주세요.</li></ul>");
+        sb.append("<p style=\"color:#6b7280;font-size:12px\">이 안내는 연장일 ").append(c.getAlertDaysBefore() == null ? PiContract.DEFAULT_ALERT_DAYS : c.getAlertDaysBefore())
+          .append("일 전(계약의 만료 알림 기준일)에 연장 주기마다 1회 발송됩니다. 만료 알림을 사용하지 않는 계약에는 보내지 않습니다.</p>");
+        return mailTail(sb, c.getContractId());
     }
 
     private String regularBody(PiContract c, int year, LocalDate deadline) {

@@ -448,10 +448,10 @@
   }
 
   async function runAlerts() {
-    if (!confirm('오늘 기준 알림 메일을 실행합니다.\n(만료 알림, 만료 서류 독촉, 조치 지연, 정기 점검 요청 — 이미 보낸 알림은 다시 보내지 않습니다)')) return;
+    if (!confirm('오늘 기준 알림 메일을 실행합니다.\n(만료 알림, 만료 서류 독촉, 조치 지연, 정기 점검 요청, 자동연장 확인 — 이미 보낸 알림은 다시 보내지 않습니다)')) return;
     try {
       const r = await PI_API.runAlerts();
-      notify(`알림 실행 완료\n· 만료 알림: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}\n· 만료 서류 독촉 ${r.docsReminderCount}건 · 조치 지연 ${r.actionOverdueCount}건 · 정기 점검 요청 ${r.regularInspectionCount}건${r.regularSummaryCount ? ' (관리자 요약 발송)' : ''}`);
+      notify(`알림 실행 완료\n· 만료 알림: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}\n· 만료 서류 독촉 ${r.docsReminderCount}건 · 조치 지연 ${r.actionOverdueCount}건 · 정기 점검 요청 ${r.regularInspectionCount}건${r.regularSummaryCount ? ' (관리자 요약 발송)' : ''} · 자동연장 확인 ${r.autoRenewNoticeCount}건`);
     } catch (e) { fail(e); }
   }
 
@@ -525,7 +525,7 @@
                       <option value="M" ${renewParts(v.autoRenewPeriodMonths).unit === 'M' ? 'selected' : ''}>개월</option></select>
                   </div></div>
                 <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 별도 해지 통보 없으면 1년씩 연장"')}</div>
-                <div class="col-12"><small class="text-muted" id="auto-renew-hint"><i class="fas fa-circle-info me-1"></i>자동연장 Y 이면 원계약 종료일이 지나도 추가 계약 없이 위 기간 단위로 계약기간이 이어지는 것으로 보고 <b>만료임박·만료·만료 서류·만료 알림 대상에서 뺍니다</b>. 실제로 끝나면 [계약 종료 처리]를 하세요.</small></div>
+                <div class="col-12"><small class="text-muted" id="auto-renew-hint"><i class="fas fa-circle-info me-1"></i>자동연장 Y 이면 원계약 종료일이 지나도 추가 계약 없이 위 기간 단위로 계약기간이 이어지는 것으로 보고 <b>만료임박·만료·만료 서류·만료 알림 대상에서 뺍니다</b>. 대신 연장일이 만료 알림 기준일(기본 30일) 안에 들어오면 담당자에게 <b>자동연장 예정 확인 메일</b>을 연장 주기마다 1회 보냅니다. 실제로 끝나면 [계약 종료 처리]를 하세요.</small></div>
               </div>
             </div>
             <div class="pi-form-sub" id="pi-entrust-contract-block">
@@ -1286,6 +1286,7 @@
               ? (c.autoRenewCount > 0
                 ? `<br><span class="pi-term-chip renew"><i class="fas fa-rotate"></i>자동연장 ${c.autoRenewCount}회</span> <small>현재 계약기간 ~ <b>${fmtDate(c.currentEndDate)}</b></small>`
                 : '<br><small class="text-muted">원계약 종료 후 자동연장 — 만료 대상 아님</small>')
+                + (c.alertYn === 'Y' ? `<br><small class="text-muted"><i class="fas fa-envelope me-1"></i>연장일 ${c.alertDaysBefore}일 전 담당자에게 유지 여부 확인 메일</small>` : '<br><small class="text-warning-emphasis">만료 알림 미사용 — 자동연장 확인 메일도 보내지 않음</small>')
               : ''}`
             : yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
           ${row('재위탁', c.subcontractYn === 'Y' ? esc(c.subcontractorName || '') + (c.subcontractTask ? ' — ' + esc(c.subcontractTask) : '') : 'N')}${row('재위탁 동의서', yn(c.subcontractConsentYn))}
