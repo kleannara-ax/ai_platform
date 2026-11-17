@@ -44,9 +44,31 @@ public class PiContractExcelService {
     private static final int[] WIDTHS = {6, 7, 22, 24, 16, 40, 14, 10, 12, 12, 24, 8, 10, 8, 24, 10, 10, 12, 12};
 
     private final PiContractService contractService;
+    private final PiAccessLogService accessLog;
 
-    public PiFileStorage.DownloadFile export(ContractSearchCondition cond, String sort) {
+    /** 계약 목록 엑셀 (사유 필수, 접근 기록 남김) */
+    public PiFileStorage.DownloadFile export(ContractSearchCondition cond, String sort, String reason) {
+        String r = PiAccessLogService.requireReason(reason);
         List<ContractSummaryResponse> rows = contractService.searchAll(cond, sort);
+        PiFileStorage.DownloadFile file = build(rows);
+        accessLog.record(com.company.module.personalinfo.entity.AccessActionType.DOWNLOAD_EXCEL, null, null, null,
+                null, describe(cond), rows.size(), r);
+        return file;
+    }
+
+    private static String describe(ContractSearchCondition c) {
+        List<String> parts = new java.util.ArrayList<>();
+        if (c.getBaseYear() != null) parts.add(c.getBaseYear() + "년");
+        if (c.getYearStatus() != null && !c.getYearStatus().isBlank()) parts.add("구분=" + c.getYearStatus());
+        if (c.getYearCheck() != null && !c.getYearCheck().isBlank()) parts.add("점검=" + c.getYearCheck());
+        if (c.getFollowUp() != null && !c.getFollowUp().isBlank()) parts.add("후속관리=" + c.getFollowUp());
+        if (c.getKeyword() != null && !c.getKeyword().isBlank()) parts.add("검색어=" + c.getKeyword());
+        if (c.getStatus() != null && !c.getStatus().isBlank()) parts.add("상태=" + c.getStatus());
+        if (c.getDeptName() != null && !c.getDeptName().isBlank()) parts.add("부서=" + c.getDeptName());
+        return "계약 목록 엑셀" + (parts.isEmpty() ? "" : " (" + String.join(", ", parts) + ")");
+    }
+
+    private PiFileStorage.DownloadFile build(List<ContractSummaryResponse> rows) {
         try (SXSSFWorkbook wb = new SXSSFWorkbook(200);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("외부위탁 현황 리스트_" + LocalDate.now().getYear());

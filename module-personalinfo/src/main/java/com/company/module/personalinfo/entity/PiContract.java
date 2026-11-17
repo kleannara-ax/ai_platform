@@ -118,6 +118,14 @@ public class PiContract extends PiBaseEntity {
     @Column(name = "TERMINATION_REASON", length = 500)
     private String terminationReason;
 
+    /** 만료 서류(만료 점검 체크리스트·확약서·파기 확인서)를 다 받지 못한 채 종료 처리한 사유 */
+    @Column(name = "EXPIRY_DOCS_NOTE", length = 500)
+    private String expiryDocsNote;
+
+    /** 미수취 만료 서류 독촉 메일 계속 발송 여부 (Y/N, 기본 Y) */
+    @Column(name = "EXPIRY_DOCS_REMIND_YN", nullable = false, length = 1, columnDefinition = "CHAR(1)")
+    private String expiryDocsRemindYn = "Y";
+
     @Column(name = "LAST_INSPECTION_ID")
     private Long lastInspectionId;
 
@@ -166,6 +174,7 @@ public class PiContract extends PiBaseEntity {
         this.alertExtraEmails = alertExtraEmails;
         this.remark = remark;
         this.terminatedYn = "N";
+        this.expiryDocsRemindYn = "Y";
         markCreatedBy(createdBy);
     }
 
@@ -237,9 +246,27 @@ public class PiContract extends PiBaseEntity {
 
     /** 계약 종료 처리 (위탁업무 종료) */
     public void terminate(LocalDate terminatedDate, String reason, Long updatedBy) {
+        terminate(terminatedDate, reason, null, null, updatedBy);
+    }
+
+    /**
+     * 계약 종료 처리. 만료 서류를 다 받지 못했으면 그 사유(expiryDocsNote)를 함께 남긴다.
+     * remindYn 이 N 이면 미수취 서류 독촉 메일을 보내지 않는다(null 이면 그대로).
+     */
+    public void terminate(LocalDate terminatedDate, String reason, String expiryDocsNote, String remindYn, Long updatedBy) {
         this.terminatedYn = "Y";
         this.terminatedDate = terminatedDate == null ? LocalDate.now() : terminatedDate;
         this.terminationReason = reason;
+        this.expiryDocsNote = expiryDocsNote;
+        if (remindYn != null) {
+            this.expiryDocsRemindYn = yn(remindYn, this.expiryDocsRemindYn);
+        }
+        markUpdatedBy(updatedBy);
+    }
+
+    /** 미수취 만료 서류 독촉 메일 발송 여부 변경 */
+    public void changeExpiryDocsRemind(String remindYn, Long updatedBy) {
+        this.expiryDocsRemindYn = yn(remindYn, this.expiryDocsRemindYn);
         markUpdatedBy(updatedBy);
     }
 
@@ -248,6 +275,7 @@ public class PiContract extends PiBaseEntity {
         this.terminatedYn = "N";
         this.terminatedDate = null;
         this.terminationReason = null;
+        this.expiryDocsNote = null;
         markUpdatedBy(updatedBy);
     }
 

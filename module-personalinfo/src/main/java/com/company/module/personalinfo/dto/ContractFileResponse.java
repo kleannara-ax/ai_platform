@@ -23,6 +23,10 @@ public class ContractFileResponse {
     private LocalDate signedDate;
     /** 체결일이 가장 최근인 위수탁 계약서인지 (계약의 체결일로 표시되는 파일) */
     private boolean latestContractDoc;
+    /** 서류 일자 (확약서 서명일 / 파기 확인서 파기 완료일) */
+    private LocalDate documentDate;
+    /** 서류 일자 항목 이름 (서명일 / 파기 완료일, 해당 없으면 null) */
+    private String documentDateLabel;
     private Long createdBy;
     private LocalDateTime createdAt;
 
@@ -42,6 +46,8 @@ public class ContractFileResponse {
                 .description(f.getDescription())
                 .signedDate(f.getSignedDate())
                 .latestContractDoc(latestFileId != null && latestFileId.equals(f.getFileId()))
+                .documentDate(f.getDocumentDate())
+                .documentDateLabel(f.getFileType().getDocumentDateLabel())
                 .createdBy(f.getCreatedBy())
                 .createdAt(f.getCreatedAt())
                 .build();

@@ -73,11 +73,30 @@ public class PiContractService {
     private final PiAlertLogRepository alertLogRepository;
     private final PiContactHistoryRepository contactHistoryRepository;
     private final PiAccessScopeResolver accessScope;
+    private final PiFollowUpRules followUps;
+
+    /** 후속 관리 목록 조건 */
+    static final Set<String> FOLLOW_UPS = Set.of("EXPIRY_DOCS_MISSING", "ACTION_OVERDUE", "CONSENT_MISSING", "DESTRUCTION_LATE");
+
+    static boolean matchesFollowUp(String followUp, com.company.module.personalinfo.dto.FollowUpResponse f) {
+        if (f == null) {
+            return false;
+        }
+        return switch (followUp) {
+            case "EXPIRY_DOCS_MISSING" -> f.isExpiryDocsMissing();
+            case "ACTION_OVERDUE" -> f.getActionOverdueCount() > 0;
+            case "CONSENT_MISSING" -> f.isConsentMissing();
+            case "DESTRUCTION_LATE" -> f.isDestructionLate();
+            default -> true;
+        };
+    }
 
     public Page<ContractSummaryResponse> search(ContractSearchCondition cond, int page, int size, String sort) {
         LocalDate today = LocalDate.now();
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), toSort(sort));
-        Integer by = cond.getBaseYear();
+        String followUp = upperOrEmpty(cond.getFollowUp(), FOLLOW_UPS);
+        // 후속 관리 조건은 요약 카드와 같이 기준 연도와 상관없이 현재 기준으로 거른다
+        Integer by = followUp.isEmpty() ? cond.getBaseYear() : null;
         if (by != null && (by < 1990 || by > 2100)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "기준 연도가 올바르지 않습니다: " + by);
         }
@@ -86,7 +105,7 @@ public class PiContractService {
         String yearCheck = by == null ? "" : upperOrEmpty(cond.getYearCheck(),
                 Set.of("INSPECTED", "NOT_INSPECTED", "TERM_UPLOADED", "TERM_MISSING"));
         PiAccessScope scope = accessScope.current();
-        Page<PiContract> result = contractRepository.search(
+        java.util.function.Function<Pageable, Page<PiContract>> query = p -> contractRepository.search(
                 nz(cond.getKeyword()), nz(cond.getDeptName()), nz(cond.getManagerName()),
                 upperOrEmpty(cond.getIsmsScopeYn(), Set.of("Y", "N")),
                 upperOrEmpty(cond.getInspectionResult(), Set.of("PASS", "NEED_ACTION", "INCOMPLETE", "NONE")),
@@ -97,11 +116,25 @@ public class PiContractService {
                 PiYearScope.refDate(year, today),
                 yearStatus, yearCheck, InspectionType.REGULAR, InspectionType.TERMINATION,
                 scope.deptOn(), scope.deptKeyList(),
-                pageable);
+                p);
+        Page<PiContract> result;
+        if (followUp.isEmpty()) {
+            result = query.apply(pageable);
+        } else {
+            // 후속 관리 조건은 파일·점검 상태로 계산하므로 같은 조건의 계약을 모두 읽어 거른 뒤 페이지를 나눈다
+            List<PiContract> all = query.apply(PageRequest.of(0, 5000, pageable.getSort())).getContent();
+            Map<Long, com.company.module.personalinfo.dto.FollowUpResponse> fu = followUps.of(all, today, false);
+            List<PiContract> filtered = all.stream().filter(c -> matchesFollowUp(followUp, fu.get(c.getContractId()))).toList();
+            int from = (int) Math.min(pageable.getOffset(), filtered.size());
+            int to = Math.min(from + pageable.getPageSize(), filtered.size());
+            result = new org.springframework.data.domain.PageImpl<>(filtered.subList(from, to), pageable, filtered.size());
+        }
+        Map<Long, com.company.module.personalinfo.dto.FollowUpResponse> pageFollowUps = followUps.of(result.getContent(), today, false);
         Set<Long> termChecked = termCheckedIds(result.getContent().stream().map(PiContract::getContractId).toList());
         Map<String, Long> vendorCounts = result.isEmpty() ? Map.of() : vendorContractCounts(scope);
         return result.map(c -> ContractSummaryResponse.from(c, today, termChecked.contains(c.getContractId()),
-                vendorCounts.getOrDefault(PiVendorNames.key(c.getVendorName()), 1L).intValue()));
+                vendorCounts.getOrDefault(PiVendorNames.key(c.getVendorName()), 1L).intValue())
+                .withFollowUp(pageFollowUps.get(c.getContractId())));
     }
 
     /** 업체(업체명 정규화 키)별 계약 수 (삭제 제외, 종료 포함, 현재 사용자가 볼 수 있는 계약만) */
@@ -165,7 +198,8 @@ public class PiContractService {
                 .stream().map(InspectionResponse::from).toList();
         List<AlertLogResponse> alerts = alertLogRepository.findTop20ByContractIdAndDeletedYnOrderByAlertIdDesc(contractId, N)
                 .stream().map(AlertLogResponse::from).toList();
-        return ContractDetailResponse.of(c, LocalDate.now(), files, inspections, alerts);
+        return ContractDetailResponse.of(c, LocalDate.now(), files, inspections, alerts)
+                .withFollowUp(followUps.of(c, LocalDate.now()));
     }
 
     @Transactional
@@ -326,7 +360,28 @@ public class PiContractService {
         if (c.getContractStartDate() != null && date.isBefore(c.getContractStartDate())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "종료일은 원계약 시작일보다 빠를 수 없습니다.");
         }
-        c.terminate(date, r == null ? null : trim(r.getReason()), userId);
+        // 만료 서류(만료 점검 체크리스트·확약서·파기 확인서)를 다 받지 못했으면 사유 필수
+        List<String> missing = followUps.of(c, LocalDate.now()).getMissingDocs();
+        String note = r == null ? null : trim(r.getExpiryDocsNote());
+        if (!missing.isEmpty() && note == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "받지 못한 만료 서류가 있습니다: " + String.join(", ", missing)
+                            + ". 미수취 사유를 입력해야 종료 처리할 수 있습니다. (예: 협력사 회신 대기, 개인정보 미보관 업체)");
+        }
+        String remind = r == null || r.getExpiryDocsRemindYn() == null ? null
+                : ("N".equalsIgnoreCase(r.getExpiryDocsRemindYn().trim()) ? "N" : "Y");
+        c.terminate(date, r == null ? null : trim(r.getReason()), missing.isEmpty() ? null : note, remind, userId);
+        return getDetail(contractId);
+    }
+
+    /** 미수취 만료 서류 독촉 메일 발송 여부 변경 */
+    @Transactional
+    public ContractDetailResponse changeExpiryDocsRemind(Long contractId, String remindYn, Long userId) {
+        if (remindYn == null || !Set.of("Y", "N").contains(remindYn.trim().toUpperCase())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "독촉 메일 발송 여부는 Y 또는 N 입니다.");
+        }
+        PiContract c = findActive(contractId);
+        c.changeExpiryDocsRemind(remindYn.trim().toUpperCase(), userId);
         return getDetail(contractId);
     }
 
@@ -388,6 +443,7 @@ public class PiContractService {
         Set<Long> termChecked = inspectionRepository.findByInspectionTypeAndDeletedYn(InspectionType.TERMINATION, N).stream()
                 .map(PiInspection::getContractId).collect(Collectors.toSet());
         long endedChecked = ended.stream().filter(c -> termChecked.contains(c.getContractId())).count();
+        Map<Long, com.company.module.personalinfo.dto.FollowUpResponse> fu = followUps.of(all, today, false);
         // 선택 가능한 연도: 계약 시작·종료 연도 범위 + 올해 (최근 연도부터)
         java.util.TreeSet<Integer> years = new java.util.TreeSet<>(Comparator.reverseOrder());
         years.add(year);
@@ -411,6 +467,10 @@ public class PiContractService {
                 .yearEndedCount(ended.size())
                 .yearEndedTermCheckCount(endedChecked)
                 .yearEndedTermMissingCount(ended.size() - endedChecked)
+                .expiryDocsMissingCount(fu.values().stream().filter(com.company.module.personalinfo.dto.FollowUpResponse::isExpiryDocsMissing).count())
+                .actionOverdueCount(fu.values().stream().filter(f -> f.getActionOverdueCount() > 0).count())
+                .consentMissingCount(fu.values().stream().filter(com.company.module.personalinfo.dto.FollowUpResponse::isConsentMissing).count())
+                .destructionLateCount(fu.values().stream().filter(com.company.module.personalinfo.dto.FollowUpResponse::isDestructionLate).count())
                 .year(year)
                 .totalCount(all.size())
                 .activeCount(byStatus.getOrDefault(ContractStatus.ACTIVE, 0L))

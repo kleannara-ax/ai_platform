@@ -16,4 +16,11 @@ public class ContractTerminateRequest {
 
     @Size(max = 500)
     private String reason;
+
+    /** 만료 서류(만료 점검 체크리스트·확약서·파기 확인서)를 다 받지 못했을 때 그 사유 (미수취 서류가 있으면 필수) */
+    @Size(max = 500)
+    private String expiryDocsNote;
+
+    /** 미수취 만료 서류 독촉 메일 계속 발송 (Y/N, 기본 Y) */
+    private String expiryDocsRemindYn;
 }

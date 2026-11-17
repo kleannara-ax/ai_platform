@@ -121,6 +121,14 @@
         <small class="text-muted d-block mt-1" id="term-date-hint"></small>
         <label class="form-label mt-3" for="term-reason">종료 사유</label>
         <input class="form-control" id="term-reason" name="reason" maxlength="500" value="계약 만료">
+        <div id="term-docs-box" class="mt-3 d-none">
+          <div class="alert alert-warning small mb-2" id="term-docs-missing" role="alert"></div>
+          <label class="form-label pi-required" for="term-docs-note">만료 서류 미수취 사유</label>
+          <textarea class="form-control" id="term-docs-note" name="expiryDocsNote" rows="2" maxlength="500"
+            placeholder="예: 협력사 회신 대기 중(○월 ○일 요청), 개인정보를 보관하지 않는 업체라 파기 대상 없음"></textarea>
+          <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="term-docs-remind" checked>
+            <label class="form-check-label small" for="term-docs-remind">서류를 다 받을 때까지 담당자에게 <b>주 1회 독촉 메일</b> 보내기</label></div>
+        </div>
         <div class="alert alert-light border small mt-3 mb-0">
           <i class="fas fa-circle-info me-1"></i>종료 처리하면 만료 알림이 중단됩니다. 기준 연도 요약에서는 <b>종료일이 지난 해부터 '종료'</b>로 잡힙니다
           (예: 2025.12.31 종료 → 2025년 계약중, 2026년 종료).<br>종료 시 <b>계약변경·만료 점검(계약종결 체크)</b> 체크리스트 업로드를 권장합니다.
@@ -186,6 +194,30 @@
       <button type="button" class="btn btn-light" data-bs-dismiss="modal">닫기</button>
       <button type="submit" form="vendor-modal-form" class="btn btn-primary" id="v-submit" disabled><i class="fas fa-upload me-1"></i>선택한 계약에 등록</button>
     </div>
+  </div></div>
+</div>
+
+<!-- 다운로드 사유 입력 (계약 목록 엑셀 / 접근 기록 엑셀) -->
+<div class="modal fade" id="download-reason-modal" tabindex="-1" aria-labelledby="download-reason-title" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <form id="download-reason-form" novalidate>
+      <div class="modal-header"><h5 class="modal-title" id="download-reason-title"><i class="fas fa-file-shield me-2 text-primary"></i>다운로드 사유 입력</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" id="download-reason-guide">개인정보(담당자 이름·연락처 등)가 포함된 목록입니다. 다운로드 사유를 입력하면 접근 기록에 사용자·일시·사유가 남습니다.</p>
+        <label class="form-label pi-required" for="download-reason">사유</label>
+        <input class="form-control" id="download-reason" maxlength="500" list="download-reason-presets" required
+          placeholder="예: 분기 위탁 현황 보고, ISMS 심사 증빙 제출">
+        <datalist id="download-reason-presets">
+          <option value="분기 위탁 현황 보고"><option value="ISMS 심사 증빙 제출"><option value="개인정보처리방침 수탁사 현황 갱신"><option value="내부 감사 자료 제출">
+        </datalist>
+        <div class="invalid-feedback">사유를 2자 이상 입력하세요.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary" id="download-reason-ok"><i class="fas fa-download me-1"></i>다운로드</button>
+      </div>
+    </form>
   </div></div>
 </div>
 

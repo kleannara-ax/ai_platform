@@ -38,8 +38,14 @@ public class PiAlertLog extends PiBaseEntity {
     @Column(name = "ALERT_ID")
     private Long alertId;
 
-    @Column(name = "CONTRACT_ID", nullable = false)
+    /** 위수탁 계약 ID (관리자 요약 메일처럼 특정 계약이 없으면 null) */
+    @Column(name = "CONTRACT_ID")
     private Long contractId;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "ALERT_TYPE", nullable = false, length = 30)
+    private AlertType alertType = AlertType.EXPIRY;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -80,9 +86,10 @@ public class PiAlertLog extends PiBaseEntity {
     private String formVersions;
 
     @Builder
-    private PiAlertLog(Long contractId, AlertTriggerType triggerType, String alertStage, LocalDate targetEndDate,
-                       String dedupKey, String recipients, String subject, Long createdBy) {
+    private PiAlertLog(Long contractId, AlertType alertType, AlertTriggerType triggerType, String alertStage,
+                       LocalDate targetEndDate, String dedupKey, String recipients, String subject, Long createdBy) {
         this.contractId = contractId;
+        this.alertType = alertType == null ? AlertType.EXPIRY : alertType;
         this.triggerType = triggerType;
         this.alertStage = alertStage;
         this.targetEndDate = targetEndDate;

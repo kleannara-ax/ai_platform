@@ -165,3 +165,19 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-colmenu-ctrl .btn{padding:0 6px;font-size:.7rem;line-height:1.6;}
 .pi-colmenu-ctrl input{width:76px;}
 .pi-colmenu-foot{margin-top:8px;}
+
+/* 보안팀 후속 관리 */
+.pi-followup-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#fff;border:1px solid var(--pi-line);border-radius:12px;padding:8px 12px;margin:-6px 0 16px;}
+.pi-fu-title{font-size:.82rem;font-weight:700;color:#374151;margin-right:4px;}
+.pi-fu-card{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--pi-line);background:#f9fafb;color:#6b7280;border-radius:999px;padding:4px 12px;font-size:.8rem;}
+.pi-fu-card b{font-size:.9rem;color:#374151;}
+.pi-fu-card.warn{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+.pi-fu-card.warn b{color:#b91c1c;}
+.pi-fu-card.active{outline:2px solid var(--pi-brand);outline-offset:1px;}
+.pi-fu-card:hover,.pi-fu-card:focus-visible{box-shadow:0 2px 8px rgba(79,70,229,.15);}
+.pi-fu-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;}
+.pi-term-chip.warn{background:#fef3c7;color:#92400e;}
+.pi-followup-panel{border-left:4px solid #f59e0b;}
+.pi-followup-panel.serious{border-left-color:#dc2626;background:#fffafa;}
+.pi-followup-panel li{margin-bottom:4px;}
+#access-log-table tr.pi-access-excel td{background:#fffbeb;}

@@ -52,6 +52,7 @@ public class PiInspectionService {
     private final PiFileStorage storage;
     private final PiAccessScopeResolver accessScope;
     private final PiFormTemplateService formTemplates;
+    private final PiAccessLogService accessLog;
 
     public List<InspectionResponse> getList(Long contractId) {
         findContract(contractId);
@@ -61,7 +62,9 @@ public class PiInspectionService {
 
     public InspectionResponse getDetail(Long inspectionId) {
         PiInspection inspection = findActive(inspectionId);
-        findContract(inspection.getContractId());
+        PiContract c = findContract(inspection.getContractId());
+        accessLog.record(com.company.module.personalinfo.entity.AccessActionType.VIEW_INSPECTION, c, inspectionId,
+                inspection.getInspectionType().getLabel() + " " + inspection.getInspectionDate());
         List<InspectionItemResponse> items = itemRepository
                 .findByInspectionIdAndDeletedYnOrderBySortOrderAsc(inspectionId, N)
                 .stream().map(InspectionItemResponse::from).toList();
@@ -188,7 +191,9 @@ public class PiInspectionService {
 
     public PiFileStorage.DownloadFile download(Long inspectionId) {
         PiInspection inspection = findActive(inspectionId);
-        findContract(inspection.getContractId());
+        PiContract c = findContract(inspection.getContractId());
+        accessLog.record(com.company.module.personalinfo.entity.AccessActionType.DOWNLOAD_INSPECTION, c, inspectionId,
+                inspection.getInspectionType().getLabel() + " · " + inspection.getOriginalName());
         return new PiFileStorage.DownloadFile(inspection.getOriginalName(), inspection.getContentType(),
                 storage.read(inspection.getStoredPath()));
     }

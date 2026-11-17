@@ -17,4 +17,6 @@ public interface PiContractFileRepository extends JpaRepository<PiContractFile, 
     Optional<PiContractFile> findByFileIdAndDeletedYn(Long fileId, String deletedYn);
 
     long countByContractIdAndDeletedYn(Long contractId, String deletedYn);
+
+    List<PiContractFile> findByContractIdInAndDeletedYn(java.util.Collection<Long> contractIds, String deletedYn);
 }

@@ -43,6 +43,13 @@
 | - | **협력사 담당자 이력** | 계약 상세의 기본정보 바로 아래에 **위탁사(당사) 담당자** 변경 이력을 보여줍니다. 위탁사 담당부서·담당자·이메일 중 하나라도 바뀌면 변경 후 값, **그 시점의 계약기간**, 변경자·변경일시를 남깁니다(바뀐 항목은 노란색 강조). **수탁사 담당자·연락처·이메일 변경은 이력을 남기지 않습니다.** 기본은 **같은 업체의 모든 계약** 이력을 함께 보여주고(㈜·(주)·공백 차이 무시), "이 계약만"으로 좁힐 수 있습니다. 이력은 추가만 되고 수정되지 않습니다. 표 제목은 **담당부서 / 담당자 / 담당자 이메일**입니다. **행을 누르면 내역 팝업**이 열려 그 이력의 **변경 전 → 변경 후**(같은 계약의 바로 이전 이력과 비교, 바뀐 항목 강조), 그 시점 계약기간, 변경자·변경일시, 해당 계약의 현재 정보(원계약 기간, 현재 담당자, 위탁계약서 체결일, 최근 점검, 종료일)를 보여줍니다. 다른(이전) 계약 행이면 **[이 계약 상세로 이동]** 버튼이 나옵니다. 키보드(Enter)로도 열 수 있습니다. 서버·DB 변경 없음. |
 | - | **계약만료시 점검** | 계약 상세의 **위수탁 점검 이력**과 **만료 알림 발송 이력** 사이에 섹션을 추가했습니다. 항목은 ① **만료 점검 결과(엑셀)**: 체크리스트 '3.계약변경 만료시 체크' 시트를 올리면 계약변경·만료 점검 이력으로 저장·판정합니다(업로드 팝업이 '계약변경·만료 점검'으로 열림). ② **정보보호 및 비밀유지 확약서**와 ③ **개인정보 파기 확인서**는 첨부 구분 `SECURITY_PLEDGE` / `DESTRUCTION_CONFIRM` 으로 저장됩니다. 항목마다 **양식 다운로드**(만료 점검 체크리스트 / 확약서 양식 / 파기 확인서 양식, 계약 정보 자동 입력), 제출 현황(수취 완료·날짜 / 미수취, 여러 건이면 총 건수), 최근 제출 파일 다운로드, 업로드 버튼이 있고, 제목 옆에 **수취 N / 3**, 오른쪽 위에 **[양식 3종 모두 다운로드]** 버튼이 있습니다. 확약서·파기 확인서 양식(docx)에는 위탁사명·수탁업체명·계약명·위탁업무·계약기간·계약종료일·재위탁 업체가 채워지고, 체크리스트는 3번 시트가 열린 상태로 내려받습니다. DB 변경 없음. |
 | - | **양식 관리 (보안팀)** | 계약 목록의 **[양식 관리]** 버튼(`#/forms`, 보안팀 관리자 `ROLE_PI_ADMIN`·플랫폼 관리자 `ROLE_ADMIN` 에게만 보임)에서 ① **위수탁 점검 체크리스트**(xlsx, 정기·만료 점검 공용) ② **정보보호 및 비밀유지 확약서** ③ **개인정보 파기 확인서**(docx·doc·hwp·hwpx·pdf)를 버전으로 관리합니다. **사용 중** 양식이 계약 화면 양식 다운로드(빈 양식·계약별 자동 입력)와 **만료 알림 메일 첨부**에 바로 쓰이므로 배포 없이 교체됩니다. ▸ **새 버전 등록**: 파일을 고르면 저장 전에 검사 결과를 보여주고 통과해야 [등록]이 켜짐. 체크리스트는 시스템 판독기로 정기(1·2번 시트)·만료(3번 시트) 점검을 실제로 읽어 보고 **읽지 못하면 등록 불가**(협력사 작성본 자동 판정 보호), 평가 항목 수가 기본 양식과 다르거나 회사명·평가일 라벨, '현황' 열이 없으면 경고. 확약서·파기 확인서 docx 는 자리표시자(`{{수탁업체명}}` 등 7개, 안쪽 공백 허용)를 찾아 자동 입력 항목을 보여주고, 자리표시자가 없거나 모르는 자리표시자는 경고. **hwp·hwpx·doc·pdf 는 등록되지만 자동 입력 없이 원본 그대로** 내려받기·메일 첨부(pdf 는 파일 형식 확인). 변경 메모, 등록 후 바로 사용 지정 여부 선택. ▸ **버전 이력**: 버전(v1, v2…, 삭제해도 번호 재사용 안 함)·파일·변경 메모·검사 결과·등록자/일시·사용 지정자/일시, 원본 다운로드, **미리보기**(샘플 계약 정보로 채운 양식), **[사용 지정]**(이전 버전으로 되돌리기), 삭제(소프트, 사용 중 버전은 불가), **[기본 양식 사용]**(모듈 내장 기본 양식으로 복귀, 등록 버전은 남음). 기본 양식 원본·미리보기도 내려받을 수 있습니다. ▸ **증적**: 점검 업로드 이력에 그 시점 체크리스트 양식 버전(`pi_inspection.FORM_VERSION`), 만료 알림 발송 이력에 첨부한 양식 버전(`pi_alert_log.FORM_VERSIONS`, 예: 체크리스트 기본 / 확약서 v1 / 파기 확인서 v2)을 남기고 상세 화면 알림 이력의 **첨부 양식** 열에 표시합니다. 사용 중 양식 파일을 읽지 못하면 기본 양식으로 대신 처리하고 오류 로그를 남깁니다. SQL `08_form_template.sql`. |
+| - | **보안팀 후속 관리 — 만료 서류 미수취** | 종료 처리했거나 원계약 종료일이 만료 알림 기간 안(만료임박)·지난 계약에서 **만료 점검 체크리스트(계약변경·만료 점검 업로드) / 정보보호 및 비밀유지 확약서 / 개인정보 파기 확인서** 중 받지 못한 서류를 계산합니다. ① 목록 상단 **후속 관리 카드**(만료 서류 미수취 / 조치 지연 / 재위탁 동의서 누락 / 파기 지연 건수, 누르면 그 조건으로 목록 필터, 기준 연도와 상관없이 오늘 기준) ② 목록 상태 칸 **만료서류 N/3** 칩 ③ 상세 **보안팀 후속 관리** 패널(미수취 서류, [계약만료시 점검으로] 이동, 독촉 메일 켜기/끄기). ④ **종료 처리 시 서류가 빠져 있으면 '만료 서류 미수취 사유'를 반드시 입력**해야 하고(서버도 400), 사유와 독촉 메일 발송 여부를 저장합니다(`pi_contract.EXPIRY_DOCS_NOTE / EXPIRY_DOCS_REMIND_YN`). 종료 취소하면 사유는 지웁니다. ⑤ **종료(만료) 후 매주 1회 독촉 메일**(담당자 + 추가 수신자 + 보안팀, 받지 못한 서류의 양식만 첨부, 미수취 사유 표시, 종료 후 90일까지, 독촉 끄기 가능). |
+| - | **점검 조치 기한 지남** | 결과가 **조치 필요**이고 조치 완료가 아닌데 **조치 예정일이 지난** 점검을 조치 지연으로 봅니다. 목록 칩 **조치지연**, 후속 관리 카드, 상세 패널(점검일·조치 예정일·지난 일수·N 항목 수)에 표시하고, 종료되지 않은 계약은 **주 1회 알림 메일**(조치 예정일 후 90일까지)을 보냅니다. 조치 완료로 바꾸면 바로 빠집니다. |
+| - | **접근 기록 (보안팀)** | 계약 상세 조회, 점검 상세 조회, 계약서·증빙 다운로드, 점검 원본 다운로드, **계약 목록 엑셀 다운로드**, 접근 기록 엑셀 다운로드를 사용자·로그인 ID·접속 IP(`X-Forwarded-For` 우선)·브라우저·대상(업체·계약·파일명·검색 조건)·행 수와 함께 `pi_access_log` 에 남깁니다(추가만, 수정·삭제 API 없음, 기록 실패가 업무를 막지 않음). **엑셀 다운로드는 사유 필수**(화면 사유 입력 팝업, 서버도 사유 없으면 400). 목록의 **[접근 기록]** 버튼(`#/access-logs`, 관리자만)에서 기간(기본 최근 30일)·행위·사용자·업체로 검색하고 엑셀로 내려받습니다. |
+| - | **정기 점검 알림 (4월 10일)** | 정기 점검은 **5월**로 보고, **4월 10일부터 5월 31일까지** 매일 알림 실행 때 올해 정기 점검을 아직 올리지 않은 **진행 중 계약**(5월에 계약기간이 걸치고 종료 처리되지 않은 계약)의 **담당자(+ 추가 수신자)**에게 정기 점검 요청 메일을 1회 보냅니다(계약 정보가 채워진 점검 체크리스트 첨부, 기한 5월 31일). 같은 날 **관리자(보안팀)**에게 대상 목록 요약 메일을 1회 보냅니다(`default-recipients` + `regular-inspection.admin-recipients`, 담당자 이메일 없는 계약 빨간 표시). 연도별로 한 번씩만 보내고, 4월 10일 이후 새로 등록된 계약은 기간 안 다음 실행 때 담당자에게 보냅니다. 날짜·월은 설정으로 바꿀 수 있습니다. |
+| - | **서류 일자 · 파기 지연** | 정보보호 및 비밀유지 확약서는 **서명일**, 개인정보 파기 확인서는 **파기 완료일**을 파일마다 저장합니다(`pi_contract_file.DOCUMENT_DATE`, 업로드 때 입력, 첨부 목록 연필 버튼으로 수정·비우기, 오늘보다 늦은 날짜 400, 다른 서류 종류는 400). 최근 파기 확인서의 파기 완료일이 **계약 종료 기준일(종료 처리일, 없으면 원계약 종료일) + 30일**보다 늦으면 **파기 지연**(목록 칩·카드·상세 패널). 일자를 입력하지 않은 서류는 상세 패널에 '일자 미입력'으로 안내합니다. |
+| - | **재위탁 동의서 누락** | 재위탁 여부가 **Y** 인데 **재위탁 동의서 파일**(첨부 구분 `SUBCONTRACT_CONSENT`)이 없으면 목록 칩 **동의서 누락**, 후속 관리 카드, 상세 패널에 경고합니다. 동의서를 올리면 바로 빠집니다. |
+| - | **업로드 파일 내용 확인** | 확장자만 바꾼 파일을 막기 위해 저장 전에 파일 내용(서명 바이트·내부 구조)을 확인합니다. pdf: 앞 1KB 안 `%PDF-` / docx·xlsx·hwpx: ZIP 이면서 각각 `word/`·`xl/`·`Contents/`(또는 `mimetype`) 항목 / zip: ZIP 서명 / doc·xls·hwp: OLE2 복합 문서 서명 / jpg·png: 이미지 서명. 맞지 않으면 저장하지 않고 400('파일 내용이 확장자(.x)와 맞지 않습니다…'). 계약서·증빙, 점검 체크리스트, 양식 관리 업로드에 모두 적용됩니다. |
 | - | 계약 종료 처리 | 종료 처리하면 만료 알림이 멈춥니다. "계약변경·만료 점검"(양식 3번 시트) 업로드를 지원합니다. |
 | - | 점검 후속조치 | 조치 예정일과 조치 완료 여부를 관리합니다. |
 
@@ -73,19 +80,31 @@
 - **첨부 양식(계약만료시 점검)**: 자동·수동 만료 알림 메일에 ① 계약만료시 점검 체크리스트(.xlsx, 3번 시트) ② 정보보호 및 비밀유지 확약서(.docx) ③ 개인정보 파기 확인서(.docx)를 계약 정보가 채워진 상태로 첨부합니다(한글 파일명). 본문에는 만료일 전에 협력사로부터 3가지 자료를 받아 시스템에 올려 달라는 안내와 **계약 만료 시 협력사 제출 자료** 표(자료별 수취 완료 / 미수취)가 들어갑니다. 양식 하나를 만들지 못해도 나머지 양식으로 메일은 발송됩니다.
 - 실패하면 다음 실행 때 최대 3회까지 재시도합니다. 메일 서버가 설정되지 않았으면 `SKIPPED` 로 기록하고, 애플리케이션 기동에는 영향을 주지 않습니다.
 
+### 보안팀 후속 알림 규칙 (같은 일일 알림 실행에서 함께 처리, 하나가 실패해도 나머지는 진행)
+| 알림 종류 (`pi_alert_log.ALERT_TYPE`) | 대상 | 수신자 | 중복 방지 키 (`DEDUP_KEY`) |
+|---|---|---|---|
+| `EXPIRY` 만료 알림 (기존) | 미종료 + 알림 사용 + 종료일 단계 | 담당자 + 추가 수신자 + 보안팀 | `계약ID:단계:종료일` |
+| `EXPIRY_DOCS` 만료 서류 독촉 | 종료 기준일이 지났고 90일 안, 미수취 서류 있음, 독촉 켜짐 | 담당자 + 추가 수신자 + 보안팀 | `DOCS:계약ID:ISO주차` (주 1회) |
+| `ACTION_OVERDUE` 조치 지연 | 조치 필요 + 미완료 + 조치 예정일 지남(90일 안), 미종료 계약 | 담당자 + 추가 수신자 + 보안팀 | `OVERDUE:계약ID:ISO주차` (주 1회) |
+| `REGULAR_INSPECTION` 정기 점검 요청 | 4/10~5/31, 올해 정기 점검 없음, 5월에 계약기간이 걸친 미종료 계약 | 담당자 + 추가 수신자 | `REGULAR:계약ID:연도` (연 1회) |
+| `REGULAR_SUMMARY` 정기 점검 요약 | 위 대상 목록 (계약 ID 없음) | 보안팀(`default-recipients`) + `regular-inspection.admin-recipients` | `REGULAR_SUMMARY:연도` (연 1회) |
+
+- 상세 화면 **알림 발송 이력**에 **종류** 열이 추가됐습니다. 관리자가 목록의 **[알림 실행]**으로 바로 돌릴 수 있고(`baseDate` 로 특정 날짜 기준 재실행 가능), 결과에 종류별 발송 건수가 나옵니다.
+
 ---
 
 ## 2. 생성 테이블 목록 (`01_schema.sql`)
 
 | 테이블 | 설명 | 주요 키/제약 |
 |---|---|---|
-| `pi_contract` | 위수탁 계약 (외부위탁 현황 1행 = 1건) | PK `CONTRACT_ID`, IDX 종료일/업체명/부서/알림 |
-| `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 | FK → `pi_contract` |
+| `pi_contract` | 위수탁 계약 (외부위탁 현황 1행 = 1건) (+ 만료 서류 미수취 사유 `EXPIRY_DOCS_NOTE`·독촉 여부 `EXPIRY_DOCS_REMIND_YN`, `09`) | PK `CONTRACT_ID`, IDX 종료일/업체명/부서/알림 |
+| `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 (+ 서류 일자 `DOCUMENT_DATE` = 확약서 서명일 / 파기 완료일, `09`) | FK → `pi_contract` |
 | `pi_inspection` | 점검 이력 (체크리스트 업로드 1건 × 계약) | FK → `pi_contract`, IDX `UPLOAD_GROUP_ID`(업체별 일괄 업로드 묶음, 개별 업로드는 NULL) |
 | `pi_inspection_item` | 점검 체크리스트 항목별 결과 | FK → `pi_inspection` |
 | `pi_contact_history` | 위탁사 담당자 변경 이력 + 기록 시점 계약기간 (`04`, `05`) | FK → `pi_contract`, IDX 계약+삭제여부+일시 |
-| `pi_alert_log` | 만료 알림 발송 이력 (+ 첨부 양식 버전 `FORM_VERSIONS`, `08`) | FK → `pi_contract`, `UK_PI_ALERT_LOG_DEDUP` |
+| `pi_alert_log` | 알림 발송 이력 (+ 첨부 양식 버전 `FORM_VERSIONS`, `08` / 알림 종류 `ALERT_TYPE`, 관리자 요약은 `CONTRACT_ID` NULL, `09`) | FK → `pi_contract`(NULL 허용), `UK_PI_ALERT_LOG_DEDUP`, IDX 종류 |
 | `pi_form_template` | 보안팀 양식 버전 이력 (`08`) — 종류(CHECKLIST/SECURITY_PLEDGE/DESTRUCTION_CONFIRM)·버전 번호·파일·변경 메모·검사 결과·사용 중 여부 | PK `FORM_TEMPLATE_ID`, `UK_PI_FORM_TEMPLATE_VERSION`(종류+버전), IDX 종류+사용중+삭제여부. 다른 테이블과 FK 없음 |
+| `pi_access_log` | 접근 기록 (`09`) — 행위(조회·다운로드)·계약·대상·행 수·사유·사용자 ID/로그인 ID/이름·접속 IP·브라우저 | PK `ACCESS_ID`, IDX 일시 / 계약 / 사용자 / 행위. 추가만, FK 없음(계약 삭제와 무관하게 보존) |
 
 - 모든 테이블에 공통 컬럼(`CREATED_AT/BY`, `UPDATED_AT/BY`, `DELETED_YN/AT/BY`)이 있습니다. 모든 테이블·컬럼에 COMMENT 가 있습니다(7개 테이블, 누락 0건 검증).
 - FK 는 업무 테이블 사이에만 있습니다. `CREATED_BY` 같은 사용자 컬럼은 core_user ID 값만 저장하고 **core 테이블 FK 는 없습니다.**
@@ -100,10 +119,11 @@
 | Method | URL | 설명 | 권한 |
 |---|---|---|---|
 | GET | `/me/permissions` | 현재 사용자의 화면 버튼 권한 + 부서 범위 `allDepartments`(관리자 true), `deptName`(비관리자 소속부서, 없으면 생략) | 로그인 |
-| GET | `/dashboard?baseYear=2026` | 목록 상단 요약. 기준 연도(없으면 올해) 기준 `baseYear, availableYears, yearTotalCount, yearActiveCount, yearActiveInspectedCount, yearEndedCount, yearEndedTermCheckCount, yearEndedTermMissingCount` + 기존 상태별 건수·만료임박 목록 | READ |
-| GET | `/contracts` | 계약 목록. `keyword, deptName, managerName, status, ismsScopeYn, inspectionResult, endDateFrom, endDateTo, page, size, sort` + 기준 연도 `baseYear`, `yearStatus`(ACTIVE/ENDED), `yearCheck`(INSPECTED/NOT_INSPECTED/TERM_UPLOADED/TERM_MISSING). `baseYear` 가 없으면 연도 조건 미적용. 행마다 `terminationCheckYn`(계약종결 체크 업로드 여부), `contractName`, `sameVendorContractCount`(같은 업체 계약 수). `keyword` 는 계약명도 검색 | READ |
-| GET | `/contracts/excel` | 목록 엑셀 다운로드 (검색 조건 적용) | READ |
-| GET | `/contracts/{id}` | 계약 상세 (첨부/점검/알림 이력 포함) | READ |
+| GET | `/dashboard?baseYear=2026` | 목록 상단 요약. 기준 연도(없으면 올해) 기준 `baseYear, availableYears, yearTotalCount, yearActiveCount, yearActiveInspectedCount, yearEndedCount, yearEndedTermCheckCount, yearEndedTermMissingCount` + 기존 상태별 건수·만료임박 목록 + 후속 관리(오늘 기준) `expiryDocsMissingCount, actionOverdueCount, consentMissingCount, destructionLateCount` | READ |
+| GET | `/contracts` | 계약 목록. `keyword, deptName, managerName, status, ismsScopeYn, inspectionResult, endDateFrom, endDateTo, page, size, sort` + 기준 연도 `baseYear`, `yearStatus`(ACTIVE/ENDED), `yearCheck`(INSPECTED/NOT_INSPECTED/TERM_UPLOADED/TERM_MISSING). `baseYear` 가 없으면 연도 조건 미적용. 행마다 `terminationCheckYn`(계약종결 체크 업로드 여부), `contractName`, `sameVendorContractCount`(같은 업체 계약 수). `keyword` 는 계약명도 검색. `followUp`(EXPIRY_DOCS_MISSING / ACTION_OVERDUE / CONSENT_MISSING / DESTRUCTION_LATE)을 주면 기준 연도와 상관없이 오늘 기준 후속 관리 대상만. 행마다 `expiryDocsNeeded, expiryDocsReceived, expiryDocsMissing, actionOverdueCount, consentMissing, destructionLate` | READ |
+| GET | `/contracts/excel?reason=` | 목록 엑셀 다운로드 (검색 조건 적용). **`reason`(다운로드 사유, 2자 이상) 필수** — 없으면 400. 접근 기록(조건·행 수·사유) 남김 | READ |
+| GET | `/contracts/{id}` | 계약 상세 (첨부/점검/알림 이력 + `followUp`(미수취 서류·조치 지연 점검·동의서 누락·파기 지연·일자 미입력) + `expiryDocsNote, expiryDocsRemindYn`). 접근 기록 남김 | READ |
+| PATCH | `/contracts/{id}/expiry-docs-remind` | 만료 서류 독촉 메일 발송 여부 `{"remindYn":"Y"}` 또는 `"N"` (그 외 400) | WRITE |
 | POST | `/contracts` | 계약 등록. 필수: `vendorName`, `contractName`(최대 200자), `entrustedTask`, `contractStartDate`, `contractEndDate` | WRITE |
 | PUT | `/contracts/{id}` | 계약 수정 | WRITE |
 | GET | `/contracts/{id}/contact-history?vendorWide=true` | 위탁사 담당자 변경 이력(계약기간 포함). `vendorWide=false` 면 이 계약만 | READ |
@@ -112,12 +132,13 @@
 | PATCH | `/contracts/{id}/flags` | 목록에서 Y/N 바로 변경 `{ismsScopeYn?, subcontractYn?}` — 보낸 항목만 변경, 값은 Y/N 만 허용 | WRITE |
 | PATCH | `/files/{fileId}/signed-date` | 위수탁 계약서 체결일 수정 `{"signedDate":"yyyy-MM-dd"}` (빈 값이면 비움). 위수탁 계약서가 아니면 400. 수정 후 계약 체결일을 최신 계약서 기준으로 다시 맞춤 | WRITE |
 | POST | `/contract-doc/analyze` | 위수탁 계약서 분석 (multipart `file`). 계약일자와 후보를 돌려주며 **파일은 저장하지 않음**. 응답: `fileName, textReadable, detectedDate(체결일 표기가 없으면 계약기간 시작일), detectedReason, candidates[{date, kind(SIGNED/DOC/PERIOD), kindLabel, context}], message` | WRITE |
-| POST | `/contracts/{id}/terminate` | 계약 종료 처리 `{terminatedDate, reason}`. 종료일 미입력 시 원계약 종료일(없으면 오늘), 원계약 시작일보다 빠르면 400 | WRITE |
+| POST | `/contracts/{id}/terminate` | 계약 종료 처리 `{terminatedDate, reason, expiryDocsNote, expiryDocsRemindYn}`. 종료일 미입력 시 원계약 종료일(없으면 오늘), 원계약 시작일보다 빠르면 400. **만료 서류 3종 중 받지 못한 서류가 있으면 `expiryDocsNote` 필수**(없으면 400, 미수취 서류 이름 안내) | WRITE |
 | POST | `/contracts/{id}/reopen` | 종료 취소 | WRITE |
 | DELETE | `/contracts/{id}` | 계약 삭제 (소프트) | **DELETE** |
 | GET | `/contracts/{id}/files` | 첨부 목록 | READ |
-| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) — 위수탁 계약서는 `signedDate`(선택, 없으면 파일에서 읽음)를 함께 저장하고 계약 체결일을 최신 계약서 기준으로 맞춤 | WRITE |
-| GET | `/files/{fileId}/download` | 첨부 다운로드 | READ |
+| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) — 위수탁 계약서는 `signedDate`(선택, 없으면 파일에서 읽음)를 함께 저장하고 계약 체결일을 최신 계약서 기준으로 맞춤. 확약서·파기 확인서는 `documentDate`(서명일 / 파기 완료일, 미래 날짜 400). **파일 내용이 확장자와 다르면 400** | WRITE |
+| PATCH | `/files/{fileId}/document-date` | 서류 일자 수정 `{"documentDate":"yyyy-MM-dd"}` (빈 값이면 비움). 확약서·파기 확인서만, 미래 날짜·형식 오류 400 | WRITE |
+| GET | `/files/{fileId}/download` | 첨부 다운로드 (접근 기록 남김) | READ |
 | DELETE | `/files/{fileId}` | 첨부 삭제 (소프트) | **DELETE** |
 | GET | `/checklist-template` | 점검 체크리스트 빈 양식 다운로드 | READ |
 | GET | `/contracts/{id}/checklist-template` | 회사명·수탁업무를 미리 채운 양식 다운로드 | READ |
@@ -125,15 +146,18 @@
 | GET | `/contracts/{id}/expiry-forms/{formType}` | 계약 정보를 채운 계약만료시 점검 양식 다운로드 (다른 부서 계약 403) | READ |
 | GET | `/contracts/{id}/inspections` | 점검 이력 | READ |
 | POST | `/contracts/{id}/inspections` | 작성된 체크리스트 업로드 (multipart: `file`, `inspectionType`, `inspectionDate`, `inspectorName`, `actionDueDate`, `remark`) | WRITE |
-| GET | `/inspections/{inspectionId}` | 점검 상세 (항목별 결과) | READ |
+| GET | `/inspections/{inspectionId}` | 점검 상세 (항목별 결과, 접근 기록 남김) | READ |
 | PUT | `/inspections/{inspectionId}` | 후속조치 수정 | WRITE |
-| GET | `/inspections/{inspectionId}/download` | 업로드 원본 다운로드 | READ |
+| GET | `/inspections/{inspectionId}/download` | 업로드 원본 다운로드 (접근 기록 남김) | READ |
 | DELETE | `/inspections/{inspectionId}` | 점검 이력 삭제 (소프트, 최근 점검 다시 계산) | **DELETE** |
 | GET | `/vendors` | 업체 목록(업체명 기준 묶음, 계약 목록·최근 점검 포함). `keyword, includeTerminated` | READ |
 | POST | `/vendors/checklist-preview` | 업체별 업로드 미리보기 — 저장하지 않고 집계·판정·업체 후보 반환 (multipart: `file`, `inspectionType`) | WRITE |
 | POST | `/vendors/checklist` | **업체별 체크리스트 업로드** — 1개 파일을 업체의 여러 계약에 등록 (multipart: `vendorKey`, `contractIds`(여러 개, 비우면 미종료 계약 전체), `file`, `inspectionType`, `inspectionDate`, `inspectorName`, `actionDueDate`, `remark`) | WRITE |
 | POST | `/contracts/{id}/alerts` | 만료 안내 메일 수동 발송 `{extraRecipients, message}` | WRITE |
-| POST | `/alerts/run?baseDate=` | 만료 알림 일괄 실행 (스케줄러 대체/재실행) | **DELETE(관리자)** |
+| POST | `/alerts/run?baseDate=` | 일일 알림 일괄 실행 (만료 알림 + 만료 서류 독촉 + 조치 지연 + 정기 점검, 스케줄러 대체/재실행). 응답에 `docsReminderCount, actionOverdueCount, regularInspectionCount, regularSummaryCount` 추가 | **DELETE(관리자)** |
+| GET | `/access-logs` | 접근 기록 검색 `from, to`(기본 최근 30일), `actionType, contractId, user`(이름·로그인 ID), `vendor`(업체·계약·대상), `page, size` → `{content, totalElements, page, size, totalPages}` | **양식 관리(관리자)** |
+| GET | `/access-logs/action-types` | 행위 구분 목록 (계약 상세 조회, 점검 상세 조회, 계약서·증빙 다운로드, 점검 원본 다운로드, 계약 목록 엑셀 다운로드, 접근 기록 엑셀 다운로드) | **양식 관리(관리자)** |
+| GET | `/access-logs/excel?reason=` | 접근 기록 엑셀 (검색 조건, 최대 10,000건). 사유 필수, 이 다운로드도 기록 | **양식 관리(관리자)** |
 | GET | `/form-templates` | 양식 3종의 사용 중 버전·버전 이력·허용 형식·자리표시자·체크리스트 구조 규칙 | **양식 관리(관리자)** |
 | POST | `/form-templates/{formType}/check` | 저장하지 않고 양식 검사만 (multipart: `file`). 체크리스트를 시스템이 읽을 수 없으면 400 | **양식 관리(관리자)** |
 | POST | `/form-templates/{formType}` | 새 버전 등록 (multipart: `file`, `changeNote`, `activate`(기본 true)). 검사 실패 시 저장하지 않고 400 | **양식 관리(관리자)** |
@@ -148,10 +172,11 @@
 ### 화면 (`/personalinfo/index.html`, 해시 라우팅)
 | 화면 | 경로 | 내용 |
 |---|---|---|
-| 목록 | `#/contracts` | 요약 카드(클릭 시 필터), 열 순서·너비 편집([열 설정]), 계약명 열, 같은 업체 **계약 N건** 배지 → 업체 계약 목록 팝업, 검색, 정렬, 페이징, 엑셀, 양식 다운로드, ISMS·재위탁 Y/N 스위치, 업체명 클릭 시 업체별 업로드 팝업, 열 너비 조정 |
+| 목록 | `#/contracts` | 요약 카드(클릭 시 필터), 후속 관리 카드 4종(클릭 시 필터)·상태 칸 후속 칩, 엑셀 사유 입력, 열 순서·너비 편집([열 설정]), 계약명 열, 같은 업체 **계약 N건** 배지 → 업체 계약 목록 팝업, 검색, 정렬, 페이징, 엑셀, 양식 다운로드, ISMS·재위탁 Y/N 스위치, 업체명 클릭 시 업체별 업로드 팝업, 열 너비 조정 |
 | 등록 | `#/contracts/new` (`?vendor=업체명` 이면 업체명 미리 채움) | 계약 항목·계약명 입력, 같은 업체 기존 계약 안내, 계약서 파일 함께 업로드 |
-| 상세 | `#/contracts/{id}` | 기본정보(계약명), 같은 업체 계약 목록·이 업체로 계약 추가, 협력사 담당자 이력, 계약서 업로드·다운로드, 체크리스트 양식 다운로드·작성본 업로드, 점검 결과 상세·후속조치, 메일 발송, 종료 처리, 알림 이력 |
+| 상세 | `#/contracts/{id}` | 기본정보(계약명), 같은 업체 계약 목록·이 업체로 계약 추가, 협력사 담당자 이력, 계약서 업로드·다운로드, 체크리스트 양식 다운로드·작성본 업로드, 점검 결과 상세·후속조치, 메일 발송, 종료 처리(미수취 사유), 보안팀 후속 관리 패널, 확약서 서명일·파기 완료일 입력, 알림 발송 이력(종류) |
 | 수정 | `#/contracts/{id}/edit` | 계약 정보 수정 |
+| 접근 기록 | `#/access-logs` (목록의 [접근 기록] 버튼, 관리자만) | 기간·행위·사용자·업체 검색, 기록 표(일시·행위·업체/계약·대상·행 수·사유·사용자·IP), 사유 입력 후 엑셀 |
 | 양식 관리 | `#/forms` (목록의 [양식 관리] 버튼, 관리자만) | 양식 3종 카드: 사용 중 버전, 새 버전 등록(저장 전 검사), 버전 이력·원본 다운로드·미리보기·사용 지정·삭제, 기본 양식 사용·기본 양식 다운로드·미리보기, 자리표시자·체크리스트 구조 안내 |
 | 업체별 체크리스트 업로드 (팝업) | 목록의 업체명 클릭 / 상세 버튼 | 업체 계약 선택 → 체크리스트 미리보기 → 일괄 등록, 결과에서 계약 상세로 이동 |
 
@@ -168,11 +193,11 @@
 | 조회 | `PERSONALINFO_READ` | `ROLE_ADMIN`, `ROLE_PI_ADMIN`, `ROLE_PI_USER`, `ROLE_PI_VIEWER` |
 | 등록/수정 (메일 수동 발송 포함) | `PERSONALINFO_WRITE` | `ROLE_ADMIN`, `ROLE_PI_ADMIN`, `ROLE_PI_USER` |
 | 삭제·일괄 알림 실행 | `PERSONALINFO_DELETE` | `ROLE_ADMIN`, `ROLE_PI_ADMIN` |
-| 양식 관리 (보안팀 양식 등록·교체·되돌리기) | `PERSONALINFO_FORM_MANAGE` | `ROLE_ADMIN`, `ROLE_PI_ADMIN` (`PiRoles.CAN_MANAGE_FORMS`) |
+| 양식 관리 (보안팀 양식 등록·교체·되돌리기) · **접근 기록 조회** | `PERSONALINFO_FORM_MANAGE` | `ROLE_ADMIN`, `ROLE_PI_ADMIN` (`PiRoles.CAN_MANAGE_FORMS`) |
 
 | 사용자 구분 | 부여할 역할 | 사용 가능 기능 |
 |---|---|---|
-| 관리자 (보안팀) | `ROLE_PI_ADMIN` (또는 플랫폼 `ROLE_ADMIN`) | 전체 기능 + 삭제 + **양식 관리** |
+| 관리자 (보안팀) | `ROLE_PI_ADMIN` (또는 플랫폼 `ROLE_ADMIN`) | 전체 기능 + 삭제 + **양식 관리** + **접근 기록** |
 | 일반 사용자 (계약 담당자) | `ROLE_PI_USER` | **소속부서 계약만** 등록, 수정, 조회, 업로드, 메일 발송 |
 | 조회 사용자 | `ROLE_PI_VIEWER` | **소속부서 계약만** 조회, 다운로드 |
 
@@ -225,6 +250,7 @@
 | 6 | `06_contract_file_signed_date.sql` | **위수탁 계약서 파일별 체결일** — `pi_contract_file.SIGNED_DATE` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함)과 인덱스(`CREATE INDEX IF NOT EXISTS`) 추가. 이미 올라가 있는 계약서 파일은 체결일이 비어 있으므로 필요하면 상세 화면에서 입력합니다. 기존 계약 체결일 값은 바꾸지 않습니다. 새로 설치할 때는 01 에 컬럼이 이미 있어 아무 변화 없이 통과합니다 |
 | 7 | `07_contract_name.sql` | **계약명** — `pi_contract.CONTRACT_NAME` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함, `VENDOR_NAME` 다음)과 업체명+계약명 인덱스(`CREATE INDEX IF NOT EXISTS`) 추가. 기존 계약은 계약명이 비어 있고 화면에서는 서비스명으로 표시되므로, 필요하면 수정 화면에서 입력합니다. **새 코드 배포 전에 먼저 실행해야 합니다**(컬럼이 없으면 계약 조회가 실패). 새로 설치할 때는 01 에 컬럼이 이미 있어 아무 변화 없이 통과합니다 |
 | 8 | `08_form_template.sql` | **양식 관리** — `pi_form_template` 테이블(`CREATE TABLE IF NOT EXISTS`, COMMENT 포함, core FK 없음)과 `pi_inspection.FORM_VERSION`, `pi_alert_log.FORM_VERSIONS` 컬럼(`ADD COLUMN IF NOT EXISTS`) 추가. 등록한 양식이 없으면 지금처럼 모듈 기본 양식을 쓰므로 실행 직후 동작은 같습니다. **새 코드 배포 전에 먼저 실행해야 합니다**(컬럼이 없으면 점검·알림 조회가 실패). 기존 데이터는 바꾸지 않습니다 |
+| 9 | `09_security_followup.sql` | **보안팀 후속 관리** — `pi_contract.EXPIRY_DOCS_NOTE / EXPIRY_DOCS_REMIND_YN`, `pi_contract_file.DOCUMENT_DATE`, `pi_alert_log.ALERT_TYPE`(기존 행은 'EXPIRY') 컬럼 추가(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함), `pi_alert_log.CONTRACT_ID` NULL 허용(`MODIFY`, 기존 값 유지), 알림 종류 인덱스, 접근 기록 테이블 `pi_access_log`(`CREATE TABLE IF NOT EXISTS`, core FK 없음) 추가. 업무 데이터 변경·삭제 없음. 두 번 실행해도 오류 없음 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
@@ -235,6 +261,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/06_contract_file_signed_date.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/07_contract_name.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/08_form_template.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/09_security_followup.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
@@ -259,6 +286,13 @@ personalinfo:
     mail-from: noreply@company.com                 # 미설정 시 spring.mail.username
     base-url: https://aiplatform.kleannara.com     # 메일 본문 "상세 보기" 링크
     subject-prefix: "[개인정보 위수탁]"
+    follow-up-remind-days: 90                      # 만료 서류 독촉·조치 지연 주간 알림 기간 (종료일/조치 예정일 후 N일)
+  regular-inspection:
+    enabled: true                                  # 정기 점검 알림 사용
+    notice-date: "04-10"                           # 알림 시작일 (MM-dd) — 이날부터 점검 월 말일까지 대상 계약에 1회
+    month: 5                                       # 정기 점검 월
+    admin-recipients: ""                           # 정기 점검 요약을 추가로 받을 관리자 (쉼표 구분, default-recipients 와 합침)
+  destruction-grace-days: 30                       # 파기 완료일 허용 기간 (계약 종료 기준일 + N일 넘으면 '파기 지연')
   company-name: 깨끗한나라                          # 확약서·파기 확인서·만료 체크리스트의 위탁사명 (비우면 빈칸)
 
 spring:
@@ -304,7 +338,7 @@ module-personalinfo/
 └── src/main/
     ├── java/com/company/module/personalinfo/
     │   ├── controller/  PiContractController, PiContractFileController, PiInspectionController,
-    │   │                PiAlertController, PiVendorChecklistController, PiFormTemplateController(양식 관리), PiDownloads(다운로드 응답 헬퍼)
+    │   │                PiAlertController, PiVendorChecklistController, PiFormTemplateController(양식 관리), PiAccessLogController(접근 기록), PiDownloads(다운로드 응답 헬퍼)
     │   ├── dto/         ContractSaveRequest, ContractSearchCondition, ContractTerminateRequest,
     │   │                InspectionUpdateRequest, AlertSendRequest,
     │   │                ContractSummaryResponse, ContractDetailResponse, ContractFileResponse,
@@ -312,11 +346,12 @@ module-personalinfo/
     │   │                AlertRunResponse, DashboardResponse, PermissionResponse,
     │   │                VendorSummaryResponse, VendorChecklistPreviewResponse, VendorChecklistUploadResponse,
     │   │                ContractDocAnalyzeResponse(계약서 분석 결과),
-    │   │                FormTemplateGroupResponse, FormTemplateResponse, FormTemplateCheckResponse(양식 관리)
+    │   │                FormTemplateGroupResponse, FormTemplateResponse, FormTemplateCheckResponse(양식 관리),
+    │   │                FollowUpResponse(보안팀 후속 관리), AccessLogResponse(접근 기록)
     │   ├── entity/      PiBaseEntity(공통 컬럼), PiContract, PiContractFile, PiInspection,
-    │   │                PiInspectionItem, PiAlertLog, PiContactHistory, PiFormTemplate + Enum(ContractStatus, ContractFileType, FormTemplateType,
-    │   │                InspectionType, InspectionResult, ChecklistSheetType, AlertSendStatus, AlertTriggerType)
-    │   ├── repository/  Pi*Repository (7개, PiFormTemplateRepository 포함)
+    │   │                PiInspectionItem, PiAlertLog, PiContactHistory, PiFormTemplate, PiAccessLog + Enum(ContractStatus, ContractFileType, FormTemplateType,
+    │   │                InspectionType, InspectionResult, ChecklistSheetType, AlertSendStatus, AlertTriggerType, AlertType, AccessActionType)
+    │   ├── repository/  Pi*Repository (8개, PiFormTemplateRepository·PiAccessLogRepository 포함)
     │   └── service/     PiContractService, PiContractFileService, PiInspectionService,
     │                    ChecklistExcelParser, PiChecklistTemplateService, PiContractExcelService,
     │                    PiAlertMailService, PiAlertScheduler, PiFileStorage, PiExcelSupport, PiRoles,
@@ -325,13 +360,14 @@ module-personalinfo/
     │                    PiYearScope(기준 연도 계약중/종료 판정 규칙),
     │                    PiAccessScope / PiAccessScopeResolver(비관리자 소속부서 계약 조회 범위),
     │                    PiExpiryFormService(계약만료시 점검 양식 3종 생성·메일 첨부),
-    │                    PiFormTemplateService(양식 버전 관리·검사, 사용 중 양식 제공)
+    │                    PiFormTemplateService(양식 버전 관리·검사, 사용 중 양식 제공),
+    │                    PiFollowUpRules(만료 서류·조치 지연·동의서 누락·파기 지연 규칙), PiAccessLogService(접근 기록)
     └── resources/
         ├── personalinfo/checklist-template.xlsx      보안팀 점검 체크리스트 원본 양식
         ├── personalinfo/security-pledge-template.docx      정보보호 및 비밀유지 확약서 양식 ({{수탁업체명}} 등 자리표시자)
         ├── personalinfo/destruction-confirm-template.docx  개인정보 파기 확인서 양식
         └── static/personalinfo/                      화면 (index.html, css, js — personalinfo-table.js: 목록 열 너비·순서 편집)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, 09_security_followup.sql, README.md
 ```
 
 ---
@@ -342,7 +378,15 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_u
 |---|---|
 | 컴파일 (Java 17 타깃, core compileOnly) | 통과 |
 | Hibernate `ddl-auto=validate` (Entity ↔ 01_schema.sql 컬럼·타입 일치) | 통과 |
-| 통합 테스트 20건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **20/20 통과** |
+| 통합 테스트 24건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **24/24 통과** |
+| 　- 파일 내용 확인: 가짜 pdf·ZIP 조각 docx·xlsx 를 docx 로·GIF 를 jpg 로·글자 hwp·docx 를 xlsx 로 → 모두 400·저장 0건 / 실제 docx·hwp·hwpx·png 200 | 통과 |
+| 　- 재위탁 동의서: 재위탁 Y·동의서 없음 → `consentMissing`·목록 필터·요약 카드 포함, 동의서 업로드 후 빠짐·카드 -1 | 통과 |
+| 　- 서류 일자·파기 지연: 파기 완료일 미래 400, 저장·라벨 '파기 완료일', 종료 60일 전 + 30일 허용 → 50일째 파기 '파기 지연'·필터 포함, 일자 수정 시 해소, 미래·형식 오류 400, 조회자 403, 비우면 '일자 미입력', 확약서 라벨 '서명일', 기타 파일 일자 400 | 통과 |
+| 　- 만료 서류: 서류 없이 종료 400(미수취 서류 이름 안내) → 사유 입력 후 종료·사유/독촉 저장, 받은 1종·미수취 2종, 요약 +1, 목록 필터·행 `expiryDocsMissing` / 3종 모두 받은 계약은 사유 없이 종료 / 독촉 메일: 미수취 양식 2종만 첨부·사유 표시, 완비 계약 미발송, 같은 주 재실행 0, 다음 주 재발송, 독촉 끄기(조회자 403·잘못된 값 400) 후 미발송, 알림 이력 종류 | 통과 |
+| 　- 조치 지연: 조치 예정일 5일 지남 → 지연 1건·5일·필터·요약, 주간 메일 1회(같은 주 재실행 0), 조치 완료 후 빠짐·다음 주 미발송 | 통과 |
+| 　- 정기 점검: 4/9 발송 0 / 4/10 담당자 메일(체크리스트 첨부, 5월 31일 기한, 종료 계약 제외) + 보안팀 요약 1회(`CONTRACT_ID` NULL) / 4/20 재실행 0 / 6/1 0 / 이후 등록 계약은 5/2 담당자만 발송·요약 재발송 없음 | 통과 |
+| 　- 접근 기록: 상세 조회·파일 다운로드 기록(로그인 ID·업체), 엑셀 사유 없음·공백 400, 사유 입력 시 기록(사유·조건·행 수 1), 계약 담당자·조회자 403, 행위 6종, 접근 기록 엑셀 사유 필수·기록, 삭제 API 없음 | 통과 |
+| 　- SQL 09: 테스트 DB·프리뷰 DB 각각 두 번 실행 오류 없음, Hibernate validate 통과 / 브라우저: 후속 관리 카드 4종·칩·카드 필터(만료 서류 4건), 엑셀 사유 팝업 → 다운로드 → 접근 기록 표시, 상세 후속 관리 패널, 종료 팝업 미수취 서류·사유 필수, 계약 담당자 [접근 기록] 버튼 없음·화면 잠금, 콘솔 오류 0 | 통과 |
 | 　- 양식 관리: 권한(보안팀 관리자·플랫폼 관리자 `canManageForms` true, 계약 담당자·조회자 false·API 403) / 처음 3종 모두 '기본' / 시스템이 못 읽는 체크리스트·확장자 다른 파일 검사·등록 400, 저장 0건 / 체크리스트 v1·v2 등록 → v2 사용 중·v1 해제·사용 중 1건, 사용 중 양식이 빈 양식·계약별 양식·만료 체크리스트에 반영(계약 정보 채움 유지), 점검 업로드 `formVersion`=v2 / v1 사용 지정(일반 사용자 403)·반영, 사용 중 삭제 400, v2 삭제 후 원본 404, v1 원본 바이트 동일, 기본 양식 복귀, 삭제 후에도 번호 v3, `activate=false` 면 사용 중 유지 / 확약서 docx: 자리표시자 자동 입력(`{{ 계약명 }}` 공백 허용), 모르는 자리표시자 경고·그대로 남김, 미리보기 샘플 값 / 파기 확인서: 가짜 pdf·xlsx 400, hwp 등록(자동 입력 없음 경고), pdf 등록 → 계약 다운로드가 원본 바이트 그대로·`.pdf` 파일명 / 만료 안내 메일: 첨부가 사용 중 양식(확약서 docx·파기 확인서 pdf), 발송 이력 `formVersions`='체크리스트 기본 / 확약서 v1 / 파기 확인서 v2' / 잘못된 양식 종류 400 / SQL 08 두 번 실행 오류 없음·Hibernate validate 통과 / 브라우저: 관리자만 [양식 관리] 버튼, 깨진 체크리스트 오류 표시·등록 버튼 비활성, 확약서 docx 검사(자동 입력 항목·모르는 자리표시자 경고)·등록·v1 사용 중, 미리보기 샘플 값, 계약 상세 확약서 다운로드에 새 양식 반영, 기본 양식 복귀, 계약 담당자는 버튼 없음·`#/forms` 안내, 콘솔 오류 0 | 통과 |
 | 　- 계약만료시 점검: 확약서·파기 확인서 docx 에 업체명·계약명·위탁업무·재위탁 업체·계약종료일 채움, `{{` 자리표시자 0, 한글 파일명(UTF-8), 체크리스트 활성 시트 '만료', 빈 양식 200, 잘못된 종류 400, 외부 역할 403, 다른 부서 403 / 확약서만 받은 상태에서 만료 안내 메일: 첨부 3건(체크리스트 xlsx, 확약서 docx, 파기 확인서 docx), 본문 '계약 만료 시 협력사 제출 자료'·수취 완료·미수취 / 자동 알림 메일도 첨부 3건 / 브라우저: 섹션 위치(점검 이력과 알림 이력 사이), 양식 3종 다운로드 파일명, 확약서 업로드 후 수취 완료·수취 1/3, 만료 점검 업로드 팝업 구분 '계약변경·만료 점검', 콘솔 오류 0 | 통과 |
 | 　- 권한: 조회자 등록 403 / 외부 역할 403 / 미로그인 401 / 일반 사용자 삭제 403 / 관리자 삭제 200 | 통과 |

@@ -71,9 +71,28 @@ public class PiContractFileController {
             @RequestParam(value = "fileType", required = false) String fileType,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
+            @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
-                fileService.upload(contractId, file, fileType, description, signedDate, currentUserId)));
+                fileService.upload(contractId, file, fileType, description, signedDate, documentDate, currentUserId)));
+    }
+
+    /** 서류 일자 변경 {"documentDate":"yyyy-MM-dd"} — 확약서 서명일 / 파기 확인서 파기 완료일 (빈 값이면 비움) */
+    @PatchMapping("/files/{fileId}/document-date")
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractFileResponse>> changeDocumentDate(
+            @PathVariable Long fileId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+        String v = body == null ? null : body.get("documentDate");
+        LocalDate date;
+        try {
+            date = v == null || v.isBlank() ? null : LocalDate.parse(v.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new com.company.core.common.exception.BusinessException(
+                    com.company.core.common.exception.ErrorCode.INVALID_INPUT_VALUE, "서류 일자 형식이 올바르지 않습니다. (yyyy-MM-dd)");
+        }
+        return ResponseEntity.ok(ApiResponse.success(fileService.changeDocumentDate(fileId, date, currentUserId)));
     }
 
     /** 위수탁 계약서 체결일 변경 {"signedDate":"yyyy-MM-dd"} (빈 값이면 비움). 계약 체결일은 최신 계약서 기준으로 다시 맞춘다. */

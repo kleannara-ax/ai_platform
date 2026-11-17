@@ -35,6 +35,7 @@ public class PiContractFileService {
     private final PiFileStorage storage;
     private final PiContractDocAnalyzer docAnalyzer;
     private final PiAccessScopeResolver accessScope;
+    private final PiAccessLogService accessLog;
 
     public List<ContractFileResponse> getList(Long contractId) {
         ensureContract(contractId);
@@ -67,12 +68,22 @@ public class PiContractFileService {
     @Transactional
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, Long userId) {
+        return upload(contractId, file, fileType, description, signedDate, null, userId);
+    }
+
+    /** 첨부 업로드 + 서류 일자(확약서 서명일 / 파기 확인서 파기 완료일) */
+    @Transactional
+    public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
+                                       LocalDate signedDate, LocalDate documentDate, Long userId) {
         ensureContract(contractId);
         if (fileRepository.countByContractIdAndDeletedYn(contractId, N) >= MAX_FILES_PER_CONTRACT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "계약 1건당 첨부파일은 최대 " + MAX_FILES_PER_CONTRACT + "개까지 등록할 수 있습니다.");
         }
         ContractFileType type = parseType(fileType);
+        if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "서류 일자는 오늘보다 늦을 수 없습니다.");
+        }
         PiFileStorage.StoredFile stored = storage.store(file, "contract", PiFileStorage.CONTRACT_EXTENSIONS,
                 storage.getMaxContractFileBytes());
         LocalDate docDate = null;
@@ -89,6 +100,7 @@ public class PiContractFileService {
                 .fileHash(stored.sha256())
                 .description(PiContractService.trim(description))
                 .signedDate(docDate)
+                .documentDate(documentDate)
                 .createdBy(userId)
                 .build());
         if (type == ContractFileType.CONTRACT) {
@@ -129,6 +141,22 @@ public class PiContractFileService {
                         }));
     }
 
+    /** 서류 일자 변경 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일). null 이면 비운다. */
+    @Transactional
+    public ContractFileResponse changeDocumentDate(Long fileId, LocalDate documentDate, Long userId) {
+        PiContractFile f = findActive(fileId);
+        ensureContract(f.getContractId());
+        if (!f.getFileType().hasDocumentDate()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "서류 일자는 정보보호 및 비밀유지 확약서(서명일)와 개인정보 파기 확인서(파기 완료일)에만 입력할 수 있습니다.");
+        }
+        if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, f.getFileType().getDocumentDateLabel() + "은(는) 오늘보다 늦을 수 없습니다.");
+        }
+        f.changeDocumentDate(documentDate, userId);
+        return ContractFileResponse.from(f, latestContractDocId(f.getContractId()));
+    }
+
     private LocalDate readSignedDate(MultipartFile file) {
         try {
             return docAnalyzer.analyze(file).getDetectedDate();
@@ -139,7 +167,9 @@ public class PiContractFileService {
 
     public PiFileStorage.DownloadFile download(Long fileId) {
         PiContractFile f = findActive(fileId);
-        ensureContract(f.getContractId());
+        PiContract c = ensureContract(f.getContractId());
+        accessLog.record(com.company.module.personalinfo.entity.AccessActionType.DOWNLOAD_FILE, c, f.getFileId(),
+                f.getFileType().getLabel() + " · " + f.getOriginalName());
         return new PiFileStorage.DownloadFile(f.getOriginalName(), f.getContentType(), storage.read(f.getStoredPath()));
     }
 
@@ -160,8 +190,8 @@ public class PiContractFileService {
     }
 
     /** 계약 존재 + 현재 사용자 부서 범위 확인 */
-    private void ensureContract(Long contractId) {
-        accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
+    private PiContract ensureContract(Long contractId) {
+        return accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
                 .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId)));
     }
 

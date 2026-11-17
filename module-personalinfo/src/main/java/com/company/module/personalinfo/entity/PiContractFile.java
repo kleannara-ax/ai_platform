@@ -62,10 +62,14 @@ public class PiContractFile extends PiBaseEntity {
     @Column(name = "SIGNED_DATE")
     private LocalDate signedDate;
 
+    /** 받은 서류의 일자 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일) */
+    @Column(name = "DOCUMENT_DATE")
+    private LocalDate documentDate;
+
     @Builder
     private PiContractFile(Long contractId, ContractFileType fileType, String originalName, String storedPath,
                            String contentType, Long fileSize, String fileHash, String description, LocalDate signedDate,
-                           Long createdBy) {
+                           LocalDate documentDate, Long createdBy) {
         this.contractId = contractId;
         this.fileType = fileType == null ? ContractFileType.CONTRACT : fileType;
         this.originalName = originalName;
@@ -75,12 +79,19 @@ public class PiContractFile extends PiBaseEntity {
         this.fileHash = fileHash;
         this.description = description;
         this.signedDate = this.fileType == ContractFileType.CONTRACT ? signedDate : null;
+        this.documentDate = this.fileType.hasDocumentDate() ? documentDate : null;
         markCreatedBy(createdBy);
     }
 
     /** 계약서상 체결일 변경 (위수탁 계약서만 가능, null 이면 비움) */
     public void changeSignedDate(LocalDate signedDate, Long updatedBy) {
         this.signedDate = signedDate;
+        markUpdatedBy(updatedBy);
+    }
+
+    /** 서류 일자 변경 (확약서 서명일 / 파기 확인서 파기 완료일, null 이면 비움) */
+    public void changeDocumentDate(LocalDate documentDate, Long updatedBy) {
+        this.documentDate = documentDate;
         markUpdatedBy(updatedBy);
     }
 

@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS pi_contract (
     TERMINATED_YN           CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '계약 종료 처리 여부 (Y/N)',
     TERMINATED_DATE         DATE          NULL                    COMMENT '계약 종료 처리일',
     TERMINATION_REASON      VARCHAR(500)  NULL                    COMMENT '계약 종료 사유',
+    EXPIRY_DOCS_NOTE        VARCHAR(500)  NULL                    COMMENT '만료 서류(만료 점검 체크리스트·확약서·파기 확인서)를 다 받지 못한 채 종료 처리한 사유',
+    EXPIRY_DOCS_REMIND_YN   CHAR(1)       NOT NULL DEFAULT 'Y'    COMMENT '미수취 만료 서류 독촉 메일 계속 발송 여부 (Y/N)',
     LAST_INSPECTION_ID      BIGINT        NULL                    COMMENT '최근 점검 ID (pi_inspection, 목록 표시용)',
     LAST_INSPECTION_DATE    DATE          NULL                    COMMENT '최근 점검일 (목록 표시용)',
     LAST_INSPECTION_RESULT  VARCHAR(20)   NULL                    COMMENT '최근 점검 결과 (PASS/NEED_ACTION/INCOMPLETE)',
@@ -84,6 +86,7 @@ CREATE TABLE IF NOT EXISTS pi_contract_file (
     FILE_HASH      VARCHAR(64)   NULL                    COMMENT '파일 SHA-256 해시 (위변조 확인용)',
     DESCRIPTION    VARCHAR(500)  NULL                    COMMENT '파일 설명',
     SIGNED_DATE    DATE          NULL                    COMMENT '계약서상 체결일 (위수탁 계약서만 사용. 체결일 표기가 없으면 계약기간 시작일)',
+    DOCUMENT_DATE  DATE          NULL                    COMMENT '받은 서류의 일자 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일)',
 
     CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY     BIGINT        NULL                    COMMENT '생성자 사용자 ID',
@@ -188,7 +191,8 @@ CREATE TABLE IF NOT EXISTS pi_inspection_item (
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pi_alert_log (
     ALERT_ID        BIGINT        NOT NULL AUTO_INCREMENT COMMENT '알림 ID',
-    CONTRACT_ID     BIGINT        NOT NULL                COMMENT '위수탁 계약 ID (pi_contract)',
+    CONTRACT_ID     BIGINT        NULL                    COMMENT '위수탁 계약 ID (pi_contract, 관리자 요약 메일처럼 특정 계약이 없으면 NULL)',
+    ALERT_TYPE      VARCHAR(30)   NOT NULL DEFAULT 'EXPIRY' COMMENT '알림 종류 (EXPIRY 만료 알림 / EXPIRY_DOCS 만료 서류 독촉 / ACTION_OVERDUE 조치 지연 / REGULAR_INSPECTION 정기 점검 요청 / REGULAR_SUMMARY 정기 점검 요약)',
     TRIGGER_TYPE    VARCHAR(10)   NOT NULL                COMMENT '발송 경로 (AUTO:자동 / MANUAL:수동)',
     ALERT_STAGE     VARCHAR(20)   NOT NULL                COMMENT '알림 단계 (D-30, D-7, D-1, D-DAY, EXPIRED, MANUAL)',
     TARGET_END_DATE DATE          NULL                    COMMENT '알림 당시 계약 종료일',

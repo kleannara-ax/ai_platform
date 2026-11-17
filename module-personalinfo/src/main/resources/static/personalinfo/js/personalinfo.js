@@ -4,6 +4,7 @@
  *   #/contracts/new        등록 화면
  *   #/contracts/{id}       상세 화면 (계약서 업로드, 체크리스트 다운로드/업로드, 메일 발송)
  *   #/contracts/{id}/edit  수정 화면
+ *   #/access-logs          접근 기록 (관리자: 조회·다운로드 기록, 엑셀 사유)
  *   #/forms                양식 관리 (보안팀 관리자·플랫폼 관리자: 체크리스트·확약서·파기 확인서 버전 관리)
  * 업체별 점검 체크리스트 업로드는 팝업(vendor-checklist-modal)으로 연다:
  *   목록의 업체명 클릭, 또는 상세의 [업체 계약 일괄 업로드] 버튼
@@ -66,6 +67,7 @@
       if ((m = hash.match(/^#\/contracts\/(\d+)\/edit$/))) return renderForm(await PI_API.getContract(m[1]));
       if ((m = hash.match(/^#\/contracts\/(\d+)$/))) return await renderDetail(m[1]);
       if (hash === '#/forms') return await renderForms();
+      if (hash === '#/access-logs') return await renderAccessLogs();
       go('#/contracts');
     } catch (e) {
       view.innerHTML = `<div class="pi-card pi-empty"><i class="fas fa-triangle-exclamation me-1"></i>${esc(e.message)}</div>`;
@@ -112,9 +114,10 @@
             </div>
             <div class="pi-actions">
               <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-template"><i class="fas fa-file-excel me-1"></i>점검 체크리스트 양식</button>
+              ${perm.canManageForms ? '<button type="button" class="btn btn-sm btn-outline-dark" id="btn-access-logs" title="계약·점검 조회와 계약서·엑셀 다운로드 기록"><i class="fas fa-user-shield me-1"></i>접근 기록</button>' : ''}
               ${perm.canManageForms ? '<button type="button" class="btn btn-sm btn-outline-dark" id="btn-forms" title="보안팀 양식(체크리스트·확약서·파기 확인서) 등록·교체"><i class="fas fa-folder-tree me-1"></i>양식 관리</button>' : ''}
               <button type="button" class="btn btn-sm btn-outline-success" id="btn-excel"><i class="fas fa-download me-1"></i>엑셀 다운로드</button>
-              ${perm.canDelete ? '<button type="button" class="btn btn-sm btn-outline-warning" id="btn-run-alert"><i class="fas fa-bell me-1"></i>만료 알림 실행</button>' : ''}
+              ${perm.canDelete ? '<button type="button" class="btn btn-sm btn-outline-warning" id="btn-run-alert"><i class="fas fa-bell me-1"></i>알림 실행</button>' : ''}
               ${canCreate() ? '<button type="button" class="btn btn-sm btn-primary" id="btn-new"><i class="fas fa-plus me-1"></i>계약 등록</button>' : ''}
             </div>
           </div>
@@ -143,18 +146,20 @@
     const form = document.getElementById('contract-search-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const keep = { yearStatus: listState.cond.yearStatus, yearCheck: listState.cond.yearCheck };
+      const keep = { yearStatus: listState.cond.yearStatus, yearCheck: listState.cond.yearCheck, followUp: listState.cond.followUp };
       listState.cond = { ...Object.fromEntries(new FormData(form).entries()), ...keep };
       listState.page = 0;
       loadList();
     });
     document.getElementById('btn-reset').onclick = () => { listState.cond = defaultCond(); listState.page = 0; renderList(); };
-    document.getElementById('btn-excel').onclick = () => PI_API.downloadExcel({ ...listState.cond, baseYear: listState.baseYear, sort: listState.sort }).catch(fail);
+    document.getElementById('btn-excel').onclick = () => askDownloadReason('계약 목록 엑셀',
+      (reason) => PI_API.downloadExcel({ ...listState.cond, baseYear: listState.baseYear, sort: listState.sort }, reason));
     document.getElementById('btn-template').onclick = () => PI_API.downloadBlankTemplate().catch(fail);
     document.getElementById('s-sort').onchange = (e) => { listState.sort = e.target.value; listState.page = 0; loadList(); };
     document.getElementById('btn-new')?.addEventListener('click', () => go('#/contracts/new'));
     document.getElementById('btn-run-alert')?.addEventListener('click', runAlerts);
     document.getElementById('btn-forms')?.addEventListener('click', () => go('#/forms'));
+    document.getElementById('btn-access-logs')?.addEventListener('click', () => go('#/access-logs'));
     PiTable.enhance(document.getElementById('contract-table'),
       { id: 'contracts', cols: listCols(), tools: 'contract-col-tools', legacyWidthKey: COL_WIDTH_KEY });
 
@@ -181,7 +186,7 @@
       const el = document.getElementById('pi-dashboard');
       if (!el) return;
       const cur = listState.cond;
-      const on = (ys, yc) => (cur.yearStatus || '') === ys && (cur.yearCheck || '') === yc && !cur.status && !cur.inspectionResult;
+      const on = (ys, yc) => (cur.yearStatus || '') === ys && (cur.yearCheck || '') === yc && !cur.status && !cur.inspectionResult && !cur.followUp;
       const years = (d.availableYears || [d.baseYear]);
       el.className = 'pi-stats pi-year-stats';
       el.innerHTML = `
@@ -208,6 +213,24 @@
             <button type="button" class="pi-sub-link ok ${on('ENDED', 'TERM_UPLOADED') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_UPLOADED" title="계약종결 체크(계약변경·만료 점검) 업로드">업로드 <b>${d.yearEndedTermCheckCount}</b></button>
             <button type="button" class="pi-sub-link ${d.yearEndedTermMissingCount ? 'warn' : ''} ${on('ENDED', 'TERM_MISSING') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_MISSING" title="계약종결 체크(계약변경·만료 점검) 미업로드">미업로드 <b>${d.yearEndedTermMissingCount}</b></button></div>
         </div>`;
+      // 보안팀 후속 관리 카드 (기준 연도와 상관없이 현재 기준)
+      const fuCards = [
+        ['EXPIRY_DOCS_MISSING', '만료 서류 미수취', d.expiryDocsMissingCount, 'fa-file-circle-exclamation', '종료·만료(임박) 계약 중 만료 점검 체크리스트·확약서·파기 확인서를 다 받지 못한 계약'],
+        ['ACTION_OVERDUE', '조치 지연', d.actionOverdueCount, 'fa-hourglass-end', '점검 결과 조치 필요 항목의 조치 예정일이 지났는데 조치 완료가 아닌 계약'],
+        ['CONSENT_MISSING', '재위탁 동의서 누락', d.consentMissingCount, 'fa-file-contract', '재위탁 Y 인데 재위탁 동의서 파일이 없는 계약'],
+        ['DESTRUCTION_LATE', '파기 지연', d.destructionLateCount, 'fa-clock-rotate-left', '파기 확인서의 파기 완료일이 계약 종료일 + 허용 기간보다 늦은 계약'],
+      ];
+      document.getElementById('pi-followup-bar')?.remove();
+      el.insertAdjacentHTML('afterend', `<section class="pi-followup-bar" id="pi-followup-bar" aria-label="보안팀 후속 관리">
+        <span class="pi-fu-title"><i class="fas fa-shield-halved me-1"></i>후속 관리</span>
+        ${fuCards.map(([k, label, n, icon, tip]) => `<button type="button" class="pi-fu-card ${n ? 'warn' : ''} ${cur.followUp === k ? 'active' : ''}" data-fu="${k}" title="${esc(tip)}">
+          <i class="fas ${icon}"></i>${esc(label)} <b>${n}</b></button>`).join('')}
+        <small class="text-muted ms-auto">기준 연도와 상관없이 오늘 기준</small></section>`);
+      document.getElementById('pi-followup-bar').querySelectorAll('[data-fu]').forEach((b) => b.addEventListener('click', () => {
+        listState.cond = cur.followUp === b.dataset.fu ? defaultCond() : { followUp: b.dataset.fu };
+        listState.page = 0;
+        renderList();
+      }));
       const apply = (ys, yc) => {
         listState.cond = {};
         if (ys) listState.cond.yearStatus = ys;
@@ -229,8 +252,10 @@
   }
 
   /** 현재 카드 필터 안내 (목록 제목 옆) */
+  const FOLLOW_UP_LABEL = { EXPIRY_DOCS_MISSING: '만료 서류 미수취', ACTION_OVERDUE: '조치 지연', CONSENT_MISSING: '재위탁 동의서 누락', DESTRUCTION_LATE: '파기 지연' };
   function yearFilterLabel() {
     const c = listState.cond; const y = listState.baseYear;
+    if (c.followUp) return `후속 관리 · ${FOLLOW_UP_LABEL[c.followUp] || c.followUp} (오늘 기준)`;
     const map = { '': '전체', ACTIVE: '계약중', ENDED: '종료' };
     const check = { INSPECTED: '수탁사 점검완료', NOT_INSPECTED: '수탁사 미점검', TERM_UPLOADED: '계약종결 체크 업로드', TERM_MISSING: '계약종결 체크 미업로드' };
     return `${y}년 · ${map[c.yearStatus || '']}${c.yearCheck ? ' · ' + check[c.yearCheck] : ''}`;
@@ -286,7 +311,7 @@
               ? (r.terminationCheckYn === 'Y'
                 ? ' <span class="pi-term-chip ok" title="계약종결 체크(계약변경·만료 점검) 업로드됨"><i class="fas fa-check"></i>종결체크</span>'
                 : ' <span class="pi-term-chip miss" title="계약종결 체크(계약변경·만료 점검) 미업로드"><i class="fas fa-xmark"></i>종결체크</span>')
-              : ''}</td>
+              : ''}${followUpChips(r)}</td>
             <td class="pi-cell pi-flag-cell">${flagCell(r, 'subcontractYn', '재위탁 여부')}</td>
             <td class="pi-cell">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
             ${perm.canDelete ? `<td class="pi-cell text-center pi-col-sticky-end"><button type="button" class="btn btn-sm btn-light text-danger pi-row-delete"
@@ -317,6 +342,40 @@
       tbody.innerHTML = `<tr><td colspan="${listCols().length}" class="pi-empty">${esc(e.message)}</td></tr>`;
     }
   }
+
+  /** 목록 상태 칸의 후속 관리 표시 */
+  function followUpChips(r) {
+    const out = [];
+    if (r.expiryDocsNeeded && r.expiryDocsReceived != null) {
+      out.push(r.expiryDocsReceived >= 3
+        ? '<span class="pi-term-chip ok" title="만료 서류 3종(만료 점검 체크리스트·확약서·파기 확인서) 모두 수취"><i class="fas fa-check"></i>만료서류 3/3</span>'
+        : `<span class="pi-term-chip miss" title="만료 서류 3종 중 ${r.expiryDocsReceived}종 수취"><i class="fas fa-file-circle-exclamation"></i>만료서류 ${r.expiryDocsReceived}/3</span>`);
+    }
+    if (r.actionOverdueCount) out.push(`<span class="pi-term-chip miss" title="조치 예정일이 지난 점검 ${r.actionOverdueCount}건"><i class="fas fa-hourglass-end"></i>조치지연</span>`);
+    if (r.consentMissing) out.push('<span class="pi-term-chip warn" title="재위탁 Y 인데 재위탁 동의서 파일 없음"><i class="fas fa-file-contract"></i>동의서 누락</span>');
+    if (r.destructionLate) out.push('<span class="pi-term-chip warn" title="파기 완료일이 허용 기한보다 늦음"><i class="fas fa-clock-rotate-left"></i>파기지연</span>');
+    return out.length ? '<div class="pi-fu-chips">' + out.join('') + '</div>' : '';
+  }
+
+  /** 다운로드 사유 입력 → 사유를 넘겨 다운로드 (서버가 사유와 함께 접근 기록을 남김) */
+  let reasonAction = null;
+  function askDownloadReason(title, action) {
+    reasonAction = action;
+    document.getElementById('download-reason-title').innerHTML = `<i class="fas fa-file-shield me-2 text-primary"></i>${esc(title)} — 다운로드 사유`;
+    const inp = document.getElementById('download-reason');
+    inp.value = ''; inp.classList.remove('is-invalid');
+    modal('download-reason-modal').show();
+    setTimeout(() => inp.focus(), 300);
+  }
+  document.getElementById('download-reason-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const inp = document.getElementById('download-reason');
+    const reason = inp.value.trim();
+    if (reason.length < 2) { inp.classList.add('is-invalid'); inp.focus(); return; }
+    const btn = document.getElementById('download-reason-ok'); btn.disabled = true;
+    try { await reasonAction(reason); modal('download-reason-modal').hide(); notify('다운로드했습니다. 사유가 접근 기록에 남았습니다.'); }
+    catch (err) { fail(err); } finally { btn.disabled = false; }
+  });
 
   // 목록에서 계약 삭제 (삭제 권한자만 버튼 노출, 서버도 CAN_DELETE 로 재확인)
   async function deleteContractFromList(btn) {
@@ -387,10 +446,10 @@
   }
 
   async function runAlerts() {
-    if (!confirm('오늘 기준 만료 알림 메일을 실행합니다. (이미 보낸 단계는 다시 보내지 않습니다)')) return;
+    if (!confirm('오늘 기준 알림 메일을 실행합니다.\n(만료 알림, 만료 서류 독촉, 조치 지연, 정기 점검 요청 — 이미 보낸 알림은 다시 보내지 않습니다)')) return;
     try {
       const r = await PI_API.runAlerts();
-      notify(`만료 알림 실행 완료: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}`);
+      notify(`알림 실행 완료\n· 만료 알림: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}\n· 만료 서류 독촉 ${r.docsReminderCount}건 · 조치 지연 ${r.actionOverdueCount}건 · 정기 점검 요청 ${r.regularInspectionCount}건${r.regularSummaryCount ? ' (관리자 요약 발송)' : ''}`);
     } catch (e) { fail(e); }
   }
 
@@ -642,6 +701,40 @@
     return d + latest + edit;
   }
 
+  /** 확약서 서명일 / 파기 확인서 파기 완료일 칸 */
+  function documentDateCell(f) {
+    const d = f.documentDate ? `<b>${fmtDate(f.documentDate)}</b>` : '<span class="text-warning-emphasis">미입력</span>';
+    const edit = perm.canWrite ? ` <button class="btn btn-sm btn-link p-0 ms-1" data-edit-docdate="${f.fileId}" data-date="${esc(f.documentDate || '')}" data-label="${esc(f.documentDateLabel)}" title="${esc(f.documentDateLabel)} 입력·수정" aria-label="${esc(f.documentDateLabel)} 수정"><i class="fas fa-pen fa-xs"></i></button>` : '';
+    return `<small class="text-muted">${esc(f.documentDateLabel)}</small> ` + d + edit;
+  }
+
+  /** 상세 상단 보안팀 후속 관리 안내 (해당 사항이 있을 때만) */
+  function followUpPanel(c) {
+    const f = c.followUp;
+    if (!f) return '';
+    const items = [];
+    if (f.expiryDocsMissing) {
+      items.push(`<li><b>만료 서류 미수취 ${3 - f.expiryDocsReceived}종</b>: ${esc(f.missingDocs.join(', '))}
+        <a href="#expiry-check-section" class="ms-1 pi-fu-jump" data-target="expiry-check-section">[계약만료시 점검으로]</a>
+        ${c.terminatedYn === 'Y' ? `<span class="text-muted ms-1">· 독촉 메일 ${c.expiryDocsRemindYn === 'N' ? '<b>꺼짐</b>' : '주 1회 발송 중'}</span>
+          ${perm.canWrite ? `<button class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="btn-toggle-remind" data-yn="${c.expiryDocsRemindYn === 'N' ? 'Y' : 'N'}">${c.expiryDocsRemindYn === 'N' ? '켜기' : '끄기'}</button>` : ''}` : ''}</li>`);
+    }
+    (f.overdueInspections || []).forEach((o) => items.push(`<li><b>조치 지연</b>: ${fmtDate(o.inspectionDate)} 점검의 N 항목 ${o.nCount}건 — 조치 예정일 ${fmtDate(o.actionDueDate)}에서 <b class="text-danger">${o.overdueDays}일 지남</b>
+      <a href="#" class="ms-1" data-open-ins="${o.inspectionId}">[점검 상세에서 조치 완료 처리]</a></li>`));
+    if (f.consentMissing) {
+      items.push(`<li><b>재위탁 동의서 누락</b>: 재위탁이 Y 인데 재위탁 동의서 파일이 없습니다. <a href="#contract-file-section" class="pi-fu-jump" data-target="contract-file-section" data-filetype="SUBCONTRACT_CONSENT">[재위탁 동의서 올리기]</a></li>`);
+    }
+    if (f.destructionLate) {
+      items.push(`<li><b>파기 지연</b>: 파기 완료일 ${fmtDate(f.destructionDate)} 이(가) 허용 기한 ${fmtDate(f.destructionDeadline)}(계약 종료일 + 허용 기간)보다 늦습니다. 협력사에 지연 사유를 확인하세요.</li>`);
+    }
+    (f.documentDateMissing || []).forEach((m) => items.push(`<li class="text-muted"><b>${esc(m)} 미입력</b>: 첨부 목록의 연필 버튼으로 입력하세요.</li>`));
+    if (!items.length) return '';
+    const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate;
+    return `<section class="pi-card pi-followup-panel ${serious ? 'serious' : ''}" id="follow-up-section" role="status">
+      <h2 class="mb-2"><i class="fas fa-shield-halved"></i>보안팀 후속 관리 <small class="fw-normal text-muted">확인이 필요한 항목</small></h2>
+      <ul class="mb-0 small">${items.join('')}</ul></section>`;
+  }
+
   /** 같은 업체 계약 표 (상세 섹션·팝업·등록 안내 공통) */
   function sameVendorTable(list, currentId, opts = {}) {
     return `<div class="table-responsive"><table class="pi-table pi-same-vendor-table"><thead><tr>
@@ -738,6 +831,87 @@
   }
 
   // ──────────────── 3. 상세 화면 ────────────────
+  // ──────────────── 접근 기록 (#/access-logs, 관리자) ────────────────
+  const accessState = { page: 0, size: 50, cond: {} };
+  let accessActionTypes = null;
+
+  async function renderAccessLogs() {
+    crumb.innerHTML = '<a href="#/contracts">계약 목록</a> &gt; 접근 기록';
+    if (!perm.canManageForms) {
+      view.innerHTML = '<div class="pi-card pi-empty"><i class="fas fa-lock me-1"></i>접근 기록은 보안팀 관리자(ROLE_PI_ADMIN)와 플랫폼 관리자만 볼 수 있습니다.</div>';
+      return;
+    }
+    if (!accessActionTypes) accessActionTypes = await PI_API.accessLogActionTypes();
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const monthAgo = new Date(Date.now() - 30 * 86400000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const c = accessState.cond;
+    if (!c.from) { c.from = monthAgo; c.to = today; }
+    view.innerHTML = `
+      <section class="pi-card" id="access-log-search-section">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+          <h2 class="mb-0"><i class="fas fa-user-shield"></i>접근 기록 <small class="text-muted fw-normal">조회·다운로드 기록 (수정·삭제 불가)</small></h2>
+          <button class="btn btn-sm btn-light" id="btn-access-back"><i class="fas fa-list me-1"></i>계약 목록</button>
+        </div>
+        <p class="small text-muted mb-2"><i class="fas fa-circle-info me-1"></i>계약 상세·점검 상세 조회, 계약서·증빙·점검 결과 다운로드, 계약 목록 엑셀(사유 필수) 다운로드를 누가·언제·어디서(IP) 했는지 남깁니다. 이 화면의 엑셀 다운로드도 사유와 함께 기록됩니다.</p>
+        <form id="access-log-form" class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label small" for="al-from">기간</label>
+            <div class="input-group input-group-sm"><input type="date" class="form-control" id="al-from" name="from" value="${esc(c.from)}" aria-label="시작일">
+              <span class="input-group-text">~</span><input type="date" class="form-control" id="al-to" name="to" value="${esc(c.to)}" aria-label="종료일"></div></div>
+          <div class="col-md-2"><label class="form-label small" for="al-action">행위</label>
+            <select class="form-select form-select-sm" id="al-action" name="actionType">${opt('', '전체', c.actionType)}${accessActionTypes.map((a) => opt(a.code, a.label, c.actionType)).join('')}</select></div>
+          <div class="col-md-2"><label class="form-label small" for="al-user">사용자</label>
+            <input class="form-control form-control-sm" id="al-user" name="user" value="${esc(c.user)}" placeholder="이름 또는 로그인 ID"></div>
+          <div class="col-md-3"><label class="form-label small" for="al-vendor">업체 / 대상</label>
+            <input class="form-control form-control-sm" id="al-vendor" name="vendor" value="${esc(c.vendor)}" placeholder="수탁업체명·계약명·파일명"></div>
+          <div class="col-md-2 d-flex gap-1">
+            <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search me-1"></i>검색</button>
+            <button class="btn btn-sm btn-outline-success" type="button" id="btn-access-excel"><i class="fas fa-download me-1"></i>엑셀</button></div>
+        </form>
+      </section>
+      <section class="pi-card" id="access-log-list-section">
+        <h2 class="mb-2"><i class="fas fa-list"></i>기록 <small class="text-muted fw-normal" id="access-log-count"></small></h2>
+        <div class="table-responsive"><table class="pi-table" id="access-log-table"><thead><tr>
+          <th>일시</th><th>행위</th><th>수탁업체 / 계약</th><th>대상</th><th>행 수</th><th>사유</th><th>사용자</th><th>접속 IP</th></tr></thead>
+          <tbody><tr><td colspan="8" class="pi-empty">불러오는 중...</td></tr></tbody></table></div>
+        <nav class="d-flex justify-content-center mt-3" id="access-log-pager" aria-label="페이지"></nav>
+      </section>`;
+    PiTable.enhance(document.getElementById('access-log-table'), { id: 'accessLogs' });
+    document.getElementById('btn-access-back').onclick = () => go('#/contracts');
+    const form = document.getElementById('access-log-form');
+    const readCond = () => Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v !== ''));
+    form.addEventListener('submit', (e) => { e.preventDefault(); accessState.cond = readCond(); accessState.page = 0; loadAccessLogs(); });
+    document.getElementById('btn-access-excel').onclick = () => askDownloadReason('접근 기록 엑셀', (reason) => PI_API.downloadAccessLogs(readCond(), reason));
+    await loadAccessLogs();
+  }
+
+  async function loadAccessLogs() {
+    const tbody = document.querySelector('#access-log-table tbody');
+    try {
+      const p = await PI_API.listAccessLogs({ ...accessState.cond, page: accessState.page, size: accessState.size });
+      document.getElementById('access-log-count').textContent = `(총 ${p.totalElements}건)`;
+      tbody.innerHTML = p.content.length ? p.content.map((a) => `
+        <tr style="cursor:default" class="${a.actionType.startsWith('DOWNLOAD_EXCEL') || a.actionType === 'DOWNLOAD_ACCESS_LOG' ? 'pi-access-excel' : ''}">
+          <td class="text-nowrap">${fmtDateTime(a.accessedAt)}</td>
+          <td class="text-nowrap"><span class="pi-status ${a.actionType.startsWith('DOWNLOAD') ? 'EXPIRING' : 'NONE'}">${esc(a.actionTypeLabel)}</span></td>
+          <td>${a.contractId ? `<a href="#/contracts/${a.contractId}">${esc(a.vendorName || '')}</a><small class="d-block text-muted">${esc(a.contractName || '')}</small>` : '<span class="text-muted">-</span>'}</td>
+          <td class="pi-ellipsis" style="max-width:280px" title="${esc(a.targetName || '')}">${esc(a.targetName || '-')}</td>
+          <td class="text-end">${a.recordCount == null ? '' : a.recordCount}</td>
+          <td class="pi-ellipsis" style="max-width:220px" title="${esc(a.reason || '')}">${esc(a.reason || '')}</td>
+          <td class="text-nowrap">${esc(a.userName || '-')}<small class="d-block text-muted">${esc(a.userLoginId || '')}</small></td>
+          <td class="text-nowrap small" title="${esc(a.userAgent || '')}">${esc(a.clientIp || '-')}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="pi-empty">조건에 맞는 기록이 없습니다.</td></tr>';
+      PiTable.refresh(document.getElementById('access-log-table'));
+      const pager = document.getElementById('access-log-pager');
+      pager.innerHTML = p.totalPages > 1 ? `<ul class="pagination pagination-sm mb-0">
+        <li class="page-item ${p.page === 0 ? 'disabled' : ''}"><button class="page-link" data-p="${p.page - 1}">이전</button></li>
+        <li class="page-item disabled"><span class="page-link">${p.page + 1} / ${p.totalPages}</span></li>
+        <li class="page-item ${p.page + 1 >= p.totalPages ? 'disabled' : ''}"><button class="page-link" data-p="${p.page + 1}">다음</button></li></ul>` : '';
+      pager.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => { accessState.page = Number(b.dataset.p); loadAccessLogs(); }));
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="8" class="pi-empty">${esc(e.message)}</td></tr>`;
+    }
+  }
+
   // ──────────────── 양식 관리 (#/forms) ────────────────
   const FORM_ICON = { checklist: 'fa-file-excel text-success', 'security-pledge': 'fa-file-signature text-primary', 'destruction-confirm': 'fa-file-shield text-danger' };
   let formGroups = [];
@@ -913,7 +1087,8 @@
         const list = c.files.filter((f) => f.fileType === it.fileType).sort(byDateDesc);
         count = list.length;
         const f = list[0];
-        status = f ? `<span class="pi-status PASS">수취 완료</span> <small class="text-muted ms-1">${fmtDate(f.createdAt)}</small>` : '<span class="pi-status NONE">미수취</span>';
+        status = f ? `<span class="pi-status PASS">수취 완료</span> <small class="text-muted ms-1">${fmtDate(f.createdAt)}</small>
+          <small class="d-block ${f.documentDate ? 'text-muted' : 'text-warning-emphasis'}">${esc(f.documentDateLabel || '')} ${f.documentDate ? fmtDate(f.documentDate) : '미입력'}</small>` : '<span class="pi-status NONE">미수취</span>';
         if (f) latest = `<button class="btn btn-link btn-sm p-0 text-truncate pi-expiry-file" data-dl-file="${f.fileId}" data-name="${esc(f.originalName)}" title="${esc(f.originalName)}"><i class="fas fa-download me-1"></i>${esc(f.originalName)}</button>`;
       }
       return `<tr data-expiry="${it.key}" style="cursor:default">
@@ -962,8 +1137,14 @@
     sec.querySelectorAll('[data-expiry-input]').forEach((inp) => inp.addEventListener('change', async () => {
       const f = inp.files?.[0]; if (!f) return;
       const it = EXPIRY_ITEMS.find((x) => x.key === inp.dataset.expiryInput);
+      const label = it.fileType === 'SECURITY_PLEDGE' ? '서명일' : '파기 완료일';
+      const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      const dd = prompt(`${it.label}의 ${label}을 입력하세요 (yyyy-mm-dd). 모르면 비워 두고 나중에 첨부 목록에서 입력할 수 있습니다.`, today);
+      if (dd === null) { inp.value = ''; return; }
+      if (dd.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(dd.trim())) { notify(`${label} 형식이 올바르지 않습니다. (예: ${today})`, 'warning'); inp.value = ''; return; }
       const fd = new FormData();
       fd.append('file', f); fd.append('fileType', it.fileType); fd.append('description', '계약만료시 점검 제출');
+      if (dd.trim()) fd.append('documentDate', dd.trim());
       try { await PI_API.uploadFile(id, fd); notify(`${it.label}을(를) 업로드했습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
     }));
   }
@@ -997,10 +1178,13 @@
           ${row('원계약 자동연장', yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
           ${row('재위탁', c.subcontractYn === 'Y' ? esc(c.subcontractorName || '') + (c.subcontractTask ? ' — ' + esc(c.subcontractTask) : '') : 'N')}${row('재위탁 동의서', yn(c.subcontractConsentYn))}
           ${row('만료 알림', c.alertYn === 'Y' ? `사용 (만료 ${c.alertDaysBefore}일 전부터)` : '미사용')}${row('추가 수신자', esc(c.alertExtraEmails || '-'))}
-          ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-')) + row('', '') : ''}
+          ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-'))
+            + row('만료 서류 미수취 사유', c.expiryDocsNote ? `<span class="text-danger">${esc(c.expiryDocsNote)}</span>` : '-') : ''}
           ${row('비고', esc(c.remark || '-'))}${row('등록 / 수정', fmtDateTime(c.createdAt) + ' / ' + fmtDateTime(c.updatedAt))}
         </dl>
       </section>
+
+      ${followUpPanel(c)}
 
       <section class="pi-card" id="same-vendor-section">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -1036,10 +1220,10 @@
             <button class="btn btn-sm btn-primary text-nowrap" type="submit"><i class="fas fa-upload me-1"></i>업로드</button></form>` : ''}
         </div>
         <p class="small text-muted mb-2" id="contract-doc-rule"><i class="fas fa-circle-info me-1"></i>위수탁 계약서는 체결일자별로 여러 건 올릴 수 있으며, 계약의 <b>개인정보처리 위탁계약 체결일</b>은 <b>체결일이 가장 최근인 위수탁 계약서</b>의 날짜로 표시됩니다. 업로드할 때 계약서에서 날짜를 읽고(체결일 표기가 없으면 계약기간 시작일), 직접 고칠 수도 있습니다.</p>
-        <div class="table-responsive"><table class="pi-table" id="file-table"><thead><tr><th>구분</th><th>파일명</th><th>계약서 체결일</th><th>크기</th><th>설명</th><th>등록일시</th><th></th></tr></thead>
+        <div class="table-responsive"><table class="pi-table" id="file-table"><thead><tr><th>구분</th><th>파일명</th><th>계약서 체결일 / 서류 일자</th><th>크기</th><th>설명</th><th>등록일시</th><th></th></tr></thead>
           <tbody>${c.files.length ? sortFiles(c.files).map((f) => `
             <tr class="${f.latestContractDoc ? 'pi-latest-doc' : ''}"><td>${esc(f.fileTypeLabel)}</td><td>${esc(f.originalName)}</td>
-              <td class="text-nowrap">${f.fileType === 'CONTRACT' ? signedDateCell(f) : '<span class="text-muted">-</span>'}</td>
+              <td class="text-nowrap">${f.fileType === 'CONTRACT' ? signedDateCell(f) : (f.documentDateLabel ? documentDateCell(f) : '<span class="text-muted">-</span>')}</td>
               <td>${fmtSize(f.fileSize)}</td><td>${esc(f.description || '')}</td>
               <td>${fmtDateTime(f.createdAt)}</td>
               <td class="text-end text-nowrap"><button class="btn btn-sm btn-light" data-dl-file="${f.fileId}" data-name="${esc(f.originalName)}"><i class="fas fa-download"></i></button>
@@ -1071,14 +1255,14 @@
       ${expirySection(c)}
 
       <section class="pi-card" id="alert-log-section">
-        <h2><i class="fas fa-bell"></i>만료 알림 발송 이력 <small class="text-muted fw-normal">(최근 20건)</small></h2>
-        <div class="table-responsive"><table class="pi-table" id="alert-log-table"><thead><tr><th>일시</th><th>경로</th><th>단계</th><th>수신자</th><th>상태</th><th>첨부 양식</th><th>사유</th></tr></thead>
+        <h2><i class="fas fa-bell"></i>알림 발송 이력 <small class="text-muted fw-normal">(최근 20건)</small></h2>
+        <div class="table-responsive"><table class="pi-table" id="alert-log-table"><thead><tr><th>일시</th><th>종류</th><th>경로</th><th>단계</th><th>수신자</th><th>상태</th><th>첨부 양식</th><th>사유</th></tr></thead>
           <tbody>${c.alerts.length ? c.alerts.map((a) => `
-            <tr style="cursor:default"><td>${fmtDateTime(a.sentAt || a.createdAt)}</td><td>${a.triggerType === 'AUTO' ? '자동' : '수동'}</td><td>${esc(a.alertStage)}</td>
+            <tr style="cursor:default"><td>${fmtDateTime(a.sentAt || a.createdAt)}</td><td class="text-nowrap">${esc(a.alertTypeLabel || '만료 알림')}</td><td>${a.triggerType === 'AUTO' ? '자동' : '수동'}</td><td>${esc(a.alertStage)}</td>
               <td class="pi-ellipsis" title="${esc(a.recipients)}">${esc(a.recipients || '-')}</td><td>${badge(a.sendStatus, a.sendStatus)}</td>
               <td class="pi-ellipsis small" title="${esc(a.formVersions)}">${esc(a.formVersions || '-')}</td>
               <td class="pi-ellipsis" title="${esc(a.errorMessage)}">${esc(a.errorMessage || '')}</td></tr>`).join('')
-            : '<tr><td colspan="7" class="pi-empty">발송 이력이 없습니다.</td></tr>'}</tbody></table></div>
+            : '<tr><td colspan="8" class="pi-empty">발송 이력이 없습니다.</td></tr>'}</tbody></table></div>
       </section>`;
 
     PiTable.enhance(document.getElementById('file-table'), { id: 'files' });
@@ -1217,6 +1401,13 @@
       dateEl.value = c.contractEndDate || today;
       dateEl.min = c.contractStartDate || '';
       document.getElementById('term-reason').value = '계약 만료';
+      const missing = (c.followUp && c.followUp.missingDocs) || [];
+      document.getElementById('term-docs-box').classList.toggle('d-none', !missing.length);
+      document.getElementById('term-docs-note').value = '';
+      document.getElementById('term-docs-note').required = missing.length > 0;
+      document.getElementById('term-docs-remind').checked = true;
+      document.getElementById('term-docs-missing').innerHTML = missing.length
+        ? `<i class="fas fa-triangle-exclamation me-1"></i>아직 받지 못한 만료 서류 <b>${missing.length}종</b>: ${esc(missing.join(', '))}<br>미수취 사유를 남겨야 종료 처리할 수 있습니다.` : '';
       document.getElementById('term-date-hint').textContent = c.contractEndDate
         ? `기본값은 원계약 종료일(${fmtDate(c.contractEndDate)})입니다. 중도 해지 등은 실제 종료일로 바꾸세요.`
         : '원계약 종료일이 없어 오늘 날짜를 기본값으로 넣었습니다.';
@@ -1269,6 +1460,32 @@
         catch (err) { fail(err); }
       };
     }));
+    // 확약서 서명일 / 파기 확인서 파기 완료일 입력·수정
+    document.querySelectorAll('[data-edit-docdate]').forEach((b) => b.addEventListener('click', () => {
+      const td = b.closest('td'); const cur = b.dataset.date || '';
+      td.innerHTML = `<div class="d-flex gap-1 align-items-center"><small class="text-muted text-nowrap">${esc(b.dataset.label)}</small>
+        <input type="date" class="form-control form-control-sm" value="${esc(cur)}" aria-label="${esc(b.dataset.label)}" style="width:150px">
+        <button class="btn btn-sm btn-primary" data-act="save" aria-label="저장"><i class="fas fa-check"></i></button>
+        <button class="btn btn-sm btn-light" data-act="cancel" aria-label="취소"><i class="fas fa-xmark"></i></button></div>`;
+      const inp = td.querySelector('input'); inp.focus();
+      td.querySelector('[data-act="cancel"]').onclick = () => reload();
+      td.querySelector('[data-act="save"]').onclick = async () => {
+        try { await PI_API.updateFileDocumentDate(b.dataset.editDocdate, inp.value || null); notify(`${b.dataset.label}을 저장했습니다.`); reload(); }
+        catch (err) { fail(err); }
+      };
+    }));
+    // 후속 관리 안내의 바로가기
+    document.querySelectorAll('.pi-fu-jump').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const sec = document.getElementById(a.dataset.target);
+      sec?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (a.dataset.filetype) { const sel = document.querySelector('#file-upload-form [name="fileType"]'); if (sel) { sel.value = a.dataset.filetype; sel.dispatchEvent(new Event('change')); } }
+    }));
+    document.querySelectorAll('[data-open-ins]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); showInspection(a.dataset.openIns); }));
+    document.getElementById('btn-toggle-remind')?.addEventListener('click', async (e) => {
+      const yn2 = e.currentTarget.dataset.yn;
+      try { await PI_API.changeExpiryDocsRemind(id, yn2); notify(yn2 === 'Y' ? '독촉 메일을 다시 보냅니다(주 1회).' : '이 계약의 독촉 메일을 껐습니다.'); reload(); } catch (err) { fail(err); }
+    });
     document.querySelectorAll('[data-dl-file]').forEach((b) => b.addEventListener('click', () => PI_API.downloadFile(b.dataset.dlFile, b.dataset.name).catch(fail)));
     document.querySelectorAll('[data-del-file]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('첨부파일을 삭제합니다.')) return;
@@ -1528,7 +1745,15 @@
     e.preventDefault();
     const f = e.target;
     if (!f.reportValidity()) return;
+    const docsBox = !document.getElementById('term-docs-box').classList.contains('d-none');
     const body = { terminatedDate: f.terminatedDate.value, reason: f.reason.value || null };
+    if (docsBox) {
+      const note = document.getElementById('term-docs-note');
+      if (!note.value.trim()) { note.classList.add('is-invalid'); note.focus(); notify('만료 서류 미수취 사유를 입력하세요.', 'warning'); return; }
+      note.classList.remove('is-invalid');
+      body.expiryDocsNote = note.value.trim();
+      body.expiryDocsRemindYn = document.getElementById('term-docs-remind').checked ? 'Y' : 'N';
+    }
     const btn = document.getElementById('btn-term-save');
     btn.disabled = true;
     try {

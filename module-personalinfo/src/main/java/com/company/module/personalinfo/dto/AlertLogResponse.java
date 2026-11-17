@@ -13,6 +13,8 @@ public class AlertLogResponse {
 
     private Long alertId;
     private Long contractId;
+    private String alertType;
+    private String alertTypeLabel;
     private String triggerType;
     private String alertStage;
     private LocalDate targetEndDate;
@@ -31,6 +33,8 @@ public class AlertLogResponse {
         return AlertLogResponse.builder()
                 .alertId(a.getAlertId())
                 .contractId(a.getContractId())
+                .alertType(a.getAlertType() == null ? null : a.getAlertType().name())
+                .alertTypeLabel(a.getAlertType() == null ? null : a.getAlertType().getLabel())
                 .triggerType(a.getTriggerType().name())
                 .alertStage(a.getAlertStage())
                 .targetEndDate(a.getTargetEndDate())

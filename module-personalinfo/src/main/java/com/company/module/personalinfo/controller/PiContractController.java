@@ -50,6 +50,7 @@ public class PiContractController {
     private final PiContractService contractService;
     private final PiContractExcelService excelService;
     private final PiAccessScopeResolver accessScope;
+    private final com.company.module.personalinfo.service.PiAccessLogService accessLog;
 
     /** 현재 사용자 권한 (화면 버튼 노출용) */
     @GetMapping("/me/permissions")
@@ -85,15 +86,30 @@ public class PiContractController {
     @GetMapping("/contracts/excel")
     @PreAuthorize(PiRoles.CAN_READ)
     public ResponseEntity<byte[]> downloadExcel(@ModelAttribute ContractSearchCondition condition,
-                                                @RequestParam(required = false) String sort) {
-        return PiDownloads.of(excelService.export(condition, sort));
+                                                @RequestParam(required = false) String sort,
+                                                @RequestParam(required = false) String reason) {
+        return PiDownloads.of(excelService.export(condition, sort, reason));
+    }
+
+    /** 미수취 만료 서류 독촉 메일 발송 여부 변경 {"remindYn":"Y|N"} */
+    @org.springframework.web.bind.annotation.PatchMapping("/contracts/{contractId}/expiry-docs-remind")
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractDetailResponse>> changeExpiryDocsRemind(
+            @PathVariable Long contractId,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.changeExpiryDocsRemind(
+                contractId, body == null ? null : body.get("remindYn"), currentUserId)));
     }
 
     /** 계약 상세 (첨부파일/점검 이력/알림 이력 포함) */
     @GetMapping("/contracts/{contractId}")
     @PreAuthorize(PiRoles.CAN_READ)
     public ResponseEntity<ApiResponse<ContractDetailResponse>> getDetail(@PathVariable Long contractId) {
-        return ResponseEntity.ok(ApiResponse.success(contractService.getDetail(contractId)));
+        ContractDetailResponse d = contractService.getDetail(contractId);
+        accessLog.record(com.company.module.personalinfo.entity.AccessActionType.VIEW_CONTRACT,
+                d.getContractId(), d.getVendorName(), d.getContractName(), null, null, null, null);
+        return ResponseEntity.ok(ApiResponse.success(d));
     }
 
     /** 계약 등록 */

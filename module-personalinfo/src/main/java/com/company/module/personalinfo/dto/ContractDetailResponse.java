@@ -58,6 +58,13 @@ public class ContractDetailResponse {
     private Long updatedBy;
     private LocalDateTime updatedAt;
 
+    /** 만료 서류 미수취 종료 사유 */
+    private String expiryDocsNote;
+    /** 미수취 만료 서류 독촉 메일 발송 여부 */
+    private String expiryDocsRemindYn;
+    /** 보안팀 후속 관리 상태 (만료 서류, 조치 지연, 재위탁 동의서, 파기 완료일) */
+    private FollowUpResponse followUp;
+
     private List<ContractFileResponse> files;
     private List<InspectionResponse> inspections;
     private List<AlertLogResponse> alerts;
@@ -97,6 +104,8 @@ public class ContractDetailResponse {
                 .terminatedYn(c.getTerminatedYn())
                 .terminatedDate(c.getTerminatedDate())
                 .terminationReason(c.getTerminationReason())
+                .expiryDocsNote(c.getExpiryDocsNote())
+                .expiryDocsRemindYn(c.getExpiryDocsRemindYn())
                 .lastInspectionId(c.getLastInspectionId())
                 .lastInspectionDate(c.getLastInspectionDate())
                 .lastInspectionResult(c.getLastInspectionResult())
@@ -113,5 +122,10 @@ public class ContractDetailResponse {
                 .inspections(inspections)
                 .alerts(alerts)
                 .build();
+    }
+
+    public ContractDetailResponse withFollowUp(FollowUpResponse f) {
+        this.followUp = f;
+        return this;
     }
 }
