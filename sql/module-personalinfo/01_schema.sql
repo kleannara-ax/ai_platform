@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS pi_contract_file (
     DESCRIPTION    VARCHAR(500)  NULL                    COMMENT '파일 설명',
     SIGNED_DATE    DATE          NULL                    COMMENT '계약서상 체결일 (위수탁 계약서만 사용. 체결일 표기가 없으면 계약기간 시작일)',
     DOCUMENT_DATE  DATE          NULL                    COMMENT '받은 서류의 일자 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일)',
+    DOCUMENT_NOTE  VARCHAR(500)  NULL                    COMMENT '서류 일자 관련 메모 (개인정보 파기 확인서: 파기 기한(계약 종료 + 5일)보다 늦게 파기한 사유)',
 
     CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY     BIGINT        NULL                    COMMENT '생성자 사용자 ID',

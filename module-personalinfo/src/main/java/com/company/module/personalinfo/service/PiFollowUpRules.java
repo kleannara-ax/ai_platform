@@ -39,9 +39,28 @@ public class PiFollowUpRules {
     private final PiContractFileRepository fileRepository;
     private final PiInspectionRepository inspectionRepository;
 
-    /** 파기 완료일 허용 기간 (계약 종료 기준일 + N일, 기본 30일) */
-    @Value("${personalinfo.destruction-grace-days:30}")
-    private int destructionGraceDays = 30;
+    /**
+     * 파기 기한 (계약 종료 기준일 + N일, 기본 5일).
+     * 표준 개인정보 보호지침 제10조 ① "보유 기간이 경과하거나 처리 목적이 달성된 경우 … 정당한 사유가 없는 한 그로부터 5일 이내에 파기".
+     */
+    @Value("${personalinfo.destruction-days:5}")
+    private int destructionDays = 5;
+
+    /** 파기 확인서 회신 기한 (계약 종료 기준일 + N일, 기본 30일). 파기 기한과 별도로 협력사가 확인서를 보내오는 실무 기간 */
+    @Value("${personalinfo.destruction-confirm-reply-days:30}")
+    private int confirmReplyDays = 30;
+
+    /** 파기 기한 (종료 기준일 + 파기 기한 일수). 종료 기준일이 없으면 null */
+    public LocalDate destructionDeadline(PiContract c) {
+        LocalDate base = endBase(c);
+        return base == null ? null : base.plusDays(destructionDays);
+    }
+
+    /** 파기 확인서 회신 기한 (종료 기준일 + 회신 기한 일수). 종료 기준일이 없으면 null */
+    public LocalDate confirmReplyDeadline(PiContract c) {
+        LocalDate base = endBase(c);
+        return base == null ? null : base.plusDays(confirmReplyDays);
+    }
 
     /** 만료 서류를 받아야 하는 계약: 종료 처리했거나, 원계약 종료일이 만료 알림 기간 안(만료임박) 또는 지남(만료) */
     public static boolean expiryDocsNeeded(PiContract c, LocalDate today) {
@@ -98,11 +117,15 @@ public class PiFollowUpRules {
 
         boolean consentMissing = "Y".equals(c.getSubcontractYn()) && ofType(files, ContractFileType.SUBCONTRACT_CONSENT).isEmpty();
 
-        // 파기 완료일: 가장 최근에 올린 파기 확인서 기준
-        LocalDate destructionDate = destructions.isEmpty() ? null : destructions.get(0).getDocumentDate();
+        // 파기 완료일: 가장 최근에 올린 파기 확인서 기준. 파기 기한(종료 + 5일)보다 늦으면 파기 지연
+        PiContractFile latestDestruction = destructions.isEmpty() ? null : destructions.get(0);
+        LocalDate destructionDate = latestDestruction == null ? null : latestDestruction.getDocumentDate();
         LocalDate base = endBase(c);
-        LocalDate deadline = base == null ? null : base.plusDays(destructionGraceDays);
+        LocalDate deadline = destructionDeadline(c);
         boolean late = destructionDate != null && deadline != null && destructionDate.isAfter(deadline);
+        // 확인서 회신 기한(종료 + 30일)이 지났는데 파기 확인서를 아직 받지 못함
+        LocalDate replyDeadline = confirmReplyDeadline(c);
+        boolean replyOverdue = latestDestruction == null && replyDeadline != null && replyDeadline.isBefore(today);
 
         List<String> dateMissing = new ArrayList<>();
         if (!pledges.isEmpty() && pledges.get(0).getDocumentDate() == null) dateMissing.add(DOC_PLEDGE + " 서명일");
@@ -124,7 +147,13 @@ public class PiFollowUpRules {
                 .consentMissing(consentMissing)
                 .destructionLate(late)
                 .destructionDate(destructionDate)
-                .destructionDeadline(destructions.isEmpty() ? null : deadline)
+                .destructionDeadline(deadline)
+                .destructionDelayReason(latestDestruction == null ? null : latestDestruction.getDocumentNote())
+                .confirmReplyDeadline(replyDeadline)
+                .confirmReplyOverdue(replyOverdue)
+                .endBaseDate(base)
+                .destructionDays(destructionDays)
+                .confirmReplyDays(confirmReplyDays)
                 .documentDateMissing(dateMissing)
                 .build();
     }
@@ -141,7 +170,11 @@ public class PiFollowUpRules {
                 .sorted(Comparator.comparing(PiContractFile::getFileId).reversed()).toList();
     }
 
-    public int getDestructionGraceDays() {
-        return destructionGraceDays;
+    public int getDestructionDays() {
+        return destructionDays;
+    }
+
+    public int getConfirmReplyDays() {
+        return confirmReplyDays;
     }
 }

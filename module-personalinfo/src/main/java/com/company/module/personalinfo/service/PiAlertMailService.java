@@ -321,6 +321,12 @@ public class PiAlertMailService {
                 new String[]{"담당부서 / 담당자", nz(c.getDeptName()) + " / " + nz(c.getManagerName())},
                 new String[]{"종료(만료)일", fmt(base) + " (" + ChronoUnit.DAYS.between(base, today) + "일 경과)"},
                 new String[]{"미수취 서류", String.join(", ", f.getMissingDocs())}));
+        if (f.getMissingDocs().contains(PiFollowUpRules.DOC_DESTRUCTION) && f.getConfirmReplyDeadline() != null) {
+            info.add(new String[]{"파기 기한 / 확인서 회신 기한",
+                    fmt(f.getDestructionDeadline()) + " (종료 + " + f.getDestructionDays() + "일) / "
+                            + fmt(f.getConfirmReplyDeadline()) + " (종료 + " + f.getConfirmReplyDays() + "일)"
+                            + (f.isConfirmReplyOverdue() ? " — 회신 기한 지남" : "")});
+        }
         if (StringUtils.hasText(c.getExpiryDocsNote())) {
             info.add(new String[]{"미수취 사유", c.getExpiryDocsNote()});
         }

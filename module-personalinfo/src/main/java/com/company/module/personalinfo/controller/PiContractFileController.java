@@ -72,12 +72,16 @@ public class PiContractFileController {
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
             @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate,
+            @RequestParam(value = "documentNote", required = false) String documentNote,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
-                fileService.upload(contractId, file, fileType, description, signedDate, documentDate, currentUserId)));
+                fileService.upload(contractId, file, fileType, description, signedDate, documentDate, documentNote, currentUserId)));
     }
 
-    /** 서류 일자 변경 {"documentDate":"yyyy-MM-dd"} — 확약서 서명일 / 파기 확인서 파기 완료일 (빈 값이면 비움) */
+    /**
+     * 서류 일자 변경 {"documentDate":"yyyy-MM-dd", "documentNote":"파기 지연 사유"} — 확약서 서명일 / 파기 확인서 파기 완료일 (빈 값이면 비움).
+     * documentNote 를 보내지 않으면 기존 사유를 유지한다(파기 확인서만).
+     */
     @PatchMapping("/files/{fileId}/document-date")
     @PreAuthorize(PiRoles.CAN_WRITE)
     public ResponseEntity<ApiResponse<ContractFileResponse>> changeDocumentDate(
@@ -92,7 +96,9 @@ public class PiContractFileController {
             throw new com.company.core.common.exception.BusinessException(
                     com.company.core.common.exception.ErrorCode.INVALID_INPUT_VALUE, "서류 일자 형식이 올바르지 않습니다. (yyyy-MM-dd)");
         }
-        return ResponseEntity.ok(ApiResponse.success(fileService.changeDocumentDate(fileId, date, currentUserId)));
+        boolean noteGiven = body != null && body.containsKey("documentNote");
+        return ResponseEntity.ok(ApiResponse.success(fileService.changeDocumentDate(fileId, date,
+                noteGiven ? body.get("documentNote") : null, noteGiven, currentUserId)));
     }
 
     /** 위수탁 계약서 체결일 변경 {"signedDate":"yyyy-MM-dd"} (빈 값이면 비움). 계약 체결일은 최신 계약서 기준으로 다시 맞춘다. */

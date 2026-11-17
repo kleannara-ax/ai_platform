@@ -47,7 +47,7 @@
 | - | **점검 조치 기한 지남** | 결과가 **조치 필요**이고 조치 완료가 아닌데 **조치 예정일이 지난** 점검을 조치 지연으로 봅니다. 목록 칩 **조치지연**, 확인 필요 카드, 상세 패널(점검일·조치 예정일·지난 일수·N 항목 수)에 표시하고, 종료되지 않은 계약은 **주 1회 알림 메일**(조치 예정일 후 90일까지)을 보냅니다. 조치 완료로 바꾸면 바로 빠집니다. |
 | - | **접근 기록 (보안팀)** | 계약 상세 조회, 점검 상세 조회, 계약서·증빙 다운로드, 점검 원본 다운로드, **계약 목록 엑셀 다운로드**, 접근 기록 엑셀 다운로드를 사용자·로그인 ID·접속 IP(`X-Forwarded-For` 우선)·브라우저·대상(업체·계약·파일명·검색 조건)·행 수와 함께 `pi_access_log` 에 남깁니다(추가만, 수정·삭제 API 없음, 기록 실패가 업무를 막지 않음). **엑셀 다운로드는 사유 필수**(화면 사유 입력 팝업, 서버도 사유 없으면 400). 목록의 **[접근 기록]** 버튼(`#/access-logs`, 관리자만)에서 기간(기본 최근 30일)·행위·사용자·업체로 검색하고 엑셀로 내려받습니다. |
 | - | **정기 점검 알림 (4월 10일)** | 정기 점검은 **5월**로 보고, **4월 10일부터 5월 31일까지** 매일 알림 실행 때 올해 정기 점검을 아직 올리지 않은 **진행 중 계약**(5월에 계약기간이 걸치고 종료 처리되지 않은 계약)의 **담당자(+ 추가 수신자)**에게 정기 점검 요청 메일을 1회 보냅니다(계약 정보가 채워진 점검 체크리스트 첨부, 기한 5월 31일). 같은 날 **관리자(보안팀)**에게 대상 목록 요약 메일을 1회 보냅니다(`default-recipients` + `regular-inspection.admin-recipients`, 담당자 이메일 없는 계약 빨간 표시). 연도별로 한 번씩만 보내고, 4월 10일 이후 새로 등록된 계약은 기간 안 다음 실행 때 담당자에게 보냅니다. 날짜·월은 설정으로 바꿀 수 있습니다. |
-| - | **서류 일자 · 파기 지연** | 정보보호 및 비밀유지 확약서는 **서명일**, 개인정보 파기 확인서는 **파기 완료일**을 파일마다 저장합니다(`pi_contract_file.DOCUMENT_DATE`, 업로드 때 입력, 첨부 목록 연필 버튼으로 수정·비우기, 오늘보다 늦은 날짜 400, 다른 서류 종류는 400). 최근 파기 확인서의 파기 완료일이 **계약 종료 기준일(종료 처리일, 없으면 원계약 종료일) + 30일**보다 늦으면 **파기 지연**(목록 칩·카드·상세 패널). 일자를 입력하지 않은 서류는 상세 패널에 '일자 미입력'으로 안내합니다. |
+| - | **서류 일자 · 파기 지연** | 정보보호 및 비밀유지 확약서는 **서명일**, 개인정보 파기 확인서는 **파기 완료일**을 파일마다 저장합니다(`pi_contract_file.DOCUMENT_DATE`, 업로드 때 입력, 첨부 목록 연필 버튼으로 수정·비우기, 오늘보다 늦은 날짜 400, 다른 서류 종류는 400). 기한은 **계약 종료 기준일**(종료 처리일, 없으면 원계약 종료일)부터 두 가지로 봅니다. ① **파기 기한 = 종료 + 5일** — 표준 개인정보 보호지침 제10조 ①("보유 기간 경과·처리 목적 달성 시 … 5일 이내에 파기"). 최근 파기 확인서의 파기 완료일이 이 날짜보다 늦으면 **파기 지연**(목록 칩·카드·상세 패널). ② **파기 확인서 회신 기한 = 종료 + 30일** — 협력사가 확인서를 보내오는 실무 기간. 이 날짜가 지났는데 파기 확인서가 없으면 **파기 확인서 회신 기한 지남**(목록 칩·상세 패널, 독촉 메일에 두 기한 표시). 일수는 설정값(`destruction-days`, `destruction-confirm-reply-days`). **입력 팝업**: 확약서·파기 확인서를 올리거나 연필 버튼을 누르면 팝업이 열리고, 파기 확인서는 두 기한을 함께 보여줍니다. 파기 기한보다 늦은 날짜를 넣으면 '○일 늦습니다 — 파기 지연으로 표시' 경고와 **파기 지연 사유** 칸이 열리고, 저장 전에 한 번 더 확인합니다(`pi_contract_file.DOCUMENT_NOTE`, 파기 확인서만, 500자, 첨부 목록·상세 패널에 표시). 일자를 입력하지 않은 서류는 상세 패널에 '일자 미입력'으로 안내합니다. |
 | - | **재위탁 동의서 누락** | 재위탁 여부가 **Y** 인데 **재위탁 동의서 파일**(첨부 구분 `SUBCONTRACT_CONSENT`)이 없으면 목록 칩 **동의서 누락**, 확인 필요 카드, 상세 패널에 경고합니다. 동의서를 올리면 바로 빠집니다. |
 | - | **업로드 파일 내용 확인** | 확장자만 바꾼 파일을 막기 위해 저장 전에 파일 내용(서명 바이트·내부 구조)을 확인합니다. pdf: 앞 1KB 안 `%PDF-` / docx·xlsx·hwpx: ZIP 이면서 각각 `word/`·`xl/`·`Contents/`(또는 `mimetype`) 항목 / zip: ZIP 서명 / doc·xls·hwp: OLE2 복합 문서 서명 / jpg·png: 이미지 서명. 맞지 않으면 저장하지 않고 400('파일 내용이 확장자(.x)와 맞지 않습니다…'). 계약서·증빙, 점검 체크리스트, 양식 관리 업로드에 모두 적용됩니다. |
 | - | 계약 종료 처리 | 종료 처리하면 만료 알림이 멈춥니다. "계약변경·만료 점검"(양식 3번 시트) 업로드를 지원합니다. |
@@ -98,7 +98,7 @@
 | 테이블 | 설명 | 주요 키/제약 |
 |---|---|---|
 | `pi_contract` | 위수탁 계약 (외부위탁 현황 1행 = 1건) (+ 만료 서류 미수취 사유 `EXPIRY_DOCS_NOTE`·독촉 여부 `EXPIRY_DOCS_REMIND_YN`, `09`) | PK `CONTRACT_ID`, IDX 종료일/업체명/부서/알림 |
-| `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 (+ 서류 일자 `DOCUMENT_DATE` = 확약서 서명일 / 파기 완료일, `09`) | FK → `pi_contract` |
+| `pi_contract_file` | 계약서·증빙 첨부파일 메타데이터 (+ 서류 일자 `DOCUMENT_DATE` = 확약서 서명일 / 파기 완료일, `09` / 파기 지연 사유 `DOCUMENT_NOTE`, `10`) | FK → `pi_contract` |
 | `pi_inspection` | 점검 이력 (체크리스트 업로드 1건 × 계약) | FK → `pi_contract`, IDX `UPLOAD_GROUP_ID`(업체별 일괄 업로드 묶음, 개별 업로드는 NULL) |
 | `pi_inspection_item` | 점검 체크리스트 항목별 결과 | FK → `pi_inspection` |
 | `pi_contact_history` | 위탁사 담당자 변경 이력 + 기록 시점 계약기간 (`04`, `05`) | FK → `pi_contract`, IDX 계약+삭제여부+일시 |
@@ -120,9 +120,9 @@
 |---|---|---|---|
 | GET | `/me/permissions` | 현재 사용자의 화면 버튼 권한 + 부서 범위 `allDepartments`(관리자 true), `deptName`(비관리자 소속부서, 없으면 생략) | 로그인 |
 | GET | `/dashboard?baseYear=2026` | 목록 상단 요약. 기준 연도(없으면 올해) 기준 `baseYear, availableYears, yearTotalCount, yearActiveCount, yearActiveInspectedCount, yearEndedCount, yearEndedTermCheckCount, yearEndedTermMissingCount` + 기존 상태별 건수·만료임박 목록 + 확인 필요(오늘 기준) `expiryDocsMissingCount, actionOverdueCount, consentMissingCount, destructionLateCount` | READ |
-| GET | `/contracts` | 계약 목록. `keyword, deptName, managerName, status, ismsScopeYn, inspectionResult, endDateFrom, endDateTo, page, size, sort` + 기준 연도 `baseYear`, `yearStatus`(ACTIVE/ENDED), `yearCheck`(INSPECTED/NOT_INSPECTED/TERM_UPLOADED/TERM_MISSING). `baseYear` 가 없으면 연도 조건 미적용. 행마다 `terminationCheckYn`(계약종결 체크 업로드 여부), `contractName`, `sameVendorContractCount`(같은 업체 계약 수). `keyword` 는 계약명도 검색. `followUp`(EXPIRY_DOCS_MISSING / ACTION_OVERDUE / CONSENT_MISSING / DESTRUCTION_LATE)을 주면 기준 연도와 상관없이 오늘 기준 확인 필요 대상만. 행마다 `expiryDocsNeeded, expiryDocsReceived, expiryDocsMissing, actionOverdueCount, consentMissing, destructionLate` | READ |
+| GET | `/contracts` | 계약 목록. `keyword, deptName, managerName, status, ismsScopeYn, inspectionResult, endDateFrom, endDateTo, page, size, sort` + 기준 연도 `baseYear`, `yearStatus`(ACTIVE/ENDED), `yearCheck`(INSPECTED/NOT_INSPECTED/TERM_UPLOADED/TERM_MISSING). `baseYear` 가 없으면 연도 조건 미적용. 행마다 `terminationCheckYn`(계약종결 체크 업로드 여부), `contractName`, `sameVendorContractCount`(같은 업체 계약 수). `keyword` 는 계약명도 검색. `followUp`(EXPIRY_DOCS_MISSING / ACTION_OVERDUE / CONSENT_MISSING / DESTRUCTION_LATE)을 주면 기준 연도와 상관없이 오늘 기준 확인 필요 대상만. 행마다 `expiryDocsNeeded, expiryDocsReceived, expiryDocsMissing, actionOverdueCount, consentMissing, destructionLate, confirmReplyOverdue` | READ |
 | GET | `/contracts/excel?reason=` | 목록 엑셀 다운로드 (검색 조건 적용). **`reason`(다운로드 사유, 2자 이상) 필수** — 없으면 400. 접근 기록(조건·행 수·사유) 남김 | READ |
-| GET | `/contracts/{id}` | 계약 상세 (첨부/점검/알림 이력 + `followUp`(미수취 서류·조치 지연 점검·동의서 누락·파기 지연·일자 미입력) + `expiryDocsNote, expiryDocsRemindYn`). 접근 기록 남김 | READ |
+| GET | `/contracts/{id}` | 계약 상세 (첨부/점검/알림 이력 + `followUp`(미수취 서류·조치 지연 점검·동의서 누락·파기 지연·지연 사유·파기 기한·확인서 회신 기한/지남·일자 미입력) + `expiryDocsNote, expiryDocsRemindYn`). 접근 기록 남김 | READ |
 | PATCH | `/contracts/{id}/expiry-docs-remind` | 만료 서류 독촉 메일 발송 여부 `{"remindYn":"Y"}` 또는 `"N"` (그 외 400) | WRITE |
 | POST | `/contracts` | 계약 등록. 필수: `vendorName`, `contractName`(최대 200자), `entrustedTask`, `contractStartDate`, `contractEndDate` | WRITE |
 | PUT | `/contracts/{id}` | 계약 수정 | WRITE |
@@ -136,8 +136,8 @@
 | POST | `/contracts/{id}/reopen` | 종료 취소 | WRITE |
 | DELETE | `/contracts/{id}` | 계약 삭제 (소프트) | **DELETE** |
 | GET | `/contracts/{id}/files` | 첨부 목록 | READ |
-| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) — 위수탁 계약서는 `signedDate`(선택, 없으면 파일에서 읽음)를 함께 저장하고 계약 체결일을 최신 계약서 기준으로 맞춤. 확약서·파기 확인서는 `documentDate`(서명일 / 파기 완료일, 미래 날짜 400). **파일 내용이 확장자와 다르면 400** | WRITE |
-| PATCH | `/files/{fileId}/document-date` | 서류 일자 수정 `{"documentDate":"yyyy-MM-dd"}` (빈 값이면 비움). 확약서·파기 확인서만, 미래 날짜·형식 오류 400 | WRITE |
+| POST | `/contracts/{id}/files` | 계약서 업로드 (multipart: `file`, `fileType`, `description`) — 위수탁 계약서는 `signedDate`(선택, 없으면 파일에서 읽음)를 함께 저장하고 계약 체결일을 최신 계약서 기준으로 맞춤. 확약서·파기 확인서는 `documentDate`(서명일 / 파기 완료일, 미래 날짜 400), 파기 확인서는 `documentNote`(파기 지연 사유). **파일 내용이 확장자와 다르면 400** | WRITE |
+| PATCH | `/files/{fileId}/document-date` | 서류 일자 수정 `{"documentDate":"yyyy-MM-dd", "documentNote":"파기 지연 사유"}` (빈 값이면 비움, `documentNote` 키를 보내지 않으면 기존 사유 유지). 확약서·파기 확인서만, 지연 사유는 파기 확인서만(500자), 미래 날짜·형식 오류 400 | WRITE |
 | GET | `/files/{fileId}/download` | 첨부 다운로드 (접근 기록 남김) | READ |
 | DELETE | `/files/{fileId}` | 첨부 삭제 (소프트) | **DELETE** |
 | GET | `/checklist-template` | 점검 체크리스트 빈 양식 다운로드 | READ |
@@ -251,6 +251,7 @@
 | 7 | `07_contract_name.sql` | **계약명** — `pi_contract.CONTRACT_NAME` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함, `VENDOR_NAME` 다음)과 업체명+계약명 인덱스(`CREATE INDEX IF NOT EXISTS`) 추가. 기존 계약은 계약명이 비어 있고 화면에서는 서비스명으로 표시되므로, 필요하면 수정 화면에서 입력합니다. **새 코드 배포 전에 먼저 실행해야 합니다**(컬럼이 없으면 계약 조회가 실패). 새로 설치할 때는 01 에 컬럼이 이미 있어 아무 변화 없이 통과합니다 |
 | 8 | `08_form_template.sql` | **양식 관리** — `pi_form_template` 테이블(`CREATE TABLE IF NOT EXISTS`, COMMENT 포함, core FK 없음)과 `pi_inspection.FORM_VERSION`, `pi_alert_log.FORM_VERSIONS` 컬럼(`ADD COLUMN IF NOT EXISTS`) 추가. 등록한 양식이 없으면 지금처럼 모듈 기본 양식을 쓰므로 실행 직후 동작은 같습니다. **새 코드 배포 전에 먼저 실행해야 합니다**(컬럼이 없으면 점검·알림 조회가 실패). 기존 데이터는 바꾸지 않습니다 |
 | 9 | `09_security_followup.sql` | **보안팀 확인 필요** — `pi_contract.EXPIRY_DOCS_NOTE / EXPIRY_DOCS_REMIND_YN`, `pi_contract_file.DOCUMENT_DATE`, `pi_alert_log.ALERT_TYPE`(기존 행은 'EXPIRY') 컬럼 추가(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함), `pi_alert_log.CONTRACT_ID` NULL 허용(`MODIFY`, 기존 값 유지), 알림 종류 인덱스, 접근 기록 테이블 `pi_access_log`(`CREATE TABLE IF NOT EXISTS`, core FK 없음) 추가. 업무 데이터 변경·삭제 없음. 두 번 실행해도 오류 없음 |
+| 10 | `10_destruction_delay_reason.sql` | **파기 지연 사유** — `pi_contract_file.DOCUMENT_NOTE` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함) 추가. 데이터 변경 없음. 두 번 실행해도 오류 없음 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
@@ -262,6 +263,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/07_contract_name.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/08_form_template.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/09_security_followup.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/10_destruction_delay_reason.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
@@ -292,7 +294,8 @@ personalinfo:
     notice-date: "04-10"                           # 알림 시작일 (MM-dd) — 이날부터 점검 월 말일까지 대상 계약에 1회
     month: 5                                       # 정기 점검 월
     admin-recipients: ""                           # 정기 점검 요약을 추가로 받을 관리자 (쉼표 구분, default-recipients 와 합침)
-  destruction-grace-days: 30                       # 파기 완료일 허용 기간 (계약 종료 기준일 + N일 넘으면 '파기 지연')
+  destruction-days: 5                              # 파기 기한 (계약 종료 기준일 + N일, 표준 개인정보 보호지침 제10조 '5일 이내') — 넘으면 '파기 지연'
+  destruction-confirm-reply-days: 30               # 파기 확인서 회신 기한 (계약 종료 기준일 + N일) — 지나도 확인서가 없으면 '회신 기한 지남'
   company-name: 깨끗한나라                          # 확약서·파기 확인서·만료 체크리스트의 위탁사명 (비우면 빈칸)
 
 spring:
@@ -367,7 +370,7 @@ module-personalinfo/
         ├── personalinfo/security-pledge-template.docx      정보보호 및 비밀유지 확약서 양식 ({{수탁업체명}} 등 자리표시자)
         ├── personalinfo/destruction-confirm-template.docx  개인정보 파기 확인서 양식
         └── static/personalinfo/                      화면 (index.html, css, js — personalinfo-table.js: 목록 열 너비·순서 편집)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, 09_security_followup.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, 09_security_followup.sql, 10_destruction_delay_reason.sql, README.md
 ```
 
 ---
@@ -381,7 +384,8 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_u
 | 통합 테스트 24건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **24/24 통과** |
 | 　- 파일 내용 확인: 가짜 pdf·ZIP 조각 docx·xlsx 를 docx 로·GIF 를 jpg 로·글자 hwp·docx 를 xlsx 로 → 모두 400·저장 0건 / 실제 docx·hwp·hwpx·png 200 | 통과 |
 | 　- 재위탁 동의서: 재위탁 Y·동의서 없음 → `consentMissing`·목록 필터·요약 카드 포함, 동의서 업로드 후 빠짐·카드 -1 | 통과 |
-| 　- 서류 일자·파기 지연: 파기 완료일 미래 400, 저장·라벨 '파기 완료일', 종료 60일 전 + 30일 허용 → 50일째 파기 '파기 지연'·필터 포함, 일자 수정 시 해소, 미래·형식 오류 400, 조회자 403, 비우면 '일자 미입력', 확약서 라벨 '서명일', 기타 파일 일자 400 | 통과 |
+| 　- 파기 기한·회신 기한: 종료 60일 지남·확인서 없음 → 회신 기한(종료 + 30일) 지남, 파기 기한 종료 + 5일 / 확인서 업로드(지연 사유 함께 저장) 후 회신 지연 해소 / 종료 + 50일 파기 → 파기 지연·사유 표시, 일자만 수정 시 사유 유지, 종료 + 3일로 수정·사유 비움 → 해소, 기한 당일(종료 + 5일)은 지연 아님 / 확약서에 지연 사유 400(업로드·수정), 501자 400 / SQL 10 두 번 실행 오류 없음 / 브라우저: 팝업에 두 기한 표시, 기한보다 늦은 날짜 → 지연 경고·사유 칸, 저장 시 재확인 창(취소 시 팝업 유지), 기한 안 날짜 → 경고 닫힘 | 통과 |
+| 　- 서류 일자·파기 지연: 파기 완료일 미래 400, 저장·라벨 '파기 완료일', 파기 지연 필터 포함, 일자 수정 시 해소, 미래·형식 오류 400, 조회자 403, 비우면 '일자 미입력', 확약서 라벨 '서명일', 기타 파일 일자 400 | 통과 |
 | 　- 만료 서류: 서류 없이 종료 400(미수취 서류 이름 안내) → 사유 입력 후 종료·사유/독촉 저장, 받은 1종·미수취 2종, 요약 +1, 목록 필터·행 `expiryDocsMissing` / 3종 모두 받은 계약은 사유 없이 종료 / 독촉 메일: 미수취 양식 2종만 첨부·사유 표시, 완비 계약 미발송, 같은 주 재실행 0, 다음 주 재발송, 독촉 끄기(조회자 403·잘못된 값 400) 후 미발송, 알림 이력 종류 | 통과 |
 | 　- 조치 지연: 조치 예정일 5일 지남 → 지연 1건·5일·필터·요약, 주간 메일 1회(같은 주 재실행 0), 조치 완료 후 빠짐·다음 주 미발송 | 통과 |
 | 　- 정기 점검: 4/9 발송 0 / 4/10 담당자 메일(체크리스트 첨부, 5월 31일 기한, 종료 계약 제외) + 보안팀 요약 1회(`CONTRACT_ID` NULL) / 4/20 재실행 0 / 6/1 0 / 이후 등록 계약은 5/2 담당자만 발송·요약 재발송 없음 | 통과 |

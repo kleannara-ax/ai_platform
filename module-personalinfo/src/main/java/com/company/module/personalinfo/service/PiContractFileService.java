@@ -68,13 +68,19 @@ public class PiContractFileService {
     @Transactional
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, Long userId) {
-        return upload(contractId, file, fileType, description, signedDate, null, userId);
+        return upload(contractId, file, fileType, description, signedDate, null, null, userId);
     }
 
-    /** 첨부 업로드 + 서류 일자(확약서 서명일 / 파기 확인서 파기 완료일) */
     @Transactional
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, LocalDate documentDate, Long userId) {
+        return upload(contractId, file, fileType, description, signedDate, documentDate, null, userId);
+    }
+
+    /** 첨부 업로드 + 서류 일자(확약서 서명일 / 파기 확인서 파기 완료일) + 파기 지연 사유 */
+    @Transactional
+    public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
+                                       LocalDate signedDate, LocalDate documentDate, String documentNote, Long userId) {
         ensureContract(contractId);
         if (fileRepository.countByContractIdAndDeletedYn(contractId, N) >= MAX_FILES_PER_CONTRACT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
@@ -101,6 +107,7 @@ public class PiContractFileService {
                 .description(PiContractService.trim(description))
                 .signedDate(docDate)
                 .documentDate(documentDate)
+                .documentNote(checkNote(type, documentNote))
                 .createdBy(userId)
                 .build());
         if (type == ContractFileType.CONTRACT) {
@@ -144,6 +151,15 @@ public class PiContractFileService {
     /** 서류 일자 변경 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일). null 이면 비운다. */
     @Transactional
     public ContractFileResponse changeDocumentDate(Long fileId, LocalDate documentDate, Long userId) {
+        return changeDocumentDate(fileId, documentDate, null, false, userId);
+    }
+
+    /**
+     * 서류 일자 + 파기 지연 사유 변경. noteGiven=false 면 기존 사유를 그대로 둔다.
+     */
+    @Transactional
+    public ContractFileResponse changeDocumentDate(Long fileId, LocalDate documentDate, String documentNote,
+                                                   boolean noteGiven, Long userId) {
         PiContractFile f = findActive(fileId);
         ensureContract(f.getContractId());
         if (!f.getFileType().hasDocumentDate()) {
@@ -153,7 +169,11 @@ public class PiContractFileService {
         if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, f.getFileType().getDocumentDateLabel() + "은(는) 오늘보다 늦을 수 없습니다.");
         }
-        f.changeDocumentDate(documentDate, userId);
+        if (noteGiven) {
+            f.changeDocumentDate(documentDate, checkNote(f.getFileType(), documentNote), userId);
+        } else {
+            f.changeDocumentDate(documentDate, userId);
+        }
         return ContractFileResponse.from(f, latestContractDocId(f.getContractId()));
     }
 
@@ -190,6 +210,21 @@ public class PiContractFileService {
     }
 
     /** 계약 존재 + 현재 사용자 부서 범위 확인 */
+    /** 파기 지연 사유: 파기 확인서에만, 최대 500자 */
+    private static String checkNote(ContractFileType type, String note) {
+        String n = PiContractService.trim(note);
+        if (n == null) {
+            return null;
+        }
+        if (type != ContractFileType.DESTRUCTION_CONFIRM) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "파기 지연 사유는 개인정보 파기 확인서에만 입력할 수 있습니다.");
+        }
+        if (n.length() > 500) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "파기 지연 사유는 500자 이내로 입력하세요.");
+        }
+        return n;
+    }
+
     private PiContract ensureContract(Long contractId) {
         return accessScope.check(contractRepository.findByContractIdAndDeletedYn(contractId, N)
                 .orElseThrow(() -> new EntityNotFoundException("위수탁 계약", contractId)));

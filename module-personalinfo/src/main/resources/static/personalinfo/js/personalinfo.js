@@ -218,7 +218,7 @@
         ['EXPIRY_DOCS_MISSING', '만료 서류 미수취', d.expiryDocsMissingCount, 'fa-file-circle-exclamation', '종료·만료(임박) 계약 중 만료 점검 체크리스트·확약서·파기 확인서를 다 받지 못한 계약'],
         ['ACTION_OVERDUE', '조치 지연', d.actionOverdueCount, 'fa-hourglass-end', '점검 결과 조치 필요 항목의 조치 예정일이 지났는데 조치 완료가 아닌 계약'],
         ['CONSENT_MISSING', '재위탁 동의서 누락', d.consentMissingCount, 'fa-file-contract', '재위탁 Y 인데 재위탁 동의서 파일이 없는 계약'],
-        ['DESTRUCTION_LATE', '파기 지연', d.destructionLateCount, 'fa-clock-rotate-left', '파기 확인서의 파기 완료일이 계약 종료일 + 허용 기간보다 늦은 계약'],
+        ['DESTRUCTION_LATE', '파기 지연', d.destructionLateCount, 'fa-clock-rotate-left', '파기 확인서의 파기 완료일이 파기 기한(계약 종료 + 5일, 표준 개인정보 보호지침 제10조)보다 늦은 계약'],
       ];
       document.getElementById('pi-followup-bar')?.remove();
       el.insertAdjacentHTML('afterend', `<section class="pi-followup-bar" id="pi-followup-bar" aria-label="보안팀 확인 필요">
@@ -353,7 +353,8 @@
     }
     if (r.actionOverdueCount) out.push(`<span class="pi-term-chip miss" title="조치 예정일이 지난 점검 ${r.actionOverdueCount}건"><i class="fas fa-hourglass-end"></i>조치지연</span>`);
     if (r.consentMissing) out.push('<span class="pi-term-chip warn" title="재위탁 Y 인데 재위탁 동의서 파일 없음"><i class="fas fa-file-contract"></i>동의서 누락</span>');
-    if (r.destructionLate) out.push('<span class="pi-term-chip warn" title="파기 완료일이 허용 기한보다 늦음"><i class="fas fa-clock-rotate-left"></i>파기지연</span>');
+    if (r.confirmReplyOverdue) out.push('<span class="pi-term-chip miss" title="계약 종료 + 30일(확인서 회신 기한)이 지났는데 파기 확인서 미수취"><i class="fas fa-envelope-open-text"></i>파기확인서 회신지연</span>');
+    if (r.destructionLate) out.push('<span class="pi-term-chip warn" title="파기 완료일이 파기 기한(계약 종료 + 5일)보다 늦음"><i class="fas fa-clock-rotate-left"></i>파기지연</span>');
     return out.length ? '<div class="pi-fu-chips">' + out.join('') + '</div>' : '';
   }
 
@@ -701,11 +702,75 @@
     return d + latest + edit;
   }
 
+  /**
+   * 서류 일자 입력 팝업 (확약서 서명일 / 파기 확인서 파기 완료일).
+   * 파기 확인서는 파기 기한(종료 + 5일)·확인서 회신 기한(종료 + 30일)을 보여주고,
+   * 파기 기한보다 늦은 날짜면 지연 사유 칸을 열고 저장 전에 한 번 더 확인한다.
+   * @returns Promise<{date, note}|null> (취소하면 null)
+   */
+  function askDocDate({ fileType, fileName, current, note }) {
+    return new Promise((resolve) => {
+      const isDest = fileType === 'DESTRUCTION_CONFIRM';
+      const label = isDest ? '파기 완료일' : '서명일';
+      const f = (currentContract && currentContract.followUp) || {};
+      const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      const $ = (id) => document.getElementById(id);
+      const input = $('doc-date-input'); const noteEl = $('doc-date-note'); const form = $('doc-date-form');
+      $('doc-date-title').textContent = (isDest ? '개인정보 파기 확인서' : '정보보호 및 비밀유지 확약서') + ' — ' + label;
+      $('doc-date-file').textContent = fileName ? '파일: ' + fileName : '';
+      $('doc-date-label').textContent = label;
+      $('doc-date-help').textContent = isDest
+        ? '파기 확인서에 적힌 실제 파기 일자를 입력하세요(업로드한 날이 아님). 모르면 비워 두고 나중에 첨부 목록의 연필 버튼으로 입력할 수 있습니다.'
+        : '확약서에 서명한 날짜를 입력하세요. 모르면 비워 두고 나중에 첨부 목록의 연필 버튼으로 입력할 수 있습니다.';
+      const box = $('doc-date-deadline');
+      if (isDest && f.destructionDeadline) {
+        box.innerHTML = `<i class="fas fa-calendar-check me-1"></i>계약 종료일 <b>${fmtDate(f.endBaseDate)}</b> 기준<br>
+          · <b>파기 기한</b> ${fmtDate(f.destructionDeadline)}까지 <span class="text-muted">(종료 + ${f.destructionDays}일, 표준 개인정보 보호지침 제10조 '5일 이내 파기')</span><br>
+          · <b>확인서 회신 기한</b> ${fmtDate(f.confirmReplyDeadline)}까지 <span class="text-muted">(종료 + ${f.confirmReplyDays}일, 협력사가 파기 확인서를 보내오는 기간)</span>`;
+        box.classList.remove('d-none');
+      } else if (isDest) {
+        box.innerHTML = '<i class="fas fa-circle-info me-1"></i>원계약 종료일이 없어 파기 기한을 계산할 수 없습니다.';
+        box.classList.remove('d-none');
+      } else {
+        box.classList.add('d-none');
+      }
+      input.value = current === undefined ? today : (current || '');
+      input.max = today;
+      input.classList.remove('is-invalid');
+      noteEl.value = note || '';
+      let late = false;
+      const check = () => {
+        late = isDest && !!input.value && !!f.destructionDeadline && input.value > f.destructionDeadline;
+        $('doc-date-late').classList.toggle('d-none', !late);
+        if (late) {
+          const days = Math.round((new Date(input.value) - new Date(f.destructionDeadline)) / 86400000);
+          $('doc-date-late-msg').innerHTML = `<i class="fas fa-triangle-exclamation me-1"></i>파기 기한(${fmtDate(f.destructionDeadline)})보다 <b>${days}일 늦습니다.</b> 저장하면 이 계약은 <b>파기 지연</b>으로 표시됩니다.`;
+        }
+      };
+      input.oninput = check; check();
+      let done = false;
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        if (input.value && input.value > today) { input.classList.add('is-invalid'); return; }
+        input.classList.remove('is-invalid');
+        if (late && !confirm(`${label} ${fmtDate(input.value)}은(는) 파기 기한 ${fmtDate(f.destructionDeadline)}보다 늦어 '파기 지연'으로 표시됩니다.\n날짜가 맞습니까?`)) return;
+        done = true;
+        modal('doc-date-modal').hide();
+        resolve({ date: input.value || null, note: isDest ? (late ? noteEl.value.trim() : '') : null });
+      };
+      document.getElementById('doc-date-modal').addEventListener('hidden.bs.modal', () => { if (!done) resolve(null); }, { once: true });
+      modal('doc-date-modal').show();
+      setTimeout(() => input.focus(), 300);
+    });
+  }
+
   /** 확약서 서명일 / 파기 확인서 파기 완료일 칸 */
   function documentDateCell(f) {
     const d = f.documentDate ? `<b>${fmtDate(f.documentDate)}</b>` : '<span class="text-warning-emphasis">미입력</span>';
-    const edit = perm.canWrite ? ` <button class="btn btn-sm btn-link p-0 ms-1" data-edit-docdate="${f.fileId}" data-date="${esc(f.documentDate || '')}" data-label="${esc(f.documentDateLabel)}" title="${esc(f.documentDateLabel)} 입력·수정" aria-label="${esc(f.documentDateLabel)} 수정"><i class="fas fa-pen fa-xs"></i></button>` : '';
-    return `<small class="text-muted">${esc(f.documentDateLabel)}</small> ` + d + edit;
+    const edit = perm.canWrite ? ` <button class="btn btn-sm btn-link p-0 ms-1" data-edit-docdate="${f.fileId}" data-date="${esc(f.documentDate || '')}" data-label="${esc(f.documentDateLabel)}"
+      data-filetype="${esc(f.fileType)}" data-name="${esc(f.originalName)}" data-note="${esc(f.documentNote || '')}" title="${esc(f.documentDateLabel)} 입력·수정" aria-label="${esc(f.documentDateLabel)} 수정"><i class="fas fa-pen fa-xs"></i></button>` : '';
+    const noteLine = f.documentNote ? `<small class="d-block text-danger pi-ellipsis" style="max-width:260px" title="${esc(f.documentNote)}">지연 사유: ${esc(f.documentNote)}</small>` : '';
+    return `<small class="text-muted">${esc(f.documentDateLabel)}</small> ` + d + edit + noteLine;
   }
 
   /** 상세 상단 처리 필요 항목 안내 (해당 사항이 있을 때만) */
@@ -725,11 +790,16 @@
       items.push(`<li><b>재위탁 동의서 누락</b>: 재위탁이 Y 인데 재위탁 동의서 파일이 없습니다. <a href="#contract-file-section" class="pi-fu-jump" data-target="contract-file-section" data-filetype="SUBCONTRACT_CONSENT">[재위탁 동의서 올리기]</a></li>`);
     }
     if (f.destructionLate) {
-      items.push(`<li><b>파기 지연</b>: 파기 완료일 ${fmtDate(f.destructionDate)} 이(가) 허용 기한 ${fmtDate(f.destructionDeadline)}(계약 종료일 + 허용 기간)보다 늦습니다. 협력사에 지연 사유를 확인하세요.</li>`);
+      items.push(`<li><b>파기 지연</b>: 파기 완료일 ${fmtDate(f.destructionDate)} 이(가) 파기 기한 ${fmtDate(f.destructionDeadline)}(계약 종료 + ${f.destructionDays}일)보다 늦습니다.
+        ${f.destructionDelayReason ? `<span class="text-muted">지연 사유: ${esc(f.destructionDelayReason)}</span>` : '협력사에 지연 사유를 확인해 첨부 목록 연필 버튼으로 기록하세요.'}</li>`);
+    }
+    if (f.confirmReplyOverdue) {
+      items.push(`<li><b>파기 확인서 회신 기한 지남</b>: 회신 기한 ${fmtDate(f.confirmReplyDeadline)}(계약 종료 + ${f.confirmReplyDays}일)이 지났는데 파기 확인서를 받지 못했습니다.
+        <a href="#expiry-check-section" class="ms-1 pi-fu-jump" data-target="expiry-check-section">[계약만료시 점검으로]</a></li>`);
     }
     (f.documentDateMissing || []).forEach((m) => items.push(`<li class="text-muted"><b>${esc(m)} 미입력</b>: 첨부 목록의 연필 버튼으로 입력하세요.</li>`));
     if (!items.length) return '';
-    const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate;
+    const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate || f.confirmReplyOverdue;
     return `<section class="pi-card pi-followup-panel ${serious ? 'serious' : ''}" id="follow-up-section" role="status">
       <h2 class="mb-1"><i class="fas fa-clipboard-list"></i>처리 필요 항목</h2>
       <p class="pi-followup-desc">계약 만료·점검 이후 아직 끝나지 않은 일입니다. 담당자가 협력사로부터 서류를 받아 올리거나 조치를 완료하면 이 목록에서 자동으로 사라집니다.</p>
@@ -1138,14 +1208,12 @@
     sec.querySelectorAll('[data-expiry-input]').forEach((inp) => inp.addEventListener('change', async () => {
       const f = inp.files?.[0]; if (!f) return;
       const it = EXPIRY_ITEMS.find((x) => x.key === inp.dataset.expiryInput);
-      const label = it.fileType === 'SECURITY_PLEDGE' ? '서명일' : '파기 완료일';
-      const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-      const dd = prompt(`${it.label}의 ${label}을 입력하세요 (yyyy-mm-dd). 모르면 비워 두고 나중에 첨부 목록에서 입력할 수 있습니다.`, today);
-      if (dd === null) { inp.value = ''; return; }
-      if (dd.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(dd.trim())) { notify(`${label} 형식이 올바르지 않습니다. (예: ${today})`, 'warning'); inp.value = ''; return; }
+      const ans = await askDocDate({ fileType: it.fileType, fileName: f.name });
+      if (!ans) { inp.value = ''; return; }
       const fd = new FormData();
       fd.append('file', f); fd.append('fileType', it.fileType); fd.append('description', '계약만료시 점검 제출');
-      if (dd.trim()) fd.append('documentDate', dd.trim());
+      if (ans.date) fd.append('documentDate', ans.date);
+      if (ans.note) fd.append('documentNote', ans.note);
       try { await PI_API.uploadFile(id, fd); notify(`${it.label}을(를) 업로드했습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
     }));
   }
@@ -1445,6 +1513,13 @@
         e.preventDefault();
         const fd = new FormData(fileForm);
         if (!fd.get('signedDate')) fd.delete('signedDate');
+        const ft = fd.get('fileType');
+        if (ft === 'SECURITY_PLEDGE' || ft === 'DESTRUCTION_CONFIRM') {
+          const ans = await askDocDate({ fileType: ft, fileName: fileSel.files?.[0]?.name });
+          if (!ans) return;
+          if (ans.date) fd.append('documentDate', ans.date);
+          if (ans.note) fd.append('documentNote', ans.note);
+        }
         try { await PI_API.uploadFile(id, fd); notify('업로드되었습니다.'); reload(); } catch (err) { fail(err); }
       });
     }
@@ -1461,19 +1536,15 @@
         catch (err) { fail(err); }
       };
     }));
-    // 확약서 서명일 / 파기 확인서 파기 완료일 입력·수정
-    document.querySelectorAll('[data-edit-docdate]').forEach((b) => b.addEventListener('click', () => {
-      const td = b.closest('td'); const cur = b.dataset.date || '';
-      td.innerHTML = `<div class="d-flex gap-1 align-items-center"><small class="text-muted text-nowrap">${esc(b.dataset.label)}</small>
-        <input type="date" class="form-control form-control-sm" value="${esc(cur)}" aria-label="${esc(b.dataset.label)}" style="width:150px">
-        <button class="btn btn-sm btn-primary" data-act="save" aria-label="저장"><i class="fas fa-check"></i></button>
-        <button class="btn btn-sm btn-light" data-act="cancel" aria-label="취소"><i class="fas fa-xmark"></i></button></div>`;
-      const inp = td.querySelector('input'); inp.focus();
-      td.querySelector('[data-act="cancel"]').onclick = () => reload();
-      td.querySelector('[data-act="save"]').onclick = async () => {
-        try { await PI_API.updateFileDocumentDate(b.dataset.editDocdate, inp.value || null); notify(`${b.dataset.label}을 저장했습니다.`); reload(); }
-        catch (err) { fail(err); }
-      };
+    // 확약서 서명일 / 파기 확인서 파기 완료일 (+ 파기 지연 사유) 입력·수정
+    document.querySelectorAll('[data-edit-docdate]').forEach((b) => b.addEventListener('click', async () => {
+      const isDest = b.dataset.filetype === 'DESTRUCTION_CONFIRM';
+      const ans = await askDocDate({ fileType: b.dataset.filetype, fileName: b.dataset.name, current: b.dataset.date || '', note: b.dataset.note || '' });
+      if (!ans) return;
+      try {
+        await PI_API.updateFileDocumentDate(b.dataset.editDocdate, ans.date, isDest ? ans.note : undefined);
+        notify(`${b.dataset.label}을 저장했습니다.`); reload();
+      } catch (err) { fail(err); }
     }));
     // 확인 필요 안내의 바로가기
     document.querySelectorAll('.pi-fu-jump').forEach((a) => a.addEventListener('click', (e) => {

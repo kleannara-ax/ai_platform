@@ -221,6 +221,34 @@
   </div></div>
 </div>
 
+<!-- 서류 일자 입력 팝업 (확약서 서명일 / 파기 확인서 파기 완료일 · 파기 지연 사유) -->
+<div class="modal fade" id="doc-date-modal" tabindex="-1" aria-labelledby="doc-date-title" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <form id="doc-date-form" novalidate>
+      <div class="modal-header"><h5 class="modal-title" id="doc-date-title">서류 일자 입력</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" id="doc-date-file"></p>
+        <div class="alert alert-light border small py-2" id="doc-date-deadline" role="note"></div>
+        <label class="form-label" for="doc-date-input" id="doc-date-label">서류 일자</label>
+        <input type="date" class="form-control" id="doc-date-input">
+        <small class="text-muted d-block mt-1" id="doc-date-help">서류에 적힌 날짜를 입력하세요. 모르면 비워 두고 나중에 첨부 목록의 연필 버튼으로 입력할 수 있습니다.</small>
+        <div class="invalid-feedback" id="doc-date-invalid">오늘보다 늦은 날짜는 입력할 수 없습니다.</div>
+        <div id="doc-date-late" class="mt-3 d-none">
+          <div class="alert alert-danger small py-2 mb-2" id="doc-date-late-msg" role="alert"></div>
+          <label class="form-label" for="doc-date-note">파기 지연 사유 <small class="text-muted">(협력사에 확인한 사유)</small></label>
+          <textarea class="form-control" id="doc-date-note" rows="2" maxlength="500"
+            placeholder="예: 백업 매체 보관 기간 만료 후 일괄 파기, 재수탁자 회수 지연"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary" id="doc-date-ok"><i class="fas fa-check me-1"></i>저장</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
 <!-- 양식 관리: 새 버전 등록 팝업 (#/forms) -->
 <div class="modal fade" id="form-template-modal" tabindex="-1" aria-labelledby="form-template-modal-title" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">

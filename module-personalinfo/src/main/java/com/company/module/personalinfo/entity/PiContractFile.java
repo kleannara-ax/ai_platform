@@ -66,10 +66,14 @@ public class PiContractFile extends PiBaseEntity {
     @Column(name = "DOCUMENT_DATE")
     private LocalDate documentDate;
 
+    /** 서류 일자 관련 메모 (파기 확인서: 파기 기한보다 늦게 파기한 사유) */
+    @Column(name = "DOCUMENT_NOTE", length = 500)
+    private String documentNote;
+
     @Builder
     private PiContractFile(Long contractId, ContractFileType fileType, String originalName, String storedPath,
                            String contentType, Long fileSize, String fileHash, String description, LocalDate signedDate,
-                           LocalDate documentDate, Long createdBy) {
+                           LocalDate documentDate, String documentNote, Long createdBy) {
         this.contractId = contractId;
         this.fileType = fileType == null ? ContractFileType.CONTRACT : fileType;
         this.originalName = originalName;
@@ -80,6 +84,7 @@ public class PiContractFile extends PiBaseEntity {
         this.description = description;
         this.signedDate = this.fileType == ContractFileType.CONTRACT ? signedDate : null;
         this.documentDate = this.fileType.hasDocumentDate() ? documentDate : null;
+        this.documentNote = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? documentNote : null;
         markCreatedBy(createdBy);
     }
 
@@ -92,6 +97,13 @@ public class PiContractFile extends PiBaseEntity {
     /** 서류 일자 변경 (확약서 서명일 / 파기 확인서 파기 완료일, null 이면 비움) */
     public void changeDocumentDate(LocalDate documentDate, Long updatedBy) {
         this.documentDate = documentDate;
+        markUpdatedBy(updatedBy);
+    }
+
+    /** 서류 일자 + 메모 변경 (파기 확인서의 파기 지연 사유) */
+    public void changeDocumentDate(LocalDate documentDate, String documentNote, Long updatedBy) {
+        this.documentDate = documentDate;
+        this.documentNote = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? documentNote : null;
         markUpdatedBy(updatedBy);
     }
 

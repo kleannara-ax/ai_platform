@@ -54,6 +54,8 @@ public class ContractSummaryResponse {
     private Boolean consentMissing;
     /** 파기 완료일이 허용 기한보다 늦음 */
     private Boolean destructionLate;
+    /** 파기 확인서 회신 기한(종료 + 30일)이 지났는데 파기 확인서 미수취 */
+    private Boolean confirmReplyOverdue;
 
     /** 확인 필요 상태 채우기 (응답 DTO) */
     public ContractSummaryResponse withFollowUp(FollowUpResponse f) {
@@ -64,6 +66,7 @@ public class ContractSummaryResponse {
             this.actionOverdueCount = f.getActionOverdueCount();
             this.consentMissing = f.isConsentMissing();
             this.destructionLate = f.isDestructionLate();
+            this.confirmReplyOverdue = f.isConfirmReplyOverdue();
         }
         return this;
     }

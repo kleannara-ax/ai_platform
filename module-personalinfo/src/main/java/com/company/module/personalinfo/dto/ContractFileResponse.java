@@ -27,6 +27,8 @@ public class ContractFileResponse {
     private LocalDate documentDate;
     /** 서류 일자 항목 이름 (서명일 / 파기 완료일, 해당 없으면 null) */
     private String documentDateLabel;
+    /** 서류 일자 메모 (파기 확인서: 파기 지연 사유) */
+    private String documentNote;
     private Long createdBy;
     private LocalDateTime createdAt;
 
@@ -48,6 +50,7 @@ public class ContractFileResponse {
                 .latestContractDoc(latestFileId != null && latestFileId.equals(f.getFileId()))
                 .documentDate(f.getDocumentDate())
                 .documentDateLabel(f.getFileType().getDocumentDateLabel())
+                .documentNote(f.getDocumentNote())
                 .createdBy(f.getCreatedBy())
                 .createdAt(f.getCreatedAt())
                 .build();

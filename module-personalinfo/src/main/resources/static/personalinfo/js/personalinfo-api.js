@@ -89,7 +89,8 @@ const PI_API = (() => {
     deleteContract: (id) => request('/contracts/' + id, { method: 'DELETE' }),
     uploadFile: (id, form) => request('/contracts/' + id + '/files', { method: 'POST', form }),
     analyzeContractDoc: (form) => request('/contract-doc/analyze', { method: 'POST', form }),
-    updateFileDocumentDate: (fileId, documentDate) => request('/files/' + fileId + '/document-date', { method: 'PATCH', body: { documentDate } }),
+    updateFileDocumentDate: (fileId, documentDate, documentNote) => request('/files/' + fileId + '/document-date',
+      { method: 'PATCH', body: documentNote === undefined ? { documentDate } : { documentDate, documentNote } }),
     changeExpiryDocsRemind: (id, remindYn) => request('/contracts/' + id + '/expiry-docs-remind', { method: 'PATCH', body: { remindYn } }),
     // 접근 기록 (관리자)
     accessLogActionTypes: () => request('/access-logs/action-types'),
