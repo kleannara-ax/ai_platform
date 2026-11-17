@@ -708,7 +708,7 @@
     return `<small class="text-muted">${esc(f.documentDateLabel)}</small> ` + d + edit;
   }
 
-  /** 상세 상단 보안팀 확인 필요 안내 (해당 사항이 있을 때만) */
+  /** 상세 상단 처리 필요 항목 안내 (해당 사항이 있을 때만) */
   function followUpPanel(c) {
     const f = c.followUp;
     if (!f) return '';
@@ -731,7 +731,8 @@
     if (!items.length) return '';
     const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate;
     return `<section class="pi-card pi-followup-panel ${serious ? 'serious' : ''}" id="follow-up-section" role="status">
-      <h2 class="mb-2"><i class="fas fa-shield-halved"></i>보안팀 확인 필요 <small class="fw-normal text-muted">아래 항목을 확인해 주세요</small></h2>
+      <h2 class="mb-1"><i class="fas fa-clipboard-list"></i>처리 필요 항목</h2>
+      <p class="pi-followup-desc">계약 만료·점검 이후 아직 끝나지 않은 일입니다. 담당자가 협력사로부터 서류를 받아 올리거나 조치를 완료하면 이 목록에서 자동으로 사라집니다.</p>
       <ul class="mb-0 small">${items.join('')}</ul></section>`;
   }
 

@@ -180,4 +180,5 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-followup-panel{border-left:4px solid #f59e0b;}
 .pi-followup-panel.serious{border-left-color:#dc2626;background:#fffafa;}
 .pi-followup-panel li{margin-bottom:4px;}
+.pi-followup-desc{font-size:13px;color:#6b7280;margin:0 0 8px;}
 #access-log-table tr.pi-access-excel td{background:#fffbeb;}
