@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS pi_contract (
     CONTRACT_PERIOD_NOTE    VARCHAR(500)  NULL                    COMMENT '계약기간 비고 (예: 체결일로부터 1년, 이용약관)',
     AUTO_RENEW_YN           CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '자동연장 여부 (Y/N)',
     AUTO_RENEW_NOTE         VARCHAR(200)  NULL                    COMMENT '자동연장 비고 (예: 1개월 단위)',
+    AUTO_RENEW_PERIOD_MONTHS INT          NOT NULL DEFAULT 12     COMMENT '자동연장 기간 (개월, 기본 12 = 1년 단위). 자동연장 Y 이면 원계약 종료일 후 이 기간 단위로 계약기간이 자동 연장됨',
     CONTRACT_DOC_YN         CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '위탁 계약서 작성 여부 (Y/N)',
     CONTRACT_SIGNED_DATE    DATE          NULL                    COMMENT '위수탁 계약 체결일',
     SUBCONTRACT_YN          CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '재위탁 여부 (Y/N)',

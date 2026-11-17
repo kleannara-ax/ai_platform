@@ -195,7 +195,7 @@ public class PiAlertMailService {
      * 예) 알림 기준 30일: 남은 20일 → D-30, 남은 5일 → D-7, 남은 1일 → D-1, 당일 → D-DAY, 지남 → EXPIRED
      */
     static Optional<String> stageOf(PiContract c, LocalDate today) {
-        if (c.getContractEndDate() == null) {
+        if (c.getContractEndDate() == null || c.isAutoRenewing()) {
             return Optional.empty();
         }
         long daysLeft = ChronoUnit.DAYS.between(today, c.getContractEndDate());
@@ -269,6 +269,7 @@ public class PiAlertMailService {
     int[] runExpiryDocsReminders(LocalDate today) {
         List<PiContract> targets = contractRepository.findByDeletedYnOrderByContractIdAsc("N").stream()
                 .filter(c -> !"N".equals(c.getExpiryDocsRemindYn()))
+                .filter(c -> !c.isAutoRenewing())
                 .filter(c -> {
                     LocalDate base = PiFollowUpRules.endBase(c);
                     return base != null && base.isBefore(today) && !base.plusDays(followUpRemindDays).isBefore(today);
@@ -426,7 +427,7 @@ public class PiAlertMailService {
         List<PiContract> targets = contractRepository.findByDeletedYnOrderByContractIdAsc("N").stream()
                 .filter(c -> !"Y".equals(c.getTerminatedYn()))
                 .filter(c -> c.getContractStartDate() == null || !c.getContractStartDate().isAfter(deadline))
-                .filter(c -> c.getContractEndDate() == null || !c.getContractEndDate().isBefore(monthStart))
+                .filter(c -> c.getContractEndDate() == null || c.isAutoRenewing() || !c.getContractEndDate().isBefore(monthStart))
                 .filter(c -> !inspected.contains(c.getContractId()))
                 .toList();
         int sent = 0;

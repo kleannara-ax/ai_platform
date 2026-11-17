@@ -52,12 +52,18 @@ public class PiFollowUpRules {
 
     /** 파기 기한 (종료 기준일 + 파기 기한 일수). 종료 기준일이 없으면 null */
     public LocalDate destructionDeadline(PiContract c) {
+        if (c.isAutoRenewing()) {
+            return null;
+        }
         LocalDate base = endBase(c);
         return base == null ? null : base.plusDays(destructionDays);
     }
 
     /** 파기 확인서 회신 기한 (종료 기준일 + 회신 기한 일수). 종료 기준일이 없으면 null */
     public LocalDate confirmReplyDeadline(PiContract c) {
+        if (c.isAutoRenewing()) {
+            return null;
+        }
         LocalDate base = endBase(c);
         return base == null ? null : base.plusDays(confirmReplyDays);
     }
@@ -67,8 +73,8 @@ public class PiFollowUpRules {
         if ("Y".equals(c.getTerminatedYn())) {
             return true;
         }
-        if (c.getContractEndDate() == null) {
-            return false;
+        if (c.getContractEndDate() == null || c.isAutoRenewing()) {
+            return false; // 자동연장 중이면 계약기간이 이어지므로 만료 서류 대상 아님
         }
         int alertDays = c.getAlertDaysBefore() == null ? PiContract.DEFAULT_ALERT_DAYS : c.getAlertDaysBefore();
         return ChronoUnit.DAYS.between(today, c.getContractEndDate()) <= alertDays;

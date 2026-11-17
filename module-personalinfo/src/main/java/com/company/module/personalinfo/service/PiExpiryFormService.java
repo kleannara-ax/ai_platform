@@ -274,7 +274,8 @@ public class PiExpiryFormService {
         m.put("{{계약명}}", c == null ? "" : dash(c.getContractName()));
         m.put("{{위탁업무}}", c == null ? "" : dash(c.getEntrustedTask()));
         m.put("{{계약기간}}", c == null ? "" : period(c));
-        m.put("{{계약종료일}}", c == null ? "" : fmt(c.getTerminatedDate() != null ? c.getTerminatedDate() : c.getContractEndDate()));
+        m.put("{{계약종료일}}", c == null ? "" : fmt(c.getTerminatedDate() != null ? c.getTerminatedDate()
+                : (c.getContractEndDate() == null ? null : c.currentEndDate(LocalDate.now()))));
         m.put("{{재위탁업체}}", c == null ? "" : ("Y".equals(c.getSubcontractYn()) ? dash(c.getSubcontractorName()) : "없음"));
         return m;
     }
@@ -317,7 +318,13 @@ public class PiExpiryFormService {
     }
 
     private static String period(PiContract c) {
-        return fmt(c.getContractStartDate()) + " ~ " + fmt(c.getContractEndDate());
+        String p = fmt(c.getContractStartDate()) + " ~ " + fmt(c.getContractEndDate());
+        if (c.isAutoRenewing()) {
+            LocalDate today = LocalDate.now();
+            p += " (자동연장 " + PiContract.renewPeriodLabel(c.autoRenewMonths()) + " 단위"
+                    + (c.autoRenewCount(today) > 0 ? ", 현재 ~ " + fmt(c.currentEndDate(today)) : "") + ")";
+        }
+        return p;
     }
 
     private static String fmt(LocalDate d) {

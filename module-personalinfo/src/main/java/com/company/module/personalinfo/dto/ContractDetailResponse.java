@@ -31,6 +31,14 @@ public class ContractDetailResponse {
     private String contractPeriodNote;
     private String autoRenewYn;
     private String autoRenewNote;
+    /** 자동연장 기간 (개월) */
+    private Integer autoRenewPeriodMonths;
+    /** 자동연장 중 — 만료 대상 아님 */
+    private boolean autoRenewing;
+    /** 기준일까지 자동연장된 횟수 */
+    private int autoRenewCount;
+    /** 현재 계약 종료일 (자동연장 반영) */
+    private LocalDate currentEndDate;
     private String contractDocYn;
     private LocalDate contractSignedDate;
     private String subcontractYn;
@@ -92,6 +100,10 @@ public class ContractDetailResponse {
                 .contractPeriodNote(c.getContractPeriodNote())
                 .autoRenewYn(c.getAutoRenewYn())
                 .autoRenewNote(c.getAutoRenewNote())
+                .autoRenewPeriodMonths(c.autoRenewMonths())
+                .autoRenewing(c.isAutoRenewing())
+                .autoRenewCount(c.autoRenewCount(today))
+                .currentEndDate(c.getContractEndDate() == null ? null : c.currentEndDate(today))
                 .contractDocYn(c.getContractDocYn())
                 .contractSignedDate(c.getContractSignedDate())
                 .subcontractYn(c.getSubcontractYn())

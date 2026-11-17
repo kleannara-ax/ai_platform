@@ -26,6 +26,14 @@ public class ContractSummaryResponse {
     private LocalDate contractEndDate;
     private String contractPeriodNote;
     private String autoRenewYn;
+    /** 자동연장 기간 (개월) */
+    private Integer autoRenewPeriodMonths;
+    /** 자동연장 중 (자동연장 Y + 미종료 + 종료일 있음) — 만료 대상 아님 */
+    private Boolean autoRenewing;
+    /** 기준일까지 자동연장된 횟수 */
+    private Integer autoRenewCount;
+    /** 현재 계약 종료일 (자동연장 중이면 연장된 종료일, 아니면 원계약 종료일) */
+    private LocalDate currentEndDate;
     private String contractDocYn;
     private String subcontractYn;
     private String subcontractorName;
@@ -95,6 +103,10 @@ public class ContractSummaryResponse {
                 .contractEndDate(c.getContractEndDate())
                 .contractPeriodNote(c.getContractPeriodNote())
                 .autoRenewYn(c.getAutoRenewYn())
+                .autoRenewPeriodMonths(c.autoRenewMonths())
+                .autoRenewing(c.isAutoRenewing())
+                .autoRenewCount(c.autoRenewCount(today))
+                .currentEndDate(c.getContractEndDate() == null ? null : c.currentEndDate(today))
                 .contractDocYn(c.getContractDocYn())
                 .subcontractYn(c.getSubcontractYn())
                 .subcontractorName(c.getSubcontractorName())
@@ -110,7 +122,7 @@ public class ContractSummaryResponse {
     }
 
     static Long daysLeft(PiContract c, LocalDate today) {
-        return c.getContractEndDate() == null ? null : ChronoUnit.DAYS.between(today, c.getContractEndDate());
+        return c.getContractEndDate() == null ? null : ChronoUnit.DAYS.between(today, c.currentEndDate(today));
     }
 
     static String resultLabel(String result) {

@@ -108,7 +108,9 @@ public class PiContractExcelService {
                 set(row, col++, fmt(x.getContractStartDate()), center);
                 set(row, col++, fmt(x.getContractEndDate()), center);
                 set(row, col++, x.getContractPeriodNote(), body);
-                set(row, col++, x.getAutoRenewYn(), center);
+                set(row, col++, "Y".equals(x.getAutoRenewYn()) && x.getAutoRenewPeriodMonths() != null
+                        ? "Y (" + com.company.module.personalinfo.entity.PiContract.renewPeriodLabel(x.getAutoRenewPeriodMonths()) + ")"
+                        : x.getAutoRenewYn(), center);
                 set(row, col++, x.getContractDocYn(), center);
                 set(row, col++, x.getSubcontractYn(), center);
                 set(row, col++, x.getSubcontractorName(), body);

@@ -53,21 +53,22 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                and (:status = ''
                     or (:status = 'TERMINATED'  and c.terminatedYn = 'Y')
                     or (:status = 'NO_END_DATE' and c.terminatedYn = 'N' and c.contractEndDate is null)
-                    or (:status = 'EXPIRED'     and c.terminatedYn = 'N' and c.contractEndDate < :today)
-                    or (:status = 'EXPIRING'    and c.terminatedYn = 'N' and c.contractEndDate >= :today
+                    or (:status = 'EXPIRED'     and c.terminatedYn = 'N' and c.autoRenewYn <> 'Y' and c.contractEndDate < :today)
+                    or (:status = 'EXPIRING'    and c.terminatedYn = 'N' and c.autoRenewYn <> 'Y' and c.contractEndDate >= :today
                                                 and function('DATEDIFF', c.contractEndDate, :today) <= c.alertDaysBefore)
-                    or (:status = 'ACTIVE'      and c.terminatedYn = 'N' and c.contractEndDate >= :today
-                                                and function('DATEDIFF', c.contractEndDate, :today) > c.alertDaysBefore))
+                    or (:status = 'ACTIVE'      and c.terminatedYn = 'N' and c.contractEndDate is not null
+                                                and (c.autoRenewYn = 'Y' or (c.contractEndDate >= :today
+                                                     and function('DATEDIFF', c.contractEndDate, :today) > c.alertDaysBefore))))
                and (:yearOn = 0 or (
                         (c.contractStartDate is null or c.contractStartDate <= :yEnd)
-                    and ((c.terminatedYn = 'N' and (c.contractEndDate is null or c.contractEndDate >= :prevEnd))
+                    and ((c.terminatedYn = 'N' and (c.contractEndDate is null or c.autoRenewYn = 'Y' or c.contractEndDate >= :prevEnd))
                          or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate >= :prevEnd)
                               or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate >= :prevEnd)))))))
                and (:yearStatus = ''
-                    or (:yearStatus = 'ENDED' and ((c.terminatedYn = 'N' and c.contractEndDate is not null and c.contractEndDate < :refDate)
+                    or (:yearStatus = 'ENDED' and ((c.terminatedYn = 'N' and c.autoRenewYn <> 'Y' and c.contractEndDate is not null and c.contractEndDate < :refDate)
                               or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate < :refDate)
                                    or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate < :refDate))))))
-                    or (:yearStatus = 'ACTIVE' and not ((c.terminatedYn = 'N' and c.contractEndDate is not null and c.contractEndDate < :refDate)
+                    or (:yearStatus = 'ACTIVE' and not ((c.terminatedYn = 'N' and c.autoRenewYn <> 'Y' and c.contractEndDate is not null and c.contractEndDate < :refDate)
                               or (c.terminatedYn = 'Y' and ((c.terminatedDate is not null and c.terminatedDate < :refDate)
                                    or (c.terminatedDate is null and (c.contractEndDate is null or c.contractEndDate < :refDate)))))))
                and (:yearCheck = ''
@@ -102,11 +103,12 @@ public interface PiContractRepository extends JpaRepository<PiContract, Long> {
                             @Param("deptKeys") List<String> deptKeys,
                             Pageable pageable);
 
-    /** 알림 대상 후보: 미종료 + 알림 사용 + 종료일이 기간 안에 있는 계약 */
+    /** 알림 대상 후보: 미종료 + 자동연장 아님 + 알림 사용 + 종료일이 기간 안에 있는 계약 */
     @Query("""
             select c from PiContract c
              where c.deletedYn = 'N'
                and c.terminatedYn = 'N'
+               and c.autoRenewYn <> 'Y'
                and c.alertYn = 'Y'
                and c.contractEndDate is not null
                and c.contractEndDate between :from and :to

@@ -306,7 +306,7 @@
             <td class="pi-cell" title="${esc(r.deptName || '')}">${esc(r.deptName || '-')}</td>
             <td class="pi-cell" title="${esc(r.managerName || '')}">${esc(r.managerName || '-')}</td>
             <td class="pi-cell">${r.contractEndDate || r.contractStartDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
-            <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}</td>
+            <td class="pi-cell">${r.status === 'TERMINATED' ? '-' : dLabel(r.daysLeft)}${r.autoRenewing && !r.autoRenewCount ? ' <small class="text-info-emphasis" title="원계약 종료 후 자동연장 — 만료 대상 아님">자동연장</small>' : ''}</td>
             <td class="pi-cell">${badge(r.status, r.statusLabel)}${(r.status === 'TERMINATED' || r.status === 'EXPIRED') && r.terminationCheckYn
               ? (r.terminationCheckYn === 'Y'
                 ? ' <span class="pi-term-chip ok" title="계약종결 체크(계약변경·만료 점검) 업로드됨"><i class="fas fa-check"></i>종결체크</span>'
@@ -346,6 +346,7 @@
   /** 목록 상태 칸의 확인 필요 표시 */
   function followUpChips(r) {
     const out = [];
+    if (r.autoRenewing && r.autoRenewCount > 0) out.push(`<span class="pi-term-chip renew" title="원계약 종료일 ${fmtDate(r.contractEndDate)} 이후 ${renewLabel(r.autoRenewPeriodMonths)} 단위 자동연장 ${r.autoRenewCount}회 — 현재 계약기간 ~ ${fmtDate(r.currentEndDate)}"><i class="fas fa-rotate"></i>자동연장 ~${fmtDate(r.currentEndDate)}</span>`);
     if (r.expiryDocsNeeded && r.expiryDocsReceived != null) {
       out.push(r.expiryDocsReceived >= 3
         ? '<span class="pi-term-chip ok" title="만료 서류 3종(만료 점검 체크리스트·확약서·파기 확인서) 모두 수취"><i class="fas fa-check"></i>만료서류 3/3</span>'
@@ -454,12 +455,23 @@
     } catch (e) { fail(e); }
   }
 
+  /** 자동연장 기간(개월) → 입력칸 값/단위 (12의 배수면 년) */
+  function renewParts(months) {
+    const m = Number(months) || 12;
+    return m % 12 === 0 ? { value: m / 12, unit: 'Y' } : { value: m, unit: 'M' };
+  }
+  /** 자동연장 기간 표시 (예: 1년, 6개월) */
+  function renewLabel(months) {
+    const p = renewParts(months);
+    return p.value + (p.unit === 'Y' ? '년' : '개월');
+  }
+
   // ──────────────── 2·4. 등록 / 수정 화면 ────────────────
   function renderForm(c, presetVendor) {
     if (!perm.canWrite) { notify('등록/수정 권한이 없습니다.', 'warning'); go(c ? '#/contracts/' + c.contractId : '#/contracts'); return; }
     if (!canCreate()) { notify('소속부서가 지정되지 않아 계약을 등록·수정할 수 없습니다. 관리자에게 부서 지정을 요청하세요.', 'warning'); go('#/contracts'); return; }
     const isEdit = !!c;
-    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
+    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', autoRenewPeriodMonths: 12, contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
     crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${isEdit ? `<a href="#/contracts/${c.contractId}">${esc(c.vendorName)}</a> &gt; 수정` : '계약 등록'}`;
     const radio = (name, value) => `
       <div class="btn-group btn-group-sm" role="group" aria-label="${name}">
@@ -505,7 +517,15 @@
                 <div class="col-md-3">${input('contractEndDate', '계약 종료일', v.contractEndDate, 'type="date" required')}</div>
                 <div class="col-md-6">${input('contractPeriodNote', '계약기간 비고', v.contractPeriodNote, 'maxlength="500" placeholder="예: 체결일로부터 1년, 이용약관"')}</div>
                 <div class="col-md-2"><label class="form-label d-block">자동연장</label>${radio('autoRenewYn', v.autoRenewYn)}</div>
-                <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 1개월 단위"')}</div>
+                <div class="col-md-3"><label class="form-label" for="f-renewValue">자동연장 기간</label>
+                  <div class="input-group">
+                    <input type="number" class="form-control" id="f-renewValue" min="1" max="120" step="1" value="${renewParts(v.autoRenewPeriodMonths).value}" aria-label="자동연장 기간 숫자">
+                    <select class="form-select" id="f-renewUnit" style="max-width:90px" aria-label="자동연장 기간 단위">
+                      <option value="Y" ${renewParts(v.autoRenewPeriodMonths).unit === 'Y' ? 'selected' : ''}>년</option>
+                      <option value="M" ${renewParts(v.autoRenewPeriodMonths).unit === 'M' ? 'selected' : ''}>개월</option></select>
+                  </div></div>
+                <div class="col-md-4">${input('autoRenewNote', '자동연장 비고', v.autoRenewNote, 'maxlength="200" placeholder="예: 별도 해지 통보 없으면 1년씩 연장"')}</div>
+                <div class="col-12"><small class="text-muted" id="auto-renew-hint"><i class="fas fa-circle-info me-1"></i>자동연장 Y 이면 원계약 종료일이 지나도 추가 계약 없이 위 기간 단위로 계약기간이 이어지는 것으로 보고 <b>만료임박·만료·만료 서류·만료 알림 대상에서 뺍니다</b>. 실제로 끝나면 [계약 종료 처리]를 하세요.</small></div>
               </div>
             </div>
             <div class="pi-form-sub" id="pi-entrust-contract-block">
@@ -554,6 +574,15 @@
     document.getElementById('btn-cancel').onclick = () => go(isEdit ? '#/contracts/' + c.contractId : '#/contracts');
     const form = document.getElementById('contract-form');
 
+    // 자동연장 기간: 자동연장 Y 일 때만 입력 (기본 1년)
+    const syncRenew = () => {
+      const on = form.querySelector('input[name="autoRenewYn"]:checked')?.value === 'Y';
+      ['f-renewValue', 'f-renewUnit'].forEach((id) => { document.getElementById(id).disabled = !on; });
+      if (on && !document.getElementById('f-renewValue').value) { document.getElementById('f-renewValue').value = 1; document.getElementById('f-renewUnit').value = 'Y'; }
+    };
+    form.querySelectorAll('input[name="autoRenewYn"]').forEach((r) => r.addEventListener('change', syncRenew));
+    syncRenew();
+
     // 재위탁 업체명·업무·동의서: 재위탁 여부가 Y 일 때만 입력 가능
     const SUB_FIELDS = ['f-subcontractorName', 'f-subcontractTask', 'f-subcontractConsentYn'];
     const subcontractOn = () => form.querySelector('input[name="subcontractYn"]:checked')?.value === 'Y';
@@ -584,6 +613,14 @@
       body.subcontractConsentYn = document.getElementById('f-subcontractConsentYn').value;
       Object.keys(body).forEach((k) => { if (body[k] === '') body[k] = null; });
       body.alertDaysBefore = body.alertDaysBefore ? Number(body.alertDaysBefore) : 30;
+      {
+        const n = Number(document.getElementById('f-renewValue').value || 0);
+        const months = document.getElementById('f-renewUnit').value === 'Y' ? n * 12 : n;
+        if (body.autoRenewYn === 'Y' && (!Number.isInteger(n) || months < 1 || months > 120)) {
+          notify('자동연장 기간은 1개월 ~ 10년 사이로 입력하세요.', 'warning'); document.getElementById('f-renewValue').focus(); return;
+        }
+        body.autoRenewPeriodMonths = months >= 1 && months <= 120 ? months : 12;
+      }
       if (body.subcontractYn === 'Y' && !body.subcontractorName && !body.subcontractTask) {
         notify('재위탁이 Y 이면 재위탁 업체명 또는 재위탁 업무를 입력하세요.', 'warning');
         document.getElementById('f-subcontractorName').focus();
@@ -1227,7 +1264,7 @@
       <section class="pi-card" id="contract-detail-section">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
           <h2 class="mb-0"><i class="fas fa-building"></i>${esc(c.vendorName)}${c.contractName ? ` <span class="pi-contract-name">${esc(c.contractName)}</span>` : ''} ${badge(c.status, c.statusLabel)}
-            <small class="text-muted fw-normal ms-1">${c.status === 'TERMINATED' ? '' : dLabel(c.daysLeft)}</small></h2>
+            <small class="text-muted fw-normal ms-1">${c.status === 'TERMINATED' ? '' : dLabel(c.daysLeft)}${c.autoRenewing ? ' · 자동연장' : ''}</small></h2>
           <div class="pi-actions">
             <button class="btn btn-sm btn-light" id="btn-back"><i class="fas fa-list me-1"></i>목록</button>
             ${perm.canSendMail ? '<button class="btn btn-sm btn-outline-primary" id="btn-mail"><i class="fas fa-envelope me-1"></i>만료 안내 메일</button>' : ''}
@@ -1244,7 +1281,13 @@
           ${row('위탁업무 내용', esc(c.entrustedTask))}${row('담당부서 / 담당자', esc((c.deptName || '-') + ' / ' + (c.managerName || '-')))}
           ${row('담당자 이메일', esc(c.managerEmail || '-'))}${row('수탁사 담당자', esc([c.vendorContactName, c.vendorContactPhone, c.vendorContactEmail].filter(Boolean).join(' / ') || '-'))}
           ${row('원계약 기간', fmtDate(c.contractStartDate) + ' ~ ' + fmtDate(c.contractEndDate))}${row('원계약 기간 비고', esc(c.contractPeriodNote || '-'))}
-          ${row('원계약 자동연장', yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
+          ${row('원계약 자동연장', c.autoRenewYn === 'Y'
+            ? `Y · <b>${renewLabel(c.autoRenewPeriodMonths)} 단위</b>${c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''}${c.autoRenewing
+              ? (c.autoRenewCount > 0
+                ? `<br><span class="pi-term-chip renew"><i class="fas fa-rotate"></i>자동연장 ${c.autoRenewCount}회</span> <small>현재 계약기간 ~ <b>${fmtDate(c.currentEndDate)}</b></small>`
+                : '<br><small class="text-muted">원계약 종료 후 자동연장 — 만료 대상 아님</small>')
+              : ''}`
+            : yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
           ${row('재위탁', c.subcontractYn === 'Y' ? esc(c.subcontractorName || '') + (c.subcontractTask ? ' — ' + esc(c.subcontractTask) : '') : 'N')}${row('재위탁 동의서', yn(c.subcontractConsentYn))}
           ${row('만료 알림', c.alertYn === 'Y' ? `사용 (만료 ${c.alertDaysBefore}일 전부터)` : '미사용')}${row('추가 수신자', esc(c.alertExtraEmails || '-'))}
           ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-'))
@@ -1467,7 +1510,7 @@
       // 종료일 기본값 = 원계약 종료일 (없으면 오늘)
       const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       const dateEl = document.getElementById('term-date');
-      dateEl.value = c.contractEndDate || today;
+      dateEl.value = c.currentEndDate || c.contractEndDate || today;
       dateEl.min = c.contractStartDate || '';
       document.getElementById('term-reason').value = '계약 만료';
       const missing = (c.followUp && c.followUp.missingDocs) || [];
@@ -1477,7 +1520,9 @@
       document.getElementById('term-docs-remind').checked = true;
       document.getElementById('term-docs-missing').innerHTML = missing.length
         ? `<i class="fas fa-triangle-exclamation me-1"></i>아직 받지 못한 만료 서류 <b>${missing.length}종</b>: ${esc(missing.join(', '))}<br>미수취 사유를 남겨야 종료 처리할 수 있습니다.` : '';
-      document.getElementById('term-date-hint').textContent = c.contractEndDate
+      document.getElementById('term-date-hint').textContent = c.autoRenewing && c.autoRenewCount > 0
+        ? `기본값은 자동연장된 현재 계약 종료일(${fmtDate(c.currentEndDate)})입니다. 원계약 종료일은 ${fmtDate(c.contractEndDate)}. 실제 종료일로 바꾸세요.`
+        : c.contractEndDate
         ? `기본값은 원계약 종료일(${fmtDate(c.contractEndDate)})입니다. 중도 해지 등은 실제 종료일로 바꾸세요.`
         : '원계약 종료일이 없어 오늘 날짜를 기본값으로 넣었습니다.';
       modal('terminate-modal').show();

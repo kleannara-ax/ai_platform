@@ -11,7 +11,8 @@ import java.time.LocalDate;
  * <ul>
  *   <li><b>기준일</b> = 조회 시점(오늘)을 기준 연도 안으로 맞춘 날.
  *       지난 연도는 12월 31일, 올해는 오늘, 앞으로 올 연도는 1월 1일.</li>
- *   <li><b>종료 기준일</b> = 종료 처리했으면 종료일(없으면 원계약 종료일), 아니면 원계약 종료일.</li>
+ *   <li><b>종료 기준일</b> = 종료 처리했으면 종료일(없으면 원계약 종료일), 아니면 원계약 종료일.
+ *       자동연장 중(자동연장 Y + 미종료)이면 끝나는 날이 없는 것으로 보고 매년 계약중으로 잡는다.</li>
  *   <li><b>대상(전체)</b>: 시작일이 없거나 연말 이전이고, 종료 기준일이 없거나 <b>전년도 12월 31일 이후</b>인 계약.
  *       → 12월 31일에 끝난 계약은 그해 계약중으로, 다음 해에는 종료로 잡힌다.</li>
  *   <li><b>종료</b>: 대상 중 종료 기준일이 기준일보다 앞선 계약 (= 기준일에 계약기간 밖).</li>
@@ -49,6 +50,9 @@ public final class PiYearScope {
     public static LocalDate effectiveEnd(PiContract c) {
         if ("Y".equals(c.getTerminatedYn()) && c.getTerminatedDate() != null) {
             return c.getTerminatedDate();
+        }
+        if (c.isAutoRenewing()) {
+            return null; // 자동연장으로 계속 이어짐
         }
         return c.getContractEndDate();
     }

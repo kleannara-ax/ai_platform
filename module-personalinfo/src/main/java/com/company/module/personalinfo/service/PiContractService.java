@@ -227,6 +227,7 @@ public class PiContractService {
                 .contractPeriodNote(trim(r.getContractPeriodNote()))
                 .autoRenewYn(r.getAutoRenewYn())
                 .autoRenewNote(trim(r.getAutoRenewNote()))
+                .autoRenewPeriodMonths(r.getAutoRenewPeriodMonths())
                 .contractDocYn(r.getContractDocYn())
                 .contractSignedDate(r.getContractSignedDate())
                 .subcontractYn(r.getSubcontractYn())
@@ -261,7 +262,7 @@ public class PiContractService {
                 accessScope.current().deptForSave(trim(r.getDeptName())), trim(r.getManagerName()), trim(r.getManagerEmail()),
                 trim(r.getVendorContactName()), trim(r.getVendorContactEmail()), trim(r.getVendorContactPhone()),
                 r.getContractStartDate(), r.getContractEndDate(), trim(r.getContractPeriodNote()),
-                r.getAutoRenewYn(), trim(r.getAutoRenewNote()), r.getContractDocYn(), r.getContractSignedDate(),
+                r.getAutoRenewYn(), trim(r.getAutoRenewNote()), r.getAutoRenewPeriodMonths(), r.getContractDocYn(), r.getContractSignedDate(),
                 r.getSubcontractYn(), trim(r.getSubcontractorName()), trim(r.getSubcontractTask()),
                 emptyToNull(r.getSubcontractConsentYn()),
                 r.getAlertYn(), r.getAlertDaysBefore(), trim(r.getAlertExtraEmails()), trim(r.getRemark()),
@@ -354,9 +355,9 @@ public class PiContractService {
     @Transactional
     public ContractDetailResponse terminate(Long contractId, ContractTerminateRequest r, Long userId) {
         PiContract c = findActive(contractId);
-        // 종료일 기본값 = 원계약 종료일 (없으면 오늘)
+        // 종료일 기본값 = 현재 계약 종료일 (자동연장 중이면 연장된 종료일, 아니면 원계약 종료일, 없으면 오늘)
         LocalDate date = r != null && r.getTerminatedDate() != null ? r.getTerminatedDate()
-                : (c.getContractEndDate() != null ? c.getContractEndDate() : LocalDate.now());
+                : (c.getContractEndDate() != null ? c.currentEndDate(LocalDate.now()) : LocalDate.now());
         if (c.getContractStartDate() != null && date.isBefore(c.getContractStartDate())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "종료일은 원계약 시작일보다 빠를 수 없습니다.");
         }

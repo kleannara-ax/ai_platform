@@ -28,6 +28,9 @@ public class PiContract extends PiBaseEntity {
     /** 알림 기준일 기본값 (만료 N일 전) */
     public static final int DEFAULT_ALERT_DAYS = 30;
 
+    /** 자동연장 기간 기본값 (개월, 12 = 1년 단위) */
+    public static final int DEFAULT_AUTO_RENEW_MONTHS = 12;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "CONTRACT_ID")
@@ -81,6 +84,10 @@ public class PiContract extends PiBaseEntity {
 
     @Column(name = "AUTO_RENEW_NOTE", length = 200)
     private String autoRenewNote;
+
+    /** 자동연장 기간 (개월). 원계약 종료일 이후 이 기간 단위로 계약기간이 자동 연장된다 (기본 12 = 1년) */
+    @Column(name = "AUTO_RENEW_PERIOD_MONTHS", nullable = false)
+    private Integer autoRenewPeriodMonths;
 
     @Column(name = "CONTRACT_DOC_YN", nullable = false, length = 1, columnDefinition = "CHAR(1)")
     private String contractDocYn;
@@ -143,7 +150,8 @@ public class PiContract extends PiBaseEntity {
                        String deptName, String managerName, String managerEmail,
                        String vendorContactName, String vendorContactEmail, String vendorContactPhone,
                        LocalDate contractStartDate, LocalDate contractEndDate, String contractPeriodNote,
-                       String autoRenewYn, String autoRenewNote, String contractDocYn, LocalDate contractSignedDate,
+                       String autoRenewYn, String autoRenewNote, Integer autoRenewPeriodMonths,
+                       String contractDocYn, LocalDate contractSignedDate,
                        String subcontractYn, String subcontractorName, String subcontractTask, String subcontractConsentYn,
                        String alertYn, Integer alertDaysBefore, String alertExtraEmails, String remark,
                        Long createdBy) {
@@ -163,6 +171,7 @@ public class PiContract extends PiBaseEntity {
         this.contractPeriodNote = contractPeriodNote;
         this.autoRenewYn = yn(autoRenewYn, "N");
         this.autoRenewNote = autoRenewNote;
+        this.autoRenewPeriodMonths = autoRenewPeriodMonths == null ? DEFAULT_AUTO_RENEW_MONTHS : autoRenewPeriodMonths;
         this.contractDocYn = yn(contractDocYn, "N");
         this.contractSignedDate = contractSignedDate;
         this.subcontractYn = yn(subcontractYn, "N");
@@ -183,7 +192,8 @@ public class PiContract extends PiBaseEntity {
                        String deptName, String managerName, String managerEmail,
                        String vendorContactName, String vendorContactEmail, String vendorContactPhone,
                        LocalDate contractStartDate, LocalDate contractEndDate, String contractPeriodNote,
-                       String autoRenewYn, String autoRenewNote, String contractDocYn, LocalDate contractSignedDate,
+                       String autoRenewYn, String autoRenewNote, Integer autoRenewPeriodMonths,
+                       String contractDocYn, LocalDate contractSignedDate,
                        String subcontractYn, String subcontractorName, String subcontractTask, String subcontractConsentYn,
                        String alertYn, Integer alertDaysBefore, String alertExtraEmails, String remark,
                        Long updatedBy) {
@@ -203,6 +213,7 @@ public class PiContract extends PiBaseEntity {
         this.contractPeriodNote = contractPeriodNote;
         this.autoRenewYn = yn(autoRenewYn, this.autoRenewYn);
         this.autoRenewNote = autoRenewNote;
+        this.autoRenewPeriodMonths = autoRenewPeriodMonths == null ? this.autoRenewPeriodMonths : autoRenewPeriodMonths;
         this.contractDocYn = yn(contractDocYn, this.contractDocYn);
         this.contractSignedDate = contractSignedDate;
         this.subcontractYn = yn(subcontractYn, this.subcontractYn);
@@ -271,6 +282,47 @@ public class PiContract extends PiBaseEntity {
     }
 
     /** 종료 처리 취소 */
+    /**
+     * 자동연장 중인 계약인지: 자동연장 Y + 종료 처리 안 함 + 원계약 종료일 있음.
+     * 원계약 종료일이 지나도 추가 계약 없이 자동연장 기간 단위로 계속 이어지므로 만료 대상이 아니다(종료 처리해야 만료 대상).
+     */
+    public boolean isAutoRenewing() {
+        return "Y".equals(autoRenewYn) && !"Y".equals(terminatedYn) && contractEndDate != null;
+    }
+
+    /** 자동연장 기간 표시 (12의 배수면 "N년", 아니면 "N개월") */
+    public static String renewPeriodLabel(int months) {
+        return months % 12 == 0 ? (months / 12) + "년" : months + "개월";
+    }
+
+    /** 자동연장 기간 (개월, 1 미만이면 기본 12) */
+    public int autoRenewMonths() {
+        return autoRenewPeriodMonths == null || autoRenewPeriodMonths < 1 ? DEFAULT_AUTO_RENEW_MONTHS : autoRenewPeriodMonths;
+    }
+
+    /** 기준일까지 자동연장된 횟수 (자동연장 중이 아니거나 원계약 기간 안이면 0) */
+    public int autoRenewCount(LocalDate today) {
+        if (!isAutoRenewing() || !contractEndDate.isBefore(today)) {
+            return 0;
+        }
+        int months = autoRenewMonths();
+        int k = 1;
+        while (contractEndDate.plusMonths((long) k * months).isBefore(today) && k < 1200) {
+            k++;
+        }
+        return k;
+    }
+
+    /**
+     * 기준일에 적용되는 현재 계약 종료일.
+     * 자동연장 중이면 원계약 종료일 + (연장 횟수 × 자동연장 기간), 아니면 원계약 종료일.
+     * 월말 날짜가 밀리지 않도록 매번 원계약 종료일에서 다시 계산한다(예: 12/31 → 이듬해 12/31).
+     */
+    public LocalDate currentEndDate(LocalDate today) {
+        int k = autoRenewCount(today);
+        return k == 0 ? contractEndDate : contractEndDate.plusMonths((long) k * autoRenewMonths());
+    }
+
     public void reopen(Long updatedBy) {
         this.terminatedYn = "N";
         this.terminatedDate = null;

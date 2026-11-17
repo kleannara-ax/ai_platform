@@ -89,6 +89,11 @@ public class ContractSaveRequest {
     @Size(max = 200)
     private String autoRenewNote;
 
+    /** 자동연장 기간 (개월, 기본 12 = 1년 단위, 1~120) */
+    @Min(1)
+    @Max(120)
+    private Integer autoRenewPeriodMonths = 12;
+
     /** 개인정보처리 위탁계약서 작성 여부 */
     @Pattern(regexp = YN)
     private String contractDocYn = "N";
