@@ -857,14 +857,17 @@
   /** 같은 업체 계약 표 (상세 섹션·팝업·등록 안내 공통) */
   function sameVendorTable(list, currentId, opts = {}) {
     return `<div class="table-responsive"><table class="pi-table pi-same-vendor-table"><thead><tr>
-        <th class="pi-sv-name">계약명</th><th>관련 서비스</th><th>위탁업무 내용</th><th class="pi-sv-dept">담당부서 / 담당자</th><th>원계약 기간</th><th>상태</th><th>최근 점검</th></tr></thead>
+        <th class="pi-sv-name">계약명</th><th>관련 서비스</th><th>위탁업무 내용</th><th class="pi-sv-dept">담당부서 / 담당자</th><th>계약기간</th><th>상태</th><th>최근 점검</th></tr></thead>
       <tbody>${list.map((r) => `
         <tr data-id="${r.contractId}" class="${r.contractId === currentId ? 'pi-same-current' : ''}" tabindex="0" role="button" title="${r.contractId === currentId ? '지금 보고 있는 계약' : '이 계약 상세로 이동'}">
           <td class="fw-semibold pi-sv-name">${esc(r.contractName || '-')}${r.contractId === currentId ? ' <span class="badge text-bg-primary">이 계약</span>' : ''}${r.vendorName && opts.showVendor ? `<small class="text-muted d-block">${esc(r.vendorName)}</small>` : ''}</td>
           <td>${esc(r.serviceName || '-')}</td>
           <td class="pi-ellipsis" style="max-width:260px" title="${esc(r.entrustedTask)}">${esc(r.entrustedTask)}</td>
           <td class="pi-sv-dept">${esc([r.deptName, r.managerName].filter(Boolean).join(' / ') || '-')}</td>
-          <td class="text-nowrap">${r.contractStartDate || r.contractEndDate ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.contractEndDate) : esc(r.contractPeriodNote || '-')}</td>
+          <td class="text-nowrap" ${r.autoRenewing && r.autoRenewCount > 0 ? `title="원계약 기간 ${fmtDate(r.contractStartDate)} ~ ${fmtDate(r.contractEndDate)} · ${renewLabel(r.autoRenewPeriodMonths)} 단위 자동연장 ${r.autoRenewCount}회"` : ''}>${r.contractStartDate || r.contractEndDate
+            ? fmtDate(r.contractStartDate) + ' ~ ' + fmtDate(r.currentEndDate || r.contractEndDate)
+              + (r.autoRenewing && r.autoRenewCount > 0 ? ` <span class="pi-term-chip renew" title="자동연장 ${r.autoRenewCount}회 반영"><i class="fas fa-rotate"></i>연장${r.autoRenewCount}</span>` : '')
+            : esc(r.contractPeriodNote || '-')}</td>
           <td class="text-nowrap">${badge(r.status, r.statusLabel)}</td>
           <td class="text-nowrap">${badge(r.lastInspectionResult || 'NONE', r.lastInspectionResultLabel)} <small class="text-muted">${r.lastInspectionDate ? fmtDate(r.lastInspectionDate) : ''}</small></td>
         </tr>`).join('')}</tbody></table></div>`;
