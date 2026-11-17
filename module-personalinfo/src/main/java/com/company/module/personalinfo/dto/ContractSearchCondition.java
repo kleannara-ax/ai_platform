@@ -47,7 +47,7 @@ public class ContractSearchCondition {
     private String yearCheck;
 
     /**
-     * 보안팀 후속 관리 조건 (기준 연도와 상관없이 적용)
+     * 보안팀 확인 필요 조건 (기준 연도와 상관없이 적용)
      * EXPIRY_DOCS_MISSING : 만료 서류(만료 점검 체크리스트·확약서·파기 확인서) 미수취
      * ACTION_OVERDUE      : 점검 조치 예정일 지남(조치 미완료)
      * CONSENT_MISSING     : 재위탁 Y 인데 재위탁 동의서 파일 없음

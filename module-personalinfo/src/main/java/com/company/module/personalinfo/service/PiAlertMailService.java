@@ -178,7 +178,7 @@ public class PiAlertMailService {
         }
         log.info("[personalinfo] 만료 알림 실행 baseDate={} 대상={} 발송={} 실패={} 미발송={} 기발송={}",
                 today, considered, sent, failed, skipped, already);
-        // 보안팀 후속 관리 알림 (각각 실패해도 다른 알림은 계속)
+        // 보안팀 확인 필요 알림 (각각 실패해도 다른 알림은 계속)
         int[] docs = safeRun("만료 서류 독촉", () -> runExpiryDocsReminders(today));
         int[] overdue = safeRun("조치 지연", () -> runActionOverdueAlerts(today));
         int[] regular = safeRun("정기 점검", () -> runRegularInspectionAlerts(today));

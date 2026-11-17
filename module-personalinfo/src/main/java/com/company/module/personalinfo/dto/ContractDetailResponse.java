@@ -62,7 +62,7 @@ public class ContractDetailResponse {
     private String expiryDocsNote;
     /** 미수취 만료 서류 독촉 메일 발송 여부 */
     private String expiryDocsRemindYn;
-    /** 보안팀 후속 관리 상태 (만료 서류, 조치 지연, 재위탁 동의서, 파기 완료일) */
+    /** 보안팀 확인 필요 상태 (만료 서류, 조치 지연, 재위탁 동의서, 파기 완료일) */
     private FollowUpResponse followUp;
 
     private List<ContractFileResponse> files;

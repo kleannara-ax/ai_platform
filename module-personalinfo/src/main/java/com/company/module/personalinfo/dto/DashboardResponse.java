@@ -49,7 +49,7 @@ public class DashboardResponse {
     /** 종료 중 계약종결 체크 미업로드 */
     private long yearEndedTermMissingCount;
 
-    // ── 보안팀 후속 관리 (기준 연도와 상관없이 현재 기준, 볼 수 있는 계약만) ──
+    // ── 보안팀 확인 필요 (기준 연도와 상관없이 현재 기준, 볼 수 있는 계약만) ──
     /** 만료 서류(만료 점검 체크리스트·확약서·파기 확인서) 미수취 계약 */
     private long expiryDocsMissingCount;
     /** 조치 예정일이 지난 점검이 있는 계약 */

@@ -75,7 +75,7 @@ public class PiContractService {
     private final PiAccessScopeResolver accessScope;
     private final PiFollowUpRules followUps;
 
-    /** 후속 관리 목록 조건 */
+    /** 확인 필요 목록 조건 */
     static final Set<String> FOLLOW_UPS = Set.of("EXPIRY_DOCS_MISSING", "ACTION_OVERDUE", "CONSENT_MISSING", "DESTRUCTION_LATE");
 
     static boolean matchesFollowUp(String followUp, com.company.module.personalinfo.dto.FollowUpResponse f) {
@@ -95,7 +95,7 @@ public class PiContractService {
         LocalDate today = LocalDate.now();
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), toSort(sort));
         String followUp = upperOrEmpty(cond.getFollowUp(), FOLLOW_UPS);
-        // 후속 관리 조건은 요약 카드와 같이 기준 연도와 상관없이 현재 기준으로 거른다
+        // 확인 필요 조건은 요약 카드와 같이 기준 연도와 상관없이 현재 기준으로 거른다
         Integer by = followUp.isEmpty() ? cond.getBaseYear() : null;
         if (by != null && (by < 1990 || by > 2100)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "기준 연도가 올바르지 않습니다: " + by);
@@ -121,7 +121,7 @@ public class PiContractService {
         if (followUp.isEmpty()) {
             result = query.apply(pageable);
         } else {
-            // 후속 관리 조건은 파일·점검 상태로 계산하므로 같은 조건의 계약을 모두 읽어 거른 뒤 페이지를 나눈다
+            // 확인 필요 조건은 파일·점검 상태로 계산하므로 같은 조건의 계약을 모두 읽어 거른 뒤 페이지를 나눈다
             List<PiContract> all = query.apply(PageRequest.of(0, 5000, pageable.getSort())).getContent();
             Map<Long, com.company.module.personalinfo.dto.FollowUpResponse> fu = followUps.of(all, today, false);
             List<PiContract> filtered = all.stream().filter(c -> matchesFollowUp(followUp, fu.get(c.getContractId()))).toList();

@@ -213,7 +213,7 @@
             <button type="button" class="pi-sub-link ok ${on('ENDED', 'TERM_UPLOADED') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_UPLOADED" title="계약종결 체크(계약변경·만료 점검) 업로드">업로드 <b>${d.yearEndedTermCheckCount}</b></button>
             <button type="button" class="pi-sub-link ${d.yearEndedTermMissingCount ? 'warn' : ''} ${on('ENDED', 'TERM_MISSING') ? 'active' : ''}" data-ys="ENDED" data-yc="TERM_MISSING" title="계약종결 체크(계약변경·만료 점검) 미업로드">미업로드 <b>${d.yearEndedTermMissingCount}</b></button></div>
         </div>`;
-      // 보안팀 후속 관리 카드 (기준 연도와 상관없이 현재 기준)
+      // 보안팀 확인 필요 카드 (기준 연도와 상관없이 현재 기준)
       const fuCards = [
         ['EXPIRY_DOCS_MISSING', '만료 서류 미수취', d.expiryDocsMissingCount, 'fa-file-circle-exclamation', '종료·만료(임박) 계약 중 만료 점검 체크리스트·확약서·파기 확인서를 다 받지 못한 계약'],
         ['ACTION_OVERDUE', '조치 지연', d.actionOverdueCount, 'fa-hourglass-end', '점검 결과 조치 필요 항목의 조치 예정일이 지났는데 조치 완료가 아닌 계약'],
@@ -221,8 +221,8 @@
         ['DESTRUCTION_LATE', '파기 지연', d.destructionLateCount, 'fa-clock-rotate-left', '파기 확인서의 파기 완료일이 계약 종료일 + 허용 기간보다 늦은 계약'],
       ];
       document.getElementById('pi-followup-bar')?.remove();
-      el.insertAdjacentHTML('afterend', `<section class="pi-followup-bar" id="pi-followup-bar" aria-label="보안팀 후속 관리">
-        <span class="pi-fu-title"><i class="fas fa-shield-halved me-1"></i>후속 관리</span>
+      el.insertAdjacentHTML('afterend', `<section class="pi-followup-bar" id="pi-followup-bar" aria-label="보안팀 확인 필요">
+        <span class="pi-fu-title"><i class="fas fa-shield-halved me-1"></i>확인 필요</span>
         ${fuCards.map(([k, label, n, icon, tip]) => `<button type="button" class="pi-fu-card ${n ? 'warn' : ''} ${cur.followUp === k ? 'active' : ''}" data-fu="${k}" title="${esc(tip)}">
           <i class="fas ${icon}"></i>${esc(label)} <b>${n}</b></button>`).join('')}
         <small class="text-muted ms-auto">기준 연도와 상관없이 오늘 기준</small></section>`);
@@ -255,7 +255,7 @@
   const FOLLOW_UP_LABEL = { EXPIRY_DOCS_MISSING: '만료 서류 미수취', ACTION_OVERDUE: '조치 지연', CONSENT_MISSING: '재위탁 동의서 누락', DESTRUCTION_LATE: '파기 지연' };
   function yearFilterLabel() {
     const c = listState.cond; const y = listState.baseYear;
-    if (c.followUp) return `후속 관리 · ${FOLLOW_UP_LABEL[c.followUp] || c.followUp} (오늘 기준)`;
+    if (c.followUp) return `확인 필요 · ${FOLLOW_UP_LABEL[c.followUp] || c.followUp} (오늘 기준)`;
     const map = { '': '전체', ACTIVE: '계약중', ENDED: '종료' };
     const check = { INSPECTED: '수탁사 점검완료', NOT_INSPECTED: '수탁사 미점검', TERM_UPLOADED: '계약종결 체크 업로드', TERM_MISSING: '계약종결 체크 미업로드' };
     return `${y}년 · ${map[c.yearStatus || '']}${c.yearCheck ? ' · ' + check[c.yearCheck] : ''}`;
@@ -343,7 +343,7 @@
     }
   }
 
-  /** 목록 상태 칸의 후속 관리 표시 */
+  /** 목록 상태 칸의 확인 필요 표시 */
   function followUpChips(r) {
     const out = [];
     if (r.expiryDocsNeeded && r.expiryDocsReceived != null) {
@@ -708,7 +708,7 @@
     return `<small class="text-muted">${esc(f.documentDateLabel)}</small> ` + d + edit;
   }
 
-  /** 상세 상단 보안팀 후속 관리 안내 (해당 사항이 있을 때만) */
+  /** 상세 상단 보안팀 확인 필요 안내 (해당 사항이 있을 때만) */
   function followUpPanel(c) {
     const f = c.followUp;
     if (!f) return '';
@@ -731,7 +731,7 @@
     if (!items.length) return '';
     const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate;
     return `<section class="pi-card pi-followup-panel ${serious ? 'serious' : ''}" id="follow-up-section" role="status">
-      <h2 class="mb-2"><i class="fas fa-shield-halved"></i>보안팀 후속 관리 <small class="fw-normal text-muted">확인이 필요한 항목</small></h2>
+      <h2 class="mb-2"><i class="fas fa-shield-halved"></i>보안팀 확인 필요 <small class="fw-normal text-muted">아래 항목을 확인해 주세요</small></h2>
       <ul class="mb-0 small">${items.join('')}</ul></section>`;
   }
 
@@ -1474,7 +1474,7 @@
         catch (err) { fail(err); }
       };
     }));
-    // 후속 관리 안내의 바로가기
+    // 확인 필요 안내의 바로가기
     document.querySelectorAll('.pi-fu-jump').forEach((a) => a.addEventListener('click', (e) => {
       e.preventDefault();
       const sec = document.getElementById(a.dataset.target);

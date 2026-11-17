@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 보안팀 후속 관리 규칙 (목록·상세·요약 카드·알림·종료 처리에서 같은 규칙을 쓴다).
+ * 보안팀 확인 필요 규칙 (목록·상세·요약 카드·알림·종료 처리에서 같은 규칙을 쓴다).
  * 목록 검색 조건(followUp)의 JPQL 은 {@link com.company.module.personalinfo.repository.PiContractRepository#search} 에 같은 규칙으로 들어 있다.
  */
 @Component
@@ -64,7 +64,7 @@ public class PiFollowUpRules {
         return of(List.of(c), today, true).get(c.getContractId());
     }
 
-    /** 여러 계약의 후속 관리 상태 (파일·점검은 한 번에 읽는다). detail=true 면 조치 지연 점검 목록까지 채움 */
+    /** 여러 계약의 확인 필요 상태 (파일·점검은 한 번에 읽는다). detail=true 면 조치 지연 점검 목록까지 채움 */
     public Map<Long, FollowUpResponse> of(Collection<PiContract> contracts, LocalDate today, boolean detail) {
         Map<Long, FollowUpResponse> result = new HashMap<>();
         if (contracts.isEmpty()) {

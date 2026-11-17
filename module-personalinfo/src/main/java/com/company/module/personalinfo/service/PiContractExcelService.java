@@ -61,7 +61,7 @@ public class PiContractExcelService {
         if (c.getBaseYear() != null) parts.add(c.getBaseYear() + "년");
         if (c.getYearStatus() != null && !c.getYearStatus().isBlank()) parts.add("구분=" + c.getYearStatus());
         if (c.getYearCheck() != null && !c.getYearCheck().isBlank()) parts.add("점검=" + c.getYearCheck());
-        if (c.getFollowUp() != null && !c.getFollowUp().isBlank()) parts.add("후속관리=" + c.getFollowUp());
+        if (c.getFollowUp() != null && !c.getFollowUp().isBlank()) parts.add("확인필요=" + c.getFollowUp());
         if (c.getKeyword() != null && !c.getKeyword().isBlank()) parts.add("검색어=" + c.getKeyword());
         if (c.getStatus() != null && !c.getStatus().isBlank()) parts.add("상태=" + c.getStatus());
         if (c.getDeptName() != null && !c.getDeptName().isBlank()) parts.add("부서=" + c.getDeptName());
