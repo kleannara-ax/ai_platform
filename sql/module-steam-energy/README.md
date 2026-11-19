@@ -8,7 +8,7 @@
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | JPA 영역 표 3개 (steam_equipment·steam_price·steam_daily_usage) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
+| 1 | `01_schema.sql` | JPA 영역 표 7개 (steam_equipment·steam_price·steam_daily_usage + 원단위 일지 4개: steam_unit_daily_usage·steam_unit_daily_common·steam_lng_daily_usage·steam_fuel_daily_usage) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
 | 2 | `02_legacy_schema.sql` | 이관 대시보드 표 3개 (steam_cell_value·steam_unit_usage·steam_unit_usage_raw) + 인덱스 |
 | 3 | `03_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플 6건) |
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
@@ -201,10 +201,83 @@ DELETE FROM steam_price
 | `steam_cell_value` | 이관 대시보드 화면들의 셀 저장소 — `table_name` 으로 논리 표를 나눈다 ([CELL_CONVENTIONS.md](CELL_CONVENTIONS.md)) | `(month, table_name, row_key, col_index)` |
 | `steam_unit_usage` | 원단위 일지 (설비·일자별) | `(month, day, machine_no)` |
 | `steam_unit_usage_raw` | 원단위 일지 원시값 (디스퍼져·TOC·PICA) | `(month, day)` |
+| `steam_unit_daily_usage` | 원단위 일지 — 호기별 일일 스팀 사용·생산 실적 (2026-11, 규격 전환) | `(USAGE_DATE, MACHINE_CODE)` |
+| `steam_unit_daily_common` | 원단위 일지 — 일자별 공통 계측값 (디스퍼져 총량·TOC·PICA) | `(USAGE_DATE)` |
+| `steam_lng_daily_usage` | 일별 LNG 연료 사용량 (보일러·버너·복합+외부, 단가) | `(USAGE_DATE)` |
+| `steam_fuel_daily_usage` | 유동상·폐합성소각로·복합·외부 일일 스팀 구매량과 단가 | `(USAGE_DATE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
 - 모든 컬럼에 `COMMENT` 부여
+
+## 원단위 일지 그룹 전환 (2026-11) — 업무 모듈 규격 4-1 맞춤
+
+이관 대시보드 중 **원단위 일지 7개 화면**(오늘 일지 등록, 단가 입력, 스팀사용 원단위, 스팀 사용량, LNG 연료 사용 비용,
+유동상/소각로/복합 일일 사용량, 호기별 요약)을 `steam_cell_value` 셀 저장소에서 **실제 컬럼을 가진 표 4개 + 기존 `steam_price`** 로 옮겼다.
+API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
+
+**데이터 이관 없음** — 새 표는 비어 있다. 지난 데이터가 필요하면 `원단위 일지 누계(YYYY년).xls` 를
+`POST /steam-energy-api/unit-log/import-excel?year=YYYY` 로 다시 올려 채운다. 옛 네임스페이스(`usage_m_*`, `lng_m_*`, `flow_m_*`,
+`unit_price*`, `steam_unit_usage`·`_raw`)는 다른 묶음 전환이 끝날 때까지 읽기용으로만 남는다.
+
+### 테이블-컬럼 매핑표 (화면 입력항목 ↔ 컬럼)
+
+공통 감사 컬럼 7개(`CREATED_AT`·`CREATED_BY`·`UPDATED_AT`·`UPDATED_BY`·`DELETED_YN`·`DELETED_AT`·`DELETED_BY`)는 생략.
+계산값(스팀량 합·원단위·LNG 합계/비용·구매 비용·스팀구매비 등)은 저장하지 않고 화면에서 계산한다.
+
+| 메뉴/기능 | 테이블명 | 컬럼명 | 타입 | NULL | COMMENT | 대응 입력항목 |
+|---|---|---|---|---|---|---|
+| 스팀사용 원단위 · 스팀 사용량 · 오늘 일지 | `steam_unit_daily_usage` | UNIT_USAGE_ID | BIGINT | N | 원단위 일지 ID | (PK) |
+| | | USAGE_DATE | DATE | N | 일자 | 조회 연·월 + 일 |
+| | | MACHINE_CODE | VARCHAR(20) | N | 호기 | PM-2 / PM-3 / TM-3 / TM-4 / TM-5 |
+| | | MAIN_STEAM | DECIMAL(18,6) | Y | Main 스팀량(톤) | PM-2·PM-3 Main 스팀량 |
+| | | COATER_STEAM | DECIMAL(18,6) | Y | Coater 스팀량(톤) | PM-2·PM-3 Coater 스팀량 |
+| | | VENTILATION_STEAM | DECIMAL(18,6) | Y | 환기시스템 스팀량(톤) | PM-3 환기시스템 |
+| | | STEAM | DECIMAL(18,6) | Y | 스팀량(톤) | TM-3~5 스팀량 |
+| | | PRODUCTION_KG | DECIMAL(18,6) | Y | 생산량(kg) | 생산량 |
+| | | PRODUCTION_TYPE | VARCHAR(50) | Y | 생산지종 | PM-2·PM-3 생산지종 |
+| | | RUNTIME_HOURS | DECIMAL(12,4) | Y | 가동시간(hr) | 호기별 가동시간 |
+| | | DISPERSER_RUNTIME_HOURS | DECIMAL(12,4) | Y | 디스퍼져 가동시간(hr) | PM-3 디스퍼져 가동시간 |
+| | | VENT_RUNTIME_HOURS | DECIMAL(12,4) | Y | Ventilation 가동시간(hr) | PM-3 Ventilation 가동시간 |
+| | | NOTE | VARCHAR(500) | Y | 비고 | PM-2·PM-3 비고 |
+| 스팀사용 원단위 공통값 · 오늘 일지 | `steam_unit_daily_common` | UNIT_COMMON_ID | BIGINT | N | 원단위 공통값 ID | (PK) |
+| | | USAGE_DATE | DATE | N | 일자 (UNIQUE) | |
+| | | DISPERSER_TOTAL | DECIMAL(18,6) | Y | 디스퍼져 스팀량 총량(톤) | 디스퍼져 스팀량 |
+| | | TOC_STEAM | DECIMAL(18,6) | Y | TOC 스팀량(환경관리) | TOC 스팀량 |
+| | | PICA121_VENT | DECIMAL(18,6) | Y | PICA-121 Vent | PICA-121 Vent |
+| LNG 연료 사용 비용 · 오늘 일지 | `steam_lng_daily_usage` | LNG_USAGE_ID | BIGINT | N | LNG 일일 사용 ID | (PK) |
+| | | USAGE_DATE | DATE | N | 일자 (UNIQUE) | |
+| | | BOILER_20T_1 / BOILER_20T_2 / BOILER_50T / BOILER_60T | DECIMAL(18,6) | Y | 보일러 LNG (N㎥) | LNG (20톤-1) / (20톤-2) / (50톤) / (60톤) |
+| | | BOILER_COMBINED / BOILER_NEW_INCINERATOR | DECIMAL(18,6) | Y | 복합보일러 / 신설소각로 LNG | 복합보일러 / 신설소각로 |
+| | | BOILER_UNIT_PRICE | DECIMAL(18,6) | Y | 보일러 LNG 단가(원/N㎥) | 단가 (단가 입력 lng_unit 전파) |
+| | | BURNER_PM3 / BURNER_TM3 / BURNER_TM4 / BURNER_TM5 | DECIMAL(18,6) | Y | 버너 LNG (N㎥) | PM-3 / TM-3 / TM-4 / TM-5 |
+| | | BURNER_UNIT_PRICE | DECIMAL(18,6) | Y | 버너 LNG 단가(원/N㎥) | 단가 (lng_unit 전파) |
+| | | MIX_PM2 / MIX_PM3 / MIX_TM3 / MIX_TM4 / MIX_TM5 | DECIMAL(18,6) | Y | 복합+외부 LNG 호기별 | 엑셀 3번 구역 (화면 없음) |
+| 유동상/소각로/복합 일일 사용량 · 오늘 일지 | `steam_fuel_daily_usage` | FUEL_USAGE_ID | BIGINT | N | 스팀 구매 일일 사용 ID | (PK) |
+| | | USAGE_DATE | DATE | N | 일자 (UNIQUE) | |
+| | | FLUID_STEAM_TON / FLUID_UNIT_PRICE | DECIMAL(18,6) | Y | 유동상 스팀량(톤) / 단가(원/톤) | 유동상(톤) / 단가 (fluid_steam 전파) |
+| | | INCINERATOR_STEAM_TON / INCINERATOR_UNIT_PRICE | DECIMAL(18,6) | Y | 폐합성소각로 스팀생산량 / 단가 | 폐합성소각로 스팀생산량 / 단가 (waste2_steam 전파) |
+| | | COMBINED_STEAM_TON / COMBINED_UNIT_PRICE / COMBINED_DEDUCTION | DECIMAL(18,6) | Y | 복합보일러 스팀생산량 / 단가 / 차감비(백만원) | 복합보일러 표 |
+| | | EXT_BOILER_STEAM_TON / EXT_BOILER_UNIT_PRICE / EXT_BOILER_DEDUCTION | DECIMAL(18,6) | Y | 외부보일러 스팀생산량 / 단가 / 차감비(백만원) | 외부보일러 표 |
+| 단가 입력 | `steam_price` (기존) | YEAR_NO / MONTH_NO / ITEM_CODE / FACILITY / ITEM_NAME / UNIT / PRICE_VALUE | 기존 | | | 항목코드 × 월 단가 |
+
+### API
+
+| Method | URL | 설명 |
+|---|---|---|
+| GET | `/steam-energy-api/unit-daily-usages?year=&month=&machineCode=` | 호기별 일일 실적 목록 (month·machineCode 생략 가능) |
+| POST | `/steam-energy-api/unit-daily-usages` | (일자+호기) 업서트 — 행 전체 |
+| PUT | `/steam-energy-api/unit-daily-usages/month` | 한 달치 일괄 저장 (clearMissing) |
+| DELETE | `/steam-energy-api/unit-daily-usages/{id}` | 소프트 삭제 |
+| GET/POST/PUT/DELETE | `/steam-energy-api/unit-daily-commons[...]` | 일자별 공통 계측값 (같은 모양, 키 = 일자) |
+| GET/POST/PUT/DELETE | `/steam-energy-api/lng-daily-usages[...]` | 일별 LNG |
+| GET/POST/PUT/DELETE | `/steam-energy-api/fuel-daily-usages[...]` | 일별 스팀 구매량 |
+| POST | `/steam-energy-api/prices/apply-daily` | 등록 단가(lng_unit / fluid_steam / waste2_steam)를 그 달 일별 표에 일괄 적용 |
+| POST | `/steam-energy-api/unit-log/import-excel?year=` | 원단위 일지 누계 엑셀 가져오기 (파일이 그 달의 기준) |
+| GET | `/steam-energy-api/unit-log/export-excel?year=` | 연도 데이터를 서식에 채워 내려받기 |
+
+쓰기 API 는 `STEAM_ENERGY_MGMT` 메뉴 권한(`@PreAuthorize`)이 필요하다. 같은 일자를 삭제했다가 다시 저장하면 삭제된 행을 되살린다
+(UNIQUE 키와 소프트 삭제의 충돌 방지).
 
 ## 메뉴 / 권한
 

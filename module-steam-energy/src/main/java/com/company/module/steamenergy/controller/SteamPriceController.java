@@ -2,6 +2,8 @@ package com.company.module.steamenergy.controller;
 
 import com.company.core.common.response.ApiResponse;
 import com.company.core.common.response.PageResponse;
+import com.company.module.steamenergy.dto.SteamPriceApplyRequest;
+import com.company.module.steamenergy.dto.SteamPriceApplyResponse;
 import com.company.module.steamenergy.dto.SteamPriceResponse;
 import com.company.module.steamenergy.dto.SteamPriceSaveRequest;
 import com.company.module.steamenergy.service.SteamPriceService;
@@ -56,6 +58,14 @@ public class SteamPriceController {
     public ResponseEntity<ApiResponse<SteamPriceResponse>> save(
             @Valid @RequestBody SteamPriceSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.created(priceService.save(request)));
+    }
+
+    /** 등록 단가를 그 달 일별 표(LNG·스팀 구매 일일 사용량)에 일괄 적용 */
+    @PostMapping("/apply-daily")
+    @PreAuthorize("@coreMenuService.hasMenuAccessByAuth(authentication.authorities, 'STEAM_ENERGY_MGMT')")
+    public ResponseEntity<ApiResponse<SteamPriceApplyResponse>> applyDaily(
+            @Valid @RequestBody SteamPriceApplyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(priceService.applyToDaily(request)));
     }
 
     @PutMapping("/{id}")

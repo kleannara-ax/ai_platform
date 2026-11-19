@@ -35,7 +35,7 @@ import java.util.Map;
  *
  * <p>행·열은 모두 0-based 다.
  */
-final class SteamUnitLngLayout {
+public final class SteamUnitLngLayout {
 
     private static final int SEARCH_FIRST_ROW = 60;
     private static final int SEARCH_LAST_ROW = 160;
@@ -67,7 +67,7 @@ final class SteamUnitLngLayout {
     private SteamUnitLngLayout() {
     }
 
-    static SteamUnitLngLayout of(Sheet sheet) {
+    public static SteamUnitLngLayout of(Sheet sheet) {
         SteamUnitLngLayout layout = new SteamUnitLngLayout();
         layout.headerRow = findHeaderRow(sheet);
         if (layout.headerRow < 0) {
@@ -123,21 +123,21 @@ final class SteamUnitLngLayout {
     }
 
     /** 표 이름 → {저장 col_index → 시트 열}. 제목을 못 찾은 칸은 들어 있지 않다. */
-    Map<Integer, Integer> columns(String tableName) {
+    public Map<Integer, Integer> columns(String tableName) {
         return columnsByTable.getOrDefault(tableName, Map.of());
     }
 
     /** 일(1~31) → 시트 행. */
-    Map<Integer, Integer> dayRows() {
+    public Map<Integer, Integer> dayRows() {
         return dayRows;
     }
 
-    int headerRow() {
+    public int headerRow() {
         return headerRow;
     }
 
     /** 제목을 못 찾아 건너뛴 칸. */
-    List<String> notFound() {
+    public List<String> notFound() {
         return notFound;
     }
 

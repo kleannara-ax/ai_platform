@@ -74,3 +74,17 @@ SELECT month, col_index, COUNT(*) AS cnt
  GROUP BY month, col_index
  ORDER BY month, col_index;
 ```
+
+
+## 전환 완료 — 더 이상 쓰지 않는 네임스페이스 (2026-11)
+
+원단위 일지 7개 화면은 실제 컬럼 표(`steam_unit_daily_usage`·`steam_unit_daily_common`·`steam_lng_daily_usage`·`steam_fuel_daily_usage`·`steam_price`)로
+옮겼다 (README "원단위 일지 그룹 전환" 참고). 아래 네임스페이스는 새 화면이 쓰지 않으며, 남은 데이터는 다른 묶음 전환이 끝나면 정리한다.
+
+| 옛 네임스페이스 | 지금 |
+|---|---|
+| `usage_m_pm2`, `usage_m_pm3a`, `usage_m_pm3b`, `usage_m_tm`, `usage_m_tissue`, `usage_m_paper`, `usage_m_other` | `steam_unit_daily_usage` (가동시간·비고). 화장지 총합 가동시간은 TM 합으로 계산 |
+| `lng_m_boiler`, `lng_m_burner`, `lng_m_mix` | `steam_lng_daily_usage` |
+| `flow_m_fluid_incinerator`, `flow_m_combined`, `flow_m_boiler`, `flow_m_summary` | `steam_fuel_daily_usage`. 유동상 운전일지·세부 운영내역이 쓰던 `flow_m_fluid_incinerator` col 0 는 `FLUID_STEAM_TON` 으로 재연결 |
+| `unit_price`, `unit_price_detail` | `steam_price` (ITEM_CODE × YEAR_NO/MONTH_NO) |
+| 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

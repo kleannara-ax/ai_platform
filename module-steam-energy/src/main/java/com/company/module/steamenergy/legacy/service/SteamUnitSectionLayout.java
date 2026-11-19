@@ -32,7 +32,7 @@ import java.util.Map;
  *
  * <p>못 찾으면 그 칸은 <b>건너뛴다.</b> 행·열은 모두 0-based 다.
  */
-final class SteamUnitSectionLayout {
+public final class SteamUnitSectionLayout {
 
     private static final int MAX_ROW = 260;
     private static final int MAX_COL = 60;
@@ -82,7 +82,7 @@ final class SteamUnitSectionLayout {
      * 그 줄을 큰 구분, 다음 줄을 설비(PM-2 …), 그다음 줄을 항목(Main 스팀량 …)으로 보고,
      * 일자는 "누계" 줄 앞까지로 잡는다. 못 찾으면 null.
      */
-    static HeaderColumnIndex unitHeaderIndex(Sheet sheet) {
+    public static HeaderColumnIndex unitHeaderIndex(Sheet sheet) {
         int topRow = -1;
         for (int row = 0; row <= MAX_ROW && topRow < 0; row += 1) {
             if (normalize(text(sheet, row, 0)).equals(normalize("일자"))) topRow = row;
@@ -101,7 +101,7 @@ final class SteamUnitSectionLayout {
      * A열에서 글자 규칙에 맞는 줄을 찾는다. {@code unitInC} 이면 같은 줄 C열이 "단위" 인 줄만 본다
      * (월 누계·월 요약 표의 머리글 줄). 못 찾으면 -1.
      */
-    static int findLabelRow(Sheet sheet, java.util.regex.Pattern pattern, boolean unitInC) {
+    public static int findLabelRow(Sheet sheet, java.util.regex.Pattern pattern, boolean unitInC) {
         for (int row = 0; row <= MAX_ROW; row += 1) {
             if (!pattern.matcher(text(sheet, row, 0)).matches()) continue;
             if (unitInC && !normalize(text(sheet, row, 2)).equals(normalize("단위"))) continue;
@@ -111,7 +111,7 @@ final class SteamUnitSectionLayout {
     }
 
     /** 2번 구역 — 항목 줄의 "총 스팀량(톤)" 을 기준으로 잡고, 그 윗줄이 설비 줄이다. */
-    static SteamUnitSectionLayout usage(Sheet sheet) {
+    public static SteamUnitSectionLayout usage(Sheet sheet) {
         SteamUnitSectionLayout layout = new SteamUnitSectionLayout();
         int itemRow = findRow(sheet, "총 스팀량(톤)");
         if (itemRow < 1) {
@@ -123,7 +123,7 @@ final class SteamUnitSectionLayout {
     }
 
     /** 4번 구역 — 설비 줄의 "유동상 스팀 구매비용" 을 기준으로 잡고, 그 아랫줄이 항목 줄이다. */
-    static SteamUnitSectionLayout flow(Sheet sheet) {
+    public static SteamUnitSectionLayout flow(Sheet sheet) {
         SteamUnitSectionLayout layout = new SteamUnitSectionLayout();
         int groupRow = findRow(sheet, "유동상 스팀 구매비용");
         if (groupRow < 0) {
@@ -160,22 +160,22 @@ final class SteamUnitSectionLayout {
     }
 
     /** 표 이름 → {저장 col_index → 시트 열}. 제목을 못 찾은 칸은 들어 있지 않다. */
-    Map<Integer, Integer> columns(String tableName) {
+    public Map<Integer, Integer> columns(String tableName) {
         return columnsByTable.getOrDefault(tableName, Map.of());
     }
 
     /** 이 구역이 쓰는 표 이름 — 항목표에 적힌 순서. */
-    List<String> tables() {
+    public List<String> tables() {
         return new ArrayList<>(columnsByTable.keySet());
     }
 
     /** 일(1~31) → 시트 행. */
-    Map<Integer, Integer> dayRows() {
+    public Map<Integer, Integer> dayRows() {
         return dayRows;
     }
 
     /** 제목을 못 찾아 건너뛴 칸. */
-    List<String> notFound() {
+    public List<String> notFound() {
         return notFound;
     }
 

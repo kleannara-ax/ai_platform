@@ -1,6 +1,10 @@
 package com.company.module.steamenergy.service;
 
+import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.steamenergy.dto.SteamPriceApplyRequest;
+import com.company.module.steamenergy.dto.SteamPriceApplyResponse;
 import com.company.module.steamenergy.dto.SteamPriceResponse;
 import com.company.module.steamenergy.dto.SteamPriceSaveRequest;
 import com.company.module.steamenergy.entity.SteamPrice;
@@ -26,6 +30,8 @@ import java.util.List;
 public class SteamPriceService {
 
     private final SteamPriceRepository priceRepository;
+    private final SteamLngDailyUsageService lngDailyUsageService;
+    private final SteamFuelDailyUsageService fuelDailyUsageService;
 
     /** 연/월 페이징 조회 (월 미지정 시 연도 전체 페이징) */
     public Page<SteamPriceResponse> getList(Integer yearNo, Integer monthNo, Pageable pageable) {
@@ -94,6 +100,39 @@ public class SteamPriceService {
         SteamPrice target = findOrThrow(id);
         target.delete(null);
         log.info("[STEAM-ENERGY] 단가 삭제(소프트) - id: {}", id);
+    }
+
+    /**
+     * 등록 단가를 그 달 일별 표에 일괄 적용한다 (단가 입력 페이지의 "단가 적용").
+     *
+     * <ul>
+     *   <li>lng_unit → LNG 일일 사용량의 보일러·버너 단가</li>
+     *   <li>fluid_steam → 유동상 단가, waste2_steam → 폐합성소각로 단가 (스팀 구매 일일 사용량)</li>
+     * </ul>
+     * 그 밖의 항목은 아직 전환되지 않은 화면의 단가라 hasDailyTarget=false 로 돌려준다.
+     */
+    @Transactional
+    public SteamPriceApplyResponse applyToDaily(SteamPriceApplyRequest request) {
+        SteamPrice price = priceRepository
+                .findByYearNoAndMonthNoAndItemCode(request.getYearNo(), request.getMonthNo(), request.getItemCode())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                        request.getYearNo() + "년 " + request.getMonthNo() + "월 " + request.getItemCode() + " 단가가 등록되지 않았습니다."));
+        if (price.getPriceValue() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, request.getItemCode() + " 단가 값이 비어 있습니다.");
+        }
+        int year = request.getYearNo(), month = request.getMonthNo();
+        java.math.BigDecimal value = price.getPriceValue();
+        int applied;
+        switch (request.getItemCode()) {
+            case "lng_unit" -> applied = lngDailyUsageService.applyUnitPrice(year, month, value);
+            case "fluid_steam" -> applied = fuelDailyUsageService.applyFluidUnitPrice(year, month, value);
+            case "waste2_steam" -> applied = fuelDailyUsageService.applyIncineratorUnitPrice(year, month, value);
+            default -> {
+                return SteamPriceApplyResponse.of(request.getItemCode(), year, month, value, false, 0);
+            }
+        }
+        log.info("[STEAM-ENERGY] 단가 일괄 적용 {} {}/{} → {}일", request.getItemCode(), year, month, applied);
+        return SteamPriceApplyResponse.of(request.getItemCode(), year, month, value, true, applied);
     }
 
     private SteamPrice findOrThrow(Long id) {
