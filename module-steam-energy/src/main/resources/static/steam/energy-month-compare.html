@@ -125,6 +125,7 @@
   <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/incinerator-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/srf-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/fluidized-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
   <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
   <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
@@ -201,7 +202,8 @@
         const params = new URLSearchParams({
           month: String(year), tableNames: "fluidized_monthly_cache", limit: "1000",
         });
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        // 규격 표 steam_fluidized_month.CONTRACT_COST — js/fluidized-store.js 가 옛 호출 모양으로 읽어 준다
+        const resp = await window.FluidizedStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (!resp.ok) { __fmcCache.set(yk, {}); return {}; }
         const payload = await resp.json();
         const out = {};

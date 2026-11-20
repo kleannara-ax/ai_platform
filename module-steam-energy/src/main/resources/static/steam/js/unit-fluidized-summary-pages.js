@@ -151,9 +151,11 @@
       const params = new URLSearchParams({ limit: String(LIMIT), page: String(pageNo) });
       if (options.fromMonth) params.set("fromMonth", options.fromMonth);
       if (options.toMonth) params.set("toMonth", options.toMonth);
+      if (options.tableNames) params.set("tableNames", options.tableNames);
       return `tables/${tableName}?${params.toString()}`;
     };
-    const first = await fetch(buildUrl(1));
+    // 이 화면의 표는 규격 표(steam_fluidized_*)다 — js/fluidized-store.js 가 옛 호출 모양으로 읽어 준다.
+    const first = await window.FluidizedStore.fetch(buildUrl(1));
     if (!first.ok) return [];
     const firstPayload = await first.json();
     const data = (firstPayload.data || []).slice();
@@ -187,7 +189,7 @@
 
   async function upsertCell(payload, existingId) {
     const url = existingId ? `tables/${CELL_TABLE}/${existingId}` : `tables/${CELL_TABLE}`;
-    const response = await fetch(url, {
+    const response = await window.FluidizedStore.fetch(url, {
       method: existingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(existingId ? payload : { table_name: CELL_TABLE, ...payload }),
@@ -739,6 +741,7 @@
       const rows = await fetchPaged(CELL_TABLE, {
         fromMonth: monthKey(String(targetYear - 1), "01"),
         toMonth: monthKey(String(targetYear), "12"),
+        tableNames: "fluidized_plan_actual,fluidized_plan_summary,fluidized_year_note,fluidized_contract_daily,fluidized_contract_cost",
       });
       cellRows.push(...rows);
       loaded = true;

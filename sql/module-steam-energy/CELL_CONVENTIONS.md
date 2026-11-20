@@ -108,4 +108,7 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `srf_boiler_invoice_accumulated` | `steam_srf_invoice_accumulated` (실제 연/월) |
 | `srf_boiler_invoice_bsc` | `steam_srf_invoice_bsc` (연도) |
 | `srf_boiler_invoice_adjustment` | `steam_srf_invoice_adjustment` (연도 + 표 + 항목) |
+| `fluidized_plan_actual`, `fluidized_plan_summary`, `fluidized_year_note`, `fluidized_contract_cost`, `fluidized_monthly_cache` | `steam_fluidized_month` (2026-11-20) |
+| `fluidized_contract_daily` | `steam_fluidized_contract_daily` |
+| `fluidized_srf_inbound` | `steam_fluidized_srf_inbound_daily` (입고량) + `steam_fluidized_srf_rate` (처리단가) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

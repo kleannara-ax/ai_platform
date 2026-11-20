@@ -1,6 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
 import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.FluidizedCellStore;
 import com.company.module.steamenergy.service.SteamFuelDailyUsageService;
 import com.company.module.steamenergy.legacy.service.sheet.SheetData;
 import org.springframework.stereotype.Service;
@@ -63,7 +64,12 @@ public class FluidizedDetailWorkbookService {
         renderCache.keySet().removeIf(key -> key.startsWith(monthKey + "|"));
     }
 
-    public FluidizedDetailWorkbookService(TableService tableService, SteamFuelDailyUsageService fuelDailyUsageService) {
+    /** SRF 입고내역 등 규격 표로 옮긴 유동상 표 */
+    private final FluidizedCellStore fluidizedStore;
+
+    public FluidizedDetailWorkbookService(TableService tableService, SteamFuelDailyUsageService fuelDailyUsageService,
+                                          FluidizedCellStore fluidizedStore) {
+        this.fluidizedStore = fluidizedStore;
         this.tableService = tableService;
         this.fuelDailyUsageService = fuelDailyUsageService;
         this.sheetTemplate = SheetData.load("fluidized-detail");
@@ -87,7 +93,9 @@ public class FluidizedDetailWorkbookService {
 
     private Map<String, Object> renderMonthUncached(String monthKey, String viewKey) {
         SheetData sheet = sheetTemplate.snapshot();
-        List<Map<String, Object>> rows = tableService.listAllByMonth("steam_cell_value", monthKey);
+        // 세부 운영내역은 아직 옛 셀, SRF 입고(AK46 계산용)는 규격 표에서 온다
+        List<Map<String, Object>> rows = fluidizedStore.mergeWithLegacy(
+                tableService.listAllByMonth("steam_cell_value", monthKey), monthKey);
         String mainRange = resolveMainRange(viewKey);
         boolean includeSummary = shouldIncludeSummary(viewKey);
 

@@ -1077,3 +1077,117 @@ CREATE TABLE IF NOT EXISTS steam_srf_invoice_adjustment (
   COMMENT='[module-steam-energy] SRF 보일러 인보이스 Adjustment Factor 항목 (연도 · 표 · 항목별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_ADJUSTMENT_DELETED_YN ON steam_srf_invoice_adjustment (DELETED_YN);
 
+
+-- ============================================================
+-- 12) 유동상 운영 그룹 (2026-11 규격 전환, 묶음 3-D)
+--    옛 steam_cell_value 의 fluidized_plan_actual / _plan_summary / _year_note / _contract_daily / _contract_cost / _srf_inbound / _monthly_cache 를 대체한다.
+--    계산값은 저장하지 않되, 다른 화면이 읽는 도급비·총 운영비는 화면 계산값 컬럼으로 둔다.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_month (
+    FLUIDIZED_MONTH_ID    BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 월별 계획·비용 ID (PK)',
+    YEAR_NO               INT           NOT NULL COMMENT '연도',
+    MONTH_NO              INT           NOT NULL COMMENT '월 (1~12)',
+    PLAN_OPERATING        DECIMAL(18,6) NULL COMMENT '사업계획: 운영비(백만원)',
+    PLAN_POWER            DECIMAL(18,6) NULL COMMENT '사업계획: 전력비(백만원)',
+    PLAN_WASTE            DECIMAL(18,6) NULL COMMENT '사업계획: 폐기물처리비(백만원)',
+    PLAN_SRF_INCOME       DECIMAL(18,6) NULL COMMENT '사업계획: SRF수입금(백만원)',
+    SUMMARY_REMARK        VARCHAR(1000) NULL COMMENT '사업계획대비 요약 비고',
+    MONTH_NOTE            VARCHAR(1000) NULL COMMENT '실적비교 월별 특이사항',
+    LABOR_COST            DECIMAL(18,6) NULL COMMENT '도급비용 지급현황: 인건비(원)',
+    OPERATING_PAY_COST    DECIMAL(18,6) NULL COMMENT '도급비용 지급현황: 운영비(원)',
+    IMPROVEMENT_PAY_COST  DECIMAL(18,6) NULL COMMENT '도급비용 지급현황: 설비개선비용(원)',
+    IMPROVEMENT_COST      DECIMAL(18,6) NULL COMMENT '월별 운영내역: 설비개선비용(천원)',
+    DEDUCTION_COST        DECIMAL(18,6) NULL COMMENT '월별 운영내역: 차감비(천원)',
+    EXTRA_PAYMENT         DECIMAL(18,6) NULL COMMENT '월별 운영내역: 추가 지급분(천원)',
+    WASTEWATER_QTY        DECIMAL(18,6) NULL COMMENT '월별 운영내역: 폐수량',
+    SOIL_QTY              DECIMAL(18,6) NULL COMMENT '월별 운영내역: 폐토사 처리량',
+    SOIL_COST             DECIMAL(18,6) NULL COMMENT '월별 운영내역: 폐토사 처리금액(천원)',
+    CONTRACT_COST         DECIMAL(18,6) NULL COMMENT '도급비(천원) = 스팀 운영비용 + 고정비 + 설비개선비용 − 차감비 + 추가 지급분 (화면 계산값, 마감비교의 유동상 스팀구매가 읽음)',
+    OPERATING_COST        DECIMAL(18,6) NULL COMMENT '총 운영비(천원) (화면 계산값)',
+    CREATED_AT            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY            BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT            DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY            BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN            CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT            DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY            BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (FLUIDIZED_MONTH_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_MONTH_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 운영 — 월별 사업계획, 비고, 도급비용 지급현황, 월별 운영내역 입력값 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_MONTH_DELETED_YN ON steam_fluidized_month (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_contract_daily (
+    FLUIDIZED_CONTRACT_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 소각로 도급비용 ID (PK)',
+    USAGE_DATE             DATE          NOT NULL COMMENT '일자',
+    STEAM_TON              DECIMAL(18,6) NULL COMMENT '스팀 생산량(T/D)',
+    STEAM_UNIT_PRICE       DECIMAL(18,6) NULL COMMENT '스팀단가(원/톤)',
+    STOP_HOURS             DECIMAL(18,6) NULL COMMENT '운휴시간(Hr)',
+    FIXED_COST_PER_HOUR    DECIMAL(18,6) NULL COMMENT '운휴시간당 고정비(원/시간)',
+    CREATED_AT             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY             BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT             DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY             BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN             CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT             DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY             BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (FLUIDIZED_CONTRACT_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_CONTRACT_DAILY_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 소각로 도급비용 (일자별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_CONTRACT_DAILY_DELETED_YN ON steam_fluidized_contract_daily (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_srf_inbound_daily (
+    SRF_INBOUND_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 SRF 입고내역 ID (PK)',
+    USAGE_DATE      DATE          NOT NULL COMMENT '일자',
+    VENDOR01_KG     DECIMAL(18,6) NULL COMMENT '업체 1번 칸 입고량(kg) — 화면 기본 업체: 대일인터내셔널',
+    VENDOR02_KG     DECIMAL(18,6) NULL COMMENT '업체 2번 칸 입고량(kg) — 화면 기본 업체: 그린플러스',
+    VENDOR03_KG     DECIMAL(18,6) NULL COMMENT '업체 3번 칸 입고량(kg) — 화면 기본 업체: 대림종합개발',
+    VENDOR04_KG     DECIMAL(18,6) NULL COMMENT '업체 4번 칸 입고량(kg) — 화면 기본 업체: 케이제이환경',
+    VENDOR05_KG     DECIMAL(18,6) NULL COMMENT '업체 5번 칸 입고량(kg) — 화면 기본 업체: 태창',
+    VENDOR06_KG     DECIMAL(18,6) NULL COMMENT '업체 6번 칸 입고량(kg) — 화면 기본 업체: 평일',
+    VENDOR07_KG     DECIMAL(18,6) NULL COMMENT '업체 7번 칸 입고량(kg) — 화면 기본 업체: 케이엠',
+    VENDOR08_KG     DECIMAL(18,6) NULL COMMENT '업체 8번 칸 입고량(kg) — 화면 기본 업체: 두제',
+    VENDOR09_KG     DECIMAL(18,6) NULL COMMENT '업체 9번 칸 입고량(kg) — 화면 기본 업체: 세종스틸',
+    VENDOR10_KG     DECIMAL(18,6) NULL COMMENT '업체 10번 칸 입고량(kg) — 화면 기본 업체: 리에나',
+    CREATED_AT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY      BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT      DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY      BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN      CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT      DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY      BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (SRF_INBOUND_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_SRF_INBOUND_DAILY_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 SRF(비성형) 입고량 — 업체 칸 10개 (일자별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_SRF_INBOUND_DAILY_DELETED_YN ON steam_fluidized_srf_inbound_daily (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_srf_rate (
+    SRF_RATE_ID    BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 SRF 처리단가 ID (PK)',
+    YEAR_NO        INT           NOT NULL COMMENT '연도',
+    MONTH_NO       INT           NOT NULL COMMENT '월 (1~12)',
+    VENDOR01_RATE  DECIMAL(18,6) NULL COMMENT '업체 1번 칸 처리단가(원/톤) — 화면 기본 업체: 대일인터내셔널',
+    VENDOR02_RATE  DECIMAL(18,6) NULL COMMENT '업체 2번 칸 처리단가(원/톤) — 화면 기본 업체: 그린플러스',
+    VENDOR03_RATE  DECIMAL(18,6) NULL COMMENT '업체 3번 칸 처리단가(원/톤) — 화면 기본 업체: 대림종합개발',
+    VENDOR04_RATE  DECIMAL(18,6) NULL COMMENT '업체 4번 칸 처리단가(원/톤) — 화면 기본 업체: 케이제이환경',
+    VENDOR05_RATE  DECIMAL(18,6) NULL COMMENT '업체 5번 칸 처리단가(원/톤) — 화면 기본 업체: 태창',
+    VENDOR06_RATE  DECIMAL(18,6) NULL COMMENT '업체 6번 칸 처리단가(원/톤) — 화면 기본 업체: 평일',
+    VENDOR07_RATE  DECIMAL(18,6) NULL COMMENT '업체 7번 칸 처리단가(원/톤) — 화면 기본 업체: 케이엠',
+    VENDOR08_RATE  DECIMAL(18,6) NULL COMMENT '업체 8번 칸 처리단가(원/톤) — 화면 기본 업체: 두제',
+    VENDOR09_RATE  DECIMAL(18,6) NULL COMMENT '업체 9번 칸 처리단가(원/톤) — 화면 기본 업체: 세종스틸',
+    VENDOR10_RATE  DECIMAL(18,6) NULL COMMENT '업체 10번 칸 처리단가(원/톤) — 화면 기본 업체: 리에나',
+    CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY     BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT     DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY     BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN     CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT     DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY     BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (SRF_RATE_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_SRF_RATE_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 SRF(비성형) 처리단가 — 업체 칸 10개 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_SRF_RATE_DELETED_YN ON steam_fluidized_srf_rate (DELETED_YN);
+

@@ -231,6 +231,10 @@ DELETE FROM steam_price
 | `steam_srf_invoice_accumulated` | SRF 인보이스 누계 스팀량 — SRF Boiler invoice › Accumulated steam volume (srf-boiler-invoice-accumulated.html) (3개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_srf_invoice_bsc` | SRF 인보이스 BSC 단가 — SRF Boiler invoice › BSC (srf-boiler-invoice-bsc.html) (1개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO)` |
 | `steam_srf_invoice_adjustment` | SRF 인보이스 Adjustment Factor — SRF Boiler invoice › Adjustment Factor (srf-boiler-invoice-adjustment.html) (3개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, SECTION, ITEM_CODE)` |
+| `steam_fluidized_month` | 유동상 월별 계획·비용 — 유동상 운영내역 › 운영실적(사업계획대비·실적비교·도급비용 지급현황), 월별 운영내역 (unit-fluidized-summary.html, unit-fluidized-monthly.html) (17개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_fluidized_contract_daily` | 유동상 소각로 도급비용 — 유동상 운영내역 › 운영실적 › 소각로 도급비용 (unit-fluidized-summary.html) (4개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_fluidized_srf_inbound_daily` | 유동상 SRF 입고내역 — 유동상 운영내역 › SRF(비성형) 입고내역 (unit-fluidized-srf-inbound.html) (10개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_fluidized_srf_rate` | 유동상 SRF 처리단가 — 유동상 운영내역 › SRF(비성형) 입고내역 › 처리단가 (unit-fluidized-srf-inbound.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1007,6 +1011,116 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 ### 데이터 이관
 
 `migration/2026-11-20_srf_invoice_cells_to_tables.sql` — Summary 의 입력값을 옮긴다 (재실행 안전). 나머지 화면은 옛 저장소에 값이 든 행이 없다 (빈 문자열뿐). Accumulated 에 남아 있던 옛 형식 2건(`static` / `current|0|bsc` = 37068, `contract` = 38000)은 어느 해 값인지 알 수 없어 옮기지 않았다.
+
+## 유동상 운영 그룹 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 3-D)
+
+유동상 운영내역의 운영실적(사업계획대비 · 실적비교 · 소각로 도급비용) · SRF 입고내역 · 월별 운영내역을 옛 `steam_cell_value` 논리 표 `fluidized_plan_actual` · `_plan_summary` · `_year_note` · `_contract_daily` · `_contract_cost` · `_srf_inbound` · `_monthly_cache` 에서 실제 컬럼 표 4개로 옮겼다. 사고이력·설비개선은 묶음 3-E, 세부 운영내역(`fluidized_detail_main`)은 묶음 4 에서 옮긴다.
+화면의 칸 키는 그대로 두고 저장할 때 표의 행·컬럼으로 옮긴다 — 화면은 `js/fluidized-store.js`, 엑셀은 `service/table/FluidizedCellStore`.
+
+### 설계 규칙
+
+- 계산값(실적 · 증감 · 합계, T/hr · 운영비용 · 총 운영비용, 일 합계 · 누계 · 업체 합계 · 비용)은 저장하지 않는다.
+- 월별 운영내역의 직접 입력 6개(설비개선비용 · 차감비 · 추가 지급분 · 폐수량 · 폐토사 처리량 · 폐토사 처리금액)는 예전에 브라우저(localStorage)에만 있었다. 이제 `steam_fluidized_month` 에 저장한다. 화면을 열 때 그 브라우저에 남은 옛 값이 있고 DB 의 그 달 칸이 비어 있으면 한 번 올린다.
+- `CONTRACT_COST` · `OPERATING_COST` 는 월별 운영내역 화면이 계산을 마치면 저장하는 화면 계산값이다 (옛 `fluidized_monthly_cache`). 마감비교의 유동상 스팀구매가 `CONTRACT_COST` 를 읽는다.
+- SRF 입고 업체는 화면처럼 10칸 고정이다 (칸 번호 = 화면의 업체 순서). 엑셀 가져오기는 서식의 업체 열 순서대로 칸을 채우며 11번째 열부터는 버린다.
+- 실적비교의 월별 특이사항은 예전에 그 해 1월 키에 `note-월` 로 모아 두었다. 이제 그 월의 행에 둔다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_fluidized_month`** — 유동상 월별 계획·비용 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `fluidized_plan_actual` 의 `operating`/`power`/`waste`/`srf_income` col 0, `fluidized_plan_summary` 의 `monthly-summary`, `fluidized_year_note` 의 `note-월`, `fluidized_contract_cost` 의 `cost` col 0·1·2, `fluidized_monthly_cache` 의 `contractCost`/`operatingCost` (col = 월), 월별 운영내역 화면의 브라우저 저장값
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `PLAN_OPERATING` | DECIMAL(18,6) | `planOperating` | 사업계획: 운영비(백만원) |
+| `PLAN_POWER` | DECIMAL(18,6) | `planPower` | 사업계획: 전력비(백만원) |
+| `PLAN_WASTE` | DECIMAL(18,6) | `planWaste` | 사업계획: 폐기물처리비(백만원) |
+| `PLAN_SRF_INCOME` | DECIMAL(18,6) | `planSrfIncome` | 사업계획: SRF수입금(백만원) |
+| `SUMMARY_REMARK` | VARCHAR(1000) | `summaryRemark` | 사업계획대비 요약 비고 |
+| `MONTH_NOTE` | VARCHAR(1000) | `monthNote` | 실적비교 월별 특이사항 |
+| `LABOR_COST` | DECIMAL(18,6) | `laborCost` | 도급비용 지급현황: 인건비(원) |
+| `OPERATING_PAY_COST` | DECIMAL(18,6) | `operatingPayCost` | 도급비용 지급현황: 운영비(원) |
+| `IMPROVEMENT_PAY_COST` | DECIMAL(18,6) | `improvementPayCost` | 도급비용 지급현황: 설비개선비용(원) |
+| `IMPROVEMENT_COST` | DECIMAL(18,6) | `improvementCost` | 월별 운영내역: 설비개선비용(천원) |
+| `DEDUCTION_COST` | DECIMAL(18,6) | `deductionCost` | 월별 운영내역: 차감비(천원) |
+| `EXTRA_PAYMENT` | DECIMAL(18,6) | `extraPayment` | 월별 운영내역: 추가 지급분(천원) |
+| `WASTEWATER_QTY` | DECIMAL(18,6) | `wastewaterQty` | 월별 운영내역: 폐수량 |
+| `SOIL_QTY` | DECIMAL(18,6) | `soilQty` | 월별 운영내역: 폐토사 처리량 |
+| `SOIL_COST` | DECIMAL(18,6) | `soilCost` | 월별 운영내역: 폐토사 처리금액(천원) |
+| `CONTRACT_COST` | DECIMAL(18,6) | `contractCost` | 도급비(천원) = 스팀 운영비용 + 고정비 + 설비개선비용 − 차감비 + 추가 지급분 (화면 계산값, 마감비교의 유동상 스팀구매가 읽음) |
+| `OPERATING_COST` | DECIMAL(18,6) | `operatingCost` | 총 운영비(천원) (화면 계산값) |
+
+**`steam_fluidized_contract_daily`** — 유동상 소각로 도급비용 · 키 `(USAGE_DATE)` · 옛 저장소: `fluidized_contract_daily` 의 `일(두 자리)` col 0·2·4·5
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `STEAM_TON` | DECIMAL(18,6) | `steamTon` | 스팀 생산량(T/D) |
+| `STEAM_UNIT_PRICE` | DECIMAL(18,6) | `steamUnitPrice` | 스팀단가(원/톤) |
+| `STOP_HOURS` | DECIMAL(18,6) | `stopHours` | 운휴시간(Hr) |
+| `FIXED_COST_PER_HOUR` | DECIMAL(18,6) | `fixedCostPerHour` | 운휴시간당 고정비(원/시간) |
+
+**`steam_fluidized_srf_inbound_daily`** — 유동상 SRF 입고내역 · 키 `(USAGE_DATE)` · 옛 저장소: `fluidized_srf_inbound` 의 `entry:일` col 1~10
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `VENDOR01_KG` | DECIMAL(18,6) | `vendor01Kg` | 업체 1번 칸 입고량(kg) — 화면 기본 업체: 대일인터내셔널 |
+| `VENDOR02_KG` | DECIMAL(18,6) | `vendor02Kg` | 업체 2번 칸 입고량(kg) — 화면 기본 업체: 그린플러스 |
+| `VENDOR03_KG` | DECIMAL(18,6) | `vendor03Kg` | 업체 3번 칸 입고량(kg) — 화면 기본 업체: 대림종합개발 |
+| `VENDOR04_KG` | DECIMAL(18,6) | `vendor04Kg` | 업체 4번 칸 입고량(kg) — 화면 기본 업체: 케이제이환경 |
+| `VENDOR05_KG` | DECIMAL(18,6) | `vendor05Kg` | 업체 5번 칸 입고량(kg) — 화면 기본 업체: 태창 |
+| `VENDOR06_KG` | DECIMAL(18,6) | `vendor06Kg` | 업체 6번 칸 입고량(kg) — 화면 기본 업체: 평일 |
+| `VENDOR07_KG` | DECIMAL(18,6) | `vendor07Kg` | 업체 7번 칸 입고량(kg) — 화면 기본 업체: 케이엠 |
+| `VENDOR08_KG` | DECIMAL(18,6) | `vendor08Kg` | 업체 8번 칸 입고량(kg) — 화면 기본 업체: 두제 |
+| `VENDOR09_KG` | DECIMAL(18,6) | `vendor09Kg` | 업체 9번 칸 입고량(kg) — 화면 기본 업체: 세종스틸 |
+| `VENDOR10_KG` | DECIMAL(18,6) | `vendor10Kg` | 업체 10번 칸 입고량(kg) — 화면 기본 업체: 리에나 |
+
+**`steam_fluidized_srf_rate`** — 유동상 SRF 처리단가 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `fluidized_srf_inbound` 의 `rate` col 1~10
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `VENDOR01_RATE` | DECIMAL(18,6) | `vendor01Rate` | 업체 1번 칸 처리단가(원/톤) — 화면 기본 업체: 대일인터내셔널 |
+| `VENDOR02_RATE` | DECIMAL(18,6) | `vendor02Rate` | 업체 2번 칸 처리단가(원/톤) — 화면 기본 업체: 그린플러스 |
+| `VENDOR03_RATE` | DECIMAL(18,6) | `vendor03Rate` | 업체 3번 칸 처리단가(원/톤) — 화면 기본 업체: 대림종합개발 |
+| `VENDOR04_RATE` | DECIMAL(18,6) | `vendor04Rate` | 업체 4번 칸 처리단가(원/톤) — 화면 기본 업체: 케이제이환경 |
+| `VENDOR05_RATE` | DECIMAL(18,6) | `vendor05Rate` | 업체 5번 칸 처리단가(원/톤) — 화면 기본 업체: 태창 |
+| `VENDOR06_RATE` | DECIMAL(18,6) | `vendor06Rate` | 업체 6번 칸 처리단가(원/톤) — 화면 기본 업체: 평일 |
+| `VENDOR07_RATE` | DECIMAL(18,6) | `vendor07Rate` | 업체 7번 칸 처리단가(원/톤) — 화면 기본 업체: 케이엠 |
+| `VENDOR08_RATE` | DECIMAL(18,6) | `vendor08Rate` | 업체 8번 칸 처리단가(원/톤) — 화면 기본 업체: 두제 |
+| `VENDOR09_RATE` | DECIMAL(18,6) | `vendor09Rate` | 업체 9번 칸 처리단가(원/톤) — 화면 기본 업체: 세종스틸 |
+| `VENDOR10_RATE` | DECIMAL(18,6) | `vendor10Rate` | 업체 10번 칸 처리단가(원/톤) — 화면 기본 업체: 리에나 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/fluidized-months?year=[&month=]` | 유동상 월별 계획·비용 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-months` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/fluidized-months/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-months/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-contract-dailies?year=[&month=]` | 유동상 소각로 도급비용 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-contract-dailies` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/fluidized-contract-dailies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-contract-dailies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-srf-inbound-dailies?year=[&month=]` | 유동상 SRF 입고내역 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-srf-inbound-dailies` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/fluidized-srf-inbound-dailies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-srf-inbound-dailies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-srf-rates?year=[&month=]` | 유동상 SRF 처리단가 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-srf-rates` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/fluidized-srf-rates/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-srf-rates/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` · `GET` | `/steam/api/tables/fluidized-summary/{import,export}-excel` 등 (옛 경로 그대로) | 유동상 운영내역 워크북은 세부 운영내역(묶음 4) · 사고·개선(묶음 3-E) 시트가 함께 들어 있어 주소는 묶음 4 전환 때 옮긴다. 이 그룹의 시트는 이미 규격 표로 읽고 쓴다 (전체 가져오기 = 그 해의 사업계획·특이사항과 고른 달의 비고·지급현황·일별 도급비용·SRF 입고를 파일 기준으로 바꿈, 탭별 가져오기 = 읽은 칸만 고침) |
+
+### 다른 화면과의 연동
+
+- 마감비교(`energy-month-compare.html`)의 유동상소각로 스팀구매 ← `steam_fluidized_month.CONTRACT_COST` ÷ 1000
+- 운영실적 화면의 SRF수입금 실적, 세부 운영내역의 AK46 ← SRF 입고량 × 처리단가 (서버 `FluidizedSummaryWorkbookService` · `FluidizedDetailWorkbookService`)
+- 월별 운영내역 ← 세부 운영내역(`fluidized_detail_main`, 묶음 4 전환 전까지 옛 셀)의 월 합계 칸
+
+### 데이터 이관
+
+`migration/2026-11-20_fluidized_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 월별 운영내역의 직접 입력값은 서버에 없던 값이라 SQL 로 옮길 수 없고, 화면을 열 때 브라우저에 남은 값을 올린다.
 
 ## 메뉴 / 권한
 
