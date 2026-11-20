@@ -52,6 +52,9 @@
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
+  <script src="/steam/js/energy-store.js?v=20261120-spec2"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-fuel-ratio">
   <main class="landing-main">
@@ -394,9 +397,9 @@
   <script>
   (function () {
     const SHARED_PERIOD_KEY = "steamlog:shared-period";
-    const TABLES_BASE = "/tables";
-    const CELL_TABLE = "steam_cell_value";
+    // 2026-11 규격 전환: steam_cell_value 대신 규격 표 5개 (energy-store.js 가 옛 row_key/col_index 좌표로 감싼다)
     const PAGE_TABLE_NAME = "energy_fuel_ratio";
+    const store = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);
     const yearSel = document.getElementById("invoiceYear");
     const searchBtn = document.getElementById("invoiceSearch");
     const mainTitle = document.getElementById("efrTitle");
@@ -507,17 +510,8 @@
 
     async function fetchSavedRows(year) {
       storedRows.clear();
-      const params = new URLSearchParams({
-        month: String(year),
-        tableNames: PAGE_TABLE_NAME,
-        limit: "5000",
-      });
-      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to load saved cells");
-      const payload = await response.json();
-      (payload.data || [])
-        .filter((row) => row.table_name === PAGE_TABLE_NAME)
-        .forEach((row) => storedRows.set(cellMapKey(row.row_key, Number(row.col_index)), row));
+      await store.load(year);
+      store.cells().forEach((r) => storedRows.set(cellMapKey(r.row_key, Number(r.col_index)), r));
     }
 
     function applySavedRows() {
@@ -558,22 +552,7 @@
     async function saveInput(input) {
       const value = normalizeInputValue(input);
       if (value === String(input.dataset.rawValue || "")) return;
-      const payload = {
-        month: currentYear,
-        year_no: Number(currentYear),
-        month_no: 0,
-        table_name: PAGE_TABLE_NAME,
-        row_key: input.dataset.rowKey,
-        col_index: Number(input.dataset.colIndex),
-        cell_value: value,
-      };
-      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error("Failed to save cell");
-      const saved = await response.json();
+      const saved = await store.set(input.dataset.rowKey, Number(input.dataset.colIndex), value);
       storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
       input.dataset.rawValue = String(saved.cell_value || "");
     }
@@ -616,21 +595,11 @@
       if (!jobs.length) return;
       const year = currentYear;
       __persistQueue = __persistQueue.then(async () => {
-        for (const job of jobs) {
-          const payload = {
-            month: year, year_no: Number(year), month_no: 0,
-            table_name: PAGE_TABLE_NAME, row_key: job.row_key, col_index: job.col_index, cell_value: job.cell_value,
-          };
-          try {
-            const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
-              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-            });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const saved = await response.json();
-            storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
-          } catch (error) {
-            console.error(`[efr] ${tblKey} 계산값 저장 실패 (${job.row_key}/${job.col_index}):`, error);
-          }
+        try {
+          const saved = await store.setMany(jobs.map((job) => ({ row_key: job.row_key, col_index: job.col_index, cell_value: job.cell_value })));
+          saved.forEach((cell) => storedRows.set(cellMapKey(cell.row_key, Number(cell.col_index)), cell));
+        } catch (error) {
+          console.error(`[efr] ${tblKey} 계산값 저장 실패:`, error);
         }
       });
     }
@@ -663,15 +632,7 @@
     async function fetchEmcCache(year) {
       if (__emcCache.year === year && __emcCache.data) return __emcCache.data;
       try {
-        const params = new URLSearchParams({ month: String(year), tableNames: EMC_TABLE, limit: "10000" });
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (!resp.ok) return null;
-        const payload = await resp.json();
-        const map = new Map();
-        (payload.data || []).forEach((row) => {
-          if (row.table_name !== EMC_TABLE) return;
-          map.set(`${row.row_key}|${row.col_index}`, row.cell_value);
-        });
+        const map = await window.EnergyStore.fetchLegacy(EMC_TABLE, Number(year));   // "fuel|key|월" → 값 (규격 표 steam_energy_month_compare)
         __emcCache.year = year; __emcCache.data = map;
         return map;
       } catch (e) { return null; }
@@ -1057,6 +1018,14 @@
       }
       finalizeSumAvg("t17", [0,1,2,3,4,5,6], { avgOnly: true });
       // t17 은 다른 페이지에서도 쓰므로 계산값을 DB 에 남긴다 (월 열만)
+      // 다른 화면(마감비교·연료비 요약·다른 사이트)이 읽는 계산 표는 규격 표에도 저장한다 (energy_specs 의 '화면 계산값' 컬럼)
+      persistCalcTable("t02", [1,2,3,4]);          // 복합·폐합성·유동상·외부 연료비 (연동값)
+      persistCalcTable("t03", [0,1,2,3,4]);        // 스팀단가
+      persistCalcTable("t04", [2,6]);              // 제지·화장지 소계 (마감비교)
+      persistCalcTable("t05", [9]);                // 기타 사용량
+      persistCalcTable("t06", [2,6]);              // 제품생산량 소계 (마감비교)
+      persistCalcTable("t11", [2,8]);              // 증감률, 버너 LNG 비용 합계 (마감비교)
+      persistCalcTable("t12", [0,1,2,3,4]);        // 버너 LNG 원단위 (연료비 요약)
       persistCalcTable("t17", [0,1,2,3,4,5,6]);
     }
 

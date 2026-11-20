@@ -114,6 +114,13 @@
     if (!legacy) throw new Error("매핑 없는 논리 표: " + legacyTable);
     const aliases = [...new Set(Object.values(legacy).map(([alias]) => alias))];
     const state = { year: null, rows: {} };   // rows[alias] = Map("year|month" → 행)
+    // 쓰기는 한 줄로 세운다 — 입력 저장(POST)과 계산값 저장(PUT)이 같은 행을 동시에 고치면 DB 가 거부한다
+    let writeQueue = Promise.resolve();
+    function enqueue(work) {
+      const run = writeQueue.then(work);
+      writeQueue = run.catch(() => {});
+      return run;
+    }
 
     function entryOf(rowKey) {
       const m = legacy[rowKey];
@@ -176,7 +183,8 @@
       return n;
     }
 
-    async function set(rowKey, col, value) {
+    function set(rowKey, col, value) { return enqueue(() => setNow(rowKey, col, value)); }
+    async function setNow(rowKey, col, value) {
       const e = entryOf(rowKey);
       if (!e) throw new Error(`저장할 수 없는 칸입니다: ${rowKey} (매핑 없음 — 계산 전용)`);
       const t = targetOf(e.rule, col);
@@ -185,31 +193,58 @@
       return { table_name: legacyTable, row_key: rowKey, col_index: Number(col), cell_value: valueText(saved[e.field]) };
     }
 
-    /** 여러 칸을 행 단위로 묶어 저장. 매핑 없는 칸은 건너뛴다. 반환: 저장된 칸 목록 */
-    async function setMany(cells) {
-      const groups = new Map();   // "alias|year|month" → { alias, yearNo, monthNo, changes, cells }
+    /** 여러 칸을 표·연도 단위로 묶어 한 번에 저장(PUT /year, clearMissing=false). 매핑 없는 칸은 건너뛴다. 반환: 저장된 칸 목록 */
+    function setMany(cells) { return enqueue(() => setManyNow(cells)); }
+    async function setManyNow(cells) {
+      // alias|year → { monthNo → changes }
+      const groups = new Map();
+      const targets = [];
       (cells || []).forEach((c) => {
         const e = entryOf(c.row_key);
         if (!e) return;
         const t = targetOf(e.rule, c.col_index);
         if (!t) return;
         const yearNo = state.year + t.yearOffset;
-        const key = `${e.alias}|${yearNo}|${t.month == null ? "" : t.month}`;
-        if (!groups.has(key)) groups.set(key, { alias: e.alias, yearNo, monthNo: t.month, changes: {}, cells: [] });
+        const key = `${e.alias}|${yearNo}`;
+        if (!groups.has(key)) groups.set(key, { alias: e.alias, yearNo, months: new Map() });
         const g = groups.get(key);
-        g.changes[e.field] = parseValue(e, c.cell_value);
-        g.cells.push({ ...c, field: e.field });
+        const mk = t.month == null ? "" : String(t.month);
+        if (!g.months.has(mk)) g.months.set(mk, {});
+        g.months.get(mk)[e.field] = parseValue(e, c.cell_value);
+        targets.push({ cell: c, alias: e.alias, yearNo, month: t.month, field: e.field });
       });
-      const saved = [];
       for (const g of groups.values()) {
-        const row = await saveRow(g.alias, g.yearNo, g.monthNo, g.changes);
-        g.cells.forEach((c) => saved.push({ table_name: legacyTable, row_key: c.row_key, col_index: Number(c.col_index), cell_value: valueText(row[c.field]) }));
+        const table = MAP().tables[g.alias];
+        const fresh = await fetchRows(g.alias, [g.yearNo]);
+        if (table.grain === "year") {
+          // 연도 표는 한 행뿐 — 행 전체 POST
+          const changes = g.months.get("") || {};
+          await saveRow(g.alias, g.yearNo, null, changes);
+          continue;
+        }
+        const rows = [];
+        g.months.forEach((changes, mk) => {
+          const monthNo = Number(mk);
+          const base = fresh.get(`${g.yearNo}|${monthNo}`) || {};
+          const body = { yearNo: g.yearNo, monthNo };
+          Object.keys(table.fields).forEach((f) => { body[f] = base[f] === undefined ? null : base[f]; });
+          Object.entries(changes).forEach(([f, v]) => { body[f] = v; });
+          rows.push(body);
+        });
+        await API().put(`${table.path}/year`, { year: g.yearNo, clearMissing: false, rows });
+        const after = await fetchRows(g.alias, [g.yearNo]);
+        if (!state.rows[g.alias]) state.rows[g.alias] = new Map();
+        after.forEach((row, k) => state.rows[g.alias].set(k, row));
       }
-      return saved;
+      return targets.map((t) => {
+        const row = (state.rows[t.alias] || new Map()).get(`${t.yearNo}|${t.month == null ? "" : t.month}`);
+        return { table_name: legacyTable, row_key: t.cell.row_key, col_index: Number(t.cell.col_index), cell_value: row ? valueText(row[t.field]) : null };
+      });
     }
 
     /** 그 해 월 행의 값을 모두 비운다 (옛 '초기화' = by-table 삭제). 이웃 연도 행·연도 비고는 그대로. */
-    async function clearYear(year) {
+    function clearYear(year) { return enqueue(() => clearYearNow(year)); }
+    async function clearYearNow(year) {
       for (const alias of aliases) {
         const table = MAP().tables[alias];
         if (table.grain === "year") continue;

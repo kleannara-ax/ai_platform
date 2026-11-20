@@ -123,6 +123,9 @@
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
+  <script src="/steam/js/energy-store.js?v=20261120-spec2"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-month-compare">
   <main class="landing-main">
@@ -173,8 +176,8 @@
     // 제스코 행 표시 여부 — 없어진 업체라 기본은 숨김. 소계·실적 계산에는 숨겨도 그대로 들어간다.
     let showZesco = false;
     const PAGE_TABLE_NAME = "energy_month_compare";
-    const TABLES_BASE = "/tables";
-    const CELL_TABLE = "steam_cell_value";
+    // 2026-11 규격 전환: 입력·계산값은 steam_energy_month_compare, 비고는 steam_energy_month_compare_note (energy-store.js)
+    const store_ = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);   // 저장용 (화면 캐시 변수 store 와 구분)
 
     const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
     const sumArr = (arr) => arr.reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
@@ -312,17 +315,9 @@
       const yk = String(year);
       if (__efrDataCache.has(yk)) return __efrDataCache.get(yk);
       try {
-        const params = new URLSearchParams({
-          month: String(year), tableNames: "energy_fuel_ratio", limit: "10000",
-        });
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (!resp.ok) return null;
-        const payload = await resp.json();
+        const legacy = await window.EnergyStore.fetchLegacy("energy_fuel_ratio", Number(year));   // "tNN|rNN|col" → 문자열
         const map = new Map();
-        (payload.data || []).forEach((row) => {
-          if (row.table_name !== "energy_fuel_ratio") return;
-          map.set(`${row.row_key}|${row.col_index}`, Number(row.cell_value));
-        });
+        legacy.forEach((v, k) => map.set(k, Number(v)));
         __efrDataCache.set(yk, map);
         return map;
       } catch (e) { return null; }
@@ -486,14 +481,11 @@
     async function loadStoreFromDB(year) {
       const yearStr = String(year);
       try {
-        const params = new URLSearchParams({ month: yearStr, tableNames: PAGE_TABLE_NAME, limit: "10000" });
-        const resp = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
-        if (!resp.ok) return;
-        const payload = await resp.json();
+        const yearStore = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);
+        await yearStore.load(Number(year));
         store[yearStr] = { fuel:{}, notes:{ fuel:{} } };
         const yd = store[yearStr];
-        (payload.data || []).forEach((row) => {
-          if (row.table_name !== PAGE_TABLE_NAME) return;
+        yearStore.cells().forEach((row) => {
           const rk = String(row.row_key);
           const ci = Number(row.col_index);
           const val = row.cell_value;
@@ -511,39 +503,27 @@
             yd[sec][rowK][ci] = Number.isFinite(num) ? num : null;
           }
         });
+        if (String(currentYear) === yearStr) await store_.load(Number(year));
       } catch (e) { console.error("[emc loadStoreFromDB]", e); }
     }
     async function upsertCellToDB(section, rowKey, monthIdx, value) {
-      const payload = {
-        month: String(currentYear), year_no: Number(currentYear), month_no: 0,
-        table_name: PAGE_TABLE_NAME,
-        row_key: `${section}|${rowKey}`, col_index: monthIdx,
-        cell_value: (value === null || value === undefined || value === "") ? null : String(value),
-      };
       try {
-        await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-        });
-      } catch (e) { console.error("[emc upsertCell]", e); }
+        if (store_.year() !== Number(currentYear)) await store_.load(Number(currentYear));
+        await store_.set(`${section}|${rowKey}`, monthIdx, (value === null || value === undefined || value === "") ? null : String(value));
+      } catch (e) { console.error("[emc upsertCell]", e); window.alert(`저장 실패: ${e.message || e}`); }
     }
     async function upsertNoteToDB(section, cat, text) {
-      const payload = {
-        month: String(currentYear), year_no: Number(currentYear), month_no: 0,
-        table_name: PAGE_TABLE_NAME,
-        row_key: `note|${section}|${cat}`, col_index: 0,
-        cell_value: String(text || ""),
-      };
       try {
-        await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-        });
-      } catch (e) { console.error("[emc upsertNote]", e); }
+        if (store_.year() !== Number(currentYear)) await store_.load(Number(currentYear));
+        await store_.set(`note|${section}|${cat}`, 0, String(text || ""));
+      } catch (e) { console.error("[emc upsertNote]", e); window.alert(`비고 저장 실패: ${e.message || e}`); }
     }
+    // 초기화: 그 해 월 행의 값을 비운다 (비고와 이웃 연도 행은 그대로)
     async function deleteYearFromDB(year) {
       try {
-        const params = new URLSearchParams({ month: String(year), tableName: PAGE_TABLE_NAME });
-        await fetch(`${TABLES_BASE}/${CELL_TABLE}/by-table?${params.toString()}`, { method: "DELETE" });
-      } catch (e) { console.error("[emc deleteYear]", e); }
+        if (store_.year() !== Number(year)) await store_.load(Number(year));
+        await store_.clearYear(Number(year));
+      } catch (e) { console.error("[emc deleteYear]", e); window.alert(`초기화 실패: ${e.message || e}`); }
     }
     function getYearState() {
       if (!store[currentYear]) store[currentYear] = { fuel:{}, power:{}, total:{}, notes:{} };
@@ -715,6 +695,7 @@
 
       const prevDec = buildPrevDec(section);
       computeSection(def, secStore, currentYear, prevDec, computed[section]);
+      if (section === "fuel") persistComputed();
 
       // group rows by cat for rowspan — 숨긴 제스코 행은 그리지 않는다(계산은 위에서 이미 끝났다)
       const catGroups = [];
@@ -799,6 +780,37 @@
         };
       }
     }, true);
+
+    // 다른 화면(연료비 배분비율)이 읽는 값은 규격 표에도 저장한다 — 실적·스팀톤당 연료비(계산), 폐합성·유동상 스팀구매(연동).
+    // 값이 달라진 달만, 행 단위로 모아 보낸다.
+    const PERSIST_KEYS = ["fuelActual", "fuelSteamUnit", "pyhsynSteam", "fluidSteam"];
+    let __persistQueue = Promise.resolve();
+    function persistComputed() {
+      const yd = store[currentYear];
+      if (!yd || !computed.fuel) return;
+      const jobs = [];
+      PERSIST_KEYS.forEach((key) => {
+        const vals = computed.fuel[key] || {};
+        for (let m = 1; m <= 12; m += 1) {
+          const v = vals[m];
+          const next = Number.isFinite(v) ? v : null;
+          const cur = yd.fuel[key] ? yd.fuel[key][m] : undefined;
+          if (next === null && (cur === null || cur === undefined)) continue;
+          if (next !== null && Number.isFinite(cur) && Math.abs(cur - next) < 1e-9) continue;
+          jobs.push({ row_key: `fuel|${key}`, col_index: m, cell_value: next === null ? null : String(next) });
+          if (!yd.fuel[key]) yd.fuel[key] = {};
+          yd.fuel[key][m] = next;
+        }
+      });
+      if (!jobs.length) return;
+      const year = Number(currentYear);
+      __persistQueue = __persistQueue.then(async () => {
+        try {
+          if (store_.year() !== year) await store_.load(year);
+          await store_.setMany(jobs);
+        } catch (e) { console.error("[emc] 계산값 저장 실패:", e); }
+      });
+    }
 
     function renderAll() {
       const active = document.activeElement;
