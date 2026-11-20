@@ -1,4 +1,8 @@
-﻿document.addEventListener("DOMContentLoaded", () => {
+﻿/* 스팀 사용량(unit-steam-usage) · LNG 연료 사용 비용(unit-lng-cost) 공용 화면 스크립트.
+ *  - LNG: 2026-11 규격 전환 — steam_lng_daily_usage (/steam-energy-api/lng-daily-usages). LNG_FIELDS 참고.
+ *  - 스팀 사용량: 아직 옛 셀 저장소(usage_m_*)·steam_unit_usage 를 읽는다 (다음 단계에서 전환).
+ */
+document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (!["unit-steam-usage.html", "unit-lng-cost.html"].includes(page)) return;
 
@@ -11,6 +15,21 @@
   const UNIT_TABLE = "steam_unit_usage";
   const RAW_TABLE = "steam_unit_usage_raw";
   const DAILY_ROW_COUNT = 31;
+
+  // ── 규격 API (steam-energy-api.js) ───────────────────────────────────────
+  //  LNG 연료 사용 비용: steam_lng_daily_usage — 일자('YYYY-MM-DD') → 행. 화면 표·열은 그대로 두고 (표, 열) → 컬럼으로 바꾼다.
+  //  계산 열(사용합계·화장지 계·비용·총비용)은 저장하지 않는다. lng_m_mix 는 화면 표가 없고 엑셀 왕복용으로만 있다.
+  const API = window.SteamEnergyApi;
+  const lngByDate = new Map();
+  const LNG_FIELDS = {
+    lng_m_boiler: { 0: "boiler20t1", 1: "boiler20t2", 2: "boiler50t", 3: "boiler60t", 5: "boilerUnitPrice", 7: "boilerCombined", 8: "boilerNewIncinerator" },
+    lng_m_burner: { 0: "burnerPm3", 1: "burnerTm3", 2: "burnerTm4", 3: "burnerTm5", 6: "burnerUnitPrice" },
+    lng_m_mix: { 0: "mixPm2", 1: "mixPm3", 3: "mixTm3", 4: "mixTm4", 5: "mixTm5" },
+  };
+  const LNG_SAVED_FIELDS = Object.values(LNG_FIELDS).flatMap((m) => Object.values(m));
+  function lngFieldOf(tableName, colIndex) { return (LNG_FIELDS[tableName] || {})[Number(colIndex)] || null; }
+  function isoOf(month, rowKey) { return `${month}-${String(rowKey).padStart(2, "0")}`; }
+  function apiValueText(value) { return value === null || value === undefined ? "" : String(value); }
 
   const cellRows = [];
   const unitRows = [];
@@ -260,13 +279,14 @@
   async function ensureLngYearLoaded(year = yearSelect.value) {
     if (page !== "unit-lng-cost.html") return;
     if (loadedCellYears.has(String(year))) return;
-    const rows = await fetchPaged(
-      CELL_TABLE,
-      "",
-      { fromMonth: `${year}-01`, toMonth: `${year}-12` },
-      { tableNames: cellTableNamesParam() }
-    );
-    mergeRows(cellRows, CELL_TABLE, rows);
+    let rows = [];
+    try {
+      rows = await API.get(`/lng-daily-usages?year=${Number(year)}`);
+    } catch (error) {
+      console.error("LNG 일일 사용량 조회 실패", error);
+      window.alert(`조회 실패: ${error.message || error}`);
+    }
+    rows.forEach((row) => lngByDate.set(row.usageDate, row));
     loadedCellYears.add(String(year));
   }
 
@@ -303,7 +323,44 @@
   }
 
   function getCellValue(tableName, month, rowKey, colIndex) {
+    if (page === "unit-lng-cost.html") {
+      const field = lngFieldOf(tableName, colIndex);
+      if (!field) return "";
+      const row = lngByDate.get(isoOf(month, rowKey));
+      return row ? apiValueText(row[field]) : "";
+    }
     return getCellRow(tableName, month, rowKey, colIndex)?.cell_value ?? "";
+  }
+
+  // LNG: 그 날의 저장 대상 입력칸(보일러·버너 표)을 모아 행 하나로 보낸다 — 행 전체 업서트.
+  //  changedInput 은 지금 저장을 일으킨 칸으로, 포커스 여부와 상관없이 현재 입력값을 쓴다.
+  function buildLngRowRequest(rowKey, changedInput) {
+    const usageDate = isoOf(monthKey(), rowKey);
+    const base = lngByDate.get(usageDate) || {};
+    const body = { usageDate };
+    LNG_SAVED_FIELDS.forEach((field) => { body[field] = base[field] === undefined ? null : base[field]; });
+    Object.keys(LNG_FIELDS).forEach((tableName) => {
+      Object.entries(LNG_FIELDS[tableName]).forEach(([col, field]) => {
+        const input = document.querySelector(`input[data-table-name="${tableName}"][data-row-mode="daily"][data-row-key="${rowKey}"][data-col-index="${col}"]`);
+        if (input) body[field] = API.num(input === changedInput ? normalizeEditableValue(input.value) : editableRawValue(input));
+      });
+    });
+    return body;
+  }
+
+  async function saveLngCell(input) {
+    const tableName = input.dataset.tableName;
+    const rowKey = input.dataset.rowKey;
+    const field = lngFieldOf(tableName, input.dataset.colIndex);
+    if (!field || input.dataset.rowMode !== "daily" || !/^\d{2}$/.test(rowKey) || Number(rowKey) > daysInMonth()) return;
+    try {
+      const saved = await API.post("/lng-daily-usages", buildLngRowRequest(rowKey, input));
+      lngByDate.set(saved.usageDate, saved);
+      input.dataset.rawValue = apiValueText(saved[field]);
+    } catch (error) {
+      console.error("LNG 일일 사용량 저장 실패", error);
+      window.alert(`저장 실패: ${error.message || error}`);
+    }
   }
 
   async function upsertCell(payload, existingId) {
@@ -320,6 +377,7 @@
 
   async function saveCell(input) {
     if (!input || input.readOnly || input.classList.contains("calc-input")) return;
+    if (page === "unit-lng-cost.html") { await saveLngCell(input); return; }
     const tableName = input.dataset.tableName;
     const rowKey = input.dataset.rowKey;
     const colIndex = Number(input.dataset.colIndex);
