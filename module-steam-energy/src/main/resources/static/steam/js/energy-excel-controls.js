@@ -8,6 +8,7 @@
  *   - 파일 input   : #{prefix}ExcelFileInput
  *
  * 페이지 prefix 와 엔드포인트는 PAGE_CONFIG 에서 결정한다.
+ * 2026-11 규격 전환: /steam-energy-api/energy-excel/{page}/import-excel|export-excel (저장소는 규격 표).
  */
 (function () {
   "use strict";
@@ -15,31 +16,31 @@
   const PAGE_CONFIG = {
     "energy-accounting-plan.html": {
       prefix: "eap",
-      endpoint: "energy-accounting-plan",
+      endpoint: "accounting-plan",
       yearSelectId: "invoiceYear",
       filename: (year) => `6. ${year}년 에너지 회계비용 실적.xlsx`,
     },
     "energy-fuel-ratio.html": {
       prefix: "efr",
-      endpoint: "energy-fuel-ratio",
+      endpoint: "fuel-ratio",
       yearSelectId: "invoiceYear",
       filename: (year) => `6. ${year}년 에너지 회계비용 실적.xlsx`,
     },
     "energy-month-compare.html": {
       prefix: "emc",
-      endpoint: "energy-month-compare",
+      endpoint: "month-compare",
       yearSelectId: "emcYear",
       filename: (year) => `6. ${year}년 에너지 회계비용 실적.xlsx`,
     },
     "energy-fuel-summary.html": {
       prefix: "efs",
-      endpoint: "energy-fuel-summary",
+      endpoint: "all",
       yearSelectId: "invoiceYear",
       filename: (year) => `6. ${year}년 에너지 회계비용 실적.xlsx`,
     },
     "energy-fuel-plan.html": {
       prefix: "efp",
-      endpoint: "energy-fuel-plan",
+      endpoint: "fuel-plan",
       yearSelectId: "invoiceYear",
       filename: (year) => `6. ${year}년 에너지 회계비용 실적.xlsx`,
     },
@@ -61,7 +62,7 @@
 
     async function doDownload() {
       const year = yearSel.value;
-      const url = `/tables/${cfg.endpoint}/export-excel?year=${encodeURIComponent(year)}`;
+      const url = `/steam-energy-api/energy-excel/${cfg.endpoint}/export-excel?year=${encodeURIComponent(year)}`;
       const response = await fetch(url);
       if (!response.ok) {
         const msg = (await window.ExcelUploadErrors?.message(response)) || "엑셀 다운로드에 실패했습니다.";
@@ -87,7 +88,7 @@
         const formData = new FormData();
         formData.append("file", file);
         formData.append("year", yearSel.value);
-        const response = await fetch(`/tables/${cfg.endpoint}/import-excel`, {
+        const response = await fetch(`/steam-energy-api/energy-excel/${cfg.endpoint}/import-excel?year=${encodeURIComponent(yearSel.value)}`, {
           method: "POST",
           body: formData,
         });
@@ -95,6 +96,8 @@
           const msg = (await window.ExcelUploadErrors?.message(response)) || "엑셀 업로드에 실패했습니다.";
           throw new Error(msg);
         }
+        const result = (await response.json())?.data || {};
+        alert(`엑셀 업로드가 완료되었습니다. (${result.year ?? yearSel.value}년, 저장된 칸 ${result.imported ?? 0}개)`);
         window.location.reload();
       } finally {
         uploadBtn.disabled = false;

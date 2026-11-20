@@ -8,7 +8,7 @@
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | JPA 영역 표 7개 (steam_equipment·steam_price·steam_daily_usage + 원단위 일지 4개: steam_unit_daily_usage·steam_unit_daily_common·steam_lng_daily_usage·steam_fuel_daily_usage) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
+| 1 | `01_schema.sql` | JPA 영역 표 17개 (steam_equipment·steam_price·steam_daily_usage + 원단위 일지 4개 + 에너지 회계비용 10개: steam_energy_*) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
 | 2 | `02_legacy_schema.sql` | 이관 대시보드 표 3개 (steam_cell_value + 퇴역한 steam_unit_usage·steam_unit_usage_raw) + 인덱스 |
 | 3 | `03_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플 6건) |
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
@@ -205,6 +205,16 @@ DELETE FROM steam_price
 | `steam_unit_daily_common` | 원단위 일지 — 일자별 공통 계측값 (디스퍼져 총량·TOC·PICA) | `(USAGE_DATE)` |
 | `steam_lng_daily_usage` | 일별 LNG 연료 사용량 (보일러·버너·복합+외부, 단가) | `(USAGE_DATE)` |
 | `steam_fuel_daily_usage` | 유동상·폐합성소각로·복합·외부 일일 스팀 구매량과 단가 | `(USAGE_DATE)` |
+| `steam_energy_accounting_plan` | 회계비용 계획 — 회계비용 계획 (energy-accounting-plan.html) (21개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_fuel_plan` | 연료비 사업계획 — 연료비 사업계획(안) (energy-fuel-plan.html) (29개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_ratio_boiler` | 연료비 배분비율(보일러별) — 연료비 배분비율 › 보일러별 종합 (energy-fuel-ratio.html t01~t03) (19개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_ratio_machine` | 연료비 배분비율(호기별) — 연료비 배분비율 › 호기별 연료비 배분 (energy-fuel-ratio.html t04~t06) (22개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_ratio_burner` | 연료비 배분비율(버너 LNG) — 연료비 배분비율 › 버너 LNG (energy-fuel-ratio.html t10~t12) (13개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_ratio_steam_unit` | 스팀사용량 원단위(기타 포함) — 연료비 배분비율 › 종합 원단위 17번째 표 (energy-fuel-ratio.html t17) (7개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_ratio_ref2019` | 연료비 배분비율(2019 참고) — 연료비 배분비율 › 2019 참고 표 (energy-fuel-ratio.html t18~t20) (31개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_month_compare` | 회계비용 마감비교 — 월별 회계비용 마감 vs 실마감 차이 (energy-month-compare.html) (9개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_energy_month_compare_note` | 회계비용 마감비교 비고 — 월별 회계비용 마감 vs 실마감 차이 — 비고 (energy-month-compare.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO)` |
+| `steam_energy_fuel_summary` | 연료비 요약 — 연료비 요약 (energy-fuel-summary.html) (49개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -299,6 +309,262 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 쓰기 API 는 `STEAM_ENERGY_MGMT` 메뉴 권한(`@PreAuthorize`)이 필요하다. 같은 일자를 삭제했다가 다시 저장하면 삭제된 행을 되살린다
 (UNIQUE 키와 소프트 삭제의 충돌 방지).
 
+## 에너지 회계비용 그룹 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 2)
+
+이관 대시보드 중 **에너지 회계비용 5개 화면**(회계비용 계획, 연료비 사업계획, 연료비 배분비율, 월별 회계비용 마감 vs 실마감, 연료비 요약)을
+`steam_cell_value` 논리 표 5개(`energy_accounting_plan`·`energy_fuel_plan`·`energy_fuel_ratio`·`energy_month_compare`·`energy_fuel_summary`)에서 **실제 컬럼 표 10개** 로 옮겼다.
+
+설계 규칙:
+
+- 연/월 한 행(비고만 연도 행). **입력 항목 1개 = 컬럼 1개.** 화면에서만 계산하는 소계·원단위·손익 행은 저장하지 않는다.
+- 예외: **다른 화면(또는 다른 사이트)이 읽는 계산값**은 COMMENT 에 '화면 계산값' 으로 표시한 컬럼에 저장한다 (원본 화면이 계산을 마치면 `PUT /year` 로 달라진 달만 저장).
+  마감비교 ← 배분비율 t04 r03·r07, t06 r03·r07, t11 r09 / 배분비율 ← 마감비교 실적·스팀톤당 연료비·폐합성·유동상 / 연료비 요약 ← 네 화면 / 다른 사이트 ← t17.
+- 전년 12월·다음해 1월 열은 따로 저장하지 않고 **이웃 연도 행**(전년도 12월 행, 다음해 1월 행)을 읽고 쓴다.
+- 합계·평균 열은 저장하지 않는다. 옛 셀의 '단위 글자'(배분비율 t04 이후 col 1)는 버린다.
+- 옛 셀 좌표 ↔ 컬럼 매핑은 스펙 한 곳에서 생성한다: JS `static/steam/js/energy-cell-map.js`, Java `service/energy/EnergyCellMapData`.
+  화면은 `energy-store.js` 로 옛 (row_key, col_index) 좌표를 그대로 쓰고, 엑셀 서비스 4개는 `EnergyCellBridge` 로 저장소만 바꿨다(라벨 매핑은 그대로).
+
+### 매핑표 (옛 row_key → 표.컬럼)
+
+| 옛 논리 표 | 옛 row_key | 테이블 | 컬럼 | 구분 | COMMENT |
+|---|---|---|---|---|---|
+| `energy_accounting_plan` | `r01` | `steam_energy_accounting_plan` | `COMPOSITE_STEAM_BUY` | 입력 | 연료비: 복합보일러 스팀구매(백만원) |
+| `energy_accounting_plan` | `r02` | `steam_energy_accounting_plan` | `ZESCO_STEAM_BUY` | 입력 | 연료비: 제스코 스팀구매(백만원) |
+| `energy_accounting_plan` | `r03` | `steam_energy_accounting_plan` | `LNG_BUY` | 입력 | 연료비: LNG 구매(백만원) |
+| `energy_accounting_plan` | `r04` | `steam_energy_accounting_plan` | `INCINERATOR_COST` | 입력 | 연료비: 폐합성소각로(백만원) |
+| `energy_accounting_plan` | `r05` | `steam_energy_accounting_plan` | `FLUID_COST` | 입력 | 연료비: 유동상소각로(백만원) |
+| `energy_accounting_plan` | `r07` | `steam_energy_accounting_plan` | `ZESCO_OFFSET` | 입력 | 차감비: 제스코 상계비(용수사용 등) |
+| `energy_accounting_plan` | `r08` | `steam_energy_accounting_plan` | `ZESCO_PENALTY` | 입력 | 차감비: 제스코 페널티 |
+| `energy_accounting_plan` | `r09` | `steam_energy_accounting_plan` | `ZESCO_ADVANCE_REPAY` | 입력 | 차감비: 제스코 선급금 상환 |
+| `energy_accounting_plan` | `r10` | `steam_energy_accounting_plan` | `COMPOSITE_LNG_WATER` | 입력 | 차감비: 복합 LNG·용수사용량 |
+| `energy_accounting_plan` | `r11` | `steam_energy_accounting_plan` | `COMPOSITE_INVEST` | 입력 | 차감비: 복합 투자비 감가상각 |
+| `energy_accounting_plan` | `r12` | `steam_energy_accounting_plan` | `COMPOSITE_INCOME` | 입력 | 차감비: 복합보일러 처분수익 연료비 차감분 |
+| `energy_accounting_plan` | `r13` | `steam_energy_accounting_plan` | `LAND_LEASE` | 입력 | 차감비: 토지 지상권 지료 |
+| `energy_accounting_plan` | `r16` | `steam_energy_accounting_plan` | `PAPER_FUEL` | 화면 계산값 | 제지 연료비 = 실적 × 0.7 (화면 계산값, 연료비 요약이 읽음) |
+| `energy_accounting_plan` | `r17` | `steam_energy_accounting_plan` | `LIVING_FUEL` | 화면 계산값 | 생활 연료비 = 실적 − 제지 (화면 계산값, 연료비 요약이 읽음) |
+| `energy_accounting_plan` | `r19` | `steam_energy_accounting_plan` | `FUEL_VS_PLAN` | 입력 | 회계비용 대비 증감(직접 입력) |
+| `energy_accounting_plan` | `r22` | `steam_energy_accounting_plan` | `PAPER_PROD_TON` | 입력 | 제지 제품생산량(톤) |
+| `energy_accounting_plan` | `r23` | `steam_energy_accounting_plan` | `TISSUE_PROD_TON` | 입력 | 화장지 제품생산량(톤) |
+| `energy_accounting_plan` | `r31` | `steam_energy_accounting_plan` | `STEAM_PROD_TON` | 입력 | 보조: 스팀생산량(톤) |
+| `energy_accounting_plan` | `r32` | `steam_energy_accounting_plan` | `LNG_BURNER_COST` | 입력 | 보조: LNG 직버너 사용 비용(백만원) |
+| `energy_accounting_plan` | `r36` | `steam_energy_accounting_plan` | `COMPOSITE_NET` | 화면 계산값 | 참고: 복합 = 스팀구매 − 차감비 일부 (화면 계산값, 연료비 요약이 읽음) |
+| `energy_accounting_plan` | `r37` | `steam_energy_accounting_plan` | `ZESCO_NET` | 화면 계산값 | 참고: 제스코 = 스팀구매 − 상계비 − 페널티 − 선급금 (화면 계산값) |
+| `energy_fuel_plan` | `t01|r01` | `steam_energy_fuel_plan` | `PAPER_PROD_TON` | 입력 | 스팀사용량 계획: 제지 생산량(톤/월) |
+| `energy_fuel_plan` | `t01|r02` | `steam_energy_fuel_plan` | `TISSUE_PROD_TON` | 입력 | 스팀사용량 계획: 화장지 생산량(톤/월) |
+| `energy_fuel_plan` | `t01|r04` | `steam_energy_fuel_plan` | `PAPER_UNIT` | 입력 | 스팀사용량 계획: 제지 생산원단위(톤/톤·제품) |
+| `energy_fuel_plan` | `t01|r05` | `steam_energy_fuel_plan` | `TISSUE_UNIT` | 입력 | 스팀사용량 계획: 화장지 생산원단위(톤/톤·제품) |
+| `energy_fuel_plan` | `t01|r11` | `steam_energy_fuel_plan` | `PAPER_TOTAL_STEAM` | 화면 계산값 | 제지 총 사용량(톤/월) (화면 계산값, 연료비 요약이 읽음) |
+| `energy_fuel_plan` | `t01|r12` | `steam_energy_fuel_plan` | `TISSUE_TOTAL_STEAM` | 화면 계산값 | 화장지 총 사용량(톤/월) (화면 계산값, 연료비 요약이 읽음) |
+| `energy_fuel_plan` | `t02|r01` | `steam_energy_fuel_plan` | `ETC_DISPERSER` | 입력 | 기타 스팀사용량: 디스퍼져(톤/월) |
+| `energy_fuel_plan` | `t02|r04` | `steam_energy_fuel_plan` | `ETC_TOC` | 입력 | 기타 스팀사용량: TOC 재생설비(톤/월) |
+| `energy_fuel_plan` | `t03|r02` | `steam_energy_fuel_plan` | `OPERATING_DAYS` | 입력 | 가동일수(일) |
+| `energy_fuel_plan` | `t04|r02` | `steam_energy_fuel_plan` | `PROD_INCINERATOR` | 입력 | 스팀생산량: 폐합성소각로(톤/월) |
+| `energy_fuel_plan` | `t04|r03` | `steam_energy_fuel_plan` | `PROD_COMPOSITE` | 입력 | 스팀생산량: 복합보일러(톤/월) |
+| `energy_fuel_plan` | `t04|r04` | `steam_energy_fuel_plan` | `PROD_EXT_BOILER` | 입력 | 스팀생산량: 외부보일러(톤/월) |
+| `energy_fuel_plan` | `t04|r05` | `steam_energy_fuel_plan` | `PROD_FLUID` | 입력 | 스팀생산량: 유동상소각로(톤/월) |
+| `energy_fuel_plan` | `t06|r02` | `steam_energy_fuel_plan` | `LNG_COMPOSITE` | 입력 | 연료사용량: 복합 LNG(㎥/월) |
+| `energy_fuel_plan` | `t06|r03` | `steam_energy_fuel_plan` | `LNG_TM3` | 입력 | 연료사용량: 화장지3 LNG(㎥/월) |
+| `energy_fuel_plan` | `t06|r04` | `steam_energy_fuel_plan` | `LNG_TM4` | 입력 | 연료사용량: 화장지4 LNG(㎥/월) |
+| `energy_fuel_plan` | `t06|r05` | `steam_energy_fuel_plan` | `LNG_TM5` | 입력 | 연료사용량: 화장지5 LNG(㎥/월) |
+| `energy_fuel_plan` | `t06|r07` | `steam_energy_fuel_plan` | `LNG_PM3` | 입력 | 연료사용량: 제지3 LNG(㎥/월) |
+| `energy_fuel_plan` | `t07|r01` | `steam_energy_fuel_plan` | `PRICE_LNG` | 입력 | 연료단가: LNG 단가(원/㎥) |
+| `energy_fuel_plan` | `t07|r02` | `steam_energy_fuel_plan` | `PRICE_INCINERATOR` | 입력 | 운영단가: 소각로 위탁(원/톤) |
+| `energy_fuel_plan` | `t07|r03` | `steam_energy_fuel_plan` | `PRICE_COMPOSITE` | 입력 | 운영단가: 복합 기본(원/톤) |
+| `energy_fuel_plan` | `t07|r04` | `steam_energy_fuel_plan` | `PRICE_EXT_BOILER` | 입력 | 운영단가: 외부 기본(원/톤) |
+| `energy_fuel_plan` | `t07|r05` | `steam_energy_fuel_plan` | `PRICE_FLUID` | 입력 | 운영단가: 유동상소각로(원/톤) |
+| `energy_fuel_plan` | `t08|r02` | `steam_energy_fuel_plan` | `OPEX_INCINERATOR` | 입력 | 보일러 운영비: 소각로 운영비(백만원/월) |
+| `energy_fuel_plan` | `t08|r05` | `steam_energy_fuel_plan` | `OPEX_FLUID` | 입력 | 보일러 운영비: 유동상소각로(백만원/월) |
+| `energy_fuel_plan` | `t09|r04` | `steam_energy_fuel_plan` | `PAY_EXT_ADVANCE` | 입력 | 실지급비: 외부 선급금 차감(백만원/월) |
+| `energy_fuel_plan` | `t09|r05` | `steam_energy_fuel_plan` | `PAY_EXT_PENALTY` | 입력 | 실지급비: 외부 페널티 차감(백만원/월) |
+| `energy_fuel_plan` | `t09|r06` | `steam_energy_fuel_plan` | `PAY_INCINERATOR` | 입력 | 실지급비: 폐합성소각로(백만원/월) |
+| `energy_fuel_plan` | `t09|r07` | `steam_energy_fuel_plan` | `PAY_FLUID` | 입력 | 실지급비: 유동상소각로(백만원/월) |
+| `energy_fuel_ratio` | `t01|r01` | `steam_energy_ratio_boiler` | `STEAM_LNG_BOILER` | 입력 | 스팀생산량: LNG 보일러(톤) |
+| `energy_fuel_ratio` | `t01|r02` | `steam_energy_ratio_boiler` | `STEAM_COMPOSITE` | 입력 | 스팀생산량: 복합보일러(톤) |
+| `energy_fuel_ratio` | `t01|r03` | `steam_energy_ratio_boiler` | `STEAM_INCINERATOR` | 입력 | 스팀생산량: 폐합성소각로(톤) |
+| `energy_fuel_ratio` | `t01|r04` | `steam_energy_ratio_boiler` | `STEAM_FLUID` | 입력 | 스팀생산량: 유동상소각로(톤) |
+| `energy_fuel_ratio` | `t01|r05` | `steam_energy_ratio_boiler` | `STEAM_EXT_BOILER` | 입력 | 스팀생산량: 외부보일러(톤) |
+| `energy_fuel_ratio` | `t01|r07` | `steam_energy_ratio_boiler` | `FLUID_VENT_TON` | 입력 | 유동상 밴트량(톤) |
+| `energy_fuel_ratio` | `t01|r08` | `steam_energy_ratio_boiler` | `COMPOSITE_PENALTY_TON` | 입력 | 복합 페널티량(톤) |
+| `energy_fuel_ratio` | `t01|r09` | `steam_energy_ratio_boiler` | `COMPOSITE_GUARANTEE_TON` | 입력 | 복합 보증량(톤) |
+| `energy_fuel_ratio` | `t02|r01` | `steam_energy_ratio_boiler` | `COST_LNG_BOILER` | 입력 | 보일러 연료비: LNG 보일러(백만원) |
+| `energy_fuel_ratio` | `t02|r02` | `steam_energy_ratio_boiler` | `COST_COMPOSITE` | 화면 계산값 | 보일러 연료비: 복합보일러(LNG·페널티 포함) (인보이스 연동 계산값 저장) |
+| `energy_fuel_ratio` | `t02|r03` | `steam_energy_ratio_boiler` | `COST_INCINERATOR` | 화면 계산값 | 보일러 연료비: 폐합성소각로 (마감비교 연동값 저장) |
+| `energy_fuel_ratio` | `t02|r04` | `steam_energy_ratio_boiler` | `COST_FLUID` | 화면 계산값 | 보일러 연료비: 유동상소각로(잉여포함) (마감비교 연동값 저장) |
+| `energy_fuel_ratio` | `t02|r05` | `steam_energy_ratio_boiler` | `COST_EXT_BOILER` | 화면 계산값 | 보일러 연료비: 외부보일러 (마감비교 연동값 저장) |
+| `energy_fuel_ratio` | `t02|r07` | `steam_energy_ratio_boiler` | `FLUID_INTERNAL_VENT_COST` | 입력 | 유동상 소내사용 + 밴트스팀 비용(백만원) |
+| `energy_fuel_ratio` | `t03|r01` | `steam_energy_ratio_boiler` | `PRICE_LNG_BOILER` | 화면 계산값 | 스팀단가: LNG 보일러(천원/톤) (화면 계산값, 연료비 요약이 읽음) |
+| `energy_fuel_ratio` | `t03|r02` | `steam_energy_ratio_boiler` | `PRICE_COMPOSITE` | 화면 계산값 | 스팀단가: 복합보일러(천원/톤) (화면 계산값) |
+| `energy_fuel_ratio` | `t03|r03` | `steam_energy_ratio_boiler` | `PRICE_INCINERATOR` | 화면 계산값 | 스팀단가: 폐합성소각로(천원/톤) (화면 계산값) |
+| `energy_fuel_ratio` | `t03|r04` | `steam_energy_ratio_boiler` | `PRICE_FLUID` | 화면 계산값 | 스팀단가: 유동상소각로(천원/톤) (화면 계산값) |
+| `energy_fuel_ratio` | `t03|r05` | `steam_energy_ratio_boiler` | `PRICE_EXT_BOILER` | 화면 계산값 | 스팀단가: 외부보일러(천원/톤) (화면 계산값) |
+| `energy_fuel_ratio` | `t04|r01` | `steam_energy_ratio_machine` | `FUEL_PM2` | 입력 | 호기별 연료비배분: 제지 2호기(백만원) |
+| `energy_fuel_ratio` | `t04|r02` | `steam_energy_ratio_machine` | `FUEL_PM3` | 입력 | 호기별 연료비배분: 제지 3호기(백만원) |
+| `energy_fuel_ratio` | `t04|r03` | `steam_energy_ratio_machine` | `FUEL_PAPER_SUBTOTAL` | 화면 계산값 | 호기별 연료비배분: 제지 소계 (화면 계산값, 마감비교·요약이 읽음) |
+| `energy_fuel_ratio` | `t04|r04` | `steam_energy_ratio_machine` | `FUEL_TM3` | 입력 | 호기별 연료비배분: 화장지 3호기(백만원) |
+| `energy_fuel_ratio` | `t04|r05` | `steam_energy_ratio_machine` | `FUEL_TM4` | 입력 | 호기별 연료비배분: 화장지 4호기(백만원) |
+| `energy_fuel_ratio` | `t04|r06` | `steam_energy_ratio_machine` | `FUEL_TM5` | 입력 | 호기별 연료비배분: 화장지 5호기(백만원) |
+| `energy_fuel_ratio` | `t04|r07` | `steam_energy_ratio_machine` | `FUEL_TISSUE_SUBTOTAL` | 화면 계산값 | 호기별 연료비배분: 화장지 소계 (화면 계산값, 마감비교가 읽음) |
+| `energy_fuel_ratio` | `t04|r10` | `steam_energy_ratio_machine` | `FUEL_STEAM_PROD_TON` | 입력 | 호기별 연료비배분: 스팀생산량(톤) |
+| `energy_fuel_ratio` | `t05|r01` | `steam_energy_ratio_machine` | `USAGE_PM2` | 입력 | 스팀사용량: 제지 2호기(톤) |
+| `energy_fuel_ratio` | `t05|r02` | `steam_energy_ratio_machine` | `USAGE_PM3` | 입력 | 스팀사용량: 제지 3호기(톤) |
+| `energy_fuel_ratio` | `t05|r04` | `steam_energy_ratio_machine` | `USAGE_TM3` | 입력 | 스팀사용량: 화장지 3호기(톤) |
+| `energy_fuel_ratio` | `t05|r05` | `steam_energy_ratio_machine` | `USAGE_TM4` | 입력 | 스팀사용량: 화장지 4호기(톤) |
+| `energy_fuel_ratio` | `t05|r06` | `steam_energy_ratio_machine` | `USAGE_TM5` | 입력 | 스팀사용량: 화장지 5호기(톤) |
+| `energy_fuel_ratio` | `t05|r09` | `steam_energy_ratio_machine` | `USAGE_TOTAL_PROD_STEAM` | 입력 | 스팀사용량: 총 생산스팀량(톤) |
+| `energy_fuel_ratio` | `t05|r10` | `steam_energy_ratio_machine` | `USAGE_ETC` | 화면 계산값 | 스팀사용량: 기타 사용량(톤) = 총 생산스팀량 − 합계 (계산 가능하면 계산값, 아니면 입력) |
+| `energy_fuel_ratio` | `t06|r01` | `steam_energy_ratio_machine` | `PROD_PM2_KG` | 입력 | 제품생산량: 제지2(kg) |
+| `energy_fuel_ratio` | `t06|r02` | `steam_energy_ratio_machine` | `PROD_PM3_KG` | 입력 | 제품생산량: 제지3(kg) |
+| `energy_fuel_ratio` | `t06|r03` | `steam_energy_ratio_machine` | `PROD_PAPER_SUBTOTAL_KG` | 화면 계산값 | 제품생산량: 제지 소계(kg) (화면 계산값, 마감비교·요약이 읽음) |
+| `energy_fuel_ratio` | `t06|r04` | `steam_energy_ratio_machine` | `PROD_TM3_KG` | 입력 | 제품생산량: 화장지3(kg) |
+| `energy_fuel_ratio` | `t06|r05` | `steam_energy_ratio_machine` | `PROD_TM4_KG` | 입력 | 제품생산량: 화장지4(kg) |
+| `energy_fuel_ratio` | `t06|r06` | `steam_energy_ratio_machine` | `PROD_TM5_KG` | 입력 | 제품생산량: 화장지5(kg) |
+| `energy_fuel_ratio` | `t06|r07` | `steam_energy_ratio_machine` | `PROD_TISSUE_SUBTOTAL_KG` | 화면 계산값 | 제품생산량: 화장지 소계(kg) (화면 계산값, 마감비교·요약이 읽음) |
+| `energy_fuel_ratio` | `t10|r01` | `steam_energy_ratio_burner` | `LNG_PM3` | 입력 | 버너 LNG 사용량: 제지3(㎥) |
+| `energy_fuel_ratio` | `t10|r02` | `steam_energy_ratio_burner` | `LNG_TM3` | 입력 | 버너 LNG 사용량: 화장지3(㎥) |
+| `energy_fuel_ratio` | `t10|r03` | `steam_energy_ratio_burner` | `LNG_TM4` | 입력 | 버너 LNG 사용량: 화장지4(㎥) |
+| `energy_fuel_ratio` | `t10|r04` | `steam_energy_ratio_burner` | `LNG_TM5` | 입력 | 버너 LNG 사용량: 화장지5(㎥) |
+| `energy_fuel_ratio` | `t11|r01` | `steam_energy_ratio_burner` | `LNG_PRICE_PREV_YEAR` | 입력 | 버너 LNG 비용: 전년 LNG 단가(원/㎥) |
+| `energy_fuel_ratio` | `t11|r02` | `steam_energy_ratio_burner` | `LNG_PRICE` | 입력 | 버너 LNG 비용: 당년 LNG 단가(원/㎥) |
+| `energy_fuel_ratio` | `t11|r03` | `steam_energy_ratio_burner` | `LNG_PRICE_CHANGE_RATE` | 화면 계산값 | 버너 LNG 비용: 증감률 (두 단가가 있으면 계산값, 아니면 입력) |
+| `energy_fuel_ratio` | `t11|r09` | `steam_energy_ratio_burner` | `LNG_COST_TOTAL` | 화면 계산값 | 버너 LNG 비용 합계(백만원) (화면 계산값, 마감비교·요약이 읽음) |
+| `energy_fuel_ratio` | `t12|r01` | `steam_energy_ratio_burner` | `LNG_UNIT_PM3` | 화면 계산값 | 버너 LNG 사용량 원단위: 제지3(㎥/제품톤) (화면 계산값, 요약이 읽음) |
+| `energy_fuel_ratio` | `t12|r02` | `steam_energy_ratio_burner` | `LNG_UNIT_TM3` | 화면 계산값 | 버너 LNG 사용량 원단위: 화장지3 (화면 계산값) |
+| `energy_fuel_ratio` | `t12|r03` | `steam_energy_ratio_burner` | `LNG_UNIT_TM4` | 화면 계산값 | 버너 LNG 사용량 원단위: 화장지4 (화면 계산값) |
+| `energy_fuel_ratio` | `t12|r04` | `steam_energy_ratio_burner` | `LNG_UNIT_TM5` | 화면 계산값 | 버너 LNG 사용량 원단위: 화장지5 (화면 계산값) |
+| `energy_fuel_ratio` | `t12|r05` | `steam_energy_ratio_burner` | `LNG_UNIT_TISSUE_SUBTOTAL` | 화면 계산값 | 버너 LNG 사용량 원단위: 화장지 소계 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r01` | `steam_energy_ratio_steam_unit` | `UNIT_PM2` | 화면 계산값 | 제지2 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r02` | `steam_energy_ratio_steam_unit` | `UNIT_PM3` | 화면 계산값 | 제지3 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r03` | `steam_energy_ratio_steam_unit` | `UNIT_PAPER_SUBTOTAL` | 화면 계산값 | 제지 소계 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r04` | `steam_energy_ratio_steam_unit` | `UNIT_TM3` | 화면 계산값 | 화장지3 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r05` | `steam_energy_ratio_steam_unit` | `UNIT_TM4` | 화면 계산값 | 화장지4 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r06` | `steam_energy_ratio_steam_unit` | `UNIT_TM5` | 화면 계산값 | 화장지5 (화면 계산값) |
+| `energy_fuel_ratio` | `t17|r07` | `steam_energy_ratio_steam_unit` | `UNIT_TISSUE_SUBTOTAL` | 화면 계산값 | 화장지 소계 (화면 계산값) |
+| `energy_fuel_ratio` | `t18|r01` | `steam_energy_ratio_ref2019` | `T18_PM1` | 입력 | 2019 호기별 스팀생산량: 제지 1호기 |
+| `energy_fuel_ratio` | `t18|r02` | `steam_energy_ratio_ref2019` | `T18_PM2` | 입력 | 2019 호기별 스팀생산량: 제지 2호기 |
+| `energy_fuel_ratio` | `t18|r03` | `steam_energy_ratio_ref2019` | `T18_PM3` | 입력 | 2019 호기별 스팀생산량: 제지 3호기 |
+| `energy_fuel_ratio` | `t18|r04` | `steam_energy_ratio_ref2019` | `T18_PAPER_SUBTOTAL` | 입력 | 2019 호기별 스팀생산량: 제지 소계 |
+| `energy_fuel_ratio` | `t18|r05` | `steam_energy_ratio_ref2019` | `T18_TM1` | 입력 | 2019 호기별 스팀생산량: 화장지 1호기 |
+| `energy_fuel_ratio` | `t18|r06` | `steam_energy_ratio_ref2019` | `T18_TM3` | 입력 | 2019 호기별 스팀생산량: 화장지 3호기 |
+| `energy_fuel_ratio` | `t18|r07` | `steam_energy_ratio_ref2019` | `T18_TM4` | 입력 | 2019 호기별 스팀생산량: 화장지 4호기 |
+| `energy_fuel_ratio` | `t18|r08` | `steam_energy_ratio_ref2019` | `T18_TM5` | 입력 | 2019 호기별 스팀생산량: 화장지 5호기 |
+| `energy_fuel_ratio` | `t18|r09` | `steam_energy_ratio_ref2019` | `T18_TISSUE_SUBTOTAL` | 입력 | 2019 호기별 스팀생산량: 화장지 소계 |
+| `energy_fuel_ratio` | `t18|r10` | `steam_energy_ratio_ref2019` | `T18_TOTAL` | 입력 | 2019 호기별 스팀생산량: 합계 |
+| `energy_fuel_ratio` | `t19|r01` | `steam_energy_ratio_ref2019` | `T19_PM1` | 입력 | 2019 호기별 스팀사용비율: 제지 1호기 |
+| `energy_fuel_ratio` | `t19|r02` | `steam_energy_ratio_ref2019` | `T19_PM2` | 입력 | 2019 호기별 스팀사용비율: 제지 2호기 |
+| `energy_fuel_ratio` | `t19|r03` | `steam_energy_ratio_ref2019` | `T19_PM3` | 입력 | 2019 호기별 스팀사용비율: 제지 3호기 |
+| `energy_fuel_ratio` | `t19|r04` | `steam_energy_ratio_ref2019` | `T19_PAPER_SUBTOTAL` | 입력 | 2019 호기별 스팀사용비율: 제지 소계 |
+| `energy_fuel_ratio` | `t19|r05` | `steam_energy_ratio_ref2019` | `T19_TM1` | 입력 | 2019 호기별 스팀사용비율: 화장지 1호기 |
+| `energy_fuel_ratio` | `t19|r06` | `steam_energy_ratio_ref2019` | `T19_TM3` | 입력 | 2019 호기별 스팀사용비율: 화장지 3호기 |
+| `energy_fuel_ratio` | `t19|r07` | `steam_energy_ratio_ref2019` | `T19_TM4` | 입력 | 2019 호기별 스팀사용비율: 화장지 4호기 |
+| `energy_fuel_ratio` | `t19|r08` | `steam_energy_ratio_ref2019` | `T19_TM5` | 입력 | 2019 호기별 스팀사용비율: 화장지 5호기 |
+| `energy_fuel_ratio` | `t19|r09` | `steam_energy_ratio_ref2019` | `T19_TISSUE_SUBTOTAL` | 입력 | 2019 호기별 스팀사용비율: 화장지 소계 |
+| `energy_fuel_ratio` | `t19|r10` | `steam_energy_ratio_ref2019` | `T19_TOTAL` | 입력 | 2019 호기별 스팀사용비율: 합계 |
+| `energy_fuel_ratio` | `t20|r01` | `steam_energy_ratio_ref2019` | `T20_PM1` | 입력 | 2019 호기별 에너지비용 배분: 제지 1호기 |
+| `energy_fuel_ratio` | `t20|r02` | `steam_energy_ratio_ref2019` | `T20_PM2` | 입력 | 2019 호기별 에너지비용 배분: 제지 2호기 |
+| `energy_fuel_ratio` | `t20|r03` | `steam_energy_ratio_ref2019` | `T20_PM3` | 입력 | 2019 호기별 에너지비용 배분: 제지 3호기 |
+| `energy_fuel_ratio` | `t20|r04` | `steam_energy_ratio_ref2019` | `T20_PAPER_SUBTOTAL` | 입력 | 2019 호기별 에너지비용 배분: 제지 소계 |
+| `energy_fuel_ratio` | `t20|r05` | `steam_energy_ratio_ref2019` | `T20_TM1` | 입력 | 2019 호기별 에너지비용 배분: 화장지 1호기 |
+| `energy_fuel_ratio` | `t20|r06` | `steam_energy_ratio_ref2019` | `T20_TM3` | 입력 | 2019 호기별 에너지비용 배분: 화장지 3호기 |
+| `energy_fuel_ratio` | `t20|r07` | `steam_energy_ratio_ref2019` | `T20_TM4` | 입력 | 2019 호기별 에너지비용 배분: 화장지 4호기 |
+| `energy_fuel_ratio` | `t20|r08` | `steam_energy_ratio_ref2019` | `T20_TM5` | 입력 | 2019 호기별 에너지비용 배분: 화장지 5호기 |
+| `energy_fuel_ratio` | `t20|r09` | `steam_energy_ratio_ref2019` | `T20_TISSUE_SUBTOTAL` | 입력 | 2019 호기별 에너지비용 배분: 화장지 소계 |
+| `energy_fuel_ratio` | `t20|r10` | `steam_energy_ratio_ref2019` | `T20_TOTAL` | 입력 | 2019 호기별 에너지비용 배분: 합계 |
+| `energy_fuel_ratio` | `t20|r11` | `steam_energy_ratio_ref2019` | `T20_TOTAL_ENERGY_COST` | 입력 | 2019 호기별 에너지비용 배분: 총 에너지비용 |
+| `energy_month_compare` | `fuel|zescoSteam` | `steam_energy_month_compare` | `ZESCO_STEAM_BUY` | 입력 | 연료비: 제스코 스팀구매(백만원) |
+| `energy_month_compare` | `fuel|lngBuy` | `steam_energy_month_compare` | `LNG_BUY` | 입력 | 연료비: LNG 구매(백만원) |
+| `energy_month_compare` | `fuel|zescoOffset` | `steam_energy_month_compare` | `ZESCO_OFFSET` | 입력 | 차감비: 제스코 상계비(유틸리티) |
+| `energy_month_compare` | `fuel|zescoPenalty` | `steam_energy_month_compare` | `ZESCO_PENALTY` | 입력 | 차감비: 제스코 페널티 |
+| `energy_month_compare` | `fuel|fuelPlan` | `steam_energy_month_compare` | `FUEL_PLAN` | 입력 | 계획: 연료비(회계비용) SG 계획금액(백만원) |
+| `energy_month_compare` | `fuel|pyhsynSteam` | `steam_energy_month_compare` | `INCINERATOR_STEAM_BUY` | 화면 계산값 | 연료비: 폐합성소각로 스팀구매 (도급내역 연동값 저장, 배분비율이 읽음) |
+| `energy_month_compare` | `fuel|fluidSteam` | `steam_energy_month_compare` | `FLUID_STEAM_BUY` | 화면 계산값 | 연료비: 유동상소각로 스팀구매 (유동상 운영내역 연동값 저장, 배분비율이 읽음) |
+| `energy_month_compare` | `fuel|fuelActual` | `steam_energy_month_compare` | `FUEL_ACTUAL` | 화면 계산값 | 실적: 연료비(회계비용) 실적 (화면 계산값, 배분비율이 읽음) |
+| `energy_month_compare` | `fuel|fuelSteamUnit` | `steam_energy_month_compare` | `FUEL_STEAM_UNIT` | 화면 계산값 | 보조: 스팀톤당 연료비(천원/톤) (화면 계산값, 배분비율이 읽음) |
+| `energy_month_compare` | `note|fuel|연료비` | `steam_energy_month_compare_note` | `NOTE_FUEL` | 비고(문자) | 비고: 연료비 |
+| `energy_month_compare` | `note|fuel|차감비` | `steam_energy_month_compare_note` | `NOTE_DEDUCT` | 비고(문자) | 비고: 차감비 |
+| `energy_month_compare` | `note|fuel|실적` | `steam_energy_month_compare_note` | `NOTE_ACTUAL` | 비고(문자) | 비고: 실적 |
+| `energy_month_compare` | `note|fuel|스팀사용비율` | `steam_energy_month_compare_note` | `NOTE_STEAM_RATIO` | 비고(문자) | 비고: 스팀사용비율 |
+| `energy_month_compare` | `note|fuel|계획` | `steam_energy_month_compare_note` | `NOTE_PLAN` | 비고(문자) | 비고: 계획 |
+| `energy_month_compare` | `note|fuel|생산량` | `steam_energy_month_compare_note` | `NOTE_PROD` | 비고(문자) | 비고: 생산량 |
+| `energy_month_compare` | `note|fuel|제품생산량` | `steam_energy_month_compare_note` | `NOTE_PRODUCT` | 비고(문자) | 비고: 제품생산량 |
+| `energy_month_compare` | `note|fuel|원단위` | `steam_energy_month_compare_note` | `NOTE_UNIT` | 비고(문자) | 비고: 원단위 |
+| `energy_month_compare` | `note|fuel|손익` | `steam_energy_month_compare_note` | `NOTE_PROFIT` | 비고(문자) | 비고: 손익 |
+| `energy_month_compare` | `note|fuel|보조 분석` | `steam_energy_month_compare_note` | `NOTE_AUX` | 비고(문자) | 비고: 보조 분석 |
+| `energy_fuel_summary` | `t1|0|prod` | `steam_energy_fuel_summary` | `T1_PM2_PROD` | 입력 | 호기별 손익분석 직접입력: 제지 2호기 제품생산량(톤) |
+| `energy_fuel_summary` | `t1|0|fuel` | `steam_energy_fuel_summary` | `T1_PM2_FUEL` | 입력 | 호기별 손익분석 직접입력: 제지 2호기 총연료비용(백만원) |
+| `energy_fuel_summary` | `t1|1|prod` | `steam_energy_fuel_summary` | `T1_PM3_PROD` | 입력 | 호기별 손익분석 직접입력: 제지 3호기 제품생산량(톤) |
+| `energy_fuel_summary` | `t1|1|fuel` | `steam_energy_fuel_summary` | `T1_PM3_FUEL` | 입력 | 호기별 손익분석 직접입력: 제지 3호기 총연료비용(백만원) |
+| `energy_fuel_summary` | `t1|3|prod` | `steam_energy_fuel_summary` | `T1_TM3_PROD` | 입력 | 호기별 손익분석 직접입력: 화장지 3호기 제품생산량(톤) |
+| `energy_fuel_summary` | `t1|3|fuel` | `steam_energy_fuel_summary` | `T1_TM3_FUEL` | 입력 | 호기별 손익분석 직접입력: 화장지 3호기 총연료비용(백만원) |
+| `energy_fuel_summary` | `t1|4|prod` | `steam_energy_fuel_summary` | `T1_TM4_PROD` | 입력 | 호기별 손익분석 직접입력: 화장지 4호기 제품생산량(톤) |
+| `energy_fuel_summary` | `t1|4|fuel` | `steam_energy_fuel_summary` | `T1_TM4_FUEL` | 입력 | 호기별 손익분석 직접입력: 화장지 4호기 총연료비용(백만원) |
+| `energy_fuel_summary` | `t1|5|prod` | `steam_energy_fuel_summary` | `T1_TM5_PROD` | 입력 | 호기별 손익분석 직접입력: 화장지 5호기 제품생산량(톤) |
+| `energy_fuel_summary` | `t1|5|fuel` | `steam_energy_fuel_summary` | `T1_TM5_FUEL` | 입력 | 호기별 손익분석 직접입력: 화장지 5호기 총연료비용(백만원) |
+| `energy_fuel_summary` | `t2|0|usage` | `steam_energy_fuel_summary` | `T2_LNG_USAGE` | 입력 | 운영단가 비교 직접입력: LNG 보일러 스팀사용량(톤) |
+| `energy_fuel_summary` | `t2|0|price` | `steam_energy_fuel_summary` | `T2_LNG_PRICE` | 입력 | 운영단가 비교 직접입력: LNG 보일러 스팀단가(천원/톤) |
+| `energy_fuel_summary` | `t2|0|cost` | `steam_energy_fuel_summary` | `T2_LNG_COST` | 입력 | 운영단가 비교 직접입력: LNG 보일러 운영비용(백만원) |
+| `energy_fuel_summary` | `t2|1|usage` | `steam_energy_fuel_summary` | `T2_COMPOSITE_USAGE` | 입력 | 운영단가 비교 직접입력: 복합보일러 스팀사용량(톤) |
+| `energy_fuel_summary` | `t2|1|price` | `steam_energy_fuel_summary` | `T2_COMPOSITE_PRICE` | 입력 | 운영단가 비교 직접입력: 복합보일러 스팀단가(천원/톤) |
+| `energy_fuel_summary` | `t2|1|cost` | `steam_energy_fuel_summary` | `T2_COMPOSITE_COST` | 입력 | 운영단가 비교 직접입력: 복합보일러 운영비용(백만원) |
+| `energy_fuel_summary` | `t2|2|usage` | `steam_energy_fuel_summary` | `T2_INCINERATOR_USAGE` | 입력 | 운영단가 비교 직접입력: 폐합성소각로 스팀사용량(톤) |
+| `energy_fuel_summary` | `t2|2|price` | `steam_energy_fuel_summary` | `T2_INCINERATOR_PRICE` | 입력 | 운영단가 비교 직접입력: 폐합성소각로 스팀단가(천원/톤) |
+| `energy_fuel_summary` | `t2|2|cost` | `steam_energy_fuel_summary` | `T2_INCINERATOR_COST` | 입력 | 운영단가 비교 직접입력: 폐합성소각로 운영비용(백만원) |
+| `energy_fuel_summary` | `t2|3|usage` | `steam_energy_fuel_summary` | `T2_FLUID_USAGE` | 입력 | 운영단가 비교 직접입력: 유동상소각로 스팀사용량(톤) |
+| `energy_fuel_summary` | `t2|3|price` | `steam_energy_fuel_summary` | `T2_FLUID_PRICE` | 입력 | 운영단가 비교 직접입력: 유동상소각로 스팀단가(천원/톤) |
+| `energy_fuel_summary` | `t2|3|cost` | `steam_energy_fuel_summary` | `T2_FLUID_COST` | 입력 | 운영단가 비교 직접입력: 유동상소각로 운영비용(백만원) |
+| `energy_fuel_summary` | `t2|4|usage` | `steam_energy_fuel_summary` | `T2_EXT_USAGE` | 입력 | 운영단가 비교 직접입력: 외부보일러 스팀사용량(톤) |
+| `energy_fuel_summary` | `t2|4|price` | `steam_energy_fuel_summary` | `T2_EXT_PRICE` | 입력 | 운영단가 비교 직접입력: 외부보일러 스팀단가(천원/톤) |
+| `energy_fuel_summary` | `t2|4|cost` | `steam_energy_fuel_summary` | `T2_EXT_COST` | 입력 | 운영단가 비교 직접입력: 외부보일러 운영비용(백만원) |
+| `energy_fuel_summary` | `t2|0|elec` | `steam_energy_fuel_summary` | `T2_LNG_ELEC` | 입력 | 운영단가 비교 참고: LNG 보일러 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|0|penalty` | `steam_energy_fuel_summary` | `T2_LNG_PENALTY` | 입력 | 운영단가 비교 특이사항: LNG 보일러 페널티 |
+| `energy_fuel_summary` | `t2|0|overprice` | `steam_energy_fuel_summary` | `T2_LNG_OVERPRICE` | 입력 | 운영단가 비교 특이사항: LNG 보일러 초과단가영향 |
+| `energy_fuel_summary` | `t2|1|elec` | `steam_energy_fuel_summary` | `T2_COMPOSITE_ELEC` | 입력 | 운영단가 비교 참고: 복합보일러 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|1|penalty` | `steam_energy_fuel_summary` | `T2_COMPOSITE_PENALTY` | 입력 | 운영단가 비교 특이사항: 복합보일러 페널티 |
+| `energy_fuel_summary` | `t2|1|overprice` | `steam_energy_fuel_summary` | `T2_COMPOSITE_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 복합보일러 초과단가영향 |
+| `energy_fuel_summary` | `t2|2|elec` | `steam_energy_fuel_summary` | `T2_INCINERATOR_ELEC` | 입력 | 운영단가 비교 참고: 폐합성소각로 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|2|penalty` | `steam_energy_fuel_summary` | `T2_INCINERATOR_PENALTY` | 입력 | 운영단가 비교 특이사항: 폐합성소각로 페널티 |
+| `energy_fuel_summary` | `t2|2|overprice` | `steam_energy_fuel_summary` | `T2_INCINERATOR_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 폐합성소각로 초과단가영향 |
+| `energy_fuel_summary` | `t2|3|elec` | `steam_energy_fuel_summary` | `T2_FLUID_ELEC` | 입력 | 운영단가 비교 참고: 유동상소각로 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|3|penalty` | `steam_energy_fuel_summary` | `T2_FLUID_PENALTY` | 입력 | 운영단가 비교 특이사항: 유동상소각로 페널티 |
+| `energy_fuel_summary` | `t2|3|overprice` | `steam_energy_fuel_summary` | `T2_FLUID_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 유동상소각로 초과단가영향 |
+| `energy_fuel_summary` | `t2|4|elec` | `steam_energy_fuel_summary` | `T2_EXT_ELEC` | 입력 | 운영단가 비교 참고: 외부보일러 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|4|penalty` | `steam_energy_fuel_summary` | `T2_EXT_PENALTY` | 입력 | 운영단가 비교 특이사항: 외부보일러 페널티 |
+| `energy_fuel_summary` | `t2|4|overprice` | `steam_energy_fuel_summary` | `T2_EXT_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 외부보일러 초과단가영향 |
+| `energy_fuel_summary` | `t2|5|elec` | `steam_energy_fuel_summary` | `T2_SUBTOTAL_ELEC` | 입력 | 운영단가 비교 참고: 소계 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|5|penalty` | `steam_energy_fuel_summary` | `T2_SUBTOTAL_PENALTY` | 입력 | 운영단가 비교 특이사항: 소계 페널티 |
+| `energy_fuel_summary` | `t2|5|overprice` | `steam_energy_fuel_summary` | `T2_SUBTOTAL_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 소계 초과단가영향 |
+| `energy_fuel_summary` | `t2|6|elec` | `steam_energy_fuel_summary` | `T2_BURNER_LNG_ELEC` | 입력 | 운영단가 비교 참고: 공정 LNG 연료비 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|6|penalty` | `steam_energy_fuel_summary` | `T2_BURNER_LNG_PENALTY` | 입력 | 운영단가 비교 특이사항: 공정 LNG 연료비 페널티 |
+| `energy_fuel_summary` | `t2|6|overprice` | `steam_energy_fuel_summary` | `T2_BURNER_LNG_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 공정 LNG 연료비 초과단가영향 |
+| `energy_fuel_summary` | `t2|7|elec` | `steam_energy_fuel_summary` | `T2_TOTAL_ELEC` | 입력 | 운영단가 비교 참고: 연료비 합계 전력비용/전력단가 |
+| `energy_fuel_summary` | `t2|7|penalty` | `steam_energy_fuel_summary` | `T2_TOTAL_PENALTY` | 입력 | 운영단가 비교 특이사항: 연료비 합계 페널티 |
+| `energy_fuel_summary` | `t2|7|overprice` | `steam_energy_fuel_summary` | `T2_TOTAL_OVERPRICE` | 입력 | 운영단가 비교 특이사항: 연료비 합계 초과단가영향 |
+
+열 규약(옛 col_index → 연·월): 회계비용 계획·배분비율 `1 = 전년 12월, 2..13 = 1..12월` / 사업계획·요약 `1..12` / 마감비교 `0 = 전년 12월, 1..12, 13 = 다음해 1월` / 비고 `0`.
+
+### API
+
+| Method | URL | 설명 |
+|---|---|---|
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-accounting-plans[?year=] [/{id}]` | 회계비용 계획 — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-fuel-plans[?year=] [/{id}]` | 연료비 사업계획 — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-ratio-boilers[?year=] [/{id}]` | 연료비 배분비율(보일러별) — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-ratio-machines[?year=] [/{id}]` | 연료비 배분비율(호기별) — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-ratio-burners[?year=] [/{id}]` | 연료비 배분비율(버너 LNG) — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-ratio-steam-units[?year=] [/{id}]` | 스팀사용량 원단위(기타 포함) — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-ratio-ref2019s[?year=] [/{id}]` | 연료비 배분비율(2019 참고) — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-month-compares[?year=] [/{id}]` | 회계비용 마감비교 — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| GET / POST / DELETE | `/steam-energy-api/energy-month-compare-notes[?year=] [/{id}]` | 회계비용 마감비교 비고 — 연도 행 1개 |
+| GET / POST / PUT /year / DELETE | `/steam-energy-api/energy-fuel-summaries[?year=] [/{id}]` | 연료비 요약 — (연,월) 업서트, 한 해치 일괄(PUT /year, clearMissing) |
+| POST | `/steam-energy-api/energy-excel/{page}/import-excel?year=` | 엑셀 가져오기 (page = accounting-plan · fuel-plan · fuel-ratio · month-compare · all) — 그 해 월 행 값을 비운 뒤 시트 값 저장(비고·이웃 연도 행은 유지) |
+| GET | `/steam-energy-api/energy-excel/{page}/export-excel?year=` | 서식(6. {연도}년 에너지 회계비용 실적.xlsx)에 채워 내려받기 |
+
+쓰기 API 는 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 옛 `/steam/api/tables/energy-*/import|export-excel` 은 제거했다.
+
+### 데이터 이관
+
+`migration/2026-11-20_energy_cells_to_tables.sql` — 옛 셀(2025·2026) 을 매핑대로 옮긴다(148행, 재실행 안전). 화면 계산 전용 행·합계 열·단위 글자는 버린다.
+옛 네임스페이스 `energy_*` 는 읽기용으로만 남고 더 이상 갱신되지 않는다. 다른 사이트의 t17 읽기는 `api/19_스팀에너지_공유데이터.md` 참고.
+
 ## 메뉴 / 권한
 
 - 메뉴 코드: `STEAM_ENERGY_MGMT` → URL `/steam-energy/page`
@@ -350,3 +616,5 @@ DROP TABLE IF EXISTS steam_equipment;
 | 컬럼명 대문자 SNAKE_CASE | `steam_cell_value` 등 소문자 | 이름을 바꾸면 화면·서비스 전부 수정 필요 |
 
 바꾸려면 화면 JS 까지 함께 손봐야 하므로, 별도 과제로 잡고 단계적으로 옮기는 것을 권한다.
+
+전환 진행: 묶음 1 원단위 일지 7개 화면(2026-11-20 완료), 묶음 2 에너지 회계비용 5개 화면(2026-11-20 완료). 남은 것: 묶음 3(일별 입력형 24개), 묶음 4(양식형 4개), 정리.

@@ -8,11 +8,6 @@ import com.company.module.steamenergy.legacy.service.WasteIncineratorLogExportSe
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogImportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDetailWorkbookService;
 import com.company.module.steamenergy.legacy.service.FluidizedSummaryWorkbookService;
-import com.company.module.steamenergy.legacy.service.EnergyAccountingPlanWorkbookService;
-import com.company.module.steamenergy.legacy.service.EnergyAllWorkbookService;
-import com.company.module.steamenergy.legacy.service.EnergyFuelPlanWorkbookService;
-import com.company.module.steamenergy.legacy.service.EnergyFuelRatioWorkbookService;
-import com.company.module.steamenergy.legacy.service.EnergyMonthCompareWorkbookService;
 import com.company.module.steamenergy.legacy.service.IncineratorWorkbookService;
 import com.company.module.steamenergy.legacy.service.SrfBoilerInvoiceWorkbookService;
 import org.springframework.core.io.ByteArrayResource;
@@ -44,11 +39,6 @@ public class TableController {
     private final ComboBoilerWorkbookService comboBoilerWorkbookService;
     private final SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService;
     private final IncineratorWorkbookService incineratorWorkbookService;
-    private final EnergyAccountingPlanWorkbookService energyAccountingPlanWorkbookService;
-    private final EnergyFuelPlanWorkbookService energyFuelPlanWorkbookService;
-    private final EnergyFuelRatioWorkbookService energyFuelRatioWorkbookService;
-    private final EnergyMonthCompareWorkbookService energyMonthCompareWorkbookService;
-    private final EnergyAllWorkbookService energyAllWorkbookService;
 
     public TableController(
             TableService tableService,
@@ -60,12 +50,7 @@ public class TableController {
             FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService,
             ComboBoilerWorkbookService comboBoilerWorkbookService,
             SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService,
-            IncineratorWorkbookService incineratorWorkbookService,
-            EnergyAccountingPlanWorkbookService energyAccountingPlanWorkbookService,
-            EnergyFuelPlanWorkbookService energyFuelPlanWorkbookService,
-            EnergyFuelRatioWorkbookService energyFuelRatioWorkbookService,
-            EnergyMonthCompareWorkbookService energyMonthCompareWorkbookService,
-            EnergyAllWorkbookService energyAllWorkbookService
+            IncineratorWorkbookService incineratorWorkbookService
     ) {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
@@ -77,11 +62,6 @@ public class TableController {
         this.comboBoilerWorkbookService = comboBoilerWorkbookService;
         this.srfBoilerInvoiceWorkbookService = srfBoilerInvoiceWorkbookService;
         this.incineratorWorkbookService = incineratorWorkbookService;
-        this.energyAccountingPlanWorkbookService = energyAccountingPlanWorkbookService;
-        this.energyFuelPlanWorkbookService = energyFuelPlanWorkbookService;
-        this.energyFuelRatioWorkbookService = energyFuelRatioWorkbookService;
-        this.energyMonthCompareWorkbookService = energyMonthCompareWorkbookService;
-        this.energyAllWorkbookService = energyAllWorkbookService;
     }
 
     @GetMapping("/{tableName}")
@@ -514,208 +494,7 @@ public class TableController {
 
     /* ── 에너지 회계비용 계획 ─────────────────────────────── */
 
-    @PostMapping("/energy-accounting-plan/import-excel")
-    public Map<String, Object> importEnergyAccountingPlanExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        try {
-            return energyAccountingPlanWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            String detail = exception.getMessage() == null ? "" : exception.getMessage();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "에너지 회계비용 엑셀을 읽을 수 없습니다: " + detail, exception);
-        }
-    }
-
-    @GetMapping("/energy-accounting-plan/export-excel")
-    public ResponseEntity<ByteArrayResource> exportEnergyAccountingPlanExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = energyAccountingPlanWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "6. " + year + "년 에너지 회계비용 실적.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "energy_accounting_plan_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export energy accounting plan Excel file", exception);
-        }
-    }
-
-    /* ── 에너지 연료비 요약 (5개 페이지 통합 워크북) ───────── */
-
-    @PostMapping("/energy-fuel-summary/import-excel")
-    public Map<String, Object> importEnergyFuelSummaryExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        try {
-            return energyAllWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            String detail = exception.getMessage() == null ? "" : exception.getMessage();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "에너지 회계비용 엑셀을 읽을 수 없습니다: " + detail, exception);
-        }
-    }
-
-    @GetMapping("/energy-fuel-summary/export-excel")
-    public ResponseEntity<ByteArrayResource> exportEnergyFuelSummaryExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = energyAllWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "6. " + year + "년 에너지 회계비용 실적.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "energy_all_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export energy all-in-one Excel file", exception);
-        }
-    }
-
-    /* ── 에너지 회계비용 마감비교 ─────────────────────────────── */
-
-    @PostMapping("/energy-month-compare/import-excel")
-    public Map<String, Object> importEnergyMonthCompareExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        try {
-            return energyMonthCompareWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            String detail = exception.getMessage() == null ? "" : exception.getMessage();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "에너지 회계비용 엑셀을 읽을 수 없습니다: " + detail, exception);
-        }
-    }
-
-    @GetMapping("/energy-month-compare/export-excel")
-    public ResponseEntity<ByteArrayResource> exportEnergyMonthCompareExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = energyMonthCompareWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "6. " + year + "년 에너지 회계비용 실적.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "energy_month_compare_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export energy month compare Excel file", exception);
-        }
-    }
-
-    /* ── 에너지 연료비 배분비율 ─────────────────────────────── */
-
-    @PostMapping("/energy-fuel-ratio/import-excel")
-    public Map<String, Object> importEnergyFuelRatioExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        try {
-            return energyFuelRatioWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            String detail = exception.getMessage() == null ? "" : exception.getMessage();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "에너지 회계비용 엑셀을 읽을 수 없습니다: " + detail, exception);
-        }
-    }
-
-    @GetMapping("/energy-fuel-ratio/export-excel")
-    public ResponseEntity<ByteArrayResource> exportEnergyFuelRatioExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = energyFuelRatioWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "6. " + year + "년 에너지 회계비용 실적.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "energy_fuel_ratio_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export energy fuel ratio Excel file", exception);
-        }
-    }
-
-    /* ── 에너지 연료비 사업계획 ─────────────────────────────── */
-
-    @PostMapping("/energy-fuel-plan/import-excel")
-    public Map<String, Object> importEnergyFuelPlanExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        try {
-            return energyFuelPlanWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            String detail = exception.getMessage() == null ? "" : exception.getMessage();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "에너지 회계비용 엑셀을 읽을 수 없습니다: " + detail, exception);
-        }
-    }
-
-    @GetMapping("/energy-fuel-plan/export-excel")
-    public ResponseEntity<ByteArrayResource> exportEnergyFuelPlanExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = energyFuelPlanWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "6. " + year + "년 에너지 회계비용 실적.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "energy_fuel_plan_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export energy fuel plan Excel file", exception);
-        }
-    }
+    // 에너지 회계비용 엑셀(/energy-*/import|export-excel)은 2026-11 규격 전환으로 /steam-energy-api/energy-excel/{page}/… (SteamEnergyExcelController) 로 옮겼다.
 
     private void ensureTable(String tableName) {
         if (!tableService.supports(tableName)) {

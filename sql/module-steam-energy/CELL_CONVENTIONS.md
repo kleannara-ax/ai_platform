@@ -87,4 +87,9 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `lng_m_boiler`, `lng_m_burner`, `lng_m_mix` | `steam_lng_daily_usage` |
 | `flow_m_fluid_incinerator`, `flow_m_combined`, `flow_m_boiler`, `flow_m_summary` | `steam_fuel_daily_usage`. 유동상 운전일지·세부 운영내역이 쓰던 `flow_m_fluid_incinerator` col 0 는 `FLUID_STEAM_TON` 으로 재연결 |
 | `unit_price`, `unit_price_detail` | `steam_price` (ITEM_CODE × YEAR_NO/MONTH_NO) |
+| `energy_accounting_plan` | `steam_energy_accounting_plan` (2026-11-20) |
+| `energy_fuel_plan` | `steam_energy_fuel_plan` |
+| `energy_fuel_ratio` | `steam_energy_ratio_boiler`(t01~t03) · `_machine`(t04~t06) · `_burner`(t10~t12) · `_steam_unit`(t17, 다른 사이트 공유) · `_ref2019`(t18~t20). 계산 전용 표(t07~t09, t13~t16)는 저장 안 함 |
+| `energy_month_compare` | `steam_energy_month_compare` (입력·연동값) + `steam_energy_month_compare_note` (비고, 연도 행) |
+| `energy_fuel_summary` | `steam_energy_fuel_summary` (직접 입력값) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |
