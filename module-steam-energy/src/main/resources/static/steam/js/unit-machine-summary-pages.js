@@ -1,3 +1,7 @@
+/* 호기별 요약 (읽기 전용) — 2026-11 규격 전환. 네 표를 연도 단위로 읽어 월 집계를 화면에서 계산한다.
+ *  /steam-energy-api/unit-daily-usages · unit-daily-commons · lng-daily-usages · fuel-daily-usages
+ *  LNG 합계·비용, 스팀 구매 비용·스팀구매비는 어느 화면도 저장하지 않으므로 LNG·일일 사용량 화면과 같은 식으로 다시 구한다.
+ */
 document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "unit-machine-summary.html") return;
@@ -7,48 +11,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "steam_cell_value";
-  const UNIT_TABLE = "steam_unit_usage";
-  const RAW_TABLE = "steam_unit_usage_raw";
-  const DAILY_ROW_COUNT = 31;
-
-  const cellRows = [];
-  const unitRows = [];
-  const rawRows = [];
-  const cellIndex = new Map();
-  const unitIndex = new Map();
-  const rawIndex = new Map();
+  const API = window.SteamEnergyApi;
+  if (!API) { console.error("steam-energy-api.js 가 로드되지 않았습니다."); return; }
+  const unitByKey = new Map();     // 'YYYY-MM-DD|호기'
+  const commonByDate = new Map();  // 'YYYY-MM-DD'
+  const lngByDate = new Map();
+  const fuelByDate = new Map();
   let loaded = false;
   let loadedYear = "";
-
-  const CELL_TABLE_NAMES = [
-    "lng_m_boiler",
-    "lng_m_burner",
-    "flow_m_fluid_incinerator",
-    "flow_m_combined",
-    "flow_m_boiler",
-  ];
-
-  function cellKey(tableName, month, rowKey, colIndex) {
-    return `${tableName}|${month}|${rowKey}|${Number(colIndex)}`;
-  }
-
-  function unitKey(month, day, machineNo) {
-    return `${month}|${normalizeDayValue(day)}|${machineNo}`;
-  }
-
-  function rawKey(month, day) {
-    return `${month}|${normalizeDayValue(day)}`;
-  }
-
-  function rebuildIndexes() {
-    cellIndex.clear();
-    unitIndex.clear();
-    rawIndex.clear();
-    cellRows.forEach((row) => cellIndex.set(cellKey(row.table_name, row.month, row.row_key, row.col_index), row));
-    unitRows.forEach((row) => unitIndex.set(unitKey(row.month, row.day, row.machine_no), row));
-    rawRows.forEach((row) => rawIndex.set(rawKey(row.month, row.day), row));
-  }
+  function isoOf(month, rowKey) { return `${month}-${String(rowKey).padStart(2, "0")}`; }
+  const n = (v) => (v === null || v === undefined ? 0 : Number(v) || 0);
 
   const STEAM_ROWS = [
     { label: "스팀 생산량 누계", unit: "톤" },
@@ -106,12 +78,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Date(year, month, 0).getDate();
   }
 
-  function normalizeDayValue(day) {
-    const numeric = Number(day);
-    if (Number.isFinite(numeric) && numeric > 0) return String(numeric);
-    return String(day ?? "").trim();
-  }
-
   function parseNumber(value) {
     if (value === null || value === undefined) return 0;
     const cleaned = String(value).replace(/[% ,]/g, "").trim();
@@ -141,39 +107,34 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${formatOne(value)}%`;
   }
 
-  async function fetchPaged(tableName, range = {}, extra = {}) {
-    const data = [];
-    let pageNo = 1;
-    let totalPages = 1;
-    const params = new URLSearchParams({ page: String(pageNo), limit: "2000" });
-    if (range.fromMonth) params.set("fromMonth", range.fromMonth);
-    if (range.toMonth) params.set("toMonth", range.toMonth);
-    if (extra.tableNames) params.set("tableNames", extra.tableNames);
-    while (pageNo <= totalPages) {
-      params.set("page", String(pageNo));
-      const response = await fetch(`tables/${tableName}?${params.toString()}`);
-      if (!response.ok) break;
-      const payload = await response.json();
-      const pageData = payload.data || [];
-      const total = payload.total || pageData.length;
-      const limit = payload.limit || 2000;
-      totalPages = Math.max(1, Math.ceil(total / limit));
-      data.push(...pageData);
-      pageNo += 1;
-    }
-    return data;
-  }
-
-  function getCellValue(tableName, month, rowKey, colIndex) {
-    return cellIndex.get(cellKey(tableName, month, rowKey, colIndex))?.cell_value ?? "";
-  }
-
   function findUnit(month, day, machine) {
-    return unitIndex.get(unitKey(month, day, machine)) || null;
+    return unitByKey.get(`${isoOf(month, day)}|${machine}`) || null;
   }
 
   function findRaw(month, day) {
-    return rawIndex.get(rawKey(month, day)) || null;
+    return commonByDate.get(isoOf(month, day)) || null;
+  }
+
+  // 그 날의 LNG·스팀 구매 집계 — LNG 연료 사용 비용·일일 사용량 화면의 계산식과 같다.
+  function dayFuel(month, day) {
+    const lng = lngByDate.get(isoOf(month, day)) || {};
+    const fuel = fuelByDate.get(isoOf(month, day)) || {};
+    const boilerTotal = n(lng.boiler20t1) + n(lng.boiler20t2) + n(lng.boiler50t) + n(lng.boiler60t) + n(lng.boilerCombined) + n(lng.boilerNewIncinerator);
+    const burnerTotal = n(lng.burnerPm3) + n(lng.burnerTm3) + n(lng.burnerTm4) + n(lng.burnerTm5);
+    const boilerCost = boilerTotal * n(lng.boilerUnitPrice) / 1000000;
+    const burnerCost = burnerTotal * n(lng.burnerUnitPrice) / 100000000;
+    const combinedCost = n(fuel.combinedSteamTon) * n(fuel.combinedUnitPrice) / 1000000;
+    const boilerPurchaseCost = n(fuel.extBoilerSteamTon) * n(fuel.extBoilerUnitPrice) / 1000000;
+    return {
+      lngUsage: boilerTotal + burnerTotal,
+      lngCost: boilerCost + burnerCost,
+      fluidCost: n(fuel.fluidSteamTon) * n(fuel.fluidUnitPrice) / 1000000,
+      incineratorSteam: n(fuel.incineratorSteamTon),
+      combinedSteam: n(fuel.combinedSteamTon),
+      combinedCost: combinedCost > 0 || n(fuel.combinedDeduction) > 0 ? combinedCost - n(fuel.combinedDeduction) : 0,
+      boilerSteam: n(fuel.extBoilerSteamTon),
+      boilerCost: boilerPurchaseCost > 0 || n(fuel.extBoilerDeduction) > 0 ? boilerPurchaseCost - n(fuel.extBoilerDeduction) : 0,
+    };
   }
 
   function steamMetric(month, day) {
@@ -184,22 +145,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const tm5 = findUnit(month, day, "TM-5") || {};
     const raw = findRaw(month, day) || {};
 
-    const pm2Steam = Number(pm2.main_steam || 0) + Number(pm2.coater_steam || 0);
-    const pm3Steam =
-      Number(pm3.main_steam || 0) +
-      Number(pm3.coater_steam || 0) +
-      Number(raw.disperser_total || 0) +
-      Number(pm3.ventilation_steam || 0);
+    const pm2Steam = n(pm2.mainSteam) + n(pm2.coaterSteam);
+    const pm3Steam = n(pm3.mainSteam) + n(pm3.coaterSteam) + n(raw.disperserTotal) + n(pm3.ventilationSteam);
     const tm3Steam = Number(tm3.steam || 0);
     const tm4Steam = Number(tm4.steam || 0);
     const tm5Steam = Number(tm5.steam || 0);
     const totalSteam = pm2Steam + pm3Steam + tm3Steam + tm4Steam + tm5Steam;
 
-    const pm2Prod = Number(pm2.production || 0);
-    const pm3Prod = Number(pm3.production || 0);
-    const tm3Prod = Number(tm3.production || 0);
-    const tm4Prod = Number(tm4.production || 0);
-    const tm5Prod = Number(tm5.production || 0);
+    const pm2Prod = n(pm2.productionKg);
+    const pm3Prod = n(pm3.productionKg);
+    const tm3Prod = n(tm3.productionKg);
+    const tm4Prod = n(tm4.productionKg);
+    const tm5Prod = n(tm5.productionKg);
     const totalProd = pm2Prod + pm3Prod + tm3Prod + tm4Prod + tm5Prod;
 
     return {
@@ -261,17 +218,15 @@ document.addEventListener("DOMContentLoaded", () => {
       totals.tm5Prod += m.tm5Prod;
       totals.totalProd += m.totalProd;
 
-      totals.lngUsage +=
-        parseNumber(getCellValue("lng_m_boiler", month, rowKey, 4)) +
-        parseNumber(getCellValue("lng_m_burner", month, rowKey, 5));
-      totals.lngCost += parseNumber(getCellValue("lng_m_burner", month, rowKey, 8));
-
-      totals.fluidCost += parseNumber(getCellValue("flow_m_fluid_incinerator", month, rowKey, 2));
-      totals.incineratorSteam += parseNumber(getCellValue("flow_m_fluid_incinerator", month, rowKey, 3));
-      totals.combinedSteam += parseNumber(getCellValue("flow_m_combined", month, rowKey, 0));
-      totals.combinedCost += parseNumber(getCellValue("flow_m_combined", month, rowKey, 4));
-      totals.boilerSteam += parseNumber(getCellValue("flow_m_boiler", month, rowKey, 0));
-      totals.boilerCost += parseNumber(getCellValue("flow_m_boiler", month, rowKey, 4));
+      const f = dayFuel(month, rowKey);
+      totals.lngUsage += f.lngUsage;
+      totals.lngCost += f.lngCost;
+      totals.fluidCost += f.fluidCost;
+      totals.incineratorSteam += f.incineratorSteam;
+      totals.combinedSteam += f.combinedSteam;
+      totals.combinedCost += f.combinedCost;
+      totals.boilerSteam += f.boilerSteam;
+      totals.boilerCost += f.boilerCost;
     }
 
     return totals;
@@ -382,11 +337,8 @@ document.addEventListener("DOMContentLoaded", () => {
           ? [m.pm2Steam / totalSteam, m.pm3Steam / totalSteam, m.tm3Steam / totalSteam, m.tm4Steam / totalSteam, m.tm5Steam / totalSteam]
           : [0, 0, 0, 0, 0];
 
-      const totalFuelCost =
-        parseNumber(getCellValue("lng_m_burner", month, rowKey, 8)) +
-        parseNumber(getCellValue("flow_m_fluid_incinerator", month, rowKey, 2)) +
-        parseNumber(getCellValue("flow_m_combined", month, rowKey, 4)) +
-        parseNumber(getCellValue("flow_m_boiler", month, rowKey, 4));
+      const f = dayFuel(month, rowKey);
+      const totalFuelCost = f.lngCost + f.fluidCost + f.combinedCost + f.boilerCost;
 
       const split = ratios.map((ratio) => totalFuelCost * ratio);
       rows.push({
@@ -462,19 +414,21 @@ document.addEventListener("DOMContentLoaded", () => {
   async function ensureLoaded() {
     const year = String(yearSelect.value || "");
     if (loaded && loadedYear === year) return;
-    const range = year ? { fromMonth: `${year}-01`, toMonth: `${year}-12` } : {};
-    const [cells, units, raws] = await Promise.all([
-      fetchPaged(CELL_TABLE, range, { tableNames: CELL_TABLE_NAMES.join(",") }),
-      fetchPaged(UNIT_TABLE, range),
-      fetchPaged(RAW_TABLE, range),
-    ]);
-    cellRows.length = 0;
-    unitRows.length = 0;
-    rawRows.length = 0;
-    cellRows.push(...cells);
-    unitRows.push(...units);
-    rawRows.push(...raws);
-    rebuildIndexes();
+    const q = `year=${Number(year)}`;
+    try {
+      const [units, commons, lngs, fuels] = await Promise.all([
+        API.get(`/unit-daily-usages?${q}`), API.get(`/unit-daily-commons?${q}`),
+        API.get(`/lng-daily-usages?${q}`), API.get(`/fuel-daily-usages?${q}`),
+      ]);
+      unitByKey.clear(); commonByDate.clear(); lngByDate.clear(); fuelByDate.clear();
+      units.forEach((row) => unitByKey.set(`${row.usageDate}|${row.machineCode}`, row));
+      commons.forEach((row) => commonByDate.set(row.usageDate, row));
+      lngs.forEach((row) => lngByDate.set(row.usageDate, row));
+      fuels.forEach((row) => fuelByDate.set(row.usageDate, row));
+    } catch (error) {
+      console.error("호기별 요약 조회 실패", error);
+      window.alert(`조회 실패: ${error.message || error}`);
+    }
     loaded = true;
     loadedYear = year;
   }
