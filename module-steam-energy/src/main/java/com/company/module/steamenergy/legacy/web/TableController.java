@@ -15,8 +15,6 @@ import com.company.module.steamenergy.legacy.service.EnergyFuelRatioWorkbookServ
 import com.company.module.steamenergy.legacy.service.EnergyMonthCompareWorkbookService;
 import com.company.module.steamenergy.legacy.service.IncineratorWorkbookService;
 import com.company.module.steamenergy.legacy.service.SrfBoilerInvoiceWorkbookService;
-import com.company.module.steamenergy.legacy.service.SteamUnitExcelExportService;
-import com.company.module.steamenergy.legacy.service.SteamUnitExcelImportService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -37,8 +35,6 @@ import java.util.Map;
 @RequestMapping("/steam/api/tables")
 public class TableController {
     private final TableService tableService;
-    private final SteamUnitExcelImportService steamUnitExcelImportService;
-    private final SteamUnitExcelExportService steamUnitExcelExportService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
     private final FluidizedDailyLogImportService fluidizedDailyLogImportService;
     private final WasteIncineratorLogImportService wasteIncineratorLogImportService;
@@ -56,8 +52,6 @@ public class TableController {
 
     public TableController(
             TableService tableService,
-            SteamUnitExcelImportService steamUnitExcelImportService,
-            SteamUnitExcelExportService steamUnitExcelExportService,
             FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
             FluidizedDailyLogImportService fluidizedDailyLogImportService,
             WasteIncineratorLogImportService wasteIncineratorLogImportService,
@@ -74,8 +68,6 @@ public class TableController {
             EnergyAllWorkbookService energyAllWorkbookService
     ) {
         this.tableService = tableService;
-        this.steamUnitExcelImportService = steamUnitExcelImportService;
-        this.steamUnitExcelExportService = steamUnitExcelExportService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
         this.fluidizedDailyLogImportService = fluidizedDailyLogImportService;
         this.wasteIncineratorLogImportService = wasteIncineratorLogImportService;
@@ -168,44 +160,8 @@ public class TableController {
         return Map.of("ok", true, "deleted", affected);
     }
 
-    @PostMapping("/unit-usage/import-excel")
-    public Map<String, Object> importUnitExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\uC5F0\uB3C4\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-        }
-
-        try {
-            return steamUnitExcelImportService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\uC5D1\uC140 \uD30C\uC77C\uC744 \uC77D\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD615\uC2DD\uC744 \uD655\uC778\uD574\uC8FC\uC138\uC694.", exception);
-        }
-    }
-
-    @GetMapping("/unit-usage/export-excel")
-    public ResponseEntity<ByteArrayResource> exportUnitExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-
-        try {
-            byte[] content = steamUnitExcelExportService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "\uC6D0\uB2E8\uC704 \uC77C\uC9C0 \uB204\uACC4(" + year + "\uB144).xls";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "unit_usage_" + year + ".xls"))
-                    .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export Excel file", exception);
-        }
-    }
+    // 원단위 일지 엑셀(/unit-usage/import-excel · export-excel)은 2026-11 규격 전환으로
+    // /steam-energy-api/unit-log/import-excel · export-excel (SteamUnitLogExcelController) 로 옮겼다.
 
     @GetMapping("/server-date")
     public Map<String, Object> serverDate() {

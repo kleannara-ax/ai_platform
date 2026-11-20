@@ -1,6 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
 import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.SteamFuelDailyUsageService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Anchor;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Entry;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.PowerUsage;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,20 +44,23 @@ public class FluidizedDailyLogImportService {
 
     private static final String CELL_TABLE = "steam_cell_value";
     private static final String DETAIL_TABLE = "fluidized_detail_main";
-    private static final String FLOW_TABLE = "flow_m_fluid_incinerator";
     private static final String LOG_TABLE = "fluidized_daily_log";
     private static final String MOISTURE_SHEET = "함수율";
 
     private final TableService tableService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
+    /** 스팀 송기량(세부 7행)은 규격 표 steam_fuel_daily_usage.FLUID_STEAM_TON 에 둔다 (2026-11, 원단위 일지 그룹 전환) */
+    private final SteamFuelDailyUsageService fuelDailyUsageService;
     private final DataFormatter dataFormatter = new DataFormatter();
 
     public FluidizedDailyLogImportService(
             TableService tableService,
-            FluidizedDetailWorkbookService fluidizedDetailWorkbookService
+            FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
+            SteamFuelDailyUsageService fuelDailyUsageService
     ) {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
+        this.fuelDailyUsageService = fuelDailyUsageService;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
@@ -245,9 +250,20 @@ public class FluidizedDailyLogImportService {
         if (value == null || value.isBlank()) return 0;
         return switch (store) {
             case DETAIL -> upsert(monthKey, year, month, DETAIL_TABLE, columnLabel(day + 2) + target, 0, value);
-            case FLOW -> upsert(monthKey, year, month, FLOW_TABLE, String.format("%02d", day), 0, value);
+            case FLOW -> saveFluidSteamTon(year, month, day, value);
             case LOG -> upsert(monthKey, year, month, LOG_TABLE, String.valueOf(day), target, value);
         };
+    }
+
+    private int saveFluidSteamTon(int year, int month, int day, String value) {
+        BigDecimal ton;
+        try {
+            ton = new BigDecimal(value.replace(",", "").trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+        fuelDailyUsageService.saveFluidSteamTon(LocalDate.of(year, month, day), ton);
+        return 1;
     }
 
     private int upsert(String monthKey, int year, int month, String tableName, String rowKey, int colIndex, String value) {

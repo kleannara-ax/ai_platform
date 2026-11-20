@@ -1,8 +1,8 @@
 /*
  * 유동상 운전일지 (현장 작성 원본 양식 / 일단위)
  *  - 엑셀 "유동상 운전일지" 의 하루치 시트(1~31) 폼을 그대로 옮긴 입력 페이지.
- *  - 세부 운영내역과 공유하는 항목(소각량·스팀·약품·전력·용수)은 세부 운영내역 셀
- *    (fluidized_detail_main / flow_m_fluid_incinerator) 을 직접 읽고 쓴다. DETAIL_MAP 참고.
+ *  - 세부 운영내역과 공유하는 항목(소각량·스팀·약품·전력·용수)은 세부 운영내역 셀(fluidized_detail_main)을 직접 읽고 쓴다. DETAIL_MAP 참고.
+ *    스팀 송기량(세부 7행)만은 규격 표 steam_fuel_daily_usage.FLUID_STEAM_TON (/steam-energy-api/fuel-daily-usages) 이다 (2026-11).
  *    → 기존 세부 운영내역 데이터가 그대로 보이고, 운전일지 입력은 세부 운영내역에 즉시 반영된다.
  *  - 나머지(근무자·결재·전일지침·소각재·특이사항)만 steam_cell_value
  *    (table_name="fluidized_daily_log", row_key=일, col_index=항목번호) 에 저장한다.
@@ -16,11 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const LOG_TABLE = "fluidized_daily_log";
   // 세부 운영내역과 공유하는 저장소
   //  - fluidized_detail_main    : row_key = 셀 참조("C18"), col_index = 0. 열 = 일자+2 (C=1일 … AG=31일)
-  //  - flow_m_fluid_incinerator : row_key = 2자리 일자, col_index = 0  (세부 7행 스팀 송기량)
+  //  - 스팀 송기량(세부 7행)      : steam_fuel_daily_usage.FLUID_STEAM_TON — 행 전체 업서트라 최신 행을 읽어 그 칸만 바꾼다
   // DETAIL_MAP 에 있는 항목은 운전일지 전용 테이블에 따로 저장하지 않고 세부 운영내역 셀을 직접 읽고 쓴다.
   // → 과거 세부 운영내역 데이터가 운전일지에 그대로 보이고, 운전일지 입력은 즉시 세부 운영내역에 반영된다.
   const DETAIL_TABLE = "fluidized_detail_main";
-  const FLOW_TABLE = "flow_m_fluid_incinerator";
+  const API = window.SteamEnergyApi;
+  if (!API) { console.error("steam-energy-api.js 가 로드되지 않았습니다."); return; }
   const TON = 0.001; // 운전일지 KG → 세부 운영내역 톤
   const TABLES_BASE = "/tables";
   const PERIOD_KEY = "steamlog:shared-period";
@@ -668,20 +669,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (saved && saved.id) detailIds.set(key, saved.id);
   }
 
-  // 스팀 송기량 저장 (세부 7행에 연결된 flow 셀)
+  // 스팀 송기량 저장 — steam_fuel_daily_usage 의 그 날 행에서 FLUID_STEAM_TON 만 바꿔 행 전체를 보낸다
+  const FUEL_FIELDS = ["fluidSteamTon", "fluidUnitPrice", "incineratorSteamTon", "incineratorUnitPrice",
+    "combinedSteamTon", "combinedUnitPrice", "combinedDeduction", "extBoilerSteamTon", "extBoilerUnitPrice", "extBoilerDeduction"];
   async function saveFlowCell(monthKey, day, value) {
     const key = flowCacheKey(monthKey, day);
     if (value === "") flowCache.delete(key);
     else flowCache.set(key, value);
 
-    const saved = await upsert({
-      ...periodFields(monthKey),
-      table_name: FLOW_TABLE,
-      row_key: String(day).padStart(2, "0"),
-      col_index: 0,
-      cell_value: value === "" ? null : value,
-    }, flowIds.get(key));
-    if (saved && saved.id) flowIds.set(key, saved.id);
+    const usageDate = `${monthKey}-${String(day).padStart(2, "0")}`;
+    const year = Number(monthKey.slice(0, 4));
+    const month = Number(monthKey.slice(5, 7));
+    const rows = await API.get(`/fuel-daily-usages?year=${year}&month=${month}`);
+    const base = rows.find((row) => row.usageDate === usageDate) || {};
+    const body = { usageDate };
+    FUEL_FIELDS.forEach((field) => { body[field] = base[field] === undefined ? null : base[field]; });
+    body.fluidSteamTon = value === "" ? null : API.num(value);
+    await API.post("/fuel-daily-usages", body);
   }
 
   // 전력 사용량(= 금일지침 − 전일지침)을 세부 운영내역 전력량 행에 반영
@@ -874,7 +878,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const limit = 1000;
     let pageNo = 1;
     let totalPages = 1;
-    const tableNames = [LOG_TABLE, DETAIL_TABLE, FLOW_TABLE].join(",");
+    const tableNames = [LOG_TABLE, DETAIL_TABLE].join(",");
+    // 스팀 송기량은 규격 표에서
+    const fuelRows = await API.get(`/fuel-daily-usages?year=${Number(monthKey.slice(0, 4))}&month=${Number(monthKey.slice(5, 7))}`);
+    fuelRows.forEach((row) => {
+      if (row.fluidSteamTon === null || row.fluidSteamTon === undefined) return;
+      flowCache.set(flowCacheKey(monthKey, Number(row.usageDate.slice(8, 10))), String(row.fluidSteamTon));
+    });
     while (pageNo <= totalPages) {
       const url = `${TABLES_BASE}/${CELL_TABLE}?page=${pageNo}&limit=${limit}` +
         `&month=${encodeURIComponent(monthKey)}&tableNames=${encodeURIComponent(tableNames)}`;
@@ -895,11 +905,6 @@ document.addEventListener("DOMContentLoaded", () => {
           if (value !== "") detailCache.set(key, value);
           detailIds.set(key, row.id);
           return;
-        }
-        if (row.table_name === FLOW_TABLE && Number(row.col_index) === 0) {
-          const key = flowCacheKey(monthKey, Number(row.row_key));
-          if (value !== "") flowCache.set(key, value);
-          flowIds.set(key, row.id);
         }
       });
       const total = Number(payload?.total || rows.length);

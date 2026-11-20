@@ -1,8 +1,9 @@
 -- ============================================================
 -- module-steam-energy: 이관 대시보드 스키마
---   steam_unit_usage      원단위 일지 (설비·일자별)
---   steam_unit_usage_raw  원단위 일지 원시값 (디스퍼져·TOC·PICA)
+--   steam_unit_usage      원단위 일지 (설비·일자별)          ← 2026-11 퇴역: 01_schema 의 steam_unit_daily_usage 로 대체. 읽는 코드 없음
+--   steam_unit_usage_raw  원단위 일지 원시값 (디스퍼져·TOC·PICA) ← 2026-11 퇴역: steam_unit_daily_common 으로 대체. 읽는 코드 없음
 --   steam_cell_value      화면별 셀 저장소 — table_name 으로 논리 표를 나눈다 (CELL_CONVENTIONS.md)
+--   (퇴역한 두 표는 전체 묶음 전환이 끝난 뒤 정리 단계에서 DROP 한다. 지금은 만들어도 쓰지 않을 뿐이다.)
 -- 플랫폼 DB(ddl-auto=none)에 수동 실행. 01_schema.sql 다음.
 -- 재실행 안전 (CREATE TABLE / CREATE INDEX 모두 IF NOT EXISTS).
 -- ============================================================

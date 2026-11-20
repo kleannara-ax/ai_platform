@@ -9,7 +9,7 @@
 | 순서 | 파일 | 설명 |
 |------|------|------|
 | 1 | `01_schema.sql` | JPA 영역 표 7개 (steam_equipment·steam_price·steam_daily_usage + 원단위 일지 4개: steam_unit_daily_usage·steam_unit_daily_common·steam_lng_daily_usage·steam_fuel_daily_usage) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
-| 2 | `02_legacy_schema.sql` | 이관 대시보드 표 3개 (steam_cell_value·steam_unit_usage·steam_unit_usage_raw) + 인덱스 |
+| 2 | `02_legacy_schema.sql` | 이관 대시보드 표 3개 (steam_cell_value + 퇴역한 steam_unit_usage·steam_unit_usage_raw) + 인덱스 |
 | 3 | `03_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플 6건) |
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
 | 5 | `05_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
@@ -199,8 +199,8 @@ DELETE FROM steam_price
 | `steam_price` | 시설별 계약·구매 단가(연/월) | `(YEAR_NO, MONTH_NO, ITEM_CODE)` |
 | `steam_daily_usage` | 일일 스팀 사용 실적 | `(USAGE_DATE, EQUIPMENT_ID)` |
 | `steam_cell_value` | 이관 대시보드 화면들의 셀 저장소 — `table_name` 으로 논리 표를 나눈다 ([CELL_CONVENTIONS.md](CELL_CONVENTIONS.md)) | `(month, table_name, row_key, col_index)` |
-| `steam_unit_usage` | 원단위 일지 (설비·일자별) | `(month, day, machine_no)` |
-| `steam_unit_usage_raw` | 원단위 일지 원시값 (디스퍼져·TOC·PICA) | `(month, day)` |
+| `steam_unit_usage` | (퇴역 2026-11) 원단위 일지 — `steam_unit_daily_usage` 로 대체, 읽는 코드 없음 | `(month, day, machine_no)` |
+| `steam_unit_usage_raw` | (퇴역 2026-11) 원단위 원시값 — `steam_unit_daily_common` 으로 대체 | `(month, day)` |
 | `steam_unit_daily_usage` | 원단위 일지 — 호기별 일일 스팀 사용·생산 실적 (2026-11, 규격 전환) | `(USAGE_DATE, MACHINE_CODE)` |
 | `steam_unit_daily_common` | 원단위 일지 — 일자별 공통 계측값 (디스퍼져 총량·TOC·PICA) | `(USAGE_DATE)` |
 | `steam_lng_daily_usage` | 일별 LNG 연료 사용량 (보일러·버너·복합+외부, 단가) | `(USAGE_DATE)` |
@@ -222,18 +222,23 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 단가(`unit_price_detail` → `steam_price`)만은 다른 사이트와 공유하는 데이터라 `migration/2026-11-20_unit_price_detail_to_steam_price.sql`
 로 옮긴다 (재실행 안전, 신규 설치에서는 불필요).
 
-### 화면 전환 진행
+### 화면 전환 진행 — 7개 화면 모두 완료 (2026-11-20)
 
-| 순서 | 화면 | 상태 | 읽기/쓰기 |
-|---|---|---|---|
-| 1 | 단가 입력 (`unit-price.html`) | **완료 2026-11-20** | `GET /prices/year/{year}` · `POST /prices` · 연동은 `POST /prices/apply-daily`(LNG·유동상·폐합성) + 옛 셀(세부 운영내역·도급내역·Invoice Summary) |
-| 2 | 유동상/소각로/복합 일일 사용량 | 예정 | `/fuel-daily-usages` |
-| 3 | LNG 연료 사용 비용 | 예정 | `/lng-daily-usages` |
-| 4·5 | 스팀사용 원단위 · 스팀 사용량 | 예정 | `/unit-daily-usages` · `/unit-daily-commons` · `/unit-log/*` |
-| 6 | 오늘 일지 등록 | 예정 | 위 4개 |
-| 7 | 호기별 요약 | 예정 | 위 4개 (읽기) |
-| 8 | 유동상 묶음 재연결 (`flow_m_fluid_incinerator` c0 → `FLUID_STEAM_TON`) | 예정 | |
-| 9 | 옛 원단위 엑셀 서비스·`steam_unit_usage` 정의 제거 | 예정 | |
+| 순서 | 화면 | 읽기/쓰기 |
+|---|---|---|
+| 1 | 단가 입력 (`unit-price.html`) | `GET /prices/year/{year}` · `POST /prices` · 연동은 `POST /prices/apply-daily`(LNG·유동상·폐합성) + 옛 셀(세부 운영내역·도급내역·Invoice Summary, 해당 묶음 전환 때 제거) |
+| 2 | 유동상/소각로/복합 일일 사용량 (`unit-flow-daily.html`) | `GET/POST /fuel-daily-usages` (그 날 행 전체), '단가 적용' = `POST /prices/apply-daily` |
+| 3 | LNG 연료 사용 비용 (`unit-lng-cost.html`) | `GET/POST /lng-daily-usages` |
+| 4·5 | 스팀사용 원단위 (`unit-steam-unit.html`) · 스팀 사용량 (`unit-steam-usage.html`) | `GET/POST /unit-daily-usages` · `/unit-daily-commons`, 엑셀 `POST /unit-log/import-excel?year=` · `GET /unit-log/export-excel?year=` |
+| 6 | 오늘 일지 등록 (`today-entry.html`) | 위 네 표에 각각 POST (비워 둔 칸은 기존 값 유지) |
+| 7 | 호기별 요약 (`unit-machine-summary.html`) | 네 표 GET, LNG·연료 비용은 화면 계산 |
+| 8 | 유동상 묶음 재연결 | 운전일지·세부 운영내역·운전일지 엑셀의 스팀 송기량(세부 7행) → `steam_fuel_daily_usage.FLUID_STEAM_TON` (`SteamFuelDailyUsageService`) |
+| 9 | 정리 | `/steam/api/tables/unit-usage/*`·`SteamUnitExcelImport/ExportService`·`TableService` 의 `steam_unit_usage(_raw)` 정의 제거. 표 자체는 02 에 남김(퇴역 표시) |
+
+저장 규칙(공통): 칸 단위 PATCH 가 아니라 **그 날(·호기) 행 전체 POST 업서트**. 여러 화면이 같은 행의 다른 컬럼을 쓰므로
+화면은 저장 직전에 그 행을 다시 읽어 자기 컬럼만 바꿔 보낸다. 삭제된 행과 같은 키로 다시 저장하면 되살린다.
+화면 열 자리 버그 2건(PM-3 Ventilation 가동시간, TM-4·5 가동시간이 원단위 열에 입력되던 것)은 전환하면서 바로잡았다.
+
 
 ### 테이블-컬럼 매핑표 (화면 입력항목 ↔ 컬럼)
 

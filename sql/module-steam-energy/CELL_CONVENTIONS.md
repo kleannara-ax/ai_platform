@@ -76,7 +76,7 @@ SELECT month, col_index, COUNT(*) AS cnt
 ```
 
 
-## 전환 완료 — 더 이상 쓰지 않는 네임스페이스 (2026-11)
+## 전환 완료 — 더 이상 쓰지 않는 네임스페이스 (2026-11-20, 원단위 일지 7개 화면 모두 전환됨)
 
 원단위 일지 7개 화면은 실제 컬럼 표(`steam_unit_daily_usage`·`steam_unit_daily_common`·`steam_lng_daily_usage`·`steam_fuel_daily_usage`·`steam_price`)로
 옮겼다 (README "원단위 일지 그룹 전환" 참고). 아래 네임스페이스는 새 화면이 쓰지 않으며, 남은 데이터는 다른 묶음 전환이 끝나면 정리한다.

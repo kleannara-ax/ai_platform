@@ -23,52 +23,8 @@ public class TableService {
 
     public TableService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        // steam_unit_usage · steam_unit_usage_raw 정의는 2026-11 규격 전환(원단위 일지 그룹 → steam_unit_daily_usage 등)으로 뺐다.
         this.definitions = Map.of(
-                "steam_unit_usage",
-                new TableDefinition(
-                        "steam_unit_usage",
-                        List.of("month", "day", "machine_no"),
-                        List.of(
-                                "id", "month", "year_no", "month_no", "day", "machine_no", "main_steam", "coater_steam",
-                                "disperser_steam",
-                                "ventilation_steam", "production", "production_type", "steam",
-                                "created_at", "updated_at"
-                        ),
-                        Map.ofEntries(
-                                Map.entry("month", "string"),
-                                Map.entry("year_no", "number"),
-                                Map.entry("month_no", "number"),
-                                Map.entry("day", "string"),
-                                Map.entry("machine_no", "string"),
-                                Map.entry("main_steam", "number"),
-                                Map.entry("coater_steam", "number"),
-                                Map.entry("disperser_steam", "number"),
-                                Map.entry("ventilation_steam", "number"),
-                                Map.entry("production", "number"),
-                                Map.entry("production_type", "string"),
-                                Map.entry("steam", "number")
-                        ),
-                        "year_no, month_no, cast(day as unsigned), id"
-                ),
-                "steam_unit_usage_raw",
-                new TableDefinition(
-                        "steam_unit_usage_raw",
-                        List.of("month", "day"),
-                        List.of(
-                                "id", "month", "year_no", "month_no", "day", "disperser_total", "toc_steam",
-                                "pica121_vent", "created_at", "updated_at"
-                        ),
-                        Map.of(
-                                "month", "string",
-                                "year_no", "number",
-                                "month_no", "number",
-                                "day", "string",
-                                "disperser_total", "number",
-                                "toc_steam", "number",
-                                "pica121_vent", "number"
-                        ),
-                        "year_no, month_no, cast(day as unsigned), id"
-                ),
                 "steam_cell_value",
                 new TableDefinition(
                         "steam_cell_value",
