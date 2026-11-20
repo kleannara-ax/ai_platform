@@ -216,9 +216,24 @@ DELETE FROM steam_price
 유동상/소각로/복합 일일 사용량, 호기별 요약)을 `steam_cell_value` 셀 저장소에서 **실제 컬럼을 가진 표 4개 + 기존 `steam_price`** 로 옮겼다.
 API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 
-**데이터 이관 없음** — 새 표는 비어 있다. 지난 데이터가 필요하면 `원단위 일지 누계(YYYY년).xls` 를
+**데이터 이관 없음 (단가 제외)** — 새 표 4개는 비어 있다. 지난 데이터가 필요하면 `원단위 일지 누계(YYYY년).xls` 를
 `POST /steam-energy-api/unit-log/import-excel?year=YYYY` 로 다시 올려 채운다. 옛 네임스페이스(`usage_m_*`, `lng_m_*`, `flow_m_*`,
 `unit_price*`, `steam_unit_usage`·`_raw`)는 다른 묶음 전환이 끝날 때까지 읽기용으로만 남는다.
+단가(`unit_price_detail` → `steam_price`)만은 다른 사이트와 공유하는 데이터라 `migration/2026-11-20_unit_price_detail_to_steam_price.sql`
+로 옮긴다 (재실행 안전, 신규 설치에서는 불필요).
+
+### 화면 전환 진행
+
+| 순서 | 화면 | 상태 | 읽기/쓰기 |
+|---|---|---|---|
+| 1 | 단가 입력 (`unit-price.html`) | **완료 2026-11-20** | `GET /prices/year/{year}` · `POST /prices` · 연동은 `POST /prices/apply-daily`(LNG·유동상·폐합성) + 옛 셀(세부 운영내역·도급내역·Invoice Summary) |
+| 2 | 유동상/소각로/복합 일일 사용량 | 예정 | `/fuel-daily-usages` |
+| 3 | LNG 연료 사용 비용 | 예정 | `/lng-daily-usages` |
+| 4·5 | 스팀사용 원단위 · 스팀 사용량 | 예정 | `/unit-daily-usages` · `/unit-daily-commons` · `/unit-log/*` |
+| 6 | 오늘 일지 등록 | 예정 | 위 4개 |
+| 7 | 호기별 요약 | 예정 | 위 4개 (읽기) |
+| 8 | 유동상 묶음 재연결 (`flow_m_fluid_incinerator` c0 → `FLUID_STEAM_TON`) | 예정 | |
+| 9 | 옛 원단위 엑셀 서비스·`steam_unit_usage` 정의 제거 | 예정 | |
 
 ### 테이블-컬럼 매핑표 (화면 입력항목 ↔ 컬럼)
 

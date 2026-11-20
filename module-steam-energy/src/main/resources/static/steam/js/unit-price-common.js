@@ -1,10 +1,12 @@
 /*
  * 설비별 단가(연/월별) 공용 모듈.
- *  - 등록 단가는 steam_cell_value 에 저장: table_name="unit_price",
- *    month=연도(String), row_key=항목코드, col_index=월(1~12), cell_value=단가.
- *  - daily 페이지(unit-lng-cost / unit-flow-daily)의 단가 셀은
- *    month="YYYY-MM", row_key="01".."31"(일), col_index=단가컬럼 에 일자별 동일값 저장.
- *  - "단가 적용": 등록된 (연,월) 단가를 그 달 전체 일자 셀에 일괄 upsert.
+ *  - 등록 단가(단가 입력 페이지)는 규격 표 steam_price 에 저장한다: GET /steam-energy-api/prices/year/{year},
+ *    POST /steam-energy-api/prices (연·월·항목코드 업서트). 2026-11 규격 전환.
+ *  - 단가 연동(applyPriceLink): 단가를 고치면 그 달 전체 일자에 일괄 적용한다.
+ *      · 전환된 일별 표(LNG·스팀 구매 일일 사용량)는 서버가 한다: POST /steam-energy-api/prices/apply-daily
+ *      · 아직 전환되지 않은 화면(세부 운영내역·도급내역·Invoice Summary)은 옛 셀 저장소에 칸 단위로 쓴다.
+ *  - [옛 경로] ITEMS / fetchRegistered / saveRegistered / applyToDaily / wireApplyButton 은 유동상·소각로·복합 일일 사용량
+ *    화면이 아직 옛 셀 저장소를 쓰는 동안만 남긴다 (그 화면 전환 때 제거).
  */
 (function (global) {
   "use strict";
@@ -26,8 +28,7 @@
   function pad2(n) { n = Number(n); return (n < 10 ? "0" : "") + n; }
   function daysInMonth(year, month) { return new Date(Number(year), Number(month), 0).getDate(); }
 
-  // 등록 단가 조회 (해당 연도 전체) → { itemCode: { monthNo: "value" } }
-  //  table 인자 생략 시 기본 REGISTRY_TABLE(=unit_price). daily 호출은 그대로 기본값 사용.
+  // [옛 경로] 셀 저장소의 등록 단가 조회 → { itemCode: { monthNo: "value" } } — 유동상·소각로·복합 일일 사용량 전환 때 제거.
   function fetchRegistered(year, table) {
     var tbl = table || REGISTRY_TABLE;
     var url = TABLES_BASE + "/" + CELL_TABLE + "?page=1&limit=100000&month=" +
@@ -46,7 +47,7 @@
       });
   }
 
-  // 등록 단가 저장(upsert). table 생략 시 기본 REGISTRY_TABLE.
+  // [옛 경로] 셀 저장소에 등록 단가 저장 — 위와 같이 제거 예정.
   function saveRegistered(year, code, monthNo, value, table) {
     return fetch(TABLES_BASE + "/" + CELL_TABLE, {
       method: "POST",
@@ -57,6 +58,42 @@
         cell_value: (value == null ? "" : String(value).replace(/[,\s]/g, "")),
       }),
     }).then(function (r) { if (!r.ok) throw new Error("저장 실패"); return r.json(); });
+  }
+
+  // ── 규격 API (steam_price) ──────────────────────────────────────
+  function api() {
+    if (!global.SteamEnergyApi) throw new Error("steam-energy-api.js 가 로드되지 않았습니다.");
+    return global.SteamEnergyApi;
+  }
+
+  // 등록 단가 조회 (해당 연도 전체) → { itemCode: { monthNo: priceValue } }  (값이 비면 칸 없음)
+  function fetchPrices(year) {
+    return api().get("/prices/year/" + encodeURIComponent(String(year))).then(function (rows) {
+      var map = {};
+      (rows || []).forEach(function (row) {
+        if (row.priceValue == null) return;
+        (map[row.itemCode] = map[row.itemCode] || {})[Number(row.monthNo)] = row.priceValue;
+      });
+      return map;
+    });
+  }
+
+  // 등록 단가 저장(업서트). meta = { facility, label, unit } — 항목의 시설·이름·단위(표에 같이 저장).
+  function savePrice(year, code, monthNo, value, meta) {
+    var clean = value == null ? "" : String(value).replace(/[,\s]/g, "");
+    var n = clean === "" ? null : Number(clean);
+    if (clean !== "" && !Number.isFinite(n)) return Promise.reject(new Error("숫자가 아닙니다: " + value));
+    meta = meta || {};
+    return api().post("/prices", {
+      yearNo: Number(year), monthNo: Number(monthNo), itemCode: code,
+      facility: meta.facility || "-", itemName: meta.label || code, unit: meta.unit || null,
+      inputType: "DIRECT", priceValue: n,
+    });
+  }
+
+  // 등록 단가를 그 달 일별 표(LNG·스팀 구매 일일 사용량)에 서버가 일괄 적용 → { appliedDays, hasDailyTarget }
+  function applyPriceDaily(year, month, code) {
+    return api().post("/prices/apply-daily", { yearNo: Number(year), monthNo: Number(month), itemCode: code });
   }
 
   function registeredValue(reg, code, monthNo) {
@@ -96,20 +133,18 @@
   //  이후 사용자가 대상 페이지에서 특정 일자를 직접 고치면 그 값은 그대로 둔다
   //  (여기서는 단가를 다시 고치기 전까지 아무것도 덮어쓰지 않는다).
   //
-  //  targets = 한 단가가 들어가는 칸들. key(일) 은 그 페이지가 쓰는 row_key 형식이다.
-  //   - LNG 연료 사용 비용 : lng_m_boiler 5열 / lng_m_burner 6열, row_key "01".."31"
+  //  daily = 전환된 일별 표(steam_lng_daily_usage·steam_fuel_daily_usage)에 서버가 넣는다 (apply-daily).
+  //   - lng_unit → LNG 보일러·버너 단가, fluid_steam → 유동상 단가, waste2_steam → 폐합성 단가
+  //  targets = 아직 옛 셀 저장소를 쓰는 화면의 칸들. key(일) 은 그 페이지가 쓰는 row_key 형식이다.
   //   - 유동상 세부 운영내역: fluidized_detail_main, row_key = 일자열(일+2) + 행번호, col 0
   //   - 폐합성 도급내역     : incinerator_contract, row_key "섹션|일|필드", col 1
-  //   - 유동상/소각로/복합 일일 사용량: flow_m_fluid_incinerator, row_key "01".."31"
   //
   //  monthTargets 는 일자별이 아니라 그 달에 한 칸만 있는 자리다(Invoice Summary(VK)).
   //  row_key 는 인보이스 화면과 같은 "summary-vk-r{행번호}", col 은 col_index(=열+1) 그대로다.
   var SUMMARY_TABLE = "srf_boiler_invoice_summary";
   var PRICE_LINKS = [
-    { code: "lng_unit", label: "LNG 연료 사용 비용 단가(보일러·버너)", targets: [
-      { table: "lng_m_boiler", col: 5, key: function (d) { return pad2(d); } },
-      { table: "lng_m_burner", col: 6, key: function (d) { return pad2(d); } },
-    ] },
+    // daily: true = 전환된 일별 표에 서버(apply-daily)가 넣는 항목. targets 는 아직 옛 셀 저장소를 쓰는 화면.
+    { code: "lng_unit", label: "LNG 연료 사용 비용 단가(보일러·버너)", daily: true },
     // 복합보일러 BSC·ASC → Invoice Summary(VK) 의 단가 칸(Won/ton steam)과 ESCALATION FACTOR 칸.
     //   1. BSC = (ROUND(BSC 단가 x BSC FACTOR) + AFBSCr) x STEAM SUPPLY AMOUNT   (원본 D14)
     //   2. ASC = ROUND(ASC 단가 x ASC FACTOR) x STEAM SUPPLY AMOUNT              (원본 D25)
@@ -128,8 +163,7 @@
     { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", monthTargets: [
       { table: SUMMARY_TABLE, rowKey: "summary-vk-r29", col: 4 },
     ] },
-    { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", targets: [
-      { table: "flow_m_fluid_incinerator", col: 1, key: function (d) { return pad2(d); } },
+    { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", daily: true, targets: [
       { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "11"; } },
     ] },
     { code: "fluid_fixed_hr", label: "세부 운영내역 KNE 운휴시간 단가", targets: [
@@ -137,8 +171,7 @@
     ] },
     // 폐합성 운영단가는 도급내역의 결산 기준 표와 실 스팀량 기준 표에 같은 값으로 들어간다.
     // (1호기 스팀단가는 단가 입력에서 뺐다 — 도급내역 1호기 운영단가는 그 페이지에서 직접 넣는다)
-    { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", targets: [
-      { table: "flow_m_fluid_incinerator", col: 4, key: function (d) { return pad2(d); } },
+    { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", daily: true, targets: [
       { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|unit"; } },
       { table: "incinerator_contract", col: 1, key: function (d) { return "real|" + d + "|unit-2"; } },
     ] },
@@ -195,6 +228,10 @@
     var ym = String(year) + "-" + pad2(month);
     var days = daysInMonth(year, month);
     var tasks = [];
+    // 전환된 일별 표는 서버가 한 번에 넣는다 (등록 단가는 이미 저장된 상태여야 한다).
+    var dailyStep = link.daily
+      ? applyPriceDaily(year, month, code).then(function (res) { return res && res.appliedDays ? res.appliedDays : 0; })
+      : Promise.resolve(0);
     function post(target, rowKey) {
       return function () {
         return fetch(TABLES_BASE + "/" + CELL_TABLE, {
@@ -214,7 +251,7 @@
     (link.monthTargets || []).forEach(function (target) {
       tasks.push(post(target, target.rowKey));
     });
-    if (link.monthTargets && !link.targets) {
+    if (link.monthTargets && !link.targets && !link.daily) {
       return runLimited(tasks, 6).then(function () {
         return { applied: 1, cells: tasks.length, label: link.label, monthly: true };
       });
@@ -238,8 +275,10 @@
         })(d);
       }
     });
-    return runLimited(tasks, 6).then(function () {
-      return { applied: days, cells: tasks.length, label: link.label };
+    return dailyStep.then(function (dailyDays) {
+      return runLimited(tasks, 6).then(function () {
+        return { applied: days, cells: tasks.length + dailyDays, label: link.label };
+      });
     });
   }
 
@@ -249,6 +288,9 @@
     PRICE_LINKS: PRICE_LINKS,
     priceLink: priceLink,
     applyPriceLink: applyPriceLink,
+    fetchPrices: fetchPrices,
+    savePrice: savePrice,
+    applyPriceDaily: applyPriceDaily,
     pad2: pad2,
     daysInMonth: daysInMonth,
     fetchRegistered: fetchRegistered,
