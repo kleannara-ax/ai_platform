@@ -1,7 +1,6 @@
 package com.company.module.steamenergy.legacy.web;
 
 import com.company.module.steamenergy.legacy.db.TableService;
-import com.company.module.steamenergy.legacy.service.ComboBoilerWorkbookService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogExportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogImportService;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogExportService;
@@ -36,7 +35,6 @@ public class TableController {
     private final WasteIncineratorLogExportService wasteIncineratorLogExportService;
     private final FluidizedDailyLogExportService fluidizedDailyLogExportService;
     private final FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService;
-    private final ComboBoilerWorkbookService comboBoilerWorkbookService;
     private final SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService;
     private final IncineratorWorkbookService incineratorWorkbookService;
 
@@ -48,7 +46,6 @@ public class TableController {
             WasteIncineratorLogExportService wasteIncineratorLogExportService,
             FluidizedDailyLogExportService fluidizedDailyLogExportService,
             FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService,
-            ComboBoilerWorkbookService comboBoilerWorkbookService,
             SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService,
             IncineratorWorkbookService incineratorWorkbookService
     ) {
@@ -59,7 +56,6 @@ public class TableController {
         this.wasteIncineratorLogExportService = wasteIncineratorLogExportService;
         this.fluidizedDailyLogExportService = fluidizedDailyLogExportService;
         this.fluidizedSummaryWorkbookService = fluidizedSummaryWorkbookService;
-        this.comboBoilerWorkbookService = comboBoilerWorkbookService;
         this.srfBoilerInvoiceWorkbookService = srfBoilerInvoiceWorkbookService;
         this.incineratorWorkbookService = incineratorWorkbookService;
     }
@@ -374,42 +370,7 @@ public class TableController {
         }
     }
 
-    @PostMapping("/combo-boiler/import-excel")
-    public Map<String, Object> importComboBoilerExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year
-    ) {
-        ensureExcelFile(file, false);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\uC5F0\uB3C4\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-        }
-        try {
-            return comboBoilerWorkbookService.importWorkbook(file, year);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD30C\uC77C\uC744 \uC77D\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.", exception);
-        }
-    }
-
-    @GetMapping("/combo-boiler/export-excel")
-    public ResponseEntity<ByteArrayResource> exportComboBoilerExcel(@RequestParam("year") int year) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        try {
-            byte[] content = comboBoilerWorkbookService.exportWorkbook(year);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String filename = "3. \uBCF5\uD569\uBCF4\uC77C\uB7EC(" + year + "\uB144) \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669.xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "combo_boiler_" + year + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export combo boiler Excel file", exception);
-        }
-    }
+    // 복합보일러 엑셀: /steam-energy-api/combo-excel 로 옮김 (SteamComboExcelController, 2026-11 규격 전환)
 
     // /combo-boiler/validate-excel \uC81C\uAC70\uB428 \u2014 \uD074\uB77C\uC774\uC5B8\uD2B8\uC5D0\uC11C \uC0AC\uC6A9 \uC548 \uB418\uB294 \uB370\uB4DC \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uC600\uACE0,
     // \uB0B4\uBD80 \uAD6C\uD604\uC774 Excel \uC744 \uB2E4\uC2DC \uC5F4\uC5B4 \uD30C\uC2F1\uD558\uBBC0\uB85C Excel \uC811\uADFC \uC815\uCC45\uC5D0 \uC704\uBC30\uB428.

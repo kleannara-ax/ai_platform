@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.ComboCellStore;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -21,11 +21,11 @@ public class SrfBoilerInvoiceWorkbookService {
      */
     private static final List<Integer> HIDDEN_OPERATION_COLUMNS = List.of(9, 10);
 
-    private final TableService tableService;
+    private final ComboCellStore comboStore;
     private final SheetMetadataLoader metadataLoader;
 
-    public SrfBoilerInvoiceWorkbookService(TableService tableService, SheetMetadataLoader metadataLoader) {
-        this.tableService = tableService;
+    public SrfBoilerInvoiceWorkbookService(ComboCellStore comboStore, SheetMetadataLoader metadataLoader) {
+        this.comboStore = comboStore;
         this.metadataLoader = metadataLoader;
     }
 
@@ -93,7 +93,7 @@ public class SrfBoilerInvoiceWorkbookService {
         // Excel \uC758\uC874 \uC81C\uAC70 \u2014 \uC2DC\uD2B8 \uBA54\uD0C0\uB370\uC774\uD130(\uC815\uC801 \uBD80\uBD84)\uB294 classpath JSON \uC5D0\uC11C \uB85C\uB4DC.
         // \uB3D9\uC801 \uBD80\uBD84(\uC81C\uBAA9, \uB0A0\uC9DC, combo \uC5F0\uACB0 \uC140)\uC740 \uC790\uBC14 \uB85C\uC9C1\uC73C\uB85C \uCC44\uC6C0.
         String monthKey = monthKey(year, month);
-        Map<String, Object> steamValues = comboSteamValues(monthKey);
+        Map<String, Object> steamValues = comboSteamValues(year, month);
         Map<String, Object> meta = metadataLoader.load("srf-invoice-operation");
         List<Map<String, Object>> rows = metadataLoader.cloneRows((List<Map<String, Object>>) meta.get("rows"));
 
@@ -170,16 +170,17 @@ public class SrfBoilerInvoiceWorkbookService {
         return rowIndex == 35 && columnIndex >= 3 && columnIndex <= 11;
     }
 
-    private Map<String, Object> comboSteamValues(String monthKey) {
-        // 복합보일러 스팀생산실적의 동일 일자 값을 운영내역 셀에 연결하기 위해 필요한 prefix 만 수집.
+    private Map<String, Object> comboSteamValues(int year, int month) {
+        // 복합보일러 스팀생산실적(steam_combo_daily_production)의 같은 날 값을 운영내역 칸에 잇는다 — 필요한 항목만.
         Map<String, Object> values = new LinkedHashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
-            if (!COMBO_PRODUCTION_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
-            String rowKey = String.valueOf(row.get("row_key"));
+        Map<String, String> production = comboStore.loadMonth(year, month)
+                .getOrDefault(ComboCellStore.PRODUCTION, Map.of());
+        for (Map.Entry<String, String> cell : production.entrySet()) {
+            String rowKey = cell.getKey();
             if (rowKey.startsWith("comboSteam-")
                     || rowKey.startsWith("comboProcess-")
                     || rowKey.startsWith("comboDeaerator-")) {
-                values.put(rowKey, row.get("cell_value"));
+                values.put(rowKey, cell.getValue());
             }
         }
         return values;

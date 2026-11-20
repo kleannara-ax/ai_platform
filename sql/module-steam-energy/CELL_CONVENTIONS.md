@@ -92,4 +92,8 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `energy_fuel_ratio` | `steam_energy_ratio_boiler`(t01~t03) · `_machine`(t04~t06) · `_burner`(t10~t12) · `_steam_unit`(t17, 다른 사이트 공유) · `_ref2019`(t18~t20). 계산 전용 표(t07~t09, t13~t16)는 저장 안 함 |
 | `energy_month_compare` | `steam_energy_month_compare` (입력·연동값) + `steam_energy_month_compare_note` (비고, 연도 행) |
 | `energy_fuel_summary` | `steam_energy_fuel_summary` (직접 입력값) |
+| `combo_boiler_production` | `steam_combo_daily_production` + `steam_combo_monthly_price`(연료단가) (2026-11-20) |
+| `combo_boiler_downtime` | `steam_combo_daily_downtime` + `steam_combo_monthly_price`(벤트 손실 단가) |
+| `combo_boiler_recovery` | `steam_combo_recovery_loss` (월 + 줄 번호) |
+| `combo_boiler_etc` | `steam_combo_plan` (기준연도 + 대상 월) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

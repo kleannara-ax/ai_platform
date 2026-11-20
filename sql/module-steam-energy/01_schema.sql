@@ -613,3 +613,140 @@ CREATE TABLE IF NOT EXISTS steam_energy_fuel_summary (
   COMMENT='[module-steam-energy] 연료비 요약 — 배분비율 기본값을 덮어쓰는 직접 입력값 (연/월별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_ENERGY_FUEL_SUMMARY_DELETED_YN ON steam_energy_fuel_summary (DELETED_YN);
 
+
+-- ============================================================
+-- 9) 복합보일러 그룹 (2026-11 규격 전환, 묶음 3-A)
+--    옛 steam_cell_value 의 combo_boiler_production / _downtime / _recovery / _etc 를 대체한다.
+--    계산값(T/H, 합계, 소계, 잔량)은 저장하지 않는다. 회수 감소는 한 건 한 행(줄 번호).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS steam_combo_daily_production (
+    COMBO_PRODUCTION_ID   BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 스팀생산실적 ID (PK)',
+    USAGE_DATE            DATE          NOT NULL COMMENT '일자',
+    COMBO_STEAM           DECIMAL(18,6) NULL COMMENT '복합보일러 스팀구매량(T/D)',
+    COMBO_CONDENSATE      DECIMAL(18,6) NULL COMMENT '복합보일러 응축수판매량',
+    COMBO_MAKEUP          DECIMAL(18,6) NULL COMMENT '복합보일러 보충수판매량',
+    COMBO_DEAERATOR       DECIMAL(18,6) NULL COMMENT '복합보일러 탈기기급수량',
+    COMBO_PROCESS         DECIMAL(18,6) NULL COMMENT '복합보일러 공정수판매량',
+    COMBO_DILUTION        DECIMAL(18,6) NULL COMMENT '복합보일러 희석수판매량',
+    EXTERNAL_STEAM        DECIMAL(18,6) NULL COMMENT '외부보일러 스팀구매량(T/D)',
+    EXTERNAL_CONDENSATE   DECIMAL(18,6) NULL COMMENT '외부보일러 응축수판매량',
+    EXTERNAL_MAKEUP       DECIMAL(18,6) NULL COMMENT '외부보일러 보충수판매량',
+    WASTE_STEAM1          DECIMAL(18,6) NULL COMMENT '폐합성 1호 스팀 구입량(T/D)',
+    WASTE_STEAM2          DECIMAL(18,6) NULL COMMENT '폐합성 2호 스팀 구입량(T/D) — 비어 있으면 소각로 도급내역 실 스팀량(2호기)을 따른다',
+    KN20                  DECIMAL(18,6) NULL COMMENT '깨끗한나라 보일러 20톤(#2) 스팀생산량(T/D)',
+    KN50                  DECIMAL(18,6) NULL COMMENT '깨끗한나라 보일러 50톤(#3) 스팀생산량(T/D)',
+    FLUIDIZED_STEAM       DECIMAL(18,6) NULL COMMENT '유동상 스팀 생산량(T/D)',
+    FLUIDIZED_CONDENSATE  DECIMAL(18,6) NULL COMMENT '유동상 응축수',
+    RUNTIME20             DECIMAL(18,6) NULL COMMENT '20톤(#2) 가동시간(H/D)',
+    RUNTIME50             DECIMAL(18,6) NULL COMMENT '50톤(#3) 가동시간(H/D)',
+    RUNTIME_FLUIDIZED     DECIMAL(18,6) NULL COMMENT '유동상 가동시간(H/D)',
+    CREATED_AT            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY            BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT            DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY            BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN            CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT            DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY            BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COMBO_PRODUCTION_ID),
+    CONSTRAINT UK_STEAM_COMBO_DAILY_PRODUCTION_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 복합보일러 스팀생산실적 (일자별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_DAILY_PRODUCTION_DELETED_YN ON steam_combo_daily_production (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_combo_daily_downtime (
+    COMBO_DOWNTIME_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 운휴·디스퍼져 ID (PK)',
+    USAGE_DATE         DATE          NOT NULL COMMENT '일자',
+    CHANGE_COMBO       VARCHAR(500)  NULL COMMENT '변동사항(복합보일러)',
+    CHANGE_JESCO       VARCHAR(500)  NULL COMMENT '변동사항(제스코, 유동상 보일러)',
+    DOWN1              DECIMAL(18,6) NULL COMMENT '#1호기 운휴시간(분)',
+    DOWN2              DECIMAL(18,6) NULL COMMENT '#2호기 운휴시간(분)',
+    DISPERSER_STEAM    DECIMAL(18,6) NULL COMMENT '디스퍼져 스팀량',
+    RUNTIME_MIN        DECIMAL(18,6) NULL COMMENT '디스퍼져 가동시간(분)',
+    VENT_PRODUCTION    DECIMAL(18,6) NULL COMMENT '벤트 손실: 생산량 FIT-301 (엑셀 왕복용, 화면 없음)',
+    VENT_INTERNAL      DECIMAL(18,6) NULL COMMENT '벤트 손실: 소내 사용량 추정 (엑셀 왕복용, 화면 없음)',
+    VENT_USAGE         DECIMAL(18,6) NULL COMMENT '벤트 손실: 사용량 FIT-304 (엑셀 왕복용, 화면 없음)',
+    CREATED_AT         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY         BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT         DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY         BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN         CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT         DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY         BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COMBO_DOWNTIME_ID),
+    CONSTRAINT UK_STEAM_COMBO_DAILY_DOWNTIME_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 복합보일러 변동사항·운휴시간·디스퍼져·벤트 (일자별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_DAILY_DOWNTIME_DELETED_YN ON steam_combo_daily_downtime (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_combo_monthly_price (
+    COMBO_PRICE_ID         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 월 연료단가 ID (PK)',
+    YEAR_NO                INT           NOT NULL COMMENT '연도',
+    MONTH_NO               INT           NOT NULL COMMENT '월 (1~12)',
+    FUEL_PRICE_LNG_BOILER  DECIMAL(18,6) NULL COMMENT '연료단가: LNG 보일러',
+    FUEL_PRICE_FLUIDIZED   DECIMAL(18,6) NULL COMMENT '연료단가: 유동상',
+    FUEL_PRICE_COMBO       DECIMAL(18,6) NULL COMMENT '연료단가: 복합보일러',
+    FUEL_PRICE_WASTE       DECIMAL(18,6) NULL COMMENT '연료단가: 폐합성',
+    FUEL_PRICE_EXTERNAL    DECIMAL(18,6) NULL COMMENT '연료단가: 외부보일러',
+    VENT_LOSS_UNIT_PRICE   DECIMAL(18,6) NULL COMMENT '벤트 손실비용 단가(전월) (엑셀 왕복용, 화면 없음)',
+    CREATED_AT             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY             BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT             DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY             BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN             CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT             DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY             BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COMBO_PRICE_ID),
+    CONSTRAINT UK_STEAM_COMBO_MONTHLY_PRICE_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 복합보일러 월 연료단가·벤트 손실 단가 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_MONTHLY_PRICE_DELETED_YN ON steam_combo_monthly_price (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_combo_recovery_loss (
+    COMBO_RECOVERY_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 스팀 회수 감소 ID (PK)',
+    YEAR_NO            INT           NOT NULL COMMENT '연도',
+    MONTH_NO           INT           NOT NULL COMMENT '월 (1~12)',
+    LINE_NO            INT           NOT NULL COMMENT '줄 번호 (1부터, 그 달의 감소 건 순번)',
+    LOSS_DATE          VARCHAR(50)   NULL COMMENT '날짜 (입력한 글자 그대로, 예: 3/26)',
+    LOSS_TIME          VARCHAR(100)  NULL COMMENT '스팀회수 감소시간 (입력한 글자 그대로, 예: 17:00~18:25)',
+    LOSS_NOTE          VARCHAR(500)  NULL COMMENT '내용',
+    LOSS_STEAM_RATE    DECIMAL(18,6) NULL COMMENT '스팀 감소량 기준(T/H)',
+    LOSS_BASE_RATE     DECIMAL(18,6) NULL COMMENT '기준(T/H)',
+    LOSS_MINUTES       DECIMAL(18,6) NULL COMMENT '감소시간(분)',
+    CREATED_AT         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY         BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT         DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY         BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN         CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT         DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY         BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COMBO_RECOVERY_ID),
+    CONSTRAINT UK_STEAM_COMBO_RECOVERY_LOSS_KEY UNIQUE (YEAR_NO, MONTH_NO, LINE_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 복합보일러 스팀 회수 감소 내역 (연/월 · 줄 번호별, 한 건 한 행)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_RECOVERY_LOSS_DELETED_YN ON steam_combo_recovery_loss (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_combo_plan (
+    COMBO_PLAN_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 연간 계획 ID (PK)',
+    YEAR_NO        INT           NOT NULL COMMENT '연도',
+    TARGET_YM      VARCHAR(7)    NOT NULL COMMENT '대상 월 (YYYY-MM, 기준연도 화면의 월 칸)',
+    COMBO_BASIC    DECIMAL(18,6) NULL COMMENT '복합보일러 계획: 기본 (전년 6월~당해 8월)',
+    COMBO_SPECIAL  DECIMAL(18,6) NULL COMMENT '복합보일러 계획: 특약',
+    COMBO_ACTUAL   DECIMAL(18,6) NULL COMMENT '복합보일러 계획: 실적',
+    JESCO_PLAN     DECIMAL(18,6) NULL COMMENT '제스코 계획: 계획 (전년 5월~당해 5월)',
+    JESCO_ACTUAL   DECIMAL(18,6) NULL COMMENT '제스코 계획: 실적',
+    LNG_BOILER     DECIMAL(18,6) NULL COMMENT 'LNG사용량: 보일러 (당해 1~12월)',
+    LNG_COMBO      DECIMAL(18,6) NULL COMMENT 'LNG사용량: 복합',
+    CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY     BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT     DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY     BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN     CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT     DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY     BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COMBO_PLAN_ID),
+    CONSTRAINT UK_STEAM_COMBO_PLAN_KEY UNIQUE (YEAR_NO, TARGET_YM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 복합보일러·제스코 연간 계획과 LNG 사용량 (기준연도 · 대상 월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_PLAN_DELETED_YN ON steam_combo_plan (DELETED_YN);
+

@@ -21,10 +21,76 @@
   const sidebarGroups = Array.from(document.querySelectorAll(".sidebar-group-flat"));
   if (!yearSelect || !monthSelect || !submitButton || !tableWrap) return;
 
-  const CELL_TABLE = "steam_cell_value";
-  const TABLES_BASE = "/tables";
+  const TABLES_BASE = "/tables";   // 도급내역(묶음 3-B 전환 전) 연동값 조회에만 쓴다
   const state = {};
-  let cellRows = [];
+  const Api = window.SteamEnergyApi;
+
+  // ── 저장소: 규격 표 (/steam-energy-api/combo-*) ──
+  // 화면의 칸 키(항목-일, fuelPrice-설비, 항목-줄번호, combo-plan-행-칸)는 그대로 두고, 여기서 표의 행·필드로 옮긴다.
+  const PRODUCTION_FIELDS = ["comboSteam", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution",
+    "externalSteam", "externalCondensate", "externalMakeup", "wasteSteam1", "wasteSteam2", "kn20", "kn50",
+    "fluidizedSteam", "fluidizedCondensate", "runtime20", "runtime50", "runtimeFluidized"];
+  const DOWNTIME_FIELDS = ["changeCombo", "changeJesco", "down1", "down2", "disperserSteam", "runtimeMin"];
+  const MONTHLY_FIELDS = ["fuelPriceLngBoiler", "fuelPriceFluidized", "fuelPriceCombo", "fuelPriceWaste", "fuelPriceExternal"];
+  const RECOVERY_FIELDS = ["lossDate", "lossTime", "lossNote", "lossSteamRate", "lossBaseRate", "lossMinutes"];
+  const TEXT_FIELDS = new Set(["changeCombo", "changeJesco", "lossDate", "lossTime", "lossNote"]);
+  // 계획 표: 칸 키 접두 → [필드, 첫 칸이 기준연도 1월에서 떨어진 달 수, 첫 칸 번호]
+  const PLAN_ROWS = {
+    "combo-plan-1-": ["comboBasic", -7, 0], "combo-plan-2-": ["comboSpecial", -7, 0], "combo-plan-4-": ["comboActual", -7, 0],
+    "jesco-plan-0-": ["jescoPlan", -8, 0], "jesco-plan-1-": ["jescoActual", -8, 0],
+    "lngBoiler-": ["lngBoiler", 0, 1], "lngCombo-": ["lngCombo", 0, 1],
+  };
+  const stores = {
+    production: window.SteamRowStore.create({ path: "combo-daily-productions", keyFields: ["usageDate"], idField: "comboProductionId" }),
+    downtime: window.SteamRowStore.create({ path: "combo-daily-downtimes", keyFields: ["usageDate"], idField: "comboDowntimeId" }),
+    monthly: window.SteamRowStore.create({ path: "combo-monthly-prices", keyFields: ["yearNo", "monthNo"], idField: "comboPriceId" }),
+    recovery: window.SteamRowStore.create({ path: "combo-recovery-losses", keyFields: ["yearNo", "monthNo", "lineNo"], idField: "comboRecoveryId" }),
+    plan: window.SteamRowStore.create({ path: "combo-plans", keyFields: ["yearNo", "targetYm"], idField: "comboPlanId" }),
+  };
+
+  function upperFirst(text) { return text.charAt(0).toUpperCase() + text.slice(1); }
+  function lowerFirst(text) { return text.charAt(0).toLowerCase() + text.slice(1); }
+  function shiftMonth(year, offset) {
+    const d = new Date(Date.UTC(Number(year), offset, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  }
+  function monthOffset(year, ym) {
+    return (Number(ym.slice(0, 4)) - Number(year)) * 12 + Number(ym.slice(5, 7)) - 1;
+  }
+
+  /** 칸 키 → { store, key(행 키), field }. 이 화면이 저장하지 않는 키면 null. */
+  function locate(rowKey) {
+    const year = Number(yearSelect.value);
+    const month = Number(monthSelect.value);
+    if (config.key === "etc") {
+      for (const prefix of Object.keys(PLAN_ROWS)) {
+        if (!rowKey.startsWith(prefix)) continue;
+        const indexText = rowKey.slice(prefix.length);
+        if (!/^\d+$/.test(indexText)) return null;
+        const [field, firstOffset, firstIndex] = PLAN_ROWS[prefix];
+        return { store: stores.plan, key: { yearNo: year, targetYm: shiftMonth(year, Number(indexText) - firstIndex + firstOffset) }, field };
+      }
+      return null;
+    }
+    if (config.key === "production" && rowKey.startsWith("fuelPrice-")) {
+      const field = "fuelPrice" + upperFirst(rowKey.slice("fuelPrice-".length));
+      return MONTHLY_FIELDS.includes(field) ? { store: stores.monthly, key: { yearNo: year, monthNo: month }, field } : null;
+    }
+    const match = /^([A-Za-z0-9]+)-(\d+)$/.exec(rowKey);
+    if (!match) return null;
+    const field = match[1];
+    const index = Number(match[2]);
+    if (config.key === "recovery") {
+      return RECOVERY_FIELDS.includes(field) ? { store: stores.recovery, key: { yearNo: year, monthNo: month, lineNo: index }, field } : null;
+    }
+    const fields = config.key === "production" ? PRODUCTION_FIELDS : DOWNTIME_FIELDS;
+    if (!fields.includes(field) || index < 1 || index > daysInMonth(year, month)) return null;
+    return { store: stores[config.key], key: { usageDate: Api.isoDate(year, month, index) }, field };
+  }
+
+  function putState(key, value) {
+    if (value !== null && value !== undefined && value !== "") state[key] = String(value);
+  }
   // 폐합성소각로 도급내역 — 2호 스팀 구입량(T/D) 의 기본값은 그 페이지 '실 스팀량 기준' 표의 2호기 스팀량에서 온다.
   const CONTRACT_TABLE = "incinerator_contract";
   let contractRows = [];
@@ -176,23 +242,40 @@
     return `${yearSelect.value}-${monthSelect.value}`;
   }
 
-  function pageTableName() {
-    return `combo_boiler_${config.key}`;
-  }
-
   function normalizeEditableValue(value) {
     return String(value ?? "").replace(/,/g, "").trim();
   }
 
-  function applyCellRowsToState() {
+  /** 조회한 행을 칸 키 → 값 으로 편다. */
+  function applyRowsToState() {
     Object.keys(state).forEach((key) => delete state[key]);
-    const tableName = pageTableName();
-    const monthKey = currentMonthKey();
-    cellRows
-      .filter((row) => row.table_name === tableName && row.month === monthKey)
-      .forEach((row) => {
-        state[String(row.row_key)] = String(row.cell_value ?? "");
+    const year = Number(yearSelect.value);
+    if (config.key === "production") {
+      stores.production.all().forEach((row) => {
+        const day = Api.dayOf(row.usageDate);
+        PRODUCTION_FIELDS.forEach((field) => putState(`${field}-${day}`, row[field]));
       });
+      stores.monthly.all().forEach((row) => {
+        MONTHLY_FIELDS.forEach((field) => putState(`fuelPrice-${lowerFirst(field.slice("fuelPrice".length))}`, row[field]));
+      });
+    } else if (config.key === "downtime") {
+      stores.downtime.all().forEach((row) => {
+        const day = Api.dayOf(row.usageDate);
+        DOWNTIME_FIELDS.forEach((field) => putState(`${field}-${day}`, row[field]));
+      });
+    } else if (config.key === "recovery") {
+      stores.recovery.all().forEach((row) => {
+        RECOVERY_FIELDS.forEach((field) => putState(`${field}-${row.lineNo}`, row[field]));
+      });
+    } else if (config.key === "etc") {
+      stores.plan.all().forEach((row) => {
+        const offset = monthOffset(year, String(row.targetYm));
+        Object.keys(PLAN_ROWS).forEach((prefix) => {
+          const [field, firstOffset, firstIndex] = PLAN_ROWS[prefix];
+          putState(`${prefix}${offset - firstOffset + firstIndex}`, row[field]);
+        });
+      });
+    }
     recoveryRowCount = Math.max(12, maxRecoveryRowIndex());
   }
 
@@ -204,35 +287,25 @@
   }
 
   async function fetchCellRows() {
-    // 자기 표와 도급내역만 받는다 — 그 달 전체를 받으면 다른 표에 밀려 잘릴 수 있다.
-    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=10000&tableNames=${pageTableName()},${CONTRACT_TABLE}&month=${encodeURIComponent(currentMonthKey())}`);
-    if (!response.ok) throw new Error("Failed to load combo boiler rows");
-    const body = await response.json();
-    const rows = Array.isArray(body.data) ? body.data : [];
-    cellRows = rows.filter((row) => row.table_name !== CONTRACT_TABLE);
-    contractRows = rows.filter((row) => row.table_name === CONTRACT_TABLE);
-    applyCellRowsToState();
-  }
-
-  function getCellRow(rowKey) {
-    const tableName = pageTableName();
-    const monthKey = currentMonthKey();
-    return cellRows.find((row) =>
-      row.table_name === tableName &&
-      row.month === monthKey &&
-      String(row.row_key) === String(rowKey) &&
-      Number(row.col_index) === 0
-    ) || null;
-  }
-
-  function cacheSavedRow(saved) {
-    if (!saved || !saved.id) return;
-    const index = cellRows.findIndex((row) => Number(row.id) === Number(saved.id));
-    if (index >= 0) {
-      cellRows[index] = saved;
-    } else {
-      cellRows.push(saved);
+    const year = Number(yearSelect.value);
+    const month = Number(monthSelect.value);
+    contractRows = [];
+    if (config.key === "production") {
+      // 도급내역(2호기 실 스팀량)은 아직 옛 셀 저장소에 있다 — 묶음 3-B 에서 규격 표로 바뀐다.
+      const contract = fetch(`${TABLES_BASE}/steam_cell_value?page=1&limit=10000&tableNames=${CONTRACT_TABLE}&month=${encodeURIComponent(currentMonthKey())}`)
+        .then((response) => (response.ok ? response.json() : { data: [] }))
+        .then((body) => (Array.isArray(body.data) ? body.data : []))
+        .catch(() => []);
+      await Promise.all([stores.production.load({ year, month }), stores.monthly.load({ year, month })]);
+      contractRows = await contract;
+    } else if (config.key === "downtime") {
+      await stores.downtime.load({ year, month });
+    } else if (config.key === "recovery") {
+      await stores.recovery.load({ year, month });
+    } else if (config.key === "etc") {
+      await stores.plan.load({ year });
     }
+    applyRowsToState();
   }
 
   async function upsertInput(input) {
@@ -240,23 +313,11 @@
     if (!rowKey) return;
     const rawValue = normalizeEditableValue(input.value);
     state[rowKey] = rawValue;
-    const existing = getCellRow(rowKey);
-    const payload = {
-      month: currentMonthKey(),
-      year_no: Number(yearSelect.value),
-      month_no: Number(monthSelect.value),
-      table_name: pageTableName(),
-      row_key: rowKey,
-      col_index: 0,
-      cell_value: rawValue,
-    };
-    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}${existing ? `/${existing.id}` : ""}`, {
-      method: existing ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error("Failed to save combo boiler cell");
-    cacheSavedRow(await response.json());
+    const target = locate(rowKey);
+    if (!target) return;
+    // 숫자 칸에 숫자가 아닌 글자를 넣으면 저장하지 않고 비운다.
+    const value = TEXT_FIELDS.has(target.field) ? (rawValue === "" ? null : rawValue) : Api.num(rawValue);
+    await target.store.save(target.key, { [target.field]: value });
     // 연동 칸을 비우면 다시 도급내역 값으로 돌아간다 — 칸에도 그 값을 보여 주고 다시 계산한다.
     const linked = linkedValue(rowKey);
     if (linked !== null) {
@@ -335,7 +396,7 @@
   }
 
   async function downloadExcel() {
-    const response = await fetch(`/tables/combo-boiler/export-excel?year=${encodeURIComponent(yearSelect.value)}`);
+    const response = await fetch(`/steam-energy-api/combo-excel/export-excel?year=${encodeURIComponent(yearSelect.value)}`);
     if (!response.ok) {
       alert("\uc5d1\uc140 \ub2e4\uc6b4\ub85c\ub4dc\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.");
       return;
@@ -361,7 +422,7 @@
       const formData = new FormData();
       formData.append("file", file);
       formData.append("year", yearSelect.value);
-      const response = await fetch("/tables/combo-boiler/import-excel", { method: "POST", body: formData });
+      const response = await fetch("/steam-energy-api/combo-excel/import-excel", { method: "POST", body: formData });
       if (!response.ok) throw new Error(await window.ExcelUploadErrors?.message(response) || "\uc5d1\uc140 \uc5c5\ub85c\ub4dc\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.");
       await reload();
     } catch (error) {
@@ -840,7 +901,7 @@
     if (!(input instanceof HTMLInputElement)) return;
     upsertInput(input).catch((error) => {
       console.error(error);
-      alert("저장에 실패했습니다.");
+      alert("저장에 실패했습니다." + (error && error.message ? "\n" + error.message : ""));
     });
   });
   yearSelect.addEventListener("change", persistPeriod);

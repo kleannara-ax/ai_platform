@@ -215,6 +215,11 @@ DELETE FROM steam_price
 | `steam_energy_month_compare` | 회계비용 마감비교 — 월별 회계비용 마감 vs 실마감 차이 (energy-month-compare.html) (9개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_energy_month_compare_note` | 회계비용 마감비교 비고 — 월별 회계비용 마감 vs 실마감 차이 — 비고 (energy-month-compare.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO)` |
 | `steam_energy_fuel_summary` | 연료비 요약 — 연료비 요약 (energy-fuel-summary.html) (49개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_combo_daily_production` | 복합보일러 스팀생산실적 — 복합보일러 › 스팀생산실적 (combo-boiler-steam-production.html) (18개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_combo_daily_downtime` | 복합보일러 운휴·디스퍼져 — 복합보일러 › 운휴시간·디스퍼져 (combo-boiler-downtime.html) (9개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_combo_monthly_price` | 복합보일러 월 연료단가 — 복합보일러 › 스팀생산실적 › N월 연료단가 (combo-boiler-steam-production.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_combo_recovery_loss` | 복합보일러 스팀 회수 감소 — 복합보일러 › 스팀 회수 감소 (combo-boiler-recovery-loss.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, LINE_NO)` |
+| `steam_combo_plan` | 복합보일러 연간 계획 — 복합보일러 › 기타(계획·LNG사용량) (combo-boiler-etc.html) (7개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, TARGET_YM)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -564,6 +569,133 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 
 `migration/2026-11-20_energy_cells_to_tables.sql` — 옛 셀(2025·2026) 을 매핑대로 옮긴다(148행, 재실행 안전). 화면 계산 전용 행·합계 열·단위 글자는 버린다.
 옛 네임스페이스 `energy_*` 는 읽기용으로만 남고 더 이상 갱신되지 않는다. 다른 사이트의 t17 읽기는 `api/19_스팀에너지_공유데이터.md` 참고.
+
+## 복합보일러 그룹 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 3-A)
+
+복합보일러 4개 화면(스팀생산실적 · 운휴시간 · 스팀 회수 감소 · 기타)을 옛 `steam_cell_value` 논리 표 `combo_boiler_*` 에서 실제 컬럼 표 5개로 옮겼다.
+화면의 칸 키는 그대로 두고(`항목-일`, `fuelPrice-설비`, `항목-줄번호`, `combo-plan-행-칸`) 저장할 때 표의 행·컬럼으로 옮긴다 — 화면은 `js/combo-boiler-pages.js` 의 `locate()`, 엑셀은 `service/table/ComboCellStore`.
+
+### 설계 규칙
+
+- 계산값(T/H = T/D ÷ 24, 스팀 합계, 누계·평균, 소계·잔량·진척률, 감소량)은 저장하지 않는다.
+- `WASTE_STEAM2` 가 NULL 이면 소각로 도급내역의 2호기 실 스팀량을 따른다 (값이 있으면 그 값). 마감비교의 스팀생산량 합계도 같은 규칙을 쓴다.
+- 스팀 회수 감소는 한 건이 한 행(`LINE_NO`). 날짜·시간은 입력한 글자 그대로 둔다 (`3/26`, `17:00~18:25`).
+- 연간 계획은 (기준연도, 대상 월) 한 행 — 복합보일러 계획은 전년 6월~당해 8월, 제스코 계획은 전년 5월~당해 5월, LNG 사용량은 당해 1~12월.
+- 벤트 손실 3항목과 벤트 손실 단가는 화면에 칸이 없고 엑셀 왕복에만 쓴다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_combo_daily_production`** — 복합보일러 스팀생산실적 · 키 `(USAGE_DATE)` · 옛 저장소: `combo_boiler_production` 의 `<필드>-<일>`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `COMBO_STEAM` | DECIMAL(18,6) | `comboSteam` | 복합보일러 스팀구매량(T/D) |
+| `COMBO_CONDENSATE` | DECIMAL(18,6) | `comboCondensate` | 복합보일러 응축수판매량 |
+| `COMBO_MAKEUP` | DECIMAL(18,6) | `comboMakeup` | 복합보일러 보충수판매량 |
+| `COMBO_DEAERATOR` | DECIMAL(18,6) | `comboDeaerator` | 복합보일러 탈기기급수량 |
+| `COMBO_PROCESS` | DECIMAL(18,6) | `comboProcess` | 복합보일러 공정수판매량 |
+| `COMBO_DILUTION` | DECIMAL(18,6) | `comboDilution` | 복합보일러 희석수판매량 |
+| `EXTERNAL_STEAM` | DECIMAL(18,6) | `externalSteam` | 외부보일러 스팀구매량(T/D) |
+| `EXTERNAL_CONDENSATE` | DECIMAL(18,6) | `externalCondensate` | 외부보일러 응축수판매량 |
+| `EXTERNAL_MAKEUP` | DECIMAL(18,6) | `externalMakeup` | 외부보일러 보충수판매량 |
+| `WASTE_STEAM1` | DECIMAL(18,6) | `wasteSteam1` | 폐합성 1호 스팀 구입량(T/D) |
+| `WASTE_STEAM2` | DECIMAL(18,6) | `wasteSteam2` | 폐합성 2호 스팀 구입량(T/D) — 비어 있으면 소각로 도급내역 실 스팀량(2호기)을 따른다 |
+| `KN20` | DECIMAL(18,6) | `kn20` | 깨끗한나라 보일러 20톤(#2) 스팀생산량(T/D) |
+| `KN50` | DECIMAL(18,6) | `kn50` | 깨끗한나라 보일러 50톤(#3) 스팀생산량(T/D) |
+| `FLUIDIZED_STEAM` | DECIMAL(18,6) | `fluidizedSteam` | 유동상 스팀 생산량(T/D) |
+| `FLUIDIZED_CONDENSATE` | DECIMAL(18,6) | `fluidizedCondensate` | 유동상 응축수 |
+| `RUNTIME20` | DECIMAL(18,6) | `runtime20` | 20톤(#2) 가동시간(H/D) |
+| `RUNTIME50` | DECIMAL(18,6) | `runtime50` | 50톤(#3) 가동시간(H/D) |
+| `RUNTIME_FLUIDIZED` | DECIMAL(18,6) | `runtimeFluidized` | 유동상 가동시간(H/D) |
+
+**`steam_combo_daily_downtime`** — 복합보일러 운휴·디스퍼져 · 키 `(USAGE_DATE)` · 옛 저장소: `combo_boiler_downtime` 의 `<필드>-<일>`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `CHANGE_COMBO` | VARCHAR(500) | `changeCombo` | 변동사항(복합보일러) |
+| `CHANGE_JESCO` | VARCHAR(500) | `changeJesco` | 변동사항(제스코, 유동상 보일러) |
+| `DOWN1` | DECIMAL(18,6) | `down1` | #1호기 운휴시간(분) |
+| `DOWN2` | DECIMAL(18,6) | `down2` | #2호기 운휴시간(분) |
+| `DISPERSER_STEAM` | DECIMAL(18,6) | `disperserSteam` | 디스퍼져 스팀량 |
+| `RUNTIME_MIN` | DECIMAL(18,6) | `runtimeMin` | 디스퍼져 가동시간(분) |
+| `VENT_PRODUCTION` | DECIMAL(18,6) | `ventProduction` | 벤트 손실: 생산량 FIT-301 (엑셀 왕복용, 화면 없음) |
+| `VENT_INTERNAL` | DECIMAL(18,6) | `ventInternal` | 벤트 손실: 소내 사용량 추정 (엑셀 왕복용, 화면 없음) |
+| `VENT_USAGE` | DECIMAL(18,6) | `ventUsage` | 벤트 손실: 사용량 FIT-304 (엑셀 왕복용, 화면 없음) |
+
+**`steam_combo_monthly_price`** — 복합보일러 월 연료단가 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `combo_boiler_production` 의 `fuelPrice-<설비>`, `combo_boiler_downtime` 의 `ventLossUnitPrice`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `FUEL_PRICE_LNG_BOILER` | DECIMAL(18,6) | `fuelPriceLngBoiler` | 연료단가: LNG 보일러 |
+| `FUEL_PRICE_FLUIDIZED` | DECIMAL(18,6) | `fuelPriceFluidized` | 연료단가: 유동상 |
+| `FUEL_PRICE_COMBO` | DECIMAL(18,6) | `fuelPriceCombo` | 연료단가: 복합보일러 |
+| `FUEL_PRICE_WASTE` | DECIMAL(18,6) | `fuelPriceWaste` | 연료단가: 폐합성 |
+| `FUEL_PRICE_EXTERNAL` | DECIMAL(18,6) | `fuelPriceExternal` | 연료단가: 외부보일러 |
+| `VENT_LOSS_UNIT_PRICE` | DECIMAL(18,6) | `ventLossUnitPrice` | 벤트 손실비용 단가(전월) (엑셀 왕복용, 화면 없음) |
+
+**`steam_combo_recovery_loss`** — 복합보일러 스팀 회수 감소 · 키 `(YEAR_NO, MONTH_NO, LINE_NO)` · 옛 저장소: `combo_boiler_recovery` 의 `<필드>-<줄번호>`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `LINE_NO` (키) | INT | `lineNo` | 줄 번호 (1부터, 그 달의 감소 건 순번) |
+| `LOSS_DATE` | VARCHAR(50) | `lossDate` | 날짜 (입력한 글자 그대로, 예: 3/26) |
+| `LOSS_TIME` | VARCHAR(100) | `lossTime` | 스팀회수 감소시간 (입력한 글자 그대로, 예: 17:00~18:25) |
+| `LOSS_NOTE` | VARCHAR(500) | `lossNote` | 내용 |
+| `LOSS_STEAM_RATE` | DECIMAL(18,6) | `lossSteamRate` | 스팀 감소량 기준(T/H) |
+| `LOSS_BASE_RATE` | DECIMAL(18,6) | `lossBaseRate` | 기준(T/H) |
+| `LOSS_MINUTES` | DECIMAL(18,6) | `lossMinutes` | 감소시간(분) |
+
+**`steam_combo_plan`** — 복합보일러 연간 계획 · 키 `(YEAR_NO, TARGET_YM)` · 옛 저장소: `combo_boiler_etc` 의 `combo-plan-{1,2,4}-<칸>`, `jesco-plan-{0,1}-<칸>`, `lngBoiler-<월>`, `lngCombo-<월>`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `TARGET_YM` (키) | VARCHAR(7) | `targetYm` | 대상 월 (YYYY-MM, 기준연도 화면의 월 칸) |
+| `COMBO_BASIC` | DECIMAL(18,6) | `comboBasic` | 복합보일러 계획: 기본 (전년 6월~당해 8월) |
+| `COMBO_SPECIAL` | DECIMAL(18,6) | `comboSpecial` | 복합보일러 계획: 특약 |
+| `COMBO_ACTUAL` | DECIMAL(18,6) | `comboActual` | 복합보일러 계획: 실적 |
+| `JESCO_PLAN` | DECIMAL(18,6) | `jescoPlan` | 제스코 계획: 계획 (전년 5월~당해 5월) |
+| `JESCO_ACTUAL` | DECIMAL(18,6) | `jescoActual` | 제스코 계획: 실적 |
+| `LNG_BOILER` | DECIMAL(18,6) | `lngBoiler` | LNG사용량: 보일러 (당해 1~12월) |
+| `LNG_COMBO` | DECIMAL(18,6) | `lngCombo` | LNG사용량: 복합 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/combo-daily-productions?year=[&month=]` | 복합보일러 스팀생산실적 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/combo-daily-productions` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/combo-daily-productions/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/combo-daily-productions/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/combo-daily-downtimes?year=[&month=]` | 복합보일러 운휴·디스퍼져 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/combo-daily-downtimes` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/combo-daily-downtimes/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/combo-daily-downtimes/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/combo-monthly-prices?year=[&month=]` | 복합보일러 월 연료단가 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/combo-monthly-prices` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/combo-monthly-prices/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/combo-monthly-prices/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/combo-recovery-losses?year=[&month=]` | 복합보일러 스팀 회수 감소 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/combo-recovery-losses` | 행 전체 업서트 `(YEAR_NO, MONTH_NO, LINE_NO)` |
+| `PUT` | `/steam-energy-api/combo-recovery-losses/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/combo-recovery-losses/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/combo-plans?year=[&month=]` | 복합보일러 연간 계획 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/combo-plans` | 행 전체 업서트 `(YEAR_NO, TARGET_YM)` |
+| `PUT` | `/steam-energy-api/combo-plans/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/combo-plans/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/combo-excel/import-excel` (file, year) | 워크북 `3. 복합보일러(YYYY년) 스팀구매 현황.xlsx` 가져오기 — 시트가 있는 달을 파일 기준으로 바꾼다 |
+| `GET` | `/steam-energy-api/combo-excel/export-excel?year=` | 같은 서식으로 내보내기 |
+
+### 다른 화면과의 연동
+
+- 마감비교(`energy-month-compare.html`)의 스팀생산량 행 ← `steam_combo_daily_production` 의 스팀 7종 월 합계
+- SRF 인보이스 운영내역(`SrfBoilerInvoiceWorkbookService`) ← `COMBO_STEAM` · `COMBO_PROCESS` · `COMBO_DEAERATOR` (같은 날)
+- 스팀생산실적의 폐합성 2호 기본값 ← 소각로 도급내역 `real|일|steam-2` (묶음 3-B 전환 전까지 옛 셀)
+
+### 데이터 이관
+
+`migration/2026-11-20_combo_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 로컬 적용 결과: 생산실적 730일, 운휴 546일, 월 단가 24개월, 회수 감소 110건. 연간 계획은 옮길 값이 없다.
 
 ## 메뉴 / 권한
 

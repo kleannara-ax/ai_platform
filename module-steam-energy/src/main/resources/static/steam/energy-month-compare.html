@@ -232,23 +232,41 @@
       if (__cbpCache.has(yk)) return __cbpCache.get(yk);
       const out = {};
       try {
-        const params = new URLSearchParams({
-          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "combo_boiler_production", limit: "20000",
-        });
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (resp.ok) {
-          const payload = await resp.json();
-          (payload.data || []).forEach((row) => {
-            if (row.table_name !== "combo_boiler_production") return;
-            const field = String(row.row_key).split("-")[0];
-            if (!STEAM_TOTAL_FIELDS.includes(field)) return;
-            const monthNo = Number(String(row.month).split("-")[1]);
-            if (!(monthNo >= 1 && monthNo <= 12)) return;
-            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
-            if (!Number.isFinite(v)) return;
-            out[monthNo] = (out[monthNo] || 0) + v;
+        // 규격 표 steam_combo_daily_production (일자별). 폐합성 2호(wasteSteam2)는 비어 있으면 스팀생산실적 화면처럼
+        // 소각로 도급내역의 2호기 실 스팀량(real|일|steam-2)을 쓴다 — 두 화면의 합계가 같아지게.
+        const linked = new Map();   // "월|일" → 도급내역 2호기 실 스팀량
+        try {
+          const params = new URLSearchParams({
+            fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
           });
-        }
+          const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+          if (resp.ok) {
+            ((await resp.json()).data || []).forEach((row) => {
+              const m = /^real\|(\d+)\|steam-2$/.exec(String(row.row_key));
+              if (!m) return;
+              const monthNo = Number(String(row.month).split("-")[1]);
+              const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+              if (monthNo >= 1 && monthNo <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= new Date(Number(yk), monthNo, 0).getDate()
+                  && String(row.cell_value ?? "").trim() !== "" && Number.isFinite(v)) linked.set(`${monthNo}|${Number(m[1])}`, v);
+            });
+          }
+        } catch (e) { console.error("[emc fetchComboProductionTotal] 도급내역", e); }
+        const rows = await window.SteamEnergyApi.get(`/combo-daily-productions?year=${yk}`);
+        const add = (monthNo, v) => { if (Number.isFinite(v)) out[monthNo] = (out[monthNo] || 0) + v; };
+        (rows || []).forEach((row) => {
+          const monthNo = window.SteamEnergyApi.monthOf(row.usageDate);
+          const dayKey = `${monthNo}|${window.SteamEnergyApi.dayOf(row.usageDate)}`;
+          STEAM_TOTAL_FIELDS.forEach((field) => {
+            let v = row[field];
+            if (field === "wasteSteam2") {
+              if (v === null || v === undefined) v = linked.get(dayKey);
+              linked.delete(dayKey);
+            }
+            if (v !== null && v !== undefined) add(monthNo, Number(v));
+          });
+        });
+        // 생산실적 행이 없는 날의 도급내역 값
+        linked.forEach((v, key) => add(Number(key.split("|")[0]), v));
       } catch (e) { console.error("[emc fetchComboProductionTotal]", e); }
       __cbpCache.set(yk, out);
       return out;
