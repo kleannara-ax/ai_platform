@@ -32,6 +32,7 @@ class SteamPriceApplyToDailyTest {
     private SteamLngDailyUsageRepository lngRepository;
     private SteamFuelDailyUsageRepository fuelRepository;
     private com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository contractRepository;
+    private com.company.module.steamenergy.repository.SteamSrfInvoiceSummaryRepository summaryRepository;
     private SteamPriceService service;
 
     @BeforeEach
@@ -41,12 +42,16 @@ class SteamPriceApplyToDailyTest {
         fuelRepository = mock(SteamFuelDailyUsageRepository.class);
         when(lngRepository.save(any(SteamLngDailyUsage.class))).thenAnswer(inv -> inv.getArgument(0));
         when(fuelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        summaryRepository = mock(com.company.module.steamenergy.repository.SteamSrfInvoiceSummaryRepository.class);
+        when(summaryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         contractRepository = mock(com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository.class);
         when(contractRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         service = new SteamPriceService(priceRepository,
                 new SteamLngDailyUsageService(lngRepository), new SteamFuelDailyUsageService(fuelRepository),
                 new com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter(
-                        new SteamIncineratorContractDailyService(contractRepository)));
+                        new SteamIncineratorContractDailyService(contractRepository)),
+                new com.company.module.steamenergy.service.table.SteamSrfInvoiceSummaryAdapter(
+                        new SteamSrfInvoiceSummaryService(summaryRepository)));
     }
 
     private static SteamPriceApplyRequest request(int year, int month, String itemCode) {
@@ -86,11 +91,11 @@ class SteamPriceApplyToDailyTest {
     }
 
     @Test
-    @DisplayName("아직 전환되지 않은 화면의 단가(예: comb_bsc)는 적용 대상이 없다고 알려 주기만 한다")
+    @DisplayName("아직 전환되지 않은 화면의 단가(예: fluid_fixed_hr)는 적용 대상이 없다고 알려 주기만 한다")
     void unknownItemHasNoDailyTarget() {
-        when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "comb_bsc")).thenReturn(Optional.of(price("comb_bsc", "11700")));
+        when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "fluid_fixed_hr")).thenReturn(Optional.of(price("fluid_fixed_hr", "11700")));
 
-        SteamPriceApplyResponse result = service.applyToDaily(request(2026, 2, "comb_bsc"));
+        SteamPriceApplyResponse result = service.applyToDaily(request(2026, 2, "fluid_fixed_hr"));
 
         assertFalse(result.isHasDailyTarget());
         assertEquals(0, result.getAppliedDays());
@@ -119,5 +124,19 @@ class SteamPriceApplyToDailyTest {
         org.mockito.Mockito.verify(contractRepository, org.mockito.Mockito.times(28)).save(captor.capture());
         org.junit.jupiter.api.Assertions.assertTrue(captor.getAllValues().stream()
                 .allMatch(row -> new BigDecimal("155000").compareTo(row.getU1Fixed()) == 0 && row.getU2Fixed() == null));
+    }
+
+    @Test
+    @DisplayName("comb_bsc 는 SRF 인보이스 Summary 그 달 행의 BSC 단가에 들어간다")
+    void combBscAppliesToSummary() {
+        when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "comb_bsc"))
+                .thenReturn(java.util.Optional.of(price("comb_bsc", "18100")));
+        var response = service.applyToDaily(request(2026, 2, "comb_bsc"));
+        org.junit.jupiter.api.Assertions.assertTrue(response.isHasDailyTarget());
+        var captor = org.mockito.ArgumentCaptor.forClass(com.company.module.steamenergy.entity.SteamSrfInvoiceSummary.class);
+        org.mockito.Mockito.verify(summaryRepository).save(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(0, new BigDecimal("18100").compareTo(captor.getValue().getBscRate()));
+        org.junit.jupiter.api.Assertions.assertEquals(2, captor.getValue().getMonthNo());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().getAscRate());
     }
 }

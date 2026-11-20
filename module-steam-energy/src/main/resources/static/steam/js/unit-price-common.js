@@ -64,6 +64,7 @@
   //
   //  daily = 전환된 일별 표(steam_lng_daily_usage·steam_fuel_daily_usage)에 서버가 넣는다 (apply-daily).
   //   - lng_unit → LNG 보일러·버너 단가, fluid_steam → 유동상 단가, waste2_steam → 폐합성 단가
+  //   - Invoice Summary(VK)(steam_srf_invoice_summary, 그 달 한 행): comb_bsc · comb_bsc_factor · comb_bsc_guarantee · comb_asc · comb_asc_factor
   //   - 소각로 도급내역(steam_incinerator_contract_daily): waste2_steam → 2호기 운영단가·실 2호기 단가,
   //     waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비
   //  targets = 아직 옛 셀 저장소를 쓰는 화면의 칸들. key(일) 은 그 페이지가 쓰는 row_key 형식이다.
@@ -78,21 +79,11 @@
     // 복합보일러 BSC·ASC → Invoice Summary(VK) 의 단가 칸(Won/ton steam)과 ESCALATION FACTOR 칸.
     //   1. BSC = (ROUND(BSC 단가 x BSC FACTOR) + AFBSCr) x STEAM SUPPLY AMOUNT   (원본 D14)
     //   2. ASC = ROUND(ASC 단가 x ASC FACTOR) x STEAM SUPPLY AMOUNT              (원본 D25)
-    { code: "comb_bsc", label: "Invoice Summary(VK) BASE SERVICE CHARGE", monthTargets: [
-      { table: SUMMARY_TABLE, rowKey: "summary-vk-r16", col: 4 },
-    ] },
-    { code: "comb_bsc_factor", label: "Invoice Summary(VK) BSC ESCALATION FACTOR", monthTargets: [
-      { table: SUMMARY_TABLE, rowKey: "summary-vk-r18", col: 4 },
-    ] },
-    { code: "comb_bsc_guarantee", label: "Invoice Summary(VK) BSC STEAM SUPPLY AMOUNT", monthTargets: [
-      { table: SUMMARY_TABLE, rowKey: "summary-vk-r22", col: 4 },
-    ] },
-    { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", monthTargets: [
-      { table: SUMMARY_TABLE, rowKey: "summary-vk-r27", col: 4 },
-    ] },
-    { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", monthTargets: [
-      { table: SUMMARY_TABLE, rowKey: "summary-vk-r29", col: 4 },
-    ] },
+    { code: "comb_bsc", label: "Invoice Summary(VK) BASE SERVICE CHARGE", daily: true, monthly: true },
+    { code: "comb_bsc_factor", label: "Invoice Summary(VK) BSC ESCALATION FACTOR", daily: true, monthly: true },
+    { code: "comb_bsc_guarantee", label: "Invoice Summary(VK) BSC STEAM SUPPLY AMOUNT", daily: true, monthly: true },
+    { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", daily: true, monthly: true },
+    { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", daily: true, monthly: true },
     { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", daily: true, targets: [
       { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "11"; } },
     ] },
@@ -200,6 +191,8 @@
     });
     return dailyStep.then(function (dailyDays) {
       return runLimited(tasks, 6).then(function () {
+        // monthly = 그 달에 한 칸만 있는 자리(Invoice Summary(VK)) — 일수가 아니라 1건으로 알린다
+        if (link.monthly) return { applied: 1, cells: tasks.length + dailyDays, label: link.label, monthly: true };
         return { applied: days, cells: tasks.length + dailyDays, label: link.label };
       });
     });

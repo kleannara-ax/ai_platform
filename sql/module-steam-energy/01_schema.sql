@@ -899,3 +899,181 @@ CREATE TABLE IF NOT EXISTS steam_incinerator_cost_monthly (
   COMMENT='[module-steam-energy] 폐합성수지 소각로 총 운영비용 입력값 (연/월별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_INCINERATOR_COST_MONTHLY_DELETED_YN ON steam_incinerator_cost_monthly (DELETED_YN);
 
+
+-- ============================================================
+-- 11) SRF 보일러 인보이스 그룹 (2026-11 규격 전환, 묶음 3-C)
+--    옛 steam_cell_value 의 srf_boiler_invoice_summary / _client / _operation / _monthly / _accumulated / _bsc / _adjustment 를 대체한다.
+--    계산값은 저장하지 않는다. 월별 운영내역·누계는 화면의 회계연도(6월~5월)가 아니라 실제 연/월로 저장한다.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_summary (
+    INVOICE_SUMMARY_ID   BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 Summary ID (PK)',
+    YEAR_NO              INT           NOT NULL COMMENT '연도',
+    MONTH_NO             INT           NOT NULL COMMENT '월 (1~12)',
+    BSC_RATE             DECIMAL(18,6) NULL COMMENT '1. BSC ▸ BASE SERVICE CHARGE (Won/ton steam) — 단가 입력 comb_bsc',
+    BSC_FACTOR           DECIMAL(18,6) NULL COMMENT 'BSC ESCALATION FACTOR — 단가 입력 comb_bsc_factor',
+    AFBSCR_BSC           DECIMAL(18,6) NULL COMMENT 'AFBSCr - BSC (Won/ton steam)',
+    BSC_STEAM_AMOUNT     DECIMAL(18,6) NULL COMMENT 'BSC STEAM SUPPLY AMOUNT (tons/month) — 단가 입력 comb_bsc_guarantee',
+    ASC_RATE             DECIMAL(18,6) NULL COMMENT '2. ASC ▸ ADDITIONAL SERVICE CHARGE (Won/ton steam) — 단가 입력 comb_asc',
+    ASC_FACTOR           DECIMAL(18,6) NULL COMMENT 'ASC ESCALATION FACTOR — 단가 입력 comb_asc_factor',
+    ASC_STEAM_AMOUNT     DECIMAL(18,6) NULL COMMENT 'ASC STEAM SUPPLY AMOUNT (tons/month)',
+    OTHERS_0             DECIMAL(18,6) NULL COMMENT '3. OTHERS 첫 금액(Won) — 비어 있으면 Client Invoice 의 깨끗한나라←베올리아 1번째 줄(수량×단가)을 따른다',
+    OTHERS_1             DECIMAL(18,6) NULL COMMENT '3. OTHERS 1)(Won) — 비어 있으면 Client Invoice 의 깨끗한나라←베올리아 2번째 줄을 따른다',
+    OTHERS_2             DECIMAL(18,6) NULL COMMENT '3. OTHERS 2)(Won)',
+    OTHERS_3             DECIMAL(18,6) NULL COMMENT '3. OTHERS 3)(Won)',
+    PAYABLE_ADJUST       DECIMAL(18,6) NULL COMMENT 'VAT 와 TOTAL AMOUNT PAYABLE 사이 조정 금액(Won)',
+    LIQUIDATED_DAMAGE    DECIMAL(18,6) NULL COMMENT 'DEDUCTIONS: LIQUIDATED DAMAGE(Won)',
+    ASC_REFUND_ANNUAL    DECIMAL(18,6) NULL COMMENT 'DEDUCTIONS: ASC REFUND(Annual)(Won)',
+    UTILITIES_DEDUCTION  DECIMAL(18,6) NULL COMMENT 'DEDUCTIONS: UTILITIES DEDUCTION COSTS(Won) — 비어 있으면 Client Invoice 유틸리티 소계를 따른다',
+    OTHER_DEDUCTION_1    DECIMAL(18,6) NULL COMMENT 'OTHER DEDUCTION COSTS (1)(Won) — 비어 있으면 Client Invoice 깨끗한나라→베올리아 1번째 줄을 따른다',
+    OTHER_DEDUCTION_2    DECIMAL(18,6) NULL COMMENT 'OTHER DEDUCTION COSTS (2)(Won) — 비어 있으면 Client Invoice 깨끗한나라→베올리아 2번째 줄을 따른다',
+    CREATED_AT           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY           BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT           DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY           BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN           CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT           DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY           BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_SUMMARY_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_SUMMARY_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 Summary(VK) 입력값 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_SUMMARY_DELETED_YN ON steam_srf_invoice_summary (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_client_item (
+    CLIENT_ITEM_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 Client Invoice ID (PK)',
+    YEAR_NO         INT           NOT NULL COMMENT '연도',
+    MONTH_NO        INT           NOT NULL COMMENT '월 (1~12)',
+    SECTION         VARCHAR(20)   NOT NULL COMMENT '구분 (utilities: 유틸리티 10줄 / other-out: 깨끗한나라→베올리아 3줄 / other-in: 깨끗한나라←베올리아 3줄)',
+    LINE_NO         INT           NOT NULL COMMENT '줄 번호 (0부터)',
+    ITEM_LABEL      VARCHAR(200)  NULL COMMENT '항목 이름 (other-out · other-in 만 입력)',
+    UNIT_LABEL      VARCHAR(50)   NULL COMMENT '단위 (other-out · other-in 만 입력)',
+    QTY             DECIMAL(18,6) NULL COMMENT '수량',
+    UNIT_PRICE      DECIMAL(18,6) NULL COMMENT '단가(원)',
+    NOTE            VARCHAR(500)  NULL COMMENT '비고',
+    CREATED_AT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY      BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT      DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY      BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN      CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT      DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY      BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (CLIENT_ITEM_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_CLIENT_ITEM_KEY UNIQUE (YEAR_NO, MONTH_NO, SECTION, LINE_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 Client Invoice 줄 (연/월 · 구분 · 줄 번호별, 한 달 16줄 고정)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_CLIENT_ITEM_DELETED_YN ON steam_srf_invoice_client_item (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_operation_daily (
+    INVOICE_OPERATION_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 운영내역 ID (PK)',
+    USAGE_DATE            DATE          NOT NULL COMMENT '일자',
+    POWER_KWH             DECIMAL(18,6) NULL COMMENT '전력량(Kw/D)',
+    CREATED_AT            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY            BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT            DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY            BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN            CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT            DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY            BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_OPERATION_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_OPERATION_DAILY_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 운영내역 — 일별 전력량 (나머지 열은 복합보일러 스팀생산실적에서 연동·계산)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_OPERATION_DAILY_DELETED_YN ON steam_srf_invoice_operation_daily (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_monthly (
+    INVOICE_MONTHLY_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 월별 운영내역 ID (PK)',
+    YEAR_NO             INT           NOT NULL COMMENT '연도',
+    MONTH_NO            INT           NOT NULL COMMENT '월 (1~12)',
+    STEAM_QTY           DECIMAL(18,6) NULL COMMENT '스팀 구매량(ton)',
+    STEAM_UNIT          DECIMAL(18,6) NULL COMMENT '스팀 단가(원/ton)',
+    POWER_QTY           DECIMAL(18,6) NULL COMMENT '전력 사용량(kwh)',
+    POWER_UNIT          DECIMAL(18,6) NULL COMMENT '전력 단가(원)',
+    LNG_QTY             DECIMAL(18,6) NULL COMMENT 'LNG 사용량(Nm3)',
+    LNG_UNIT            DECIMAL(18,6) NULL COMMENT 'LNG 단가(원)',
+    PROCESS_QTY         DECIMAL(18,6) NULL COMMENT '공정수 사용량(m3)',
+    PROCESS_UNIT        DECIMAL(18,6) NULL COMMENT '공정수 단가(원)',
+    SOFT_QTY            DECIMAL(18,6) NULL COMMENT '청수 사용량(m3)',
+    SOFT_UNIT           DECIMAL(18,6) NULL COMMENT '청수 단가(원)',
+    SOFTEN_QTY          DECIMAL(18,6) NULL COMMENT '연수 사용량(m3)',
+    SOFTEN_UNIT         DECIMAL(18,6) NULL COMMENT '연수 단가(원)',
+    LIFE_QTY            DECIMAL(18,6) NULL COMMENT '생활용수 사용량(m3)',
+    LIFE_UNIT           DECIMAL(18,6) NULL COMMENT '생활용수 단가(원)',
+    ETC_SPECIAL         DECIMAL(18,6) NULL COMMENT '기타: 특약 미달금액(원, +)',
+    ETC_BSC7            DECIMAL(18,6) NULL COMMENT '기타: 7차연도 BSC물량 정산금(원, +)',
+    ETC_SRF_SHARE       DECIMAL(18,6) NULL COMMENT '기타: SRF이익 분배금(원, −)',
+    ETC_INSPECT         DECIMAL(18,6) NULL COMMENT '기타: 보일러 검사수수료(원, −)',
+    ETC_OVER7           DECIMAL(18,6) NULL COMMENT '기타: 7차연도 단가 초과 지급분(원, −)',
+    ETC_AIR_OVER        DECIMAL(18,6) NULL COMMENT '기타: 대기초과배출부과금(원, −)',
+    ETC_WASTE           DECIMAL(18,6) NULL COMMENT '기타: 폐기물 처분부담금(원, −)',
+    CREATED_AT          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY          BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT          DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY          BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN          CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT          DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY          BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_MONTHLY_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_MONTHLY_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 월별 운영내역 (연/월별 — 화면은 6월~다음해 5월을 한 해로 본다)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_MONTHLY_DELETED_YN ON steam_srf_invoice_monthly (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_accumulated (
+    INVOICE_ACCUMULATED_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 누계 스팀량 ID (PK)',
+    YEAR_NO                 INT           NOT NULL COMMENT '연도',
+    MONTH_NO                INT           NOT NULL COMMENT '월 (1~12)',
+    CONTRACT_VOLUME         DECIMAL(18,6) NULL COMMENT 'Contract Supply Volume(ton)',
+    BSC_VOLUME              DECIMAL(18,6) NULL COMMENT 'BSC steam supply volume(ton)',
+    ASC_VOLUME              DECIMAL(18,6) NULL COMMENT 'ASC steam supply volume(ton)',
+    CREATED_AT              DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY              BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT              DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY              BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN              CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT              DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY              BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_ACCUMULATED_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_ACCUMULATED_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 누계 스팀 공급량 (연/월별 — 화면은 6월~다음해 5월을 한 해로 본다)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_ACCUMULATED_DELETED_YN ON steam_srf_invoice_accumulated (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_bsc (
+    INVOICE_BSC_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 BSC 단가 ID (PK)',
+    YEAR_NO         INT           NOT NULL COMMENT '연도',
+    BSC_RATE        DECIMAL(18,6) NULL COMMENT 'Base Service Charge Rate(Won/ton)',
+    CREATED_AT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY      BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT      DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY      BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN      CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT      DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY      BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_BSC_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_BSC_KEY UNIQUE (YEAR_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 Base Service Charge Rate (연도별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_BSC_DELETED_YN ON steam_srf_invoice_bsc (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_srf_invoice_adjustment (
+    INVOICE_ADJUSTMENT_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'SRF 인보이스 Adjustment Factor ID (PK)',
+    YEAR_NO                INT           NOT NULL COMMENT '연도',
+    SECTION                VARCHAR(20)   NOT NULL COMMENT '표 구분 (afbsc / afbsc-rebase / afasc)',
+    ITEM_CODE              VARCHAR(20)   NOT NULL COMMENT '항목 (a, b, c, d, e, e-bottom, e-fly, f, g, h)',
+    COEFFICIENT            DECIMAL(18,6) NULL COMMENT '계수',
+    BASE_VALUE             DECIMAL(18,6) NULL COMMENT '기준값(Base)',
+    PRESENT_VALUE          DECIMAL(18,6) NULL COMMENT '현재값(Present)',
+    CREATED_AT             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY             BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT             DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY             BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN             CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT             DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY             BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INVOICE_ADJUSTMENT_ID),
+    CONSTRAINT UK_STEAM_SRF_INVOICE_ADJUSTMENT_KEY UNIQUE (YEAR_NO, SECTION, ITEM_CODE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] SRF 보일러 인보이스 Adjustment Factor 항목 (연도 · 표 · 항목별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_SRF_INVOICE_ADJUSTMENT_DELETED_YN ON steam_srf_invoice_adjustment (DELETED_YN);
+

@@ -101,4 +101,11 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `incinerator_yoy` | 저장 없음 (도급내역에서 계산) |
 | `incinerator_operation` | `steam_incinerator_operation_monthly` |
 | `incinerator_total_cost` | `steam_incinerator_cost_monthly` (입력 39개) |
+| `srf_boiler_invoice_summary` | `steam_srf_invoice_summary` (2026-11-20) |
+| `srf_boiler_invoice_client` | `steam_srf_invoice_client_item` (월 + 구분 + 줄 번호) |
+| `srf_boiler_invoice_operation` | `steam_srf_invoice_operation_daily` (전력량) |
+| `srf_boiler_invoice_monthly` | `steam_srf_invoice_monthly` (실제 연/월) |
+| `srf_boiler_invoice_accumulated` | `steam_srf_invoice_accumulated` (실제 연/월) |
+| `srf_boiler_invoice_bsc` | `steam_srf_invoice_bsc` (연도) |
+| `srf_boiler_invoice_adjustment` | `steam_srf_invoice_adjustment` (연도 + 표 + 항목) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

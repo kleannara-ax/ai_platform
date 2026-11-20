@@ -224,6 +224,13 @@ DELETE FROM steam_price
 | `steam_incinerator_plan_monthly` | 소각로 사업계획대비 — 폐합성수지 소각로 › 사업계획대비 (incinerator-plan-vs.html), 도급내역의 월 인건비 (14개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_incinerator_operation_monthly` | 소각로 계획대비 가동실적 — 폐합성수지 소각로 › 계획대비 가동실적 (incinerator-operation.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_incinerator_cost_monthly` | 소각로 총 운영비용 — 폐합성수지 소각로 › 총 운영비용 (incinerator-total-cost.html) (39개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_srf_invoice_summary` | SRF 인보이스 Summary — SRF Boiler invoice › Summary(VK) (srf-boiler-invoice.html) (17개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_srf_invoice_client_item` | SRF 인보이스 Client Invoice — SRF Boiler invoice › Client Invoice (srf-boiler-invoice-client.html) (5개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, SECTION, LINE_NO)` |
+| `steam_srf_invoice_operation_daily` | SRF 인보이스 운영내역 — SRF Boiler invoice › 운영내역 (srf-boiler-invoice-operation.html) (1개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_srf_invoice_monthly` | SRF 인보이스 월별 운영내역 — SRF Boiler invoice › 월별 운영내역 (srf-boiler-invoice-monthly.html) (21개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_srf_invoice_accumulated` | SRF 인보이스 누계 스팀량 — SRF Boiler invoice › Accumulated steam volume (srf-boiler-invoice-accumulated.html) (3개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_srf_invoice_bsc` | SRF 인보이스 BSC 단가 — SRF Boiler invoice › BSC (srf-boiler-invoice-bsc.html) (1개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO)` |
+| `steam_srf_invoice_adjustment` | SRF 인보이스 Adjustment Factor — SRF Boiler invoice › Adjustment Factor (srf-boiler-invoice-adjustment.html) (3개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, SECTION, ITEM_CODE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -849,6 +856,157 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 ### 데이터 이관
 
 `migration/2026-11-20_incinerator_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 저장돼 있던 계산값, 그 달에 없는 날짜(6월 31일), 숫자 칸의 글자는 옮기지 않는다. **2025년 총 운영비용의 유틸리티 칸(전력단가·가성소다 구입량/단가·용수·폐기물처분부담금)과 차감비는 옛 셀 자체가 한 칸씩 밀려 저장돼 있었다** (옛 가져오기 코드의 결함). 이관 뒤 원본 `5. 소각로 위탁운영비 첨부자료(25년10월).xls` 를 2025년 10월로 다시 올리면 바로잡힌다 (로컬은 그렇게 했다).
+
+## SRF 보일러 인보이스 그룹 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 3-C)
+
+SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월별 운영내역 · Accumulated · BSC · Adjustment Factor)을 옛 `steam_cell_value` 논리 표 `srf_boiler_invoice_*` 에서 실제 컬럼 표 7개로 옮겼다. 사고이력은 묶음 3-E 에서 옮긴다.
+화면의 칸 키는 그대로 두고 저장할 때 표의 행·컬럼으로 옮긴다 — `js/srf-store.js` 가 옛 호출 모양을 받아 새 API 로 보낸다. 이 그룹은 엑셀 가져오기·내보내기가 없다.
+
+### 설계 규칙
+
+- 계산값(BSC·ASC 금액, TOTAL SERVICE CHARGES, VAT, DEDUCTIONS, NET CASH, 줄 금액·소계, 누계, AF 합계)은 저장하지 않는다.
+- Summary 의 `OTHERS_0` · `OTHERS_1` · `UTILITIES_DEDUCTION` · `OTHER_DEDUCTION_1` · `OTHER_DEDUCTION_2` 는 NULL 이면 Client Invoice 값을 따른다 (값이 있으면 그 값). 마감비교·배분비율이 읽는 복합보일러 스팀구매 합계도 같은 규칙을 쓴다 (`energy-linked-sources.js`).
+- 월별 운영내역과 Accumulated 는 화면이 6월~다음해 5월을 한 해로 보지만 표에는 실제 연/월로 저장한다 (옛 키의 칸 번호 0~6 → 그 해 6~12월, 7~11 → 다음 해 1~5월).
+- 운영내역은 전력량만 입력이다. 스팀생산량·공정수·탈기기급수량은 복합보일러 스팀생산실적(`steam_combo_daily_production`)에서 오고 나머지는 계산이다.
+- Client Invoice 는 한 달 16줄 고정 (유틸리티 10 + 두 방향 기타 3줄씩), Adjustment Factor 는 한 해 24줄 고정이다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_srf_invoice_summary`** — SRF 인보이스 Summary · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `srf_boiler_invoice_summary` 의 `summary-vk-r{엑셀 행}` (col_index 4 = D열, 6 = F열): r16 r18 r20 r22 r27 r29 r31 r34 r36 r37 r38 r44(F) r51 r53 r55 r57 r59 순서로 아래 컬럼
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `BSC_RATE` | DECIMAL(18,6) | `bscRate` | 1. BSC ▸ BASE SERVICE CHARGE (Won/ton steam) — 단가 입력 comb_bsc |
+| `BSC_FACTOR` | DECIMAL(18,6) | `bscFactor` | BSC ESCALATION FACTOR — 단가 입력 comb_bsc_factor |
+| `AFBSCR_BSC` | DECIMAL(18,6) | `afbscrBsc` | AFBSCr - BSC (Won/ton steam) |
+| `BSC_STEAM_AMOUNT` | DECIMAL(18,6) | `bscSteamAmount` | BSC STEAM SUPPLY AMOUNT (tons/month) — 단가 입력 comb_bsc_guarantee |
+| `ASC_RATE` | DECIMAL(18,6) | `ascRate` | 2. ASC ▸ ADDITIONAL SERVICE CHARGE (Won/ton steam) — 단가 입력 comb_asc |
+| `ASC_FACTOR` | DECIMAL(18,6) | `ascFactor` | ASC ESCALATION FACTOR — 단가 입력 comb_asc_factor |
+| `ASC_STEAM_AMOUNT` | DECIMAL(18,6) | `ascSteamAmount` | ASC STEAM SUPPLY AMOUNT (tons/month) |
+| `OTHERS_0` | DECIMAL(18,6) | `others0` | 3. OTHERS 첫 금액(Won) — 비어 있으면 Client Invoice 의 깨끗한나라←베올리아 1번째 줄(수량×단가)을 따른다 |
+| `OTHERS_1` | DECIMAL(18,6) | `others1` | 3. OTHERS 1)(Won) — 비어 있으면 Client Invoice 의 깨끗한나라←베올리아 2번째 줄을 따른다 |
+| `OTHERS_2` | DECIMAL(18,6) | `others2` | 3. OTHERS 2)(Won) |
+| `OTHERS_3` | DECIMAL(18,6) | `others3` | 3. OTHERS 3)(Won) |
+| `PAYABLE_ADJUST` | DECIMAL(18,6) | `payableAdjust` | VAT 와 TOTAL AMOUNT PAYABLE 사이 조정 금액(Won) |
+| `LIQUIDATED_DAMAGE` | DECIMAL(18,6) | `liquidatedDamage` | DEDUCTIONS: LIQUIDATED DAMAGE(Won) |
+| `ASC_REFUND_ANNUAL` | DECIMAL(18,6) | `ascRefundAnnual` | DEDUCTIONS: ASC REFUND(Annual)(Won) |
+| `UTILITIES_DEDUCTION` | DECIMAL(18,6) | `utilitiesDeduction` | DEDUCTIONS: UTILITIES DEDUCTION COSTS(Won) — 비어 있으면 Client Invoice 유틸리티 소계를 따른다 |
+| `OTHER_DEDUCTION_1` | DECIMAL(18,6) | `otherDeduction1` | OTHER DEDUCTION COSTS (1)(Won) — 비어 있으면 Client Invoice 깨끗한나라→베올리아 1번째 줄을 따른다 |
+| `OTHER_DEDUCTION_2` | DECIMAL(18,6) | `otherDeduction2` | OTHER DEDUCTION COSTS (2)(Won) — 비어 있으면 Client Invoice 깨끗한나라→베올리아 2번째 줄을 따른다 |
+
+**`steam_srf_invoice_client_item`** — SRF 인보이스 Client Invoice · 키 `(YEAR_NO, MONTH_NO, SECTION, LINE_NO)` · 옛 저장소: `srf_boiler_invoice_client` 의 `{구분}|{줄}|{qty,price,note,label,unit}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `SECTION` (키) | VARCHAR(20) | `section` | 구분 (utilities: 유틸리티 10줄 / other-out: 깨끗한나라→베올리아 3줄 / other-in: 깨끗한나라←베올리아 3줄) |
+| `LINE_NO` (키) | INT | `lineNo` | 줄 번호 (0부터) |
+| `ITEM_LABEL` | VARCHAR(200) | `itemLabel` | 항목 이름 (other-out · other-in 만 입력) |
+| `UNIT_LABEL` | VARCHAR(50) | `unitLabel` | 단위 (other-out · other-in 만 입력) |
+| `QTY` | DECIMAL(18,6) | `qty` | 수량 |
+| `UNIT_PRICE` | DECIMAL(18,6) | `unitPrice` | 단가(원) |
+| `NOTE` | VARCHAR(500) | `note` | 비고 |
+
+**`steam_srf_invoice_operation_daily`** — SRF 인보이스 운영내역 · 키 `(USAGE_DATE)` · 옛 저장소: `srf_boiler_invoice_operation` 의 `operation-r{일+4}` col_index 12
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `POWER_KWH` | DECIMAL(18,6) | `powerKwh` | 전력량(Kw/D) |
+
+**`steam_srf_invoice_monthly`** — SRF 인보이스 월별 운영내역 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `srf_boiler_invoice_monthly` (연 키 = 6월이 속한 해) 의 `{steam,ops,etc}|{칸 0~11}|{항목}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `STEAM_QTY` | DECIMAL(18,6) | `steamQty` | 스팀 구매량(ton) |
+| `STEAM_UNIT` | DECIMAL(18,6) | `steamUnit` | 스팀 단가(원/ton) |
+| `POWER_QTY` | DECIMAL(18,6) | `powerQty` | 전력 사용량(kwh) |
+| `POWER_UNIT` | DECIMAL(18,6) | `powerUnit` | 전력 단가(원) |
+| `LNG_QTY` | DECIMAL(18,6) | `lngQty` | LNG 사용량(Nm3) |
+| `LNG_UNIT` | DECIMAL(18,6) | `lngUnit` | LNG 단가(원) |
+| `PROCESS_QTY` | DECIMAL(18,6) | `processQty` | 공정수 사용량(m3) |
+| `PROCESS_UNIT` | DECIMAL(18,6) | `processUnit` | 공정수 단가(원) |
+| `SOFT_QTY` | DECIMAL(18,6) | `softQty` | 청수 사용량(m3) |
+| `SOFT_UNIT` | DECIMAL(18,6) | `softUnit` | 청수 단가(원) |
+| `SOFTEN_QTY` | DECIMAL(18,6) | `softenQty` | 연수 사용량(m3) |
+| `SOFTEN_UNIT` | DECIMAL(18,6) | `softenUnit` | 연수 단가(원) |
+| `LIFE_QTY` | DECIMAL(18,6) | `lifeQty` | 생활용수 사용량(m3) |
+| `LIFE_UNIT` | DECIMAL(18,6) | `lifeUnit` | 생활용수 단가(원) |
+| `ETC_SPECIAL` | DECIMAL(18,6) | `etcSpecial` | 기타: 특약 미달금액(원, +) |
+| `ETC_BSC7` | DECIMAL(18,6) | `etcBsc7` | 기타: 7차연도 BSC물량 정산금(원, +) |
+| `ETC_SRF_SHARE` | DECIMAL(18,6) | `etcSrfShare` | 기타: SRF이익 분배금(원, −) |
+| `ETC_INSPECT` | DECIMAL(18,6) | `etcInspect` | 기타: 보일러 검사수수료(원, −) |
+| `ETC_OVER7` | DECIMAL(18,6) | `etcOver7` | 기타: 7차연도 단가 초과 지급분(원, −) |
+| `ETC_AIR_OVER` | DECIMAL(18,6) | `etcAirOver` | 기타: 대기초과배출부과금(원, −) |
+| `ETC_WASTE` | DECIMAL(18,6) | `etcWaste` | 기타: 폐기물 처분부담금(원, −) |
+
+**`steam_srf_invoice_accumulated`** — SRF 인보이스 누계 스팀량 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `srf_boiler_invoice_accumulated` (연 키 = 6월이 속한 해) 의 `{칸 0~11}|{contract,bsc,asc}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `CONTRACT_VOLUME` | DECIMAL(18,6) | `contractVolume` | Contract Supply Volume(ton) |
+| `BSC_VOLUME` | DECIMAL(18,6) | `bscVolume` | BSC steam supply volume(ton) |
+| `ASC_VOLUME` | DECIMAL(18,6) | `ascVolume` | ASC steam supply volume(ton) |
+
+**`steam_srf_invoice_bsc`** — SRF 인보이스 BSC 단가 · 키 `(YEAR_NO)` · 옛 저장소: `srf_boiler_invoice_bsc` 의 `rate`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `BSC_RATE` | DECIMAL(18,6) | `bscRate` | Base Service Charge Rate(Won/ton) |
+
+**`steam_srf_invoice_adjustment`** — SRF 인보이스 Adjustment Factor · 키 `(YEAR_NO, SECTION, ITEM_CODE)` · 옛 저장소: `srf_boiler_invoice_adjustment` 의 `{표}|{항목}|{coef,base,present}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `SECTION` (키) | VARCHAR(20) | `section` | 표 구분 (afbsc / afbsc-rebase / afasc) |
+| `ITEM_CODE` (키) | VARCHAR(20) | `itemCode` | 항목 (a, b, c, d, e, e-bottom, e-fly, f, g, h) |
+| `COEFFICIENT` | DECIMAL(18,6) | `coefficient` | 계수 |
+| `BASE_VALUE` | DECIMAL(18,6) | `baseValue` | 기준값(Base) |
+| `PRESENT_VALUE` | DECIMAL(18,6) | `presentValue` | 현재값(Present) |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/srf-invoice-summaries?year=[&month=]` | SRF 인보이스 Summary 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-summaries` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/srf-invoice-summaries/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-summaries/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-client-items?year=[&month=]` | SRF 인보이스 Client Invoice 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-client-items` | 행 전체 업서트 `(YEAR_NO, MONTH_NO, SECTION, LINE_NO)` |
+| `PUT` | `/steam-energy-api/srf-invoice-client-items/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-client-items/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-operation-dailies?year=[&month=]` | SRF 인보이스 운영내역 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-operation-dailies` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/srf-invoice-operation-dailies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-operation-dailies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-monthlies?year=[&month=]` | SRF 인보이스 월별 운영내역 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-monthlies` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/srf-invoice-monthlies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-monthlies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-accumulateds?year=[&month=]` | SRF 인보이스 누계 스팀량 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-accumulateds` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/srf-invoice-accumulateds/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-accumulateds/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-bscs?year=[&month=]` | SRF 인보이스 BSC 단가 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-bscs` | 행 전체 업서트 `(YEAR_NO)` |
+| `PUT` | `/steam-energy-api/srf-invoice-bscs/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-bscs/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/srf-invoice-adjustments?year=[&month=]` | SRF 인보이스 Adjustment Factor 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/srf-invoice-adjustments` | 행 전체 업서트 `(YEAR_NO, SECTION, ITEM_CODE)` |
+| `PUT` | `/steam-energy-api/srf-invoice-adjustments/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/srf-invoice-adjustments/{id}` | 단건 조회 · 소프트 삭제 |
+
+### 다른 화면과의 연동
+
+- 단가 입력(`steam_price`) → `POST /prices/apply-daily`: `comb_bsc` → `BSC_RATE`, `comb_bsc_factor` → `BSC_FACTOR`, `comb_bsc_guarantee` → `BSC_STEAM_AMOUNT`, `comb_asc` → `ASC_RATE`, `comb_asc_factor` → `ASC_FACTOR` (그 달의 Summary 행)
+- Summary ← Client Invoice: 기타 2줄, 유틸리티 소계, 차감 2줄의 기본값
+- 마감비교(`energy-month-compare.html`) · 배분비율(`energy-fuel-ratio.html`) ← Summary 의 TOTAL SERVICE CHARGES(입력값에서 계산), Client Invoice 의 전력 외 유틸리티 + 깨끗한나라→베올리아 합계 (`energy-linked-sources.js`)
+- 운영내역 ← 복합보일러 스팀생산실적 `COMBO_STEAM` · `COMBO_PROCESS` · `COMBO_DEAERATOR`
+
+### 데이터 이관
+
+`migration/2026-11-20_srf_invoice_cells_to_tables.sql` — Summary 의 입력값을 옮긴다 (재실행 안전). 나머지 화면은 옛 저장소에 값이 든 행이 없다 (빈 문자열뿐). Accumulated 에 남아 있던 옛 형식 2건(`static` / `current|0|bsc` = 37068, `contract` = 38000)은 어느 해 값인지 알 수 없어 옮기지 않았다.
 
 ## 메뉴 / 권한
 

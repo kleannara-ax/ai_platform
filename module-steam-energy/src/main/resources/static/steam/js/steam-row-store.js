@@ -86,5 +86,92 @@
     return store;
   }
 
-  global.SteamRowStore = { create: create, enqueue: enqueue };
+  // ── 조회 재사용: 같은 범위를 잠깐(3초) 다시 묻지 않는다 (화면이 12개월을 따로 물어도 요청은 한 번) ──
+  var cache = new Map();   // "path|year|month" → { at, promise }
+  var CACHE_MS = 3000;
+  function cachedGet(path, year, month) {
+    var key = path + "|" + year + "|" + (month || "");
+    var hit = cache.get(key);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise;
+    var promise = global.SteamEnergyApi.get("/" + path + "?year=" + year + (month ? "&month=" + month : ""))
+      .catch(function (e) { cache.delete(key); throw e; });
+    cache.set(key, { at: Date.now(), promise: promise });
+    return promise;
+  }
+  function clearCache() { cache.clear(); }
+
+  function monthKeysBetween(from, to) {
+    var keys = [];
+    var y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7));
+    var ey = Number(to.slice(0, 4)), em = Number(to.slice(5, 7));
+    if (!(y >= 2000 && ey >= 2000 && m >= 1 && em >= 1)) return keys;
+    while (y < ey || (y === ey && m <= em)) {
+      keys.push(y + "-" + String(m).padStart(2, "0"));
+      m += 1;
+      if (m > 12) { m = 1; y += 1; }
+    }
+    return keys;
+  }
+
+  /**
+   * 옛 셀 저장소(/tables/steam_cell_value) 호출 모양을 그대로 받아 규격 표로 옮기는 껍데기를 만든다.
+   * 화면은 fetch 대신 반환된 fetch 를 부르기만 하면 된다.
+   *
+   *   def.tables                       이 껍데기가 맡는 옛 논리 표 이름들 (나머지 요청은 원래 fetch 로 넘긴다)
+   *   def.rows(table, monthKey, query) → Promise<[{ rowKey, col, value }]>   그 월 키의 칸 목록 (값 없는 칸은 걸러 준다)
+   *   def.locate(table, monthKey, rowKey, col) → { store, scope, key, field, text? } | null   저장할 자리 (null = 저장하지 않는 칸)
+   *
+   *   GET   /tables/steam_cell_value?month=…&tableNames=…   (fromMonth / toMonth 도 가능)
+   *   POST  /tables/steam_cell_value          body { month, table_name, row_key, col_index, cell_value }
+   *   PATCH /tables/steam_cell_value/{id}     body 같음
+   */
+  function cellShim(def) {
+    function has(v) { return v !== null && v !== undefined && v !== ""; }
+    function row(table, monthKey, rowKey, col, value) {
+      return { id: table + "#" + monthKey + "#" + rowKey + "#" + col, month: monthKey, table_name: table,
+        row_key: rowKey, col_index: col, cell_value: value === null || value === undefined ? "" : String(value) };
+    }
+    async function legacyRows(table, monthKey, query) {
+      var list = await def.rows(table, String(monthKey), query || new URLSearchParams());
+      return (list || []).filter(function (c) { return has(c.value); })
+        .map(function (c) { return row(table, String(monthKey), c.rowKey, c.col === undefined ? 1 : c.col, c.value); });
+    }
+    async function saveCell(table, monthKey, rowKey, col, rawValue) {
+      var text = rawValue === null || rawValue === undefined ? "" : String(rawValue);
+      var target = def.locate(table, String(monthKey), String(rowKey), Number(col));
+      if (target) {
+        var patch = {};
+        patch[target.field] = target.text ? (text.trim() === "" ? null : text) : global.SteamEnergyApi.num(text);
+        await target.store.save(target.key, patch, target.scope);
+        clearCache();
+      }
+      return row(table, String(monthKey), String(rowKey), Number(col), text);
+    }
+    function response(ok, body) {
+      return { ok: ok, status: ok ? 200 : 500, json: async function () { return body; }, text: async function () { return JSON.stringify(body); } };
+    }
+    async function shimFetch(url, init) {
+      var method = (init && init.method ? String(init.method) : "GET").toUpperCase();
+      try {
+        if (method === "GET") {
+          var query = new URLSearchParams(String(url).split("?")[1] || "");
+          var names = (query.get("tableNames") || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (!names.length || !names.every(function (n) { return def.tables.indexOf(n) >= 0; })) return global.fetch(url, init);
+          var months = query.get("month") ? [query.get("month")] : monthKeysBetween(query.get("fromMonth") || "", query.get("toMonth") || "");
+          var jobs = [];
+          names.forEach(function (name) { months.forEach(function (mk) { jobs.push(legacyRows(name, mk, query)); }); });
+          return response(true, { data: [].concat.apply([], await Promise.all(jobs)) });
+        }
+        var body = JSON.parse((init && init.body) || "{}");
+        if (def.tables.indexOf(body.table_name) < 0) return global.fetch(url, init);
+        return response(true, await saveCell(body.table_name, body.month, body.row_key, body.col_index === undefined ? 1 : body.col_index, body.cell_value));
+      } catch (e) {
+        console.error("[SteamRowStore.cellShim]", e);
+        return response(false, { message: e && e.message ? e.message : String(e) });
+      }
+    }
+    return { fetch: shimFetch, legacyRows: legacyRows, saveCell: saveCell };
+  }
+
+  global.SteamRowStore = { create: create, enqueue: enqueue, cachedGet: cachedGet, clearCache: clearCache, cellShim: cellShim };
 })(window);

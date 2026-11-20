@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const [operationResponse, cellsResponse] = await Promise.all([
         fetch(`/tables/srf-boiler-invoice/operation?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
-        fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${OPERATION_TABLE}&month=${encodeURIComponent(monthKey())}`),
+        window.SrfStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${OPERATION_TABLE}&month=${encodeURIComponent(monthKey())}`),
       ]);
       const payload = await operationResponse.json();
       if (!operationResponse.ok) throw new Error(payload.message || "데이터를 불러오지 못했습니다.");
@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
       col_index: columnIndex + 1,
       cell_value: input.value,
     };
-    const response = await fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
+    const response = await window.SrfStore.fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
       method: existing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

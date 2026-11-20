@@ -22,6 +22,10 @@
   //       row_key = "summary-vk-r{행번호}", col_index = 열번호(0-based) + 1
   // 계산식은 js/srf-boiler-invoice-pages.js 의 calculatedCellValue 와 같아야 한다.
   const SRF_TABLE = "srf_boiler_invoice_summary";
+  // 규격 표(steam_srf_invoice_*)는 js/srf-store.js 가 옛 호출 모양으로 읽어 준다.
+  function srfFetch(url) {
+    return (window.SrfStore ? window.SrfStore.fetch : window.fetch)(url);
+  }
   const VALUE_COLUMNS = [3, 5];        // 금액이 적히는 두 열 (D, F)
 
   function round(value, digits) {
@@ -105,6 +109,24 @@
   const srfCache = { year: null, data: null };
   const clientCache = { year: null, data: null };
 
+  /** 한 해의 Client Invoice 칸 — Map(월 → Map("구역|순번|항목" → 값)) */
+  async function fetchClientCells(yearKey) {
+    const byMonth = new Map();
+    const params = new URLSearchParams({
+      fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12`, tableNames: CLIENT_TABLE, limit: "10000",
+    });
+    const resp = await srfFetch(`/tables/steam_cell_value?${params.toString()}`);
+    if (!resp.ok) return byMonth;
+    ((await resp.json()).data || []).forEach((row) => {
+      if (row.table_name !== CLIENT_TABLE) return;
+      const monthNo = Number(String(row.month).split("-")[1]);
+      if (!(monthNo >= 1 && monthNo <= 12)) return;
+      if (!byMonth.has(monthNo)) byMonth.set(monthNo, new Map());
+      byMonth.get(monthNo).set(String(row.row_key), String(row.cell_value ?? ""));
+    });
+    return byMonth;
+  }
+
   /**
    * 한 해의 복합 LNG 사용량, 처분부담금 등(백만원)을 월별로 돌려준다 — { 1: 값, …, 12: 값 }.
    * Client Invoice 를 입력하지 않은 달은 빠진다.
@@ -117,7 +139,7 @@
       const params = new URLSearchParams({
         fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12`, tableNames: CLIENT_TABLE, limit: "10000",
       });
-      const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+      const resp = await srfFetch(`/tables/steam_cell_value?${params.toString()}`);
       if (resp.ok) {
         const payload = await resp.json();
         const byMonth = new Map();
@@ -157,7 +179,7 @@
       const params = new URLSearchParams({
         fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12`, tableNames: SRF_TABLE, limit: "10000",
       });
-      const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+      const resp = await srfFetch(`/tables/steam_cell_value?${params.toString()}`);
       if (resp.ok) {
         const payload = await resp.json();
         const byMonth = new Map();
@@ -172,7 +194,20 @@
           const colIndex = Number(row.col_index) - 1;
           byMonth.get(monthNo).set(`${rowIndex}|${colIndex}`, String(row.cell_value ?? ""));
         });
-        byMonth.forEach((stored, monthNo) => {
+        // 3. OTHERS 의 두 칸(33행·35행)은 비어 있으면 Client Invoice 의 깨끗한나라←베올리아 1·2번째 줄(수량×단가)을 따른다
+        // — 인보이스 화면(clientLinkedValue)과 같은 규칙이라야 두 화면의 합계가 같다.
+        const clientByMonth = await fetchClientCells(yearKey);
+        const months = new Set([...byMonth.keys(), ...clientByMonth.keys()]);
+        months.forEach((monthNo) => {
+          const stored = byMonth.get(monthNo) || new Map();
+          const client = clientByMonth.get(monthNo) || new Map();
+          [[33, 0], [35, 1]].forEach(([rowIndex, line]) => {
+            const key = `${rowIndex}|3`;
+            if (parseNumber(stored.get(key)) !== null) return;
+            const qty = parseNumber(client.get(`other-in|${line}|qty`));
+            const price = parseNumber(client.get(`other-in|${line}|price`));
+            if (qty !== null && price !== null) stored.set(key, String(qty * price));
+          });
           const won = srfTotalServiceCharges(stored);
           if (won !== null) out[monthNo] = won / 1000000;   // 원 → 백만원
         });

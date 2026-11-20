@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const [summaryResponse, cellsResponse] = await Promise.all([
         fetch(`/tables/srf-boiler-invoice/summary?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
-        fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${SUMMARY_TABLE},${CLIENT_TABLE}&month=${encodeURIComponent(monthKey())}`),
+        window.SrfStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${SUMMARY_TABLE},${CLIENT_TABLE}&month=${encodeURIComponent(monthKey())}`),
       ]);
       const payload = await summaryResponse.json();
       if (!summaryResponse.ok) throw new Error(payload.message || "\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
@@ -557,7 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
       col_index: columnIndex + 1,
       cell_value: input.value,
     };
-    const response = await fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
+    const response = await window.SrfStore.fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
       method: existing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
