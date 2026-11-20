@@ -1,6 +1,8 @@
-﻿/* 스팀 사용량(unit-steam-usage) · LNG 연료 사용 비용(unit-lng-cost) 공용 화면 스크립트.
- *  - LNG: 2026-11 규격 전환 — steam_lng_daily_usage (/steam-energy-api/lng-daily-usages). LNG_FIELDS 참고.
- *  - 스팀 사용량: 아직 옛 셀 저장소(usage_m_*)·steam_unit_usage 를 읽는다 (다음 단계에서 전환).
+﻿/* 스팀 사용량(unit-steam-usage) · LNG 연료 사용 비용(unit-lng-cost) 공용 화면 스크립트. 2026-11 규격 전환.
+ *  - LNG: steam_lng_daily_usage (/steam-energy-api/lng-daily-usages). LNG_FIELDS 참고.
+ *  - 스팀 사용량: steam_unit_daily_usage (/unit-daily-usages, 일자+호기) 와 steam_unit_daily_common (/unit-daily-commons, 일자).
+ *    스팀량·생산량은 스팀사용 원단위 화면이 넣고, 여기서는 가동시간·비고만 고친다 (USAGE_FIELDS). 원단위·합계는 화면 계산.
+ *  화면 표·열 구조(옛 논리 표 이름 usage_m_* / lng_m_*)는 그대로 두고 (표, 열) → 컬럼으로 바꿔 읽고 쓴다.
  */
 document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
@@ -11,9 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "steam_cell_value";
-  const UNIT_TABLE = "steam_unit_usage";
-  const RAW_TABLE = "steam_unit_usage_raw";
   const DAILY_ROW_COUNT = 31;
 
   // ── 규격 API (steam-energy-api.js) ───────────────────────────────────────
@@ -31,64 +30,24 @@ document.addEventListener("DOMContentLoaded", () => {
   function isoOf(month, rowKey) { return `${month}-${String(rowKey).padStart(2, "0")}`; }
   function apiValueText(value) { return value === null || value === undefined ? "" : String(value); }
 
-  const cellRows = [];
-  const unitRows = [];
-  const rawRows = [];
-  const cellIndex = new Map();
-  const unitIndex = new Map();
-  const rawIndex = new Map();
   let loaded = false;
-
-  const CELL_TABLE_NAMES_BY_PAGE = {
-    "unit-lng-cost.html": ["lng_m_boiler", "lng_m_burner"],
-    "unit-steam-usage.html": [
-      "usage_m_pm2",
-      "usage_m_pm3a",
-      "usage_m_pm3b",
-      "usage_m_tm",
-      "usage_m_paper",
-      "usage_m_tissue",
-      "usage_m_other",
-    ],
+  // 스팀 사용량: steam_unit_daily_usage ('YYYY-MM-DD|호기' → 행) + steam_unit_daily_common ('YYYY-MM-DD' → 행)
+  const unitByKey = new Map();
+  const commonByDate = new Map();
+  // 이 화면에서 고치는 칸: (표, 열) → [호기, 컬럼]. 나머지 칸은 계산값이거나 다른 화면(스팀사용 원단위)의 값이다.
+  const USAGE_FIELDS = {
+    usage_m_pm2: { 1: ["PM-2", "runtimeHours"], 3: ["PM-2", "note"] },
+    usage_m_pm3a: { 1: ["PM-3", "runtimeHours"], 3: ["PM-3", "note"] },
+    usage_m_pm3b: { 1: ["PM-3", "disperserRuntimeHours"], 4: ["PM-3", "ventRuntimeHours"] },
+    usage_m_tm: { 1: ["TM-3", "runtimeHours"], 4: ["TM-4", "runtimeHours"], 7: ["TM-5", "runtimeHours"] },
   };
-
-  function cellKey(tableName, month, rowKey, colIndex) {
-    return `${tableName}|${month}|${rowKey}|${Number(colIndex)}`;
-  }
-
-  function unitKey(month, day, machineNo) {
-    return `${month}|${normalizeDayValue(day)}|${machineNo}`;
-  }
-
-  function rawKey(month, day) {
-    return `${month}|${normalizeDayValue(day)}`;
-  }
-
-  function indexCellRow(row) {
-    if (!row) return;
-    cellIndex.set(cellKey(row.table_name, row.month, row.row_key, row.col_index), row);
-  }
-
-  function indexUnitRow(row) {
-    if (!row) return;
-    unitIndex.set(unitKey(row.month, row.day, row.machine_no), row);
-  }
-
-  function indexRawRow(row) {
-    if (!row) return;
-    rawIndex.set(rawKey(row.month, row.day), row);
-  }
-
-  function cellTableNamesParam() {
-    const names = CELL_TABLE_NAMES_BY_PAGE[page];
-    return names && names.length ? names.join(",") : "";
-  }
-  const loadedCellYears = new Set();
-  const loadedUnitYears = new Set();
-  const loadedRawYears = new Set();
-  const loadedCellMonths = new Set();
-  const loadedUnitMonths = new Set();
-  const loadedRawMonths = new Set();
+  const UNIT_ROW_FIELDS = ["mainSteam", "coaterSteam", "ventilationSteam", "steam", "productionKg", "productionType",
+    "runtimeHours", "disperserRuntimeHours", "ventRuntimeHours", "note"];
+  function usageFieldOf(tableName, colIndex) { return (USAGE_FIELDS[tableName] || {})[Number(colIndex)] || null; }
+  function unitKey(month, day, machineNo) { return `${isoOf(month, day)}|${machineNo}`; }
+  const loadedCellYears = new Set();   // LNG: 연도 로드 여부
+  const loadedUnitYears = new Set();   // 스팀 사용량: 연도 로드 여부
+  const loadedUnitMonths = new Set();  // 스팀 사용량: 월 로드 여부
   const dirtyInputs = new Set();
   const pendingSaveTimers = new WeakMap();
   let yearlyRenderTimer = null;
@@ -97,8 +56,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "unit-steam-usage.html": {
       usage_m_pm2: [0, 2],
       usage_m_pm3a: [0, 2],
-      usage_m_pm3b: [0, 2, 3, 4, 6],
-      usage_m_tm: [0, 2, 3, 4, 6, 7, 9, 10, 11, 12],
+      usage_m_pm3b: [0, 2, 3, 5],
+      usage_m_tm: [0, 2, 3, 5, 6, 8, 9, 10, 11, 12],   // 가동시간 1·4·7 입력, 원단위 2·5·8 계산 (옛 코드는 TM-4·5 가동시간을 원단위 열에 받아 값이 사라졌다)
       usage_m_paper: [0, 1, 2],
       usage_m_tissue: [0, 1, 2],
       usage_m_other: [0],
@@ -128,14 +87,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function monthKey(year = yearSelect.value, month = monthSelect.value) {
     return `${year}-${month}`;
-  }
-
-  function monthMeta(year = yearSelect.value, month = monthSelect.value) {
-    return {
-      month: `${year}-${month}`,
-      year_no: Number(year),
-      month_no: Number(month),
-    };
   }
 
   function daysInMonth(year = Number(yearSelect.value), month = Number(monthSelect.value)) {
@@ -204,76 +155,40 @@ document.addEventListener("DOMContentLoaded", () => {
     return ((MONTHLY_READONLY[page] || {})[tableName] || []).includes(colIndex);
   }
 
-  async function fetchPaged(tableName, month = "", range = {}, extra = {}) {
-    const data = [];
-    let pageNo = 1;
-    let totalPages = 1;
-    while (pageNo <= totalPages) {
-      const params = new URLSearchParams({ page: String(pageNo), limit: "2000" });
-      if (month) params.set("month", month);
-      if (range.fromMonth) params.set("fromMonth", range.fromMonth);
-      if (range.toMonth) params.set("toMonth", range.toMonth);
-      if (extra.tableNames) params.set("tableNames", extra.tableNames);
-      const response = await fetch(`tables/${tableName}?${params.toString()}`);
-      if (!response.ok) break;
-      const payload = await response.json();
-      const pageData = payload.data || [];
-      const total = payload.total || pageData.length;
-      const limit = payload.limit || 2000;
-      totalPages = Math.max(1, Math.ceil(total / limit));
-      data.push(...pageData);
-      pageNo += 1;
-    }
-    return data;
-  }
-
-  function rowIdentity(tableName, row) {
-    if (tableName === CELL_TABLE) return `${row.table_name}::${row.month}::${row.row_key}::${row.col_index}`;
-    if (tableName === UNIT_TABLE) return `${row.month}::${row.day}::${row.machine_no}`;
-    return `${row.month}::${row.day}`;
-  }
-
-  function mergeRows(targetRows, tableName, rows) {
-    if (!rows.length) return;
-    const indexMap = new Map(targetRows.map((row, index) => [rowIdentity(tableName, row), index]));
-    rows.forEach((row) => {
-      const key = rowIdentity(tableName, row);
-      const existingIndex = indexMap.get(key);
-      if (existingIndex === undefined) {
-        indexMap.set(key, targetRows.length);
-        targetRows.push(row);
-      } else {
-        targetRows[existingIndex] = row;
-      }
-      if (tableName === CELL_TABLE) indexCellRow(row);
-      else if (tableName === UNIT_TABLE) indexUnitRow(row);
-      else if (tableName === RAW_TABLE) indexRawRow(row);
-    });
+  async function loadUsageRows(query) {
+    const [units, commons] = await Promise.all([
+      API.get(`/unit-daily-usages?${query}`),
+      API.get(`/unit-daily-commons?${query}`),
+    ]);
+    units.forEach((row) => unitByKey.set(`${row.usageDate}|${row.machineCode}`, row));
+    commons.forEach((row) => commonByDate.set(row.usageDate, row));
   }
 
   async function ensureSteamMonthLoaded(targetMonth = monthKey()) {
     if (page !== "unit-steam-usage.html") return;
-    const cellNames = cellTableNamesParam();
-    const tasks = [];
-    if (!loadedCellMonths.has(targetMonth)) {
-      tasks.push(fetchPaged(CELL_TABLE, targetMonth, {}, { tableNames: cellNames }).then((rows) => {
-        mergeRows(cellRows, CELL_TABLE, rows);
-        loadedCellMonths.add(targetMonth);
-      }));
+    const year = Number(targetMonth.slice(0, 4));
+    const month = Number(targetMonth.slice(5, 7));
+    if (loadedUnitYears.has(String(year)) || loadedUnitMonths.has(targetMonth)) return;
+    try {
+      await loadUsageRows(`year=${year}&month=${month}`);
+      loadedUnitMonths.add(targetMonth);
+    } catch (error) {
+      console.error("스팀 사용량 조회 실패", error);
+      window.alert(`조회 실패: ${error.message || error}`);
     }
-    if (!loadedUnitMonths.has(targetMonth)) {
-      tasks.push(fetchPaged(UNIT_TABLE, targetMonth).then((rows) => {
-        mergeRows(unitRows, UNIT_TABLE, rows);
-        loadedUnitMonths.add(targetMonth);
-      }));
+  }
+
+  async function ensureSteamYearLoaded(year = yearSelect.value) {
+    if (page !== "unit-steam-usage.html") return;
+    const yearKey = String(year);
+    if (loadedUnitYears.has(yearKey)) return;
+    try {
+      await loadUsageRows(`year=${Number(year)}`);
+      loadedUnitYears.add(yearKey);
+    } catch (error) {
+      console.error("스팀 사용량 조회 실패", error);
+      window.alert(`조회 실패: ${error.message || error}`);
     }
-    if (!loadedRawMonths.has(targetMonth)) {
-      tasks.push(fetchPaged(RAW_TABLE, targetMonth).then((rows) => {
-        mergeRows(rawRows, RAW_TABLE, rows);
-        loadedRawMonths.add(targetMonth);
-      }));
-    }
-    await Promise.all(tasks);
   }
 
   async function ensureLngYearLoaded(year = yearSelect.value) {
@@ -290,38 +205,6 @@ document.addEventListener("DOMContentLoaded", () => {
     loadedCellYears.add(String(year));
   }
 
-  async function ensureSteamYearLoaded(year = yearSelect.value) {
-    if (page !== "unit-steam-usage.html") return;
-    const yearKey = String(year);
-    const range = { fromMonth: `${yearKey}-01`, toMonth: `${yearKey}-12` };
-
-    const cellNames = cellTableNamesParam();
-    const tasks = [];
-    if (!loadedCellYears.has(yearKey)) {
-      tasks.push(fetchPaged(CELL_TABLE, "", range, { tableNames: cellNames }).then((rows) => {
-        mergeRows(cellRows, CELL_TABLE, rows);
-        loadedCellYears.add(yearKey);
-      }));
-    }
-    if (!loadedUnitYears.has(yearKey)) {
-      tasks.push(fetchPaged(UNIT_TABLE, "", range).then((rows) => {
-        mergeRows(unitRows, UNIT_TABLE, rows);
-        loadedUnitYears.add(yearKey);
-      }));
-    }
-    if (!loadedRawYears.has(yearKey)) {
-      tasks.push(fetchPaged(RAW_TABLE, "", range).then((rows) => {
-        mergeRows(rawRows, RAW_TABLE, rows);
-        loadedRawYears.add(yearKey);
-      }));
-    }
-    await Promise.all(tasks);
-  }
-
-  function getCellRow(tableName, month, rowKey, colIndex) {
-    return cellIndex.get(cellKey(tableName, month, rowKey, colIndex)) || null;
-  }
-
   function getCellValue(tableName, month, rowKey, colIndex) {
     if (page === "unit-lng-cost.html") {
       const field = lngFieldOf(tableName, colIndex);
@@ -329,7 +212,53 @@ document.addEventListener("DOMContentLoaded", () => {
       const row = lngByDate.get(isoOf(month, rowKey));
       return row ? apiValueText(row[field]) : "";
     }
-    return getCellRow(tableName, month, rowKey, colIndex)?.cell_value ?? "";
+    const spec = usageFieldOf(tableName, colIndex);
+    if (!spec) return "";
+    const row = findUnit(month, rowKey, spec[0]);
+    return row ? apiValueText(row[spec[1]]) : "";
+  }
+
+  // 스팀 사용량: 저장 직전에 그 날·호기의 최신 행을 다시 읽어(다른 화면이 넣은 스팀량·생산량 보존) 가동시간·비고만 바꿔 행 전체를 보낸다.
+  async function fetchUnitRow(usageDate, machine) {
+    const rows = await API.get(`/unit-daily-usages?year=${Number(usageDate.slice(0, 4))}&month=${Number(usageDate.slice(5, 7))}&machineCode=${encodeURIComponent(machine)}`);
+    return rows.find((row) => row.usageDate === usageDate) || null;
+  }
+
+  function buildUnitRowRequest(usageDate, machine, rowKey, base, changedInput) {
+    const body = { usageDate, machineCode: machine };
+    UNIT_ROW_FIELDS.forEach((field) => { body[field] = base && base[field] !== undefined ? base[field] : null; });
+    Object.keys(USAGE_FIELDS).forEach((tableName) => {
+      Object.entries(USAGE_FIELDS[tableName]).forEach(([col, spec]) => {
+        if (spec[0] !== machine) return;
+        const el = document.querySelector(`input[data-table-name="${tableName}"][data-row-mode="daily"][data-row-key="${rowKey}"][data-col-index="${col}"]`);
+        if (!el) return;
+        if (spec[1] === "note") {
+          const text = String(el.value ?? "").trim();
+          body.note = text === "" ? null : text;
+        } else {
+          body[spec[1]] = API.num(el === changedInput ? normalizeEditableValue(el.value) : editableRawValue(el));
+        }
+      });
+    });
+    return body;
+  }
+
+  async function saveUsageCell(input) {
+    const spec = usageFieldOf(input.dataset.tableName, input.dataset.colIndex);
+    const rowKey = input.dataset.rowKey;
+    if (!spec || input.dataset.rowMode !== "daily" || !/^\d{2}$/.test(rowKey) || Number(rowKey) > daysInMonth()) return;
+    const [machine, field] = spec;
+    const usageDate = isoOf(monthKey(), rowKey);
+    try {
+      const fresh = await fetchUnitRow(usageDate, machine);
+      const base = fresh || unitByKey.get(`${usageDate}|${machine}`) || null;
+      const saved = await API.post("/unit-daily-usages", buildUnitRowRequest(usageDate, machine, rowKey, base, input));
+      unitByKey.set(`${saved.usageDate}|${saved.machineCode}`, saved);
+      input.dataset.rawValue = field === "note" ? String(saved.note ?? "") : apiValueText(saved[field]);
+    } catch (error) {
+      console.error("스팀 사용량 저장 실패", error);
+      window.alert(`저장 실패: ${error.message || error}`);
+    }
   }
 
   // LNG: 그 날의 저장 대상 입력칸(보일러·버너 표)을 모아 행 하나로 보낸다 — 행 전체 업서트.
@@ -363,50 +292,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function upsertCell(payload, existingId) {
-    const url = existingId ? `tables/${CELL_TABLE}/${existingId}` : `tables/${CELL_TABLE}`;
-    const method = existingId ? "PATCH" : "POST";
-    const response = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(existingId ? payload : { table_name: CELL_TABLE, ...payload }),
-    });
-    if (!response.ok) return null;
-    return response.json();
-  }
-
   async function saveCell(input) {
     if (!input || input.readOnly || input.classList.contains("calc-input")) return;
     if (page === "unit-lng-cost.html") { await saveLngCell(input); return; }
-    const tableName = input.dataset.tableName;
-    const rowKey = input.dataset.rowKey;
-    const colIndex = Number(input.dataset.colIndex);
-    if (!tableName || !rowKey || !Number.isFinite(colIndex)) return;
-
-    const payload = {
-      ...monthMeta(),
-      table_name: tableName,
-      row_key: rowKey,
-      col_index: colIndex,
-      cell_value: editableRawValue(input),
-    };
-    const existing = getCellRow(tableName, payload.month, rowKey, colIndex);
-    const saved = await upsertCell(payload, existing?.id);
-    if (!saved) return;
-
-    const index = cellRows.findIndex((row) => row.id === saved.id);
-    if (index >= 0) cellRows[index] = saved;
-    else cellRows.push(saved);
-    indexCellRow(saved);
-    input.dataset.rawValue = normalizeEditableValue(saved.cell_value);
+    if (page === "unit-steam-usage.html") { await saveUsageCell(input); return; }
   }
 
   function findUnit(month, day, machine) {
-    return unitIndex.get(unitKey(month, day, machine)) || null;
+    return unitByKey.get(unitKey(month, day, machine)) || null;
   }
 
   function findRaw(month, day) {
-    return rawIndex.get(rawKey(month, day)) || null;
+    return commonByDate.get(isoOf(month, day)) || null;
   }
 
   function steamMetric(month, day) {
@@ -417,10 +314,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const tm5 = findUnit(month, day, "TM-5") || {};
     const raw = findRaw(month, day) || {};
 
-    const pm2Steam = Number(pm2.main_steam || 0) + Number(pm2.coater_steam || 0);
-    const pm3McSteam = Number(pm3.main_steam || 0) + Number(pm3.coater_steam || 0);
-    const disperser = Number(raw.disperser_total || 0);
-    const ventilation = Number(pm3.ventilation_steam || 0);
+    const pm2Steam = Number(pm2.mainSteam || 0) + Number(pm2.coaterSteam || 0);
+    const pm3McSteam = Number(pm3.mainSteam || 0) + Number(pm3.coaterSteam || 0);
+    const disperser = Number(raw.disperserTotal || 0);
+    const ventilation = Number(pm3.ventilationSteam || 0);
     const tm3Steam = Number(tm3.steam || 0);
     const tm4Steam = Number(tm4.steam || 0);
     const tm5Steam = Number(tm5.steam || 0);
@@ -551,7 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
       a.pm2Run += parseNumber(getCellValue("usage_m_pm2", month, key, 1));
       a.pm3Run += parseNumber(getCellValue("usage_m_pm3a", month, key, 1));
       a.dispRun += parseNumber(getCellValue("usage_m_pm3b", month, key, 1));
-      a.ventRun += parseNumber(getCellValue("usage_m_pm3b", month, key, 5));
+      a.ventRun += parseNumber(getCellValue("usage_m_pm3b", month, key, 4));
       a.tm3Run += parseNumber(getCellValue("usage_m_tm", month, key, 1));
       a.tm4Run += parseNumber(getCellValue("usage_m_tm", month, key, 4));
       a.tm5Run += parseNumber(getCellValue("usage_m_tm", month, key, 7));
@@ -1532,14 +1429,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function ensureLoaded() {
     if (loaded) return;
-    const [cells, units, raws] = await Promise.all([
-      (page === "unit-lng-cost.html" || page === "unit-steam-usage.html") ? Promise.resolve([]) : fetchPaged(CELL_TABLE),
-      Promise.resolve([]),
-      Promise.resolve([]),
-    ]);
-    if (cells.length) cellRows.push(...cells);
-    if (units.length) unitRows.push(...units);
-    if (raws.length) rawRows.push(...raws);
     loaded = true;
     if (page === "unit-lng-cost.html") {
       await ensureLngYearLoaded(yearSelect.value);

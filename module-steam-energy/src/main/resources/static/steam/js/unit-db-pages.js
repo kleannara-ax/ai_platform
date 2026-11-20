@@ -1,4 +1,10 @@
-﻿document.addEventListener("DOMContentLoaded", () => {
+﻿/* 스팀사용 원단위 — 호기별 스팀량·생산량·생산지종과 일자별 공통값(디스퍼져·TOC·PICA)을 넣는 화면. 2026-11 규격 전환.
+ *  - 호기별: steam_unit_daily_usage (/steam-energy-api/unit-daily-usages, 일자+호기 업서트). 가동시간·비고는 스팀 사용량 화면이 넣는다.
+ *  - 공통값: steam_unit_daily_common (/steam-energy-api/unit-daily-commons, 일자 업서트)
+ *  - 엑셀: 원단위 일지 누계 .xls → POST /unit-log/import-excel?year= / GET /unit-log/export-excel?year=
+ *  저장은 칸 단위가 아니라 그 날(·호기) 행 전체 업서트. 보내기 직전에 최신 행을 읽어 다른 화면이 넣은 값(가동시간 등)을 보존한다.
+ */
+document.addEventListener("DOMContentLoaded", () => {
   const pageKind = document.body.dataset.pageKind;
   if (pageKind !== "unit") return;
 
@@ -11,10 +17,14 @@
   const unitExcelFileInput = document.getElementById("unitExcelFileInput");
   if (!yearSelect || !monthSelect) return;
 
-  const DB_TABLE_UNIT = "steam_unit_usage";
-  const DB_TABLE_UNIT_RAW = "steam_unit_usage_raw";
-  const unitRows = [];
-  const rawRows = [];
+  const API = window.SteamEnergyApi;
+  if (!API) { console.error("steam-energy-api.js 가 로드되지 않았습니다."); return; }
+  // 'YYYY-MM-DD|호기' → 호기별 행, 'YYYY-MM-DD' → 공통값 행
+  const unitByKey = new Map();
+  const commonByDate = new Map();
+  const UNIT_ROW_FIELDS = ["mainSteam", "coaterSteam", "ventilationSteam", "steam", "productionKg", "productionType",
+    "runtimeHours", "disperserRuntimeHours", "ventRuntimeHours", "note"];
+  const COMMON_ROW_FIELDS = ["disperserTotal", "tocSteam", "pica121Vent"];
   let loaded = false;
   let loadedYear = "";
   const dirtyInputs = new Set();
@@ -25,12 +35,8 @@
     return `${year}-${month}`;
   }
 
-  function monthMeta(year = yearSelect.value, month = monthSelect.value) {
-    return {
-      month: `${year}-${month}`,
-      year_no: Number(year),
-      month_no: Number(month),
-    };
+  function isoDate(month, day) {
+    return `${month}-${String(normalizeDayValue(day)).padStart(2, "0")}`;
   }
 
   function daysInMonth(year = Number(yearSelect.value), month = Number(monthSelect.value)) {
@@ -43,28 +49,6 @@
       return String(numeric);
     }
     return String(day ?? "").trim();
-  }
-
-  function findLastMatching(rows, predicate) {
-    for (let index = rows.length - 1; index >= 0; index -= 1) {
-      if (predicate(rows[index])) return rows[index];
-    }
-    return null;
-  }
-
-  function findPreferredDayRow(rows, month, day, extraPredicate = () => true) {
-    const normalizedDay = normalizeDayValue(day);
-    const exact = findLastMatching(rows, (row) =>
-      row.month === month &&
-      String(row.day) === normalizedDay &&
-      extraPredicate(row)
-    );
-    if (exact) return exact;
-    return findLastMatching(rows, (row) =>
-      row.month === month &&
-      normalizeDayValue(row.day) === normalizedDay &&
-      extraPredicate(row)
-    );
   }
 
   function asNumber(value) {
@@ -106,13 +90,13 @@
 
   async function downloadUnitExcel() {
     const year = uploadYearSelect?.value || yearSelect.value;
-    const response = await fetch(`/tables/unit-usage/export-excel?year=${encodeURIComponent(year)}`);
-    if (!response.ok) { throw new Error(await window.ExcelUploadErrors?.message(response) || "엑셀 업로드에 실패했습니다."); }
+    const response = await fetch(`/steam-energy-api/unit-log/export-excel?year=${encodeURIComponent(year)}`);
+    if (!response.ok) { throw new Error(await window.ExcelUploadErrors?.message(response) || "엑셀 다운로드에 실패했습니다."); }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${year}_?먮떒???쇱?.xls`;
+    anchor.download = `원단위 일지 누계(${year}년).xls`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -121,55 +105,66 @@
 
   const DAILY_ROW_COUNT = 31;
 
-  async function fetchAllPages(tableName, options = {}) {
-    const rows = [];
-    let page = 1;
-    let totalPages = 1;
-
-    while (page <= totalPages) {
-      const params = new URLSearchParams({ page: String(page), limit: "500" });
-      if (options.fromMonth) params.set("fromMonth", options.fromMonth);
-      if (options.toMonth) params.set("toMonth", options.toMonth);
-      if (options.month) params.set("month", options.month);
-      const response = await fetch(`tables/${tableName}?${params.toString()}`);
-      if (!response.ok) break;
-      const payload = await response.json();
-      const data = payload.data || [];
-      const total = payload.total || data.length;
-      const limit = payload.limit || 200;
-      totalPages = Math.max(1, Math.ceil(total / limit));
-      rows.push(...data);
-      page += 1;
-    }
-
-    return rows;
-  }
-
   function resetLoadedState() {
-    unitRows.length = 0;
-    rawRows.length = 0;
+    unitByKey.clear();
+    commonByDate.clear();
     loaded = false;
     loadedYear = "";
   }
 
   function findUnit(month, day, machine) {
-    return findPreferredDayRow(unitRows, month, day, (row) => row.machine_no === machine);
+    return unitByKey.get(`${isoDate(month, day)}|${machine}`) || null;
   }
 
   function findRaw(month, day) {
-    return findPreferredDayRow(rawRows, month, day);
+    return commonByDate.get(isoDate(month, day)) || null;
   }
 
-  async function upsert(tableName, payload, existingId) {
-    const url = existingId ? `tables/${tableName}/${existingId}` : `tables/${tableName}`;
-    const method = existingId ? "PATCH" : "POST";
-    const response = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(existingId ? payload : { table_name: tableName, ...payload }),
+  async function loadYear(year) {
+    const [units, commons] = await Promise.all([
+      API.get(`/unit-daily-usages?year=${Number(year)}`),
+      API.get(`/unit-daily-commons?year=${Number(year)}`),
+    ]);
+    unitByKey.clear();
+    commonByDate.clear();
+    units.forEach((row) => unitByKey.set(`${row.usageDate}|${row.machineCode}`, row));
+    commons.forEach((row) => commonByDate.set(row.usageDate, row));
+  }
+
+  // 저장 직전 최신 행 — 같은 날을 다른 화면(스팀 사용량·오늘 일지)이 고쳤을 수 있어 그 값을 보존한다.
+  async function fetchFreshUnit(usageDate, machine) {
+    const rows = await API.get(`/unit-daily-usages?year=${Number(usageDate.slice(0, 4))}&month=${Number(usageDate.slice(5, 7))}&machineCode=${encodeURIComponent(machine)}`);
+    return rows.find((row) => row.usageDate === usageDate) || null;
+  }
+  async function fetchFreshCommon(usageDate) {
+    const rows = await API.get(`/unit-daily-commons?year=${Number(usageDate.slice(0, 4))}&month=${Number(usageDate.slice(5, 7))}`);
+    return rows.find((row) => row.usageDate === usageDate) || null;
+  }
+
+  // 그 날·호기의 입력칸(월단위 표 전체)을 모아 행 하나로 만든다. changedInput 은 포커스와 상관없이 현재 값.
+  function buildUnitBody(usageDate, machine, day, base, changedInput) {
+    const body = { usageDate, machineCode: machine };
+    UNIT_ROW_FIELDS.forEach((field) => { body[field] = base && base[field] !== undefined ? base[field] : null; });
+    document.querySelectorAll(`[data-period-panel="monthly"] tr[data-day="${day}"] input[data-kind="unit"][data-machine="${machine}"], [data-period-panel="monthly"] tr[data-day="${day}"] input[data-kind="unit-text"][data-machine="${machine}"]`).forEach((el) => {
+      const field = el.dataset.field;
+      if (!field) return;
+      if (el.dataset.kind === "unit-text") {
+        const text = String(el.value ?? "").trim();
+        body[field] = text === "" ? null : text;
+      } else {
+        body[field] = asNumber(el === changedInput ? normalizeEditableValue(el.value) : editableRawValue(el));
+      }
     });
-    if (!response.ok) return null;
-    return response.json();
+    return body;
+  }
+  function buildCommonBody(usageDate, day, base, changedInput) {
+    const body = { usageDate };
+    COMMON_ROW_FIELDS.forEach((field) => { body[field] = base && base[field] !== undefined ? base[field] : null; });
+    document.querySelectorAll(`[data-period-panel="monthly"] tr[data-day="${day}"] input[data-kind="raw"]`).forEach((el) => {
+      const field = el.dataset.field;
+      if (field) body[field] = asNumber(el === changedInput ? normalizeEditableValue(el.value) : editableRawValue(el));
+    });
+    return body;
   }
 
   function metricForDay(month, day) {
@@ -180,31 +175,31 @@
     const tm5 = findUnit(month, day, "TM-5") || {};
     const raw = findRaw(month, day) || {};
 
-    const pm2Main = Number(pm2.main_steam || 0);
-    const pm2Coater = Number(pm2.coater_steam || 0);
+    const pm2Main = Number(pm2.mainSteam || 0);
+    const pm2Coater = Number(pm2.coaterSteam || 0);
     // 원단위(톤/톤) = 스팀(톤) / 생산량(톤) = 스팀(톤) * 1000 / 생산량(kg).
     // 원본 엑셀 1번 시트와 단위 일치 (헤더에 톤/톤 명시되어 있음).
     const TON_PER_KG = 1000;
     const pm2Steam = pm2Main + pm2Coater;
-    const pm2Prod = Number(pm2.production || 0);
+    const pm2Prod = Number(pm2.productionKg || 0);
     const pm2Unit = pm2Prod ? (pm2Steam * TON_PER_KG) / pm2Prod : 0;
 
-    const pm3Main = Number(pm3.main_steam || 0);
-    const pm3Coater = Number(pm3.coater_steam || 0);
-    const disperser = Number(raw.disperser_total || 0);
-    const vent = Number(pm3.ventilation_steam || 0);
+    const pm3Main = Number(pm3.mainSteam || 0);
+    const pm3Coater = Number(pm3.coaterSteam || 0);
+    const disperser = Number(raw.disperserTotal || 0);
+    const vent = Number(pm3.ventilationSteam || 0);
     const pm3Steam = pm3Main + pm3Coater + disperser + vent;
-    const pm3Prod = Number(pm3.production || 0);
+    const pm3Prod = Number(pm3.productionKg || 0);
     const pm3Unit = pm3Prod ? (pm3Steam * TON_PER_KG) / pm3Prod : 0;
 
     const tm3Steam = Number(tm3.steam || 0);
-    const tm3Prod = Number(tm3.production || 0);
+    const tm3Prod = Number(tm3.productionKg || 0);
     const tm3Unit = tm3Prod ? (tm3Steam * TON_PER_KG) / tm3Prod : 0;
     const tm4Steam = Number(tm4.steam || 0);
-    const tm4Prod = Number(tm4.production || 0);
+    const tm4Prod = Number(tm4.productionKg || 0);
     const tm4Unit = tm4Prod ? (tm4Steam * TON_PER_KG) / tm4Prod : 0;
     const tm5Steam = Number(tm5.steam || 0);
-    const tm5Prod = Number(tm5.production || 0);
+    const tm5Prod = Number(tm5.productionKg || 0);
     const tm5Unit = tm5Prod ? (tm5Steam * TON_PER_KG) / tm5Prod : 0;
 
     const paperSteam = pm2Steam + pm3Steam;
@@ -431,9 +426,9 @@
   }
 
   function updatePm2Row(row) {
-    const main = getNumericInput(row, "main_steam");
-    const coater = getNumericInput(row, "coater_steam");
-    const production = getNumericInput(row, "production");
+    const main = getNumericInput(row, "mainSteam");
+    const coater = getNumericInput(row, "coaterSteam");
+    const production = getNumericInput(row, "productionKg");
     const steam = main + coater;
     // 원단위(톤/톤) = 스팀(톤) * 1000 / 생산량(kg).
     const unit = production ? (steam * 1000) / production : 0;
@@ -442,11 +437,11 @@
   }
 
   function updatePm3Row(row) {
-    const main = getNumericInput(row, "main_steam");
-    const coater = getNumericInput(row, "coater_steam");
-    const disperser = getNumericInput(row, "disperser_total");
-    const vent = getNumericInput(row, "ventilation_steam");
-    const production = getNumericInput(row, "production");
+    const main = getNumericInput(row, "mainSteam");
+    const coater = getNumericInput(row, "coaterSteam");
+    const disperser = getNumericInput(row, "disperserTotal");
+    const vent = getNumericInput(row, "ventilationSteam");
+    const production = getNumericInput(row, "productionKg");
     const steam = main + coater + disperser + vent;
     // 원단위(톤/톤) = 스팀(톤) * 1000 / 생산량(kg).
     const unit = production ? (steam * 1000) / production : 0;
@@ -456,11 +451,11 @@
 
   function updateTmRow(row) {
     const tm3Steam = getNumericInput(row, "steam", 0);
-    const tm3Prod = getNumericInput(row, "production", 0);
+    const tm3Prod = getNumericInput(row, "productionKg", 0);
     const tm4Steam = getNumericInput(row, "steam", 1);
-    const tm4Prod = getNumericInput(row, "production", 1);
+    const tm4Prod = getNumericInput(row, "productionKg", 1);
     const tm5Steam = getNumericInput(row, "steam", 2);
-    const tm5Prod = getNumericInput(row, "production", 2);
+    const tm5Prod = getNumericInput(row, "productionKg", 2);
     // 원단위(톤/톤) = 스팀(톤) * 1000 / 생산량(kg).
     const tm3Unit = tm3Prod ? (tm3Steam * 1000) / tm3Prod : 0;
     const tm4Unit = tm4Prod ? (tm4Steam * 1000) / tm4Prod : 0;
@@ -542,34 +537,34 @@
       const day = pm2Row.children[0].textContent;
       const inactiveDay = pm2Row.classList.contains("invalid-day-row");
       const pm2Steam = asNumber(pm2Row.children[3].textContent) ?? 0;
-      const pm2Prod = getNumericInput(pm2Row, "production");
+      const pm2Prod = getNumericInput(pm2Row, "productionKg");
       const pm3Steam = asNumber(pm3Row.children[5].textContent) ?? 0;
-      const pm3Prod = getNumericInput(pm3Row, "production");
+      const pm3Prod = getNumericInput(pm3Row, "productionKg");
       const paperSteam = pm2Steam + pm3Steam;
       const paperProd = pm2Prod + pm3Prod;
       // 원단위(톤/톤) = 스팀(톤) * 1000 / 생산량(kg).
       const paperUnit = paperProd ? (paperSteam * 1000) / paperProd : 0;
 
       const tm3Steam = getNumericInput(tmRow, "steam", 0);
-      const tm3Prod = getNumericInput(tmRow, "production", 0);
+      const tm3Prod = getNumericInput(tmRow, "productionKg", 0);
       const tm4Steam = getNumericInput(tmRow, "steam", 1);
-      const tm4Prod = getNumericInput(tmRow, "production", 1);
+      const tm4Prod = getNumericInput(tmRow, "productionKg", 1);
       const tm5Steam = getNumericInput(tmRow, "steam", 2);
-      const tm5Prod = getNumericInput(tmRow, "production", 2);
+      const tm5Prod = getNumericInput(tmRow, "productionKg", 2);
       const tissueSteam = tm3Steam + tm4Steam + tm5Steam;
       const tissueProd = tm3Prod + tm4Prod + tm5Prod;
       const tissueUnit = tissueProd ? (tissueSteam * 1000) / tissueProd : 0;
       const totalSteam = paperSteam + tissueSteam;
       const totalProd = paperProd + tissueProd;
       const totalUnit = totalProd ? (totalSteam * 1000) / totalProd : 0;
-      const disperserValue = pm3Row.querySelector('[data-field="disperser_total"]')?.value ?? "";
+      const disperserValue = pm3Row.querySelector('[data-field="disperserTotal"]')?.value ?? "";
       const currentTotalRow = totalBody.children[index];
-      const tocValue = currentTotalRow?.querySelector('[data-field="toc_steam"]')?.value ?? "";
-      const picaValue = currentTotalRow?.querySelector('[data-field="pica121_vent"]')?.value ?? "";
+      const tocValue = currentTotalRow?.querySelector('[data-field="tocSteam"]')?.value ?? "";
+      const picaValue = currentTotalRow?.querySelector('[data-field="pica121Vent"]')?.value ?? "";
 
       paperRows.push(`<tr${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${day}</td><td>${format(paperSteam)}</td><td>${format(paperProd)}</td><td>${format(paperUnit, 2)}</td></tr>`);
       tissueRows.push(`<tr${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${day}</td><td>${format(tissueSteam)}</td><td>${format(tissueProd)}</td><td>${format(tissueUnit, 2)}</td></tr>`);
-      totalRows.push(`<tr data-day="${day}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${day}</td><td>${format(totalSteam)}</td><td>${format(totalProd)}</td><td>${format(totalUnit, 2)}</td><td>${disperserValue}</td><td>${inputCell(tocValue, 'data-kind="raw" data-field="toc_steam"', inactiveDay)}</td><td>${inputCell(picaValue, 'data-kind="raw" data-field="pica121_vent"', inactiveDay)}</td></tr>`);
+      totalRows.push(`<tr data-day="${day}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${day}</td><td>${format(totalSteam)}</td><td>${format(totalProd)}</td><td>${format(totalUnit, 2)}</td><td>${disperserValue}</td><td>${inputCell(tocValue, 'data-kind="raw" data-field="tocSteam"', inactiveDay)}</td><td>${inputCell(picaValue, 'data-kind="raw" data-field="pica121Vent"', inactiveDay)}</td></tr>`);
     });
 
     paperBody.innerHTML = paperRows.join("");
@@ -601,15 +596,15 @@
       const d = String(day).padStart(2, "0");
       const inactiveDay = day > maxDays;
 
-      pm2Rows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.pm2.main_steam ?? "", 'data-kind="unit" data-machine="PM-2" data-field="main_steam"', inactiveDay)}</td><td>${inputCell(m.pm2.coater_steam ?? "", 'data-kind="unit" data-machine="PM-2" data-field="coater_steam"', inactiveDay)}</td><td>${cell(format(m.pm2Steam))}</td><td>${inputCell(m.pm2.production ?? "", 'data-kind="unit" data-machine="PM-2" data-field="production"', inactiveDay)}</td><td>${cell(format(m.pm2Unit, 2))}</td><td>${inputCell(m.pm2.production_type ?? "", 'data-kind="unit-text" data-machine="PM-2" data-field="production_type" placeholder="직접입력" autocomplete="off"', inactiveDay)}</td></tr>`);
+      pm2Rows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.pm2.mainSteam ?? "", 'data-kind="unit" data-machine="PM-2" data-field="mainSteam"', inactiveDay)}</td><td>${inputCell(m.pm2.coaterSteam ?? "", 'data-kind="unit" data-machine="PM-2" data-field="coaterSteam"', inactiveDay)}</td><td>${cell(format(m.pm2Steam))}</td><td>${inputCell(m.pm2.productionKg ?? "", 'data-kind="unit" data-machine="PM-2" data-field="productionKg"', inactiveDay)}</td><td>${cell(format(m.pm2Unit, 2))}</td><td>${inputCell(m.pm2.productionType ?? "", 'data-kind="unit-text" data-machine="PM-2" data-field="productionType" placeholder="직접입력" autocomplete="off"', inactiveDay)}</td></tr>`);
 
-      pm3Rows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.pm3.main_steam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="main_steam"', inactiveDay)}</td><td>${inputCell(m.pm3.coater_steam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="coater_steam"', inactiveDay)}</td><td>${inputCell(m.raw.disperser_total ?? "", 'data-kind="raw" data-field="disperser_total"', inactiveDay)}</td><td>${inputCell(m.pm3.ventilation_steam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="ventilation_steam"', inactiveDay)}</td><td>${cell(format(m.pm3Steam))}</td><td>${inputCell(m.pm3.production ?? "", 'data-kind="unit" data-machine="PM-3" data-field="production"', inactiveDay)}</td><td>${cell(format(m.pm3Unit, 2))}</td><td>${inputCell(m.pm3.production_type ?? "", 'data-kind="unit-text" data-machine="PM-3" data-field="production_type" placeholder="직접입력" autocomplete="off"', inactiveDay)}</td></tr>`);
+      pm3Rows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.pm3.mainSteam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="mainSteam"', inactiveDay)}</td><td>${inputCell(m.pm3.coaterSteam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="coaterSteam"', inactiveDay)}</td><td>${inputCell(m.raw.disperserTotal ?? "", 'data-kind="raw" data-field="disperserTotal"', inactiveDay)}</td><td>${inputCell(m.pm3.ventilationSteam ?? "", 'data-kind="unit" data-machine="PM-3" data-field="ventilationSteam"', inactiveDay)}</td><td>${cell(format(m.pm3Steam))}</td><td>${inputCell(m.pm3.productionKg ?? "", 'data-kind="unit" data-machine="PM-3" data-field="productionKg"', inactiveDay)}</td><td>${cell(format(m.pm3Unit, 2))}</td><td>${inputCell(m.pm3.productionType ?? "", 'data-kind="unit-text" data-machine="PM-3" data-field="productionType" placeholder="직접입력" autocomplete="off"', inactiveDay)}</td></tr>`);
 
-      tmRows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.tm3.steam ?? "", 'data-kind="unit" data-machine="TM-3" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm3.production ?? "", 'data-kind="unit" data-machine="TM-3" data-field="production"', inactiveDay)}</td><td>${cell(format(m.tm3Unit, 2))}</td><td>${inputCell(m.tm4.steam ?? "", 'data-kind="unit" data-machine="TM-4" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm4.production ?? "", 'data-kind="unit" data-machine="TM-4" data-field="production"', inactiveDay)}</td><td>${cell(format(m.tm4Unit, 2))}</td><td>${inputCell(m.tm5.steam ?? "", 'data-kind="unit" data-machine="TM-5" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm5.production ?? "", 'data-kind="unit" data-machine="TM-5" data-field="production"', inactiveDay)}</td><td>${cell(format(m.tm5Unit, 2))}</td></tr>`);
+      tmRows.push(`<tr data-day="${d}"${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${inputCell(m.tm3.steam ?? "", 'data-kind="unit" data-machine="TM-3" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm3.productionKg ?? "", 'data-kind="unit" data-machine="TM-3" data-field="productionKg"', inactiveDay)}</td><td>${cell(format(m.tm3Unit, 2))}</td><td>${inputCell(m.tm4.steam ?? "", 'data-kind="unit" data-machine="TM-4" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm4.productionKg ?? "", 'data-kind="unit" data-machine="TM-4" data-field="productionKg"', inactiveDay)}</td><td>${cell(format(m.tm4Unit, 2))}</td><td>${inputCell(m.tm5.steam ?? "", 'data-kind="unit" data-machine="TM-5" data-field="steam"', inactiveDay)}</td><td>${inputCell(m.tm5.productionKg ?? "", 'data-kind="unit" data-machine="TM-5" data-field="productionKg"', inactiveDay)}</td><td>${cell(format(m.tm5Unit, 2))}</td></tr>`);
 
       paperRows.push(`<tr><td>${d}</td><td>${format(m.paperSteam)}</td><td>${format(m.paperProd)}</td><td>${format(m.paperUnit, 2)}</td></tr>`);
       tissueRows.push(`<tr><td>${d}</td><td>${format(m.tissueSteam)}</td><td>${format(m.tissueProd)}</td><td>${format(m.tissueUnit, 2)}</td></tr>`);
-      totalRows.push(`<tr${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${format(m.totalSteam)}</td><td>${format(m.totalProd)}</td><td>${format(m.totalUnit, 2)}</td><td>${cell(format(m.disperser))}</td><td>${inputCell(m.raw.toc_steam ?? "", 'data-kind="raw" data-field="toc_steam"', inactiveDay)}</td><td>${inputCell(m.raw.pica121_vent ?? "", 'data-kind="raw" data-field="pica121_vent"', inactiveDay)}</td></tr>`);
+      totalRows.push(`<tr${inactiveDay ? ' class="invalid-day-row"' : ""}><td>${d}</td><td>${format(m.totalSteam)}</td><td>${format(m.totalProd)}</td><td>${format(m.totalUnit, 2)}</td><td>${cell(format(m.disperser))}</td><td>${inputCell(m.raw.tocSteam ?? "", 'data-kind="raw" data-field="tocSteam"', inactiveDay)}</td><td>${inputCell(m.raw.pica121Vent ?? "", 'data-kind="raw" data-field="pica121Vent"', inactiveDay)}</td></tr>`);
     }
 
     pm2Body.innerHTML = pm2Rows.join("");
@@ -944,38 +939,27 @@
     const field = input.dataset.field;
     const normalizedDay = normalizeDayValue(day);
 
-    if (kind === "unit" || kind === "unit-text") {
-      const machine = input.dataset.machine;
-      const existing = findUnit(currentMonth, normalizedDay, machine);
-      const meta = monthMeta();
-      const payload = {
-        ...meta,
-        day: normalizedDay,
-        machine_no: machine,
-        [field]: kind === "unit-text" ? input.value : asNumber(editableRawValue(input)),
-      };
-      const saved = await upsert(DB_TABLE_UNIT, payload, existing?.id);
-      if (saved) {
-        const index = unitRows.findIndex((rowItem) => rowItem.id === saved.id);
-        if (index >= 0) unitRows[index] = saved;
-        else unitRows.push(saved);
+    if (Number(normalizedDay) > daysInMonth()) return;
+    const usageDate = isoDate(currentMonth, normalizedDay);
+    try {
+      if (kind === "unit" || kind === "unit-text") {
+        const machine = input.dataset.machine;
+        const base = (await fetchFreshUnit(usageDate, machine)) || findUnit(currentMonth, normalizedDay, machine);
+        const saved = await API.post("/unit-daily-usages", buildUnitBody(usageDate, machine, day, base, input));
+        unitByKey.set(`${saved.usageDate}|${saved.machineCode}`, saved);
+        if (kind === "unit") input.dataset.rawValue = saved[field] === null || saved[field] === undefined ? "" : String(saved[field]);
       }
-    }
 
-    if (kind === "raw") {
-      const existing = findRaw(currentMonth, normalizedDay);
-      const meta = monthMeta();
-      const payload = {
-        ...meta,
-        day: normalizedDay,
-        [field]: asNumber(editableRawValue(input)),
-      };
-      const saved = await upsert(DB_TABLE_UNIT_RAW, payload, existing?.id);
-      if (saved) {
-        const index = rawRows.findIndex((rowItem) => rowItem.id === saved.id);
-        if (index >= 0) rawRows[index] = saved;
-        else rawRows.push(saved);
+      if (kind === "raw") {
+        const base = (await fetchFreshCommon(usageDate)) || findRaw(currentMonth, normalizedDay);
+        const saved = await API.post("/unit-daily-commons", buildCommonBody(usageDate, day, base, input));
+        commonByDate.set(saved.usageDate, saved);
+        input.dataset.rawValue = saved[field] === null || saved[field] === undefined ? "" : String(saved[field]);
       }
+    } catch (error) {
+      console.error("스팀사용 원단위 저장 실패", error);
+      alert(`저장 실패: ${error.message || error}`);
+      return;
     }
 
     const table = input.closest("table");
@@ -1062,7 +1046,7 @@
         });
       }
 
-      if (input.dataset.field === "production_type") {
+      if (input.dataset.field === "productionType") {
         input.addEventListener("focus", () => openProductionTypeDropdown(input));
         input.addEventListener("click", () => openProductionTypeDropdown(input));
         input.addEventListener("blur", () => closeProductionTypeDropdown(input));
@@ -1095,12 +1079,12 @@
   async function ensureLoaded() {
     const year = String(yearSelect.value);
     if (loaded && loadedYear === year) return;
-    const range = { fromMonth: `${year}-01`, toMonth: `${year}-12` };
-    const [units, raws] = await Promise.all([fetchAllPages(DB_TABLE_UNIT, range), fetchAllPages(DB_TABLE_UNIT_RAW, range)]);
-    unitRows.length = 0;
-    rawRows.length = 0;
-    unitRows.push(...units);
-    rawRows.push(...raws);
+    try {
+      await loadYear(year);
+    } catch (error) {
+      console.error("스팀사용 원단위 조회 실패", error);
+      alert(`조회 실패: ${error.message || error}`);
+    }
     loaded = true;
     loadedYear = year;
   }
@@ -1123,22 +1107,26 @@
 
     try {
       await flushDirtyInputs();
+      const year = uploadYearSelect?.value || yearSelect.value;
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("year", uploadYearSelect?.value || yearSelect.value);
 
-      const response = await fetch("/tables/unit-usage/import-excel", {
+      const response = await fetch(`/steam-energy-api/unit-log/import-excel?year=${encodeURIComponent(year)}`, {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) { throw new Error(await window.ExcelUploadErrors?.message(response) || "엑셀 업로드에 실패했습니다."); }
+      const result = (await response.json())?.data || {};
 
       resetLoadedState();
       await render();
-      alert("?묒? ?낅줈?쒓? ?꾨즺?섏뿀?듬땲??");
+      const lines = [`엑셀 업로드가 완료되었습니다. (${result.year ?? year}년, 시트 ${(result.sheets || []).length}개)`,
+        `호기별 ${result.unitRows ?? 0}건 · 공통값 ${result.commonRows ?? 0}건 · LNG ${result.lngRows ?? 0}건 · 스팀 구매 ${result.fuelRows ?? 0}건`];
+      if (result.notFound && result.notFound.length) lines.push(`찾지 못한 칸: ${result.notFound.join(", ")}`);
+      alert(lines.join("\n"));
     } catch (error) {
-      alert(error instanceof Error ? error.message : "?묒? ?낅줈??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+      alert(error instanceof Error ? error.message : "엑셀 처리 중 오류가 발생했습니다.");
     } finally {
       uploadInFlight = false;
       if (unitExcelUploadButton) {
@@ -1189,7 +1177,7 @@
     try {
       await downloadUnitExcel();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "?묒? ?ㅼ슫濡쒕뱶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+      alert(error instanceof Error ? error.message : "엑셀 처리 중 오류가 발생했습니다.");
     }
   });
 
