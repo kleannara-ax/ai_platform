@@ -5,60 +5,16 @@
  *  - 단가 연동(applyPriceLink): 단가를 고치면 그 달 전체 일자에 일괄 적용한다.
  *      · 전환된 일별 표(LNG·스팀 구매 일일 사용량)는 서버가 한다: POST /steam-energy-api/prices/apply-daily
  *      · 아직 전환되지 않은 화면(세부 운영내역·도급내역·Invoice Summary)은 옛 셀 저장소에 칸 단위로 쓴다.
- *  - [옛 경로] ITEMS / fetchRegistered / saveRegistered / applyToDaily / wireApplyButton 은 유동상·소각로·복합 일일 사용량
- *    화면이 아직 옛 셀 저장소를 쓰는 동안만 남긴다 (그 화면 전환 때 제거).
+ *  - 옛 셀 저장소 경로(ITEMS / fetchRegistered / saveRegistered / applyToDaily / wireApplyButton)는 2026-11-20 제거.
  */
 (function (global) {
   "use strict";
 
   var TABLES_BASE = "/tables";
   var CELL_TABLE = "steam_cell_value";
-  var REGISTRY_TABLE = "unit_price";
-
-  // 연료 단가 6종. table/col = daily 그리드 셀 위치, todayInput = today-entry 입력 id.
-  var ITEMS = [
-    { code: "lng_boiler",       label: "LNG 보일러 단가",   unit: "원/N㎥", table: "lng_m_boiler",             col: 5, todayInput: "lngBoilerPrice" },
-    { code: "lng_burner",       label: "LNG 버너 단가",     unit: "원/N㎥", table: "lng_m_burner",             col: 6, todayInput: "lngBurnerPrice" },
-    { code: "flow_fluid",       label: "유동상 단가",        unit: "원/톤",  table: "flow_m_fluid_incinerator", col: 1, todayInput: "flowFluidPrice" },
-    { code: "flow_incinerator", label: "폐합성소각로 단가",  unit: "원/톤",  table: "flow_m_fluid_incinerator", col: 4, todayInput: "flowIncineratorPrice" },
-    { code: "flow_combined",    label: "복합 단가",          unit: "원/톤",  table: "flow_m_combined",          col: 1, todayInput: "flowCombinedPrice" },
-    { code: "flow_boiler",      label: "외부보일러 단가",    unit: "원/톤",  table: "flow_m_boiler",            col: 1, todayInput: "flowBoilerPrice" },
-  ];
 
   function pad2(n) { n = Number(n); return (n < 10 ? "0" : "") + n; }
   function daysInMonth(year, month) { return new Date(Number(year), Number(month), 0).getDate(); }
-
-  // [옛 경로] 셀 저장소의 등록 단가 조회 → { itemCode: { monthNo: "value" } } — 유동상·소각로·복합 일일 사용량 전환 때 제거.
-  function fetchRegistered(year, table) {
-    var tbl = table || REGISTRY_TABLE;
-    var url = TABLES_BASE + "/" + CELL_TABLE + "?page=1&limit=100000&month=" +
-      encodeURIComponent(String(year)) + "&tableNames=" + tbl;
-    return fetch(url)
-      .then(function (r) { return r.ok ? r.json() : { data: [] }; })
-      .then(function (j) {
-        var map = {};
-        (j.data || []).forEach(function (row) {
-          if (row.table_name !== tbl) return;
-          var code = row.row_key;
-          var m = Number(row.col_index);
-          (map[code] = map[code] || {})[m] = row.cell_value;
-        });
-        return map;
-      });
-  }
-
-  // [옛 경로] 셀 저장소에 등록 단가 저장 — 위와 같이 제거 예정.
-  function saveRegistered(year, code, monthNo, value, table) {
-    return fetch(TABLES_BASE + "/" + CELL_TABLE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        month: String(year), year_no: Number(year), month_no: Number(monthNo),
-        table_name: table || REGISTRY_TABLE, row_key: code, col_index: Number(monthNo),
-        cell_value: (value == null ? "" : String(value).replace(/[,\s]/g, "")),
-      }),
-    }).then(function (r) { if (!r.ok) throw new Error("저장 실패"); return r.json(); });
-  }
 
   // ── 규격 API (steam_price) ──────────────────────────────────────
   function api() {
@@ -99,33 +55,6 @@
   function registeredValue(reg, code, monthNo) {
     var v = (reg && reg[code]) ? reg[code][Number(monthNo)] : undefined;
     return (v == null || v === "") ? null : v;
-  }
-
-  // daily 그리드: (연,월)의 등록 단가를 그 달 전체 일자 단가 셀에 일괄 upsert.
-  //  items: ITEMS 부분집합. 반환: { applied: 적용항목수, skipped: 미등록항목 [label...] }
-  function applyToDaily(items, year, month, reg) {
-    var ym = String(year) + "-" + pad2(month);
-    var days = daysInMonth(year, month);
-    var tasks = [];
-    var applied = 0;
-    var skipped = [];
-    items.forEach(function (item) {
-      var v = registeredValue(reg, item.code, month);
-      if (v == null) { skipped.push(item.label); return; }
-      applied += 1;
-      for (var d = 1; d <= days; d++) {
-        tasks.push(fetch(TABLES_BASE + "/" + CELL_TABLE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            month: ym, year_no: Number(year), month_no: Number(month),
-            table_name: item.table, row_key: pad2(d), col_index: item.col,
-            cell_value: String(v),
-          }),
-        }));
-      }
-    });
-    return Promise.all(tasks).then(function () { return { applied: applied, skipped: skipped }; });
   }
 
   // ── 단가 연동 ─────────────────────────────────────────────────────
@@ -283,8 +212,6 @@
   }
 
   global.UnitPrice = {
-    ITEMS: ITEMS,
-    REGISTRY_TABLE: REGISTRY_TABLE,
     PRICE_LINKS: PRICE_LINKS,
     priceLink: priceLink,
     applyPriceLink: applyPriceLink,
@@ -293,43 +220,6 @@
     applyPriceDaily: applyPriceDaily,
     pad2: pad2,
     daysInMonth: daysInMonth,
-    fetchRegistered: fetchRegistered,
-    saveRegistered: saveRegistered,
     registeredValue: registeredValue,
-    applyToDaily: applyToDaily,
-    itemsForTables: function (tableNames) {
-      return ITEMS.filter(function (it) { return tableNames.indexOf(it.table) !== -1; });
-    },
-
-    // daily 페이지(filterYear/filterMonth 사용)의 "단가 적용" 버튼 배선.
-    //  buttonId 버튼 클릭 → 조회 연/월의 등록단가를 그 달 전체 일자 단가 셀에 적용 후 새로고침.
-    wireApplyButton: function (buttonId, tables) {
-      var btn = document.getElementById(buttonId);
-      if (!btn) return;
-      var items = ITEMS.filter(function (it) { return tables.indexOf(it.table) !== -1; });
-      btn.addEventListener("click", function () {
-        var yearSel = document.getElementById("filterYear");
-        var monthSel = document.getElementById("filterMonth");
-        var year = Number(yearSel && yearSel.value);
-        var month = Number(monthSel && monthSel.value);
-        if (!year || !month) { alert("조회 연/월을 먼저 선택하세요."); return; }
-        if (!confirm(year + "년 " + month + "월 등록 단가를 이 달 전체 일자의 단가 칸에 적용할까요?\n(해당 월 기존 단가는 덮어씁니다)")) return;
-        var prev = btn.textContent;
-        btn.disabled = true; btn.textContent = "적용 중…";
-        fetchRegistered(year)
-          .then(function (reg) { return applyToDaily(items, year, month, reg); })
-          .then(function (res) {
-            if (!res.applied) {
-              btn.disabled = false; btn.textContent = prev;
-              alert("이 달에 등록된 단가가 없습니다.\n먼저 '단가 입력' 페이지에서 등록하세요.");
-              return;
-            }
-            try { localStorage.setItem("steamlog:shared-period", JSON.stringify({ year: year, month: pad2(month) })); } catch (e) {}
-            btn.textContent = "적용됨 · 새로고침";
-            global.location.reload();
-          })
-          .catch(function () { btn.disabled = false; btn.textContent = prev; alert("단가 적용 실패"); });
-      });
-    },
   };
 })(window);

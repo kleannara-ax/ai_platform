@@ -1,3 +1,9 @@
+/* 유동상/소각로/외부/복합 일일 사용량 — 규격 표 steam_fuel_daily_usage (/steam-energy-api/fuel-daily-usages) 를 읽고 쓴다.
+ *  - 2026-11 규격 전환: 옛 셀 저장소(flow_m_fluid_incinerator / flow_m_combined / flow_m_boiler) 대신 일자별 행 하나.
+ *    화면 표·열 구조는 그대로 두고 (tableName, colIndex) 를 컬럼 이름으로 바꿔 저장한다 (FIELD_MAP).
+ *  - 저장은 칸 단위가 아니라 그 날의 행 전체 업서트(POST). 비용·스팀구매비·총합 표는 화면 계산만 한다.
+ *  - '단가 적용'은 서버 POST /prices/apply-daily (유동상·폐합성). 복합·외부보일러 단가는 직접 입력.
+ */
 document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "unit-flow-daily.html") return;
@@ -7,11 +13,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitButton = document.getElementById("filterSubmit");
   if (!yearSelect || !monthSelect) return;
 
-  const CELL_TABLE = "steam_cell_value";
+  const API = window.SteamEnergyApi;
+  if (!API) { console.error("steam-energy-api.js 가 로드되지 않았습니다."); return; }
   const DAILY_ROW_COUNT = 31;
-  const cellRows = [];
+  // 일자('YYYY-MM-DD') → steam_fuel_daily_usage 행 (GET /steam-energy-api/fuel-daily-usages 응답)
+  const rowsByDate = new Map();
   let loaded = false;
   let loadedMonth = "";
+
+  // 화면 표(옛 논리 표 이름 유지)·열 → 규격 표 컬럼. 비용·스팀구매비·총합 표는 계산만 하고 저장하지 않는다.
+  const FIELD_MAP = {
+    flow_m_fluid_incinerator: { 0: "fluidSteamTon", 1: "fluidUnitPrice", 3: "incineratorSteamTon", 4: "incineratorUnitPrice" },
+    flow_m_combined: { 0: "combinedSteamTon", 1: "combinedUnitPrice", 3: "combinedDeduction" },
+    flow_m_boiler: { 0: "extBoilerSteamTon", 1: "extBoilerUnitPrice", 3: "extBoilerDeduction" },
+    flow_m_summary: {},
+  };
+  const SAVED_FIELDS = Object.values(FIELD_MAP).flatMap((m) => Object.values(m));
+  function fieldOf(tableName, colIndex) { return (FIELD_MAP[tableName] || {})[Number(colIndex)] || null; }
   const dirtyInputs = new Set();
   const pendingSaveTimers = new WeakMap();
 
@@ -28,12 +46,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${year}-${month}`;
   }
 
-  function monthMeta(year = yearSelect.value, month = monthSelect.value) {
-    return {
-      month: `${year}-${month}`,
-      year_no: Number(year),
-      month_no: Number(month),
-    };
+  function isoDateOfDay(day) {
+    return API.isoDate(Number(yearSelect.value), Number(monthSelect.value), Number(day));
   }
 
   function daysInMonth() {
@@ -84,67 +98,54 @@ document.addEventListener("DOMContentLoaded", () => {
     return (MONTHLY_READONLY[tableName] || []).includes(colIndex);
   }
 
-  async function fetchPaged(tableName, month = "") {
-    const data = [];
-    let pageNo = 1;
-    let totalPages = 1;
-    while (pageNo <= totalPages) {
-      const monthQuery = month ? `&month=${encodeURIComponent(month)}` : "";
-      const response = await fetch(`tables/${tableName}?page=${pageNo}&limit=500${monthQuery}`);
-      if (!response.ok) break;
-      const payload = await response.json();
-      const pageData = payload.data || [];
-      const total = payload.total || pageData.length;
-      const limit = payload.limit || 500;
-      totalPages = Math.max(1, Math.ceil(total / limit));
-      data.push(...pageData);
-      pageNo += 1;
-    }
-    return data;
+  async function fetchMonthRows() {
+    const year = Number(yearSelect.value);
+    const month = Number(monthSelect.value);
+    return API.get(`/fuel-daily-usages?year=${year}&month=${month}`);
   }
 
-  function getCellRow(tableName, month, rowKey, colIndex) {
-    return cellRows.find((row) => row.table_name === tableName && row.month === month && String(row.row_key) === String(rowKey) && Number(row.col_index) === colIndex) || null;
+  // 화면 값: 규격 표 행의 컬럼 값 (없으면 빈 문자열). month 인자는 옛 호출 모양을 맞추기 위한 것으로 쓰지 않는다.
+  function getCellValue(tableName, _month, rowKey, colIndex) {
+    const field = fieldOf(tableName, colIndex);
+    if (!field) return "";
+    const row = rowsByDate.get(isoDateOfDay(rowKey));
+    const value = row ? row[field] : null;
+    return value === null || value === undefined ? "" : String(value);
   }
 
-  function getCellValue(tableName, month, rowKey, colIndex) {
-    return getCellRow(tableName, month, rowKey, colIndex)?.cell_value ?? "";
-  }
-
-  async function upsertCell(payload, existingId) {
-    const url = existingId ? `tables/${CELL_TABLE}/${existingId}` : `tables/${CELL_TABLE}`;
-    const method = existingId ? "PATCH" : "POST";
-    const response = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(existingId ? payload : { table_name: CELL_TABLE, ...payload }),
+  // 그 날의 저장 대상 입력칸 전부(세 표)를 모아 행 하나로 보낸다 — 행 전체 업서트.
+  //  changedInput: 지금 저장을 일으킨 칸 — 포커스 여부와 상관없이 현재 입력값을 쓴다.
+  function buildRowRequest(rowKey, changedInput) {
+    const usageDate = isoDateOfDay(rowKey);
+    const base = rowsByDate.get(usageDate) || {};
+    const body = { usageDate };
+    SAVED_FIELDS.forEach((field) => { body[field] = base[field] === undefined ? null : base[field]; });
+    Object.keys(FIELD_MAP).forEach((tableName) => {
+      Object.entries(FIELD_MAP[tableName]).forEach(([col, field]) => {
+        const input = document.querySelector(`input[data-table-name="${tableName}"][data-row-key="${rowKey}"][data-col-index="${col}"]`);
+        if (input) body[field] = API.num(input === changedInput ? normalizeEditableValue(input.value) : editableRawValue(input));
+      });
     });
-    if (!response.ok) return null;
-    return response.json();
+    return body;
   }
 
   async function saveCell(input) {
     if (!input || input.readOnly || input.classList.contains("calc-input")) return;
     const tableName = input.dataset.tableName;
     const rowKey = input.dataset.rowKey;
-    const colIndex = Number(input.dataset.colIndex);
-    if (!tableName || !rowKey || !Number.isFinite(colIndex)) return;
+    if (!fieldOf(tableName, input.dataset.colIndex) || !rowKey || rowKey === "total" || rowKey === "avg") return;
+    if (Number(rowKey) > daysInMonth()) return;
 
-    const payload = {
-      ...monthMeta(),
-      table_name: tableName,
-      row_key: rowKey,
-      col_index: colIndex,
-      cell_value: editableRawValue(input),
-    };
-    const existing = getCellRow(tableName, payload.month, rowKey, colIndex);
-    const saved = await upsertCell(payload, existing?.id);
-    if (!saved) return;
-
-    const index = cellRows.findIndex((row) => row.id === saved.id);
-    if (index >= 0) cellRows[index] = saved;
-    else cellRows.push(saved);
-    input.dataset.rawValue = normalizeEditableValue(saved.cell_value);
+    try {
+      const saved = await API.post("/fuel-daily-usages", buildRowRequest(rowKey, input));
+      rowsByDate.set(saved.usageDate, saved);
+      const field = fieldOf(tableName, input.dataset.colIndex);
+      const value = saved[field];
+      input.dataset.rawValue = value === null || value === undefined ? "" : String(value);
+    } catch (error) {
+      console.error("일일 사용량 저장 실패", error);
+      window.alert(`저장 실패: ${error.message || error}`);
+    }
   }
 
   function buildInput(tableName, rowKey, colIndex, value, forceReadonly = false) {
@@ -395,15 +396,61 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  async function ensureLoaded() {
+  async function ensureLoaded(force = false) {
     const currentMonth = monthKey();
-    if (loaded && loadedMonth === currentMonth) return;
-    const cells = await fetchPaged(CELL_TABLE, currentMonth);
-    cellRows.length = 0;
-    cellRows.push(...cells);
+    if (!force && loaded && loadedMonth === currentMonth) return;
+    let rows = [];
+    try {
+      rows = await fetchMonthRows();
+    } catch (error) {
+      console.error("일일 사용량 조회 실패", error);
+      window.alert(`조회 실패: ${error.message || error}`);
+    }
+    rowsByDate.clear();
+    rows.forEach((row) => rowsByDate.set(row.usageDate, row));
     loaded = true;
     loadedMonth = currentMonth;
   }
+
+  // '단가 적용': 단가 입력에 등록된 이번 달 유동상(fluid_steam)·폐합성(waste2_steam) 단가를
+  // 서버가 그 달 전체 일자의 단가 칸에 넣는다 (POST /prices/apply-daily). 복합·외부보일러 단가는 여기서 직접 입력한다.
+  const APPLY_PRICE_ITEMS = [
+    { code: "fluid_steam", label: "유동상 단가" },
+    { code: "waste2_steam", label: "폐합성소각로 단가" },
+  ];
+  async function applyRegisteredPrices() {
+    const year = Number(yearSelect.value);
+    const month = Number(monthSelect.value);
+    if (!year || !month) { window.alert("조회 연/월을 먼저 선택하세요."); return; }
+    if (!window.confirm(`${year}년 ${month}월 등록 단가(유동상·폐합성소각로)를 이 달 전체 일자의 단가 칸에 적용할까요?\n(해당 월 기존 단가는 덮어씁니다)`)) return;
+    const button = document.getElementById("applyPriceBtn");
+    const prevText = button?.textContent;
+    if (button) { button.disabled = true; button.textContent = "적용 중…"; }
+    await flushDirtyInputs();
+    const applied = [];
+    const skipped = [];
+    for (const item of APPLY_PRICE_ITEMS) {
+      try {
+        const result = await API.post("/prices/apply-daily", { yearNo: year, monthNo: month, itemCode: item.code });
+        if (result && result.hasDailyTarget) applied.push(`${item.label} ${result.appliedDays}일`);
+        else skipped.push(item.label);
+      } catch (error) {
+        skipped.push(`${item.label}(${error.message || "실패"})`);
+      }
+    }
+    if (button) { button.disabled = false; button.textContent = prevText; }
+    await ensureLoaded(true);
+    document.querySelectorAll('[data-cell-table][data-row-mode="daily"]').forEach(renderMonthlyTable);
+    recalcAll();
+    bindInputs();
+    applyDataAlignment();
+    if (!applied.length) {
+      window.alert("이 달에 등록된 단가가 없습니다.\n먼저 '단가 입력' 페이지에서 등록하세요.\n" + skipped.join(", "));
+    } else if (skipped.length) {
+      window.alert(`적용: ${applied.join(", ")}\n미등록: ${skipped.join(", ")}`);
+    }
+  }
+  document.getElementById("applyPriceBtn")?.addEventListener("click", applyRegisteredPrices);
 
   async function render() {
     await ensureLoaded();
