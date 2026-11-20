@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function fetchRows() {
-    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`);
+    const response = await window.RecordStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=2000&month=${encodeURIComponent(monthKey())}`);
     if (!response.ok) {
       cellRows = [];
       return;
@@ -299,7 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function upsertCell(payload, existingId) {
     const url = existingId ? `${TABLES_BASE}/${CELL_TABLE}/${existingId}` : `${TABLES_BASE}/${CELL_TABLE}`;
-    const response = await fetch(url, {
+    const response = await window.RecordStore.fetch(url, {
       method: existingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -309,7 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function deleteRowGroup(currentRowKey) {
-    const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}/row-group?month=${encodeURIComponent(monthKey())}&rowKey=${encodeURIComponent(currentRowKey)}`, {
+    const response = await window.RecordStore.fetch(`${TABLES_BASE}/${CELL_TABLE}/row-group?month=${encodeURIComponent(monthKey())}&rowKey=${encodeURIComponent(currentRowKey)}`, {
       method: "DELETE",
     });
     if (!response.ok) return false;

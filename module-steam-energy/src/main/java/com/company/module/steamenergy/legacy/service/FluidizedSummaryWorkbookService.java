@@ -2,6 +2,7 @@ package com.company.module.steamenergy.legacy.service;
 
 import com.company.module.steamenergy.legacy.db.TableService;
 import com.company.module.steamenergy.service.table.FluidizedCellStore;
+import com.company.module.steamenergy.service.table.RecordCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -81,12 +82,17 @@ public class FluidizedSummaryWorkbookService {
     private final FluidizedCellStore store;
     /** 가져오기 중 읽은 규격 표 칸을 모아 두는 곳 — 가져오기 메서드가 synchronized 라 한 번에 한 파일만 쓴다 */
     private List<FluidizedCellStore.Cell> pending = new ArrayList<>();
+    /** 사고·정비·설비개선 목록은 규격 표 (RecordCellStore) */
+    private final RecordCellStore recordStore;
+    private List<RecordCellStore.Cell> pendingRecords = new ArrayList<>();
 
     public FluidizedSummaryWorkbookService(TableService tableService,
                                            FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
                                            SheetMetadataLoader sheetMetadataLoader,
-                                           FluidizedCellStore store) {
+                                           FluidizedCellStore store,
+                                           RecordCellStore recordStore) {
         this.store = store;
+        this.recordStore = recordStore;
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
         this.sheetMetadataLoader = sheetMetadataLoader;
@@ -411,6 +417,7 @@ public class FluidizedSummaryWorkbookService {
 
     public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
         pending = new ArrayList<>();
+        pendingRecords = new ArrayList<>();
         int importedPlanRows = 0;
         int importedNoteRows = 0;
         int importedContractRows = 0;
@@ -443,6 +450,8 @@ public class FluidizedSummaryWorkbookService {
 
         store.apply(year, month, true, pending);
         pending = new ArrayList<>();
+        recordStore.replace(year, List.of(IMPROVEMENT_MONTHLY_PREFIX, IMPROVEMENT_ITEM_PREFIX, ACCIDENT_PREFIX, MAINTENANCE_PREFIX), pendingRecords);
+        pendingRecords = new ArrayList<>();
         return Map.of(
                 "year", year,
                 "month", String.format("%02d", month),
@@ -463,13 +472,7 @@ public class FluidizedSummaryWorkbookService {
         // DETAIL_MAIN_TABLE 은 사용자 정의 추가 행(row_key="custom|...") 을 보존한다.
         tableService.deleteTableCellValuesByTableExcludingRowKeyPrefixes(
                 selectedMonth, DETAIL_MAIN_TABLE, List.of("custom|"));
-        String yearMonth = yearAnchorKey(year).replace("-01", "-00");
-        tableService.deleteTableCellRowsByMonthAndPrefixes(yearMonth, List.of(
-                IMPROVEMENT_MONTHLY_PREFIX,
-                IMPROVEMENT_ITEM_PREFIX,
-                ACCIDENT_PREFIX,
-                MAINTENANCE_PREFIX
-        ));
+        // 사고·정비·설비개선 목록은 시트를 다 읽은 뒤 recordStore.replace 가 그 해의 유동상 목록을 파일 기준으로 바꾼다.
     }
 
     public Map<String, Object> detailActuals(int year) {
@@ -1232,10 +1235,10 @@ public class FluidizedSummaryWorkbookService {
         return mapped;
     }
 
-    /** 그 달의 셀 — 옛 셀(세부 운영내역 등) + 규격 표에서 옛 형식으로 편 것. 사고·개선 목록(YYYY-00)은 옛 셀 그대로. */
+    /** 그 달의 셀 — 옛 셀(세부 운영내역 등) + 규격 표에서 옛 형식으로 편 것. 사고·개선 목록(YYYY-00)은 규격 표(RecordCellStore)에서. */
     private List<Map<String, Object>> listCells(String monthKey) {
         List<Map<String, Object>> legacy = tableService.listAllByMonth("steam_cell_value", monthKey);
-        if (monthKey != null && monthKey.endsWith("-00")) return legacy;
+        if (monthKey != null && monthKey.endsWith("-00")) return recordStore.listByYear(Integer.parseInt(monthKey.substring(0, 4)));
         return store.mergeWithLegacy(legacy, monthKey);
     }
 
@@ -1248,6 +1251,11 @@ public class FluidizedSummaryWorkbookService {
             return 0;
         }
         String normalizedValue = normalizeUploadedValue(value);
+        if (month != null && month.endsWith("-00")) {
+            // 사고·정비·설비개선 목록 (옛 월 키 YYYY-00) — 모아 두었다가 한 번에 반영한다
+            pendingRecords.add(new RecordCellStore.Cell(rowKey, colIndex, normalizedValue));
+            return 1;
+        }
         if (FluidizedCellStore.TABLES.contains(tableName)) {
             // 규격 표로 가는 칸은 모아 두었다가 한 번에 반영한다
             pending.add(new FluidizedCellStore.Cell(tableName, month, rowKey, colIndex, normalizedValue));

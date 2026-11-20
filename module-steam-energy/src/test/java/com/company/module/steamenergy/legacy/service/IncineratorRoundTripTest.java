@@ -51,10 +51,10 @@ class IncineratorRoundTripTest {
         Assumptions.assumeTrue(Files.exists(path), "소각로 위탁운영비 원본이 없어 건너뜀");
         byte[] original = Files.readAllBytes(path);
         Store first = new Store();
-        new IncineratorWorkbookService(first, new FakeIncineratorCellStore(first)).importWorkbook(new MockMultipartFile("f", "f.xls", null, original), 2025, 10);
-        byte[] exported = new IncineratorWorkbookService(first, new FakeIncineratorCellStore(first)).exportWorkbook(2025, 10);
+        new IncineratorWorkbookService(new FakeIncineratorCellStore(first), new FakeIncineratorCellStore(first).records()).importWorkbook(new MockMultipartFile("f", "f.xls", null, original), 2025, 10);
+        byte[] exported = new IncineratorWorkbookService(new FakeIncineratorCellStore(first), new FakeIncineratorCellStore(first).records()).exportWorkbook(2025, 10);
         Store second = new Store();
-        new IncineratorWorkbookService(second, new FakeIncineratorCellStore(second)).importWorkbook(new MockMultipartFile("f", "f.xlsx", null, exported), 2025, 10);
+        new IncineratorWorkbookService(new FakeIncineratorCellStore(second), new FakeIncineratorCellStore(second).records()).importWorkbook(new MockMultipartFile("f", "f.xlsx", null, exported), 2025, 10);
 
         Map<String, String> a = first.snapshot(), b = second.snapshot();
         List<String> out = new ArrayList<>();

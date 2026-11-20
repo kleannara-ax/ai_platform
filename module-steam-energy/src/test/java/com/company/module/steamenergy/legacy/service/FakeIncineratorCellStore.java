@@ -20,6 +20,30 @@ class FakeIncineratorCellStore extends IncineratorCellStore {
         this.target = target;
     }
 
+    /** 사고·정비 이력용 가짜 — 같은 가짜 TableService 에 옛 형식(월 키 YYYY-00)으로 적고 읽는다. */
+    com.company.module.steamenergy.service.table.RecordCellStore records() {
+        return new com.company.module.steamenergy.service.table.RecordCellStore(null, null, null) {
+            @Override
+            public List<Map<String, Object>> listByYear(int year) {
+                return target.listAllByMonth("steam_cell_value", year + "-00");
+            }
+
+            @Override
+            public int replace(int year, List<String> prefixes, List<Cell> cells) {
+                for (Cell cell : cells) {
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("month", year + "-00");
+                    payload.put("table_name", "steam_cell_value");
+                    payload.put("row_key", cell.rowKey());
+                    payload.put("col_index", cell.col());
+                    payload.put("cell_value", cell.value());
+                    target.upsert("steam_cell_value", payload);
+                }
+                return cells.size();
+            }
+        };
+    }
+
     @Override
     public List<Map<String, Object>> listByMonthKey(String monthKey) {
         return target.listAllByMonth("steam_cell_value", monthKey);

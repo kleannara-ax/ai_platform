@@ -235,6 +235,9 @@ DELETE FROM steam_price
 | `steam_fluidized_contract_daily` | 유동상 소각로 도급비용 — 유동상 운영내역 › 운영실적 › 소각로 도급비용 (unit-fluidized-summary.html) (4개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
 | `steam_fluidized_srf_inbound_daily` | 유동상 SRF 입고내역 — 유동상 운영내역 › SRF(비성형) 입고내역 (unit-fluidized-srf-inbound.html) (10개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
 | `steam_fluidized_srf_rate` | 유동상 SRF 처리단가 — 유동상 운영내역 › SRF(비성형) 입고내역 › 처리단가 (unit-fluidized-srf-inbound.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_incident` | 사고·정비 이력 — 유동상 운영내역 › 사고이력 · SRF Boiler invoice › 사고이력 · 폐합성수지 소각로 › 사고이력 (unit-fluidized-accident.html, srf-boiler-invoice-accident.html, incinerator-accident.html) (9개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
+| `steam_fluidized_improvement_payment` | 유동상 설비개선 월별 비용 — 유동상 운영내역 › 설비개선 › 월별개선 (unit-fluidized-improvement.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
+| `steam_fluidized_improvement_item` | 유동상 설비개선 항목 — 유동상 운영내역 › 설비개선 › 항목개선 (unit-fluidized-improvement.html) (8개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1121,6 +1124,89 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 ### 데이터 이관
 
 `migration/2026-11-20_fluidized_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 월별 운영내역의 직접 입력값은 서버에 없던 값이라 SQL 로 옮길 수 없고, 화면을 열 때 브라우저에 남은 값을 올린다.
+
+## 사고·정비 이력 · 설비개선 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 3-E)
+
+사고이력 화면 3개(유동상 · SRF 보일러 · 폐합성수지 소각로)와 유동상 설비개선 화면을 옛 `steam_cell_value` (표 이름 `steam_cell_value`, 월 키 `YYYY-00`, 키 `접두어:번호`, col_index = 항목)에서 실제 컬럼 표 3개로 옮겼다. 건수가 변하는 목록이라 한 건이 한 행이다.
+화면은 `js/record-store.js` 가 옛 호출 모양(조회 · 칸 저장 · 행 삭제)을 받아 새 API 로 옮기고, 엑셀은 `service/table/RecordCellStore` 가 옮긴다.
+
+### 설계 규칙
+
+- `RECORD_KEY` 는 옛 키 그대로다 (`accident-record:` · `maintenance-record:` 유동상, `srf-accident-record:` SRF, `incinerator-accident-record:` · `incinerator-maintenance-record:` 소각로, `improvement-monthly:` · `improvement-item:` 설비개선). 접두어에서 `FACILITY` · `KIND` 를 채운다.
+- 일자 · 운휴시간 · 손실금액은 화면이 글자 입력 칸이라 입력한 그대로 둔다 (`3/16~17` 같은 범위가 실제로 있다). 지급액 · 사용액 · 계획비용 · 실비용은 숫자다.
+- 행 삭제는 그 기록 한 건만 소프트 삭제한다 — 예전 API 는 월 키와 키만 보고 지워서 표 이름을 가리지 않았다.
+- 엑셀 가져오기는 예전처럼 그 해의 해당 목록(유동상 워크북: 유동상 사고·정비·설비개선, 소각로 워크북: 소각로 사고·정비)만 파일 기준으로 바꾼다. 다른 시설의 기록은 건드리지 않는다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_incident`** — 사고·정비 이력 · 키 `(YEAR_NO, RECORD_KEY)` · 옛 저장소: `{accident,maintenance,srf-accident,incinerator-accident,incinerator-maintenance}-record:{번호}` 의 col 1 일자 · 2 사유 · 3 조치내역 · 4 운휴시간 · 5 손실금액 · 6 비고 · 7 정렬순서
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `RECORD_KEY` (키) | VARCHAR(80) | `recordKey` | 기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12) |
+| `FACILITY` | VARCHAR(20) | `facility` | 시설 (FLUIDIZED: 유동상 / SRF: SRF 보일러 / INCINERATOR: 폐합성수지 소각로) |
+| `KIND` | VARCHAR(20) | `kind` | 종류 (ACCIDENT: 사고 / MAINTENANCE: 정비) |
+| `OCCUR_DATE` | VARCHAR(100) | `occurDate` | 일자 — 입력한 글자 그대로 (예: 2025-02-16, 3/16~17) |
+| `REASON` | VARCHAR(1000) | `reason` | 사유 |
+| `ACTION_TAKEN` | VARCHAR(1000) | `actionTaken` | 조치내역 |
+| `DOWNTIME_HOURS` | VARCHAR(100) | `downtimeHours` | 운휴시간(Hr) — 입력한 글자 그대로 |
+| `LOSS_AMOUNT` | VARCHAR(100) | `lossAmount` | 손실금액(백만원) — 입력한 글자 그대로, 사고만 |
+| `NOTE` | VARCHAR(500) | `note` | 비고 |
+| `SORT_ORDER` | INT | `sortOrder` | 화면 정렬 순서 |
+
+**`steam_fluidized_improvement_payment`** — 유동상 설비개선 월별 비용 · 키 `(YEAR_NO, RECORD_KEY)` · 옛 저장소: `improvement-monthly:{번호}` 의 col 1 월 · 2 지급액 · 3 사용액 · 4 업체명 · 5 사용처 · 6 정렬순서
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `RECORD_KEY` (키) | VARCHAR(80) | `recordKey` | 기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12) |
+| `PAY_MONTH` | VARCHAR(10) | `payMonth` | 월 (01~12) |
+| `PAYMENT_AMOUNT` | DECIMAL(18,6) | `paymentAmount` | 지급액(원) |
+| `SPENT_AMOUNT` | DECIMAL(18,6) | `spentAmount` | 사용액(원) |
+| `VENDOR_NAME` | VARCHAR(200) | `vendorName` | 업체명 |
+| `USAGE_DESC` | VARCHAR(500) | `usageDesc` | 사용처 |
+| `SORT_ORDER` | INT | `sortOrder` | 화면 정렬 순서 |
+
+**`steam_fluidized_improvement_item`** — 유동상 설비개선 항목 · 키 `(YEAR_NO, RECORD_KEY)` · 옛 저장소: `improvement-item:{번호}` 의 col 1 구분 · 2 No. · 3 항목 · 4 계획비용 · 5 실비용 · 6 완료여부 · 7 비고 · 8 정렬순서
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `RECORD_KEY` (키) | VARCHAR(80) | `recordKey` | 기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12) |
+| `CATEGORY` | VARCHAR(50) | `category` | 구분 (설비개선 / 유지보수 / 추가 작업사항) |
+| `ITEM_NO` | VARCHAR(50) | `itemNo` | No. (화면에 보이는 번호, 글자) |
+| `ITEM_NAME` | VARCHAR(500) | `itemName` | 항목 |
+| `PLAN_COST` | DECIMAL(18,6) | `planCost` | 계획비용 |
+| `ACTUAL_COST` | DECIMAL(18,6) | `actualCost` | 실비용 |
+| `STATUS` | VARCHAR(50) | `status` | 완료여부 (완료 / 진행중 / 빈 값) |
+| `REMARK` | VARCHAR(500) | `remark` | 비고 |
+| `SORT_ORDER` | INT | `sortOrder` | 화면 정렬 순서 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/incidents?year=[&month=]` | 사고·정비 이력 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/incidents` | 행 전체 업서트 `(YEAR_NO, RECORD_KEY)` |
+| `PUT` | `/steam-energy-api/incidents/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/incidents/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-improvement-payments?year=[&month=]` | 유동상 설비개선 월별 비용 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-improvement-payments` | 행 전체 업서트 `(YEAR_NO, RECORD_KEY)` |
+| `PUT` | `/steam-energy-api/fluidized-improvement-payments/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-improvement-payments/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-improvement-items?year=[&month=]` | 유동상 설비개선 항목 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-improvement-items` | 행 전체 업서트 `(YEAR_NO, RECORD_KEY)` |
+| `PUT` | `/steam-energy-api/fluidized-improvement-items/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-improvement-items/{id}` | 단건 조회 · 소프트 삭제 |
+
+### 다른 화면과의 연동
+
+- 유동상 운영내역 워크북(`FluidizedSummaryWorkbookService`)의 `5. 설비개선…` · `6. 사고이력` 시트, 소각로 위탁운영비 워크북(`IncineratorWorkbookService`)의 `6. 사고이력` 시트가 이 표를 읽고 쓴다
+- 다른 화면이 이 표를 읽는 곳은 없다
+
+### 데이터 이관
+
+`migration/2026-11-20_record_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 값이 하나도 없는 빈 줄은 옮기지 않는다.
 
 ## 메뉴 / 권한
 

@@ -1,7 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
 import com.company.module.steamenergy.service.table.IncineratorCellStore;
+import com.company.module.steamenergy.service.table.RecordCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -84,22 +84,23 @@ public class IncineratorWorkbookService {
             {"cost-plan", "운영비 계획"}, {"cost-actual", "운영비 실적"}, {"cost-diff", "운영비 증감"}
     };
 
-    /** 사고이력(월 키 YYYY-00)만 아직 옛 셀 저장소를 쓴다 — 묶음 3-E 에서 옮긴다. */
-    private final TableService tableService;
+    /** 사고·정비 이력(옛 월 키 YYYY-00)은 규격 표 steam_incident (RecordCellStore) */
+    private final RecordCellStore recordStore;
+    private List<RecordCellStore.Cell> pendingRecords = new java.util.ArrayList<>();
     /** 도급내역·사업계획대비·가동실적·총 운영비용은 규격 표 (IncineratorCellStore 가 옛 키를 표의 행·컬럼으로 옮긴다) */
     private final IncineratorCellStore store;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
     /** 가져오기 중 읽은 칸을 모아 두는 곳 (옛 논리 표 이름 → 키 → 값) — importWorkbook 이 synchronized 라 한 번에 한 파일만 쓴다 */
     private Map<String, Map<String, String>> pending = new LinkedHashMap<>();
 
-    public IncineratorWorkbookService(TableService tableService, IncineratorCellStore store) {
-        this.tableService = tableService;
+    public IncineratorWorkbookService(IncineratorCellStore store, RecordCellStore recordStore) {
         this.store = store;
+        this.recordStore = recordStore;
     }
 
-    /** 월 키의 셀 목록 — 사고이력(YYYY-00)은 옛 셀, 나머지는 규격 표에서 옛 형식으로 편 것. */
+    /** 월 키의 셀 목록 — 규격 표에서 옛 형식으로 편 것 (사고·정비 이력은 YYYY-00). */
     private List<Map<String, Object>> listCells(String monthKey) {
-        if (monthKey != null && monthKey.endsWith("-00")) return tableService.listAllByMonth(CELL_TABLE, monthKey);
+        if (monthKey != null && monthKey.endsWith("-00")) return recordStore.listByYear(Integer.parseInt(monthKey.substring(0, 4)));
         return store.listByMonthKey(monthKey);
     }
 
@@ -936,7 +937,9 @@ public class IncineratorWorkbookService {
     @Transactional
     public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
         pending = new LinkedHashMap<>();
+        pendingRecords = new java.util.ArrayList<>();
         int contractRows = 0, planVsRows = 0, yoyRows = 0, opRows = 0, totalCostRows = 0, accidentRows = 0;
+        boolean importedAccidentSheet = false;
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet contractSheet = findSheet(workbook, "도급내역", 0);
@@ -962,7 +965,10 @@ public class IncineratorWorkbookService {
             if (yoySheet != null) yoyRows = 0;
             if (operationSheet != null) opRows = importOperationSheet(operationSheet, year);
             if (totalCostSheet != null) totalCostRows = importTotalCostSheet(totalCostSheet, year);
-            if (accidentSheet != null) accidentRows = importAccidentSheet(accidentSheet, year);
+            if (accidentSheet != null) {
+                accidentRows = importAccidentSheet(accidentSheet, year);
+                importedAccidentSheet = true;
+            }
         }
         int totalRows = contractRows + planVsRows + yoyRows + opRows + totalCostRows + accidentRows;
         if (totalRows <= 0) {
@@ -971,6 +977,9 @@ public class IncineratorWorkbookService {
         pending.remove(YOY_TABLE);
         store.replaceFromImport(year, month, pending);
         pending = new LinkedHashMap<>();
+        // 사고·정비 이력: 그 해의 소각로 기록을 파일 기준으로 바꾼다 (다른 시설의 기록은 그대로)
+        if (importedAccidentSheet) recordStore.replace(year, List.of(ACCIDENT_PREFIX, MAINTENANCE_PREFIX), pendingRecords);
+        pendingRecords = new java.util.ArrayList<>();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("year", year);
         result.put("month", month);
@@ -984,9 +993,7 @@ public class IncineratorWorkbookService {
     }
 
     private void clearImportTargets(int year, int month) {
-        // 사고이력: 매번 전체 갱신 (엑셀에 그 해 전부가 들어 있다)
-        String accidentMk = year + "-00";
-        tableService.deleteTableCellRowsByMonthAndPrefixes(accidentMk, List.of(ACCIDENT_PREFIX, MAINTENANCE_PREFIX));
+        // 지울 것이 없다 — 규격 표는 시트를 다 읽은 뒤 한 번에 파일 기준으로 바꾼다 (store.replaceFromImport, recordStore.replace).
     }
 
     private Sheet findSheet(Workbook workbook, String nameFragment, int fallbackIndex) {
@@ -1925,15 +1932,8 @@ public class IncineratorWorkbookService {
             pending.computeIfAbsent(tableName, key -> new LinkedHashMap<>()).put(rowKey, value);
             return 1;
         }
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("month", month);
-        payload.put("year_no", year);
-        payload.put("month_no", monthNo);
-        payload.put("table_name", tableName);
-        payload.put("row_key", rowKey);
-        payload.put("col_index", colIndex);
-        payload.put("cell_value", value);
-        tableService.upsert(CELL_TABLE, payload);
+        // 사고·정비 이력 (옛 표 이름 steam_cell_value, 월 키 YYYY-00)
+        pendingRecords.add(new RecordCellStore.Cell(rowKey, colIndex, value));
         return 1;
     }
 

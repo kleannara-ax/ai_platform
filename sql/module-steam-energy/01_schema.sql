@@ -1191,3 +1191,83 @@ CREATE TABLE IF NOT EXISTS steam_fluidized_srf_rate (
   COMMENT='[module-steam-energy] 유동상 SRF(비성형) 처리단가 — 업체 칸 10개 (연/월별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_SRF_RATE_DELETED_YN ON steam_fluidized_srf_rate (DELETED_YN);
 
+
+-- ============================================================
+-- 13) 사고·정비 이력 · 유동상 설비개선 (2026-11 규격 전환, 묶음 3-E)
+--    옛 steam_cell_value (표 이름 steam_cell_value, 월 키 YYYY-00, 키 접두어:번호) 의 목록을 대체한다. 한 건 한 행.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS steam_incident (
+    INCIDENT_ID     BIGINT        NOT NULL AUTO_INCREMENT COMMENT '사고·정비 이력 ID (PK)',
+    YEAR_NO         INT           NOT NULL COMMENT '연도',
+    RECORD_KEY      VARCHAR(80)   NOT NULL COMMENT '기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12)',
+    FACILITY        VARCHAR(20)   NULL COMMENT '시설 (FLUIDIZED: 유동상 / SRF: SRF 보일러 / INCINERATOR: 폐합성수지 소각로)',
+    KIND            VARCHAR(20)   NULL COMMENT '종류 (ACCIDENT: 사고 / MAINTENANCE: 정비)',
+    OCCUR_DATE      VARCHAR(100)  NULL COMMENT '일자 — 입력한 글자 그대로 (예: 2025-02-16, 3/16~17)',
+    REASON          VARCHAR(1000) NULL COMMENT '사유',
+    ACTION_TAKEN    VARCHAR(1000) NULL COMMENT '조치내역',
+    DOWNTIME_HOURS  VARCHAR(100)  NULL COMMENT '운휴시간(Hr) — 입력한 글자 그대로',
+    LOSS_AMOUNT     VARCHAR(100)  NULL COMMENT '손실금액(백만원) — 입력한 글자 그대로, 사고만',
+    NOTE            VARCHAR(500)  NULL COMMENT '비고',
+    SORT_ORDER      INT           NULL COMMENT '화면 정렬 순서',
+    CREATED_AT      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY      BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT      DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY      BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN      CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT      DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY      BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (INCIDENT_ID),
+    CONSTRAINT UK_STEAM_INCIDENT_KEY UNIQUE (YEAR_NO, RECORD_KEY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 사고·정비 이력 — 유동상 · SRF 보일러 · 폐합성수지 소각로 (연도 · 기록별, 한 건 한 행)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_INCIDENT_DELETED_YN ON steam_incident (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_improvement_payment (
+    IMPROVEMENT_PAYMENT_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 설비개선 월별 비용 ID (PK)',
+    YEAR_NO                 INT           NOT NULL COMMENT '연도',
+    RECORD_KEY              VARCHAR(80)   NOT NULL COMMENT '기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12)',
+    PAY_MONTH               VARCHAR(10)   NULL COMMENT '월 (01~12)',
+    PAYMENT_AMOUNT          DECIMAL(18,6) NULL COMMENT '지급액(원)',
+    SPENT_AMOUNT            DECIMAL(18,6) NULL COMMENT '사용액(원)',
+    VENDOR_NAME             VARCHAR(200)  NULL COMMENT '업체명',
+    USAGE_DESC              VARCHAR(500)  NULL COMMENT '사용처',
+    SORT_ORDER              INT           NULL COMMENT '화면 정렬 순서',
+    CREATED_AT              DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY              BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT              DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY              BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN              CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT              DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY              BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (IMPROVEMENT_PAYMENT_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_IMPROVEMENT_PAYMENT_KEY UNIQUE (YEAR_NO, RECORD_KEY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 설비개선 비용현황 — 월별 지급·사용 내역 (연도 · 기록별, 한 건 한 행)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_IMPROVEMENT_PAYMENT_DELETED_YN ON steam_fluidized_improvement_payment (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_fluidized_improvement_item (
+    IMPROVEMENT_ITEM_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '유동상 설비개선 항목 ID (PK)',
+    YEAR_NO              INT           NOT NULL COMMENT '연도',
+    RECORD_KEY           VARCHAR(80)   NOT NULL COMMENT '기록 키 (구분 접두어:번호 — 예: accident-record:1763600000000, improvement-item:xlsx-r12)',
+    CATEGORY             VARCHAR(50)   NULL COMMENT '구분 (설비개선 / 유지보수 / 추가 작업사항)',
+    ITEM_NO              VARCHAR(50)   NULL COMMENT 'No. (화면에 보이는 번호, 글자)',
+    ITEM_NAME            VARCHAR(500)  NULL COMMENT '항목',
+    PLAN_COST            DECIMAL(18,6) NULL COMMENT '계획비용',
+    ACTUAL_COST          DECIMAL(18,6) NULL COMMENT '실비용',
+    STATUS               VARCHAR(50)   NULL COMMENT '완료여부 (완료 / 진행중 / 빈 값)',
+    REMARK               VARCHAR(500)  NULL COMMENT '비고',
+    SORT_ORDER           INT           NULL COMMENT '화면 정렬 순서',
+    CREATED_AT           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY           BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT           DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY           BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN           CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT           DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY           BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (IMPROVEMENT_ITEM_ID),
+    CONSTRAINT UK_STEAM_FLUIDIZED_IMPROVEMENT_ITEM_KEY UNIQUE (YEAR_NO, RECORD_KEY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 유동상 설비개선 리스트 — 항목별 계획·실비용·완료여부 (연도 · 기록별, 한 건 한 행)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_IMPROVEMENT_ITEM_DELETED_YN ON steam_fluidized_improvement_item (DELETED_YN);
+
