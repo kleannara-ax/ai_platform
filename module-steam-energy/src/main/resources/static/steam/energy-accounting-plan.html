@@ -50,6 +50,9 @@
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
+  <script src="/steam/js/energy-store.js?v=20261120-spec2"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-accounting-plan">
   <main class="landing-main">
@@ -144,9 +147,9 @@
   <script>
   (function () {
     const SHARED_PERIOD_KEY = "steamlog:shared-period";
-    const TABLES_BASE = "/tables";
-    const CELL_TABLE = "steam_cell_value";
+    // 2026-11 규격 전환: steam_cell_value 대신 규격 표 (energy-store.js 가 옛 row_key/col_index 좌표로 감싼다)
     const PAGE_TABLE_NAME = "energy_accounting_plan";
+    const store = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);
     const yearSel = document.getElementById("invoiceYear");
     const searchBtn = document.getElementById("invoiceSearch");
     const mainTitle = document.getElementById("eapTitle");
@@ -239,12 +242,8 @@
     }
     async function fetchSavedRows(year) {
       storedRows.clear();
-      const params = new URLSearchParams({ month: String(year), tableNames: PAGE_TABLE_NAME, limit: "5000" });
-      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to load");
-      const payload = await response.json();
-      (payload.data || []).filter((r) => r.table_name === PAGE_TABLE_NAME)
-        .forEach((r) => storedRows.set(cellMapKey(r.row_key, Number(r.col_index)), r));
+      await store.load(year);
+      store.cells().forEach((r) => storedRows.set(cellMapKey(r.row_key, Number(r.col_index)), r));
     }
     // 표시용 정수 반올림 (DB/계산은 full precision 유지)
     function roundDisplay(v) {
@@ -273,17 +272,7 @@
       const value = String(input.value || "").trim();
       // 사용자가 변경 안 했으면(입력값 == 반올림된 원본) DB full precision 보존
       if (value === roundDisplay(input.dataset.rawValue || "")) return;
-      const payload = {
-        month: currentYear, year_no: Number(currentYear), month_no: 0,
-        table_name: PAGE_TABLE_NAME,
-        row_key: input.dataset.rowKey, col_index: Number(input.dataset.colIndex),
-        cell_value: value,
-      };
-      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error("Failed to save");
-      const saved = await response.json();
+      const saved = await store.set(input.dataset.rowKey, Number(input.dataset.colIndex), value);
       storedRows.set(cellMapKey(saved.row_key, Number(saved.col_index)), saved);
       input.dataset.rawValue = String(saved.cell_value || "");
     }
@@ -408,7 +397,45 @@
       if (__formulaTimer) clearTimeout(__formulaTimer);
       __formulaTimer = setTimeout(() => { __formulaTimer = null; applyFormulas(); }, delay === undefined ? 250 : delay);
     }
-    function applyFormulas() { applyOnce(); applyOnce(); }
+    function applyFormulas() { applyOnce(); applyOnce(); persistCalcRows(); }
+
+    // 다른 화면(연료비 요약)이 읽는 계산 행은 규격 표에도 저장한다 — r16·r17(제지·생활 연료비), r36·r37(참고 복합·제스코).
+    // 값이 달라진 칸만, 행 단위로 모아 보낸다 (energy-store.js setMany).
+    const PERSIST_ROW_IDXS = [15, 16, 35, 36];
+    let __persistQueue = Promise.resolve();
+    function persistCalcRows() {
+      if (!currentYear) return;
+      const jobs = [];
+      PERSIST_ROW_IDXS.forEach((rowIdx) => {
+        const row = getRow(rowIdx); if (!row) return;
+        const key = rowKeyFor(rowIdx);
+        const fixed = Array.from(row.children).findIndex((c) => c.classList.contains("value-cell") || c.classList.contains("calc-cell"));
+        if (fixed < 0) return;
+        for (let c = 1; c <= 13; c += 1) {
+          const span = row.children[fixed + c - 1]?.querySelector("span.efr-calc");
+          if (!span) continue;
+          const raw = span.dataset.raw || "";
+          const stored = storedRows.get(cellMapKey(key, c));
+          const storedValue = stored?.cell_value == null ? "" : String(stored.cell_value);
+          if (raw === storedValue) continue;
+          if (raw !== "" && storedValue !== "" && Number(raw) === Number(storedValue)) continue;
+          if (raw === "" && !stored) continue;
+          const cellValue = raw === "" ? null : raw;
+          jobs.push({ row_key: key, col_index: c, cell_value: cellValue });
+          storedRows.set(cellMapKey(key, c), { row_key: key, col_index: c, cell_value: cellValue });
+        }
+      });
+      if (!jobs.length) return;
+      __persistQueue = __persistQueue.then(async () => {
+        try {
+          const saved = await store.setMany(jobs);
+          saved.forEach((cell) => storedRows.set(cellMapKey(cell.row_key, Number(cell.col_index)), cell));
+        } catch (error) {
+          console.error("[eap] 계산값 저장 실패:", error);
+        }
+      });
+    }
+
     function applyOnce() {
       // col 1=prev Dec, col 2~13 = 1~12월
       for (let c = 1; c <= 13; c++) {
