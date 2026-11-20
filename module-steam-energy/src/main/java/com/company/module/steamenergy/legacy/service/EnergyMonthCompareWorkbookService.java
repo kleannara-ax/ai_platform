@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.energy.EnergyCellBridge;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,7 +44,6 @@ public class EnergyMonthCompareWorkbookService {
     private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
     private static final Pattern SHEET_NAME_PATTERN = Pattern.compile("회계비용\\s*마감과\\s*실마감\\s*비교");
-    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_month_compare";
 
     /**
@@ -96,12 +96,12 @@ public class EnergyMonthCompareWorkbookService {
     static final int MONTH_HEADER_ROW = 2;
     static final int FIRST_DATA_ROW = 3;
 
-    private final TableService tableService;
+    private final EnergyCellBridge bridge;   // 2026-11 규격 전환: 옛 셀 저장소 대신 실제 컬럼 표
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public EnergyMonthCompareWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public EnergyMonthCompareWorkbookService(EnergyCellBridge bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
@@ -127,7 +127,8 @@ public class EnergyMonthCompareWorkbookService {
     public int applyImport(Workbook workbook, int year) {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return 0;
-        tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
+        bridge.clearYear(PAGE_TABLE, year);
+        List<EnergyCellBridge.Cell> pending = new ArrayList<>();
         int imported = 0;
         EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, FIRST_DATA_ROW, MONTH_HEADER_ROW);
         Map<String, Integer> rows = resolveRows(index);
@@ -141,10 +142,11 @@ public class EnergyMonthCompareWorkbookService {
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
-                upsertCell(year, dbRowKey(map), colIndex, text);
+                pending.add(new EnergyCellBridge.Cell(dbRowKey(map), colIndex, text));
                 imported += 1;
             }
         }
+        imported = bridge.upsertCells(PAGE_TABLE, year, pending).saved();
         return imported;
     }
 
@@ -214,7 +216,7 @@ public class EnergyMonthCompareWorkbookService {
 
     private Map<String, String> loadCells(int year) {
         Map<String, String> out = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, String.valueOf(year))) {
+        for (Map<String, Object> row : bridge.cellsOf(PAGE_TABLE, year)) {
             if (!PAGE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rk = String.valueOf(row.get("row_key"));
             int ci = toInt(row.get("col_index"));
@@ -225,18 +227,6 @@ public class EnergyMonthCompareWorkbookService {
         return out;
     }
 
-    private void upsertCell(int year, String rowKey, int colIndex, String value) {
-        if (value == null || value.isBlank()) return;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", String.valueOf(year),
-                "year_no", year,
-                "month_no", 0,
-                "table_name", PAGE_TABLE,
-                "row_key", rowKey,
-                "col_index", colIndex,
-                "cell_value", value
-        ));
-    }
 
     private String readInputCellText(Cell cell) {
         if (cell == null) return null;

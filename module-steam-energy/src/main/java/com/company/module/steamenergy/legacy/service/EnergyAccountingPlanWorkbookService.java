@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.energy.EnergyCellBridge;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,7 +44,6 @@ public class EnergyAccountingPlanWorkbookService {
     // 시트명 패턴: "25년 회계비용 계획", "26년 회계비용 계획", "2025년 회계비용 계획" 등 모두 매칭
     private static final java.util.regex.Pattern SHEET_NAME_PATTERN =
             java.util.regex.Pattern.compile("\\d+년\\s*회계비용\\s*계획");
-    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_accounting_plan";
     private static final int HTML_ROW_COUNT = 32;
     private static final int HTML_TO_EXCEL_ROW_OFFSET = 2; // HTML r01 → Excel row 3 (이름을 못 찾을 때의 폴백)
@@ -94,12 +94,12 @@ public class EnergyAccountingPlanWorkbookService {
     private static final int MONTH_HEADER_ROW = 2;
 
 
-    private final TableService tableService;
+    private final EnergyCellBridge bridge;   // 2026-11 규격 전환: 옛 셀 저장소 대신 실제 컬럼 표
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public EnergyAccountingPlanWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public EnergyAccountingPlanWorkbookService(EnergyCellBridge bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
@@ -126,7 +126,8 @@ public class EnergyAccountingPlanWorkbookService {
     public int applyImport(Workbook workbook, int year) {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return 0;
-        tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
+        bridge.clearYear(PAGE_TABLE, year);
+        List<EnergyCellBridge.Cell> pending = new ArrayList<>();
         int imported = 0;
         EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS,
                 HTML_TO_EXCEL_ROW_OFFSET + 1, MONTH_HEADER_ROW);
@@ -140,10 +141,11 @@ public class EnergyAccountingPlanWorkbookService {
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
-                upsertCell(year, rowKey(htmlRow), colIndex, text);
+                pending.add(new EnergyCellBridge.Cell(rowKey(htmlRow), colIndex, text));
                 imported += 1;
             }
         }
+        imported = bridge.upsertCells(PAGE_TABLE, year, pending).saved();
         return imported;
     }
 
@@ -182,7 +184,7 @@ public class EnergyAccountingPlanWorkbookService {
 
     private Map<String, String> loadCells(int year) {
         Map<String, String> out = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, String.valueOf(year))) {
+        for (Map<String, Object> row : bridge.cellsOf(PAGE_TABLE, year)) {
             if (!PAGE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rk = String.valueOf(row.get("row_key"));
             int ci = toInt(row.get("col_index"));
@@ -193,18 +195,6 @@ public class EnergyAccountingPlanWorkbookService {
         return out;
     }
 
-    private void upsertCell(int year, String rowKey, int colIndex, String value) {
-        if (value == null || value.isBlank()) return;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", String.valueOf(year),
-                "year_no", year,
-                "month_no", 0,
-                "table_name", PAGE_TABLE,
-                "row_key", rowKey,
-                "col_index", colIndex,
-                "cell_value", value
-        ));
-    }
 
     private String readInputCellText(Cell cell) {
         if (cell == null) return null;
