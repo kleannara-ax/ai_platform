@@ -31,6 +31,7 @@ class SteamPriceApplyToDailyTest {
     private SteamPriceRepository priceRepository;
     private SteamLngDailyUsageRepository lngRepository;
     private SteamFuelDailyUsageRepository fuelRepository;
+    private com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository contractRepository;
     private SteamPriceService service;
 
     @BeforeEach
@@ -40,8 +41,12 @@ class SteamPriceApplyToDailyTest {
         fuelRepository = mock(SteamFuelDailyUsageRepository.class);
         when(lngRepository.save(any(SteamLngDailyUsage.class))).thenAnswer(inv -> inv.getArgument(0));
         when(fuelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        contractRepository = mock(com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository.class);
+        when(contractRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         service = new SteamPriceService(priceRepository,
-                new SteamLngDailyUsageService(lngRepository), new SteamFuelDailyUsageService(fuelRepository));
+                new SteamLngDailyUsageService(lngRepository), new SteamFuelDailyUsageService(fuelRepository),
+                new com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter(
+                        new SteamIncineratorContractDailyService(contractRepository)));
     }
 
     private static SteamPriceApplyRequest request(int year, int month, String itemCode) {
@@ -100,5 +105,19 @@ class SteamPriceApplyToDailyTest {
 
         when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "waste2_steam")).thenReturn(Optional.of(price("waste2_steam", null)));
         assertThrows(BusinessException.class, () -> service.applyToDaily(request(2026, 2, "waste2_steam")));
+    }
+
+    @Test
+    @DisplayName("waste1_fixed_hr 은 소각로 도급내역 그 달 모든 날의 1호기 운휴시간당 고정비에 들어간다")
+    void wasteFixedAppliesToContract() {
+        when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "waste1_fixed_hr"))
+                .thenReturn(java.util.Optional.of(price("waste1_fixed_hr", "155000")));
+        var response = service.applyToDaily(request(2026, 2, "waste1_fixed_hr"));
+        org.junit.jupiter.api.Assertions.assertTrue(response.isHasDailyTarget());
+        org.junit.jupiter.api.Assertions.assertEquals(28, response.getAppliedDays());
+        var captor = org.mockito.ArgumentCaptor.forClass(com.company.module.steamenergy.entity.SteamIncineratorContractDaily.class);
+        org.mockito.Mockito.verify(contractRepository, org.mockito.Mockito.times(28)).save(captor.capture());
+        org.junit.jupiter.api.Assertions.assertTrue(captor.getAllValues().stream()
+                .allMatch(row -> new BigDecimal("155000").compareTo(row.getU1Fixed()) == 0 && row.getU2Fixed() == null));
     }
 }

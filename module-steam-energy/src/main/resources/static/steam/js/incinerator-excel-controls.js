@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function downloadExcel() {
     const year = yearValue();
     const month = monthValue();
-    const res = await fetch(`/tables/incinerator/export-excel?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`);
+    const res = await fetch(`/steam-energy-api/incinerator-excel/export-excel?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`);
     if (!res.ok) {
       throw new Error(await responseMessage(res, "엑셀 다운로드에 실패했습니다."));
     }
@@ -79,15 +79,14 @@ document.addEventListener("DOMContentLoaded", () => {
       fd.append("year", uploadYear);
       fd.append("month", uploadMonth);
 
-      const res = await fetch("/tables/incinerator/import-excel", { method: "POST", body: fd });
+      const res = await fetch("/steam-energy-api/incinerator-excel/import-excel", { method: "POST", body: fd });
       if (!res.ok) {
         throw new Error(await responseMessage(res, "엑셀 업로드에 실패했습니다."));
       }
 
-      const result = await res.json().catch(() => ({}));
-      const importedRows = Object.entries(result)
-        .filter(([key]) => key.endsWith("_rows"))
-        .reduce((sum, [, value]) => sum + (Number(value) || 0), 0);
+      // 응답은 ApiResponse { data: { imported, contractRows, … } }
+      const result = ((await res.json().catch(() => ({}))) || {}).data || {};
+      const importedRows = Number(result.imported) || 0;
       if (importedRows <= 0) {
         throw new Error("업로드한 엑셀에서 반영할 데이터를 찾지 못했습니다. 다운로드한 양식의 시트와 셀 위치를 확인해주세요.");
       }

@@ -77,7 +77,7 @@ class IncineratorTitleImportTest {
         Assumptions.assumeTrue(path != null, "소각로 위탁운영비 원본이 없어 건너뜀");
         Recording store = new Recording();
         byte[] bytes = Files.readAllBytes(path);
-        new IncineratorWorkbookService(store).importWorkbook(new MockMultipartFile("f", "f.xls", null, bytes), 2025, 10);
+        new IncineratorWorkbookService(store, new FakeIncineratorCellStore(store)).importWorkbook(new MockMultipartFile("f", "f.xls", null, bytes), 2025, 10);
         return store;
     }
 

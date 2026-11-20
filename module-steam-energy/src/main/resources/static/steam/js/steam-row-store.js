@@ -24,7 +24,8 @@
   }
 
   function create(def) {
-    var Api = global.SteamEnergyApi;
+    // steam-energy-api.js 가 이 파일보다 뒤에 실려도 되게, 부를 때 찾는다
+    var Api = { get: function (p) { return global.SteamEnergyApi.get(p); }, post: function (p, b) { return global.SteamEnergyApi.post(p, b); } };
     var keyFields = def.keyFields;
     var rows = new Map();
     var scope = null;
@@ -57,9 +58,12 @@
       return Array.from(rows.values());
     }
 
-    /** 행 하나의 일부 칸을 고친다. patch = { 필드: 값(null 이면 비움) }. 저장된 행을 돌려준다. */
-    function save(key, patch) {
-      var s = scope;
+    /**
+     * 행 하나의 일부 칸을 고친다. patch = { 필드: 값(null 이면 비움) }. 저장된 행을 돌려준다.
+     * saveScope 를 주면 load 한 범위 대신 그 범위에서 최신 행을 읽는다 (load 없이 저장만 할 때).
+     */
+    function save(key, patch, saveScope) {
+      var s = saveScope ? { year: Number(saveScope.year), month: saveScope.month ? Number(saveScope.month) : null } : scope;
       return enqueue(async function () {
         var fresh = index(await Api.get(url(s)));
         var body = {};

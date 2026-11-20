@@ -750,3 +750,152 @@ CREATE TABLE IF NOT EXISTS steam_combo_plan (
   COMMENT='[module-steam-energy] 복합보일러·제스코 연간 계획과 LNG 사용량 (기준연도 · 대상 월별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_PLAN_DELETED_YN ON steam_combo_plan (DELETED_YN);
 
+
+-- ============================================================
+-- 10) 소각로 위탁 그룹 (2026-11 규격 전환, 묶음 3-B)
+--    옛 steam_cell_value 의 incinerator_contract / _plan_vs / _operation / _total_cost 를 대체한다.
+--    계산값(운영비용·운휴비용·소계·달성율·증감)은 저장하지 않는다. 전년대비는 저장하는 값이 없다.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS steam_incinerator_contract_daily (
+    CONTRACT_DAILY_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '소각로 도급내역 ID (PK)',
+    USAGE_DATE         DATE          NOT NULL COMMENT '일자',
+    U1_STEAM           DECIMAL(18,6) NULL COMMENT '결산 1호기 스팀량(톤/일)',
+    U1_UNIT            DECIMAL(18,6) NULL COMMENT '결산 1호기 운영단가(원/톤)',
+    U1_RUNTIME         DECIMAL(18,6) NULL COMMENT '결산 1호기 운휴시간(Hr) — 비어 있으면 화면·집계에서 24 로 본다',
+    U1_FIXED           DECIMAL(18,6) NULL COMMENT '결산 1호기 운휴시간당 고정비(원/시간) — 단가 입력 waste1_fixed_hr 이 그 달 모든 날에 기록',
+    U2_STEAM           DECIMAL(18,6) NULL COMMENT '결산 2호기 스팀량(톤/일) — 실 2호기 스팀량과 상한 336 중 작은 값 (화면 계산값, 과거 값 보존)',
+    U2_UNIT            DECIMAL(18,6) NULL COMMENT '결산 2호기 운영단가(원/톤) — 단가 입력 waste2_steam',
+    U2_RUNTIME         DECIMAL(18,6) NULL COMMENT '결산 2호기 운휴시간(Hr)',
+    U2_FIXED           DECIMAL(18,6) NULL COMMENT '결산 2호기 운휴시간당 고정비(원/시간) — 단가 입력 waste2_fixed_hr',
+    REAL_STEAM1        DECIMAL(18,6) NULL COMMENT '실 스팀량 기준 1호기 스팀량(톤/일)',
+    REAL_UNIT1         DECIMAL(18,6) NULL COMMENT '실 스팀량 기준 1호기 단가(원/톤)',
+    REAL_STEAM2        DECIMAL(18,6) NULL COMMENT '실 스팀량 기준 2호기 스팀량(톤/일) — 복합보일러 스팀생산실적의 폐합성 2호 기본값',
+    REAL_UNIT2         DECIMAL(18,6) NULL COMMENT '실 스팀량 기준 2호기 단가(원/톤) — 단가 입력 waste2_steam',
+    CREATED_AT         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY         BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT         DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY         BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN         CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT         DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY         BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (CONTRACT_DAILY_ID),
+    CONSTRAINT UK_STEAM_INCINERATOR_CONTRACT_DAILY_KEY UNIQUE (USAGE_DATE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 폐합성수지 소각로 도급내역 — 결산 1·2호기와 실 스팀량 기준 (일자별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_INCINERATOR_CONTRACT_DAILY_DELETED_YN ON steam_incinerator_contract_daily (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_incinerator_plan_monthly (
+    PLAN_MONTHLY_ID   BIGINT        NOT NULL AUTO_INCREMENT COMMENT '소각로 사업계획대비 ID (PK)',
+    YEAR_NO           INT           NOT NULL COMMENT '연도',
+    MONTH_NO          INT           NOT NULL COMMENT '월 (1~12)',
+    CONTRACT_LABOR    DECIMAL(18,6) NULL COMMENT '도급내역: 인건비(원/월)',
+    LABOR_PLAN        DECIMAL(18,6) NULL COMMENT '인건비 계획(천원)',
+    LABOR_ACTUAL      DECIMAL(18,6) NULL COMMENT '인건비 실적(천원)',
+    OPERATION_PLAN    DECIMAL(18,6) NULL COMMENT '운영비 계획(천원)',
+    OPERATION_ACTUAL  DECIMAL(18,6) NULL COMMENT '운영비 실적(천원) — 도급내역으로 계산할 수 없는 달에 쓰는 직접 입력·엑셀 값',
+    TOTAL_PLAN        DECIMAL(18,6) NULL COMMENT '합계 계획(천원) — 직접 입력',
+    NOTE_U1           VARCHAR(500)  NULL COMMENT '비고: #1 폐합성수지소각로',
+    NOTE_U2           VARCHAR(500)  NULL COMMENT '비고: #2 폐합성수지소각로',
+    BRK_MONTH_PLAN    DECIMAL(18,6) NULL COMMENT '위탁운영비 이달 계획(백만원)',
+    BRK_MONTH_ACTUAL  DECIMAL(18,6) NULL COMMENT '위탁운영비 이달 실적(백만원)',
+    BRK_YTD_PLAN      DECIMAL(18,6) NULL COMMENT '위탁운영비 누계 계획(백만원)',
+    BRK_YTD_ACTUAL    DECIMAL(18,6) NULL COMMENT '위탁운영비 누계 실적(백만원)',
+    BRK_PREV_ACTUAL   DECIMAL(18,6) NULL COMMENT '위탁운영비 전월 실적(백만원)',
+    BRK_NOTE          VARCHAR(500)  NULL COMMENT '위탁운영비 비고',
+    CREATED_AT        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY        BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT        DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY        BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN        CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT        DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY        BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (PLAN_MONTHLY_ID),
+    CONSTRAINT UK_STEAM_INCINERATOR_PLAN_MONTHLY_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 폐합성수지 소각로 사업계획대비 실적·비고와 도급내역 월 인건비 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_INCINERATOR_PLAN_MONTHLY_DELETED_YN ON steam_incinerator_plan_monthly (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_incinerator_operation_monthly (
+    OPERATION_MONTHLY_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '소각로 계획대비 가동실적 ID (PK)',
+    YEAR_NO               INT           NOT NULL COMMENT '연도',
+    MONTH_NO              INT           NOT NULL COMMENT '월 (1~12)',
+    U1_PLAN               DECIMAL(18,6) NULL COMMENT '1호기 가동계획(hr)',
+    U1_ACTUAL             DECIMAL(18,6) NULL COMMENT '1호기 가동실적(hr) — 총 운영비용 화면이 읽음',
+    U2_PLAN               DECIMAL(18,6) NULL COMMENT '2호기 가동계획(hr)',
+    U2_ACTUAL             DECIMAL(18,6) NULL COMMENT '2호기 가동실적(hr) — 총 운영비용 화면이 읽음',
+    STEAM_PLAN            DECIMAL(18,6) NULL COMMENT '스팀생산량 계획(톤)',
+    STEAM_ACTUAL          DECIMAL(18,6) NULL COMMENT '스팀생산량 실적(톤)',
+    RATE_PLAN             DECIMAL(24,12) NULL COMMENT '운영단가(위탁) 계획(원/톤)',
+    RATE_ACTUAL           DECIMAL(24,12) NULL COMMENT '운영단가(위탁) 실적(원/톤) — 전체 자릿수 보존',
+    COST_PLAN             DECIMAL(18,6) NULL COMMENT '위탁운영비용 계획(천원)',
+    COST_ACTUAL           DECIMAL(18,6) NULL COMMENT '위탁운영비용 실적(천원)',
+    CREATED_AT            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY            BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT            DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY            BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN            CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT            DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY            BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (OPERATION_MONTHLY_ID),
+    CONSTRAINT UK_STEAM_INCINERATOR_OPERATION_MONTHLY_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 폐합성수지 소각로 계획대비 가동실적 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_INCINERATOR_OPERATION_MONTHLY_DELETED_YN ON steam_incinerator_operation_monthly (DELETED_YN);
+
+CREATE TABLE IF NOT EXISTS steam_incinerator_cost_monthly (
+    COST_MONTHLY_ID         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '소각로 총 운영비용 ID (PK)',
+    YEAR_NO                 INT           NOT NULL COMMENT '연도',
+    MONTH_NO                INT           NOT NULL COMMENT '월 (1~12)',
+    OP_BURN_BURN_1          DECIMAL(18,6) NULL COMMENT '운영현황: 폐기물 실소각량 1호기(톤)',
+    OP_BURN_BURN_2          DECIMAL(18,6) NULL COMMENT '운영현황: 폐기물 실소각량 2호기(톤)',
+    OP_BURN_RATE_1          DECIMAL(18,6) NULL COMMENT '운영현황: 스팀생산원단위 1호기',
+    OP_BURN_RATE_2          DECIMAL(18,6) NULL COMMENT '운영현황: 스팀생산원단위 2호기',
+    OP_COST_UNIT            DECIMAL(18,6) NULL COMMENT '위탁운영비: 위탁계약단가(원/톤)',
+    OP_COST_DEDUCT          DECIMAL(18,6) NULL COMMENT '위탁운영비: 차감비(천원)',
+    SELF_SRF_IN_QTY         DECIMAL(18,6) NULL COMMENT '자체비용: 외부 폐합성수지 입고량(톤)',
+    SELF_SRF_IN_REV         DECIMAL(18,6) NULL COMMENT '자체비용: 외부 폐합성수지 수익비용(천원)',
+    SELF_SRF_FLOOR_RECYCLE  DECIMAL(18,6) NULL COMMENT '자체비용: 바닥재 재활용(톤)',
+    SELF_SRF_FLOOR_BURY     DECIMAL(18,6) NULL COMMENT '자체비용: 바닥재 매립(톤)',
+    SELF_SRF_FLY_SOLID      DECIMAL(18,6) NULL COMMENT '자체비용: 비산재 고형화(톤)',
+    SELF_SRF_FLY_BURY       DECIMAL(18,6) NULL COMMENT '자체비용: 비산재 매립(톤)',
+    SELF_SRF_COST_FLOOR     DECIMAL(18,6) NULL COMMENT '자체비용: 폐기물처리비용 바닥재(천원)',
+    SELF_SRF_COST_FLY       DECIMAL(18,6) NULL COMMENT '자체비용: 폐기물처리비용 비산재(천원)',
+    SELF_SRF_COST_MISC      DECIMAL(18,6) NULL COMMENT '자체비용: 폐기물처리비용 기타(천원)',
+    SELF_UTIL_P1            DECIMAL(18,6) NULL COMMENT '유틸리티: 전력 1호기 사용량(Kw)',
+    SELF_UTIL_P2            DECIMAL(18,6) NULL COMMENT '유틸리티: 전력 2호기 사용량(Kw)',
+    SELF_UTIL_PRATE         DECIMAL(18,6) NULL COMMENT '유틸리티: 전력단가',
+    SELF_UTIL_NAOH_QTY      DECIMAL(18,6) NULL COMMENT '유틸리티: 가성소다 구입량(Kg)',
+    SELF_UTIL_NAOH_UNIT     DECIMAL(18,6) NULL COMMENT '유틸리티: 가성소다 단가',
+    SELF_UTIL_WATER         DECIMAL(18,6) NULL COMMENT '유틸리티: 용수사용비(천원)',
+    SELF_UTIL_WASTE_CHARGE  DECIMAL(18,6) NULL COMMENT '유틸리티: 폐기물처분부담금(천원)',
+    SELF_UTIL_ETC           DECIMAL(18,6) NULL COMMENT '유틸리티: 기타(천원)',
+    SELF_TOTAL_TOTAL        DECIMAL(18,6) NULL COMMENT '자체비용 합계: 비용합계(천원) — 화면 입력',
+    SELF_TOTAL_BURN_RATE    DECIMAL(18,6) NULL COMMENT '자체비용 합계: 처리량당 비용 — 화면 입력',
+    SELF_TOTAL_STEAM_RATE   DECIMAL(18,6) NULL COMMENT '자체비용 합계: 스팀톤당 비용 — 화면 입력',
+    MAT_OIL_U1              DECIMAL(18,6) NULL COMMENT '원부자재: 부생유 #1 사용량',
+    MAT_OIL_U2              DECIMAL(18,6) NULL COMMENT '원부자재: 부생유 #2 사용량',
+    MAT_OIL_UNIT            DECIMAL(18,6) NULL COMMENT '원부자재: 부생유 단가',
+    MAT_OIL_CK_QTY          DECIMAL(18,6) NULL COMMENT '원부자재: 청관제 구입량',
+    MAT_OIL_CK_UNIT         DECIMAL(18,6) NULL COMMENT '원부자재: 청관제 단가',
+    MAT_CHEM_U_QTY          DECIMAL(18,6) NULL COMMENT '원부자재: 요소수 구입량',
+    MAT_CHEM_U_UNIT         DECIMAL(18,6) NULL COMMENT '원부자재: 요소수 단가',
+    MAT_CHEM_S_QTY          DECIMAL(18,6) NULL COMMENT '원부자재: 소금 구입량',
+    MAT_CHEM_S_UNIT         DECIMAL(18,6) NULL COMMENT '원부자재: 소금 단가',
+    MAT_MISC_A_QTY          DECIMAL(18,6) NULL COMMENT '원부자재: 분말활성탄 구입량',
+    MAT_MISC_A_UNIT         DECIMAL(18,6) NULL COMMENT '원부자재: 분말활성탄 단가',
+    MAT_MISC_K_QTY          DECIMAL(18,6) NULL COMMENT '원부자재: 크링커제거제 구입량',
+    MAT_MISC_K_UNIT         DECIMAL(18,6) NULL COMMENT '원부자재: 크링커제거제 단가',
+    CREATED_AT              DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
+    CREATED_BY              BIGINT        NULL COMMENT '생성자 사용자 ID',
+    UPDATED_AT              DATETIME      NULL COMMENT '수정일시',
+    UPDATED_BY              BIGINT        NULL COMMENT '수정자 사용자 ID',
+    DELETED_YN              CHAR(1)       NOT NULL DEFAULT 'N' COMMENT '삭제 여부 (Y/N)',
+    DELETED_AT              DATETIME      NULL COMMENT '삭제일시',
+    DELETED_BY              BIGINT        NULL COMMENT '삭제자 사용자 ID',
+    PRIMARY KEY (COST_MONTHLY_ID),
+    CONSTRAINT UK_STEAM_INCINERATOR_COST_MONTHLY_KEY UNIQUE (YEAR_NO, MONTH_NO)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='[module-steam-energy] 폐합성수지 소각로 총 운영비용 입력값 (연/월별)';
+CREATE INDEX IF NOT EXISTS IDX_STEAM_INCINERATOR_COST_MONTHLY_DELETED_YN ON steam_incinerator_cost_monthly (DELETED_YN);
+

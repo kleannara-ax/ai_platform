@@ -35,7 +35,7 @@ SELECT STR_TO_DATE(CONCAT(month, '-', LPAD(d, 2, '0')), '%Y-%m-%d'),
 FROM (
     SELECT month,
            SUBSTRING_INDEX(row_key, '-', 1) AS f,
-           CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) AS d,
+           CASE WHEN row_key REGEXP '-[0-9]+$' THEN CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) END AS d,
            TRIM(cell_value) AS v
     FROM steam_cell_value
     WHERE table_name = 'combo_boiler_production'
@@ -81,7 +81,7 @@ SELECT STR_TO_DATE(CONCAT(month, '-', LPAD(d, 2, '0')), '%Y-%m-%d'),
 FROM (
     SELECT month,
            SUBSTRING_INDEX(row_key, '-', 1) AS f,
-           CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) AS d,
+           CASE WHEN row_key REGEXP '-[0-9]+$' THEN CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) END AS d,
            TRIM(cell_value) AS v
     FROM steam_cell_value
     WHERE table_name = 'combo_boiler_downtime'
@@ -141,7 +141,7 @@ SELECT CAST(LEFT(month, 4) AS UNSIGNED), CAST(RIGHT(month, 2) AS UNSIGNED), d,
 FROM (
     SELECT month,
            SUBSTRING_INDEX(row_key, '-', 1) AS f,
-           CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) AS d,
+           CASE WHEN row_key REGEXP '-[0-9]+$' THEN CAST(SUBSTRING_INDEX(row_key, '-', -1) AS UNSIGNED) END AS d,
            TRIM(cell_value) AS v
     FROM steam_cell_value
     WHERE table_name = 'combo_boiler_recovery'

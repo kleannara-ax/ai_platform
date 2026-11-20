@@ -122,6 +122,8 @@
 
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/incinerator-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
   <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
   <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
@@ -239,7 +241,7 @@
           const params = new URLSearchParams({
             fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
           });
-          const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+          const resp = await window.IncineratorStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
           if (resp.ok) {
             ((await resp.json()).data || []).forEach((row) => {
               const m = /^real\|(\d+)\|steam-2$/.exec(String(row.row_key));
@@ -288,7 +290,7 @@
         const params = new URLSearchParams({
           fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
         });
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
+        const resp = await window.IncineratorStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
         if (resp.ok) {
           const payload = await resp.json();
           const byMonth = new Map();   // monthNo → Map("unit1|5|steam" → 값)

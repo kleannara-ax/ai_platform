@@ -9,6 +9,8 @@ import com.company.module.steamenergy.dto.SteamPriceResponse;
 import com.company.module.steamenergy.dto.SteamPriceSaveRequest;
 import com.company.module.steamenergy.entity.SteamPrice;
 import com.company.module.steamenergy.repository.SteamPriceRepository;
+import com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter;
+import com.company.module.steamenergy.service.table.SteamTableFieldApplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 시설별 단가 비즈니스 로직
@@ -32,6 +35,7 @@ public class SteamPriceService {
     private final SteamPriceRepository priceRepository;
     private final SteamLngDailyUsageService lngDailyUsageService;
     private final SteamFuelDailyUsageService fuelDailyUsageService;
+    private final SteamIncineratorContractDailyAdapter incineratorContract;
 
     /** 연/월 페이징 조회 (월 미지정 시 연도 전체 페이징) */
     public Page<SteamPriceResponse> getList(Integer yearNo, Integer monthNo, Pageable pageable) {
@@ -108,6 +112,7 @@ public class SteamPriceService {
      * <ul>
      *   <li>lng_unit → LNG 일일 사용량의 보일러·버너 단가</li>
      *   <li>fluid_steam → 유동상 단가, waste2_steam → 폐합성소각로 단가 (스팀 구매 일일 사용량)</li>
+     *   <li>waste2_steam → 소각로 도급내역 2호기 운영단가·실 2호기 단가, waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비</li>
      * </ul>
      * 그 밖의 항목은 아직 전환되지 않은 화면의 단가라 hasDailyTarget=false 로 돌려준다.
      */
@@ -126,7 +131,13 @@ public class SteamPriceService {
         switch (request.getItemCode()) {
             case "lng_unit" -> applied = lngDailyUsageService.applyUnitPrice(year, month, value);
             case "fluid_steam" -> applied = fuelDailyUsageService.applyFluidUnitPrice(year, month, value);
-            case "waste2_steam" -> applied = fuelDailyUsageService.applyIncineratorUnitPrice(year, month, value);
+            case "waste2_steam" -> {
+                applied = fuelDailyUsageService.applyIncineratorUnitPrice(year, month, value);
+                // 소각로 도급내역: 결산 2호기 운영단가 + 실 스팀량 기준 2호기 단가
+                SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u2Unit", value, "realUnit2", value));
+            }
+            case "waste1_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u1Fixed", value));
+            case "waste2_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u2Fixed", value));
             default -> {
                 return SteamPriceApplyResponse.of(request.getItemCode(), year, month, value, false, 0);
             }

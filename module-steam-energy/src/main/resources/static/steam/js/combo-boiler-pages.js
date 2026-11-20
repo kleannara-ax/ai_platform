@@ -21,7 +21,7 @@
   const sidebarGroups = Array.from(document.querySelectorAll(".sidebar-group-flat"));
   if (!yearSelect || !monthSelect || !submitButton || !tableWrap) return;
 
-  const TABLES_BASE = "/tables";   // 도급내역(묶음 3-B 전환 전) 연동값 조회에만 쓴다
+  const TABLES_BASE = "/tables";   // 도급내역 연동값 조회 주소 모양 (IncineratorStore.fetch 가 받는다)
   const state = {};
   const Api = window.SteamEnergyApi;
 
@@ -291,8 +291,8 @@
     const month = Number(monthSelect.value);
     contractRows = [];
     if (config.key === "production") {
-      // 도급내역(2호기 실 스팀량)은 아직 옛 셀 저장소에 있다 — 묶음 3-B 에서 규격 표로 바뀐다.
-      const contract = fetch(`${TABLES_BASE}/steam_cell_value?page=1&limit=10000&tableNames=${CONTRACT_TABLE}&month=${encodeURIComponent(currentMonthKey())}`)
+      // 도급내역(2호기 실 스팀량)은 규격 표 steam_incinerator_contract_daily 에서 온다 (incinerator-store.js 가 옛 키 모양으로 돌려준다).
+      const contract = window.IncineratorStore.fetch(`${TABLES_BASE}/steam_cell_value?page=1&limit=10000&tableNames=${CONTRACT_TABLE}&month=${encodeURIComponent(currentMonthKey())}`)
         .then((response) => (response.ok ? response.json() : { data: [] }))
         .then((body) => (Array.isArray(body.data) ? body.data : []))
         .catch(() => []);

@@ -220,6 +220,10 @@ DELETE FROM steam_price
 | `steam_combo_monthly_price` | 복합보일러 월 연료단가 — 복합보일러 › 스팀생산실적 › N월 연료단가 (combo-boiler-steam-production.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_combo_recovery_loss` | 복합보일러 스팀 회수 감소 — 복합보일러 › 스팀 회수 감소 (combo-boiler-recovery-loss.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, LINE_NO)` |
 | `steam_combo_plan` | 복합보일러 연간 계획 — 복합보일러 › 기타(계획·LNG사용량) (combo-boiler-etc.html) (7개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, TARGET_YM)` |
+| `steam_incinerator_contract_daily` | 소각로 도급내역 — 폐합성수지 소각로 › 도급내역 (incinerator-contract.html) (12개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_incinerator_plan_monthly` | 소각로 사업계획대비 — 폐합성수지 소각로 › 사업계획대비 (incinerator-plan-vs.html), 도급내역의 월 인건비 (14개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_incinerator_operation_monthly` | 소각로 계획대비 가동실적 — 폐합성수지 소각로 › 계획대비 가동실적 (incinerator-operation.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_incinerator_cost_monthly` | 소각로 총 운영비용 — 폐합성수지 소각로 › 총 운영비용 (incinerator-total-cost.html) (39개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -696,6 +700,155 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 ### 데이터 이관
 
 `migration/2026-11-20_combo_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 로컬 적용 결과: 생산실적 730일, 운휴 546일, 월 단가 24개월, 회수 감소 110건. 연간 계획은 옮길 값이 없다.
+
+## 소각로 위탁 그룹 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 3-B)
+
+폐합성수지 소각로 5개 화면(도급내역 · 사업계획대비 · 전년대비 · 계획대비 가동실적 · 총 운영비용)을 옛 `steam_cell_value` 논리 표 `incinerator_*` 에서 실제 컬럼 표 4개로 옮겼다. 사고이력은 묶음 3-E 에서 옮긴다.
+화면의 칸 키(`구분|일|항목`, `구분|항목-m월`, `구분|월|항목`)는 그대로 두고 저장할 때 표의 행·컬럼으로 옮긴다 — 화면은 `js/incinerator-store.js`, 엑셀은 `service/table/IncineratorCellStore`.
+
+### 설계 규칙
+
+- 계산값(운영비용 = 스팀량 × 단가, 운휴비용 = 운휴시간 × 고정비, 소계·합계, 달성율·증감)은 저장하지 않는다. 옛 저장소에 엑셀 업로드로 들어와 있던 계산값은 옮기지 않았다.
+- 사업계획대비 · 전년대비 · 총 운영비용의 도급 합계는 도급내역 **입력값에서 계산**한다 (예전에는 엑셀로 올린 달에만 값이 나왔다). 결산 1호기 운휴시간이 비어 있고 그 날 고정비가 있으면 도급내역 화면처럼 24 로 본다.
+- 스팀량이 하루도 없는 달(단가 입력이 단가만 기록해 둔 달)은 도급 실적이 없는 달로 보고 합계를 만들지 않는다 — 사업계획대비는 그런 달에 저장된 운영비 실적(`OPERATION_ACTUAL`, 엑셀 값)을 보여 준다. 화면(`incinerator-store.js` 의 `computed=1`)과 엑셀 내보내기(`collectContractMonth`)가 같은 규칙을 쓴다.
+- `U2_STEAM`(결산 2호기 스팀량)은 실 2호기 스팀량에서 나오는 값이지만 과거 값을 지키려고 컬럼으로 둔다.
+- 사업계획대비는 예전에 '조회한 월'마다 12개월 표를 따로 저장했다. 이제 (연, 월) 한 행으로 접는다 — 위탁운영비 이달·누계 칸과 비고는 그 월의 행에 둔다.
+- 전년대비는 저장하는 값이 없다 (도급내역에서 계산).
+- 운영단가(위탁)는 소수 12자리까지 보존한다 (`DECIMAL(24,12)`).
+- 엑셀 가져오기는 고른 달의 도급내역, 그 해의 사업계획대비 표·가동실적·총 운영비용을 파일 기준으로 바꾼다. 다른 달의 도급내역은 건드리지 않는다 (예전에는 그 해 12개월을 지웠다).
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_incinerator_contract_daily`** — 소각로 도급내역 · 키 `(USAGE_DATE)` · 옛 저장소: `incinerator_contract` 의 `unit1|일|{steam,unit,runtime,fixed}`, `unit2|일|…`, `real|일|{steam-1,unit-1,steam-2,unit-2}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `U1_STEAM` | DECIMAL(18,6) | `u1Steam` | 결산 1호기 스팀량(톤/일) |
+| `U1_UNIT` | DECIMAL(18,6) | `u1Unit` | 결산 1호기 운영단가(원/톤) |
+| `U1_RUNTIME` | DECIMAL(18,6) | `u1Runtime` | 결산 1호기 운휴시간(Hr) — 비어 있으면 화면·집계에서 24 로 본다 |
+| `U1_FIXED` | DECIMAL(18,6) | `u1Fixed` | 결산 1호기 운휴시간당 고정비(원/시간) — 단가 입력 waste1_fixed_hr 이 그 달 모든 날에 기록 |
+| `U2_STEAM` | DECIMAL(18,6) | `u2Steam` | 결산 2호기 스팀량(톤/일) — 실 2호기 스팀량과 상한 336 중 작은 값 (화면 계산값, 과거 값 보존) |
+| `U2_UNIT` | DECIMAL(18,6) | `u2Unit` | 결산 2호기 운영단가(원/톤) — 단가 입력 waste2_steam |
+| `U2_RUNTIME` | DECIMAL(18,6) | `u2Runtime` | 결산 2호기 운휴시간(Hr) |
+| `U2_FIXED` | DECIMAL(18,6) | `u2Fixed` | 결산 2호기 운휴시간당 고정비(원/시간) — 단가 입력 waste2_fixed_hr |
+| `REAL_STEAM1` | DECIMAL(18,6) | `realSteam1` | 실 스팀량 기준 1호기 스팀량(톤/일) |
+| `REAL_UNIT1` | DECIMAL(18,6) | `realUnit1` | 실 스팀량 기준 1호기 단가(원/톤) |
+| `REAL_STEAM2` | DECIMAL(18,6) | `realSteam2` | 실 스팀량 기준 2호기 스팀량(톤/일) — 복합보일러 스팀생산실적의 폐합성 2호 기본값 |
+| `REAL_UNIT2` | DECIMAL(18,6) | `realUnit2` | 실 스팀량 기준 2호기 단가(원/톤) — 단가 입력 waste2_steam |
+
+**`steam_incinerator_plan_monthly`** — 소각로 사업계획대비 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `incinerator_plan_vs` 의 `{labor,operation,total}|{plan,actual}-m월`, `break|…`, `notes|m월-u{1,2}` + `incinerator_contract` 의 `summary|0|labor`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `CONTRACT_LABOR` | DECIMAL(18,6) | `contractLabor` | 도급내역: 인건비(원/월) |
+| `LABOR_PLAN` | DECIMAL(18,6) | `laborPlan` | 인건비 계획(천원) |
+| `LABOR_ACTUAL` | DECIMAL(18,6) | `laborActual` | 인건비 실적(천원) |
+| `OPERATION_PLAN` | DECIMAL(18,6) | `operationPlan` | 운영비 계획(천원) |
+| `OPERATION_ACTUAL` | DECIMAL(18,6) | `operationActual` | 운영비 실적(천원) — 도급내역으로 계산할 수 없는 달에 쓰는 직접 입력·엑셀 값 |
+| `TOTAL_PLAN` | DECIMAL(18,6) | `totalPlan` | 합계 계획(천원) — 직접 입력 |
+| `NOTE_U1` | VARCHAR(500) | `noteU1` | 비고: #1 폐합성수지소각로 |
+| `NOTE_U2` | VARCHAR(500) | `noteU2` | 비고: #2 폐합성수지소각로 |
+| `BRK_MONTH_PLAN` | DECIMAL(18,6) | `brkMonthPlan` | 위탁운영비 이달 계획(백만원) |
+| `BRK_MONTH_ACTUAL` | DECIMAL(18,6) | `brkMonthActual` | 위탁운영비 이달 실적(백만원) |
+| `BRK_YTD_PLAN` | DECIMAL(18,6) | `brkYtdPlan` | 위탁운영비 누계 계획(백만원) |
+| `BRK_YTD_ACTUAL` | DECIMAL(18,6) | `brkYtdActual` | 위탁운영비 누계 실적(백만원) |
+| `BRK_PREV_ACTUAL` | DECIMAL(18,6) | `brkPrevActual` | 위탁운영비 전월 실적(백만원) |
+| `BRK_NOTE` | VARCHAR(500) | `brkNote` | 위탁운영비 비고 |
+
+**`steam_incinerator_operation_monthly`** — 소각로 계획대비 가동실적 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `incinerator_operation` 의 `hours|월|u{1,2}-{plan,actual}`, `metric|월|{steam,rate,cost}-{plan,actual}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `U1_PLAN` | DECIMAL(18,6) | `u1Plan` | 1호기 가동계획(hr) |
+| `U1_ACTUAL` | DECIMAL(18,6) | `u1Actual` | 1호기 가동실적(hr) — 총 운영비용 화면이 읽음 |
+| `U2_PLAN` | DECIMAL(18,6) | `u2Plan` | 2호기 가동계획(hr) |
+| `U2_ACTUAL` | DECIMAL(18,6) | `u2Actual` | 2호기 가동실적(hr) — 총 운영비용 화면이 읽음 |
+| `STEAM_PLAN` | DECIMAL(18,6) | `steamPlan` | 스팀생산량 계획(톤) |
+| `STEAM_ACTUAL` | DECIMAL(18,6) | `steamActual` | 스팀생산량 실적(톤) |
+| `RATE_PLAN` | DECIMAL(24,12) | `ratePlan` | 운영단가(위탁) 계획(원/톤) |
+| `RATE_ACTUAL` | DECIMAL(24,12) | `rateActual` | 운영단가(위탁) 실적(원/톤) — 전체 자릿수 보존 |
+| `COST_PLAN` | DECIMAL(18,6) | `costPlan` | 위탁운영비용 계획(천원) |
+| `COST_ACTUAL` | DECIMAL(18,6) | `costActual` | 위탁운영비용 실적(천원) |
+
+**`steam_incinerator_cost_monthly`** — 소각로 총 운영비용 · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `incinerator_total_cost` 의 `{구분}|월|{항목}` — 컬럼 이름은 구분-항목을 이은 것
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `OP_BURN_BURN_1` | DECIMAL(18,6) | `opBurnBurn1` | 운영현황: 폐기물 실소각량 1호기(톤) |
+| `OP_BURN_BURN_2` | DECIMAL(18,6) | `opBurnBurn2` | 운영현황: 폐기물 실소각량 2호기(톤) |
+| `OP_BURN_RATE_1` | DECIMAL(18,6) | `opBurnRate1` | 운영현황: 스팀생산원단위 1호기 |
+| `OP_BURN_RATE_2` | DECIMAL(18,6) | `opBurnRate2` | 운영현황: 스팀생산원단위 2호기 |
+| `OP_COST_UNIT` | DECIMAL(18,6) | `opCostUnit` | 위탁운영비: 위탁계약단가(원/톤) |
+| `OP_COST_DEDUCT` | DECIMAL(18,6) | `opCostDeduct` | 위탁운영비: 차감비(천원) |
+| `SELF_SRF_IN_QTY` | DECIMAL(18,6) | `selfSrfInQty` | 자체비용: 외부 폐합성수지 입고량(톤) |
+| `SELF_SRF_IN_REV` | DECIMAL(18,6) | `selfSrfInRev` | 자체비용: 외부 폐합성수지 수익비용(천원) |
+| `SELF_SRF_FLOOR_RECYCLE` | DECIMAL(18,6) | `selfSrfFloorRecycle` | 자체비용: 바닥재 재활용(톤) |
+| `SELF_SRF_FLOOR_BURY` | DECIMAL(18,6) | `selfSrfFloorBury` | 자체비용: 바닥재 매립(톤) |
+| `SELF_SRF_FLY_SOLID` | DECIMAL(18,6) | `selfSrfFlySolid` | 자체비용: 비산재 고형화(톤) |
+| `SELF_SRF_FLY_BURY` | DECIMAL(18,6) | `selfSrfFlyBury` | 자체비용: 비산재 매립(톤) |
+| `SELF_SRF_COST_FLOOR` | DECIMAL(18,6) | `selfSrfCostFloor` | 자체비용: 폐기물처리비용 바닥재(천원) |
+| `SELF_SRF_COST_FLY` | DECIMAL(18,6) | `selfSrfCostFly` | 자체비용: 폐기물처리비용 비산재(천원) |
+| `SELF_SRF_COST_MISC` | DECIMAL(18,6) | `selfSrfCostMisc` | 자체비용: 폐기물처리비용 기타(천원) |
+| `SELF_UTIL_P1` | DECIMAL(18,6) | `selfUtilP1` | 유틸리티: 전력 1호기 사용량(Kw) |
+| `SELF_UTIL_P2` | DECIMAL(18,6) | `selfUtilP2` | 유틸리티: 전력 2호기 사용량(Kw) |
+| `SELF_UTIL_PRATE` | DECIMAL(18,6) | `selfUtilPrate` | 유틸리티: 전력단가 |
+| `SELF_UTIL_NAOH_QTY` | DECIMAL(18,6) | `selfUtilNaohQty` | 유틸리티: 가성소다 구입량(Kg) |
+| `SELF_UTIL_NAOH_UNIT` | DECIMAL(18,6) | `selfUtilNaohUnit` | 유틸리티: 가성소다 단가 |
+| `SELF_UTIL_WATER` | DECIMAL(18,6) | `selfUtilWater` | 유틸리티: 용수사용비(천원) |
+| `SELF_UTIL_WASTE_CHARGE` | DECIMAL(18,6) | `selfUtilWasteCharge` | 유틸리티: 폐기물처분부담금(천원) |
+| `SELF_UTIL_ETC` | DECIMAL(18,6) | `selfUtilEtc` | 유틸리티: 기타(천원) |
+| `SELF_TOTAL_TOTAL` | DECIMAL(18,6) | `selfTotalTotal` | 자체비용 합계: 비용합계(천원) — 화면 입력 |
+| `SELF_TOTAL_BURN_RATE` | DECIMAL(18,6) | `selfTotalBurnRate` | 자체비용 합계: 처리량당 비용 — 화면 입력 |
+| `SELF_TOTAL_STEAM_RATE` | DECIMAL(18,6) | `selfTotalSteamRate` | 자체비용 합계: 스팀톤당 비용 — 화면 입력 |
+| `MAT_OIL_U1` | DECIMAL(18,6) | `matOilU1` | 원부자재: 부생유 #1 사용량 |
+| `MAT_OIL_U2` | DECIMAL(18,6) | `matOilU2` | 원부자재: 부생유 #2 사용량 |
+| `MAT_OIL_UNIT` | DECIMAL(18,6) | `matOilUnit` | 원부자재: 부생유 단가 |
+| `MAT_OIL_CK_QTY` | DECIMAL(18,6) | `matOilCkQty` | 원부자재: 청관제 구입량 |
+| `MAT_OIL_CK_UNIT` | DECIMAL(18,6) | `matOilCkUnit` | 원부자재: 청관제 단가 |
+| `MAT_CHEM_U_QTY` | DECIMAL(18,6) | `matChemUQty` | 원부자재: 요소수 구입량 |
+| `MAT_CHEM_U_UNIT` | DECIMAL(18,6) | `matChemUUnit` | 원부자재: 요소수 단가 |
+| `MAT_CHEM_S_QTY` | DECIMAL(18,6) | `matChemSQty` | 원부자재: 소금 구입량 |
+| `MAT_CHEM_S_UNIT` | DECIMAL(18,6) | `matChemSUnit` | 원부자재: 소금 단가 |
+| `MAT_MISC_A_QTY` | DECIMAL(18,6) | `matMiscAQty` | 원부자재: 분말활성탄 구입량 |
+| `MAT_MISC_A_UNIT` | DECIMAL(18,6) | `matMiscAUnit` | 원부자재: 분말활성탄 단가 |
+| `MAT_MISC_K_QTY` | DECIMAL(18,6) | `matMiscKQty` | 원부자재: 크링커제거제 구입량 |
+| `MAT_MISC_K_UNIT` | DECIMAL(18,6) | `matMiscKUnit` | 원부자재: 크링커제거제 단가 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/incinerator-contract-dailies?year=[&month=]` | 소각로 도급내역 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/incinerator-contract-dailies` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/incinerator-contract-dailies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/incinerator-contract-dailies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/incinerator-plan-monthlies?year=[&month=]` | 소각로 사업계획대비 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/incinerator-plan-monthlies` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/incinerator-plan-monthlies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/incinerator-plan-monthlies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/incinerator-operation-monthlies?year=[&month=]` | 소각로 계획대비 가동실적 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/incinerator-operation-monthlies` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/incinerator-operation-monthlies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/incinerator-operation-monthlies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/incinerator-cost-monthlies?year=[&month=]` | 소각로 총 운영비용 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/incinerator-cost-monthlies` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/incinerator-cost-monthlies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/incinerator-cost-monthlies/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/incinerator-excel/import-excel` (file, year, month) | 워크북 `5. 소각로 위탁운영비(YYYY년MM월).xlsx` 가져오기 |
+| `GET` | `/steam-energy-api/incinerator-excel/export-excel?year=&month=` | 같은 서식으로 내보내기 |
+
+### 다른 화면과의 연동
+
+- 단가 입력(`steam_price`) → `POST /prices/apply-daily`: `waste2_steam` → `U2_UNIT` · `REAL_UNIT2`, `waste1_fixed_hr` → `U1_FIXED`, `waste2_fixed_hr` → `U2_FIXED` (그 달 모든 날)
+- 마감비교(`energy-month-compare.html`)의 폐합성 스팀구매 ← 도급내역 입력값에서 계산한 월 합계
+- 복합보일러 스팀생산실적의 폐합성 2호 기본값 ← `REAL_STEAM2`
+- 총 운영비용 ← 가동실적 `U1_ACTUAL` · `U2_ACTUAL`, 도급내역 월 합계
+
+### 데이터 이관
+
+`migration/2026-11-20_incinerator_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 저장돼 있던 계산값, 그 달에 없는 날짜(6월 31일), 숫자 칸의 글자는 옮기지 않는다. **2025년 총 운영비용의 유틸리티 칸(전력단가·가성소다 구입량/단가·용수·폐기물처분부담금)과 차감비는 옛 셀 자체가 한 칸씩 밀려 저장돼 있었다** (옛 가져오기 코드의 결함). 이관 뒤 원본 `5. 소각로 위탁운영비 첨부자료(25년10월).xls` 를 2025년 10월로 다시 올리면 바로잡힌다 (로컬은 그렇게 했다).
 
 ## 메뉴 / 권한
 

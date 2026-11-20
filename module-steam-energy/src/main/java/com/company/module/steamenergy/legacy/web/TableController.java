@@ -7,7 +7,6 @@ import com.company.module.steamenergy.legacy.service.WasteIncineratorLogExportSe
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogImportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDetailWorkbookService;
 import com.company.module.steamenergy.legacy.service.FluidizedSummaryWorkbookService;
-import com.company.module.steamenergy.legacy.service.IncineratorWorkbookService;
 import com.company.module.steamenergy.legacy.service.SrfBoilerInvoiceWorkbookService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -36,7 +35,6 @@ public class TableController {
     private final FluidizedDailyLogExportService fluidizedDailyLogExportService;
     private final FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService;
     private final SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService;
-    private final IncineratorWorkbookService incineratorWorkbookService;
 
     public TableController(
             TableService tableService,
@@ -46,8 +44,7 @@ public class TableController {
             WasteIncineratorLogExportService wasteIncineratorLogExportService,
             FluidizedDailyLogExportService fluidizedDailyLogExportService,
             FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService,
-            SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService,
-            IncineratorWorkbookService incineratorWorkbookService
+            SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService
     ) {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
@@ -57,7 +54,6 @@ public class TableController {
         this.fluidizedDailyLogExportService = fluidizedDailyLogExportService;
         this.fluidizedSummaryWorkbookService = fluidizedSummaryWorkbookService;
         this.srfBoilerInvoiceWorkbookService = srfBoilerInvoiceWorkbookService;
-        this.incineratorWorkbookService = incineratorWorkbookService;
     }
 
     @GetMapping("/{tableName}")
@@ -405,53 +401,7 @@ public class TableController {
         }
     }
 
-    @PostMapping("/incinerator/import-excel")
-    public Map<String, Object> importIncineratorExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year,
-            @RequestParam(value = "month", defaultValue = "1") int month
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도가 올바르지 않습니다.");
-        }
-        if (month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "월이 올바르지 않습니다.");
-        }
-        try {
-            return incineratorWorkbookService.importWorkbook(file, year, month);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "소각로 위탁운영 엑셀 파일을 읽을 수 없습니다.", exception);
-        }
-    }
-
-    @GetMapping("/incinerator/export-excel")
-    public ResponseEntity<ByteArrayResource> exportIncineratorExcel(
-            @RequestParam("year") int year,
-            @RequestParam(value = "month", defaultValue = "1") int month
-    ) {
-        if (year < 2000 || year > 2100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
-        }
-        if (month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid month");
-        }
-        try {
-            byte[] content = incineratorWorkbookService.exportWorkbook(year, month);
-            ByteArrayResource resource = new ByteArrayResource(content);
-            String mm = String.format("%02d", month);
-            String filename = "5. 소각로 위탁운영비(" + year + "년" + mm + "월).xlsx";
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, attachmentFilename(filename, "incinerator_" + year + "_" + mm + ".xlsx"))
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(content.length)
-                    .body(resource);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to export incinerator Excel file", exception);
-        }
-    }
+    // 소각로 위탁운영비 엑셀: /steam-energy-api/incinerator-excel 로 옮김 (SteamIncineratorExcelController, 2026-11 규격 전환)
 
     /* ── 에너지 회계비용 계획 ─────────────────────────────── */
 

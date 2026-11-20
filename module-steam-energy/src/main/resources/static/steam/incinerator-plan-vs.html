@@ -76,6 +76,9 @@
     }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/incinerator-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
 </head>
 <body class="landing-body" data-page-kind="incinerator-plan">
@@ -411,7 +414,7 @@
       for (let m = 1; m <= 12; m++) {
         const mk = `${currentYear}-${String(m).padStart(2,"0")}`;
         tasks.push(
-          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}`)
+          window.IncineratorStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(mk)}&tableNames=${encodeURIComponent(CONTRACT_NAME)}&computed=1`)
             .then(r => r.ok ? r.json() : { data: [] })
             .then(j => {
               const s = emptyContract();
@@ -445,7 +448,7 @@
       recomputeAll();
       try {
         const [res] = await Promise.all([
-          fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`),
+          window.IncineratorStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&month=${encodeURIComponent(monthKey())}&tableNames=${encodeURIComponent(T_NAME)}`),
           loadContract(),
         ]);
         if (res.ok) {
@@ -469,7 +472,7 @@
       const payload = { month: monthKey(), year_no: currentYear, month_no: currentMonth, table_name: T_NAME, row_key: key, col_index: 1, cell_value: raw };
       try {
         const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
-        const res = await fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        const res = await window.IncineratorStore.fetch(url, { method: existing ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error(await res.text());
         storedRows.set(key, await res.json());
       } catch (e) { console.error(e); }
@@ -495,6 +498,6 @@
       setTimeout(() => window.print(), 50);
     });
   </script>
-  <script src="/steam/js/incinerator-excel-controls.js?v=20260522-incinerator-xlsx4-monthsync"></script>
+  <script src="/steam/js/incinerator-excel-controls.js?v=20261120-spec3"></script>
 </body>
 </html>

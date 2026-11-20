@@ -64,9 +64,10 @@
   //
   //  daily = 전환된 일별 표(steam_lng_daily_usage·steam_fuel_daily_usage)에 서버가 넣는다 (apply-daily).
   //   - lng_unit → LNG 보일러·버너 단가, fluid_steam → 유동상 단가, waste2_steam → 폐합성 단가
+  //   - 소각로 도급내역(steam_incinerator_contract_daily): waste2_steam → 2호기 운영단가·실 2호기 단가,
+  //     waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비
   //  targets = 아직 옛 셀 저장소를 쓰는 화면의 칸들. key(일) 은 그 페이지가 쓰는 row_key 형식이다.
   //   - 유동상 세부 운영내역: fluidized_detail_main, row_key = 일자열(일+2) + 행번호, col 0
-  //   - 폐합성 도급내역     : incinerator_contract, row_key "섹션|일|필드", col 1
   //
   //  monthTargets 는 일자별이 아니라 그 달에 한 칸만 있는 자리다(Invoice Summary(VK)).
   //  row_key 는 인보이스 화면과 같은 "summary-vk-r{행번호}", col 은 col_index(=열+1) 그대로다.
@@ -100,17 +101,10 @@
     ] },
     // 폐합성 운영단가는 도급내역의 결산 기준 표와 실 스팀량 기준 표에 같은 값으로 들어간다.
     // (1호기 스팀단가는 단가 입력에서 뺐다 — 도급내역 1호기 운영단가는 그 페이지에서 직접 넣는다)
-    { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", daily: true, targets: [
-      { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|unit"; } },
-      { table: "incinerator_contract", col: 1, key: function (d) { return "real|" + d + "|unit-2"; } },
-    ] },
+    { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", daily: true },
     // 고정단가 → 운휴시간당 고정비(원/시간). 결산 기준 표에만 있다.
-    { code: "waste1_fixed_hr", label: "도급내역 1호기 운휴시간당 고정비", targets: [
-      { table: "incinerator_contract", col: 1, key: function (d) { return "unit1|" + d + "|fixed"; } },
-    ] },
-    { code: "waste2_fixed_hr", label: "도급내역 2호기 운휴시간당 고정비", targets: [
-      { table: "incinerator_contract", col: 1, key: function (d) { return "unit2|" + d + "|fixed"; } },
-    ] },
+    { code: "waste1_fixed_hr", label: "도급내역 1호기 운휴시간당 고정비", daily: true },
+    { code: "waste2_fixed_hr", label: "도급내역 2호기 운휴시간당 고정비", daily: true },
   ];
 
   function priceLink(code) {

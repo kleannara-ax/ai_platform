@@ -96,4 +96,9 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `combo_boiler_downtime` | `steam_combo_daily_downtime` + `steam_combo_monthly_price`(벤트 손실 단가) |
 | `combo_boiler_recovery` | `steam_combo_recovery_loss` (월 + 줄 번호) |
 | `combo_boiler_etc` | `steam_combo_plan` (기준연도 + 대상 월) |
+| `incinerator_contract` | `steam_incinerator_contract_daily` + `steam_incinerator_plan_monthly.CONTRACT_LABOR` (2026-11-20) |
+| `incinerator_plan_vs` | `steam_incinerator_plan_monthly` (연/월 한 행으로 접음) |
+| `incinerator_yoy` | 저장 없음 (도급내역에서 계산) |
+| `incinerator_operation` | `steam_incinerator_operation_monthly` |
+| `incinerator_total_cost` | `steam_incinerator_cost_monthly` (입력 39개) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |
