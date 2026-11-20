@@ -1,6 +1,8 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.DailyLogCells;
+import com.company.module.steamenergy.service.table.SteamWasteIncinDailyLogAdapter;
+import com.company.module.steamenergy.service.table.WasteIncinLogFields;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Anchor;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Entry;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Layout;
@@ -39,16 +41,15 @@ import java.util.regex.Pattern;
 @Service
 public class WasteIncineratorLogImportService {
 
-    private static final String CELL_TABLE = "steam_cell_value";
-    private static final String LOG_TABLE = "waste_incin_log";
     /** 제목의 "(07월)" 에서 월을 읽는다. */
     private static final Pattern TITLE_MONTH = Pattern.compile("(\\d{1,2})\\s*월");
 
-    private final TableService tableService;
+    /** 저장소: 규격 표 steam_waste_incin_daily_log (하루 한 행) */
+    private final SteamWasteIncinDailyLogAdapter logTable;
     private final DataFormatter dataFormatter = new DataFormatter();
 
-    public WasteIncineratorLogImportService(TableService tableService) {
-        this.tableService = tableService;
+    public WasteIncineratorLogImportService(SteamWasteIncinDailyLogAdapter logTable) {
+        this.logTable = logTable;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
@@ -109,6 +110,12 @@ public class WasteIncineratorLogImportService {
                 }
             }
         }
+
+        // 읽은 칸을 한 번에 저장한다 (값이 있는 칸만 덮어쓴다 — 파일에서 빈 칸은 저장된 값을 지우지 않는다).
+        // 같은 항목이 두 시트에 있으면 나중 시트 값이 남는다.
+        Map<String, String> cells = new LinkedHashMap<>();
+        writtenBy.forEach((key, written) -> cells.put(key, written[1]));
+        DailyLogCells.merge(logTable, WasteIncinLogFields.FIELDS, year, month, cells);
 
         if (!missingSheets.isEmpty()) {
             warnings.add("시트를 찾지 못해 건너뛰었습니다 — " + String.join(", ", missingSheets));
@@ -190,7 +197,7 @@ public class WasteIncineratorLogImportService {
                             + "(" + before[0] + "=" + before[1] + ", " + sheetMap.sheetName() + "=" + value + ")");
                 }
                 writtenBy.put(key, new String[]{sheetMap.sheetName(), value});
-                written += store(monthKey, year, month, day, entry.colIndex(), value);
+                written += 1;
             }
         }
         return written;
@@ -201,21 +208,6 @@ public class WasteIncineratorLogImportService {
         if (!matcher.find()) return null;
         int value = Integer.parseInt(matcher.group(1));
         return (value >= 1 && value <= 12) ? value : null;
-    }
-
-    // ── 저장 ────────────────────────────────────────────────────────
-    private int store(String monthKey, int year, int month, int day, int colIndex, String value) {
-        if (value == null || value.isBlank()) return 0;
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("month", monthKey);
-        payload.put("year_no", year);
-        payload.put("month_no", month);
-        payload.put("table_name", LOG_TABLE);
-        payload.put("row_key", String.valueOf(day));
-        payload.put("col_index", colIndex);
-        payload.put("cell_value", value);
-        tableService.upsert(CELL_TABLE, payload);
-        return 1;
     }
 
     // ── 셀 읽기 (유동상 업로드와 같은 규칙) ─────────────────────────

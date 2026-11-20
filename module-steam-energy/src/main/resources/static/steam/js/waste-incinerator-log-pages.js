@@ -1,6 +1,7 @@
 /*
  * 폐합성소각로 운전일지 — 원본 엑셀 "폐합성소각로운전일지(YYYY년 MM월).xlsx" 의 시트별 월 표.
- *  - 저장소: steam_cell_value (table_name="waste_incin_log", row_key=일, col_index=항목 고정번호)
+ *  - 저장소: 규격 표 steam_waste_incin_daily_log (하루 한 행). 이 파일은 옛 셀 모양(row_key=일, col_index=항목 고정번호)으로
+ *    읽고 쓰고, waste-log-store.js 가 그것을 규격 API(/steam-energy-api/waste-incin-daily-logs)로 옮긴다.
  *  - col_index 는 항목 고정 번호이므로 재배치 금지. 시트별 구간:
  *      소각량 1~29 / 스팀량 100~ / 급수량 200~ / 전력 300~ / 폐기물 400~ /
  *      약품 500~ / TMS 600~ / 외부반입 700~ / 폐기물발생 800~
@@ -598,7 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function upsert(payload, existingId) {
     const url = existingId ? `${TABLES_BASE}/${CELL_TABLE}/${existingId}` : `${TABLES_BASE}/${CELL_TABLE}`;
-    const response = await fetch(url, {
+    const response = await window.WasteLogStore.fetch(url, {
       method: existingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -675,7 +676,7 @@ document.addEventListener("DOMContentLoaded", () => {
     while (pageNo <= totalPages) {
       const url = `${TABLES_BASE}/${CELL_TABLE}?page=${pageNo}&limit=${limit}` +
         `&month=${encodeURIComponent(monthKey)}&tableNames=${encodeURIComponent(LOG_TABLE)}`;
-      const response = await fetch(url);
+      const response = await window.WasteLogStore.fetch(url);
       if (!response.ok) throw new Error("데이터를 불러오지 못했습니다.");
       const payload = await response.json();
       const rows = Array.isArray(payload?.data) ? payload.data : [];
@@ -738,7 +739,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.append("year", String(Number(yearSelect.value)));
     form.append("month", String(Number(monthSelect.value)));
 
-    const response = await fetch(`${TABLES_BASE}/waste-incinerator-log/import-excel`, { method: "POST", body: form });
+    const response = await fetch("/steam-energy-api/waste-incin-log-excel/import-excel", { method: "POST", body: form });
     if (!response.ok) {
       let message = "업로드에 실패했습니다.";
       try {
@@ -747,7 +748,8 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (_error) { /* 기본 메시지 사용 */ }
       throw new Error(message);
     }
-    return response.json();
+    const payload = await response.json();
+    return payload && payload.data ? payload.data : payload;
   }
 
   uploadButton?.addEventListener("click", () => uploadInput?.click());
@@ -787,7 +789,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const year = Number(yearSelect.value);
       const month = Number(monthSelect.value);
-      const response = await fetch(`${TABLES_BASE}/waste-incinerator-log/export-excel?year=${year}&month=${month}`);
+      const response = await fetch(`/steam-energy-api/waste-incin-log-excel/export-excel?year=${year}&month=${month}`);
       if (!response.ok) {
         let message = "다운로드에 실패했습니다.";
         try {

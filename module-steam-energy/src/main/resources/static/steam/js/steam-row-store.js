@@ -160,7 +160,9 @@
           var months = query.get("month") ? [query.get("month")] : monthKeysBetween(query.get("fromMonth") || "", query.get("toMonth") || "");
           var jobs = [];
           names.forEach(function (name) { months.forEach(function (mk) { jobs.push(legacyRows(name, mk, query)); }); });
-          return response(true, { data: [].concat.apply([], await Promise.all(jobs)) });
+          var data = [].concat.apply([], await Promise.all(jobs));
+          // 한 번에 다 준다 — 화면의 쪽 넘김 반복(total ÷ limit)이 한 쪽으로 끝나게
+          return response(true, { data: data, total: data.length, page: 1, limit: Math.max(data.length, 1) });
         }
         var body = JSON.parse((init && init.body) || "{}");
         if (def.tables.indexOf(body.table_name) < 0) return global.fetch(url, init);

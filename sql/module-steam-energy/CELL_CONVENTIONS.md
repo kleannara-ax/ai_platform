@@ -113,4 +113,5 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `fluidized_srf_inbound` | `steam_fluidized_srf_inbound_daily` (입고량) + `steam_fluidized_srf_rate` (처리단가) |
 | `steam_cell_value` / 월 키 `YYYY-00` 의 `*-record:*` | `steam_incident` (FACILITY · KIND · RECORD_KEY) (2026-11-20) |
 | `steam_cell_value` / 월 키 `YYYY-00` 의 `improvement-monthly:*`, `improvement-item:*` | `steam_fluidized_improvement_payment`, `steam_fluidized_improvement_item` |
+| `waste_incin_log` | `steam_waste_incin_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-20) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

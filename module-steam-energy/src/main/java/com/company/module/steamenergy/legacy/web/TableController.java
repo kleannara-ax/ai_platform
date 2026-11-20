@@ -3,8 +3,6 @@ package com.company.module.steamenergy.legacy.web;
 import com.company.module.steamenergy.legacy.db.TableService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogExportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogImportService;
-import com.company.module.steamenergy.legacy.service.WasteIncineratorLogExportService;
-import com.company.module.steamenergy.legacy.service.WasteIncineratorLogImportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDetailWorkbookService;
 import com.company.module.steamenergy.legacy.service.FluidizedSummaryWorkbookService;
 import com.company.module.steamenergy.legacy.service.SrfBoilerInvoiceWorkbookService;
@@ -30,8 +28,6 @@ public class TableController {
     private final TableService tableService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
     private final FluidizedDailyLogImportService fluidizedDailyLogImportService;
-    private final WasteIncineratorLogImportService wasteIncineratorLogImportService;
-    private final WasteIncineratorLogExportService wasteIncineratorLogExportService;
     private final FluidizedDailyLogExportService fluidizedDailyLogExportService;
     private final FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService;
     private final SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService;
@@ -40,8 +36,6 @@ public class TableController {
             TableService tableService,
             FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
             FluidizedDailyLogImportService fluidizedDailyLogImportService,
-            WasteIncineratorLogImportService wasteIncineratorLogImportService,
-            WasteIncineratorLogExportService wasteIncineratorLogExportService,
             FluidizedDailyLogExportService fluidizedDailyLogExportService,
             FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService,
             SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService
@@ -49,8 +43,6 @@ public class TableController {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
         this.fluidizedDailyLogImportService = fluidizedDailyLogImportService;
-        this.wasteIncineratorLogImportService = wasteIncineratorLogImportService;
-        this.wasteIncineratorLogExportService = wasteIncineratorLogExportService;
         this.fluidizedDailyLogExportService = fluidizedDailyLogExportService;
         this.fluidizedSummaryWorkbookService = fluidizedSummaryWorkbookService;
         this.srfBoilerInvoiceWorkbookService = srfBoilerInvoiceWorkbookService;
@@ -205,49 +197,6 @@ public class TableController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
         } catch (IOException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유동상 운전일지 엑셀 파일을 읽을 수 없습니다.", exception);
-        }
-    }
-
-    @GetMapping("/waste-incinerator-log/export-excel")
-    public ResponseEntity<ByteArrayResource> exportWasteIncineratorLogExcel(
-            @RequestParam("year") int year,
-            @RequestParam("month") int month
-    ) {
-        if (year < 2000 || year > 2100 || month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연/월이 올바르지 않습니다.");
-        }
-        try {
-            byte[] body = wasteIncineratorLogExportService.exportWorkbook(year, month);
-            String fileName = wasteIncineratorLogExportService.fileName(year, month);
-            String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
-                    .contentType(MediaType.parseMediaType(
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(body.length)
-                    .body(new ByteArrayResource(body));
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    exception.getMessage() == null ? "엑셀을 만들지 못했습니다." : exception.getMessage(), exception);
-        }
-    }
-
-    @PostMapping("/waste-incinerator-log/import-excel")
-    public Map<String, Object> importWasteIncineratorLogExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year,
-            @RequestParam("month") int month
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100 || month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연/월이 올바르지 않습니다.");
-        }
-        try {
-            return wasteIncineratorLogImportService.importWorkbook(file, year, month);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "폐합성소각로 운전일지 엑셀 파일을 읽을 수 없습니다.", exception);
         }
     }
 

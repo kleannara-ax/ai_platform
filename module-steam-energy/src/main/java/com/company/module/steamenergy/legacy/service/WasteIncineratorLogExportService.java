@@ -1,6 +1,8 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.DailyLogCells;
+import com.company.module.steamenergy.service.table.SteamWasteIncinDailyLogAdapter;
+import com.company.module.steamenergy.service.table.WasteIncinLogFields;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Entry;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.Layout;
 import com.company.module.steamenergy.legacy.service.WasteIncineratorLogCellMap.SheetMap;
@@ -41,21 +43,20 @@ public class WasteIncineratorLogExportService {
 
     private static final String ORIGINAL_DIR = "원본";
     private static final String TEMPLATE_KEYWORD = "폐합성소각로운전일지";
-    private static final String LOG_TABLE = "waste_incin_log";
     /** 제목의 "(07월)" 부분 — 내려받는 월로 바꿔 준다. */
     private static final Pattern TITLE_MONTH = Pattern.compile("\\(\\s*\\d{1,2}\\s*월\\s*\\)");
 
-    private final TableService tableService;
+    /** 저장소: 규격 표 steam_waste_incin_daily_log (하루 한 행) */
+    private final SteamWasteIncinDailyLogAdapter logTable;
     private final DataFormatter dataFormatter = new DataFormatter();
 
-    public WasteIncineratorLogExportService(TableService tableService) {
-        this.tableService = tableService;
+    public WasteIncineratorLogExportService(SteamWasteIncinDailyLogAdapter logTable) {
+        this.logTable = logTable;
     }
 
     public byte[] exportWorkbook(int year, int month) throws IOException {
-        String monthKey = String.format("%04d-%02d", year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        Map<String, String> cells = loadMonthCells(monthKey);
+        Map<String, String> cells = DailyLogCells.load(logTable, WasteIncinLogFields.FIELDS, year, month);
 
         Path template = resolveTemplatePath();
         try (InputStream inputStream = Files.newInputStream(template);
@@ -144,29 +145,9 @@ public class WasteIncineratorLogExportService {
         title.setCellValue(matcher.find() ? matcher.replaceFirst(replacement) : text + " " + replacement);
     }
 
-    // ── DB 읽기 ─────────────────────────────────────────────────────
-    private Map<String, String> loadMonthCells(String monthKey) {
-        Map<String, String> cells = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
-            if (!LOG_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
-            Object value = row.get("cell_value");
-            if (value == null) continue;
-            cells.put(key(String.valueOf(row.get("row_key")), toInt(row.get("col_index"))), String.valueOf(value));
-        }
-        return cells;
-    }
-
+    // ── 셀 키 (DailyLogCells 와 같은 모양: 일|항목번호) ──
     private String key(String rowKey, int colIndex) {
         return rowKey + "|" + colIndex;
-    }
-
-    private int toInt(Object value) {
-        if (value instanceof Number number) return number.intValue();
-        try {
-            return Integer.parseInt(String.valueOf(value));
-        } catch (Exception ignored) {
-            return 0;
-        }
     }
 
     // ── 셀 쓰기 도우미 ──────────────────────────────────────────────

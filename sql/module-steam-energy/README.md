@@ -238,6 +238,7 @@ DELETE FROM steam_price
 | `steam_incident` | 사고·정비 이력 — 유동상 운영내역 › 사고이력 · SRF Boiler invoice › 사고이력 · 폐합성수지 소각로 › 사고이력 (unit-fluidized-accident.html, srf-boiler-invoice-accident.html, incinerator-accident.html) (9개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
 | `steam_fluidized_improvement_payment` | 유동상 설비개선 월별 비용 — 유동상 운영내역 › 설비개선 › 월별개선 (unit-fluidized-improvement.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
 | `steam_fluidized_improvement_item` | 유동상 설비개선 항목 — 유동상 운영내역 › 설비개선 › 항목개선 (unit-fluidized-improvement.html) (8개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
+| `steam_waste_incin_daily_log` | 폐합성소각로 운전일지 — 폐합성수지 소각로 › 운전일지 (waste-incinerator-log.html) (87개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1207,6 +1208,135 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 ### 데이터 이관
 
 `migration/2026-11-20_record_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 값이 하나도 없는 빈 줄은 옮기지 않는다.
+
+## 폐합성소각로 운전일지 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 4-A)
+
+폐합성소각로 운전일지 화면을 옛 `steam_cell_value` (표 이름 `waste_incin_log`, 월 키 `YYYY-MM`, 키 = 일, col_index = 항목 번호)에서 실제 컬럼 표 1개(하루 한 행, 항목 87개)로 옮겼다.
+화면은 `js/waste-log-store.js` 가 옛 호출 모양(조회 · 칸 저장)을 받아 새 API 로 옮기고, 엑셀은 `service/table/DailyLogCellStore` 가 옮긴다. 항목 번호 ↔ 필드 표는 `service/table/WasteIncinLogFields` (서버)와 `waste-log-store.js` (화면) 두 곳에 있다.
+
+### 설계 규칙
+
+- 합계 · 평균 · 시간당 · 적산량 · 누계 · 크링커 투입비 · 2일 이후 재고는 화면이 계산한다 — 저장하지 않는다.
+- 재고 7개(요소수 · 청관재 · 소금 · 가성 · 활성탄 · 부생유 · 크링커)는 1일 행에 월초 재고를 넣는다.
+- 스팀량(적산) 탭은 스팀량 탭과 같은 컬럼(`STEAM_U1`, `STEAM_U2_FIRST`, `STEAM_U2_SECOND`)을 고친다.
+- 외부반입은 업체 칸 14개를 고정한다 (`INBOUND_VENDOR01`~`14`, 순서는 화면 · 엑셀 서식의 업체 순서). 업체가 바뀌면 화면 · 엑셀 서식의 이름만 바꾼다.
+- 숫자 칸에 숫자가 아닌 글자를 넣으면 저장하지 않는다 (예전에는 글자 그대로 저장되고 계산에서만 빠졌다).
+- 엑셀 가져오기는 예전처럼 값이 있는 칸만 덮어쓴다 — 파일에서 비어 있는 칸은 저장된 값을 지우지 않는다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_waste_incin_daily_log`** — 폐합성소각로 운전일지 · 키 `(USAGE_DATE)` · 옛 저장소: `waste_incin_log` / 월 키 `YYYY-MM` / 키 = 일(`1`~`31`) / col_index = 항목 번호 (1→`burnU1Self`, 2→`burnU1Recycle`, 3→`burnU1Generated`, 4→`burnU1RunHours`, 5→`burnU1ExtStock`, 11→`burnU2Self`, 12→`burnU2Recycle`, 13→`burnU2Generated`, 14→`burnU2RunHours`, 15→`burnU2SelfStock`, 21→`burnExtTotal`, 100→`steamU1`, 101→`steamU2First`, 102→`steamU2Second`, 103→`steamAgency`, 104→`steamPressure`, 200→`waterU1First`, 201→`waterU1Second`, 202→`waterU2First`, 203→`waterU2Second`, 300→`powerMeter`, 301→`powerU1`, 302→`powerU2`, 303→`powerEp`, 400→`flyAshU1`, 401→`flyAshU2`, 402→`bottomAshU1`, 403→`bottomAshU2`, 500→`ureaIn`, 501→`ureaUse`, 502→`ureaStock`, 503→`boilerChemIn`, 504→`boilerChemUse`, 505→`boilerChemStock`, 506→`saltIn`, 507→`saltUse`, 508→`saltFluidized`, 509→`saltStock`, 510→`causticIn`, 511→`causticUse`, 512→`causticStock`, 513→`carbonIn`, 514→`carbonUse`, 515→`carbonStock`, 516→`oilIn`, 517→`oilU1`, 518→`oilU2`, 519→`oilSludge1`, 520→`oilSludge2`, 521→`oilStock`, 522→`clinkerSideWall`, 523→`clinkerDrop`, 524→`clinkerIn`, 525→`clinkerUse`, 526→`clinkerStock`, 600→`tmsU1Dust`, 601→`tmsU1Co`, 602→`tmsU1Nox`, 603→`tmsU1Sox`, 604→`tmsU1Hcl`, 605→`tmsU1Temp`, 606→`tmsU2Dust`, 607→`tmsU2Co`, 608→`tmsU2Nox`, 609→`tmsU2Sox`, 610→`tmsU2Hcl`, 611→`tmsU2Temp`, 700→`inboundVendor01`, 701→`inboundVendor02`, 702→`inboundVendor03`, 703→`inboundVendor04`, 704→`inboundVendor05`, 705→`inboundVendor06`, 706→`inboundVendor07`, 707→`inboundVendor08`, 708→`inboundVendor09`, 709→`inboundVendor10`, 710→`inboundVendor11`, 711→`inboundVendor12`, 712→`inboundVendor13`, 713→`inboundVendor14`, 800→`genWood`, 801→`genSaengbul`, 802→`genPlastic`, 803→`genReject`, 804→`genRagger`, 805→`genStock`)
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `BURN_U1_SELF` | DECIMAL(18,6) | `burnU1Self` | 소각량 폐1 자폐 |
+| `BURN_U1_RECYCLE` | DECIMAL(18,6) | `burnU1Recycle` | 소각량 폐1 재활용 |
+| `BURN_U1_GENERATED` | DECIMAL(18,6) | `burnU1Generated` | 소각량 폐1 발생량 |
+| `BURN_U1_RUN_HOURS` | DECIMAL(18,6) | `burnU1RunHours` | 소각량 폐1 가동시간 |
+| `BURN_U1_EXT_STOCK` | DECIMAL(18,6) | `burnU1ExtStock` | 소각량 폐1 외폐재고 |
+| `BURN_U2_SELF` | DECIMAL(18,6) | `burnU2Self` | 소각량 폐2 자폐 |
+| `BURN_U2_RECYCLE` | DECIMAL(18,6) | `burnU2Recycle` | 소각량 폐2 재활용 |
+| `BURN_U2_GENERATED` | DECIMAL(18,6) | `burnU2Generated` | 소각량 폐2 발생량 |
+| `BURN_U2_RUN_HOURS` | DECIMAL(18,6) | `burnU2RunHours` | 소각량 폐2 가동시간 |
+| `BURN_U2_SELF_STOCK` | DECIMAL(18,6) | `burnU2SelfStock` | 소각량 폐2 자폐재고 |
+| `BURN_EXT_TOTAL` | DECIMAL(18,6) | `burnExtTotal` | 소각량 합계 외폐 |
+| `STEAM_U1` | DECIMAL(18,6) | `steamU1` | 스팀 폐1 생산량 |
+| `STEAM_U2_FIRST` | DECIMAL(18,6) | `steamU2First` | 스팀 폐2-1 (폐#2 1차) |
+| `STEAM_U2_SECOND` | DECIMAL(18,6) | `steamU2Second` | 스팀 폐2-2 (폐#2 2차) |
+| `STEAM_AGENCY` | DECIMAL(18,6) | `steamAgency` | 스팀 기관 |
+| `STEAM_PRESSURE` | VARCHAR(20) | `steamPressure` | 스팀 저/고 (글자) |
+| `WATER_U1_FIRST` | DECIMAL(18,6) | `waterU1First` | 급수 폐1-1 |
+| `WATER_U1_SECOND` | DECIMAL(18,6) | `waterU1Second` | 급수 폐1-2 |
+| `WATER_U2_FIRST` | DECIMAL(18,6) | `waterU2First` | 급수 폐2-1 |
+| `WATER_U2_SECOND` | DECIMAL(18,6) | `waterU2Second` | 급수 폐2-2 |
+| `POWER_METER` | DECIMAL(18,6) | `powerMeter` | 전력 지침 |
+| `POWER_U1` | DECIMAL(18,6) | `powerU1` | 전력 폐#1 |
+| `POWER_U2` | DECIMAL(18,6) | `powerU2` | 전력 폐#2 |
+| `POWER_EP` | DECIMAL(18,6) | `powerEp` | 전력 EP |
+| `FLY_ASH_U1` | DECIMAL(18,6) | `flyAshU1` | 비산재 폐#1 |
+| `FLY_ASH_U2` | DECIMAL(18,6) | `flyAshU2` | 비산재 폐#2 |
+| `BOTTOM_ASH_U1` | DECIMAL(18,6) | `bottomAshU1` | 바닥재 폐#1 |
+| `BOTTOM_ASH_U2` | DECIMAL(18,6) | `bottomAshU2` | 바닥재 폐#2 |
+| `UREA_IN` | DECIMAL(18,6) | `ureaIn` | 요소수 반입 |
+| `UREA_USE` | DECIMAL(18,6) | `ureaUse` | 요소수 사용 |
+| `UREA_STOCK` | DECIMAL(18,6) | `ureaStock` | 요소수 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `BOILER_CHEM_IN` | DECIMAL(18,6) | `boilerChemIn` | 청관재 반입 |
+| `BOILER_CHEM_USE` | DECIMAL(18,6) | `boilerChemUse` | 청관재 사용 |
+| `BOILER_CHEM_STOCK` | DECIMAL(18,6) | `boilerChemStock` | 청관재 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `SALT_IN` | DECIMAL(18,6) | `saltIn` | 소금 반입 |
+| `SALT_USE` | DECIMAL(18,6) | `saltUse` | 소금 사용 |
+| `SALT_FLUIDIZED` | DECIMAL(18,6) | `saltFluidized` | 소금 유동상 |
+| `SALT_STOCK` | DECIMAL(18,6) | `saltStock` | 소금 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `CAUSTIC_IN` | DECIMAL(18,6) | `causticIn` | 가성 반입 |
+| `CAUSTIC_USE` | DECIMAL(18,6) | `causticUse` | 가성 사용 |
+| `CAUSTIC_STOCK` | DECIMAL(18,6) | `causticStock` | 가성 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `CARBON_IN` | DECIMAL(18,6) | `carbonIn` | 활성탄 반입 |
+| `CARBON_USE` | DECIMAL(18,6) | `carbonUse` | 활성탄 사용 |
+| `CARBON_STOCK` | DECIMAL(18,6) | `carbonStock` | 활성탄 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `OIL_IN` | DECIMAL(18,6) | `oilIn` | 부생유 반입 |
+| `OIL_U1` | DECIMAL(18,6) | `oilU1` | 부생유 폐1 |
+| `OIL_U2` | DECIMAL(18,6) | `oilU2` | 부생유 폐2 |
+| `OIL_SLUDGE1` | DECIMAL(18,6) | `oilSludge1` | 부생유 슬1 |
+| `OIL_SLUDGE2` | DECIMAL(18,6) | `oilSludge2` | 부생유 슬2 |
+| `OIL_STOCK` | DECIMAL(18,6) | `oilStock` | 부생유 재고량 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `CLINKER_SIDE_WALL` | DECIMAL(18,6) | `clinkerSideWall` | 크링커 측벽 |
+| `CLINKER_DROP` | DECIMAL(18,6) | `clinkerDrop` | 크링커 낙차 |
+| `CLINKER_IN` | DECIMAL(18,6) | `clinkerIn` | 크링커 반입 |
+| `CLINKER_USE` | DECIMAL(18,6) | `clinkerUse` | 크링커 사용 |
+| `CLINKER_STOCK` | DECIMAL(18,6) | `clinkerStock` | 크링커 재고 — 1일 행에 월초 재고를 넣는다 (2일부터는 화면 계산) |
+| `TMS_U1_DUST` | DECIMAL(18,6) | `tmsU1Dust` | TMS 폐#1 분진 |
+| `TMS_U1_CO` | DECIMAL(18,6) | `tmsU1Co` | TMS 폐#1 CO |
+| `TMS_U1_NOX` | DECIMAL(18,6) | `tmsU1Nox` | TMS 폐#1 Nox |
+| `TMS_U1_SOX` | DECIMAL(18,6) | `tmsU1Sox` | TMS 폐#1 Sox |
+| `TMS_U1_HCL` | DECIMAL(18,6) | `tmsU1Hcl` | TMS 폐#1 HCl |
+| `TMS_U1_TEMP` | DECIMAL(18,6) | `tmsU1Temp` | TMS 폐#1 온도 |
+| `TMS_U2_DUST` | DECIMAL(18,6) | `tmsU2Dust` | TMS 폐#2 분진 |
+| `TMS_U2_CO` | DECIMAL(18,6) | `tmsU2Co` | TMS 폐#2 CO |
+| `TMS_U2_NOX` | DECIMAL(18,6) | `tmsU2Nox` | TMS 폐#2 Nox |
+| `TMS_U2_SOX` | DECIMAL(18,6) | `tmsU2Sox` | TMS 폐#2 Sox |
+| `TMS_U2_HCL` | DECIMAL(18,6) | `tmsU2Hcl` | TMS 폐#2 HCl |
+| `TMS_U2_TEMP` | DECIMAL(18,6) | `tmsU2Temp` | TMS 폐#2 온도 |
+| `INBOUND_VENDOR01` | DECIMAL(18,6) | `inboundVendor01` | 외부반입 업체 1번 칸 (보노아) |
+| `INBOUND_VENDOR02` | DECIMAL(18,6) | `inboundVendor02` | 외부반입 업체 2번 칸 (스라이브) |
+| `INBOUND_VENDOR03` | DECIMAL(18,6) | `inboundVendor03` | 외부반입 업체 3번 칸 (나투라) |
+| `INBOUND_VENDOR04` | DECIMAL(18,6) | `inboundVendor04` | 외부반입 업체 4번 칸 (대한제지) |
+| `INBOUND_VENDOR05` | DECIMAL(18,6) | `inboundVendor05` | 외부반입 업체 5번 칸 (신성) |
+| `INBOUND_VENDOR06` | DECIMAL(18,6) | `inboundVendor06` | 외부반입 업체 6번 칸 (그린이엔텍) |
+| `INBOUND_VENDOR07` | DECIMAL(18,6) | `inboundVendor07` | 외부반입 업체 7번 칸 (금보산업) |
+| `INBOUND_VENDOR08` | DECIMAL(18,6) | `inboundVendor08` | 외부반입 업체 8번 칸 (청원es) |
+| `INBOUND_VENDOR09` | DECIMAL(18,6) | `inboundVendor09` | 외부반입 업체 9번 칸 (티와이) |
+| `INBOUND_VENDOR10` | DECIMAL(18,6) | `inboundVendor10` | 외부반입 업체 10번 칸 (재운산업) |
+| `INBOUND_VENDOR11` | DECIMAL(18,6) | `inboundVendor11` | 외부반입 업체 11번 칸 (현진RC) |
+| `INBOUND_VENDOR12` | DECIMAL(18,6) | `inboundVendor12` | 외부반입 업체 12번 칸 (중앙이엔비) |
+| `INBOUND_VENDOR13` | DECIMAL(18,6) | `inboundVendor13` | 외부반입 업체 13번 칸 (주원) |
+| `INBOUND_VENDOR14` | DECIMAL(18,6) | `inboundVendor14` | 외부반입 업체 14번 칸 (태창) |
+| `GEN_WOOD` | DECIMAL(18,6) | `genWood` | 폐기물발생 폐목재 |
+| `GEN_SAENGBUL` | DECIMAL(18,6) | `genSaengbul` | 폐기물발생 생불 |
+| `GEN_PLASTIC` | DECIMAL(18,6) | `genPlastic` | 폐기물발생 폐합성 |
+| `GEN_REJECT` | DECIMAL(18,6) | `genReject` | 폐기물발생 리젝트 |
+| `GEN_RAGGER` | DECIMAL(18,6) | `genRagger` | 폐기물발생 라가 |
+| `GEN_STOCK` | DECIMAL(18,6) | `genStock` | 폐기물발생 재고량 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/waste-incin-daily-logs?year=[&month=]` | 폐합성소각로 운전일지 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/waste-incin-daily-logs` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/waste-incin-daily-logs/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/waste-incin-daily-logs/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/waste-incin-log-excel/import-excel` | 운전일지 엑셀 가져오기 (multipart `file`, `year`, `month`) |
+| `GET` | `/steam-energy-api/waste-incin-log-excel/export-excel?year=&month=` | 운전일지 엑셀 내려받기 (파일 응답) |
+
+### 다른 화면과의 연동
+
+- 다른 화면 · 다른 표와 연동이 없다 (소각로 도급내역 · 일일 사용량의 스팀량과는 따로 입력한다)
+
+### 데이터 이관
+
+`migration/2026-11-20_waste_incin_log_cells_to_table.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 숫자 칸의 글자는 옮기지 않는다.
 
 ## 메뉴 / 권한
 
