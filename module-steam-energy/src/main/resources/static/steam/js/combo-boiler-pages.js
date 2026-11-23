@@ -116,10 +116,12 @@
       ["스팀총계", ["totalSteam", "totalSteamHour"]],
     ] },
     { id: "reference", label: "참고자료",
-      note: "참고자료입니다. 스팀총계와 스팀 원단위에는 들어가지 않습니다.",
+      note: "참고자료입니다. 스팀총계와 스팀 원단위에는 들어가지 않습니다. 회색 칸은 비교용으로 다른 탭의 값을 가져온 것입니다.",
       groups: [
         ["폐합성소각로 기관실유량계", ["wasteRoomSteam2", "viewWaste2", "wasteRoomDiff"]],
-        ["유동상 보일러", ["fluidizedTotalSteam", "fluidizedTotalCondensate"]],
+        // 비교할 수 있게 합계에 들어가는 값(스팀 생산량 FI-304 · 응축수 FI-07)을 바로 옆에 읽기 전용으로 둔다
+        ["유동상 보일러 스팀", ["fluidizedTotalSteam", "viewFluidizedSteam", "fluidizedSteamDiff"]],
+        ["유동상 보일러 응축수", ["fluidizedTotalCondensate", "viewFluidizedCondensate", "fluidizedCondensateDiff"]],
       ] },
   ];
 
@@ -158,7 +160,11 @@
     viewWaste2: ["2호 스팀 구입량", "T/D", "calc"],
     wasteRoomDiff: ["편차 (구입량 − 기관실)", "T/D", "calc"],
     fluidizedTotalSteam: ["총스팀량 (FI-301)", "T/D", "input"],
+    viewFluidizedSteam: ["스팀 생산량 (FI-304)", "T/D", "calc"],
+    fluidizedSteamDiff: ["편차 (총스팀량 − 생산량)", "T/D", "calc"],
     fluidizedTotalCondensate: ["응축수 (FI-303)", "㎥/D", "input"],
+    viewFluidizedCondensate: ["응축수 (FI-07)", "㎥/D", "calc"],
+    fluidizedCondensateDiff: ["편차 (FI-303 − FI-07)", "㎥/D", "calc"],
   };
 
   // 스팀총계에 들어가는 일곱 칸 (참고자료 칸은 없다)
@@ -189,6 +195,16 @@
     totalSteam: (day) => addFields(TOTAL_STEAM_FIELDS, day),
     totalSteamHour: (day) => perHour(addFields(TOTAL_STEAM_FIELDS, day)),
     viewWaste2: (day) => dayValue("wasteSteam2", day),
+    viewFluidizedSteam: (day) => dayValue("fluidizedSteam", day),
+    viewFluidizedCondensate: (day) => dayValue("fluidizedCondensate", day),
+    fluidizedSteamDiff: (day) => {
+      const total = dayValue("fluidizedTotalSteam", day);
+      return total === null ? null : total - (dayValue("fluidizedSteam", day) ?? 0);
+    },
+    fluidizedCondensateDiff: (day) => {
+      const total = dayValue("fluidizedTotalCondensate", day);
+      return total === null ? null : total - (dayValue("fluidizedCondensate", day) ?? 0);
+    },
     wasteRoomDiff: (day) => {
       const room = dayValue("wasteRoomSteam2", day);
       return room === null ? null : (dayValue("wasteSteam2", day) ?? 0) - room;
