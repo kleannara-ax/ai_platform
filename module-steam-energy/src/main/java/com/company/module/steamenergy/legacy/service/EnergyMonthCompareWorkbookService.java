@@ -77,7 +77,10 @@ public class EnergyMonthCompareWorkbookService {
             new RowMap("fuel", "compositeInvest", 12, "복합 투자비 감가상각"),
             new RowMap("fuel", "compositeIncome", 13, "복합보일러 처분수익 연료비 차감분"),
             new RowMap("fuel", "landLease",       14, "토지 지상권 지료"),
-            // r15 deductSubtotal = formula / r16 fuelActual = formula
+            // r15 deductSubtotal = formula
+            // r16 fuelActual = 화면 계산값이지만 배분비율 화면이 읽는다. 올리면서 그 해를 비우므로
+            //     마감비교 화면을 다시 열기 전까지 빈 값이 되지 않게 원본의 계산 결과를 넣어 둔다 (화면을 열면 다시 계산해 덮는다).
+            new RowMap("fuel", "fuelActual",      16, "연료비(회계비용) 실적"),
             new RowMap("fuel", "paperFuel",       17, "제지 연료비(스팀사용비율)"),
             new RowMap("fuel", "livingFuel",      18, "생활 연료비(스팀사용비율)"),
             new RowMap("fuel", "fuelPlan",        19, "연료비(회계비용) SG 계획금액"),
@@ -92,8 +95,9 @@ public class EnergyMonthCompareWorkbookService {
             new RowMap("fuel", "livingProfit",    30, "생활손익"),
             // r31 profitSum = formula
             new RowMap("fuel", "steamProd",       32, "스팀생산량"),
-            new RowMap("fuel", "lngBurner",       33, "LNG 직버너 사용 비용")
-            // r34~r36 = formula
+            new RowMap("fuel", "lngBurner",       33, "LNG 직버너 사용 비용"),
+            // r34~r35 = formula / r36 fuelSteamUnit = fuelActual 과 같은 이유로 원본 계산 결과를 넣어 둔다
+            new RowMap("fuel", "fuelSteamUnit",   36, "스팀톤당 연료비 (천원/톤)")
 
             // 37행 이후(전력비·에너지 합산)는 연동하지 않는다 — 화면에서 뺀 항목이라
             // 엑셀에서 읽어 와도 쓰는 곳이 없다. 36행까지(연료비)만 왕복한다.
