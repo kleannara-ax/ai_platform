@@ -177,9 +177,10 @@ public class IpAddressController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String ipGroup,
             @RequestParam(required = false) String site,
+            @RequestParam(required = false) String layout,   // ip = IP관리 표, pc = PC관리 표 (서울), 미지정 = 전체 PC 목록
             Authentication authentication) {
-        byte[] body = ipAddressService.exportExcel(keyword, searchField, status, department, ipGroup, site, authentication);
-        String filename = "ip_addresses.xlsx";
+        byte[] body = ipAddressService.exportExcel(keyword, searchField, status, department, ipGroup, site, layout, authentication);
+        String filename = "ip".equals(layout) ? "ip_management.xlsx" : "pc".equals(layout) ? "pc_management.xlsx" : "ip_addresses.xlsx";
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -195,8 +196,9 @@ public class IpAddressController {
     public ResponseEntity<ApiResponse<IpExcelUploadResult>> uploadExcel(
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String site,
+            @RequestParam(required = false) String layout,   // ip = IP관리 표, pc = PC관리 표 (서울), 미지정 = 전체 PC 목록(신규만)
             Authentication authentication) {
         String changedBy = (authentication != null) ? authentication.getName() : "upload";
-        return ResponseEntity.ok(ApiResponse.success(ipAddressService.importExcel(file, site, changedBy, authentication)));
+        return ResponseEntity.ok(ApiResponse.success(ipAddressService.importExcel(file, site, changedBy, authentication, layout)));
     }
 }

@@ -7,7 +7,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 
 번호는 실행 순서 그대로다(건너뛰는 번호 없음). 모든 파일이 재실행해도 안전한 idempotent
 패턴(표는 `IF NOT EXISTS`, 컬럼/인덱스는 `INFORMATION_SCHEMA` 존재 체크 후 추가, 메뉴는 삭제 후
-재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 13번까지
+재삽입, 코드/명단은 없을 때만 추가)이므로, **신규 설치든 기존 배포 DB든 01번부터 14번까지
 순서대로 전부 실행**하면 된다.
 
 | 순서 | 파일 | 설명 |
@@ -25,6 +25,7 @@ KIMS(IT 운영 관리) 모듈의 DB 스크립트. 플랫폼과 **같은 DB** 를
 | 11 | `11_delete_disposed_win7_notebooks.sql` | 별도관리(IP 없음) 노트북 중 OS가 Win 7 계열인 장비 삭제(이력 포함) — 창고 보관 노트북 전량 폐기(2026-09-23). 재실행 안전, 10번과 순서 무관 |
 | 12 | `12_supply_issue_without_request.sql` | 소모품 지급(출고)을 업무요청 없이도 등록 — `supply_issue.REQUEST_ID` NULL 허용, `REQUESTER_NAME`(요청자명) 컬럼 추가 후 기존 지급 내역은 연결된 요청의 요청자명으로 백필. 코드 배포 전 실행 필수(idempotent) |
 | 13 | `13_inventory_transaction_date_issue_link.sql` | 소모품 입출고 이력(`inventory_transaction`)에 입출고일(`TRANSACTION_DATE`)·세부 구분(`SUB_TYPE`)·지급 내역 연결(`ISSUE_ID`) 추가 + 기존 이력 백필. 입고일/출고일 표시, 요청자·지급대상자 표시, 이력 취소·수정에 사용. 코드 배포 전 실행 필수(idempotent) |
+| 14 | `14_ip_address_group_backfill.sql` | PC 관리 화면에서 신규 등록한 IP 의 IP 그룹(`IP_GROUP`)이 비어 저장되던 문제 보정 — IP 주소는 있는데 그룹이 빈 행을 IP 앞 3자리로 채움(목록 정렬·그룹 필터 정상화). 데이터 보정만, 구조 변경 없음(idempotent) |
 
 ```bash
 mysql -u root --default-character-set=utf8mb4 {db} < 01_schema.sql
@@ -40,6 +41,7 @@ mysql -u root --default-character-set=utf8mb4 {db} < 10_klogi_sync_20260923.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 11_delete_disposed_win7_notebooks.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 12_supply_issue_without_request.sql
 mysql -u root --default-character-set=utf8mb4 {db} < 13_inventory_transaction_date_issue_link.sql
+mysql -u root --default-character-set=utf8mb4 {db} < 14_ip_address_group_backfill.sql
 ```
 
 ### 기존 KIMS 데이터를 함께 옮길 때
