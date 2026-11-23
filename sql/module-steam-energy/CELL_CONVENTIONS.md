@@ -114,4 +114,6 @@ SELECT month, col_index, COUNT(*) AS cnt
 | `steam_cell_value` / 월 키 `YYYY-00` 의 `*-record:*` | `steam_incident` (FACILITY · KIND · RECORD_KEY) (2026-11-20) |
 | `steam_cell_value` / 월 키 `YYYY-00` 의 `improvement-monthly:*`, `improvement-item:*` | `steam_fluidized_improvement_payment`, `steam_fluidized_improvement_item` |
 | `waste_incin_log` | `steam_waste_incin_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-20) |
+| `fluidized_detail_main` | `steam_fluidized_detail_daily` (일별 입력), `steam_fluidized_detail_month` (단가 · 비용), `steam_fluidized_detail_custom_row` (추가 행) (2026-11-20) |
+| `fluidized_daily_log` | `steam_fluidized_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-23) |
 | 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

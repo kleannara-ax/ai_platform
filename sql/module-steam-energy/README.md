@@ -239,6 +239,10 @@ DELETE FROM steam_price
 | `steam_fluidized_improvement_payment` | 유동상 설비개선 월별 비용 — 유동상 운영내역 › 설비개선 › 월별개선 (unit-fluidized-improvement.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
 | `steam_fluidized_improvement_item` | 유동상 설비개선 항목 — 유동상 운영내역 › 설비개선 › 항목개선 (unit-fluidized-improvement.html) (8개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, RECORD_KEY)` |
 | `steam_waste_incin_daily_log` | 폐합성소각로 운전일지 — 폐합성수지 소각로 › 운전일지 (waste-incinerator-log.html) (87개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_fluidized_detail_daily` | 유동상 세부 운영내역 (일별) — 유동상 운영내역 › 세부 운영내역 · 유동상 운전일지 (unit-fluidized-detail.html, fluidized-daily-log.html) (65개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_fluidized_detail_month` | 유동상 세부 운영내역 (월별 단가·비용) — 유동상 운영내역 › 세부 운영내역 (unit-fluidized-detail.html) (50개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
+| `steam_fluidized_detail_custom_row` | 유동상 세부 운영내역 (추가 행) — 유동상 운영내역 › 세부 운영내역 — 사용자가 추가한 행 (unit-fluidized-detail.html) (33개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` |
+| `steam_fluidized_daily_log` | 유동상 운전일지 — 유동상 운영내역 › 운전일지 (fluidized-daily-log.html) (75개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1337,6 +1341,337 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 ### 데이터 이관
 
 `migration/2026-11-20_waste_incin_log_cells_to_table.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 숫자 칸의 글자는 옮기지 않는다.
+
+## 유동상 세부 운영내역 전환 (2026-11-20) — 업무 모듈 규격 4-1 맞춤 (묶음 4-B)
+
+유동상 세부 운영내역(엑셀 `3. 세부 운영내역` 시트 모양의 화면)을 옛 `steam_cell_value` (표 이름 `fluidized_detail_main`, 월 키 `YYYY-MM`, 키 = 엑셀 셀 주소, col_index 0)에서 실제 컬럼 표 3개로 옮겼다: 일별 입력(하루 한 행), 월별 입력(단가 · 비용), 사용자가 추가한 행.
+화면과 계산 서비스는 여전히 셀 주소(`C18`, `AJ50`, `AK15`, `custom|구역|행|…`)로 일한다. 화면은 `js/fluidized-detail-store.js`, 서버는 `service/table/FluidizedDetailCellStore` 가 셀 주소 ↔ 표 컬럼을 옮긴다 (행 번호 → 필드 표는 `service/table/FluidizedDetailFields`).
+
+### 설계 규칙
+
+- 일자 열 C~AG = 1~31일 (열 번호 = 일 + 2). 입력 행만 컬럼이 된다 — 수식 행(운휴시간 · 구매비 · 고정비 · 재고 · 소계 · 합계 · 평균 · 비용)은 `FluidizedDetailWorkbookService` 가 계산하고 저장하지 않는다.
+- 스팀 송기량(7행)은 이 표가 아니라 `steam_fuel_daily_usage.FLUID_STEAM_TON` 이다 (묶음 1).
+- 단가(AJ 열)는 직접 입력하는 줄만 월별 컬럼이 된다. 서식 수식을 따르는 줄(탄산암모늄 사용 = 반입 단가 등)은 저장하지 않는다. `POWER_UREA_UNIT_PRICE` · `POWER_FD_FAN_UNIT_PRICE` · `SRF_UNIT_PRICE` 는 NULL 이면 서식 수식을 따른다.
+- 약품 재고는 저장하지 않는다 — 데이터가 있는 첫 달부터 반입 − 사용을 이어 계산한다 (예전과 같다).
+- 소각재 반출 · 슬러지위탁 업체는 칸을 고정한다 (`…01`~). 순서는 서식의 업체 순서.
+- 사용자가 추가한 행은 한 행이 한 줄이다 (구역 · 행 식별자). 일자 값은 `DAY01`~`DAY31`.
+- 규사 사용 줄(40행)은 숫자면 일별 컬럼, 글자(`사용량 측정불가`)면 월별 `SILICA_SAND_USE_NOTE` 에 둔다.
+- 숫자 칸에 숫자가 아닌 글자를 넣으면 저장하지 않는다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_fluidized_detail_daily`** — 유동상 세부 운영내역 (일별) · 키 `(USAGE_DATE)` · 옛 저장소: `fluidized_detail_main` 의 `{C~AG}{행}` (4행→`runHours`, 6행→`steamProducedTon`, 8행→`sludgeBurnTon`, 9행→`srfBurnTon`, 11행→`steamUnitPrice`, 13행→`stopHourUnitPrice`, 18행→`ammoniumCarbonateInKg`, 19행→`ammoniumCarbonateUseKg`, 21행→`boilerChemInKg`, 22행→`boilerChemUseKg`, 24행→`activatedCarbonInKg`, 25행→`activatedCarbonUseKg`, 27행→`causticSodaInKg`, 28행→`causticSodaUseKg`, 30행→`slakedLimeInKg`, 31행→`slakedLimeUseKg`, 33행→`saltInKg`, 34행→`saltUseKg`, 36행→`dieselInL`, 37행→`dieselUseL`, 39행→`silicaSandInKg`, 40행→`silicaSandUseKg`, 41행→`activatedCarbonExtraInKg`, 42행→`emergencyDieselInL`, 46행→`srfInTon`, 49행→`flyAshGeneratedTon`, 50행→`flyAshOut01Ton`, 51행→`flyAshOut02Ton`, 52행→`flyAshOut03Ton`, 53행→`flyAshOut04Ton`, 54행→`flyAshOut05Ton`, 55행→`flyAshOut06Ton`, 56행→`flyAshOut07Ton`, 57행→`flyAshOut08Ton`, 58행→`bottomAshGeneratedTon`, 59행→`bottomAshOut01Ton`, 60행→`bottomAshOut02Ton`, 61행→`bottomAshOut03Ton`, 62행→`bottomAshOut04Ton`, 65행→`powerMainKwh`, 66행→`powerAshVentFilterKwh`, 67행→`powerBagFilterKwh`, 68행→`powerScrubberKwh`, 69행→`powerCarbonFeedKwh`, 70행→`powerLimeFeedKwh`, 71행→`powerUreaKwh`, 72행→`powerFdFanKwh`, 74행→`reuseWaterTon`, 75행→`riverbedWaterTon`, 76행→`condensateTon`, 77행→`boilerFeedWaterTon`, 78행→`wasteWaterTon`, 79행→`softWaterTon`, 81행→`sludgeOutsource01Ton`, 82행→`sludgeOutsource02Ton`, 83행→`sludgeOutsource03Ton`, 84행→`sludgeOutsource04Ton`, 85행→`sludgeOutsource05Ton`, 86행→`sludgeOutsource06Ton`, 87행→`sludgeOutsource07Ton`, 88행→`sludgeOutsource08Ton`, 89행→`sludgeOutsource09Ton`, 90행→`sludgeOutsource10Ton`, 91행→`sludgeOutsource11Ton`, 92행→`inspectionFeeQty`)
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `RUN_HOURS` | DECIMAL(18,6) | `runHours` | 가동시간(HR) — 서식 4행 |
+| `STEAM_PRODUCED_TON` | DECIMAL(18,6) | `steamProducedTon` | 스팀 생산량(톤) — 서식 6행 |
+| `SLUDGE_BURN_TON` | DECIMAL(18,6) | `sludgeBurnTon` | 소각량 슬러지(톤) — 서식 8행 |
+| `SRF_BURN_TON` | DECIMAL(18,6) | `srfBurnTon` | 소각량 SRF(톤) — 서식 9행 |
+| `STEAM_UNIT_PRICE` | DECIMAL(18,6) | `steamUnitPrice` | KNE 스팀단가(원/톤) — 서식 11행 |
+| `STOP_HOUR_UNIT_PRICE` | DECIMAL(18,6) | `stopHourUnitPrice` | KNE 운휴시간 단가(원/시간) — 서식 13행 |
+| `AMMONIUM_CARBONATE_IN_KG` | DECIMAL(18,6) | `ammoniumCarbonateInKg` | 탄산암모늄 반입(KG) — 서식 18행 |
+| `AMMONIUM_CARBONATE_USE_KG` | DECIMAL(18,6) | `ammoniumCarbonateUseKg` | 탄산암모늄 사용(KG) — 서식 19행 |
+| `BOILER_CHEM_IN_KG` | DECIMAL(18,6) | `boilerChemInKg` | 청관제 반입(KG) — 서식 21행 |
+| `BOILER_CHEM_USE_KG` | DECIMAL(18,6) | `boilerChemUseKg` | 청관제 사용(KG) — 서식 22행 |
+| `ACTIVATED_CARBON_IN_KG` | DECIMAL(18,6) | `activatedCarbonInKg` | 활성탄 반입(KG) — 서식 24행 |
+| `ACTIVATED_CARBON_USE_KG` | DECIMAL(18,6) | `activatedCarbonUseKg` | 활성탄 사용(KG) — 서식 25행 |
+| `CAUSTIC_SODA_IN_KG` | DECIMAL(18,6) | `causticSodaInKg` | 가성소다 반입(KG) — 서식 27행 |
+| `CAUSTIC_SODA_USE_KG` | DECIMAL(18,6) | `causticSodaUseKg` | 가성소다 사용(KG) — 서식 28행 |
+| `SLAKED_LIME_IN_KG` | DECIMAL(18,6) | `slakedLimeInKg` | 소석회 반입(KG) — 서식 30행 |
+| `SLAKED_LIME_USE_KG` | DECIMAL(18,6) | `slakedLimeUseKg` | 소석회 사용(KG) — 서식 31행 |
+| `SALT_IN_KG` | DECIMAL(18,6) | `saltInKg` | 소금 반입(KG) — 서식 33행 |
+| `SALT_USE_KG` | DECIMAL(18,6) | `saltUseKg` | 소금 사용(KG) — 서식 34행 |
+| `DIESEL_IN_L` | DECIMAL(18,6) | `dieselInL` | 경유 반입(L) — 서식 36행 |
+| `DIESEL_USE_L` | DECIMAL(18,6) | `dieselUseL` | 경유 사용(L) — 서식 37행 |
+| `SILICA_SAND_IN_KG` | DECIMAL(18,6) | `silicaSandInKg` | 규사 반입(KG) — 서식 39행 |
+| `SILICA_SAND_USE_KG` | DECIMAL(18,6) | `silicaSandUseKg` | 규사 사용(KG) — 서식 40행 |
+| `ACTIVATED_CARBON_EXTRA_IN_KG` | DECIMAL(18,6) | `activatedCarbonExtraInKg` | 활성탄 반입(KG) — 약품 아래 둘째 줄 — 서식 41행 |
+| `EMERGENCY_DIESEL_IN_L` | DECIMAL(18,6) | `emergencyDieselInL` | 경유(L)-비상발전기 반입 — 서식 42행 |
+| `SRF_IN_TON` | DECIMAL(18,6) | `srfInTon` | SRF 반입 (서식 이름은 KG, 값은 톤) — 서식 46행 |
+| `FLY_ASH_GENERATED_TON` | DECIMAL(18,6) | `flyAshGeneratedTon` | 소각재 비산재(발생) — 서식 49행 |
+| `FLY_ASH_OUT_01_TON` | DECIMAL(18,6) | `flyAshOut01Ton` | 소각재 비산재(반출) 1번 칸 (조은) — 서식 50행 |
+| `FLY_ASH_OUT_02_TON` | DECIMAL(18,6) | `flyAshOut02Ton` | 소각재 비산재(반출) 2번 칸 (씨엠디기술단) — 서식 51행 |
+| `FLY_ASH_OUT_03_TON` | DECIMAL(18,6) | `flyAshOut03Ton` | 소각재 비산재(반출) 3번 칸 (대광소재) — 서식 52행 |
+| `FLY_ASH_OUT_04_TON` | DECIMAL(18,6) | `flyAshOut04Ton` | 소각재 비산재(반출) 4번 칸 (아이케이) — 서식 53행 |
+| `FLY_ASH_OUT_05_TON` | DECIMAL(18,6) | `flyAshOut05Ton` | 소각재 비산재(반출) 5번 칸 (연경기초소재) — 서식 54행 |
+| `FLY_ASH_OUT_06_TON` | DECIMAL(18,6) | `flyAshOut06Ton` | 소각재 비산재(반출) 6번 칸 (느티나무) — 서식 55행 |
+| `FLY_ASH_OUT_07_TON` | DECIMAL(18,6) | `flyAshOut07Ton` | 소각재 비산재(반출) 7번 칸 (모두그린) — 서식 56행 |
+| `FLY_ASH_OUT_08_TON` | DECIMAL(18,6) | `flyAshOut08Ton` | 소각재 비산재(반출) 8번 칸 (주영이엔티) — 서식 57행 |
+| `BOTTOM_ASH_GENERATED_TON` | DECIMAL(18,6) | `bottomAshGeneratedTon` | 소각재 바닥재(발생) — 서식 58행 |
+| `BOTTOM_ASH_OUT_01_TON` | DECIMAL(18,6) | `bottomAshOut01Ton` | 소각재 바닥재(반출) 1번 칸 (하이콘코리아) — 서식 59행 |
+| `BOTTOM_ASH_OUT_02_TON` | DECIMAL(18,6) | `bottomAshOut02Ton` | 소각재 바닥재(반출) 2번 칸 (제이에이그린) — 서식 60행 |
+| `BOTTOM_ASH_OUT_03_TON` | DECIMAL(18,6) | `bottomAshOut03Ton` | 소각재 바닥재(반출) 3번 칸 (새롬산업) — 서식 61행 |
+| `BOTTOM_ASH_OUT_04_TON` | DECIMAL(18,6) | `bottomAshOut04Ton` | 소각재 바닥재(반출) 4번 칸 (삼영에스엔알) — 서식 62행 |
+| `POWER_MAIN_KWH` | DECIMAL(18,6) | `powerMainKwh` | 전력량 Main(KW) — 서식 65행 |
+| `POWER_ASH_VENT_FILTER_KWH` | DECIMAL(18,6) | `powerAshVentFilterKwh` | 전력량 Ash 밴트필터(KW) — 서식 66행 |
+| `POWER_BAG_FILTER_KWH` | DECIMAL(18,6) | `powerBagFilterKwh` | 전력량 백필터(KW) — 서식 67행 |
+| `POWER_SCRUBBER_KWH` | DECIMAL(18,6) | `powerScrubberKwh` | 전력량 스크러버(KW) — 서식 68행 |
+| `POWER_CARBON_FEED_KWH` | DECIMAL(18,6) | `powerCarbonFeedKwh` | 전력량 활성탄공급(KW) — 서식 69행 |
+| `POWER_LIME_FEED_KWH` | DECIMAL(18,6) | `powerLimeFeedKwh` | 전력량 소석회공급(KW) — 서식 70행 |
+| `POWER_UREA_KWH` | DECIMAL(18,6) | `powerUreaKwh` | 전력량 요소수(KW) — 서식 71행 |
+| `POWER_FD_FAN_KWH` | DECIMAL(18,6) | `powerFdFanKwh` | 전력량 F.D FAN(KW) — 서식 72행 |
+| `REUSE_WATER_TON` | DECIMAL(18,6) | `reuseWaterTon` | 용수 재이용수 — 서식 74행 |
+| `RIVERBED_WATER_TON` | DECIMAL(18,6) | `riverbedWaterTon` | 용수 복류수 — 서식 75행 |
+| `CONDENSATE_TON` | DECIMAL(18,6) | `condensateTon` | 용수 응축수 — 서식 76행 |
+| `BOILER_FEED_WATER_TON` | DECIMAL(18,6) | `boilerFeedWaterTon` | 용수 보일러급수 — 서식 77행 |
+| `WASTE_WATER_TON` | DECIMAL(18,6) | `wasteWaterTon` | 용수 폐수 — 서식 78행 |
+| `SOFT_WATER_TON` | DECIMAL(18,6) | `softWaterTon` | 용수 연수 — 서식 79행 |
+| `SLUDGE_OUTSOURCE_01_TON` | DECIMAL(18,6) | `sludgeOutsource01Ton` | 슬러지위탁 1번 칸 (에덴녹화) — 서식 81행 |
+| `SLUDGE_OUTSOURCE_02_TON` | DECIMAL(18,6) | `sludgeOutsource02Ton` | 슬러지위탁 2번 칸 (에코비트) — 서식 82행 |
+| `SLUDGE_OUTSOURCE_03_TON` | DECIMAL(18,6) | `sludgeOutsource03Ton` | 슬러지위탁 3번 칸 (신기산업) — 서식 83행 |
+| `SLUDGE_OUTSOURCE_04_TON` | DECIMAL(18,6) | `sludgeOutsource04Ton` | 슬러지위탁 4번 칸 (진들농산) — 서식 84행 |
+| `SLUDGE_OUTSOURCE_05_TON` | DECIMAL(18,6) | `sludgeOutsource05Ton` | 슬러지위탁 5번 칸 (보림씨에스) — 서식 85행 |
+| `SLUDGE_OUTSOURCE_06_TON` | DECIMAL(18,6) | `sludgeOutsource06Ton` | 슬러지위탁 6번 칸 (삼화그린웰) — 서식 86행 |
+| `SLUDGE_OUTSOURCE_07_TON` | DECIMAL(18,6) | `sludgeOutsource07Ton` | 슬러지위탁 7번 칸 (제이농장) — 서식 87행 |
+| `SLUDGE_OUTSOURCE_08_TON` | DECIMAL(18,6) | `sludgeOutsource08Ton` | 슬러지위탁 8번 칸 (오대오바이오) — 서식 88행 |
+| `SLUDGE_OUTSOURCE_09_TON` | DECIMAL(18,6) | `sludgeOutsource09Ton` | 슬러지위탁 9번 칸 (관동녹화) — 서식 89행 |
+| `SLUDGE_OUTSOURCE_10_TON` | DECIMAL(18,6) | `sludgeOutsource10Ton` | 슬러지위탁 10번 칸 (원진영농) — 서식 90행 |
+| `SLUDGE_OUTSOURCE_11_TON` | DECIMAL(18,6) | `sludgeOutsource11Ton` | 슬러지위탁 11번 칸 (산우리) — 서식 91행 |
+| `INSPECTION_FEE_QTY` | DECIMAL(18,6) | `inspectionFeeQty` | 측정검사비 — 서식 92행 |
+
+**`steam_fluidized_detail_month`** — 유동상 세부 운영내역 (월별 단가·비용) · 키 `(YEAR_NO, MONTH_NO)` · 옛 저장소: `fluidized_detail_main` 의 `AK15` · `AK16` · `AJ{행}` (AJ6→`steamProducedUnitPrice`, AJ18→`ammoniumCarbonateUnitPrice`, AJ21→`boilerChemInUnitPrice`, AJ22→`boilerChemUseUnitPrice`, AJ24→`activatedCarbonInUnitPrice`, AJ25→`activatedCarbonUseUnitPrice`, AJ27→`causticSodaInUnitPrice`, AJ28→`causticSodaUseUnitPrice`, AJ30→`slakedLimeUnitPrice`, AJ33→`saltUnitPrice`, AJ36→`dieselUnitPrice`, AJ40→`silicaSandUseUnitPrice`, AJ46→`srfUnitPrice`, AJ49→`flyAshGeneratedUnitPrice`, AJ50→`flyAshOut01UnitPrice`, AJ51→`flyAshOut02UnitPrice`, AJ52→`flyAshOut03UnitPrice`, AJ53→`flyAshOut04UnitPrice`, AJ54→`flyAshOut05UnitPrice`, AJ55→`flyAshOut06UnitPrice`, AJ56→`flyAshOut07UnitPrice`, AJ57→`flyAshOut08UnitPrice`, AJ58→`bottomAshGeneratedUnitPrice`, AJ59→`bottomAshOut01UnitPrice`, AJ60→`bottomAshOut02UnitPrice`, AJ61→`bottomAshOut03UnitPrice`, AJ62→`bottomAshOut04UnitPrice`, AJ65→`powerUnitPrice`, AJ71→`powerUreaUnitPrice`, AJ72→`powerFdFanUnitPrice`, AJ74→`reuseWaterUnitPrice`, AJ76→`condensateUnitPrice`, AJ77→`boilerFeedWaterUnitPrice`, AJ78→`wasteWaterUnitPrice`, AJ79→`softWaterUnitPrice`, AJ81→`sludgeOutsource01UnitPrice`, AJ82→`sludgeOutsource02UnitPrice`, AJ83→`sludgeOutsource03UnitPrice`, AJ84→`sludgeOutsource04UnitPrice`, AJ85→`sludgeOutsource05UnitPrice`, AJ86→`sludgeOutsource06UnitPrice`, AJ87→`sludgeOutsource07UnitPrice`, AJ88→`sludgeOutsource08UnitPrice`, AJ89→`sludgeOutsource09UnitPrice`, AJ90→`sludgeOutsource10UnitPrice`, AJ91→`sludgeOutsource11UnitPrice`, AJ92→`inspectionFeeUnitPrice`) · `C40` 의 글자
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `IMPROVEMENT_COST` | DECIMAL(18,6) | `improvementCost` | KNE 설비개선비용 (AK15) |
+| `EXTRA_COST` | DECIMAL(18,6) | `extraCost` | KNE 추가비용 (AK16) — 엑셀로만 들어온다 |
+| `STEAM_PRODUCED_UNIT_PRICE` | DECIMAL(18,6) | `steamProducedUnitPrice` | 스팀 생산량 단가 — 서식 AJ6 |
+| `AMMONIUM_CARBONATE_UNIT_PRICE` | DECIMAL(18,6) | `ammoniumCarbonateUnitPrice` | 탄산암모늄 단가 (사용 줄도 같은 값) — 서식 AJ18 |
+| `BOILER_CHEM_IN_UNIT_PRICE` | DECIMAL(18,6) | `boilerChemInUnitPrice` | 청관제 반입 단가 — 서식 AJ21 |
+| `BOILER_CHEM_USE_UNIT_PRICE` | DECIMAL(18,6) | `boilerChemUseUnitPrice` | 청관제 사용 단가 — 서식 AJ22 |
+| `ACTIVATED_CARBON_IN_UNIT_PRICE` | DECIMAL(18,6) | `activatedCarbonInUnitPrice` | 활성탄 반입 단가 — 서식 AJ24 |
+| `ACTIVATED_CARBON_USE_UNIT_PRICE` | DECIMAL(18,6) | `activatedCarbonUseUnitPrice` | 활성탄 사용 단가 — 서식 AJ25 |
+| `CAUSTIC_SODA_IN_UNIT_PRICE` | DECIMAL(18,6) | `causticSodaInUnitPrice` | 가성소다 반입 단가 — 서식 AJ27 |
+| `CAUSTIC_SODA_USE_UNIT_PRICE` | DECIMAL(18,6) | `causticSodaUseUnitPrice` | 가성소다 사용 단가 — 서식 AJ28 |
+| `SLAKED_LIME_UNIT_PRICE` | DECIMAL(18,6) | `slakedLimeUnitPrice` | 소석회 단가 (사용 줄도 같은 값) — 서식 AJ30 |
+| `SALT_UNIT_PRICE` | DECIMAL(18,6) | `saltUnitPrice` | 소금 단가 (사용 줄도 같은 값) — 서식 AJ33 |
+| `DIESEL_UNIT_PRICE` | DECIMAL(18,6) | `dieselUnitPrice` | 경유 단가 (사용 줄도 같은 값) — 서식 AJ36 |
+| `SILICA_SAND_USE_UNIT_PRICE` | DECIMAL(18,6) | `silicaSandUseUnitPrice` | 규사 사용 단가 — 서식 AJ40 |
+| `SRF_UNIT_PRICE` | DECIMAL(18,6) | `srfUnitPrice` | SRF 반입 단가 — 값이 있으면 계산(비용÷반입량) 대신 이 값을 보인다 — 서식 AJ46 |
+| `FLY_ASH_GENERATED_UNIT_PRICE` | DECIMAL(18,6) | `flyAshGeneratedUnitPrice` | 비산재(발생) 단가 — 서식 AJ49 |
+| `FLY_ASH_OUT_01_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut01UnitPrice` | 비산재(반출) 1번 칸 단가 (조은) — 서식 AJ50 |
+| `FLY_ASH_OUT_02_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut02UnitPrice` | 비산재(반출) 2번 칸 단가 (씨엠디기술단) — 서식 AJ51 |
+| `FLY_ASH_OUT_03_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut03UnitPrice` | 비산재(반출) 3번 칸 단가 (대광소재) — 서식 AJ52 |
+| `FLY_ASH_OUT_04_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut04UnitPrice` | 비산재(반출) 4번 칸 단가 (아이케이) — 서식 AJ53 |
+| `FLY_ASH_OUT_05_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut05UnitPrice` | 비산재(반출) 5번 칸 단가 (연경기초소재) — 서식 AJ54 |
+| `FLY_ASH_OUT_06_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut06UnitPrice` | 비산재(반출) 6번 칸 단가 (느티나무) — 서식 AJ55 |
+| `FLY_ASH_OUT_07_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut07UnitPrice` | 비산재(반출) 7번 칸 단가 (모두그린) — 서식 AJ56 |
+| `FLY_ASH_OUT_08_UNIT_PRICE` | DECIMAL(18,6) | `flyAshOut08UnitPrice` | 비산재(반출) 8번 칸 단가 (주영이엔티) — 서식 AJ57 |
+| `BOTTOM_ASH_GENERATED_UNIT_PRICE` | DECIMAL(18,6) | `bottomAshGeneratedUnitPrice` | 바닥재(발생) 단가 — 서식 AJ58 |
+| `BOTTOM_ASH_OUT_01_UNIT_PRICE` | DECIMAL(18,6) | `bottomAshOut01UnitPrice` | 바닥재(반출) 1번 칸 단가 (하이콘코리아) — 서식 AJ59 |
+| `BOTTOM_ASH_OUT_02_UNIT_PRICE` | DECIMAL(18,6) | `bottomAshOut02UnitPrice` | 바닥재(반출) 2번 칸 단가 (제이에이그린) — 서식 AJ60 |
+| `BOTTOM_ASH_OUT_03_UNIT_PRICE` | DECIMAL(18,6) | `bottomAshOut03UnitPrice` | 바닥재(반출) 3번 칸 단가 (새롬산업) — 서식 AJ61 |
+| `BOTTOM_ASH_OUT_04_UNIT_PRICE` | DECIMAL(18,6) | `bottomAshOut04UnitPrice` | 바닥재(반출) 4번 칸 단가 (삼영에스엔알) — 서식 AJ62 |
+| `POWER_UNIT_PRICE` | DECIMAL(18,6) | `powerUnitPrice` | 전력 단가 (Main — 밴트필터~소석회공급 줄도 같은 값) — 서식 AJ65 |
+| `POWER_UREA_UNIT_PRICE` | DECIMAL(18,6) | `powerUreaUnitPrice` | 전력 요소수 단가 (서식은 Main 단가를 따른다) — 서식 AJ71 |
+| `POWER_FD_FAN_UNIT_PRICE` | DECIMAL(18,6) | `powerFdFanUnitPrice` | 전력 F.D FAN 단가 (서식은 Main 단가를 따른다) — 서식 AJ72 |
+| `REUSE_WATER_UNIT_PRICE` | DECIMAL(18,6) | `reuseWaterUnitPrice` | 재이용수 단가 (복류수도 같은 값) — 서식 AJ74 |
+| `CONDENSATE_UNIT_PRICE` | DECIMAL(18,6) | `condensateUnitPrice` | 응축수 단가 — 서식 AJ76 |
+| `BOILER_FEED_WATER_UNIT_PRICE` | DECIMAL(18,6) | `boilerFeedWaterUnitPrice` | 보일러급수 단가 — 서식 AJ77 |
+| `WASTE_WATER_UNIT_PRICE` | DECIMAL(18,6) | `wasteWaterUnitPrice` | 폐수 단가 — 서식 AJ78 |
+| `SOFT_WATER_UNIT_PRICE` | DECIMAL(18,6) | `softWaterUnitPrice` | 연수 단가 — 서식 AJ79 |
+| `SLUDGE_OUTSOURCE_01_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource01UnitPrice` | 슬러지위탁 1번 칸 단가 (에덴녹화) — 서식 AJ81 |
+| `SLUDGE_OUTSOURCE_02_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource02UnitPrice` | 슬러지위탁 2번 칸 단가 (에코비트) — 서식 AJ82 |
+| `SLUDGE_OUTSOURCE_03_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource03UnitPrice` | 슬러지위탁 3번 칸 단가 (신기산업) — 서식 AJ83 |
+| `SLUDGE_OUTSOURCE_04_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource04UnitPrice` | 슬러지위탁 4번 칸 단가 (진들농산) — 서식 AJ84 |
+| `SLUDGE_OUTSOURCE_05_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource05UnitPrice` | 슬러지위탁 5번 칸 단가 (보림씨에스) — 서식 AJ85 |
+| `SLUDGE_OUTSOURCE_06_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource06UnitPrice` | 슬러지위탁 6번 칸 단가 (삼화그린웰) — 서식 AJ86 |
+| `SLUDGE_OUTSOURCE_07_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource07UnitPrice` | 슬러지위탁 7번 칸 단가 (제이농장) — 서식 AJ87 |
+| `SLUDGE_OUTSOURCE_08_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource08UnitPrice` | 슬러지위탁 8번 칸 단가 (오대오바이오) — 서식 AJ88 |
+| `SLUDGE_OUTSOURCE_09_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource09UnitPrice` | 슬러지위탁 9번 칸 단가 (관동녹화) — 서식 AJ89 |
+| `SLUDGE_OUTSOURCE_10_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource10UnitPrice` | 슬러지위탁 10번 칸 단가 (원진영농) — 서식 AJ90 |
+| `SLUDGE_OUTSOURCE_11_UNIT_PRICE` | DECIMAL(18,6) | `sludgeOutsource11UnitPrice` | 슬러지위탁 11번 칸 단가 (산우리) — 서식 AJ91 |
+| `INSPECTION_FEE_UNIT_PRICE` | DECIMAL(18,6) | `inspectionFeeUnitPrice` | 측정검사비 단가 — 서식 AJ92 |
+| `SILICA_SAND_USE_NOTE` | VARCHAR(200) | `silicaSandUseNote` | 규사 사용 줄의 글자 (예: 사용량 측정불가) — 서식 C40 |
+
+**`steam_fluidized_detail_custom_row`** — 유동상 세부 운영내역 (추가 행) · 키 `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` · 옛 저장소: `fluidized_detail_main` 의 `custom|{구역}|{행}|label` · `|insertAfter` · `|d{일}`
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `SECTION` (키) | VARCHAR(30) | `section` | 구역 (kne · chemical · waste · power · water · etc) |
+| `ROW_KEY` (키) | VARCHAR(40) | `rowKey` | 행 식별자 (화면이 만든 값, 예: r1779432186923216) |
+| `LABEL` | VARCHAR(200) | `label` | 행 이름 |
+| `INSERT_AFTER` | INT | `insertAfter` | 이 서식 행 번호 아래에 끼워 넣는다 |
+| `DAY01` | DECIMAL(18,6) | `day01` | 1일 값 |
+| `DAY02` | DECIMAL(18,6) | `day02` | 2일 값 |
+| `DAY03` | DECIMAL(18,6) | `day03` | 3일 값 |
+| `DAY04` | DECIMAL(18,6) | `day04` | 4일 값 |
+| `DAY05` | DECIMAL(18,6) | `day05` | 5일 값 |
+| `DAY06` | DECIMAL(18,6) | `day06` | 6일 값 |
+| `DAY07` | DECIMAL(18,6) | `day07` | 7일 값 |
+| `DAY08` | DECIMAL(18,6) | `day08` | 8일 값 |
+| `DAY09` | DECIMAL(18,6) | `day09` | 9일 값 |
+| `DAY10` | DECIMAL(18,6) | `day10` | 10일 값 |
+| `DAY11` | DECIMAL(18,6) | `day11` | 11일 값 |
+| `DAY12` | DECIMAL(18,6) | `day12` | 12일 값 |
+| `DAY13` | DECIMAL(18,6) | `day13` | 13일 값 |
+| `DAY14` | DECIMAL(18,6) | `day14` | 14일 값 |
+| `DAY15` | DECIMAL(18,6) | `day15` | 15일 값 |
+| `DAY16` | DECIMAL(18,6) | `day16` | 16일 값 |
+| `DAY17` | DECIMAL(18,6) | `day17` | 17일 값 |
+| `DAY18` | DECIMAL(18,6) | `day18` | 18일 값 |
+| `DAY19` | DECIMAL(18,6) | `day19` | 19일 값 |
+| `DAY20` | DECIMAL(18,6) | `day20` | 20일 값 |
+| `DAY21` | DECIMAL(18,6) | `day21` | 21일 값 |
+| `DAY22` | DECIMAL(18,6) | `day22` | 22일 값 |
+| `DAY23` | DECIMAL(18,6) | `day23` | 23일 값 |
+| `DAY24` | DECIMAL(18,6) | `day24` | 24일 값 |
+| `DAY25` | DECIMAL(18,6) | `day25` | 25일 값 |
+| `DAY26` | DECIMAL(18,6) | `day26` | 26일 값 |
+| `DAY27` | DECIMAL(18,6) | `day27` | 27일 값 |
+| `DAY28` | DECIMAL(18,6) | `day28` | 28일 값 |
+| `DAY29` | DECIMAL(18,6) | `day29` | 29일 값 |
+| `DAY30` | DECIMAL(18,6) | `day30` | 30일 값 |
+| `DAY31` | DECIMAL(18,6) | `day31` | 31일 값 |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/fluidized-detail-dailies?year=[&month=]` | 유동상 세부 운영내역 (일별) 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-detail-dailies` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/fluidized-detail-dailies/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-detail-dailies/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-detail-months?year=[&month=]` | 유동상 세부 운영내역 (월별 단가·비용) 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-detail-months` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
+| `PUT` | `/steam-energy-api/fluidized-detail-months/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-detail-months/{id}` | 단건 조회 · 소프트 삭제 |
+| `GET` | `/steam-energy-api/fluidized-detail-custom-rows?year=[&month=]` | 유동상 세부 운영내역 (추가 행) 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-detail-custom-rows` | 행 전체 업서트 `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` |
+| `PUT` | `/steam-energy-api/fluidized-detail-custom-rows/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-detail-custom-rows/{id}` | 단건 조회 · 소프트 삭제 |
+
+### 다른 화면과의 연동
+
+- 유동상 운전일지 화면 · 운전일지 엑셀이 이 일별 표의 가동시간 · 스팀 생산량 · 소각량 · 약품 · SRF 반입 · 전력 · 용수 컬럼을 쓴다 (SRF 소각 · 슬러지 · SRF 입고는 KG → 톤 × 0.001)
+- 단가 입력의 유동상 스팀단가 · 고정비 단가가 `STEAM_UNIT_PRICE` · `STOP_HOUR_UNIT_PRICE` 를 그 달 모든 날에 넣는다 (`POST /steam-energy-api/prices/apply-daily`)
+- 월별 운영내역 · 사업계획대비 실적 · 마감비교(유동상 스팀구매)가 계산된 세부 운영내역(`/steam-energy-api/fluidized-detail/rendered`, `detail-actuals`)을 읽는다
+- 유동상 운영내역 워크북의 `3. 세부 운영내역` 시트를 올리면 그 달의 일별 · 월별 입력을 파일 기준으로 바꾼다 (추가 행은 그대로 둔다)
+
+### 데이터 이관
+
+`migration/2026-11-20_fluidized_detail_cells_to_tables.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 수식 행에 남아 있던 값, 빈 문자열, 숫자 칸의 글자는 옮기지 않는다.
+
+## 유동상 운전일지 전환 (2026-11-23) — 업무 모듈 규격 4-1 맞춤 (묶음 4-C)
+
+유동상 운전일지 화면이 자기 것으로 저장하던 75개 항목을 옛 `steam_cell_value` (표 이름 `fluidized_daily_log`, 월 키 `YYYY-MM`, 키 = 일, col_index = 항목 번호)에서 실제 컬럼 표 1개(하루 한 행)로 옮겼다.
+운전일지의 나머지 항목은 예전처럼 다른 표의 값이다: 소각량 · 스팀 생산량 · 가동시간 · 약품 입고/사용 · 유틸리티 금일 사용량 · 전력 사용량은 세부 운영내역 일별 표(`steam_fluidized_detail_daily`), 스팀 송기량은 `steam_fuel_daily_usage.FLUID_STEAM_TON`.
+화면은 `js/fluidized-detail-store.js` (세부 운영내역 칸)와 `js/fluidized-log-store.js` (운전일지 칸)가 옛 호출 모양을 받아 새 API 로 옮기고, 엑셀은 `service/table/DailyLogCells` + `FluidizedDailyLogFields` 가 옮긴다.
+
+### 설계 규칙
+
+- 누계 · 합계 · 재고량 · 전력 사용량 · 평균은 화면이 계산한다 — 저장하지 않는다 (전력 사용량만 세부 운영내역 일별 표에 넣는다. 다른 화면이 읽기 때문).
+- 전일 재고량 · 전일 지침 · 전일 사용량은 NULL 이면 전날 값을 이어 쓴다. 값을 넣으면 그 날부터 그 값이 기준이 된다.
+- 함수율 취득시간은 화면이 글자 입력이라 글자 그대로 둔다 (`HH:MM`).
+- 숫자 칸에 숫자가 아닌 글자를 넣으면 저장하지 않는다 (옛 데이터의 규사 전일 재고량 `-` 는 옮기지 않았다 — 예전에도 계산에서는 빈 값이었다).
+- 엑셀 가져오기는 예전처럼 값이 있는 칸만 덮어쓴다 — 파일에서 비어 있는 칸은 저장된 값을 지우지 않는다.
+
+### 매핑표 (옛 키 → 표.컬럼)
+
+**`steam_fluidized_daily_log`** — 유동상 운전일지 · 키 `(USAGE_DATE)` · 옛 저장소: `fluidized_daily_log` / 월 키 `YYYY-MM` / 키 = 일(`1`~`31`) / col_index = 항목 번호 (1→`workerAm`, 2→`workerPm`, 3→`workerNight`, 4→`apprLeader`, 5→`apprAssistant`, 6→`apprManager`, 20→`chemAmmoniumCarbonatePrev`, 23→`chemBoilerAgentPrev`, 26→`chemActivatedCarbonPrev`, 29→`chemCausticSodaPrev`, 32→`chemSlakedLimePrev`, 35→`chemSaltPrev`, 38→`chemDieselPrev`, 41→`chemSrfPrev`, 44→`chemSilicaSandPrev`, 50→`ashFlyOut`, 51→`ashBottomOut`, 52→`incombustibleDay`, 53→`incombustibleNight`, 60→`powerMainPrev`, 61→`powerMainToday`, 62→`powerAshSiloPrev`, 63→`powerAshSiloToday`, 64→`powerBagFilterPrev`, 65→`powerBagFilterToday`, 66→`powerScrubberPrev`, 67→`powerScrubberToday`, 68→`powerCarbonFeedPrev`, 69→`powerCarbonFeedToday`, 70→`powerLimeFeedPrev`, 71→`powerLimeFeedToday`, 72→`powerUreaFeedPrev`, 73→`powerUreaFeedToday`, 74→`powerFdPrev`, 75→`powerFdToday`, 76→`powerCarbonBagPrev`, 77→`powerCarbonBagToday`, 78→`powerLimeBagPrev`, 79→`powerLimeBagToday`, 90→`utilReuseWaterPrev`, 92→`utilRiverWaterPrev`, 94→`utilCondensatePrev`, 96→`utilBoilerFeedPrev`, 98→`utilWasteWaterPrev`, 100→`utilSoftWaterPrev`, 200→`moistAm1Time`, 201→`moistAm1Value`, 202→`moistAm2Time`, 203→`moistAm2Value`, 204→`moistAm3Time`, 205→`moistAm3Value`, 206→`moistAm4Time`, 207→`moistAm4Value`, 208→`moistAm5Time`, 209→`moistAm5Value`, 210→`moistPm1Time`, 211→`moistPm1Value`, 212→`moistPm2Time`, 213→`moistPm2Value`, 214→`moistPm3Time`, 215→`moistPm3Value`, 216→`moistPm4Time`, 217→`moistPm4Value`, 218→`moistPm5Time`, 219→`moistPm5Value`, 220→`moistNight1Time`, 221→`moistNight1Value`, 222→`moistNight2Time`, 223→`moistNight2Value`, 224→`moistNight3Time`, 225→`moistNight3Value`, 226→`moistNight4Time`, 227→`moistNight4Value`, 228→`moistNight5Time`, 229→`moistNight5Value`)
+
+| 컬럼 | 타입 | 화면 필드 | 설명 |
+|---|---|---|---|
+| `WORKER_AM` | VARCHAR(100) | `workerAm` | 근무자 오전 |
+| `WORKER_PM` | VARCHAR(100) | `workerPm` | 근무자 오후 |
+| `WORKER_NIGHT` | VARCHAR(100) | `workerNight` | 근무자 야간 |
+| `APPR_LEADER` | VARCHAR(50) | `apprLeader` | 결재 반장 |
+| `APPR_ASSISTANT` | VARCHAR(50) | `apprAssistant` | 결재 대리 |
+| `APPR_MANAGER` | VARCHAR(50) | `apprManager` | 결재 팀장 |
+| `CHEM_AMMONIUM_CARBONATE_PREV` | DECIMAL(18,6) | `chemAmmoniumCarbonatePrev` | 약품 탄산암모늄 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_BOILER_AGENT_PREV` | DECIMAL(18,6) | `chemBoilerAgentPrev` | 약품 청관제 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_ACTIVATED_CARBON_PREV` | DECIMAL(18,6) | `chemActivatedCarbonPrev` | 약품 활성탄 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_CAUSTIC_SODA_PREV` | DECIMAL(18,6) | `chemCausticSodaPrev` | 약품 가성소다 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_SLAKED_LIME_PREV` | DECIMAL(18,6) | `chemSlakedLimePrev` | 약품 소석회 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_SALT_PREV` | DECIMAL(18,6) | `chemSaltPrev` | 약품 소금 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_DIESEL_PREV` | DECIMAL(18,6) | `chemDieselPrev` | 약품 경유(L) 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_SRF_PREV` | DECIMAL(18,6) | `chemSrfPrev` | 약품 SRF 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `CHEM_SILICA_SAND_PREV` | DECIMAL(18,6) | `chemSilicaSandPrev` | 약품 규사 전일 재고량 — 비어 있으면 전날 재고를 이어 쓴다 |
+| `ASH_FLY_OUT` | DECIMAL(18,6) | `ashFlyOut` | 소각재 비산재 반출량(TON) |
+| `ASH_BOTTOM_OUT` | DECIMAL(18,6) | `ashBottomOut` | 소각재 바닥재 반출량(TON) |
+| `INCOMBUSTIBLE_DAY` | DECIMAL(18,6) | `incombustibleDay` | 불연물 주간(대) |
+| `INCOMBUSTIBLE_NIGHT` | DECIMAL(18,6) | `incombustibleNight` | 불연물 야간(대) |
+| `POWER_MAIN_PREV` | DECIMAL(18,6) | `powerMainPrev` | 전력 MAIN 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_MAIN_TODAY` | DECIMAL(18,6) | `powerMainToday` | 전력 MAIN 금일 지침 |
+| `POWER_ASH_SILO_PREV` | DECIMAL(18,6) | `powerAshSiloPrev` | 전력 ASH 저장조 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_ASH_SILO_TODAY` | DECIMAL(18,6) | `powerAshSiloToday` | 전력 ASH 저장조 금일 지침 |
+| `POWER_BAG_FILTER_PREV` | DECIMAL(18,6) | `powerBagFilterPrev` | 전력 BAG FILTER 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_BAG_FILTER_TODAY` | DECIMAL(18,6) | `powerBagFilterToday` | 전력 BAG FILTER 금일 지침 |
+| `POWER_SCRUBBER_PREV` | DECIMAL(18,6) | `powerScrubberPrev` | 전력 SCRUBBER 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_SCRUBBER_TODAY` | DECIMAL(18,6) | `powerScrubberToday` | 전력 SCRUBBER 금일 지침 |
+| `POWER_CARBON_FEED_PREV` | DECIMAL(18,6) | `powerCarbonFeedPrev` | 전력 활성탄 공급 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_CARBON_FEED_TODAY` | DECIMAL(18,6) | `powerCarbonFeedToday` | 전력 활성탄 공급 금일 지침 |
+| `POWER_LIME_FEED_PREV` | DECIMAL(18,6) | `powerLimeFeedPrev` | 전력 소석회 공급 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_LIME_FEED_TODAY` | DECIMAL(18,6) | `powerLimeFeedToday` | 전력 소석회 공급 금일 지침 |
+| `POWER_UREA_FEED_PREV` | DECIMAL(18,6) | `powerUreaFeedPrev` | 전력 요소수 공급 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_UREA_FEED_TODAY` | DECIMAL(18,6) | `powerUreaFeedToday` | 전력 요소수 공급 금일 지침 |
+| `POWER_FD_PREV` | DECIMAL(18,6) | `powerFdPrev` | 전력 F.D 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_FD_TODAY` | DECIMAL(18,6) | `powerFdToday` | 전력 F.D 금일 지침 |
+| `POWER_CARBON_BAG_PREV` | DECIMAL(18,6) | `powerCarbonBagPrev` | 전력 활성탄 BAG 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_CARBON_BAG_TODAY` | DECIMAL(18,6) | `powerCarbonBagToday` | 전력 활성탄 BAG 금일 지침 |
+| `POWER_LIME_BAG_PREV` | DECIMAL(18,6) | `powerLimeBagPrev` | 전력 소석회 BAG 전일 지침 — 비어 있으면 전날 금일 지침을 이어 쓴다 |
+| `POWER_LIME_BAG_TODAY` | DECIMAL(18,6) | `powerLimeBagToday` | 전력 소석회 BAG 금일 지침 |
+| `UTIL_REUSE_WATER_PREV` | DECIMAL(18,6) | `utilReuseWaterPrev` | 유틸리티 재이용수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `UTIL_RIVER_WATER_PREV` | DECIMAL(18,6) | `utilRiverWaterPrev` | 유틸리티 복류수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `UTIL_CONDENSATE_PREV` | DECIMAL(18,6) | `utilCondensatePrev` | 유틸리티 응축수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `UTIL_BOILER_FEED_PREV` | DECIMAL(18,6) | `utilBoilerFeedPrev` | 유틸리티 보일러 급수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `UTIL_WASTE_WATER_PREV` | DECIMAL(18,6) | `utilWasteWaterPrev` | 유틸리티 폐수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `UTIL_SOFT_WATER_PREV` | DECIMAL(18,6) | `utilSoftWaterPrev` | 유틸리티 연수 전일 사용량 — 비어 있으면 전날 금일 사용량을 이어 쓴다 |
+| `MOIST_AM_1_TIME` | VARCHAR(8) | `moistAm1Time` | 함수율 오전 1번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_AM_1_VALUE` | DECIMAL(18,6) | `moistAm1Value` | 함수율 오전 1번 탈수기 (%) |
+| `MOIST_AM_2_TIME` | VARCHAR(8) | `moistAm2Time` | 함수율 오전 2번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_AM_2_VALUE` | DECIMAL(18,6) | `moistAm2Value` | 함수율 오전 2번 탈수기 (%) |
+| `MOIST_AM_3_TIME` | VARCHAR(8) | `moistAm3Time` | 함수율 오전 3번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_AM_3_VALUE` | DECIMAL(18,6) | `moistAm3Value` | 함수율 오전 3번 탈수기 (%) |
+| `MOIST_AM_4_TIME` | VARCHAR(8) | `moistAm4Time` | 함수율 오전 4번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_AM_4_VALUE` | DECIMAL(18,6) | `moistAm4Value` | 함수율 오전 4번 탈수기 (%) |
+| `MOIST_AM_5_TIME` | VARCHAR(8) | `moistAm5Time` | 함수율 오전 5번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_AM_5_VALUE` | DECIMAL(18,6) | `moistAm5Value` | 함수율 오전 5번 탈수기 (%) |
+| `MOIST_PM_1_TIME` | VARCHAR(8) | `moistPm1Time` | 함수율 오후 1번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_PM_1_VALUE` | DECIMAL(18,6) | `moistPm1Value` | 함수율 오후 1번 탈수기 (%) |
+| `MOIST_PM_2_TIME` | VARCHAR(8) | `moistPm2Time` | 함수율 오후 2번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_PM_2_VALUE` | DECIMAL(18,6) | `moistPm2Value` | 함수율 오후 2번 탈수기 (%) |
+| `MOIST_PM_3_TIME` | VARCHAR(8) | `moistPm3Time` | 함수율 오후 3번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_PM_3_VALUE` | DECIMAL(18,6) | `moistPm3Value` | 함수율 오후 3번 탈수기 (%) |
+| `MOIST_PM_4_TIME` | VARCHAR(8) | `moistPm4Time` | 함수율 오후 4번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_PM_4_VALUE` | DECIMAL(18,6) | `moistPm4Value` | 함수율 오후 4번 탈수기 (%) |
+| `MOIST_PM_5_TIME` | VARCHAR(8) | `moistPm5Time` | 함수율 오후 5번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_PM_5_VALUE` | DECIMAL(18,6) | `moistPm5Value` | 함수율 오후 5번 탈수기 (%) |
+| `MOIST_NIGHT_1_TIME` | VARCHAR(8) | `moistNight1Time` | 함수율 야간 1번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_NIGHT_1_VALUE` | DECIMAL(18,6) | `moistNight1Value` | 함수율 야간 1번 탈수기 (%) |
+| `MOIST_NIGHT_2_TIME` | VARCHAR(8) | `moistNight2Time` | 함수율 야간 2번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_NIGHT_2_VALUE` | DECIMAL(18,6) | `moistNight2Value` | 함수율 야간 2번 탈수기 (%) |
+| `MOIST_NIGHT_3_TIME` | VARCHAR(8) | `moistNight3Time` | 함수율 야간 3번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_NIGHT_3_VALUE` | DECIMAL(18,6) | `moistNight3Value` | 함수율 야간 3번 탈수기 (%) |
+| `MOIST_NIGHT_4_TIME` | VARCHAR(8) | `moistNight4Time` | 함수율 야간 4번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_NIGHT_4_VALUE` | DECIMAL(18,6) | `moistNight4Value` | 함수율 야간 4번 탈수기 (%) |
+| `MOIST_NIGHT_5_TIME` | VARCHAR(8) | `moistNight5Time` | 함수율 야간 5번 탈수기 취득시간 (HH:MM, 글자) |
+| `MOIST_NIGHT_5_VALUE` | DECIMAL(18,6) | `moistNight5Value` | 함수율 야간 5번 탈수기 (%) |
+
+### API
+
+쓰기는 모두 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다. 응답은 `ApiResponse`.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/fluidized-daily-logs?year=[&month=]` | 유동상 운전일지 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/fluidized-daily-logs` | 행 전체 업서트 `(USAGE_DATE)` |
+| `PUT` | `/steam-energy-api/fluidized-daily-logs/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/fluidized-daily-logs/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/fluidized-daily-log-excel/import-excel` | 운전일지 엑셀 가져오기 (multipart `file`, `year`, `month`) — 운전일지 표 + 세부 운영내역 일별 표 + 스팀 송기량 |
+| `GET` | `/steam-energy-api/fluidized-daily-log-excel/export-excel?year=&month=` | 운전일지 엑셀 내려받기 (파일 응답) |
+
+### 다른 화면과의 연동
+
+- 세부 운영내역 일별 표(`steam_fluidized_detail_daily`) — 운전일지에서 입력한 소각량 · 스팀 · 약품 · 전력 사용량 · 용수가 세부 운영내역 · 월별 운영내역 · 사업계획대비 실적에 그대로 보인다
+- `steam_fuel_daily_usage.FLUID_STEAM_TON` — 스팀 송기량 (유동상/소각로/복합 일일 사용량 화면과 같은 값)
+
+### 데이터 이관
+
+`migration/2026-11-23_fluidized_daily_log_cells_to_table.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 숫자 칸의 글자(`-`)는 옮기지 않는다.
 
 ## 메뉴 / 권한
 

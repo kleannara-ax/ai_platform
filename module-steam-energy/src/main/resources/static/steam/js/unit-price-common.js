@@ -67,8 +67,8 @@
   //   - Invoice Summary(VK)(steam_srf_invoice_summary, 그 달 한 행): comb_bsc · comb_bsc_factor · comb_bsc_guarantee · comb_asc · comb_asc_factor
   //   - 소각로 도급내역(steam_incinerator_contract_daily): waste2_steam → 2호기 운영단가·실 2호기 단가,
   //     waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비
-  //  targets = 아직 옛 셀 저장소를 쓰는 화면의 칸들. key(일) 은 그 페이지가 쓰는 row_key 형식이다.
-  //   - 유동상 세부 운영내역: fluidized_detail_main, row_key = 일자열(일+2) + 행번호, col 0
+  //   - 유동상 세부 운영내역(steam_fluidized_detail_daily): fluid_steam → KNE 스팀단가, fluid_fixed_hr → KNE 운휴시간 단가
+  //  targets = 옛 셀 저장소를 쓰는 화면의 칸들 (지금은 없다 — 모든 연동을 서버가 넣는다).
   //
   //  monthTargets 는 일자별이 아니라 그 달에 한 칸만 있는 자리다(Invoice Summary(VK)).
   //  row_key 는 인보이스 화면과 같은 "summary-vk-r{행번호}", col 은 col_index(=열+1) 그대로다.
@@ -84,12 +84,8 @@
     { code: "comb_bsc_guarantee", label: "Invoice Summary(VK) BSC STEAM SUPPLY AMOUNT", daily: true, monthly: true },
     { code: "comb_asc", label: "Invoice Summary(VK) ADDITIONAL SERVICE CHARGE", daily: true, monthly: true },
     { code: "comb_asc_factor", label: "Invoice Summary(VK) ASC ESCALATION FACTOR", daily: true, monthly: true },
-    { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", daily: true, targets: [
-      { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "11"; } },
-    ] },
-    { code: "fluid_fixed_hr", label: "세부 운영내역 KNE 운휴시간 단가", targets: [
-      { table: "fluidized_detail_main", col: 0, key: function (d) { return columnLabel(d + 2) + "13"; } },
-    ] },
+    { code: "fluid_steam", label: "유동상 단가 · 세부 운영내역 KNE 스팀단가", daily: true },
+    { code: "fluid_fixed_hr", label: "세부 운영내역 KNE 운휴시간 단가", daily: true },
     // 폐합성 운영단가는 도급내역의 결산 기준 표와 실 스팀량 기준 표에 같은 값으로 들어간다.
     // (1호기 스팀단가는 단가 입력에서 뺐다 — 도급내역 1호기 운영단가는 그 페이지에서 직접 넣는다)
     { code: "waste2_steam", label: "폐합성소각로 단가 · 도급내역 2호기 운영단가", daily: true },

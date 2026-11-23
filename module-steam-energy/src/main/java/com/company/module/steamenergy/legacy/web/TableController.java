@@ -1,8 +1,6 @@
 package com.company.module.steamenergy.legacy.web;
 
 import com.company.module.steamenergy.legacy.db.TableService;
-import com.company.module.steamenergy.legacy.service.FluidizedDailyLogExportService;
-import com.company.module.steamenergy.legacy.service.FluidizedDailyLogImportService;
 import com.company.module.steamenergy.legacy.service.FluidizedDetailWorkbookService;
 import com.company.module.steamenergy.legacy.service.FluidizedSummaryWorkbookService;
 import com.company.module.steamenergy.legacy.service.SrfBoilerInvoiceWorkbookService;
@@ -27,23 +25,17 @@ import java.util.Map;
 public class TableController {
     private final TableService tableService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
-    private final FluidizedDailyLogImportService fluidizedDailyLogImportService;
-    private final FluidizedDailyLogExportService fluidizedDailyLogExportService;
     private final FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService;
     private final SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService;
 
     public TableController(
             TableService tableService,
             FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
-            FluidizedDailyLogImportService fluidizedDailyLogImportService,
-            FluidizedDailyLogExportService fluidizedDailyLogExportService,
             FluidizedSummaryWorkbookService fluidizedSummaryWorkbookService,
             SrfBoilerInvoiceWorkbookService srfBoilerInvoiceWorkbookService
     ) {
         this.tableService = tableService;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
-        this.fluidizedDailyLogImportService = fluidizedDailyLogImportService;
-        this.fluidizedDailyLogExportService = fluidizedDailyLogExportService;
         this.fluidizedSummaryWorkbookService = fluidizedSummaryWorkbookService;
         this.srfBoilerInvoiceWorkbookService = srfBoilerInvoiceWorkbookService;
     }
@@ -155,49 +147,6 @@ public class TableController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid year");
         }
         return fluidizedSummaryWorkbookService.detailActuals(year);
-    }
-
-    @GetMapping("/fluidized-daily-log/export-excel")
-    public ResponseEntity<ByteArrayResource> exportFluidizedDailyLogExcel(
-            @RequestParam("year") int year,
-            @RequestParam("month") int month
-    ) {
-        if (year < 2000 || year > 2100 || month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "\uC5F0/\uC6D4\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
-        }
-        try {
-            byte[] body = fluidizedDailyLogExportService.exportWorkbook(year, month);
-            String fileName = fluidizedDailyLogExportService.fileName(year, month);
-            String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
-                    .contentType(MediaType.parseMediaType(
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .contentLength(body.length)
-                    .body(new ByteArrayResource(body));
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    exception.getMessage() == null ? "\uC5D1\uC140\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4." : exception.getMessage(), exception);
-        }
-    }
-
-    @PostMapping("/fluidized-daily-log/import-excel")
-    public Map<String, Object> importFluidizedDailyLogExcel(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("year") int year,
-            @RequestParam("month") int month
-    ) {
-        ensureExcelFile(file, true);
-        if (year < 2000 || year > 2100 || month < 1 || month > 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연/월이 올바르지 않습니다.");
-        }
-        try {
-            return fluidizedDailyLogImportService.importWorkbook(file, year, month);
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "유동상 운전일지 엑셀 파일을 읽을 수 없습니다.", exception);
-        }
     }
 
     @PostMapping("/fluidized-summary/import-excel")

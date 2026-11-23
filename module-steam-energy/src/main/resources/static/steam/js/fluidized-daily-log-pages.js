@@ -638,7 +638,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── 저장 ────────────────────────────────────────────────────
   async function upsert(payload, existingId) {
     const url = existingId ? `${TABLES_BASE}/${CELL_TABLE}/${existingId}` : `${TABLES_BASE}/${CELL_TABLE}`;
-    const response = await fetch(url, {
+    const response = await window.FluidizedLogStore.fetch(url, {
       method: existingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -888,7 +888,7 @@ document.addEventListener("DOMContentLoaded", () => {
     while (pageNo <= totalPages) {
       const url = `${TABLES_BASE}/${CELL_TABLE}?page=${pageNo}&limit=${limit}` +
         `&month=${encodeURIComponent(monthKey)}&tableNames=${encodeURIComponent(tableNames)}`;
-      const response = await fetch(url);
+      const response = await window.FluidizedLogStore.fetch(url);
       if (!response.ok) throw new Error("데이터를 불러오지 못했습니다.");
       const payload = await response.json();
       const rows = Array.isArray(payload?.data) ? payload.data : [];
@@ -1461,7 +1461,7 @@ ${fileName}
     form.append("year", String(Number(yearSelect.value)));
     form.append("month", String(Number(monthSelect.value)));
 
-    const response = await fetch(`${TABLES_BASE}/fluidized-daily-log/import-excel`, { method: "POST", body: form });
+    const response = await fetch("/steam-energy-api/fluidized-daily-log-excel/import-excel", { method: "POST", body: form });
     if (!response.ok) {
       let message = "업로드에 실패했습니다.";
       try {
@@ -1470,7 +1470,8 @@ ${fileName}
       } catch (_error) { /* 기본 메시지 사용 */ }
       throw new Error(message);
     }
-    return response.json();
+    const payload = await response.json();
+    return payload && payload.data ? payload.data : payload;
   }
 
   uploadButton?.addEventListener("click", () => uploadInput?.click());
@@ -1516,7 +1517,7 @@ ${fileName}
     try {
       const year = Number(yearSelect.value);
       const month = Number(monthSelect.value);
-      const response = await fetch(`${TABLES_BASE}/fluidized-daily-log/export-excel?year=${year}&month=${month}`);
+      const response = await fetch(`/steam-energy-api/fluidized-daily-log-excel/export-excel?year=${year}&month=${month}`);
       if (!response.ok) throw new Error("다운로드에 실패했습니다.");
       const blob = await response.blob();
       const link = document.createElement("a");

@@ -1,6 +1,9 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.DailyLogCells;
+import com.company.module.steamenergy.service.table.FluidizedDailyLogFields;
+import com.company.module.steamenergy.service.table.FluidizedDetailCellStore;
+import com.company.module.steamenergy.service.table.SteamFluidizedDailyLogAdapter;
 import com.company.module.steamenergy.service.SteamFuelDailyUsageService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Entry;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.PowerUsage;
@@ -48,19 +51,23 @@ public class FluidizedDailyLogExportService {
     private static final String LOG_TABLE = "fluidized_daily_log";
     private static final String MOISTURE_SHEET = "함수율";
 
-    private final TableService tableService;
+    /** 운전일지 자체 항목(규격 표 steam_fluidized_daily_log)과 세부 운영내역 일별 표 */
+    private final SteamFluidizedDailyLogAdapter logTable;
+    private final FluidizedDetailCellStore detailStore;
     /** 스팀 송기량(세부 7행)은 규격 표 steam_fuel_daily_usage.FLUID_STEAM_TON 에서 읽는다 (2026-11) */
     private final SteamFuelDailyUsageService fuelDailyUsageService;
 
-    public FluidizedDailyLogExportService(TableService tableService, SteamFuelDailyUsageService fuelDailyUsageService) {
-        this.tableService = tableService;
+    public FluidizedDailyLogExportService(SteamFluidizedDailyLogAdapter logTable, FluidizedDetailCellStore detailStore,
+                                          SteamFuelDailyUsageService fuelDailyUsageService) {
+        this.logTable = logTable;
+        this.detailStore = detailStore;
         this.fuelDailyUsageService = fuelDailyUsageService;
     }
 
     public byte[] exportWorkbook(int year, int month) throws IOException {
         String monthKey = String.format("%04d-%02d", year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        Map<String, String> cells = loadMonthCells(monthKey);
+        Map<String, String> cells = loadMonthCells(year, month);
         fuelDailyUsageService.fluidSteamTonByDate(year, month).forEach((date, ton) ->
                 cells.put(key(FLOW_TABLE, String.format("%02d", date.getDayOfMonth()), 0), ton.stripTrailingZeros().toPlainString()));
 
@@ -211,17 +218,15 @@ public class FluidizedDailyLogExportService {
     }
 
     // ── DB 읽기 ─────────────────────────────────────────────────────
-    private Map<String, String> loadMonthCells(String monthKey) {
+    private Map<String, String> loadMonthCells(int year, int month) {
         Map<String, String> cells = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", monthKey)) {
-            String tableName = String.valueOf(row.get("table_name"));
-            if (!DETAIL_TABLE.equals(tableName) && !LOG_TABLE.equals(tableName)) {   // FLOW 는 규격 표에서 (exportWorkbook)
-                continue;
-            }
-            Object value = row.get("cell_value");
-            if (value == null) continue;
-            cells.put(key(tableName, String.valueOf(row.get("row_key")), toInt(row.get("col_index"))), String.valueOf(value));
+        for (Map<String, Object> row : detailStore.listByMonthKey(String.format("%04d-%02d", year, month))) {
+            cells.put(key(DETAIL_TABLE, String.valueOf(row.get("row_key")), 0), String.valueOf(row.get("cell_value")));
         }
+        DailyLogCells.load(logTable, FluidizedDailyLogFields.FIELDS, year, month).forEach((dayAndCol, value) -> {
+            int bar = dayAndCol.indexOf('|');
+            cells.put(key(LOG_TABLE, dayAndCol.substring(0, bar), Integer.parseInt(dayAndCol.substring(bar + 1))), value);
+        });
         return cells;
     }
 

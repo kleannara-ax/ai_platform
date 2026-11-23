@@ -1,6 +1,9 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.DailyLogCells;
+import com.company.module.steamenergy.service.table.FluidizedDailyLogFields;
+import com.company.module.steamenergy.service.table.FluidizedDetailCellStore;
+import com.company.module.steamenergy.service.table.SteamFluidizedDailyLogAdapter;
 import com.company.module.steamenergy.service.SteamFuelDailyUsageService;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Anchor;
 import com.company.module.steamenergy.legacy.service.FluidizedDailyLogCellMap.Entry;
@@ -42,28 +45,35 @@ import java.util.Set;
 @Service
 public class FluidizedDailyLogImportService {
 
-    private static final String CELL_TABLE = "steam_cell_value";
-    private static final String DETAIL_TABLE = "fluidized_detail_main";
-    private static final String LOG_TABLE = "fluidized_daily_log";
     private static final String MOISTURE_SHEET = "함수율";
 
-    private final TableService tableService;
+    /** 운전일지 자체 항목: 규격 표 steam_fluidized_daily_log (하루 한 행) */
+    private final SteamFluidizedDailyLogAdapter logTable;
+    /** 세부 운영내역과 같이 쓰는 항목: 규격 표 steam_fluidized_detail_daily (FluidizedDetailCellStore) */
+    private final FluidizedDetailCellStore detailStore;
+    /** 읽은 칸을 모아 두는 곳 — importWorkbook 이 synchronized 라 한 번에 한 파일만 쓴다 */
+    private Map<String, String> pendingLog = new LinkedHashMap<>();
+    private Map<String, String> pendingDetail = new LinkedHashMap<>();
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
     /** 스팀 송기량(세부 7행)은 규격 표 steam_fuel_daily_usage.FLUID_STEAM_TON 에 둔다 (2026-11, 원단위 일지 그룹 전환) */
     private final SteamFuelDailyUsageService fuelDailyUsageService;
     private final DataFormatter dataFormatter = new DataFormatter();
 
     public FluidizedDailyLogImportService(
-            TableService tableService,
+            SteamFluidizedDailyLogAdapter logTable,
+            FluidizedDetailCellStore detailStore,
             FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
             SteamFuelDailyUsageService fuelDailyUsageService
     ) {
-        this.tableService = tableService;
+        this.logTable = logTable;
+        this.detailStore = detailStore;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
         this.fuelDailyUsageService = fuelDailyUsageService;
     }
 
-    public Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+    public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+        pendingLog = new LinkedHashMap<>();
+        pendingDetail = new LinkedHashMap<>();
         String monthKey = String.format("%04d-%02d", year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
         YearMonth target = YearMonth.of(year, month);
@@ -125,6 +135,11 @@ public class FluidizedDailyLogImportService {
             }
         }
 
+        // 읽은 칸을 한 번에 저장한다 (값이 있는 칸만 덮어쓴다 — 파일에서 빈 칸은 저장된 값을 지우지 않는다)
+        DailyLogCells.merge(logTable, FluidizedDailyLogFields.FIELDS, year, month, pendingLog);
+        detailStore.mergeCells(year, month, pendingDetail);
+        pendingLog = new LinkedHashMap<>();
+        pendingDetail = new LinkedHashMap<>();
         fluidizedDetailWorkbookService.invalidateRenderCache(monthKey);
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -249,9 +264,9 @@ public class FluidizedDailyLogImportService {
     private int store(String monthKey, int year, int month, int day, Store store, int target, String value) {
         if (value == null || value.isBlank()) return 0;
         return switch (store) {
-            case DETAIL -> upsert(monthKey, year, month, DETAIL_TABLE, columnLabel(day + 2) + target, 0, value);
+            case DETAIL -> put(pendingDetail, columnLabel(day + 2) + target, value);
             case FLOW -> saveFluidSteamTon(year, month, day, value);
-            case LOG -> upsert(monthKey, year, month, LOG_TABLE, String.valueOf(day), target, value);
+            case LOG -> put(pendingLog, DailyLogCells.key(day, target), value);
         };
     }
 
@@ -266,16 +281,8 @@ public class FluidizedDailyLogImportService {
         return 1;
     }
 
-    private int upsert(String monthKey, int year, int month, String tableName, String rowKey, int colIndex, String value) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("month", monthKey);
-        payload.put("year_no", year);
-        payload.put("month_no", month);
-        payload.put("table_name", tableName);
-        payload.put("row_key", rowKey);
-        payload.put("col_index", colIndex);
-        payload.put("cell_value", value);
-        tableService.upsert(CELL_TABLE, payload);
+    private static int put(Map<String, String> cells, String key, String value) {
+        cells.put(key, value);
         return 1;
     }
 

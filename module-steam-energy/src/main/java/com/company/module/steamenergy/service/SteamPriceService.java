@@ -9,6 +9,7 @@ import com.company.module.steamenergy.dto.SteamPriceResponse;
 import com.company.module.steamenergy.dto.SteamPriceSaveRequest;
 import com.company.module.steamenergy.entity.SteamPrice;
 import com.company.module.steamenergy.repository.SteamPriceRepository;
+import com.company.module.steamenergy.service.table.SteamFluidizedDetailDailyAdapter;
 import com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter;
 import com.company.module.steamenergy.service.table.SteamSrfInvoiceSummaryAdapter;
 import com.company.module.steamenergy.service.table.SteamTableFieldApplier;
@@ -38,6 +39,7 @@ public class SteamPriceService {
     private final SteamFuelDailyUsageService fuelDailyUsageService;
     private final SteamIncineratorContractDailyAdapter incineratorContract;
     private final SteamSrfInvoiceSummaryAdapter srfSummary;
+    private final SteamFluidizedDetailDailyAdapter fluidizedDetailDaily;
 
     /** 연/월 페이징 조회 (월 미지정 시 연도 전체 페이징) */
     public Page<SteamPriceResponse> getList(Integer yearNo, Integer monthNo, Pageable pageable) {
@@ -114,10 +116,11 @@ public class SteamPriceService {
      * <ul>
      *   <li>lng_unit → LNG 일일 사용량의 보일러·버너 단가</li>
      *   <li>fluid_steam → 유동상 단가, waste2_steam → 폐합성소각로 단가 (스팀 구매 일일 사용량)</li>
+     *   <li>fluid_steam → 유동상 세부 운영내역 KNE 스팀단가, fluid_fixed_hr → KNE 운휴시간 단가</li>
      *   <li>comb_bsc · comb_bsc_factor · comb_bsc_guarantee · comb_asc · comb_asc_factor → SRF 인보이스 Summary(VK) 의 그 달 행</li>
      *   <li>waste2_steam → 소각로 도급내역 2호기 운영단가·실 2호기 단가, waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비</li>
      * </ul>
-     * 그 밖의 항목은 아직 전환되지 않은 화면의 단가라 hasDailyTarget=false 로 돌려준다.
+     * 그 밖의 항목은 연동할 화면이 없는 단가라 hasDailyTarget=false 로 돌려준다.
      */
     @Transactional
     public SteamPriceApplyResponse applyToDaily(SteamPriceApplyRequest request) {
@@ -133,7 +136,13 @@ public class SteamPriceService {
         int applied;
         switch (request.getItemCode()) {
             case "lng_unit" -> applied = lngDailyUsageService.applyUnitPrice(year, month, value);
-            case "fluid_steam" -> applied = fuelDailyUsageService.applyFluidUnitPrice(year, month, value);
+            case "fluid_steam" -> {
+                applied = fuelDailyUsageService.applyFluidUnitPrice(year, month, value);
+                // 유동상 세부 운영내역: KNE 스팀단가 (11행)
+                SteamTableFieldApplier.applyToEveryDay(fluidizedDetailDaily, year, month, Map.of("steamUnitPrice", value));
+            }
+            // 유동상 세부 운영내역: KNE 운휴시간 단가 (13행)
+            case "fluid_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(fluidizedDetailDaily, year, month, Map.of("stopHourUnitPrice", value));
             case "waste2_steam" -> {
                 applied = fuelDailyUsageService.applyIncineratorUnitPrice(year, month, value);
                 // 소각로 도급내역: 결산 2호기 운영단가 + 실 스팀량 기준 2호기 단가

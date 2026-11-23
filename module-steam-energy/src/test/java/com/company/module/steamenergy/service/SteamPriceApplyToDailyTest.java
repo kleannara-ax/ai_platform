@@ -33,6 +33,7 @@ class SteamPriceApplyToDailyTest {
     private SteamFuelDailyUsageRepository fuelRepository;
     private com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository contractRepository;
     private com.company.module.steamenergy.repository.SteamSrfInvoiceSummaryRepository summaryRepository;
+    private com.company.module.steamenergy.repository.SteamFluidizedDetailDailyRepository detailRepository;
     private SteamPriceService service;
 
     @BeforeEach
@@ -46,12 +47,16 @@ class SteamPriceApplyToDailyTest {
         when(summaryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         contractRepository = mock(com.company.module.steamenergy.repository.SteamIncineratorContractDailyRepository.class);
         when(contractRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        detailRepository = mock(com.company.module.steamenergy.repository.SteamFluidizedDetailDailyRepository.class);
+        when(detailRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         service = new SteamPriceService(priceRepository,
                 new SteamLngDailyUsageService(lngRepository), new SteamFuelDailyUsageService(fuelRepository),
                 new com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter(
                         new SteamIncineratorContractDailyService(contractRepository)),
                 new com.company.module.steamenergy.service.table.SteamSrfInvoiceSummaryAdapter(
-                        new SteamSrfInvoiceSummaryService(summaryRepository)));
+                        new SteamSrfInvoiceSummaryService(summaryRepository)),
+                new com.company.module.steamenergy.service.table.SteamFluidizedDetailDailyAdapter(
+                        new com.company.module.steamenergy.service.SteamFluidizedDetailDailyService(detailRepository)));
     }
 
     private static SteamPriceApplyRequest request(int year, int month, String itemCode) {
@@ -91,15 +96,28 @@ class SteamPriceApplyToDailyTest {
     }
 
     @Test
-    @DisplayName("아직 전환되지 않은 화면의 단가(예: fluid_fixed_hr)는 적용 대상이 없다고 알려 주기만 한다")
-    void unknownItemHasNoDailyTarget() {
+    @DisplayName("fluid_fixed_hr 는 유동상 세부 운영내역의 운휴시간 단가를 그 달 모든 날에 넣는다")
+    void fluidFixedHourGoesToDetailDaily() {
         when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "fluid_fixed_hr")).thenReturn(Optional.of(price("fluid_fixed_hr", "11700")));
 
         SteamPriceApplyResponse result = service.applyToDaily(request(2026, 2, "fluid_fixed_hr"));
 
+        assertTrue(result.isHasDailyTarget());
+        assertEquals(28, result.getAppliedDays());
+        verify(detailRepository, times(28)).save(any());
+        verifyNoInteractions(lngRepository, fuelRepository);
+    }
+
+    @Test
+    @DisplayName("연동할 화면이 없는 단가는 적용 대상이 없다고 알려 주기만 한다")
+    void unknownItemHasNoDailyTarget() {
+        when(priceRepository.findByYearNoAndMonthNoAndItemCode(2026, 2, "etc_item")).thenReturn(Optional.of(price("etc_item", "11700")));
+
+        SteamPriceApplyResponse result = service.applyToDaily(request(2026, 2, "etc_item"));
+
         assertFalse(result.isHasDailyTarget());
         assertEquals(0, result.getAppliedDays());
-        verifyNoInteractions(lngRepository, fuelRepository);
+        verifyNoInteractions(lngRepository, fuelRepository, detailRepository);
     }
 
     @Test
