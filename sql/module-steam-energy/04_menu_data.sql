@@ -15,10 +15,13 @@ ON DUPLICATE KEY UPDATE
     is_visible = VALUES(is_visible), is_active = VALUES(is_active), updated_at = NOW();
 
 -- 역할별 메뉴 접근 권한 (중복 방지)
+--  /steam-energy-api 의 저장 · 엑셀 올리기는 이 상위 메뉴 권한을 본다 (@PreAuthorize ... 'STEAM_ENERGY_MGMT').
+--  스팀 전용 역할 3종(06_roles.sql)도 입력 담당이라 함께 연결한다 — 빠지면 조회만 되고 저장이 403 으로 막힌다.
 INSERT INTO core_role_menu (role, menu_id)
 SELECT r.role, m.menu_id
 FROM core_menu m
-JOIN (SELECT 'ROLE_ADMIN' AS role UNION ALL SELECT 'ROLE_MANAGER' UNION ALL SELECT 'ROLE_USER') r
+JOIN (SELECT 'ROLE_ADMIN' AS role UNION ALL SELECT 'ROLE_MANAGER' UNION ALL SELECT 'ROLE_USER'
+      UNION ALL SELECT 'ROLE_STEAM_MANAGER' UNION ALL SELECT 'ROLE_STEAM_BOILER' UNION ALL SELECT 'ROLE_STEAM_KNE') r
 WHERE m.menu_code = 'STEAM_ENERGY_MGMT'
   AND NOT EXISTS (
       SELECT 1 FROM core_role_menu rm WHERE rm.role = r.role AND rm.menu_id = m.menu_id

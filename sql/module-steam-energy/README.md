@@ -1719,6 +1719,7 @@ DROP TABLE IF EXISTS steam_equipment;
 | API Prefix | `/steam-energy-api` |
 | 등록 SQL | `04_menu_data.sql`(상위) + `05_submenus.sql`(하위) |
 | 역할 | `ROLE_ADMIN`, `ROLE_MANAGER`, `ROLE_USER` + 스팀 전용 3종(`06_roles.sql`) |
+| 쓰기 권한 | 저장 · 엑셀 올리기는 상위 메뉴 `STEAM_ENERGY_MGMT` 권한이 있는 역할만 된다. `04_menu_data.sql` 이 위 6개 역할 모두에 연결한다 (2026-11-23 에 스팀 전용 3종 추가 — 빠져 있으면 조회만 되고 저장이 403) |
 
 ### core 에 추가로 필요한 기능
 
