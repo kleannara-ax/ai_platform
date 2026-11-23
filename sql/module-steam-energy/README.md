@@ -1025,6 +1025,32 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 | `POST` | `/steam-energy-api/srf-invoice-adjustments` | 행 전체 업서트 `(YEAR_NO, SECTION, ITEM_CODE)` |
 | `PUT` | `/steam-energy-api/srf-invoice-adjustments/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
 | `GET` · `DELETE` | `/steam-energy-api/srf-invoice-adjustments/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/srf-invoice-excel/import-excel` (file[, year, month]) | 통합본 `KleanNara SRF Boiler AOT invoice(N월).xls` 가져오기 — 기간은 엑셀의 `Invoice for the period` 시작일. `year` · `month` 를 보내면 그 기간과 다를 때 400 |
+| `GET` | `/steam-energy-api/srf-invoice-excel/export-excel?year=&month=` | 원본 서식(`원본/4. …xls`)을 DB 값으로 채워 내려받기 (`.xls` 파일 응답) |
+
+### SRF 인보이스 엑셀 (2026-11-23)
+
+월마다 받는 통합본 한 파일로 SRF 인보이스 화면 전체를 채우고(업로드), DB 값으로 통합본을 다시 만든다(다운로드). 새 표 · 컬럼은 없다.
+버튼은 SRF 인보이스 8개 화면 모두에 있다(`js/srf-excel-controls.js`) — 어느 화면에서 눌러도 같은 파일이다.
+
+- **자리는 글자로 찾는다** (`SrfInvoiceSheets`). 2026년 양식은 Summary 에 `4. OTHERS (O&M of NOx Reduction Facility)` 묶음이 끼어 아래가 8줄 밀렸고, 운영내역에 둘째 줄 머리글과 De-NOx · 액체산소 열이, Client Invoice 에 `4. Other Charge` 묶음이 생겼다. 옛 양식 · 새 양식 모두 같은 코드로 읽는다.
+- **원본값이 우선** — 엑셀의 빈칸은 그 달(연 단위 시트는 그 해)의 저장값도 비운다. 시트나 제목을 못 찾으면 그 부분만 건너뛰고 응답의 `warnings` 에 적는다(이미 저장된 값은 그대로).
+- 화면에 칸이 없는 것은 저장소를 만들지 않고 건너뛰며 `warnings` 에 적는다.
+
+| 시트 | 가져오는 것 → 표 | 건너뛰는 것 |
+|------|------------------|-------------|
+| `Summary(VK)` | 입력 칸 17개 → `steam_srf_invoice_summary` (그 달 한 행). BASE SERVICE CHARGE 는 수식(`=BSC!E11`)의 계산 결과를 넣는다 | 계산 칸(1. BSC, 2. ASC, TOTAL, VAT, NET CASH …), `3. OTHERS ▸ 4)`, **`4. OTHERS (O&M of NOx Reduction Facility)` 묶음** — 화면 합계가 그만큼 작다(응답 `workbookTotal` / `screenTotal` 로 비교) |
+| `Client Invoice` | 유틸리티 10줄(양 · 단가 · 비고), `2.`/`3. Other Charge` 각 앞 3줄까지(항목 · 단위 · 양 · 단가 · 비고) → `steam_srf_invoice_client_item` | 유틸리티 11번째 줄, **`4. Other Charge (NOx)` 묶음**, 청구금액 · Sub total(계산) |
+| `운영내역` | `전력량` 열(새 양식은 첫 열 `Main (A)`) → `steam_srf_invoice_operation_daily.POWER_KWH` | 스팀생산량 · 공정수 사용량 · 탈기기급수량 — 저장하지 않고 복합보일러 생산 데이터(`steam_combo_daily_production`)와 **비교만** 해서 다르면 경고. 약품희석수 · 전력량 De-NOx · 액체산소 열 |
+| `월별 운영내역` | 인보이스 기간이 속한 회계연도(6월 시작) 표 12줄 × 21칸 → `steam_srf_invoice_monthly` (실제 연/월). 스팀단가(`=지급액/구매량`) 등 수식 칸은 계산 결과 | 다른 연도 표, `※ De-Nox설비 운영비` 표, 지급액 · 사용비용 · 합계(계산) |
+| `Accumulated steam volume` | 맨 위 표 12줄의 Contract · BSC · ASC → `steam_srf_invoice_accumulated`. 연도는 표의 YEAR 칸이 아니라 **인보이스 기간의 회계연도**로 정한다(YEAR 칸이 다르면 경고) | 아래쪽 과거 연도 표 |
+| `BSC` | Base Service Charge Rate → `steam_srf_invoice_bsc` (그 해) | Guaranteed Volume(상수) |
+| `Adjustment Factor` | 세 표(AFBSC · rebasing · AFASC)의 계수 · Base · Present → `steam_srf_invoice_adjustment` (그 해) | 증감률 · AFBSCpy(계산) |
+| `NN년 사고이력` | No. 줄 → `steam_incident` (`FACILITY=SRF`, `KIND=ACCIDENT`, 시트 이름의 연도). 같은 해에 (일자, 사유)가 같은 기록이 있으면 그 기록을 고치고, 없으면 `srf-accident-record:xlsx-{No}` 키로 넣는다 — 다시 올려도 줄이 늘지 않는다 | 엑셀에서 빠진 줄은 지우지 않는다(경고만) |
+| `계약량 대비 실적현황` (숨김) | — | 화면 없음 |
+
+- **Summary 의 연동 칸** (`OTHERS_0` · `OTHERS_1` · `UTILITIES_DEDUCTION` · `OTHER_DEDUCTION_1/2`, 비어 있으면 Client Invoice 를 따르는 칸): 엑셀에서 수식이고 값이 Client Invoice 연동값과 같으면 `NULL` 로 둔다(연동 유지). 손으로 넣은 숫자이거나 연동값과 다르면 그 값을 넣고 경고한다. 나머지 칸(단가 입력에서 복사돼 오는 `BSC_RATE` · `BSC_FACTOR` · `BSC_STEAM_AMOUNT` · `ASC_RATE` · `ASC_FACTOR` 포함)은 엑셀 값을 그대로 넣는다 — 단가 입력에서 다시 적용하면 그 값으로 덮인다.
+- **내보내기**: 값은 수식이 아닌 칸에만 쓴다. 화면 입력 칸이 서식에서 수식인 경우에는 수식을 계산해 DB 값과 같으면 수식을 두고, 다르면 DB 값으로 바꿔 쓴다(연동 칸은 DB 가 `NULL` 이면 수식 유지). 그래서 내려받은 파일을 다시 올려도 DB 는 바뀌지 않는다. 운영내역의 스팀생산량 · 공정수 · 탈기기급수량은 화면처럼 복합보일러 생산 데이터로 채운다. 월별 운영내역은 그 회계연도 표가 서식에 없으면 맨 위 표를 그 연도로 바꿔 쓰고, 사고이력 시트는 `YY년 사고이력` 으로 이름을 바꾼다. 서식이 옛 양식이라 NOx 묶음 · De-NOx 열은 내려받은 파일에 없다.
 
 ### 다른 화면과의 연동
 
