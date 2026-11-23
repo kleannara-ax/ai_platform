@@ -1,5 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
@@ -32,11 +34,11 @@ public class SheetMetadataLoader {
         String path = "/sheet-metadata/" + name + ".json";
         try (InputStream in = getClass().getResourceAsStream(path)) {
             if (in == null) {
-                throw new IllegalStateException("Sheet metadata not found in classpath: " + path);
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Sheet metadata not found in classpath: " + path);
             }
             return mapper.readValue(in, Map.class);
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to load sheet metadata: " + path, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to load sheet metadata: " + path + " (" + ex.getMessage() + ")");
         }
     }
 

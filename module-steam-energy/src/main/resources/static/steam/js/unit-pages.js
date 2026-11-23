@@ -451,6 +451,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (page === "unit-steam-unit.html") return;
 
+    // 규격 API 오류 응답(ApiResponse.message) → 안내 문구
+    async function apiErrorMessage(response, fallback) {
+      try {
+        const json = await response.json();
+        return (json && json.message) || fallback;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
     const downloadButton = document.getElementById("unitExcelDownloadButton");
     const uploadButton = document.getElementById("unitExcelUploadButton");
     const fileInput = document.getElementById("unitExcelFileInput");
@@ -461,8 +471,8 @@ document.addEventListener("DOMContentLoaded", () => {
     downloadButton.addEventListener("click", async () => {
       await window.UnitPageSaveCoordinator.flushAll();
       try {
-        const response = await fetch(`/tables/unit-usage/export-excel?year=${encodeURIComponent(yearSelect.value)}`);
-        if (!response.ok) throw new Error("엑셀 다운로드에 실패했습니다.");
+        const response = await fetch(`/steam-energy-api/unit-log/export-excel?year=${encodeURIComponent(yearSelect.value)}`);
+        if (!response.ok) throw new Error(await apiErrorMessage(response, "엑셀 다운로드에 실패했습니다."));
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -491,9 +501,12 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("year", yearSelect.value);
-        const response = await fetch("/tables/unit-usage/import-excel", { method: "POST", body: formData });
-        if (!response.ok) throw new Error("엑셀 업로드에 실패했습니다.");
+        const response = await fetch(`/steam-energy-api/unit-log/import-excel?year=${encodeURIComponent(yearSelect.value)}`, { method: "POST", body: formData });
+        if (!response.ok) throw new Error(await apiErrorMessage(response, "엑셀 업로드에 실패했습니다."));
+        const result = (await response.json())?.data || {};
+        alert(`엑셀 업로드가 완료되었습니다. (${result.year ?? yearSelect.value}년, 시트 ${(result.sheets || []).length}개)\n` +
+          `호기별 ${result.unitRows ?? 0}건 · 공통값 ${result.commonRows ?? 0}건 · LNG ${result.lngRows ?? 0}건 · 스팀 구매 ${result.fuelRows ?? 0}건` +
+          (result.notFound && result.notFound.length ? `\n찾지 못한 칸: ${result.notFound.join(", ")}` : ""));
         window.location.reload();
       } catch (error) {
         alert(error instanceof Error ? error.message : "엑셀 업로드 중 오류가 발생했습니다.");

@@ -1,5 +1,7 @@
 package com.company.module.steamenergy.legacy.service.sheet;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
@@ -54,10 +56,10 @@ public class SheetData {
     public static SheetData load(String name) {
         String path = "/sheet-metadata/" + name + ".json";
         try (InputStream in = SheetData.class.getResourceAsStream(path)) {
-            if (in == null) throw new IllegalStateException("Sheet template not found: " + path);
+            if (in == null) throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Sheet template not found: " + path);
             return new SheetData(JSON_MAPPER.readValue(in, Map.class));
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to load sheet template: " + path, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to load sheet template: " + path + " (" + ex.getMessage() + ")");
         }
     }
 
@@ -180,7 +182,7 @@ public class SheetData {
     /** "A1" → {col:1, row:1}. */
     public static int[] parseRef(String addr) {
         Matcher m = CELL_REF.matcher(addr);
-        if (!m.matches()) throw new IllegalArgumentException("Bad cell ref: " + addr);
+        if (!m.matches()) throw new BusinessException(ErrorCode.INVALID_INPUT, "Bad cell ref: " + addr);
         int col = 0;
         for (char c : m.group(1).toCharArray()) col = col * 26 + (c - 'A' + 1);
         int row = Integer.parseInt(m.group(2));

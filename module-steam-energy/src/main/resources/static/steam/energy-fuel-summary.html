@@ -67,6 +67,10 @@
     }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
+  <script src="/steam/js/energy-store.js?v=20261120-spec2"></script>
 </head>
 <body class="landing-body" data-page-kind="energy-fuel-summary">
   <main class="landing-main">
@@ -608,20 +612,11 @@
 
     async function fetchEfrYear(year) {
       efrCache.clear();
-      const params = new URLSearchParams({
-        month: String(year),
-        tableNames: "energy_fuel_ratio,energy_month_compare,energy_fuel_plan,energy_accounting_plan",
-        limit: "10000",
-      });
+      // 2026-11 규격 전환: 네 화면의 규격 표를 옛 "table|row_key|col_index" 좌표로 읽는다 (energy-store.js)
+      const tables = ["energy_fuel_ratio", "energy_month_compare", "energy_fuel_plan", "energy_accounting_plan"];
       try {
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (!resp.ok) return;
-        const payload = await resp.json();
-        (payload.data || []).forEach((row) => {
-          const tbl = row.table_name;
-          const key = `${tbl}|${row.row_key}|${row.col_index}`;
-          efrCache.set(key, num(row.cell_value));
-        });
+        const maps = await Promise.all(tables.map((t) => window.EnergyStore.fetchLegacy(t, Number(year))));
+        maps.forEach((map, i) => map.forEach((v, k) => efrCache.set(`${tables[i]}|${k}`, num(v))));
       } catch (e) { console.warn("[efs] fetch failed:", e); }
     }
     function num(v) {
@@ -650,33 +645,22 @@
     // row_key = `${t}|${idx}|${metric}`, col_index = 월(1~12)
     const PAGE_TABLE = "energy_fuel_summary";
     const efsStore = new Map(); // `${dbKey}|${month}` → string (override)
+    const ownStore = window.EnergyStore.forLegacy(PAGE_TABLE);   // 규격 표 steam_energy_fuel_summary
 
     async function loadEfs(year) {
       efsStore.clear();
-      const params = new URLSearchParams({ month: String(year), tableNames: PAGE_TABLE, limit: "10000" });
       try {
-        const resp = await fetch(`/tables/steam_cell_value?${params.toString()}`);
-        if (!resp.ok) return;
-        const payload = await resp.json();
-        (payload.data || []).forEach((row) => {
-          if (row.table_name !== PAGE_TABLE) return;
-          efsStore.set(`${row.row_key}|${row.col_index}`, row.cell_value);
-        });
+        await ownStore.load(Number(year));
+        ownStore.cells().forEach((row) => efsStore.set(`${row.row_key}|${row.col_index}`, row.cell_value));
       } catch (e) { console.warn("[efs] override load failed:", e); }
     }
     async function saveEfs(dbKey, month, value) {
       const k = `${dbKey}|${month}`;
       if (value === "" || value === null) efsStore.delete(k); else efsStore.set(k, value);
       try {
-        await fetch(`/tables/steam_cell_value`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            month: String(currentYear), year_no: Number(currentYear), month_no: 0,
-            table_name: PAGE_TABLE, row_key: dbKey, col_index: month,
-            cell_value: (value === "" ? null : value),
-          }),
-        });
-      } catch (e) { console.error("[efs] save failed:", e); }
+        if (ownStore.year() !== Number(currentYear)) await ownStore.load(Number(currentYear));
+        await ownStore.set(dbKey, month, value === "" ? null : value);
+      } catch (e) { console.error("[efs] save failed:", e); window.alert(`저장 실패: ${e.message || e}`); }
     }
     // efr(배분비율) 에서 해당 입력 셀에 대응하는 기본값
     function efrFallback(dbKey, month) {
@@ -1346,6 +1330,6 @@
     });
   </script>
   <script defer src="/steam/js/excel-upload-errors.js?v=20260507-excel-errors1"></script>
-  <script defer src="/steam/js/energy-excel-controls.js?v=20260527-energy-excel2"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20261120-spec2"></script>
 </body>
 </html>

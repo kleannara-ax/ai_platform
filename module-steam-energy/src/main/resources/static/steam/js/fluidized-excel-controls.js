@@ -21,7 +21,7 @@
   async function downloadFluidizedExcel() {
     const year = yearSelect.value;
     const month = monthValue();
-    const response = await fetch(`/tables/fluidized-summary/export-excel?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`);
+    const response = await fetch(`/steam-energy-api/fluidized-excel/export-excel?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`);
     if (!response.ok) throw new Error(await window.ExcelUploadErrors?.message(response) || "엑셀 업로드에 실패했습니다.");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -46,7 +46,7 @@
       formData.append("file", file);
       formData.append("year", yearSelect.value);
       formData.append("month", monthValue());
-      const response = await fetch("/tables/fluidized-summary/import-excel", {
+      const response = await fetch("/steam-energy-api/fluidized-excel/import-excel", {
         method: "POST",
         body: formData,
       });

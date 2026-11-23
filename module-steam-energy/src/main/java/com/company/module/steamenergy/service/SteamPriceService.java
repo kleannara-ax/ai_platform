@@ -1,10 +1,18 @@
 package com.company.module.steamenergy.service;
 
+import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.steamenergy.dto.SteamPriceApplyRequest;
+import com.company.module.steamenergy.dto.SteamPriceApplyResponse;
 import com.company.module.steamenergy.dto.SteamPriceResponse;
 import com.company.module.steamenergy.dto.SteamPriceSaveRequest;
 import com.company.module.steamenergy.entity.SteamPrice;
 import com.company.module.steamenergy.repository.SteamPriceRepository;
+import com.company.module.steamenergy.service.table.SteamFluidizedDetailDailyAdapter;
+import com.company.module.steamenergy.service.table.SteamIncineratorContractDailyAdapter;
+import com.company.module.steamenergy.service.table.SteamSrfInvoiceSummaryAdapter;
+import com.company.module.steamenergy.service.table.SteamTableFieldApplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -13,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 시설별 단가 비즈니스 로직
@@ -26,6 +35,11 @@ import java.util.List;
 public class SteamPriceService {
 
     private final SteamPriceRepository priceRepository;
+    private final SteamLngDailyUsageService lngDailyUsageService;
+    private final SteamFuelDailyUsageService fuelDailyUsageService;
+    private final SteamIncineratorContractDailyAdapter incineratorContract;
+    private final SteamSrfInvoiceSummaryAdapter srfSummary;
+    private final SteamFluidizedDetailDailyAdapter fluidizedDetailDaily;
 
     /** 연/월 페이징 조회 (월 미지정 시 연도 전체 페이징) */
     public Page<SteamPriceResponse> getList(Integer yearNo, Integer monthNo, Pageable pageable) {
@@ -94,6 +108,65 @@ public class SteamPriceService {
         SteamPrice target = findOrThrow(id);
         target.delete(null);
         log.info("[STEAM-ENERGY] 단가 삭제(소프트) - id: {}", id);
+    }
+
+    /**
+     * 등록 단가를 그 달 일별 표에 일괄 적용한다 (단가 입력 페이지의 "단가 적용").
+     *
+     * <ul>
+     *   <li>lng_unit → LNG 일일 사용량의 보일러·버너 단가</li>
+     *   <li>fluid_steam → 유동상 단가, waste2_steam → 폐합성소각로 단가 (스팀 구매 일일 사용량)</li>
+     *   <li>fluid_steam → 유동상 세부 운영내역 KNE 스팀단가, fluid_fixed_hr → KNE 운휴시간 단가</li>
+     *   <li>comb_bsc · comb_bsc_factor · comb_bsc_guarantee · comb_asc · comb_asc_factor → SRF 인보이스 Summary(VK) 의 그 달 행</li>
+     *   <li>waste2_steam → 소각로 도급내역 2호기 운영단가·실 2호기 단가, waste1_fixed_hr / waste2_fixed_hr → 1·2호기 운휴시간당 고정비</li>
+     * </ul>
+     * 그 밖의 항목은 연동할 화면이 없는 단가라 hasDailyTarget=false 로 돌려준다.
+     */
+    @Transactional
+    public SteamPriceApplyResponse applyToDaily(SteamPriceApplyRequest request) {
+        SteamPrice price = priceRepository
+                .findByYearNoAndMonthNoAndItemCode(request.getYearNo(), request.getMonthNo(), request.getItemCode())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                        request.getYearNo() + "년 " + request.getMonthNo() + "월 " + request.getItemCode() + " 단가가 등록되지 않았습니다."));
+        if (price.getPriceValue() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, request.getItemCode() + " 단가 값이 비어 있습니다.");
+        }
+        int year = request.getYearNo(), month = request.getMonthNo();
+        java.math.BigDecimal value = price.getPriceValue();
+        int applied;
+        switch (request.getItemCode()) {
+            case "lng_unit" -> applied = lngDailyUsageService.applyUnitPrice(year, month, value);
+            case "fluid_steam" -> {
+                applied = fuelDailyUsageService.applyFluidUnitPrice(year, month, value);
+                // 유동상 세부 운영내역: KNE 스팀단가 (11행)
+                SteamTableFieldApplier.applyToEveryDay(fluidizedDetailDaily, year, month, Map.of("steamUnitPrice", value));
+            }
+            // 유동상 세부 운영내역: KNE 운휴시간 단가 (13행)
+            case "fluid_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(fluidizedDetailDaily, year, month, Map.of("stopHourUnitPrice", value));
+            case "waste2_steam" -> {
+                applied = fuelDailyUsageService.applyIncineratorUnitPrice(year, month, value);
+                // 소각로 도급내역: 결산 2호기 운영단가 + 실 스팀량 기준 2호기 단가
+                SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u2Unit", value, "realUnit2", value));
+            }
+            // SRF 인보이스 Summary(VK): 그 달 한 행의 단가·계수·물량 칸
+            case "comb_bsc" -> applied = applySummary(year, month, "bscRate", value);
+            case "comb_bsc_factor" -> applied = applySummary(year, month, "bscFactor", value);
+            case "comb_bsc_guarantee" -> applied = applySummary(year, month, "bscSteamAmount", value);
+            case "comb_asc" -> applied = applySummary(year, month, "ascRate", value);
+            case "comb_asc_factor" -> applied = applySummary(year, month, "ascFactor", value);
+            case "waste1_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u1Fixed", value));
+            case "waste2_fixed_hr" -> applied = SteamTableFieldApplier.applyToEveryDay(incineratorContract, year, month, Map.of("u2Fixed", value));
+            default -> {
+                return SteamPriceApplyResponse.of(request.getItemCode(), year, month, value, false, 0);
+            }
+        }
+        log.info("[STEAM-ENERGY] 단가 일괄 적용 {} {}/{} → {}일", request.getItemCode(), year, month, applied);
+        return SteamPriceApplyResponse.of(request.getItemCode(), year, month, value, true, applied);
+    }
+
+    private int applySummary(int year, int month, String field, java.math.BigDecimal value) {
+        SteamTableFieldApplier.applyToMonth(srfSummary, year, month, Map.of(field, value));
+        return 1;
     }
 
     private SteamPrice findOrThrow(Long id) {

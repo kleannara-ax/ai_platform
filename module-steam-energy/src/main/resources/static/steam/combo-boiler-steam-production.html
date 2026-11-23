@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>스팀생산실적</title>
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />  <link rel="stylesheet" href="css/page-combo.css?v=20260608-sticky3" />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />  <link rel="stylesheet" href="css/page-combo.css?v=20261123-combo2" />
 
   <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -37,25 +37,10 @@
     body.embedded-mode[data-page-kind="combo-boiler"] { display:block; min-height:auto; background:transparent; }
     body.embedded-mode[data-page-kind="combo-boiler"] .sidebar-shell, body.embedded-mode[data-page-kind="combo-boiler"] .landing-page-copy { display:none !important; }
     body.embedded-mode[data-page-kind="combo-boiler"] .landing-main, body.embedded-mode[data-page-kind="combo-boiler"] .combo-canvas { padding:0; min-height:auto; box-shadow:none; background:transparent; }
-    .combo-excel-table.combo-production-table { width:100%; min-width:0; table-layout:fixed; }
-    .combo-excel-table.combo-production-table .combo-input, .combo-excel-table.combo-production-table .combo-readonly { min-width:0; width:100%; }
-    .combo-excel-table.combo-production-table .combo-day-col { width:clamp(30px,3.4vw,44px); }
-    .combo-excel-table.combo-production-table th:first-child, .combo-excel-table.combo-production-table td:first-child { width:clamp(30px,3.4vw,44px); }
-    .combo-excel-table.combo-production-table thead th { white-space:normal; line-height:1.2; word-break:keep-all; }
-    .combo-excel-table.combo-production-combo .combo-field-comboSteam,
-    .combo-excel-table.combo-production-combo .combo-field-comboSteamHour,
-    .combo-excel-table.combo-production-external .combo-field-externalSteamHour,
-    .combo-excel-table.combo-production-waste .combo-field-wasteSteam1,
-    .combo-excel-table.combo-production-waste .combo-field-wasteSteam1Hour,
-    .combo-excel-table.combo-production-waste .combo-field-wasteSteam2,
-    .combo-excel-table.combo-production-waste .combo-field-wasteSteam2Hour,
-    .combo-excel-table.combo-production-total .combo-field-totalSteam,
-    .combo-excel-table.combo-production-total .combo-field-totalSteamHour { width:clamp(58px,7vw,88px) !important; }
-    .combo-excel-table.combo-production-external .combo-field-externalSteam { width:clamp(120px,14vw,200px) !important; }
-    .combo-excel-table.combo-production-external .combo-field-externalSteamHour { width:clamp(120px,14vw,200px) !important; }
 
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
 </head>
 <body class="landing-body" data-page-kind="combo-boiler">
   <main class="landing-main">
@@ -75,7 +60,10 @@
   </main>
   <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
   <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
-  <script src="/steam/js/combo-boiler-pages.js?v=20261014-real-steam2"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/incinerator-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/combo-boiler-pages.js?v=20261123-combo3"></script>
   <script src="/steam/js/grid-arrow-nav.js?v=20260608-sticky3"></script>
 </body>
 </html>

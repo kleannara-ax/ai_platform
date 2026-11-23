@@ -1,5 +1,5 @@
 /* 단가 입력 페이지 — 엑셀 "2. 단가 등록 (관리자)" 시트 구조를 반영한 확장판.
- *  - 시설별 세부 단가 항목을 연/월(1~12) 그리드로 등록. 저장 테이블: unit_price_detail.
+ *  - 시설별 세부 단가 항목을 연/월(1~12) 그리드로 등록. 저장 표: steam_price (규격 API /steam-energy-api/prices, 2026-11 전환).
  *  - 단가를 고치면 연동 대상 페이지의 그 달 전체 일자에 일괄 적용 (unit-price-common.js 의 PRICE_LINKS).
  *    LNG → LNG 연료 사용 비용 / 유동상·폐합성 → 유동상·소각로·복합 일일 사용량 + 세부 운영내역·도급내역 /
  *    복합보일러 BSC·ASC → Invoice Summary(VK) 의 그 달 단가 칸.
@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const UP = window.UnitPrice;
   if (!UP) { console.error("UnitPrice 공용 모듈이 로드되지 않았습니다."); return; }
 
-  const DETAIL_TABLE = "unit_price_detail";
   const SHARED_PERIOD_KEY = "steamlog:shared-period";
   const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -66,7 +65,14 @@ document.addEventListener("DOMContentLoaded", () => {
       ],
     },
   ];
+  // 항목에 시설명을 붙여 둔다 — 저장 시 facility·itemName·unit 을 표에 같이 넣는다.
+  GROUPS.forEach((g) => g.items.forEach((item) => { item.facility = g.facility; }));
   const ALL_ITEMS = GROUPS.reduce((a, g) => a.concat(g.items), []);
+  const ITEM_BY_CODE = ALL_ITEMS.reduce((m, item) => { m[item.code] = item; return m; }, {});
+  function metaOf(code) {
+    const item = ITEM_BY_CODE[code] || {};
+    return { facility: item.facility, label: item.label, unit: item.unit };
+  }
   const COLSPAN = 2 + MONTHS.length; // 항목 + 일괄 + 12개월
 
   const yearSelect = document.getElementById("priceYear");
@@ -180,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
     reloadBtn.disabled = true;
     setMsg("불러오는 중…", true);
     try {
-      const reg = await UP.fetchRegistered(currentYear, DETAIL_TABLE);
+      const reg = await UP.fetchPrices(currentYear);
       ALL_ITEMS.forEach((item) => {
         MONTHS.forEach((m) => {
           const input = monthInput(item.code, m);
@@ -192,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
       refreshAllBulkSums();
       setMsg("", true);
     } catch (e) {
-      setMsg("불러오기 실패", false);
+      setMsg("불러오기 실패" + (e && e.message ? ` · ${e.message}` : ""), false);
     } finally {
       reloadBtn.disabled = false;
     }
@@ -200,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function saveMonth(code, m, value) {
     try {
-      await UP.saveRegistered(currentYear, code, m, value, DETAIL_TABLE);
+      await UP.savePrice(currentYear, code, m, value, metaOf(code));
       const link = UP.priceLink(code);
       if (!link) { setMsg("저장됨", true); return; }
       // 연동 항목은 그 달 대상 페이지 전체 일자에 함께 반영한다.
@@ -211,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ? `저장됨 · ${currentYear}년 ${m}월 ${link.label} 적용`
             : `저장됨 · ${m}월 ${link.label} ${result.applied}일 적용`)
         : "저장됨", true);
-    } catch (e) { setMsg("저장 실패", false); }
+    } catch (e) { setMsg("저장 실패" + (e && e.message ? ` · ${e.message}` : ""), false); }
   }
 
   // 개별 월 저장 (change/blur)
@@ -234,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (mi) mi.value = withCommas(raw);
     }
     try {
-      await Promise.all(MONTHS.map((m) => UP.saveRegistered(currentYear, code, m, raw, DETAIL_TABLE)));
+      await Promise.all(MONTHS.map((m) => UP.savePrice(currentYear, code, m, raw, metaOf(code))));
       input.value = "";
 
       const link = UP.priceLink(code);
@@ -245,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await UP.applyPriceLink(code, currentYear, m, raw);
       }
       setMsg(`일괄 적용·저장 완료 · ${link.label} 12개월 반영`, true);
-    } catch (e) { setMsg("일괄 저장 실패", false); }
+    } catch (e) { setMsg("일괄 저장 실패" + (e && e.message ? ` · ${e.message}` : ""), false); }
   }
   body.addEventListener("change", (e) => {
     const bulk = e.target.closest('input[data-role="bulk"]');

@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.energy.EnergyCellBridge;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,7 +61,6 @@ public class EnergyFuelRatioWorkbookService {
     private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
     private static final Pattern SHEET_NAME_PATTERN = Pattern.compile("\\d{4}\\s*연료비\\s*배분비율");
-    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_fuel_ratio";
 
     /**
@@ -69,6 +69,12 @@ public class EnergyFuelRatioWorkbookService {
      * @param labels        표 안 행 라벨 — A열, 비어 있으면 B열
      */
     record TableMap(String tableId, int htmlRowCount, int firstExcelRow, String title, List<String> labels) {}
+
+    /**
+     * "24년 LNG 단가" · "25년 LNG 단가" 처럼 해마다 앞 숫자가 바뀌는 행.
+     * 위에서 아래 순서로 첫 줄이 전년 단가, 둘째 줄이 올해 단가다.
+     */
+    static final String YEAR_LNG_PRICE = "re:\\d{2,4}년lng단가";
 
     // 제목으로 표 블록을 잡고, 그 안에서 행 라벨로 줄을 찾는다.
     // (예전에는 firstExcelRow + (htmlRow-1) 로만 계산해 원본에 행이 끼면 통째로 밀렸다.
@@ -95,7 +101,7 @@ public class EnergyFuelRatioWorkbookService {
             new TableMap("t10", 6, 112, "2025년 버너 LNG 사용량",
                     List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
             new TableMap("t11", 9, 120, "2025년 버너 LNG 비용",
-                    List.of("24년 LNG 단가", "25년 LNG 단가", "증감률(%)", "제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
+                    List.of(YEAR_LNG_PRICE, YEAR_LNG_PRICE, "증감률(%)", "제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
             new TableMap("t12", 5, 133, "2025년 버너 LNG 사용량 원단위",
                     List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계")),
             new TableMap("t13", 5, 141, "2025년 버너 LNG 사용비용 원단위",
@@ -113,12 +119,12 @@ public class EnergyFuelRatioWorkbookService {
     /** 라벨 열 — A열이 우선, 비어 있으면 B열. */
     static final int[] LABEL_COLS = {2, 1};
 
-    private final TableService tableService;
+    private final EnergyCellBridge bridge;   // 2026-11 규격 전환: 옛 셀 저장소 대신 실제 컬럼 표
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public EnergyFuelRatioWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public EnergyFuelRatioWorkbookService(EnergyCellBridge bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
@@ -144,7 +150,8 @@ public class EnergyFuelRatioWorkbookService {
     public int applyImport(Workbook workbook, int year) {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return 0;
-        tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
+        bridge.clearYear(PAGE_TABLE, year);
+        List<EnergyCellBridge.Cell> pending = new ArrayList<>();
         int imported = 0;
         Map<String, Integer> rows = resolveRows(sheet);
         for (TableMap map : TABLE_MAPS) {
@@ -158,11 +165,12 @@ public class EnergyFuelRatioWorkbookService {
                     Cell cell = row.getCell(excelColZeroBased);
                     String text = readInputCellText(cell);
                     if (text == null) continue;
-                    upsertCell(year, rowKey(map.tableId(), htmlRow), colIndex, text);
+                    pending.add(new EnergyCellBridge.Cell(rowKey(map.tableId(), htmlRow), colIndex, text));
                     imported += 1;
                 }
             }
         }
+        imported = bridge.upsertCells(PAGE_TABLE, year, pending).saved();
         return imported;
     }
 
@@ -204,7 +212,9 @@ public class EnergyFuelRatioWorkbookService {
             int cursor = titleRow + 1;
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
                 String label = map.labels().get(htmlRow - 1);
-                Integer found = index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
+                Integer found = label.startsWith("re:")
+                        ? index.rowMatchingOrNull(cursor, map.tableId() + " " + label, Pattern.compile(label.substring(3)))
+                        : index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
                 if (found == null) continue;
                 rows.put(map.tableId() + "|" + htmlRow, found);
                 cursor = found + 1;
@@ -227,7 +237,7 @@ public class EnergyFuelRatioWorkbookService {
 
     private Map<String, String> loadCells(int year) {
         Map<String, String> out = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, String.valueOf(year))) {
+        for (Map<String, Object> row : bridge.cellsOf(PAGE_TABLE, year)) {
             if (!PAGE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rk = String.valueOf(row.get("row_key"));
             int ci = toInt(row.get("col_index"));
@@ -238,18 +248,6 @@ public class EnergyFuelRatioWorkbookService {
         return out;
     }
 
-    private void upsertCell(int year, String rowKey, int colIndex, String value) {
-        if (value == null || value.isBlank()) return;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", String.valueOf(year),
-                "year_no", year,
-                "month_no", 0,
-                "table_name", PAGE_TABLE,
-                "row_key", rowKey,
-                "col_index", colIndex,
-                "cell_value", value
-        ));
-    }
 
     /**
      * 연료비 배분비율 셀 읽기 정책:

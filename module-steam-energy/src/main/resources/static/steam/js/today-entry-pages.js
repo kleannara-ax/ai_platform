@@ -1,3 +1,9 @@
+/* 오늘 일지 등록 — 어제(KST) 하루치를 한 번에 넣는 화면. 2026-11 규격 전환.
+ *  - 호기별 실적 POST /steam-energy-api/unit-daily-usages (PM-2·PM-3·TM-3·4·5, 가동시간·비고 포함)
+ *  - 공통값 POST /unit-daily-commons, LNG POST /lng-daily-usages, 스팀 구매 POST /fuel-daily-usages
+ *  행 전체 업서트라 저장 직전에 그 날 행을 읽어 두고, 이 화면에서 비워 둔 칸은 기존 값을 그대로 둔다
+ *  (단가처럼 다른 화면이 넣는 값도 유지). 한 묶음의 입력이 모두 비어 있으면 그 묶음은 보내지 않는다.
+ */
 document.addEventListener("DOMContentLoaded", () => {
   const page = window.location.pathname.split("/").pop();
   if (page !== "today-entry.html") return;
@@ -28,14 +34,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const dateLabel = document.getElementById("todayEntryDateLabel");
   if (saveButton) saveButton.textContent = "저장";
 
-  const unitRows = [];
-  const rawRows = [];
-  const cellRows = [];
+  const API = window.SteamEnergyApi;
+  if (!API) { console.error("steam-energy-api.js 가 로드되지 않았습니다."); return; }
+  const UNIT_ROW_FIELDS = ["mainSteam", "coaterSteam", "ventilationSteam", "steam", "productionKg", "productionType",
+    "runtimeHours", "disperserRuntimeHours", "ventRuntimeHours", "note"];
+  const COMMON_ROW_FIELDS = ["disperserTotal", "tocSteam", "pica121Vent"];
+  const LNG_ROW_FIELDS = ["boiler20t1", "boiler20t2", "boiler50t", "boiler60t", "boilerCombined", "boilerNewIncinerator", "boilerUnitPrice",
+    "burnerPm3", "burnerTm3", "burnerTm4", "burnerTm5", "burnerUnitPrice", "mixPm2", "mixPm3", "mixTm3", "mixTm4", "mixTm5"];
+  const FUEL_ROW_FIELDS = ["fluidSteamTon", "fluidUnitPrice", "incineratorSteamTon", "incineratorUnitPrice",
+    "combinedSteamTon", "combinedUnitPrice", "combinedDeduction", "extBoilerSteamTon", "extBoilerUnitPrice", "extBoilerDeduction"];
 
   let today = null;
-  let monthKey = "";
-  let dayKey = "";
-  let rowKey = "";
   const NUMERIC_INPUT_IDS = new Set([
     "pm2MainSteam", "pm2CoaterSteam", "pm2Production",
     "pm3MainSteam", "pm3CoaterSteam", "pm3DisperserSteam", "pm3VentSteam", "pm3Production",
@@ -71,9 +80,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateTodayContext() {
     today = getKstParts();
-    monthKey = `${today.year}-${today.month}`;
-    dayKey = String(Number(today.day));
-    rowKey = today.day;
 
     if (dateLabel) {
       dateLabel.textContent = `${today.year}.${today.month}.${today.day}`;
@@ -104,72 +110,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function isNumericInputId(id) {
     return NUMERIC_INPUT_IDS.has(id);
-  }
-
-  function normalizeDayValue(day) {
-    const numeric = Number(day);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return String(numeric);
-    }
-    return String(day ?? "").trim();
-  }
-
-  async function fetchMonthRows(tableName) {
-    const rows = [];
-    let pageNo = 1;
-    let totalPages = 1;
-
-    while (pageNo <= totalPages) {
-      const response = await fetch(`tables/${tableName}?month=${encodeURIComponent(monthKey)}&page=${pageNo}&limit=500`);
-      if (!response.ok) break;
-      const payload = await response.json();
-      const data = payload.data || [];
-      const total = payload.total || data.length;
-      const limit = payload.limit || 500;
-      totalPages = Math.max(1, Math.ceil(total / limit));
-      rows.push(...data);
-      pageNo += 1;
-    }
-
-    return rows;
-  }
-
-  function findLastMatching(rows, predicate) {
-    for (let index = rows.length - 1; index >= 0; index -= 1) {
-      if (predicate(rows[index])) return rows[index];
-    }
-    return null;
-  }
-
-  function findPreferredDayRow(rows, extraPredicate = () => true) {
-    const exact = findLastMatching(rows, (row) =>
-      row.month === monthKey &&
-      String(row.day) === dayKey &&
-      extraPredicate(row)
-    );
-    if (exact) return exact;
-    return findLastMatching(rows, (row) =>
-      row.month === monthKey &&
-      normalizeDayValue(row.day) === dayKey &&
-      extraPredicate(row)
-    );
-  }
-
-  function findUnit(machine) {
-    return findPreferredDayRow(unitRows, (row) => row.machine_no === machine);
-  }
-
-  function findRaw() {
-    return findPreferredDayRow(rawRows);
-  }
-
-  function findCell(tableName, colIndex) {
-    return findLastMatching(cellRows, (row) =>
-      row.month === monthKey &&
-      row.table_name === tableName &&
-      String(row.row_key) === rowKey &&
-      Number(row.col_index) === colIndex
-    );
   }
 
   function setInputValue(id, value) {
@@ -209,94 +149,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  async function upsert(tableName, payload, existingId) {
-    const url = existingId ? `tables/${tableName}/${existingId}` : `tables/${tableName}`;
-    const response = await fetch(url, {
-      method: existingId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(existingId ? payload : { table_name: tableName, ...payload }),
-    });
-    if (!response.ok) {
-      throw new Error("저장에 실패했습니다.");
-    }
-    return response.json();
-  }
-
-  async function saveUnit(machine, fieldMap) {
-    const existing = findUnit(machine);
-    const payload = {
-      month: monthKey,
-      year_no: Number(today.year),
-      month_no: Number(today.month),
-      day: dayKey,
-      machine_no: machine,
-    };
-
-    let hasValue = false;
-    Object.entries(fieldMap).forEach(([field, config]) => {
-      const rawValue = getInputValue(config.id);
-      const value = config.type === "number" ? parseNumber(rawValue) : (rawValue || null);
-      if (value !== null && value !== "") hasValue = true;
-      payload[field] = value;
-    });
-
-    if (!existing && !hasValue) return;
-
-    const saved = await upsert("steam_unit_usage", payload, existing?.id);
-    const index = unitRows.findIndex((row) => row.id === saved.id);
-    if (index >= 0) unitRows[index] = saved;
-    else unitRows.push(saved);
-  }
-
-  async function saveRaw(fieldMap) {
-    const existing = findRaw();
-    const payload = {
-      month: monthKey,
-      year_no: Number(today.year),
-      month_no: Number(today.month),
-      day: dayKey,
-    };
-
-    let hasValue = false;
-    Object.entries(fieldMap).forEach(([field, id]) => {
-      const value = parseNumber(getInputValue(id));
-      if (value !== null) hasValue = true;
-      payload[field] = value;
-    });
-
-    if (!existing && !hasValue) return;
-
-    const saved = await upsert("steam_unit_usage_raw", payload, existing?.id);
-    const index = rawRows.findIndex((row) => row.id === saved.id);
-    if (index >= 0) rawRows[index] = saved;
-    else rawRows.push(saved);
-  }
-
-  async function saveCellValue(tableName, colIndex, value) {
-    const existing = findCell(tableName, colIndex);
-    const cellValue = (value === undefined || value === null || value === "") ? null : String(value);
-    if (!existing && cellValue === null) return;
-
-    const payload = {
-      month: monthKey,
-      year_no: Number(today.year),
-      month_no: Number(today.month),
-      table_name: tableName,
-      row_key: rowKey,
-      col_index: colIndex,
-      cell_value: cellValue,
-    };
-
-    const saved = await upsert("steam_cell_value", payload, existing?.id);
-    const index = cellRows.findIndex((row) => row.id === saved.id);
-    if (index >= 0) cellRows[index] = saved;
-    else cellRows.push(saved);
-  }
-
-  function saveCell(tableName, colIndex, inputId) {
-    return saveCellValue(tableName, colIndex, getInputValue(inputId) || null);
-  }
-
   function fillForm() {
     document.querySelectorAll("input").forEach((input) => {
       input.value = "";
@@ -308,24 +160,59 @@ document.addEventListener("DOMContentLoaded", () => {
     saveButton.disabled = true;
     setSaveButtonLabel("불러오는 중");
     updateTodayContext();
-
-    const [units, raws, cells] = await Promise.all([
-      fetchMonthRows("steam_unit_usage"),
-      fetchMonthRows("steam_unit_usage_raw"),
-      fetchMonthRows("steam_cell_value"),
-    ]);
-
-    unitRows.length = 0;
-    rawRows.length = 0;
-    cellRows.length = 0;
-    unitRows.push(...units);
-    rawRows.push(...raws);
-    cellRows.push(...cells);
     fillForm();
     bindNumberFormatting();
-
     saveButton.disabled = false;
     setSaveButtonLabel("저장");
+  }
+
+  // ── 규격 API 저장 ─────────────────────────────────────────────
+  function isoToday() { return `${today.year}-${today.month}-${today.day}`; }
+  function monthQuery() { return `year=${Number(today.year)}&month=${Number(today.month)}`; }
+  // 입력칸 → 보낼 값. 비어 있으면 undefined(= 기존 값 유지).
+  function numberOf(id) { const v = getInputValue(id); return v === "" ? undefined : parseNumber(v); }
+  function textOf(id) { const v = getInputValue(id); return v === "" ? undefined : v; }
+  function anyFilled(values) { return Object.values(values).some((v) => v !== undefined); }
+
+  function mergeRow(fieldNames, base, values, keys) {
+    const body = { ...keys };
+    fieldNames.forEach((f) => { body[f] = base && base[f] !== undefined ? base[f] : null; });
+    Object.entries(values).forEach(([f, v]) => { if (v !== undefined) body[f] = v; });
+    return body;
+  }
+
+  async function freshRow(path, pick) {
+    const rows = await API.get(path);
+    return rows.find(pick) || null;
+  }
+
+  // 호기별 실적 — 그 호기 입력이 하나라도 있을 때만. 다른 화면이 넣은 값은 최신 행에서 가져와 유지한다.
+  async function saveMachine(machine, values) {
+    if (!anyFilled(values)) return;
+    const usageDate = isoToday();
+    const base = await freshRow(`/unit-daily-usages?${monthQuery()}&machineCode=${encodeURIComponent(machine)}`, (r) => r.usageDate === usageDate);
+    await API.post("/unit-daily-usages", mergeRow(UNIT_ROW_FIELDS, base, values, { usageDate, machineCode: machine }));
+  }
+
+  async function saveCommon(values) {
+    if (!anyFilled(values)) return;
+    const usageDate = isoToday();
+    const base = await freshRow(`/unit-daily-commons?${monthQuery()}`, (r) => r.usageDate === usageDate);
+    await API.post("/unit-daily-commons", mergeRow(COMMON_ROW_FIELDS, base, values, { usageDate }));
+  }
+
+  async function saveLng(values) {
+    if (!anyFilled(values)) return;
+    const usageDate = isoToday();
+    const base = await freshRow(`/lng-daily-usages?${monthQuery()}`, (r) => r.usageDate === usageDate);
+    await API.post("/lng-daily-usages", mergeRow(LNG_ROW_FIELDS, base, values, { usageDate }));
+  }
+
+  async function saveFuel(values) {
+    if (!anyFilled(values)) return;
+    const usageDate = isoToday();
+    const base = await freshRow(`/fuel-daily-usages?${monthQuery()}`, (r) => r.usageDate === usageDate);
+    await API.post("/fuel-daily-usages", mergeRow(FUEL_ROW_FIELDS, base, values, { usageDate }));
   }
 
   async function saveAll() {
@@ -334,86 +221,40 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       updateTodayContext();
 
-      await saveUnit("PM-2", {
-        main_steam: { id: "pm2MainSteam", type: "number" },
-        coater_steam: { id: "pm2CoaterSteam", type: "number" },
-        production: { id: "pm2Production", type: "number" },
-        production_type: { id: "pm2ProductionType", type: "string" },
+      await saveMachine("PM-2", {
+        mainSteam: numberOf("pm2MainSteam"), coaterSteam: numberOf("pm2CoaterSteam"),
+        productionKg: numberOf("pm2Production"), productionType: textOf("pm2ProductionType"),
+        runtimeHours: numberOf("usagePm2Runtime"), note: textOf("usagePm2Note"),
+      });
+      // PM-3 가동시간: 하나의 입력을 M+C · 디스퍼져 · Vent 가동시간 세 곳에 같은 값으로
+      const pm3Runtime = numberOf("usagePm3McRuntime");
+      await saveMachine("PM-3", {
+        mainSteam: numberOf("pm3MainSteam"), coaterSteam: numberOf("pm3CoaterSteam"), ventilationSteam: numberOf("pm3VentSteam"),
+        productionKg: numberOf("pm3Production"), productionType: textOf("pm3ProductionType"),
+        runtimeHours: pm3Runtime, disperserRuntimeHours: pm3Runtime, ventRuntimeHours: pm3Runtime, note: textOf("usagePm3McNote"),
+      });
+      await saveMachine("TM-3", { steam: numberOf("tm3Steam"), productionKg: numberOf("tm3Production"), runtimeHours: numberOf("usageTm3Runtime") });
+      await saveMachine("TM-4", { steam: numberOf("tm4Steam"), productionKg: numberOf("tm4Production"), runtimeHours: numberOf("usageTm4Runtime") });
+      await saveMachine("TM-5", { steam: numberOf("tm5Steam"), productionKg: numberOf("tm5Production"), runtimeHours: numberOf("usageTm5Runtime") });
+
+      await saveCommon({ disperserTotal: numberOf("pm3DisperserSteam"), tocSteam: numberOf("tocSteam"), pica121Vent: numberOf("pica121Vent") });
+
+      await saveLng({
+        boiler20t1: numberOf("lngBoiler1"), boiler20t2: numberOf("lngBoiler2"), boiler50t: numberOf("lngBoiler3"), boiler60t: numberOf("lngBoiler4"),
+        burnerPm3: numberOf("lngBurnerPm3"), burnerTm3: numberOf("lngBurnerTm3"), burnerTm4: numberOf("lngBurnerTm4"), burnerTm5: numberOf("lngBurnerTm5"),
+        mixPm2: numberOf("lngMixPm2"), mixPm3: numberOf("lngMixPm3"), mixTm3: numberOf("lngMixTm3"), mixTm4: numberOf("lngMixTm4"), mixTm5: numberOf("lngMixTm5"),
       });
 
-      await saveUnit("PM-3", {
-        main_steam: { id: "pm3MainSteam", type: "number" },
-        coater_steam: { id: "pm3CoaterSteam", type: "number" },
-        ventilation_steam: { id: "pm3VentSteam", type: "number" },
-        production: { id: "pm3Production", type: "number" },
-        production_type: { id: "pm3ProductionType", type: "string" },
+      await saveFuel({
+        fluidSteamTon: numberOf("flowFluidAmount"), incineratorSteamTon: numberOf("flowIncineratorAmount"),
+        combinedSteamTon: numberOf("flowCombinedAmount"), combinedDeduction: numberOf("flowCombinedDeduction"),
+        extBoilerSteamTon: numberOf("flowBoilerAmount"), extBoilerDeduction: numberOf("flowBoilerDeduction"),
       });
-
-      await saveUnit("TM-3", {
-        steam: { id: "tm3Steam", type: "number" },
-        production: { id: "tm3Production", type: "number" },
-      });
-      await saveUnit("TM-4", {
-        steam: { id: "tm4Steam", type: "number" },
-        production: { id: "tm4Production", type: "number" },
-      });
-      await saveUnit("TM-5", {
-        steam: { id: "tm5Steam", type: "number" },
-        production: { id: "tm5Production", type: "number" },
-      });
-
-      await saveRaw({
-        disperser_total: "pm3DisperserSteam",
-        toc_steam: "tocSteam",
-        pica121_vent: "pica121Vent",
-      });
-
-      await saveCell("usage_m_pm2", 1, "usagePm2Runtime");
-      await saveCell("usage_m_pm2", 3, "usagePm2Note");
-      // PM-3 가동시간: 하나의 입력을 M+C(pm3a col1) · 디스퍼져(pm3b col1) · Vent(pm3b col5) 세 곳에 동일 저장
-      const pm3Runtime = getInputValue("usagePm3McRuntime") || null;
-      await saveCellValue("usage_m_pm3a", 1, pm3Runtime);
-      await saveCellValue("usage_m_pm3b", 1, pm3Runtime);
-      await saveCellValue("usage_m_pm3b", 5, pm3Runtime);
-      await saveCell("usage_m_pm3a", 3, "usagePm3McNote");
-      await saveCell("usage_m_tm", 1, "usageTm3Runtime");
-      await saveCell("usage_m_tm", 4, "usageTm4Runtime");
-      await saveCell("usage_m_tm", 7, "usageTm5Runtime");
-      // 화장지 계 가동시간 = TM-3~5 가동시간 합 (입력 하나라도 있으면 저장)
-      const tmRuntimes = ["usageTm3Runtime", "usageTm4Runtime", "usageTm5Runtime"].map((id) => parseNumber(getInputValue(id)));
-      const hasTmRuntime = tmRuntimes.some((v) => v !== null);
-      const tissueRuntime = hasTmRuntime ? tmRuntimes.reduce((sum, v) => sum + (v || 0), 0) : null;
-      await saveCellValue("usage_m_tissue", 1, tissueRuntime);
-
-      await saveCell("lng_m_boiler", 0, "lngBoiler1");
-      await saveCell("lng_m_boiler", 1, "lngBoiler2");
-      await saveCell("lng_m_boiler", 2, "lngBoiler3");
-      await saveCell("lng_m_boiler", 3, "lngBoiler4");
-
-      await saveCell("lng_m_burner", 0, "lngBurnerPm3");
-      await saveCell("lng_m_burner", 1, "lngBurnerTm3");
-      await saveCell("lng_m_burner", 2, "lngBurnerTm4");
-      await saveCell("lng_m_burner", 3, "lngBurnerTm5");
-
-      await saveCell("lng_m_mix", 0, "lngMixPm2");
-      await saveCell("lng_m_mix", 1, "lngMixPm3");
-      await saveCell("lng_m_mix", 3, "lngMixTm3");
-      await saveCell("lng_m_mix", 4, "lngMixTm4");
-      await saveCell("lng_m_mix", 5, "lngMixTm5");
-
-      await saveCell("flow_m_fluid_incinerator", 0, "flowFluidAmount");
-      await saveCell("flow_m_fluid_incinerator", 3, "flowIncineratorAmount");
-
-      await saveCell("flow_m_combined", 0, "flowCombinedAmount");
-      await saveCell("flow_m_combined", 3, "flowCombinedDeduction");
-
-      await saveCell("flow_m_boiler", 0, "flowBoilerAmount");
-      await saveCell("flow_m_boiler", 3, "flowBoilerDeduction");
 
       setSaveButtonLabel("저장 완료");
     } catch (error) {
       setSaveButtonLabel("저장");
-      alert(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      alert(error instanceof Error ? `저장 실패: ${error.message}` : "저장에 실패했습니다.");
     } finally {
       saveButton.disabled = false;
       if (saveButton.textContent === "저장 완료") {

@@ -1,6 +1,8 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.steamenergy.service.table.ComboCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -27,23 +29,27 @@ import java.util.regex.Pattern;
 
 @Service
 public class ComboBoilerWorkbookService {
-    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PRODUCTION_TABLE = "combo_boiler_production";
     private static final String DOWNTIME_TABLE = "combo_boiler_downtime";
     private static final String RECOVERY_TABLE = "combo_boiler_recovery";
     private static final String ETC_TABLE = "combo_boiler_etc";
     private static final int MAX_RECOVERY_ROWS = 26;
 
-    private final TableService tableService;
+    /** 저장소: 규격 표 5개 (ComboCellStore 가 옛 키를 표의 행·컬럼으로 옮긴다) */
+    private final ComboCellStore store;
+    /** 가져오기 중 한 시트(한 달)의 칸을 모아 두는 곳 — importWorkbook 이 synchronized 라 한 번에 한 파일만 쓴다 */
+    private Map<String, Map<String, String>> pendingMonth = new LinkedHashMap<>();
+    private Map<String, String> pendingEtc = new LinkedHashMap<>();
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public ComboBoilerWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public ComboBoilerWorkbookService(ComboCellStore store) {
+        this.store = store;
     }
 
-    public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
+    public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
         int imported = 0;
+        Map<String, String> lastEtc = null;
         int validSheets = 0;
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
@@ -55,26 +61,23 @@ public class ComboBoilerWorkbookService {
                 ComboBoilerLayout layout = ComboBoilerLayout.of(sheet);
                 validateMonthlySheet(sheet, layout);
                 validSheets += 1;
-                clearImportedMonth(year, month);
-                imported += importProductionSheet(sheet, layout, year, month);
-                imported += importDowntimeSheet(sheet, layout, year, month);
-                imported += importRecoverySheet(sheet, layout, year, month);
-                imported += importEtcSheet(sheet, layout, year, month);
+                // 시트 한 장 = 한 달. 칸을 모은 뒤 그 달을 통째로 바꾼다 (파일이 그 달의 기준).
+                pendingMonth = new LinkedHashMap<>();
+                pendingEtc = new LinkedHashMap<>();
+                importProductionSheet(sheet, layout, year, month);
+                importDowntimeSheet(sheet, layout, year, month);
+                importRecoverySheet(sheet, layout, year, month);
+                importEtcSheet(sheet, layout, year, month);
+                imported += store.replaceMonth(year, month, pendingMonth);
+                // 연간 계획 표는 시트마다 같은 표가 들어 있다 — 값이 있는 마지막 시트를 쓴다.
+                if (!pendingEtc.isEmpty()) lastEtc = pendingEtc;
             }
         }
+        if (lastEtc != null) imported += store.replaceEtc(year, lastEtc);
         if (validSheets == 0) {
-            throw new IllegalArgumentException("\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD30C\uC77C\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD30C\uC77C\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
         }
         return Map.of("year", year, "imported", imported);
-    }
-
-    private void clearImportedMonth(int year, int month) {
-        tableService.deleteTableCellValuesByTables(monthKey(year, month), List.of(
-                PRODUCTION_TABLE,
-                DOWNTIME_TABLE,
-                RECOVERY_TABLE
-        ));
-        tableService.deleteTableCellValuesByTables(monthKey(year, 1), List.of(ETC_TABLE));
     }
 
     public byte[] exportWorkbook(int year) throws IOException {
@@ -83,20 +86,19 @@ public class ComboBoilerWorkbookService {
              Workbook workbook = WorkbookFactory.create(inputStream);
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             workbook.setForceFormulaRecalculation(true);
+            Map<String, String> annualCells = store.loadEtc(year);
             for (int i = 0; i < workbook.getNumberOfSheets(); i += 1) {
                 Sheet sheet = workbook.getSheetAt(i);
                 int month = sheetMonth(sheet.getSheetName());
                 if (month < 1 || month > 12) continue;
-                String monthKey = monthKey(year, month);
-                Map<String, Map<String, String>> cells = loadMonthCells(monthKey);
-                Map<String, Map<String, String>> annualCells = loadMonthCells(monthKey(year, 1));
+                Map<String, Map<String, String>> cells = store.loadMonth(year, month);
                 // \uB0B4\uB824\uBC1B\uAE30\uB3C4 \uAC19\uC740 \uC0C9\uC778\uC744 \uC4F4\uB2E4 \u2014 \uC5C5\uB85C\uB4DC\uC640 \uC790\uB9AC\uAC00 \uC5B4\uAE0B\uB098\uC9C0 \uC54A\uAC8C.
                 ComboBoilerLayout layout = ComboBoilerLayout.of(sheet);
                 setCellValue(sheet, 2, 0, year + "\uB144  " + month + "\uC6D4");
                 fillProductionSheet(sheet, layout, cells.getOrDefault(PRODUCTION_TABLE, Map.of()));
                 fillDowntimeSheet(sheet, layout, cells.getOrDefault(DOWNTIME_TABLE, Map.of()));
                 fillRecoverySheet(sheet, layout, cells.getOrDefault(RECOVERY_TABLE, Map.of()));
-                fillEtcSheet(sheet, layout, annualCells.getOrDefault(ETC_TABLE, Map.of()));
+                fillEtcSheet(sheet, layout, annualCells);
             }
             workbook.write(outputStream);
             return outputStream.toByteArray();
@@ -115,7 +117,8 @@ public class ComboBoilerWorkbookService {
                 "externalSteam", "externalCondensate", "externalMakeup",
                 "wasteSteam1", "wasteSteam2", "kn20", "kn50",
                 "fluidizedSteam", "fluidizedCondensate",
-                "runtime20", "runtime50", "runtimeFluidized"
+                "runtime20", "runtime50", "runtimeFluidized",
+                "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate"   // 참고자료 (2026년 10·11월 양식)
         };
         imported += importDayFields(sheet, layout, PRODUCTION_TABLE, monthKey, year, month, fields);
 
@@ -218,7 +221,8 @@ public class ComboBoilerWorkbookService {
                 "externalSteam", "externalCondensate", "externalMakeup",
                 "wasteSteam1", "wasteSteam2", "kn20", "kn50",
                 "fluidizedSteam", "fluidizedCondensate",
-                "runtime20", "runtime50", "runtimeFluidized"
+                "runtime20", "runtime50", "runtimeFluidized",
+                "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate"   // 참고자료 (2026년 10·11월 양식)
         };
         fillDayFields(sheet, layout, cells, fields);
 
@@ -287,29 +291,11 @@ public class ComboBoilerWorkbookService {
         }
     }
 
-    private Map<String, Map<String, String>> loadMonthCells(String monthKey) {
-        Map<String, Map<String, String>> result = new LinkedHashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, monthKey)) {
-            if (toInt(row.get("col_index")) != 0) continue;
-            String tableName = String.valueOf(row.get("table_name"));
-            String rowKey = String.valueOf(row.get("row_key"));
-            String value = String.valueOf(row.get("cell_value"));
-            result.computeIfAbsent(tableName, key -> new LinkedHashMap<>()).put(rowKey, value);
-        }
-        return result;
-    }
-
+    /** 읽은 칸을 모아 둔다 (저장은 시트를 다 읽은 뒤 ComboCellStore 가 한다). */
     private int upsertCell(String tableName, String monthKey, int year, int month, String rowKey, String value) {
         if (value == null || value.isBlank()) return 0;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", monthKey,
-                "year_no", year,
-                "month_no", month,
-                "table_name", tableName,
-                "row_key", rowKey,
-                "col_index", 0,
-                "cell_value", value
-        ));
+        if (ETC_TABLE.equals(tableName)) pendingEtc.put(rowKey, value);
+        else pendingMonth.computeIfAbsent(tableName, key -> new LinkedHashMap<>()).put(rowKey, value);
         return 1;
     }
 
@@ -331,7 +317,7 @@ public class ComboBoilerWorkbookService {
      */
     private void validateMonthlySheet(Sheet sheet, ComboBoilerLayout layout) {
         if (layout.dayRows().isEmpty() || layout.dayColumns().isEmpty() || layout.fuelPriceColumn() < 0) {
-            throw new IllegalArgumentException("\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
         }
     }
 
@@ -379,13 +365,4 @@ public class ComboBoilerWorkbookService {
         return year + "-" + String.format("%02d", month);
     }
 
-
-    private int toInt(Object value) {
-        if (value instanceof Number number) return number.intValue();
-        try {
-            return Integer.parseInt(String.valueOf(value));
-        } catch (Exception exception) {
-            return 0;
-        }
-    }
 }

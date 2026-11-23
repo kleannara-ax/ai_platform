@@ -1,6 +1,9 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.steamenergy.service.table.IncineratorCellStore;
+import com.company.module.steamenergy.service.table.RecordCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -83,11 +86,24 @@ public class IncineratorWorkbookService {
             {"cost-plan", "운영비 계획"}, {"cost-actual", "운영비 실적"}, {"cost-diff", "운영비 증감"}
     };
 
-    private final TableService tableService;
+    /** 사고·정비 이력(옛 월 키 YYYY-00)은 규격 표 steam_incident (RecordCellStore) */
+    private final RecordCellStore recordStore;
+    private List<RecordCellStore.Cell> pendingRecords = new java.util.ArrayList<>();
+    /** 도급내역·사업계획대비·가동실적·총 운영비용은 규격 표 (IncineratorCellStore 가 옛 키를 표의 행·컬럼으로 옮긴다) */
+    private final IncineratorCellStore store;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
+    /** 가져오기 중 읽은 칸을 모아 두는 곳 (옛 논리 표 이름 → 키 → 값) — importWorkbook 이 synchronized 라 한 번에 한 파일만 쓴다 */
+    private Map<String, Map<String, String>> pending = new LinkedHashMap<>();
 
-    public IncineratorWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public IncineratorWorkbookService(IncineratorCellStore store, RecordCellStore recordStore) {
+        this.store = store;
+        this.recordStore = recordStore;
+    }
+
+    /** 월 키의 셀 목록 — 규격 표에서 옛 형식으로 편 것 (사고·정비 이력은 YYYY-00). */
+    private List<Map<String, Object>> listCells(String monthKey) {
+        if (monthKey != null && monthKey.endsWith("-00")) return recordStore.listByYear(Integer.parseInt(monthKey.substring(0, 4)));
+        return store.listByMonthKey(monthKey);
     }
 
     // =============================================================
@@ -140,7 +156,7 @@ public class IncineratorWorkbookService {
     /** Sheet 1 도급내역 — 가져오기와 같은 {@link ContractLayout} 로 칸·일자를 찾아 쓴다. */
     private void fillContractTemplate(Sheet sheet, int year, int month) {
         String monthKey = monthKey(year, month);
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, monthKey), CONTRACT_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(monthKey), CONTRACT_TABLE);
         int[] title = findTitleCell(sheet, k -> k.startsWith("1.") && k.contains("도급"));
         if (title != null) setTemplateText(sheet, title[0], title[1], "1. " + year + "년 " + month + "월 소각로 도급비용");
 
@@ -336,7 +352,7 @@ public class IncineratorWorkbookService {
 
     /** Sheet 3 전년대비 — "구 분 | 1월 …" 표마다 첫 "…실적" 줄이 전년, 둘째가 올해다. */
     private void fillYoyTemplate(Sheet sheet, int year) {
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), YOY_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(String.valueOf(year)), YOY_TABLE);
         hydrateYoyComputedCells(cells, year);
         for (Map.Entry<String, Integer> r : yoyRows(sheet).entrySet()) {
             Map<Integer, Integer> months = SheetLabels.monthColumns(sheet, yoyHeaderAbove(sheet, r.getValue()));
@@ -377,7 +393,7 @@ public class IncineratorWorkbookService {
 
     /** Sheet 4 계획대비 가동실적 — 가져오기와 같은 {@link #operationLayout} 으로 칸·월을 찾아 쓴다. */
     private void fillOperationTemplate(Sheet sheet, int year) {
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), OPERATION_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(String.valueOf(year)), OPERATION_TABLE);
         hydrateOperationComputedCells(cells);
         OperationLayout layout = operationLayout(sheet);
         for (Map.Entry<Integer, Integer> m : layout.monthRows().entrySet()) {
@@ -434,7 +450,7 @@ public class IncineratorWorkbookService {
      * (예전에는 운영내역만, 그것도 한 줄 아래에 써서 다시 올리면 달이 하나씩 밀렸다)
      */
     private void fillTotalCostTemplate(Sheet sheet, int year) {
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), TOTAL_COST_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(String.valueOf(year)), TOTAL_COST_TABLE);
         hydrateTotalCostComputedCells(cells, year);
         for (String table : new String[]{"op", "self", "mat"}) {
             String anchor = totalCostAnchor(table);
@@ -483,7 +499,7 @@ public class IncineratorWorkbookService {
         Map<String, java.util.TreeMap<Integer, Map<Integer, Object>>> byPrefix = new LinkedHashMap<>();
         byPrefix.put(ACCIDENT_PREFIX, new java.util.TreeMap<>());
         byPrefix.put(MAINTENANCE_PREFIX, new java.util.TreeMap<>());
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, mk)) {
+        for (Map<String, Object> row : listCells(mk)) {
             String rowKey = String.valueOf(row.get("row_key"));
             for (Map.Entry<String, java.util.TreeMap<Integer, Map<Integer, Object>>> e : byPrefix.entrySet()) {
                 if (!rowKey.startsWith(e.getKey())) continue;
@@ -566,7 +582,7 @@ public class IncineratorWorkbookService {
         setString(sheet, row++, 0, year + "년 " + month + "월 소각로 도급내역");
         row += 1;
         String monthKey = monthKey(year, month);
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, monthKey), CONTRACT_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(monthKey), CONTRACT_TABLE);
         hydrateContractComputedCells(cells);
         for (String section : new String[]{"unit1", "unit2", "real"}) {
             row = writeContractSection(sheet, row, section, cells, headerStyle);
@@ -706,7 +722,7 @@ public class IncineratorWorkbookService {
         order.add(selectedMonth);
         for (Integer m : order) {
             String mk = monthKey(year, m);
-            for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, mk)) {
+            for (Map<String, Object> row : listCells(mk)) {
                 if (!PLAN_VS_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
                 String rowKey = String.valueOf(row.get("row_key"));
                 Object value = row.get("cell_value");
@@ -721,7 +737,7 @@ public class IncineratorWorkbookService {
     // ---------- Sheet 3: 전년대비 ----------
     private void writeYoySheet(Sheet sheet, int year, CellStyle headerStyle) {
         Map<String, Object> cells = buildCellMap(
-                tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)),
+                listCells(String.valueOf(year)),
                 YOY_TABLE
         );
         hydrateYoyComputedCells(cells, year);
@@ -761,7 +777,7 @@ public class IncineratorWorkbookService {
     // ---------- Sheet 4: 가동실적 ----------
     private void writeOperationSheet(Sheet sheet, int year, CellStyle headerStyle) {
         Map<String, Object> cells = buildCellMap(
-                tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)),
+                listCells(String.valueOf(year)),
                 OPERATION_TABLE
         );
         hydrateOperationComputedCells(cells);
@@ -829,7 +845,7 @@ public class IncineratorWorkbookService {
 
     private void writeTotalCostSheet(Sheet sheet, int year, CellStyle headerStyle) {
         Map<String, Object> cells = buildCellMap(
-                tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)),
+                listCells(String.valueOf(year)),
                 TOTAL_COST_TABLE
         );
         hydrateTotalCostComputedCells(cells, year);
@@ -859,7 +875,7 @@ public class IncineratorWorkbookService {
     // ---------- Sheet 6: 사고이력 ----------
     private void writeAccidentSheet(Sheet sheet, int year, CellStyle headerStyle) {
         String monthKey = year + "-00";
-        List<Map<String, Object>> rows = tableService.listAllByMonth(CELL_TABLE, monthKey);
+        List<Map<String, Object>> rows = listCells(monthKey);
         // 사고: 6 cols (date, reason, action, downtime, loss, note)
         // 정비: 5 cols (date, reason, action, downtime, note) — loss 없음, col_index 6=note
         int row = 0;
@@ -921,8 +937,11 @@ public class IncineratorWorkbookService {
     // IMPORT
     // =============================================================
     @Transactional
-    public Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+    public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+        pending = new LinkedHashMap<>();
+        pendingRecords = new java.util.ArrayList<>();
         int contractRows = 0, planVsRows = 0, yoyRows = 0, opRows = 0, totalCostRows = 0, accidentRows = 0;
+        boolean importedAccidentSheet = false;
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet contractSheet = findSheet(workbook, "도급내역", 0);
@@ -932,8 +951,14 @@ public class IncineratorWorkbookService {
             Sheet totalCostSheet = findSheet(workbook, "총 운영비용", 4);
             Sheet accidentSheet = findSheet(workbook, "사고이력", 5);
 
-            // 선택한 월에 해당하는 데이터만 클리어 (도급내역/사업계획대비). 연 기준 표는 매 import 마다 전체 갱신.
+            // 사고이력만 미리 지운다. 규격 표는 시트를 다 읽은 뒤 한 번에 바꾼다 (store.replaceFromImport):
+            // 고른 달의 도급내역, 그 해의 사업계획대비 표·가동실적·총 운영비용. 다른 달의 도급내역은 건드리지 않는다.
             clearImportTargets(year, month);
+            // 시트가 있는 표는 값이 하나도 없어도 "파일 기준으로 바꿈" 대상이다.
+            if (contractSheet != null) pending.computeIfAbsent(CONTRACT_TABLE, key -> new LinkedHashMap<>());
+            if (planVsSheet != null) pending.computeIfAbsent(PLAN_VS_TABLE, key -> new LinkedHashMap<>());
+            if (operationSheet != null) pending.computeIfAbsent(OPERATION_TABLE, key -> new LinkedHashMap<>());
+            if (totalCostSheet != null) pending.computeIfAbsent(TOTAL_COST_TABLE, key -> new LinkedHashMap<>());
 
             if (contractSheet != null) contractRows = importContractSheet(contractSheet, year, month);
             if (planVsSheet != null) planVsRows = importPlanVsSheet(planVsSheet, year, month);
@@ -942,12 +967,21 @@ public class IncineratorWorkbookService {
             if (yoySheet != null) yoyRows = 0;
             if (operationSheet != null) opRows = importOperationSheet(operationSheet, year);
             if (totalCostSheet != null) totalCostRows = importTotalCostSheet(totalCostSheet, year);
-            if (accidentSheet != null) accidentRows = importAccidentSheet(accidentSheet, year);
+            if (accidentSheet != null) {
+                accidentRows = importAccidentSheet(accidentSheet, year);
+                importedAccidentSheet = true;
+            }
         }
         int totalRows = contractRows + planVsRows + yoyRows + opRows + totalCostRows + accidentRows;
         if (totalRows <= 0) {
-            throw new IllegalArgumentException("업로드한 소각로 위탁운영비 엑셀에서 반영할 데이터를 찾지 못했습니다. 다운로드한 양식의 시트와 셀 위치를 확인해주세요.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "업로드한 소각로 위탁운영비 엑셀에서 반영할 데이터를 찾지 못했습니다. 다운로드한 양식의 시트와 셀 위치를 확인해주세요.");
         }
+        pending.remove(YOY_TABLE);
+        store.replaceFromImport(year, month, pending);
+        pending = new LinkedHashMap<>();
+        // 사고·정비 이력: 그 해의 소각로 기록을 파일 기준으로 바꾼다 (다른 시설의 기록은 그대로)
+        if (importedAccidentSheet) recordStore.replace(year, List.of(ACCIDENT_PREFIX, MAINTENANCE_PREFIX), pendingRecords);
+        pendingRecords = new java.util.ArrayList<>();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("year", year);
         result.put("month", month);
@@ -961,15 +995,7 @@ public class IncineratorWorkbookService {
     }
 
     private void clearImportTargets(int year, int month) {
-        // 도급내역·사업계획대비: 선택한 월 monthKey 만 클리어 (다른 월 데이터 보존)
-        for (int m = 1; m <= 12; m += 1) {
-            tableService.deleteTableCellValuesByTables(monthKey(year, m), List.of(CONTRACT_TABLE, PLAN_VS_TABLE));
-        }
-        // 연 기준 표: 매번 전체 갱신 (엑셀에 12개월치 다 들어있음)
-        String yearMk = String.valueOf(year);
-        tableService.deleteTableCellValuesByTables(yearMk, List.of(YOY_TABLE, OPERATION_TABLE, TOTAL_COST_TABLE));
-        String accidentMk = year + "-00";
-        tableService.deleteTableCellRowsByMonthAndPrefixes(accidentMk, List.of(ACCIDENT_PREFIX, MAINTENANCE_PREFIX));
+        // 지울 것이 없다 — 규격 표는 시트를 다 읽은 뒤 한 번에 파일 기준으로 바꾼다 (store.replaceFromImport, recordStore.replace).
     }
 
     private Sheet findSheet(Workbook workbook, String nameFragment, int fallbackIndex) {
@@ -1640,9 +1666,30 @@ public class IncineratorWorkbookService {
         }
     }
 
+    /** 결산 1호기 운휴시간 기본값(Hr) — 도급내역 화면과 같다 */
+    private static final double UNIT1_RUNTIME_DEFAULT = 24.0;
+
     private ContractMonth collectContractMonth(int year, int month) {
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, monthKey(year, month)), CONTRACT_TABLE);
-        hydrateContractComputedCells(cells);
+        Map<String, Object> cells = buildCellMap(listCells(monthKey(year, month)), CONTRACT_TABLE);
+        // 화면(js/incinerator-store.js 의 computed 조회)과 같은 규칙으로 월 합계를 낸다:
+        //  - 스팀량이 하루도 없는 달(단가만 기록된 달)은 도급 실적이 없는 달 — 운영비용·운휴비용을 만들지 않는다.
+        //  - 결산 1호기 운휴시간이 비어 있고 그 날 고정비가 있으면 도급내역 화면처럼 24 로 본다.
+        boolean hasSteam = false;
+        for (int day = 1; day <= 31 && !hasSteam; day += 1) {
+            for (String key : new String[]{"unit1|" + day + "|steam", "unit2|" + day + "|steam", "real|" + day + "|steam-1", "real|" + day + "|steam-2"}) {
+                Double steam = getNumber(cells, CONTRACT_TABLE, key);
+                if (steam != null && steam > 0) { hasSteam = true; break; }
+            }
+        }
+        if (hasSteam) {
+            for (int day = 1; day <= 31; day += 1) {
+                if (getNumber(cells, CONTRACT_TABLE, "unit1|" + day + "|runtime") == null
+                        && getNumber(cells, CONTRACT_TABLE, "unit1|" + day + "|fixed") != null) {
+                    putNumber(cells, CONTRACT_TABLE, "unit1|" + day + "|runtime", UNIT1_RUNTIME_DEFAULT);
+                }
+            }
+            hydrateContractComputedCells(cells);
+        }
         double unit1Steam = 0;
         double unit2Steam = 0;
         double unit1Oper = 0;
@@ -1665,7 +1712,7 @@ public class IncineratorWorkbookService {
     }
 
     private Double collectOperationActual(int year, int month, String unit) {
-        Map<String, Object> cells = buildCellMap(tableService.listAllByMonth(CELL_TABLE, String.valueOf(year)), OPERATION_TABLE);
+        Map<String, Object> cells = buildCellMap(listCells(String.valueOf(year)), OPERATION_TABLE);
         return getNumber(cells, OPERATION_TABLE, "hours|" + month + "|" + unit + "-actual");
     }
 
@@ -1882,15 +1929,13 @@ public class IncineratorWorkbookService {
 
     private int upsertCell(String month, int year, int monthNo, String tableName, String rowKey, int colIndex, String value) {
         if (value == null || value.isBlank()) return 0;
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("month", month);
-        payload.put("year_no", year);
-        payload.put("month_no", monthNo);
-        payload.put("table_name", tableName);
-        payload.put("row_key", rowKey);
-        payload.put("col_index", colIndex);
-        payload.put("cell_value", value);
-        tableService.upsert(CELL_TABLE, payload);
+        if (!CELL_TABLE.equals(tableName)) {
+            // 규격 표로 가는 칸은 모아 두었다가 한 번에 반영한다
+            pending.computeIfAbsent(tableName, key -> new LinkedHashMap<>()).put(rowKey, value);
+            return 1;
+        }
+        // 사고·정비 이력 (옛 표 이름 steam_cell_value, 월 키 YYYY-00)
+        pendingRecords.add(new RecordCellStore.Cell(rowKey, colIndex, value));
         return 1;
     }
 

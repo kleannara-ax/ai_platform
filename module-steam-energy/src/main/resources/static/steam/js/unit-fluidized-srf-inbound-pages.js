@@ -109,7 +109,7 @@
     let totalPages = 1;
     const limit = 1000;
     while (pageNo <= totalPages) {
-      const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=${pageNo}&limit=${limit}&month=${encodeURIComponent(currentMonthKey())}`);
+      const response = await window.FluidizedStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=${pageNo}&limit=${limit}&month=${encodeURIComponent(currentMonthKey())}&tableNames=${SRF_TABLE}`);
       if (!response.ok) {
         cellRows = [];
         return;
@@ -136,7 +136,7 @@
       col_index: colIndex,
       cell_value: rawValue,
     };
-    const response = await fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
+    const response = await window.FluidizedStore.fetch(existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`, {
       method: existing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -431,7 +431,7 @@
       formData.append("file", file);
       formData.append("year", yearSelect.value);
       formData.append("month", monthSelect.value);
-      const response = await fetch("/tables/fluidized-summary/import-excel", {
+      const response = await fetch("/steam-energy-api/fluidized-excel/import-excel", {
         method: "POST",
         body: formData,
       });

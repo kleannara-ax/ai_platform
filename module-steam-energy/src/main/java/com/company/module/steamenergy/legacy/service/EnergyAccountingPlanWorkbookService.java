@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.energy.EnergyCellBridge;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,7 +44,11 @@ public class EnergyAccountingPlanWorkbookService {
     // 시트명 패턴: "25년 회계비용 계획", "26년 회계비용 계획", "2025년 회계비용 계획" 등 모두 매칭
     private static final java.util.regex.Pattern SHEET_NAME_PATTERN =
             java.util.regex.Pattern.compile("\\d+년\\s*회계비용\\s*계획");
-    private static final String CELL_TABLE = "steam_cell_value";
+    // 2026년 워크북은 같은 표를 '2026년 연료비 사업계획' 시트에 둔다 ('25년 회계비용 계획' 시트가 없다).
+    // '2025 연료비 사업계획(안)' 은 다른 표(연료비 사업계획 화면)라서 이름만으로는 못 가린다 — 표 안의 항목으로 확인한다.
+    private static final java.util.regex.Pattern FALLBACK_SHEET_NAME_PATTERN =
+            java.util.regex.Pattern.compile("연료비\\s*사업계획");
+    private static final String FALLBACK_MARKER_LABEL = "연료비(회계비용) 실적";
     private static final String PAGE_TABLE = "energy_accounting_plan";
     private static final int HTML_ROW_COUNT = 32;
     private static final int HTML_TO_EXCEL_ROW_OFFSET = 2; // HTML r01 → Excel row 3 (이름을 못 찾을 때의 폴백)
@@ -52,18 +57,19 @@ public class EnergyAccountingPlanWorkbookService {
      * 화면 행(r01~r32) 에 대응하는 <b>원본 시트의 항목 이름</b>.
      * 구분 열(B)에 적힌 글자를 그대로 쓰되, 소계 행처럼 B 가 비어 있으면 대분류 열(A)의 글자다.
      * 위치(행 번호)가 아니라 이 이름으로 찾으므로 원본에 행이 끼어들어도 밀리지 않는다.
+     * <p>{@code |} 뒤는 해마다 바뀐 표기다 (2026년 양식).
      */
     private static final String[] ROW_LABELS = {
             "복합보일러 스팀구매",            // r01
-            "제스코 스팀구매",               // r02
+            "제스코 스팀구매|제스코",          // r02
             "LNG 구매",                   // r03
-            "폐합성소각로",                  // r04
-            "유동상소각로",                  // r05
+            "폐합성소각로|폐합성/신설 소각로 스팀구매|폐합성소각로 스팀구매",   // r04
+            "유동상소각로|유동상소각로 스팀구매",  // r05
             "연료비 월별",                  // r06
             "제스코 상계비 (용수사용 등)",      // r07
             "제스코 페널티",                 // r08
             "제스코 선급금 상환",             // r09
-            "복합 LNG, 용수사용량",          // r10
+            "복합 LNG, 용수사용량|복합 LNG 사용량, 처분부담금 등",   // r10
             "복합 투자비 감가상각",            // r11
             "복합보일러 처분수익 연료비 차감분",   // r12
             "토지 지상권 지료",               // r13
@@ -71,7 +77,7 @@ public class EnergyAccountingPlanWorkbookService {
             "연료비(회계비용) 실적",           // r15  (A열)
             "제지 연료비(스팀사용비율)",        // r16
             "생활 연료비(스팀사용비율)",        // r17
-            "연료비(회계비용) 계획금액",        // r18  (A열)
+            "연료비(회계비용) 계획금액|연료비(회계비용) SG 계획금액",   // r18  (A열)
             "회계비용 대비 증감",             // r19  (A열)
             "전월대비 증감",                 // r20  (A열)
             "생산량",                      // r21  (A열)
@@ -94,12 +100,12 @@ public class EnergyAccountingPlanWorkbookService {
     private static final int MONTH_HEADER_ROW = 2;
 
 
-    private final TableService tableService;
+    private final EnergyCellBridge bridge;   // 2026-11 규격 전환: 옛 셀 저장소 대신 실제 컬럼 표
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public EnergyAccountingPlanWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public EnergyAccountingPlanWorkbookService(EnergyCellBridge bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
@@ -126,7 +132,8 @@ public class EnergyAccountingPlanWorkbookService {
     public int applyImport(Workbook workbook, int year) {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return 0;
-        tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
+        bridge.clearYear(PAGE_TABLE, year);
+        List<EnergyCellBridge.Cell> pending = new ArrayList<>();
         int imported = 0;
         EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS,
                 HTML_TO_EXCEL_ROW_OFFSET + 1, MONTH_HEADER_ROW);
@@ -136,14 +143,16 @@ public class EnergyAccountingPlanWorkbookService {
             Row row = sheet.getRow(excelRowOneBased - 1);
             if (row == null) continue;
             for (int colIndex = 1; colIndex <= 13; colIndex += 1) {
+                if (colIndex == 1 && index.noPrevDecember()) continue;   // 전년 12월 열이 없는 양식 ("2025년 예상" 열)
                 int excelColZeroBased = resolveMonthCol(index, colIndex);
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
-                upsertCell(year, rowKey(htmlRow), colIndex, text);
+                pending.add(new EnergyCellBridge.Cell(rowKey(htmlRow), colIndex, text));
                 imported += 1;
             }
         }
+        imported = bridge.upsertCells(PAGE_TABLE, year, pending).saved();
         return imported;
     }
 
@@ -161,6 +170,7 @@ public class EnergyAccountingPlanWorkbookService {
                 String key = rowKey(htmlRow) + "|" + colIndex;
                 String value = cells.get(key);
                 if (value == null) continue;
+                if (colIndex == 1 && index.noPrevDecember()) continue;
                 int excelColZeroBased = resolveMonthCol(index, colIndex);
                 setNonFormulaCellNumber(sheet, excelRowOneBased, excelColZeroBased, value);
             }
@@ -177,12 +187,19 @@ public class EnergyAccountingPlanWorkbookService {
                 return sheet;
             }
         }
+        for (int i = 0; i < workbook.getNumberOfSheets(); i += 1) {
+            Sheet sheet = workbook.getSheetAt(i);
+            String name = sheet.getSheetName();
+            if (name == null || !FALLBACK_SHEET_NAME_PATTERN.matcher(name).find()) continue;
+            EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, HTML_TO_EXCEL_ROW_OFFSET + 1, 0);
+            if (index.rowOrNull(0, 0, FALLBACK_MARKER_LABEL, FALLBACK_MARKER_LABEL) != null) return sheet;
+        }
         return null;
     }
 
     private Map<String, String> loadCells(int year) {
         Map<String, String> out = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, String.valueOf(year))) {
+        for (Map<String, Object> row : bridge.cellsOf(PAGE_TABLE, year)) {
             if (!PAGE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rk = String.valueOf(row.get("row_key"));
             int ci = toInt(row.get("col_index"));
@@ -193,18 +210,6 @@ public class EnergyAccountingPlanWorkbookService {
         return out;
     }
 
-    private void upsertCell(int year, String rowKey, int colIndex, String value) {
-        if (value == null || value.isBlank()) return;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", String.valueOf(year),
-                "year_no", year,
-                "month_no", 0,
-                "table_name", PAGE_TABLE,
-                "row_key", rowKey,
-                "col_index", colIndex,
-                "cell_value", value
-        ));
-    }
 
     private String readInputCellText(Cell cell) {
         if (cell == null) return null;
@@ -268,7 +273,7 @@ public class EnergyAccountingPlanWorkbookService {
         String label = htmlRow <= ROW_LABELS.length ? ROW_LABELS[htmlRow - 1] : null;
         if (label == null) return declared;
         // 이름을 못 찾으면 null — 호출부가 그 항목을 건너뛴다(다른 제목 줄에 붙이지 않는다)
-        return index.rowOrNull(0, declared, label, label);
+        return index.rowOrNull(0, declared, label, label.split("\\|"));
     }
 
     /**

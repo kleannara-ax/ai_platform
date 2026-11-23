@@ -1,6 +1,10 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.steamenergy.service.table.FluidizedCellStore;
+import com.company.module.steamenergy.service.table.FluidizedDetailCellStore;
+import com.company.module.steamenergy.service.table.RecordCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -70,16 +74,32 @@ public class FluidizedSummaryWorkbookService {
             "labor", 0, "operating", 1, "improvement", 2
     );
 
-    private final TableService tableService;
     private final FluidizedDetailWorkbookService fluidizedDetailWorkbookService;
     private final SheetMetadataLoader sheetMetadataLoader;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public FluidizedSummaryWorkbookService(TableService tableService,
+    /** 사업계획·비고·도급비용·지급현황·SRF 입고는 규격 표 (FluidizedCellStore). 세부 운영내역은 FluidizedDetailCellStore, 사고·개선은 RecordCellStore. */
+    private final FluidizedCellStore store;
+    /** 가져오기 중 읽은 규격 표 칸을 모아 두는 곳 — 가져오기 메서드가 synchronized 라 한 번에 한 파일만 쓴다 */
+    private List<FluidizedCellStore.Cell> pending = new ArrayList<>();
+    /** 사고·정비·설비개선 목록은 규격 표 (RecordCellStore) */
+    private final RecordCellStore recordStore;
+    private List<RecordCellStore.Cell> pendingRecords = new ArrayList<>();
+    /** 세부 운영내역 입력은 규격 표 3개 (FluidizedDetailCellStore). 가져오기 중 읽은 칸(셀 주소 → 값)을 모아 둔다 */
+    private final FluidizedDetailCellStore detailStore;
+    private Map<String, String> pendingDetail = new LinkedHashMap<>();
+    /** 올린 파일에서 세부 운영내역 시트를 읽을 수 있었는지 — 읽었을 때만 그 달을 파일 기준으로 바꾼다 */
+    private boolean detailSheetRead;
+
+    public FluidizedSummaryWorkbookService(FluidizedDetailCellStore detailStore,
                                            FluidizedDetailWorkbookService fluidizedDetailWorkbookService,
-                                           SheetMetadataLoader sheetMetadataLoader) {
-        this.tableService = tableService;
+                                           SheetMetadataLoader sheetMetadataLoader,
+                                           FluidizedCellStore store,
+                                           RecordCellStore recordStore) {
+        this.store = store;
+        this.recordStore = recordStore;
+        this.detailStore = detailStore;
         this.fluidizedDetailWorkbookService = fluidizedDetailWorkbookService;
         this.sheetMetadataLoader = sheetMetadataLoader;
     }
@@ -104,7 +124,7 @@ public class FluidizedSummaryWorkbookService {
             Sheet monthlySummarySheet = FluidizedSummaryLayout.sheetByName(workbook, 3, "3-1.");
             String monthKey = monthKey(year, month);
             Map<String, Object> annualCells = buildCellMap(loadCellsForYear(year));
-            Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("steam_cell_value", monthKey));
+            Map<String, Object> monthlyCells = buildCellMap(listCells(monthKey));
             Map<String, String> detailCells = renderDetailCells(monthKey);
             Map<String, Map<String, String>> annualDetailCells = renderAnnualDetailCells(year);
 
@@ -139,7 +159,8 @@ public class FluidizedSummaryWorkbookService {
     //       설비개선비용        -> col_index=2
     // ========================================================================
 
-    public Map<String, Object> importCompareWorkbook(MultipartFile file, int year) throws IOException {
+    public synchronized Map<String, Object> importCompareWorkbook(MultipartFile file, int year) throws IOException {
+        pending = new ArrayList<>();
         int noteRows = 0;
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
@@ -170,13 +191,16 @@ public class FluidizedSummaryWorkbookService {
                 }
             }
         }
+        store.apply(year, 1, false, pending);
+        pending = new ArrayList<>();
         return Map.of(
                 "year", year,
                 "note_rows", noteRows
         );
     }
 
-    public Map<String, Object> importContractWorkbook(MultipartFile file, int year, int month) throws IOException {
+    public synchronized Map<String, Object> importContractWorkbook(MultipartFile file, int year, int month) throws IOException {
+        pending = new ArrayList<>();
         int contractRows = 0;
         int costRows = 0;
         String monthKey = monthKey(year, month);
@@ -207,6 +231,8 @@ public class FluidizedSummaryWorkbookService {
                 }
             }
         }
+        store.apply(year, month, false, pending);
+        pending = new ArrayList<>();
         return Map.of(
                 "year", year,
                 "month", String.format("%02d", month),
@@ -251,7 +277,7 @@ public class FluidizedSummaryWorkbookService {
             setString(sheet, 8, 1, "특이사항");
             // 10..21행: 1~12월 노트
             Map<String, String> notes = new LinkedHashMap<>();
-            for (Map<String, Object> row : tableService.listAllByMonth("steam_cell_value", anchorMonth)) {
+            for (Map<String, Object> row : listCells(anchorMonth)) {
                 if (!NOTE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
                 if (toInt(row.get("col_index")) != 0) continue;
                 notes.put(String.valueOf(row.get("row_key")), String.valueOf(row.get("cell_value")));
@@ -276,7 +302,7 @@ public class FluidizedSummaryWorkbookService {
     public byte[] exportContractWorkbook(int year, int month) throws IOException {
         String monthKey = monthKey(year, month);
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
-        Map<String, Object> monthlyCells = buildCellMap(tableService.listAllByMonth("steam_cell_value", monthKey));
+        Map<String, Object> monthlyCells = buildCellMap(listCells(monthKey));
         try (Workbook workbook = WorkbookFactory.create(true);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("도급비용");
@@ -395,7 +421,11 @@ public class FluidizedSummaryWorkbookService {
         c.setCellValue(value);
     }
 
-    public Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+    public synchronized Map<String, Object> importWorkbook(MultipartFile file, int year, int month) throws IOException {
+        pending = new ArrayList<>();
+        pendingRecords = new ArrayList<>();
+        pendingDetail = new LinkedHashMap<>();
+        detailSheetRead = false;
         int importedPlanRows = 0;
         int importedNoteRows = 0;
         int importedContractRows = 0;
@@ -426,6 +456,13 @@ public class FluidizedSummaryWorkbookService {
             importedAccidentRows += importAccidentSheet(accidentSheet, year);
         }
 
+        store.apply(year, month, true, pending);
+        pending = new ArrayList<>();
+        if (detailSheetRead) detailStore.replaceMonth(year, month, pendingDetail);
+        pendingDetail = new LinkedHashMap<>();
+        detailSheetRead = false;
+        recordStore.replace(year, List.of(IMPROVEMENT_MONTHLY_PREFIX, IMPROVEMENT_ITEM_PREFIX, ACCIDENT_PREFIX, MAINTENANCE_PREFIX), pendingRecords);
+        pendingRecords = new ArrayList<>();
         return Map.of(
                 "year", year,
                 "month", String.format("%02d", month),
@@ -441,36 +478,16 @@ public class FluidizedSummaryWorkbookService {
     }
 
     private void clearImportedWorkbookTargets(int year, int month) {
-        String selectedMonth = monthKey(year, month);
-        for (int monthNo = 1; monthNo <= 12; monthNo += 1) {
-            tableService.deleteTableCellValuesByTables(monthKey(year, monthNo), List.of(
-                    PLAN_TABLE,
-                    NOTE_TABLE
-            ));
-        }
-        tableService.deleteTableCellValuesByTables(selectedMonth, List.of(
-                SUMMARY_TABLE,
-                CONTRACT_TABLE,
-                COST_TABLE,
-                SRF_INBOUND_TABLE
-        ));
-        // DETAIL_MAIN_TABLE 은 사용자 정의 추가 행(row_key="custom|...") 을 보존한다.
-        tableService.deleteTableCellValuesByTableExcludingRowKeyPrefixes(
-                selectedMonth, DETAIL_MAIN_TABLE, List.of("custom|"));
-        String yearMonth = yearAnchorKey(year).replace("-01", "-00");
-        tableService.deleteTableCellRowsByMonthAndPrefixes(yearMonth, List.of(
-                IMPROVEMENT_MONTHLY_PREFIX,
-                IMPROVEMENT_ITEM_PREFIX,
-                ACCIDENT_PREFIX,
-                MAINTENANCE_PREFIX
-        ));
+        // 규격 표(사업계획·비고·도급비용·지급현황·SRF 입고)는 시트를 다 읽은 뒤 store.apply(replace=true) 가 파일 기준으로 바꾼다.
+        // 세부 운영내역도 시트를 읽은 뒤 detailStore.replaceMonth 가 그 달을 파일 기준으로 바꾼다 (사용자가 추가한 행은 그대로 둔다).
+        // 사고·정비·설비개선 목록은 시트를 다 읽은 뒤 recordStore.replace 가 그 해의 유동상 목록을 파일 기준으로 바꾼다.
     }
 
     public Map<String, Object> detailActuals(int year) {
         String fromMonth = monthKey(year - 1, 1);
         String toMonth = monthKey(year, 12);
-        List<Map<String, Object>> detailRows = tableService.listCellRowsByTableNameBetweenMonths(DETAIL_MAIN_TABLE, fromMonth, toMonth);
-        List<Map<String, Object>> srfRows = tableService.listCellRowsByTableNameBetweenMonths(SRF_INBOUND_TABLE, fromMonth, toMonth);
+        List<Map<String, Object>> detailRows = detailStore.listBetween(fromMonth, toMonth);
+        List<Map<String, Object>> srfRows = store.listSrfInboundBetween(fromMonth, toMonth);
 
         Map<String, Map<String, String>> detailByMonth = new LinkedHashMap<>();
         for (Map<String, Object> row : detailRows) {
@@ -719,7 +736,7 @@ public class FluidizedSummaryWorkbookService {
      * 업로드(import)는 main grid 의 cellRef 기반이라 inline 행은 자동 무시.
      */
     private void appendDetailCustomRows(Sheet sheet, int year, int month, String monthKey) {
-        List<Map<String, Object>> rows = tableService.listAllByMonth("steam_cell_value", monthKey);
+        List<Map<String, Object>> rows = listCells(monthKey);
         Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
         for (Map<String, Object> row : rows) {
@@ -934,6 +951,7 @@ public class FluidizedSummaryWorkbookService {
         int monthDays = YearMonth.of(year, month).lengthOfMonth();
         FluidizedDetailSheetIndex index = detailIndex(sheet);
         if (!index.usable()) return imported;
+        detailSheetRead = true;
 
         if (index.rowFor(DETAIL_EXTRA_COST_ROW) == null) {
             deleteDetailExtraCost(monthKey);
@@ -961,8 +979,8 @@ public class FluidizedSummaryWorkbookService {
     }
 
     private void deleteDetailExtraCost(String monthKey) {
-        tableService.deleteTableCellValue(monthKey, DETAIL_MAIN_TABLE, "AK16", 0);
-        tableService.deleteTableCellValue(monthKey, DETAIL_MAIN_TABLE, KNE_EXTRA_COST_KEY, 0);
+        // 추가비용(AK16)이 파일에 없으면 비운다 — 모아 둔 칸에서 빼 두면 replaceMonth 가 비운다
+        pendingDetail.remove("AK16");
     }
 
     /**
@@ -1205,7 +1223,7 @@ public class FluidizedSummaryWorkbookService {
     private List<Map<String, Object>> loadCellsForYear(int year) {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int month = 1; month <= 12; month += 1) {
-            rows.addAll(tableService.listAllByMonth("steam_cell_value", monthKey(year, month)));
+            rows.addAll(listCells(monthKey(year, month)));
         }
         return rows;
     }
@@ -1226,6 +1244,12 @@ public class FluidizedSummaryWorkbookService {
         return mapped;
     }
 
+    /** 그 달의 셀 — 규격 표(세부 운영내역 · 유동상 운영)에서 옛 형식으로 편 것. 사고·개선 목록(YYYY-00)은 규격 표(RecordCellStore)에서. */
+    private List<Map<String, Object>> listCells(String monthKey) {
+        if (monthKey != null && monthKey.endsWith("-00")) return recordStore.listByYear(Integer.parseInt(monthKey.substring(0, 4)));
+        return store.mergeWithLegacy(detailStore.listByMonthKey(monthKey), monthKey);
+    }
+
     private String cellKey(String tableName, String month, String rowKey, int colIndex) {
         return tableName + "|" + month + "|" + rowKey + "|" + colIndex;
     }
@@ -1234,17 +1258,23 @@ public class FluidizedSummaryWorkbookService {
         if (value == null || value.isBlank()) {
             return 0;
         }
-        Map<String, Object> payload = new LinkedHashMap<>();
         String normalizedValue = normalizeUploadedValue(value);
-        payload.put("month", month);
-        payload.put("year_no", year);
-        payload.put("month_no", monthNo);
-        payload.put("table_name", tableName);
-        payload.put("row_key", rowKey);
-        payload.put("col_index", colIndex);
-        payload.put("cell_value", normalizedValue);
-        tableService.upsert("steam_cell_value", payload);
-        return 1;
+        if (month != null && month.endsWith("-00")) {
+            // 사고·정비·설비개선 목록 (옛 월 키 YYYY-00) — 모아 두었다가 한 번에 반영한다
+            pendingRecords.add(new RecordCellStore.Cell(rowKey, colIndex, normalizedValue));
+            return 1;
+        }
+        if (FluidizedCellStore.TABLES.contains(tableName)) {
+            // 규격 표로 가는 칸은 모아 두었다가 한 번에 반영한다
+            pending.add(new FluidizedCellStore.Cell(tableName, month, rowKey, colIndex, normalizedValue));
+            return 1;
+        }
+        if (DETAIL_MAIN_TABLE.equals(tableName)) {
+            // 세부 운영내역 칸 (셀 주소 → 값) — 모아 두었다가 한 번에 반영한다
+            pendingDetail.put(rowKey, normalizedValue);
+            return 1;
+        }
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "저장할 곳이 없는 표입니다: " + tableName);
     }
 
     private String normalizeUploadedValue(String value) {

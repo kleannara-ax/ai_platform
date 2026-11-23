@@ -1,5 +1,7 @@
 # module-steam-energy: steam_cell_value 네임스페이스 / col_index 규약
 
+> **2026-11-23: 모든 네임스페이스가 실제 컬럼 표로 옮겨졌다.** 이 문서는 이관 기록이다 — 옛 `steam_cell_value` 의 키가 무엇이었고 어느 표로 갔는지(아래 '전환 완료' 표)를 남겨 둔다. 새 화면은 셀 저장소를 쓰지 않는다 (README 7절).
+
 > 실행하는 SQL 이 아니라 **문서**다. 스팀 화면들이 `steam_cell_value` 한 표를 나눠 쓰기 때문에,
 > 어떤 화면이 어떤 `table_name` 과 `col_index` 를 쓰는지 여기에 적어 둔다.
 > `col_index` 는 화면 항목의 고정 번호라 **재배치하면 기존 데이터가 어긋난다.**
@@ -74,3 +76,46 @@ SELECT month, col_index, COUNT(*) AS cnt
  GROUP BY month, col_index
  ORDER BY month, col_index;
 ```
+
+
+## 전환 완료 — 더 이상 쓰지 않는 네임스페이스 (2026-11-20, 원단위 일지 7개 화면 모두 전환됨)
+
+원단위 일지 7개 화면은 실제 컬럼 표(`steam_unit_daily_usage`·`steam_unit_daily_common`·`steam_lng_daily_usage`·`steam_fuel_daily_usage`·`steam_price`)로
+옮겼다 (README "원단위 일지 그룹 전환" 참고). 아래 네임스페이스는 새 화면이 쓰지 않으며, 남은 데이터는 다른 묶음 전환이 끝나면 정리한다.
+
+| 옛 네임스페이스 | 지금 |
+|---|---|
+| `usage_m_pm2`, `usage_m_pm3a`, `usage_m_pm3b`, `usage_m_tm`, `usage_m_tissue`, `usage_m_paper`, `usage_m_other` | `steam_unit_daily_usage` (가동시간·비고). 화장지 총합 가동시간은 TM 합으로 계산 |
+| `lng_m_boiler`, `lng_m_burner`, `lng_m_mix` | `steam_lng_daily_usage` |
+| `flow_m_fluid_incinerator`, `flow_m_combined`, `flow_m_boiler`, `flow_m_summary` | `steam_fuel_daily_usage`. 유동상 운전일지·세부 운영내역이 쓰던 `flow_m_fluid_incinerator` col 0 는 `FLUID_STEAM_TON` 으로 재연결 |
+| `unit_price`, `unit_price_detail` | `steam_price` (ITEM_CODE × YEAR_NO/MONTH_NO) |
+| `energy_accounting_plan` | `steam_energy_accounting_plan` (2026-11-20) |
+| `energy_fuel_plan` | `steam_energy_fuel_plan` |
+| `energy_fuel_ratio` | `steam_energy_ratio_boiler`(t01~t03) · `_machine`(t04~t06) · `_burner`(t10~t12) · `_steam_unit`(t17, 다른 사이트 공유) · `_ref2019`(t18~t20). 계산 전용 표(t07~t09, t13~t16)는 저장 안 함 |
+| `energy_month_compare` | `steam_energy_month_compare` (입력·연동값) + `steam_energy_month_compare_note` (비고, 연도 행) |
+| `energy_fuel_summary` | `steam_energy_fuel_summary` (직접 입력값) |
+| `combo_boiler_production` | `steam_combo_daily_production` + `steam_combo_monthly_price`(연료단가) (2026-11-20) |
+| `combo_boiler_downtime` | `steam_combo_daily_downtime` + `steam_combo_monthly_price`(벤트 손실 단가) |
+| `combo_boiler_recovery` | `steam_combo_recovery_loss` (월 + 줄 번호) |
+| `combo_boiler_etc` | `steam_combo_plan` (기준연도 + 대상 월) |
+| `incinerator_contract` | `steam_incinerator_contract_daily` + `steam_incinerator_plan_monthly.CONTRACT_LABOR` (2026-11-20) |
+| `incinerator_plan_vs` | `steam_incinerator_plan_monthly` (연/월 한 행으로 접음) |
+| `incinerator_yoy` | 저장 없음 (도급내역에서 계산) |
+| `incinerator_operation` | `steam_incinerator_operation_monthly` |
+| `incinerator_total_cost` | `steam_incinerator_cost_monthly` (입력 39개) |
+| `srf_boiler_invoice_summary` | `steam_srf_invoice_summary` (2026-11-20) |
+| `srf_boiler_invoice_client` | `steam_srf_invoice_client_item` (월 + 구분 + 줄 번호) |
+| `srf_boiler_invoice_operation` | `steam_srf_invoice_operation_daily` (전력량) |
+| `srf_boiler_invoice_monthly` | `steam_srf_invoice_monthly` (실제 연/월) |
+| `srf_boiler_invoice_accumulated` | `steam_srf_invoice_accumulated` (실제 연/월) |
+| `srf_boiler_invoice_bsc` | `steam_srf_invoice_bsc` (연도) |
+| `srf_boiler_invoice_adjustment` | `steam_srf_invoice_adjustment` (연도 + 표 + 항목) |
+| `fluidized_plan_actual`, `fluidized_plan_summary`, `fluidized_year_note`, `fluidized_contract_cost`, `fluidized_monthly_cache` | `steam_fluidized_month` (2026-11-20) |
+| `fluidized_contract_daily` | `steam_fluidized_contract_daily` |
+| `fluidized_srf_inbound` | `steam_fluidized_srf_inbound_daily` (입고량) + `steam_fluidized_srf_rate` (처리단가) |
+| `steam_cell_value` / 월 키 `YYYY-00` 의 `*-record:*` | `steam_incident` (FACILITY · KIND · RECORD_KEY) (2026-11-20) |
+| `steam_cell_value` / 월 키 `YYYY-00` 의 `improvement-monthly:*`, `improvement-item:*` | `steam_fluidized_improvement_payment`, `steam_fluidized_improvement_item` |
+| `waste_incin_log` | `steam_waste_incin_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-20) |
+| `fluidized_detail_main` | `steam_fluidized_detail_daily` (일별 입력), `steam_fluidized_detail_month` (단가 · 비용), `steam_fluidized_detail_custom_row` (추가 행) (2026-11-20) |
+| `fluidized_daily_log` | `steam_fluidized_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-23) |
+| 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

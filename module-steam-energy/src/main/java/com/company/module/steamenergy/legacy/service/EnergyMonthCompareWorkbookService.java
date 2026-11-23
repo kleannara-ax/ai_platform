@@ -1,6 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.energy.EnergyCellBridge;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,14 +44,21 @@ public class EnergyMonthCompareWorkbookService {
     private static final String ORIGINAL_DIR = "원본";
     private static final String FILE_PREFIX = "6.";
     private static final Pattern SHEET_NAME_PATTERN = Pattern.compile("회계비용\\s*마감과\\s*실마감\\s*비교");
-    private static final String CELL_TABLE = "steam_cell_value";
     private static final String PAGE_TABLE = "energy_month_compare";
 
     /**
      * @param excelRowOneBased 원본 시트 행 — 이름을 못 찾았을 때의 폴백 좌표
      * @param label            원본 시트에 적힌 항목 이름. 이걸로 행을 찾는다
      */
-    record RowMap(String section, String rowKey, int excelRowOneBased, String label) {}
+    record RowMap(String section, String rowKey, int excelRowOneBased, String label, String... altLabels) {
+        /** 찾을 이름들 — 기본 이름 다음에 해마다 바뀐 표기. */
+        String[] labels() {
+            String[] all = new String[altLabels.length + 1];
+            all[0] = label;
+            System.arraycopy(altLabels, 0, all, 1, altLabels.length);
+            return all;
+        }
+    }
 
     // 위에서 아래 순서 그대로 둔다 — 직전에 찾은 행 다음부터 훑는다(resolveRowAfter).
     static final List<RowMap> ROW_MAPS = List.of(
@@ -59,7 +67,8 @@ public class EnergyMonthCompareWorkbookService {
             //    (화면이 인보이스에서 계산해 가져오므로 엑셀과 왕복하지 않는다)
             new RowMap("fuel", "zescoSteam",       4, "제스코 스팀구매"),
             new RowMap("fuel", "lngBuy",           5, "LNG 구매"),
-            new RowMap("fuel", "pyhsynSteam",      6, "폐합성소각로 스팀구매"),
+            // 2026년 양식부터 "폐합성 /신설소각로 스팀구매" 로 적는다
+            new RowMap("fuel", "pyhsynSteam",      6, "폐합성소각로 스팀구매", "폐합성 /신설소각로 스팀구매", "폐합성/신설 소각로 스팀구매"),
             new RowMap("fuel", "fluidSteam",       7, "유동상소각로 스팀구매"),
             // r8 fuelMonthly = formula
             new RowMap("fuel", "zescoOffset",      9, "제스코 상계비 (유틸리티)"),
@@ -68,7 +77,10 @@ public class EnergyMonthCompareWorkbookService {
             new RowMap("fuel", "compositeInvest", 12, "복합 투자비 감가상각"),
             new RowMap("fuel", "compositeIncome", 13, "복합보일러 처분수익 연료비 차감분"),
             new RowMap("fuel", "landLease",       14, "토지 지상권 지료"),
-            // r15 deductSubtotal = formula / r16 fuelActual = formula
+            // r15 deductSubtotal = formula
+            // r16 fuelActual = 화면 계산값이지만 배분비율 화면이 읽는다. 올리면서 그 해를 비우므로
+            //     마감비교 화면을 다시 열기 전까지 빈 값이 되지 않게 원본의 계산 결과를 넣어 둔다 (화면을 열면 다시 계산해 덮는다).
+            new RowMap("fuel", "fuelActual",      16, "연료비(회계비용) 실적"),
             new RowMap("fuel", "paperFuel",       17, "제지 연료비(스팀사용비율)"),
             new RowMap("fuel", "livingFuel",      18, "생활 연료비(스팀사용비율)"),
             new RowMap("fuel", "fuelPlan",        19, "연료비(회계비용) SG 계획금액"),
@@ -83,8 +95,9 @@ public class EnergyMonthCompareWorkbookService {
             new RowMap("fuel", "livingProfit",    30, "생활손익"),
             // r31 profitSum = formula
             new RowMap("fuel", "steamProd",       32, "스팀생산량"),
-            new RowMap("fuel", "lngBurner",       33, "LNG 직버너 사용 비용")
-            // r34~r36 = formula
+            new RowMap("fuel", "lngBurner",       33, "LNG 직버너 사용 비용"),
+            // r34~r35 = formula / r36 fuelSteamUnit = fuelActual 과 같은 이유로 원본 계산 결과를 넣어 둔다
+            new RowMap("fuel", "fuelSteamUnit",   36, "스팀톤당 연료비 (천원/톤)")
 
             // 37행 이후(전력비·에너지 합산)는 연동하지 않는다 — 화면에서 뺀 항목이라
             // 엑셀에서 읽어 와도 쓰는 곳이 없다. 36행까지(연료비)만 왕복한다.
@@ -96,12 +109,12 @@ public class EnergyMonthCompareWorkbookService {
     static final int MONTH_HEADER_ROW = 2;
     static final int FIRST_DATA_ROW = 3;
 
-    private final TableService tableService;
+    private final EnergyCellBridge bridge;   // 2026-11 규격 전환: 옛 셀 저장소 대신 실제 컬럼 표
     private final DataFormatter formatter = new DataFormatter(Locale.KOREA);
     private volatile Path cachedWorkbookPath;
 
-    public EnergyMonthCompareWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    public EnergyMonthCompareWorkbookService(EnergyCellBridge bridge) {
+        this.bridge = bridge;
     }
 
     public Map<String, Object> importWorkbook(MultipartFile file, int year) throws IOException {
@@ -127,7 +140,8 @@ public class EnergyMonthCompareWorkbookService {
     public int applyImport(Workbook workbook, int year) {
         Sheet sheet = findSheetByPattern(workbook);
         if (sheet == null) return 0;
-        tableService.deleteTableCellValuesByTables(String.valueOf(year), List.of(PAGE_TABLE));
+        bridge.clearYear(PAGE_TABLE, year);
+        List<EnergyCellBridge.Cell> pending = new ArrayList<>();
         int imported = 0;
         EnergySheetIndex index = EnergySheetIndex.build(sheet, LABEL_COLS, FIRST_DATA_ROW, MONTH_HEADER_ROW);
         Map<String, Integer> rows = resolveRows(index);
@@ -141,10 +155,11 @@ public class EnergyMonthCompareWorkbookService {
                 Cell cell = row.getCell(excelColZeroBased);
                 String text = readInputCellText(cell);
                 if (text == null) continue;
-                upsertCell(year, dbRowKey(map), colIndex, text);
+                pending.add(new EnergyCellBridge.Cell(dbRowKey(map), colIndex, text));
                 imported += 1;
             }
         }
+        imported = bridge.upsertCells(PAGE_TABLE, year, pending).saved();
         return imported;
     }
 
@@ -179,7 +194,7 @@ public class EnergyMonthCompareWorkbookService {
         Map<String, Integer> rows = new LinkedHashMap<>();
         int cursor = FIRST_DATA_ROW;
         for (RowMap map : ROW_MAPS) {
-            Integer found = index.rowOrNull(cursor, map.excelRowOneBased(), map.label(), map.label());
+            Integer found = index.rowOrNull(cursor, map.excelRowOneBased(), map.label(), map.labels());
             if (found == null) continue;   // 원본에서 지워진 항목 — 건너뛴다(다른 줄에 붙이지 않는다)
             rows.put(dbRowKey(map), found);
             cursor = found + 1;            // 찾았을 때만 커서를 옮긴다
@@ -214,7 +229,7 @@ public class EnergyMonthCompareWorkbookService {
 
     private Map<String, String> loadCells(int year) {
         Map<String, String> out = new HashMap<>();
-        for (Map<String, Object> row : tableService.listAllByMonth(CELL_TABLE, String.valueOf(year))) {
+        for (Map<String, Object> row : bridge.cellsOf(PAGE_TABLE, year)) {
             if (!PAGE_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
             String rk = String.valueOf(row.get("row_key"));
             int ci = toInt(row.get("col_index"));
@@ -225,18 +240,6 @@ public class EnergyMonthCompareWorkbookService {
         return out;
     }
 
-    private void upsertCell(int year, String rowKey, int colIndex, String value) {
-        if (value == null || value.isBlank()) return;
-        tableService.upsert(CELL_TABLE, Map.of(
-                "month", String.valueOf(year),
-                "year_no", year,
-                "month_no", 0,
-                "table_name", PAGE_TABLE,
-                "row_key", rowKey,
-                "col_index", colIndex,
-                "cell_value", value
-        ));
-    }
 
     private String readInputCellText(Cell cell) {
         if (cell == null) return null;

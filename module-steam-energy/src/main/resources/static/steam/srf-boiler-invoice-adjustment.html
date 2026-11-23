@@ -110,6 +110,10 @@
     }
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/srf-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
 </head>
 <body class="landing-body" data-page-kind="srf-invoice-adj">
   <main class="invoice-workspace">
@@ -603,7 +607,7 @@
       eachInput((input) => { input.value = ""; });
       document.querySelectorAll("table.adj-table").forEach((table) => recomputeTable(table));
       try {
-        const response = await fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${ADJ_TABLE_NAME}&month=${encodeURIComponent(adjMonthKey())}`, {
+        const response = await window.SrfStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${ADJ_TABLE_NAME}&month=${encodeURIComponent(adjMonthKey())}`, {
           headers: { Accept: "application/json" }
         });
         if (!response.ok) return;
@@ -638,7 +642,7 @@
       };
       try {
         const url = existing ? `${TABLES_BASE}/${CELL_TABLE}/${existing.id}` : `${TABLES_BASE}/${CELL_TABLE}`;
-        const response = await fetch(url, {
+        const response = await window.SrfStore.fetch(url, {
           method: existing ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -676,5 +680,7 @@
       setTimeout(() => window.print(), 50);
     });
   </script>
+  <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/srf-excel-controls.js?v=20261123-srfx1"></script>
 </body>
 </html>

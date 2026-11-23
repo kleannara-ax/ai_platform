@@ -492,6 +492,61 @@
     if (!store[year][sectionName][month]) store[year][sectionName][month] = {};
     store[year][sectionName][month][key] = rawValue;
     saveStore(store);
+    // 직접 입력 6개는 DB(steam_fluidized_month)에 저장한다 — 브라우저 저장소는 화면을 그리기 위한 사본일 뿐이다.
+    if (DB_INPUT_SECTIONS[key] === sectionName && window.FluidizedStore) {
+      window.FluidizedStore.monthInputs.save(year, Number(month), key, rawValue)
+        .catch((error) => console.error("[월별 운영내역] 저장 실패:", error));
+    }
+  }
+
+  // ── 직접 입력 6개: DB 가 기준 ──────────────────────────────────────────
+  //  예전에는 이 값들이 브라우저(localStorage)에만 있어서 사람·PC 마다 값이 달랐다.
+  //  이제 DB 에서 읽어 브라우저 사본을 맞춘다. 단, 이 브라우저에 옛 값이 남아 있고 DB 의 그 칸이 비어 있으면
+  //  (연도별로 한 번만) DB 로 올린다.
+  const DB_INPUT_SECTIONS = {
+    improvementCost: "contract", deductionCost: "contract", extraPayment: "contract",
+    wastewaterQty: "utilities", soilQty: "utilities", soilCost: "utilities",
+  };
+  const UPLOADED_KEY = "steamlog:fluidized-monthly-workbook:db-uploaded:v1";
+
+  async function syncInputsWithDb(year) {
+    if (!window.FluidizedStore) return;
+    let dbValues;
+    try {
+      dbValues = await window.FluidizedStore.monthInputs.load(year);
+    } catch (error) {
+      console.error("[월별 운영내역] 조회 실패:", error);
+      return;
+    }
+    const uploaded = loadJsonStore(UPLOADED_KEY);
+    const firstTime = !uploaded[year];
+    const store = loadStore();
+    if (!store[year]) store[year] = createYearState();
+    const uploads = [];
+    MONTHS.forEach(({ key: month }) => {
+      Object.keys(DB_INPUT_SECTIONS).forEach((key) => {
+        const sectionName = DB_INPUT_SECTIONS[key];
+        if (!store[year][sectionName]) store[year][sectionName] = {};
+        if (!store[year][sectionName][month]) store[year][sectionName][month] = {};
+        const local = String(store[year][sectionName][month][key] ?? "").trim();
+        const db = (dbValues[month] && dbValues[month][key]) || "";
+        if (db === "" && local !== "" && firstTime && parseNumber(local) !== null) {
+          uploads.push(window.FluidizedStore.monthInputs.save(year, Number(month), key, local));   // 옛 값 올리기 (한 번)
+        } else {
+          store[year][sectionName][month][key] = db;                                              // DB 가 기준
+        }
+      });
+    });
+    saveStore(store);
+    if (firstTime) {
+      try {
+        await Promise.all(uploads);
+        uploaded[year] = new Date().toISOString();
+        localStorage.setItem(UPLOADED_KEY, JSON.stringify(uploaded));
+      } catch (error) {
+        console.error("[월별 운영내역] 옛 입력값 올리기 실패:", error);
+      }
+    }
   }
 
   function parseNumber(value) {
@@ -534,7 +589,7 @@
     if (DETAIL_RENDER_CACHE.has(monthKey)) {
       return DETAIL_RENDER_CACHE.get(monthKey);
     }
-    const promise = fetch(`/tables/fluidized-detail/rendered?month=${encodeURIComponent(monthKey)}&view=all`, {
+    const promise = fetch(`/steam-energy-api/fluidized-detail/rendered?month=${encodeURIComponent(monthKey)}&view=all`, {
       cache: "no-store",
     })
       .then((response) => {
@@ -542,7 +597,7 @@
           DETAIL_RENDER_CACHE.delete(monthKey);
           return null;
         }
-        return response.json();
+        return response.json().then((body) => (body && body.data ? body.data : body));
       })
       .catch(() => {
         DETAIL_RENDER_CACHE.delete(monthKey);
@@ -1486,6 +1541,7 @@
     root.__monthlyViewState = { year, month, section, sub };
 
     async function paint() {
+      await syncInputsWithDb(year);
       const state = getYearState(year);
       const detailEntries = await Promise.all(MONTHS.map(async (monthMeta) => ([
         monthMeta.key,
@@ -1498,35 +1554,18 @@
         values: computeOperatingRow(state, year, monthMeta.key, detailByMonth[monthMeta.key]),
       }));
 
-      // 외부 페이지(예: energy-month-compare)에서 참조 가능하도록 DB 에 계산값 저장.
-      // steam_cell_value(table_name=fluidized_monthly_cache, month=YYYY, col_index=1..12, row_key=contractCost|operatingCost).
-      // 렌더가 자주 발생하므로 디바운스로 묶어서 1초 후 한 번만 POST.
+      // 다른 화면(마감비교의 유동상 스팀구매)이 읽는 계산값을 DB 에 저장한다 —
+      // steam_fluidized_month 의 CONTRACT_COST · OPERATING_COST (천원). 달라진 달만 보낸다 (fluidized-store.js).
       try {
         if (window.__fmcCacheUpsertTimer) clearTimeout(window.__fmcCacheUpsertTimer);
         window.__fmcCacheUpsertTimer = setTimeout(() => {
           window.__fmcCacheUpsertTimer = null;
-          const tasks = [];
-          operatingRecords.forEach((rec) => {
-            const monthNum = Number(rec.month);
-            if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) return;
-            const cc = rec.values.contractCost;
-            const oc = rec.values.operatingCost;
-            const baseRow = { month: String(year), year_no: Number(year), month_no: monthNum, table_name: "fluidized_monthly_cache" };
-            if (Number.isFinite(cc)) {
-              tasks.push(fetch("/tables/steam_cell_value", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...baseRow, row_key: "contractCost", col_index: monthNum, cell_value: String(cc) }),
-              }));
-            }
-            if (Number.isFinite(oc)) {
-              tasks.push(fetch("/tables/steam_cell_value", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...baseRow, row_key: "operatingCost", col_index: monthNum, cell_value: String(oc) }),
-              }));
-            }
-          });
-          // fire-and-forget
-          Promise.allSettled(tasks).catch(() => {});
+          if (!window.FluidizedStore) return;
+          const records = operatingRecords.map((rec) => ({
+            month: Number(rec.month), contractCost: rec.values.contractCost, operatingCost: rec.values.operatingCost,
+          }));
+          window.FluidizedStore.saveMonthlyCache(year, records)
+            .catch((error) => console.error("[월별 운영내역] 계산값 저장 실패:", error));
         }, 500);
       } catch (e) { /* ignore */ }
 

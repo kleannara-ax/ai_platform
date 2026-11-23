@@ -121,6 +121,7 @@
   function resolveTarget(input) {
     if (typeof input === "string") {
       if (input.indexOf("/steam/api/") === 0) return { target: input, api: true };
+      if (input.indexOf("/steam-energy-api/") === 0) return { target: input, api: true };   // 규격 API — 토큰·401 재발급 적용
       if (input.indexOf("/steam/tables") === 0) return { target: "/steam/api" + input.substring("/steam".length), api: true };
       if (input.indexOf("/tables") === 0) return { target: "/steam/api" + input, api: true };
       if (input.indexOf("tables/") === 0) return { target: "/steam/api/" + input, api: true };
@@ -130,6 +131,7 @@
       var url = new URL(input.url, window.location.origin);
       if (url.origin !== window.location.origin) return { target: input, api: false };
       if (url.pathname.indexOf("/steam/api/") === 0) return { target: input, api: true };
+      if (url.pathname.indexOf("/steam-energy-api/") === 0) return { target: input, api: true };
       if (url.pathname.indexOf("/steam/tables") === 0) {
         return { target: new Request("/steam/api" + url.pathname.substring("/steam".length) + url.search, input), api: true };
       }

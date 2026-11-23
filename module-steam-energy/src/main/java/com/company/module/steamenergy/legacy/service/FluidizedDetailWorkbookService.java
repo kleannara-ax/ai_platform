@@ -1,6 +1,8 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
+import com.company.module.steamenergy.service.table.FluidizedCellStore;
+import com.company.module.steamenergy.service.table.FluidizedDetailCellStore;
+import com.company.module.steamenergy.service.SteamFuelDailyUsageService;
 import com.company.module.steamenergy.legacy.service.sheet.SheetData;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class FluidizedDetailWorkbookService {
     private static final String MAIN_TABLE = "fluidized_detail_main";
-    private static final String FLOW_TABLE = "flow_m_fluid_incinerator";
     private static final String KNE_EXTRA_COST_KEY = "KNE_EXTRA_COST";
     private static final String MAIN_RANGE = "A1:AK96";
     private static final String SUMMARY_RANGE = "G100:J102";
@@ -42,7 +43,10 @@ public class FluidizedDetailWorkbookService {
             {46, 47, 48}
     };
 
-    private final TableService tableService;
+    /** 세부 운영내역 입력은 규격 표 3개 (FluidizedDetailCellStore) */
+    private final FluidizedDetailCellStore detailStore;
+    /** 스팀 송기량(7행)은 규격 표 steam_fuel_daily_usage.FLUID_STEAM_TON 에서 읽는다 (2026-11, 원단위 일지 그룹 전환) */
+    private final SteamFuelDailyUsageService fuelDailyUsageService;
     /** 시트 템플릿 — 한 번 로드 후 immutable 공유. 각 요청은 snapshot() 으로 mutable 사본 받음. */
     private final SheetData sheetTemplate;
 
@@ -61,8 +65,14 @@ public class FluidizedDetailWorkbookService {
         renderCache.keySet().removeIf(key -> key.startsWith(monthKey + "|"));
     }
 
-    public FluidizedDetailWorkbookService(TableService tableService) {
-        this.tableService = tableService;
+    /** SRF 입고내역 등 규격 표로 옮긴 유동상 표 */
+    private final FluidizedCellStore fluidizedStore;
+
+    public FluidizedDetailWorkbookService(FluidizedDetailCellStore detailStore, SteamFuelDailyUsageService fuelDailyUsageService,
+                                          FluidizedCellStore fluidizedStore) {
+        this.fluidizedStore = fluidizedStore;
+        this.detailStore = detailStore;
+        this.fuelDailyUsageService = fuelDailyUsageService;
         this.sheetTemplate = SheetData.load("fluidized-detail");
     }
 
@@ -84,14 +94,15 @@ public class FluidizedDetailWorkbookService {
 
     private Map<String, Object> renderMonthUncached(String monthKey, String viewKey) {
         SheetData sheet = sheetTemplate.snapshot();
-        List<Map<String, Object>> rows = tableService.listAllByMonth("steam_cell_value", monthKey);
+        // 세부 운영내역 입력 + SRF 입고(AK46 계산용) — 모두 규격 표에서 옛 셀 형식으로 편 것
+        List<Map<String, Object>> rows = fluidizedStore.mergeWithLegacy(detailStore.listByMonthKey(monthKey), monthKey);
         String mainRange = resolveMainRange(viewKey);
         boolean includeSummary = shouldIncludeSummary(viewKey);
 
         clearEditableInputs(sheet);
         clearLinkedFlowInputs(sheet);
         applyStoredInputs(sheet, rows);
-        applyLinkedFlowInputs(sheet, rows);
+        applyLinkedFlowInputs(sheet, monthKey);
         applyOperationCalculations(sheet, monthKey);
         applySrfUsageFromBurnRow(sheet, monthKey);
         applyInventoryCarryOver(sheet, monthKey);
@@ -166,14 +177,15 @@ public class FluidizedDetailWorkbookService {
         }
     }
 
-    private void applyLinkedFlowInputs(SheetData sheet, List<Map<String, Object>> rows) {
-        for (Map<String, Object> row : rows) {
-            if (!FLOW_TABLE.equals(String.valueOf(row.get("table_name")))) continue;
-            if (toInt(row.get("col_index")) != 0) continue;
-            int day = toInt(row.get("row_key"));
-            if (day < 1 || day > 31) continue;
-            setCellValue(sheet, columnLabel(day + 2) + "7", row.get("cell_value"));
+    private void applyLinkedFlowInputs(SheetData sheet, String monthKey) {
+        YearMonth ym;
+        try {
+            ym = YearMonth.parse(monthKey);
+        } catch (RuntimeException ignored) {
+            return;
         }
+        fuelDailyUsageService.fluidSteamTonByDate(ym.getYear(), ym.getMonthValue()).forEach((date, ton) ->
+                setCellValue(sheet, columnLabel(date.getDayOfMonth() + 2) + "7", ton.stripTrailingZeros().toPlainString()));
     }
 
     private void applyInventoryCarryOver(SheetData sheet, String monthKey) {
@@ -221,7 +233,7 @@ public class FluidizedDetailWorkbookService {
     private Map<Integer, Double> resolveStartingInventory(String monthKey) {
         String previousMonthKey = previousMonthKey(monthKey);
         if (previousMonthKey == null) return Map.of();
-        List<Map<String, Object>> historyRows = tableService.listCellRowsByTableNameThroughMonth(MAIN_TABLE, previousMonthKey);
+        List<Map<String, Object>> historyRows = detailStore.listThrough(previousMonthKey);
         if (historyRows.isEmpty()) return Map.of();
 
         Map<String, List<Map<String, Object>>> rowsByMonth = new LinkedHashMap<>();

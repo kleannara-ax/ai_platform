@@ -370,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2페이지 이상 필요할 때만 나머지를 병렬 fetch.
     const LIMIT = 5000;
     const url = (pageNo) => `${TABLES_BASE}/${tableName}?page=${pageNo}&limit=${LIMIT}&month=${encodeURIComponent(month)}`;
-    const first = await fetch(url(1));
+    const first = await window.FluidizedDetailStore.fetch(url(1));
     if (!first.ok) return [];
     const firstPayload = await first.json();
     const data = (firstPayload.data || []).slice();
@@ -379,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalPages = Math.max(1, Math.ceil(total / limit));
     if (totalPages > 1) {
       const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-      const responses = await Promise.all(pageNumbers.map((pn) => fetch(url(pn))));
+      const responses = await Promise.all(pageNumbers.map((pn) => window.FluidizedDetailStore.fetch(url(pn))));
       for (const res of responses) {
         if (!res.ok) continue;
         const payload = await res.json();
@@ -744,7 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     for (const { id, key } of ids) {
       cellRowMap.delete(key);
-      try { await fetch(`${TABLES_BASE}/${CELL_TABLE}/${id}`, { method: "DELETE" }); } catch (_) {}
+      try { await window.FluidizedDetailStore.fetch(`${TABLES_BASE}/${CELL_TABLE}/${encodeURIComponent(id)}`, { method: "DELETE" }); } catch (_) {}
     }
     // 행 제거 + 섹션 A rowspan 감소
     const tr = document.querySelector(`tr.detail-custom-row[data-custom-id="${section}|${rowId}"]`);
@@ -1084,7 +1084,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function upsertCell(payload, existingId) {
     const url = existingId ? `${TABLES_BASE}/${CELL_TABLE}/${existingId}` : `${TABLES_BASE}/${CELL_TABLE}`;
-    const response = await fetch(url, {
+    const response = await window.FluidizedDetailStore.fetch(url, {
       method: existingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(existingId ? payload : { table_name: CELL_TABLE, ...payload }),
@@ -1194,7 +1194,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       renderedResponse = await fetch(
-        `${TABLES_BASE}/fluidized-detail/rendered?month=${encodeURIComponent(currentMonth)}&view=${encodeURIComponent(activeView)}`
+        `/steam-energy-api/fluidized-detail/rendered?month=${encodeURIComponent(currentMonth)}&view=${encodeURIComponent(activeView)}`
       );
     } catch (error) {
       console.error("Failed to load fluidized detail data", error);
@@ -1202,7 +1202,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (renderedResponse?.ok) {
       try {
-        detailData = await renderedResponse.json();
+        const renderedBody = await renderedResponse.json();
+        detailData = renderedBody && renderedBody.data ? renderedBody.data : renderedBody;
         // 서버가 다시 계산한 값이므로 전월 이월 재고 캐시를 새로 잡는다.
         INVENTORY_GROUPS.forEach((group) => inventoryStarts.delete(`${currentMonth}|${group.inventory}`));
         if (detailData?.main) detailViewCache.set(cacheKey, detailData);

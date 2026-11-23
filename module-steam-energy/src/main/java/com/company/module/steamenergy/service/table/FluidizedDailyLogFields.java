@@ -1,0 +1,91 @@
+package com.company.module.steamenergy.service.table;
+
+import java.util.Map;
+
+/**
+ * 유동상 운전일지: 항목 번호(옛 col_index, 엑셀 위치표 {@code FluidizedDailyLogCellMap} 의 번호) → 규격 표 필드.
+ * 화면 쪽 같은 표는 {@code static/steam/js/fluidized-log-store.js}.
+ */
+public final class FluidizedDailyLogFields {
+
+    private FluidizedDailyLogFields() {
+    }
+
+    public static final Map<Integer, String> FIELDS = Map.ofEntries(
+            Map.entry(1, "workerAm"),
+            Map.entry(2, "workerPm"),
+            Map.entry(3, "workerNight"),
+            Map.entry(4, "apprLeader"),
+            Map.entry(5, "apprAssistant"),
+            Map.entry(6, "apprManager"),
+            Map.entry(20, "chemAmmoniumCarbonatePrev"),
+            Map.entry(23, "chemBoilerAgentPrev"),
+            Map.entry(26, "chemActivatedCarbonPrev"),
+            Map.entry(29, "chemCausticSodaPrev"),
+            Map.entry(32, "chemSlakedLimePrev"),
+            Map.entry(35, "chemSaltPrev"),
+            Map.entry(38, "chemDieselPrev"),
+            Map.entry(41, "chemSrfPrev"),
+            Map.entry(44, "chemSilicaSandPrev"),
+            Map.entry(50, "ashFlyOut"),
+            Map.entry(51, "ashBottomOut"),
+            Map.entry(52, "incombustibleDay"),
+            Map.entry(53, "incombustibleNight"),
+            Map.entry(60, "powerMainPrev"),
+            Map.entry(61, "powerMainToday"),
+            Map.entry(62, "powerAshSiloPrev"),
+            Map.entry(63, "powerAshSiloToday"),
+            Map.entry(64, "powerBagFilterPrev"),
+            Map.entry(65, "powerBagFilterToday"),
+            Map.entry(66, "powerScrubberPrev"),
+            Map.entry(67, "powerScrubberToday"),
+            Map.entry(68, "powerCarbonFeedPrev"),
+            Map.entry(69, "powerCarbonFeedToday"),
+            Map.entry(70, "powerLimeFeedPrev"),
+            Map.entry(71, "powerLimeFeedToday"),
+            Map.entry(72, "powerUreaFeedPrev"),
+            Map.entry(73, "powerUreaFeedToday"),
+            Map.entry(74, "powerFdPrev"),
+            Map.entry(75, "powerFdToday"),
+            Map.entry(76, "powerCarbonBagPrev"),
+            Map.entry(77, "powerCarbonBagToday"),
+            Map.entry(78, "powerLimeBagPrev"),
+            Map.entry(79, "powerLimeBagToday"),
+            Map.entry(90, "utilReuseWaterPrev"),
+            Map.entry(92, "utilRiverWaterPrev"),
+            Map.entry(94, "utilCondensatePrev"),
+            Map.entry(96, "utilBoilerFeedPrev"),
+            Map.entry(98, "utilWasteWaterPrev"),
+            Map.entry(100, "utilSoftWaterPrev"),
+            Map.entry(200, "moistAm1Time"),
+            Map.entry(201, "moistAm1Value"),
+            Map.entry(202, "moistAm2Time"),
+            Map.entry(203, "moistAm2Value"),
+            Map.entry(204, "moistAm3Time"),
+            Map.entry(205, "moistAm3Value"),
+            Map.entry(206, "moistAm4Time"),
+            Map.entry(207, "moistAm4Value"),
+            Map.entry(208, "moistAm5Time"),
+            Map.entry(209, "moistAm5Value"),
+            Map.entry(210, "moistPm1Time"),
+            Map.entry(211, "moistPm1Value"),
+            Map.entry(212, "moistPm2Time"),
+            Map.entry(213, "moistPm2Value"),
+            Map.entry(214, "moistPm3Time"),
+            Map.entry(215, "moistPm3Value"),
+            Map.entry(216, "moistPm4Time"),
+            Map.entry(217, "moistPm4Value"),
+            Map.entry(218, "moistPm5Time"),
+            Map.entry(219, "moistPm5Value"),
+            Map.entry(220, "moistNight1Time"),
+            Map.entry(221, "moistNight1Value"),
+            Map.entry(222, "moistNight2Time"),
+            Map.entry(223, "moistNight2Value"),
+            Map.entry(224, "moistNight3Time"),
+            Map.entry(225, "moistNight3Value"),
+            Map.entry(226, "moistNight4Time"),
+            Map.entry(227, "moistNight4Value"),
+            Map.entry(228, "moistNight5Time"),
+            Map.entry(229, "moistNight5Value")
+    );
+}

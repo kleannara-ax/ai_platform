@@ -31,16 +31,17 @@ import java.util.regex.Pattern;
  *  ⑤ 연간 계획    Q열의 "복합보일러" · "제스코" · "LNG사용량" 제목 아래 월 표
  * </pre>
  *
- * <p>①의 열은 머리글이 세 줄이라 <b>색인을 두 벌</b> 만든다. 위 두 줄(설비+항목)로 찾는 칸과
- * 아래 두 줄(설비+세부)로 찾는 칸이 섞여 있기 때문이다. 예를 들어 "복합보일러 스팀구매량"은
- * 6행이 단위 {@code (T/D)} 뿐이라 5행으로 찾고, "깨끗한나라 보일러 20톤"은 5행이
- * {@code 스팀 생산량(T/D)} 하나로 병합돼 있어 6행으로 찾는다.
+ * <p>①의 열은 머리글이 세 줄(설비 / 항목 / 단위·세부)이다. 열마다 그 세 줄의 글자를 모아
+ * <b>항목마다 정해 둔 조건</b>으로 찾는다 — "설비가 복합보일러이고 항목이 스팀구매량",
+ * "세부가 20톤이고 설비가 가동시간이 아님" 같은 식이다. 열의 <b>순서나 위치에 기대지 않으므로</b>
+ * 열이 추가·삭제되거나 자리가 바뀌어도 같은 항목을 찾는다.
  *
- * <p>같은 이름이 한 줄에 두 번 나오는 칸("변동사항", "스팀량")은 <b>왼쪽에서 오른쪽 순서대로</b>,
- * 직전에 찾은 열 다음부터 훑는다({@link HeaderColumnIndex#columnAfter}).
+ * <p>양식이 해마다 조금씩 바뀐다. 2026년 10월부터 폐합성 1호가 빠지고 유동상 보일러에
+ * "총스팀량(FI-301) · 응축수(FI-303)"가 생겼고, 11월부터 외부보일러가 빠지고
+ * "폐합성소각로 기관실유량계"가 생겼다. 새로 생긴 세 칸은 <b>참고자료</b>라 합계에 넣지 않는다.
  *
- * <p>월 시트마다 표기가 조금씩 다르다(1월 "디스파샤" ↔ 10월 "디스퍼져",
- * 1월 "시간" ↔ 10월 "가동시간(분)"). 그래서 항목마다 <b>후보 이름을 여러 개</b> 둔다.
+ * <p>월 시트마다 표기도 조금씩 다르다(1월 "디스파샤" ↔ 10월 "디스퍼져",
+ * 1월 "시간" ↔ 10월 "가동시간(분)"). 그래서 조건에 <b>후보 이름을 여러 개</b> 둔다.
  *
  * <p>못 찾으면 그 항목·그 줄은 <b>건너뛴다.</b> 열 번호로 폴백하면 값이 엉뚱한 항목에 붙는다.
  * 값을 잘못 넣느니 넣지 않고 {@link #notFound()} 로 알리는 편이 안전하다.
@@ -50,10 +51,8 @@ import java.util.regex.Pattern;
 final class ComboBoilerLayout {
 
 
-    /** 일별 표 머리글 줄(0-based) — 4행 설비 / 5행 항목 / 6행 단위·세부. */
-    private static final int GROUP_ROW = 3;
+    /** 일별 표 항목 줄의 기본 위치(0-based) — 원본은 4행 설비 / 5행 항목 / 6행 단위·세부. A열 "일" 로 다시 찾는다. */
     private static final int ITEM_ROW = 4;
-    private static final int DETAIL_ROW = 5;
     private static final int FIRST_DAY_ROW = 6;
     private static final int LAST_DAY_ROW = 40;
     private static final int DAY_COL = 0;
@@ -71,13 +70,11 @@ final class ComboBoilerLayout {
     private static final int RECOVERY_DATE_COL = 0;
     private static final int PLAN_LABEL_COL = 16;
 
-    /**
-     * 일별 표의 항목 — {@code {키, 설비, 후보 이름…}}.
-     *
-     * <p><b>왼쪽에서 오른쪽 순서</b>로 적어야 한다. 같은 설비 안에 같은 이름이 두 번 나오는
-     * "변동사항"(복합보일러분·제스코분)과 "스팀량"(디스퍼져·시간당)을 순서로 가르기 때문이다.
-     */
-    private static final String[][] ITEM_FIELDS = {
+    /** 계측기 번호만 적힌 세부 칸("FI-301", "FIT-304") — 정규화하면 {@code fi301} 이 된다. */
+    private static final Pattern FLOW_TAG = Pattern.compile("^[a-z]{2,4}\\d{1,4}$");
+
+    /** "설비가 복합보일러/외부보일러이고 항목이 …" 로 찾는 칸 — {@code {키, 설비, 항목}}. */
+    private static final String[][] PURCHASE_FIELDS = {
             {"comboSteam", "복합보일러", "스팀구매량"},
             {"comboCondensate", "복합보일러", "응축수판매량"},
             {"comboMakeup", "복합보일러", "보충수판매량"},
@@ -86,27 +83,20 @@ final class ComboBoilerLayout {
             {"comboDilution", "복합보일러", "희석수판매량"},
             {"externalSteam", "외부보일러", "스팀구매량"},
             {"externalCondensate", "외부보일러", "응축수판매량"},
-            {"externalMakeup", "외부보일러", "보충수판매량"},
-            {"wasteSteam1", "폐합성 소각로", "1호 스팀 구입량"},
-            {"wasteSteam2", "폐합성 소각로", "2호 스팀 구입량"}
+            {"externalMakeup", "외부보일러", "보충수판매량"}
     };
 
-    /** 아래 두 줄(설비+세부)로 찾는 항목 — 역시 왼쪽에서 오른쪽 순서다. */
-    private static final String[][] DETAIL_FIELDS = {
-            {"kn20", "깨끗한나라 보일러", "20톤"},
-            {"kn50", "깨끗한나라 보일러", "50톤"},
-            {"fluidizedSteam", "유동상", "스팀 생산량"},
-            {"fluidizedCondensate", "유동상", "응축수"},
-            {"runtime20", "당사 보일러 가동시간", "20톤"},
-            {"runtime50", "당사 보일러 가동시간", "50톤"},
-            {"runtimeFluidized", "당사 보일러 가동시간", "유동상"},
-            {"changeCombo", "당사 보일러 가동시간", "변동사항"},       // 복합보일러분
-            {"changeJesco", "당사 보일러 가동시간", "변동사항"},       // 제스코분 — 같은 이름이라 순서로 가른다
-            {"down1", "당사 보일러 가동시간", "#1호기"},
-            {"down2", "당사 보일러 가동시간", "#2호기"},
-            {"disperserSteam", "당사 보일러 가동시간", "스팀량"},      // 디스퍼져분
-            {"runtimeMin", "당사 보일러 가동시간", "시간", "가동시간"} // 1월 "시간" ↔ 10월 "가동시간(분)"
-    };
+    /** 일별 표의 한 열 — 머리글 세 줄의 글자(정규화한 것)와 세부 칸의 원문. */
+    private record HeaderCol(int col, String group, String item, String detail, String rawDetail) {
+        /** 가장 구체적인 이름 — 세부 칸이 단위·계측기 번호뿐이면 항목 칸의 글자다. */
+        String leaf() {
+            return detail.isEmpty() || FLOW_TAG.matcher(detail).matches() ? item : detail;
+        }
+
+        boolean runtimeGroup() {
+            return group.contains("가동시간");
+        }
+    }
 
     /** 연료단가 표의 설비 이름 — 42~46행 B열. */
     private static final String[][] FUEL_PRICE_ROWS = {
@@ -179,39 +169,134 @@ final class ComboBoilerLayout {
     // ── ① 일별 표 ────────────────────────────────────────────────────────────
 
     private void readDayTable(Sheet sheet) {
-        HeaderColumnIndex byItem = HeaderColumnIndex.build(
-                sheet, -1, GROUP_ROW, ITEM_ROW, FIRST_DAY_ROW, LAST_DAY_ROW, DAY_COL);
-        HeaderColumnIndex byDetail = HeaderColumnIndex.build(
-                sheet, -1, GROUP_ROW, DETAIL_ROW, FIRST_DAY_ROW, LAST_DAY_ROW, DAY_COL);
+        // 머리글 줄: A열이 "일" 인 줄이 항목 줄이고 그 위가 설비, 아래가 단위·세부다. 못 찾으면 원본의 4~6행.
+        int itemRow = ITEM_ROW;
+        for (int row = 0; row <= 14; row += 1) {
+            if (normalize(text(sheet, row + 1, DAY_COL)).equals("일")) {
+                itemRow = row;
+                break;
+            }
+        }
+        int groupRow = Math.max(itemRow - 1, 0);
+        int detailRow = itemRow + 1;
 
-        collectColumns(byItem, ITEM_FIELDS);
-        collectColumns(byDetail, DETAIL_FIELDS);
+        List<HeaderCol> cols = headerColumns(sheet, groupRow, itemRow, detailRow);
 
+        for (String[] field : PURCHASE_FIELDS) {
+            String group = normalize(field[1]);
+            String item = normalize(field[2]);
+            putDay(field[0], field[1] + " " + field[2], first(cols, c -> c.group().equals(group) && c.item().equals(item)));
+        }
+        // 폐합성 소각로 — 10월 양식의 설비 칸은 "폐합성소각로 깨끗한나라 보일러" 라서 항목 이름으로 찾는다.
+        putDay("wasteSteam1", "폐합성 소각로 1호 스팀 구입량", first(cols, c -> c.item().equals("1호스팀구입량")));
+        putDay("wasteSteam2", "폐합성 소각로 2호 스팀 구입량", first(cols, c -> c.item().equals("2호스팀구입량")));
+        putDay("wasteRoomSteam2", "폐합성소각로 기관실유량계 2호 스팀량",
+                first(cols, c -> c.group().contains("기관실") && c.item().startsWith("2호")));
+
+        // 깨끗한나라 보일러 스팀생산량 ↔ 당사 보일러 가동시간 — 세부 이름(20톤·50톤)이 같아 설비로 가른다.
+        putDay("kn20", "깨끗한나라 보일러 20톤", first(cols, c -> !c.runtimeGroup() && c.detail().equals("20톤")));
+        putDay("kn50", "깨끗한나라 보일러 50톤", first(cols, c -> !c.runtimeGroup() && c.detail().equals("50톤")));
+        putDay("runtime20", "가동시간 20톤", first(cols, c -> c.runtimeGroup() && c.detail().equals("20톤")));
+        putDay("runtime50", "가동시간 50톤", first(cols, c -> c.runtimeGroup() && c.detail().equals("50톤")));
+        putDay("runtimeFluidized", "가동시간 유동상", first(cols, c -> c.runtimeGroup() && c.detail().equals("유동상")));
+
+        readFluidizedColumns(cols);
+        readChangeColumns(cols);
+
+        putDay("down1", "#1호기 운휴시간", first(cols, c -> c.detail().equals("1호기")));
+        putDay("down2", "#2호기 운휴시간", first(cols, c -> c.detail().equals("2호기")));
+        // "스팀량" 은 디스퍼져분과 시간당(계산)이 나란히 있다 — 항목 칸이 디스퍼져(1월 "디스파샤")인 쪽이다.
+        HeaderCol disperser = first(cols, c -> c.detail().equals("스팀량")
+                && (c.item().contains("디스퍼") || c.item().contains("디스파")));
+        if (disperser == null) disperser = first(cols, c -> c.detail().equals("스팀량") && !c.item().contains("시간당"));
+        putDay("disperserSteam", "디스퍼져 스팀량", disperser);
+        // 1월 "시간" ↔ 10월 "가동시간(분)"
+        putDay("runtimeMin", "디스퍼져 가동시간(분)",
+                first(cols, c -> c.detail().equals("시간") || c.detail().equals("가동시간")));
+
+        int lastDayRow = detailRow + 1 + (LAST_DAY_ROW - FIRST_DAY_ROW);
+        HeaderColumnIndex days = HeaderColumnIndex.build(sheet, -1, groupRow, itemRow, detailRow + 1, lastDayRow, DAY_COL);
         for (int day = 1; day <= 31; day += 1) {
-            Integer row = byItem.rowOfDay(day);
+            Integer row = days.rowOfDay(day);
             if (row != null) dayRows.put(day, row + 1);   // 서비스는 1-based 행을 쓴다
         }
         if (dayRows.isEmpty()) notFound.add("일별 표의 일자 칸(A열)");
     }
 
-    /** 설비마다 왼쪽에서 오른쪽으로 훑는다 — 같은 이름이 두 번 나와도 순서로 갈린다. */
-    private void collectColumns(HeaderColumnIndex index, String[][] fields) {
-        Map<String, Integer> cursorByGroup = new LinkedHashMap<>();
-        for (String[] field : fields) {
-            String key = field[0];
-            String group = field[1];
-            int cursor = cursorByGroup.getOrDefault(group, 0);
-            Integer col = null;
-            for (int i = 2; i < field.length && col == null; i += 1) {
-                col = index.columnAfter(cursor, group, field[i]);
+    /**
+     * 유동상 — 옛 양식은 "스팀 생산량 · 응축수" 두 칸, 2026년 10월부터는
+     * "총스팀량(FI-301) · 응축수(FI-303) · 스팀 생산량(FI-304) · 응축수(FI-07)" 네 칸이다.
+     * "응축수" 가 두 번 나오므로 <b>바로 왼쪽의 스팀 칸</b>이 어느 쪽인지로 가른다(쌍이 통째로 자리를 바꿔도 맞는다).
+     */
+    private void readFluidizedColumns(List<HeaderCol> cols) {
+        List<HeaderCol> fluidized = cols.stream()
+                .filter(c -> c.group().contains("유동상") && !c.runtimeGroup())
+                .toList();
+        HeaderCol total = first(fluidized, c -> c.leaf().equals("총스팀량"));
+        HeaderCol production = first(fluidized, c -> c.leaf().equals("스팀생산량"));
+        putDay("fluidizedTotalSteam", "유동상 보일러 총스팀량", total);
+        putDay("fluidizedSteam", "유동상 스팀 생산량", production);
+
+        HeaderCol totalCondensate = null;
+        HeaderCol productionCondensate = null;
+        for (HeaderCol c : fluidized) {
+            if (!c.leaf().equals("응축수")) continue;
+            HeaderCol owner = null;                       // 왼쪽에서 가장 가까운 스팀 칸
+            for (HeaderCol steam : new HeaderCol[]{total, production}) {
+                if (steam == null || steam.col() > c.col()) continue;
+                if (owner == null || steam.col() > owner.col()) owner = steam;
             }
-            if (col == null) {
-                notFound.add(group + " " + field[2]);
-                continue;
+            if (owner != null && owner == total) {
+                if (totalCondensate == null) totalCondensate = c;
+            } else if (productionCondensate == null) {
+                productionCondensate = c;
             }
-            dayColumns.put(key, col);
-            cursorByGroup.put(group, col + 1);
         }
+        putDay("fluidizedCondensate", "유동상 응축수", productionCondensate);
+        if (total != null) putDay("fluidizedTotalCondensate", "유동상 보일러 총스팀량 응축수", totalCondensate);
+    }
+
+    /** "변동사항(복합보일러)" ↔ "변동사항(제스코,유동상 보일러)" — 괄호 안 글자로 가르고, 없으면 왼쪽이 복합이다. */
+    private void readChangeColumns(List<HeaderCol> cols) {
+        List<HeaderCol> changes = cols.stream().filter(c -> c.detail().equals("변동사항")).toList();
+        HeaderCol combo = first(changes, c -> c.rawDetail().contains("복합"));
+        HeaderCol jesco = first(changes, c -> c.rawDetail().contains("제스코") || c.rawDetail().contains("유동상"));
+        if (combo == null && jesco == null && changes.size() >= 2) {
+            combo = changes.get(0);
+            jesco = changes.get(1);
+        }
+        putDay("changeCombo", "변동사항(복합보일러)", combo);
+        putDay("changeJesco", "변동사항(제스코)", jesco);
+    }
+
+    /** 머리글 세 줄을 열마다 모은다. 설비 칸은 병합돼 있어 왼쪽 값을 이어받는다. */
+    private static List<HeaderCol> headerColumns(Sheet sheet, int groupRow, int itemRow, int detailRow) {
+        int lastCol = 0;
+        for (int rowIndex : new int[]{groupRow, itemRow, detailRow}) {
+            Row row = sheet.getRow(rowIndex);
+            if (row != null) lastCol = Math.max(lastCol, row.getLastCellNum());
+        }
+        List<HeaderCol> cols = new ArrayList<>();
+        String group = "";
+        for (int col = DAY_COL + 1; col <= lastCol; col += 1) {
+            String groupText = normalize(text(sheet, groupRow + 1, col));
+            if (!groupText.isEmpty()) group = groupText;
+            String rawDetail = text(sheet, detailRow + 1, col);
+            cols.add(new HeaderCol(col, group, normalize(text(sheet, itemRow + 1, col)), normalize(rawDetail), rawDetail));
+        }
+        return cols;
+    }
+
+    private static HeaderCol first(List<HeaderCol> cols, java.util.function.Predicate<HeaderCol> condition) {
+        for (HeaderCol col : cols) {
+            if (condition.test(col)) return col;
+        }
+        return null;
+    }
+
+    private void putDay(String key, String what, HeaderCol col) {
+        if (col == null) notFound.add(what);
+        else dayColumns.put(key, col.col());
     }
 
     // ── ② 연료단가 표 ────────────────────────────────────────────────────────
