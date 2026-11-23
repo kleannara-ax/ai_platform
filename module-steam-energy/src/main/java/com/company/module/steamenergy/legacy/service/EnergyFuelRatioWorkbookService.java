@@ -70,6 +70,12 @@ public class EnergyFuelRatioWorkbookService {
      */
     record TableMap(String tableId, int htmlRowCount, int firstExcelRow, String title, List<String> labels) {}
 
+    /**
+     * "24년 LNG 단가" · "25년 LNG 단가" 처럼 해마다 앞 숫자가 바뀌는 행.
+     * 위에서 아래 순서로 첫 줄이 전년 단가, 둘째 줄이 올해 단가다.
+     */
+    static final String YEAR_LNG_PRICE = "re:\\d{2,4}년lng단가";
+
     // 제목으로 표 블록을 잡고, 그 안에서 행 라벨로 줄을 찾는다.
     // (예전에는 firstExcelRow + (htmlRow-1) 로만 계산해 원본에 행이 끼면 통째로 밀렸다.
     //  t11 의 "헤더 한 줄 건너뛰기" 예외도 라벨로 찾으면서 없어졌다.)
@@ -95,7 +101,7 @@ public class EnergyFuelRatioWorkbookService {
             new TableMap("t10", 6, 112, "2025년 버너 LNG 사용량",
                     List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
             new TableMap("t11", 9, 120, "2025년 버너 LNG 비용",
-                    List.of("24년 LNG 단가", "25년 LNG 단가", "증감률(%)", "제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
+                    List.of(YEAR_LNG_PRICE, YEAR_LNG_PRICE, "증감률(%)", "제지3", "화장지3", "화장지4", "화장지5", "화장지 소계", "합 계")),
             new TableMap("t12", 5, 133, "2025년 버너 LNG 사용량 원단위",
                     List.of("제지3", "화장지3", "화장지4", "화장지5", "화장지 소계")),
             new TableMap("t13", 5, 141, "2025년 버너 LNG 사용비용 원단위",
@@ -206,7 +212,9 @@ public class EnergyFuelRatioWorkbookService {
             int cursor = titleRow + 1;
             for (int htmlRow = 1; htmlRow <= map.htmlRowCount(); htmlRow += 1) {
                 String label = map.labels().get(htmlRow - 1);
-                Integer found = index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
+                Integer found = label.startsWith("re:")
+                        ? index.rowMatchingOrNull(cursor, map.tableId() + " " + label, Pattern.compile(label.substring(3)))
+                        : index.rowOrNull(cursor, 0, map.tableId() + " " + label, label);
                 if (found == null) continue;
                 rows.put(map.tableId() + "|" + htmlRow, found);
                 cursor = found + 1;

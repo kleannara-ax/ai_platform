@@ -50,7 +50,15 @@ public class EnergyMonthCompareWorkbookService {
      * @param excelRowOneBased 원본 시트 행 — 이름을 못 찾았을 때의 폴백 좌표
      * @param label            원본 시트에 적힌 항목 이름. 이걸로 행을 찾는다
      */
-    record RowMap(String section, String rowKey, int excelRowOneBased, String label) {}
+    record RowMap(String section, String rowKey, int excelRowOneBased, String label, String... altLabels) {
+        /** 찾을 이름들 — 기본 이름 다음에 해마다 바뀐 표기. */
+        String[] labels() {
+            String[] all = new String[altLabels.length + 1];
+            all[0] = label;
+            System.arraycopy(altLabels, 0, all, 1, altLabels.length);
+            return all;
+        }
+    }
 
     // 위에서 아래 순서 그대로 둔다 — 직전에 찾은 행 다음부터 훑는다(resolveRowAfter).
     static final List<RowMap> ROW_MAPS = List.of(
@@ -59,7 +67,8 @@ public class EnergyMonthCompareWorkbookService {
             //    (화면이 인보이스에서 계산해 가져오므로 엑셀과 왕복하지 않는다)
             new RowMap("fuel", "zescoSteam",       4, "제스코 스팀구매"),
             new RowMap("fuel", "lngBuy",           5, "LNG 구매"),
-            new RowMap("fuel", "pyhsynSteam",      6, "폐합성소각로 스팀구매"),
+            // 2026년 양식부터 "폐합성 /신설소각로 스팀구매" 로 적는다
+            new RowMap("fuel", "pyhsynSteam",      6, "폐합성소각로 스팀구매", "폐합성 /신설소각로 스팀구매", "폐합성/신설 소각로 스팀구매"),
             new RowMap("fuel", "fluidSteam",       7, "유동상소각로 스팀구매"),
             // r8 fuelMonthly = formula
             new RowMap("fuel", "zescoOffset",      9, "제스코 상계비 (유틸리티)"),
@@ -181,7 +190,7 @@ public class EnergyMonthCompareWorkbookService {
         Map<String, Integer> rows = new LinkedHashMap<>();
         int cursor = FIRST_DATA_ROW;
         for (RowMap map : ROW_MAPS) {
-            Integer found = index.rowOrNull(cursor, map.excelRowOneBased(), map.label(), map.label());
+            Integer found = index.rowOrNull(cursor, map.excelRowOneBased(), map.label(), map.labels());
             if (found == null) continue;   // 원본에서 지워진 항목 — 건너뛴다(다른 줄에 붙이지 않는다)
             rows.put(dbRowKey(map), found);
             cursor = found + 1;            // 찾았을 때만 커서를 옮긴다

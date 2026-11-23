@@ -45,6 +45,8 @@ public final class EnergySheetIndex {
     private final Map<Integer, Integer> monthCols;
     private final List<String> notFound = new ArrayList<>();
     private final List<String> moved = new ArrayList<>();
+    /** 1월 왼쪽 칸이 전년 12월이 아닌 다른 열(연간 예상 등)인 양식이면 true. */
+    private boolean noPrevDecember;
 
     private EnergySheetIndex(Map<String, List<Integer>> labelRows, Map<Integer, Integer> monthCols) {
         this.labelRows = labelRows;
@@ -71,6 +73,7 @@ public final class EnergySheetIndex {
         }
 
         Map<Integer, Integer> monthCols = new LinkedHashMap<>();
+        boolean noPrevDecember = false;
         if (monthHeaderRow > 0) {
             Row header = sheet.getRow(monthHeaderRow - 1);
             if (header != null) {
@@ -81,11 +84,17 @@ public final class EnergySheetIndex {
                     if (month == 1 && januaryCol == null) januaryCol = col;
                     if (januaryCol != null) monthCols.putIfAbsent(month, col);
                 }
-                // 1월 왼쪽 칸이 전년 12월이다 (원본의 "20. 12월")
-                if (januaryCol != null && januaryCol > 1) monthCols.put(0, januaryCol - 1);
+                // 1월 왼쪽 칸이 전년 12월이다 (원본의 "20. 12월").
+                // 단, 그 칸 머리글이 "2025년 예상" 처럼 12월이 아닌 다른 글자면 전년 12월 열이 없는 양식이다.
+                if (januaryCol != null && januaryCol > 1) {
+                    String left = text(sheet, monthHeaderRow, januaryCol - 1);
+                    boolean otherColumn = left != null && !left.isBlank() && !left.contains("12월");
+                    if (otherColumn) noPrevDecember = true; else monthCols.put(0, januaryCol - 1);
+                }
             }
         }
         EnergySheetIndex index = new EnergySheetIndex(labelRows, monthCols);
+        index.noPrevDecember = noPrevDecember;
         orderedRows.forEach(row -> index.rowOrder.add(new int[]{row}));
         index.rowLabel.putAll(orderedLabels);
         return index;
@@ -133,9 +142,30 @@ public final class EnergySheetIndex {
      * 이름으로만 행을 찾는다. 못 찾으면 <b>null</b> 이라 호출부가 그 항목을 건너뛸 수 있다.
      * 좌표 폴백이 없으므로 값이 다른 제목 줄에 붙지 않는다.
      */
-    public Integer rowOrNull(int minRow, int declaredRow, String what, String label) {
-        Resolved resolved = resolveRowAfter(minRow, declaredRow, what, label);
+    public Integer rowOrNull(int minRow, int declaredRow, String what, String... labels) {
+        Resolved resolved = resolveRowAfter(minRow, declaredRow, what, labels);
         return resolved.byLabel() ? resolved.row() : null;
+    }
+
+    /**
+     * 이름이 해마다 바뀌는 행("25년 LNG 단가" → "26년 LNG 단가")을 정규식으로 찾는다.
+     * 정규식은 {@link #normalize} 를 거친 글자(공백·괄호 설명 없음, 소문자)에 맞춘다.
+     *
+     * @return 못 찾으면 null
+     */
+    public Integer rowMatchingOrNull(int minRow, String what, Pattern normalizedLabel) {
+        for (int[] entry : rowOrder) {
+            int row = entry[0];
+            if (row < minRow) continue;
+            if (normalizedLabel.matcher(rowLabel.getOrDefault(row, "")).matches()) return row;
+        }
+        notFound.add(what);
+        return null;
+    }
+
+    /** 전년 12월 열이 없는 양식인가 (1월 왼쪽이 "2025년 예상" 같은 다른 열). */
+    public boolean noPrevDecember() {
+        return noPrevDecember;
     }
 
     /**
