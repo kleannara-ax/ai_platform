@@ -1,5 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.module.steamenergy.service.table.IncineratorCellStore;
 import com.company.module.steamenergy.service.table.RecordCellStore;
 import org.apache.poi.ss.usermodel.Cell;
@@ -972,7 +974,7 @@ public class IncineratorWorkbookService {
         }
         int totalRows = contractRows + planVsRows + yoyRows + opRows + totalCostRows + accidentRows;
         if (totalRows <= 0) {
-            throw new IllegalArgumentException("업로드한 소각로 위탁운영비 엑셀에서 반영할 데이터를 찾지 못했습니다. 다운로드한 양식의 시트와 셀 위치를 확인해주세요.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "업로드한 소각로 위탁운영비 엑셀에서 반영할 데이터를 찾지 못했습니다. 다운로드한 양식의 시트와 셀 위치를 확인해주세요.");
         }
         pending.remove(YOY_TABLE);
         store.replaceFromImport(year, month, pending);

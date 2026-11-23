@@ -164,7 +164,7 @@
     const totalPages = Math.max(1, Math.ceil(total / limit));
     if (totalPages > 1) {
       const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-      const responses = await Promise.all(pageNumbers.map((pn) => fetch(buildUrl(pn))));
+      const responses = await Promise.all(pageNumbers.map((pn) => window.FluidizedStore.fetch(buildUrl(pn))));
       for (const res of responses) {
         if (!res.ok) continue;
         const payload = await res.json();
@@ -752,12 +752,12 @@
 
   async function fetchDetailActuals(targetYear) {
     try {
-      const response = await fetch(`/tables/fluidized-summary/detail-actuals?year=${encodeURIComponent(targetYear)}`, {
+      const response = await fetch(`/steam-energy-api/fluidized-detail/actuals?year=${encodeURIComponent(targetYear)}`, {
         cache: "no-store",
       });
       if (!response.ok) return;
-      const payload = await response.json();
-      const months = payload.months || {};
+      const body = await response.json();
+      const months = (body && body.data ? body.data.months : body.months) || {};
       Object.entries(months).forEach(([targetMonth, cells]) => {
         detailCellsByMonth.set(targetMonth, cells || {});
       });
@@ -769,14 +769,15 @@
   async function fetchRenderedDetail(targetMonth) {
     if (detailCellsByMonth.has(targetMonth)) return;
     try {
-      const response = await fetch(`/tables/fluidized-detail/rendered?month=${encodeURIComponent(targetMonth)}&view=all`, {
+      const response = await fetch(`/steam-energy-api/fluidized-detail/rendered?month=${encodeURIComponent(targetMonth)}&view=all`, {
         cache: "no-store",
       });
       if (!response.ok) {
         detailCellsByMonth.set(targetMonth, {});
         return;
       }
-      const payload = await response.json();
+      const body = await response.json();
+      const payload = body && body.data ? body.data : body;
       detailCellsByMonth.set(targetMonth, {
         ...(payload.main?.cells || {}),
         ...(payload.summary?.cells || {}),
@@ -841,18 +842,18 @@
 
   async function downloadSummaryExcel() {
     // 활성 탭에 따라 endpoint 분기:
-    //   plan     -> /tables/fluidized-summary/export-excel (전체 워크북)
-    //   compare  -> /tables/fluidized-summary/export-compare-excel?year (실적비교 단일시트)
-    //   contract -> /tables/fluidized-summary/export-contract-excel?year&month (도급비용 단일시트)
+    //   plan     -> /steam-energy-api/fluidized-excel/export-excel (전체 워크북)
+    //   compare  -> /steam-energy-api/fluidized-excel/export-compare-excel?year (실적비교 단일시트)
+    //   contract -> /steam-energy-api/fluidized-excel/export-contract-excel?year&month (도급비용 단일시트)
     let endpoint, filename;
     if (activeTabKey === "compare") {
-      endpoint = `/tables/fluidized-summary/export-compare-excel?year=${encodeURIComponent(yearValue())}`;
+      endpoint = `/steam-energy-api/fluidized-excel/export-compare-excel?year=${encodeURIComponent(yearValue())}`;
       filename = `유동상_실적비교_${yearValue()}.xlsx`;
     } else if (activeTabKey === "contract") {
-      endpoint = `/tables/fluidized-summary/export-contract-excel?year=${encodeURIComponent(yearValue())}&month=${encodeURIComponent(monthValue())}`;
+      endpoint = `/steam-energy-api/fluidized-excel/export-contract-excel?year=${encodeURIComponent(yearValue())}&month=${encodeURIComponent(monthValue())}`;
       filename = `유동상_도급비용_${yearValue()}_${monthValue()}.xlsx`;
     } else {
-      endpoint = `/tables/fluidized-summary/export-excel?year=${encodeURIComponent(yearValue())}&month=${encodeURIComponent(monthValue())}`;
+      endpoint = `/steam-energy-api/fluidized-excel/export-excel?year=${encodeURIComponent(yearValue())}&month=${encodeURIComponent(monthValue())}`;
       filename = `유동상_운영내역_${yearValue()}_${monthValue()}.xlsx`;
     }
     const response = await fetch(endpoint);
@@ -884,9 +885,9 @@
       formData.append("year", yearValue());
       formData.append("month", monthValue());
 
-      let endpoint = "/tables/fluidized-summary/import-excel";
-      if (activeTabKey === "compare") endpoint = "/tables/fluidized-summary/import-compare-excel";
-      else if (activeTabKey === "contract") endpoint = "/tables/fluidized-summary/import-contract-excel";
+      let endpoint = "/steam-energy-api/fluidized-excel/import-excel";
+      if (activeTabKey === "compare") endpoint = "/steam-energy-api/fluidized-excel/import-compare-excel";
+      else if (activeTabKey === "contract") endpoint = "/steam-energy-api/fluidized-excel/import-contract-excel";
       const response = await fetch(endpoint, {
         method: "POST",
         body: formData,

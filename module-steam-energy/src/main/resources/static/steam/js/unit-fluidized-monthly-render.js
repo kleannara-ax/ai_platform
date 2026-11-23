@@ -589,7 +589,7 @@
     if (DETAIL_RENDER_CACHE.has(monthKey)) {
       return DETAIL_RENDER_CACHE.get(monthKey);
     }
-    const promise = fetch(`/tables/fluidized-detail/rendered?month=${encodeURIComponent(monthKey)}&view=all`, {
+    const promise = fetch(`/steam-energy-api/fluidized-detail/rendered?month=${encodeURIComponent(monthKey)}&view=all`, {
       cache: "no-store",
     })
       .then((response) => {
@@ -597,7 +597,7 @@
           DETAIL_RENDER_CACHE.delete(monthKey);
           return null;
         }
-        return response.json();
+        return response.json().then((body) => (body && body.data ? body.data : body));
       })
       .catch(() => {
         DETAIL_RENDER_CACHE.delete(monthKey);

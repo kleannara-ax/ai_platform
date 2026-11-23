@@ -26,7 +26,7 @@ public class SteamFluidizedRenderCacheFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        boolean steam = uri != null && (uri.contains("/steam-energy-api/") || uri.contains("/steam/api/"));
+        boolean steam = uri != null && uri.contains("/steam-energy-api/");
         return !steam || "GET".equalsIgnoreCase(request.getMethod()) || "OPTIONS".equalsIgnoreCase(request.getMethod());
     }
 

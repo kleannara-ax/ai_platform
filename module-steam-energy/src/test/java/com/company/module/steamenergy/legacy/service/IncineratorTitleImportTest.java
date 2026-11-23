@@ -1,7 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
 import com.company.module.steamenergy.legacy.SteamPoiConfig;
-import com.company.module.steamenergy.legacy.db.TableService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -30,12 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class IncineratorTitleImportTest {
 
     /** upsert 만 기록하고 나머지는 아무것도 하지 않는 저장소. */
-    static class Recording extends TableService {
+    static class Recording extends CellTable {
         final Map<String, String> cells = new TreeMap<>();
-
-        Recording() {
-            super(null);
-        }
 
         @Override
         public Map<String, Object> upsert(String tableName, Map<String, Object> p) {
@@ -48,15 +43,6 @@ class IncineratorTitleImportTest {
             return List.of();
         }
 
-        @Override
-        public int deleteTableCellValuesByTables(String m, List<String> t) {
-            return 0;
-        }
-
-        @Override
-        public int deleteTableCellRowsByMonthAndPrefixes(String m, List<String> p) {
-            return 0;
-        }
 
         /** 칸 번호를 안 적으면 #1 (한 칸짜리 항목). */
         double number(String key) {

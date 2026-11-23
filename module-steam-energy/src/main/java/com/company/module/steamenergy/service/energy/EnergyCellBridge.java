@@ -184,7 +184,7 @@ public class EnergyCellBridge {
             case "emcNote" -> {
                 return col == 0 ? new Target(0, null) : null;
             }
-            default -> throw new IllegalStateException("unknown colRule " + colRule);
+            default -> throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "unknown colRule " + colRule);
         }
     }
 
@@ -208,7 +208,7 @@ public class EnergyCellBridge {
             case "emcNote" -> {
                 return rowYear == year ? 0 : null;
             }
-            default -> throw new IllegalStateException("unknown colRule " + colRule);
+            default -> throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "unknown colRule " + colRule);
         }
     }
 

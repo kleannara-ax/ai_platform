@@ -108,11 +108,12 @@ document.addEventListener("DOMContentLoaded", () => {
     tableShell.innerHTML = `<div class="invoice-empty">\uB85C\uB529 \uC911</div>`;
     try {
       const [summaryResponse, cellsResponse] = await Promise.all([
-        fetch(`/tables/srf-boiler-invoice/summary?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
+        fetch(`/steam-energy-api/srf-invoice-view/summary?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
         window.SrfStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${SUMMARY_TABLE},${CLIENT_TABLE}&month=${encodeURIComponent(monthKey())}`),
       ]);
-      const payload = await summaryResponse.json();
-      if (!summaryResponse.ok) throw new Error(payload.message || "\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+      const summaryBody = await summaryResponse.json();
+      const payload = summaryBody && summaryBody.data ? summaryBody.data : summaryBody;
+      if (!summaryResponse.ok) throw new Error(summaryBody.message || "\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
       const cellsPayload = cellsResponse.ok ? await cellsResponse.json() : { data: [] };
       const cellRows = Array.isArray(cellsPayload?.data) ? cellsPayload.data : [];
       state.cellRows = cellRows.filter((row) => row.table_name === SUMMARY_TABLE);

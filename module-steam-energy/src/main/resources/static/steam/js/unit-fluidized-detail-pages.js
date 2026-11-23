@@ -1194,7 +1194,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       renderedResponse = await fetch(
-        `${TABLES_BASE}/fluidized-detail/rendered?month=${encodeURIComponent(currentMonth)}&view=${encodeURIComponent(activeView)}`
+        `/steam-energy-api/fluidized-detail/rendered?month=${encodeURIComponent(currentMonth)}&view=${encodeURIComponent(activeView)}`
       );
     } catch (error) {
       console.error("Failed to load fluidized detail data", error);
@@ -1202,7 +1202,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (renderedResponse?.ok) {
       try {
-        detailData = await renderedResponse.json();
+        const renderedBody = await renderedResponse.json();
+        detailData = renderedBody && renderedBody.data ? renderedBody.data : renderedBody;
         // 서버가 다시 계산한 값이므로 전월 이월 재고 캐시를 새로 잡는다.
         INVENTORY_GROUPS.forEach((group) => inventoryStarts.delete(`${currentMonth}|${group.inventory}`));
         if (detailData?.main) detailViewCache.set(cacheKey, detailData);

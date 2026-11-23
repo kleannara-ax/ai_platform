@@ -1,5 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.module.steamenergy.service.table.FluidizedCellStore;
 import com.company.module.steamenergy.service.table.FluidizedDetailCellStore;
 import com.company.module.steamenergy.service.table.RecordCellStore;
@@ -1272,7 +1274,7 @@ public class FluidizedSummaryWorkbookService {
             pendingDetail.put(rowKey, normalizedValue);
             return 1;
         }
-        throw new IllegalStateException("저장할 곳이 없는 표입니다: " + tableName);
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "저장할 곳이 없는 표입니다: " + tableName);
     }
 
     private String normalizeUploadedValue(String value) {

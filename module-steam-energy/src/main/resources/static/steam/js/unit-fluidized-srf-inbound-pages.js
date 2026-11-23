@@ -431,7 +431,7 @@
       formData.append("file", file);
       formData.append("year", yearSelect.value);
       formData.append("month", monthSelect.value);
-      const response = await fetch("/tables/fluidized-summary/import-excel", {
+      const response = await fetch("/steam-energy-api/fluidized-excel/import-excel", {
         method: "POST",
         body: formData,
       });

@@ -1,7 +1,6 @@
 package com.company.module.steamenergy.legacy.service;
 
 import com.company.module.steamenergy.legacy.SteamPoiConfig;
-import com.company.module.steamenergy.legacy.db.TableService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,17 +18,14 @@ import java.util.*;
 class IncineratorRoundTripTest {
 
     /** upsert 를 모아 두고 listAllByMonth 로 돌려주는 저장소. */
-    static class Store extends TableService {
+    static class Store extends CellTable {
         final List<Map<String, Object>> rows = new ArrayList<>();
-        Store() { super(null); }
         @Override public Map<String, Object> upsert(String t, Map<String, Object> p) { rows.add(new LinkedHashMap<>(p)); return p; }
         @Override public List<Map<String, Object>> listAllByMonth(String t, String month) {
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> r : rows) if (month.equals(String.valueOf(r.get("month")))) out.add(r);
             return out;
         }
-        @Override public int deleteTableCellValuesByTables(String m, List<String> t) { return 0; }
-        @Override public int deleteTableCellRowsByMonthAndPrefixes(String m, List<String> p) { return 0; }
         Map<String, String> snapshot() {
             Map<String, String> m = new TreeMap<>();
             for (Map<String, Object> r : rows) m.put(r.get("month") + " # " + r.get("table_name") + " # " + r.get("row_key") + " # " + r.get("col_index"), norm(String.valueOf(r.get("cell_value"))));

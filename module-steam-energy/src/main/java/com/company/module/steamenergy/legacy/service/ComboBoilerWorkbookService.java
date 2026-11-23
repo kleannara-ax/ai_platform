@@ -1,5 +1,7 @@
 package com.company.module.steamenergy.legacy.service;
 
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
 import com.company.module.steamenergy.service.table.ComboCellStore;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -73,7 +75,7 @@ public class ComboBoilerWorkbookService {
         }
         if (lastEtc != null) imported += store.replaceEtc(year, lastEtc);
         if (validSheets == 0) {
-            throw new IllegalArgumentException("\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD30C\uC77C\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD30C\uC77C\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
         }
         return Map.of("year", year, "imported", imported);
     }
@@ -313,7 +315,7 @@ public class ComboBoilerWorkbookService {
      */
     private void validateMonthlySheet(Sheet sheet, ComboBoilerLayout layout) {
         if (layout.dayRows().isEmpty() || layout.dayColumns().isEmpty() || layout.fuelPriceColumn() < 0) {
-            throw new IllegalArgumentException("\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "\uBCF5\uD569\uBCF4\uC77C\uB7EC \uC2A4\uD300\uAD6C\uB9E4 \uD604\uD669 \uC5D1\uC140 \uD615\uC2DD\uC774 \uC544\uB2D9\uB2C8\uB2E4.");
         }
     }
 

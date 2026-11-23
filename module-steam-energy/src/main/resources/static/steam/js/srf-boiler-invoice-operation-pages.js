@@ -98,11 +98,12 @@ document.addEventListener("DOMContentLoaded", () => {
     tableShell.innerHTML = `<div class="invoice-empty">로딩 중</div>`;
     try {
       const [operationResponse, cellsResponse] = await Promise.all([
-        fetch(`/tables/srf-boiler-invoice/operation?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
+        fetch(`/steam-energy-api/srf-invoice-view/operation?year=${encodeURIComponent(state.year)}&month=${encodeURIComponent(Number(state.month))}`),
         window.SrfStore.fetch(`${TABLES_BASE}/${CELL_TABLE}?page=1&limit=5000&tableNames=${OPERATION_TABLE}&month=${encodeURIComponent(monthKey())}`),
       ]);
-      const payload = await operationResponse.json();
-      if (!operationResponse.ok) throw new Error(payload.message || "데이터를 불러오지 못했습니다.");
+      const operationBody = await operationResponse.json();
+      const payload = operationBody && operationBody.data ? operationBody.data : operationBody;
+      if (!operationResponse.ok) throw new Error(operationBody.message || "데이터를 불러오지 못했습니다.");
       const cellsPayload = cellsResponse.ok ? await cellsResponse.json() : { data: [] };
       state.cellRows = Array.isArray(cellsPayload?.data)
         ? cellsPayload.data.filter((row) => row.table_name === OPERATION_TABLE)

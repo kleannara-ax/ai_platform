@@ -1,5 +1,7 @@
 # module-steam-energy: steam_cell_value 네임스페이스 / col_index 규약
 
+> **2026-11-23: 모든 네임스페이스가 실제 컬럼 표로 옮겨졌다.** 이 문서는 이관 기록이다 — 옛 `steam_cell_value` 의 키가 무엇이었고 어느 표로 갔는지(아래 '전환 완료' 표)를 남겨 둔다. 새 화면은 셀 저장소를 쓰지 않는다 (README 7절).
+
 > 실행하는 SQL 이 아니라 **문서**다. 스팀 화면들이 `steam_cell_value` 한 표를 나눠 쓰기 때문에,
 > 어떤 화면이 어떤 `table_name` 과 `col_index` 를 쓰는지 여기에 적어 둔다.
 > `col_index` 는 화면 항목의 고정 번호라 **재배치하면 기존 데이터가 어긋난다.**

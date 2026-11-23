@@ -1,6 +1,5 @@
 package com.company.module.steamenergy.legacy.service;
 
-import com.company.module.steamenergy.legacy.db.TableService;
 import com.company.module.steamenergy.service.table.IncineratorCellStore;
 
 import java.util.LinkedHashMap;
@@ -8,19 +7,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 시험용 소각로 셀 저장소 — 규격 표 대신 시험의 가짜 TableService 에 옛 형식 그대로 적고 읽는다.
+ * 시험용 소각로 셀 저장소 — 규격 표 대신 시험의 가짜 셀 표(CellTable) 에 옛 형식 그대로 적고 읽는다.
  * 엑셀 읽기·쓰기(칸 찾기)만 시험하려는 것이므로 계산값 키도 버리지 않고 그대로 남긴다.
  */
 class FakeIncineratorCellStore extends IncineratorCellStore {
 
-    private final TableService target;
+    private final CellTable target;
 
-    FakeIncineratorCellStore(TableService target) {
+    FakeIncineratorCellStore(CellTable target) {
         super(null, null, null, null);
         this.target = target;
     }
 
-    /** 사고·정비 이력용 가짜 — 같은 가짜 TableService 에 옛 형식(월 키 YYYY-00)으로 적고 읽는다. */
+    /** 사고·정비 이력용 가짜 — 같은 가짜 셀 표(CellTable) 에 옛 형식(월 키 YYYY-00)으로 적고 읽는다. */
     com.company.module.steamenergy.service.table.RecordCellStore records() {
         return new com.company.module.steamenergy.service.table.RecordCellStore(null, null, null) {
             @Override

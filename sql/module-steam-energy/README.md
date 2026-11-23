@@ -4,12 +4,11 @@
 
 ## 실행 순서
 
-파일 번호 순서대로 실행하면 된다(01 → 06). 번호가 곧 실행 순서다. 모든 파일은 재실행해도 안전하다.
+파일 번호 순서대로 실행하면 된다(01 → 06, 02 번은 없다). 모든 파일은 재실행해도 안전하다.
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | JPA 영역 표 17개 (steam_equipment·steam_price·steam_daily_usage + 원단위 일지 4개 + 에너지 회계비용 10개: steam_energy_*) + 인덱스. 감사·소프트 삭제 컬럼 포함 |
-| 2 | `02_legacy_schema.sql` | 이관 대시보드 표 3개 (steam_cell_value + 퇴역한 steam_unit_usage·steam_unit_usage_raw) + 인덱스 |
+| 1 | `01_schema.sql` | 업무 표 45개 + 인덱스. 모든 표에 감사·소프트 삭제 컬럼, 모든 컬럼에 COMMENT |
 | 3 | `03_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플 6건) |
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
 | 5 | `05_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
@@ -17,26 +16,48 @@
 
 ```bash
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 01_schema.sql
-mysql -u {user} -p --default-character-set=utf8mb4 {database} < 02_legacy_schema.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 03_seed_data.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 04_menu_data.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 05_submenus.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 06_roles.sql
 ```
 
-표를 만들고(01~02) 데이터를 넣고(03), 메뉴·권한(04~06)을 등록하는 순서다.
+표를 만들고(01) 데이터를 넣고(03), 메뉴·권한(04~06)을 등록하는 순서다.
+
+`02_legacy_schema.sql` (옛 셀 저장소 `steam_cell_value` 와 퇴역 표 2개를 만들던 파일)은 2026-11-23 에 없앴다 —
+모든 화면이 `01_schema.sql` 의 실제 컬럼 표를 쓴다. 새로 설치하는 DB 에는 옛 표를 만들지 않는다.
+
+### 옛 셀 저장소를 쓰던 DB 를 옮길 때 (개발서버 등)
+
+`steam_cell_value` 에 데이터가 있는 DB 는 `01_schema.sql` 을 실행한 뒤 `migration/` 의 이관 SQL 을 **한 번씩** 돌린다.
+모두 재실행해도 안전하다 (이미 값이 있는 칸은 건드리지 않고 비어 있는 칸만 채운다). 원본 셀은 지우지 않는다.
+
+```bash
+cd migration
+for f in 2026-11-20_unit_price_detail_to_steam_price.sql 2026-11-20_energy_cells_to_tables.sql \
+         2026-11-20_combo_cells_to_tables.sql 2026-11-20_incinerator_cells_to_tables.sql \
+         2026-11-20_srf_invoice_cells_to_tables.sql 2026-11-20_fluidized_cells_to_tables.sql \
+         2026-11-20_record_cells_to_tables.sql 2026-11-20_waste_incin_log_cells_to_table.sql \
+         2026-11-20_fluidized_detail_cells_to_tables.sql 2026-11-23_fluidized_daily_log_cells_to_table.sql; do
+  mysql -u {user} -p --default-character-set=utf8mb4 {database} < "$f"
+done
+```
+
+- 원단위 일지 7개 화면(묶음 1)은 이관 SQL 이 없다 — `원단위 일지 누계(YYYY년).xls` 를 화면에서 다시 올려 채운다.
+- 이관이 끝나고 화면에서 값을 확인한 뒤에는 옛 표(`steam_cell_value`, `steam_unit_usage`, `steam_unit_usage_raw`)를 읽는 코드가 없다.
+  표를 지울지는 DB 담당자가 백업 뒤에 정한다 (이 폴더에는 표를 지우는 SQL 을 두지 않는다).
 
 **전제** — 플랫폼 공통 표(`core_menu`·`core_role_menu`·`code_group`·`code_detail`)가 먼저 있어야 한다.
 04~06 이 거기에 메뉴·역할을 넣는다. `--default-character-set=utf8mb4` 를 붙여 한글 메뉴명이 깨지지 않게 한다.
 
-`steam_cell_value` 를 화면별로 어떻게 나눠 쓰는지(네임스페이스·col_index)는
-실행 대상이 아니라 문서다 — [CELL_CONVENTIONS.md](CELL_CONVENTIONS.md) 참고.
+옛 셀 저장소의 키(네임스페이스·col_index)가 어느 표·컬럼으로 갔는지는 [CELL_CONVENTIONS.md](CELL_CONVENTIONS.md) 와
+아래 전환 절들의 매핑표에 적혀 있다 (이관 기록).
 
 ### 운영 데이터를 함께 옮길 때
 
 로컬에서 뽑은 데이터 파일(`steam-data-YYYYMMDD.sql`, REPLACE INTO)이 있으면
-**위 01~06 을 모두 실행한 뒤 마지막에** 넣는다. 데이터 파일은 현재 표 이름
-(`steam_cell_value`·`steam_unit_usage`·`steam_unit_usage_raw`)으로 뽑은 것이어야 한다.
+**위 01~06 을 모두 실행한 뒤 마지막에** 넣는다. 데이터 파일은 현재 표 이름(`steam_*`)으로 뽑은 것이어야 한다.
+옛 셀 저장소(`steam_cell_value`)로 뽑은 파일이면 옛 표가 있는 DB 에 넣은 뒤 위의 이관 SQL 을 돌린다.
 
 ```bash
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < steam-data-YYYYMMDD.sql
@@ -73,7 +94,7 @@ mysql -u {user} -p --default-character-set=utf8mb4 {database} < steam-data-YYYYM
 - 이름은 `NN_무엇을_하는지.sql` — 두 자리 번호 + 소문자 snake_case. 번호가 곧 실행 순서다.
 - **번호는 마지막 번호 다음을 쓰고, 한 번 쓴 번호는 재사용하지 않는다.** 순서가 꼬이면 다른 환경에서 재현이 안 된다.
 - **이미 배포된 파일은 고치지 않는다.** 바꿀 게 있으면 새 번호로 "되돌리는/고치는" 파일을 추가한다.
-  예외는 신규 설치용 `01_schema`·`02_legacy_schema`·`03_seed_data` 뿐이다 — 정리 SQL 로 지운 항목은 시드에서도 함께 빼서
+  예외는 신규 설치용 `01_schema`·`03_seed_data` 뿐이다 — 정리 SQL 로 지운 항목은 시드에서도 함께 빼서
   새로 까는 DB 와 기존 DB 가 같은 상태가 되게 한다.
 - 파일을 추가하면 위 **실행 순서 표와 명령 블록**에 같은 번호로 한 줄씩 넣는다.
 - **모든 환경이 같은 상태가 된 시점**에는 마이그레이션 파일을 걷어내고 신규 설치 파일로 합칠 수 있다(위 "정리 이력").
@@ -162,24 +183,22 @@ DELETE FROM steam_price
 - 업무 표는 공통 감사 컬럼을 둔다 — `CREATED_AT/CREATED_BY/UPDATED_AT/UPDATED_BY/DELETED_AT/DELETED_BY/DELETED_YN`.
   삭제는 `DELETED_YN='Y'` 소프트 삭제이고, 엔티티는 `@SQLRestriction("DELETED_YN = 'N'")` 로 가린다 (`01_schema.sql` 참고).
 - 키 이름 — PK 는 `{TABLE}_ID`, 인덱스 `IDX_STEAM_{표}_{컬럼}`, 외래키 `FK_STEAM_{표}_{참조}`, 유니크 `UK_STEAM_{표}_{컬럼들}` (대문자, `01_schema.sql` 기준).
-  이관 표 `steam_cell_value` 의 소문자 `uk_…` 는 옛 이름이라 예외다 — 새로 만들 땐 따라 하지 않는다.
 - JPA 엔티티의 `@Table(name=…)`·`@Column(name=…)` 과 글자 하나까지 같아야 한다. `ddl-auto=none` 이라 틀려도 기동 때 안 잡힌다.
 
-### 7. `steam_cell_value` 를 쓸 때
+### 7. 화면이 저장할 것이 생길 때
 
-이관 대시보드 화면들은 표를 새로 만들지 않고 `steam_cell_value` 한 표를 **`table_name` 으로 나눠** 쓴다.
+범용 셀 저장소는 없다 (2026-11-23 에 걷어 냈다). 입력 항목 하나가 표의 컬럼 하나다.
 
-- 새 화면이 저장할 게 생기면 `table_name` 을 하나 정하고(소문자 snake_case, 화면 이름을 담아서)
-  **[CELL_CONVENTIONS.md](CELL_CONVENTIONS.md) 에 `row_key`·`col_index` 규약을 먼저 적는다.**
-- `col_index` 는 화면 항목의 **고정 번호**다. 번호를 재배치하면 기존 데이터가 다른 항목에 붙는다 — 추가만 하고 바꾸지 않는다.
-- `row_key` 는 뜻이 보이게 짓는다 — `일(2자리)`, `섹션|항목`, `표|행` 처럼. 셀 주소(`A1`)는 세부 운영내역처럼 양식이 곧 화면인 경우에만.
-- 유니크 키가 `(month, table_name, row_key, col_index)` 이므로, 월과 무관한 값도 `month` 를 비워 두지 말고 규약대로 채운다.
+- 표를 정하고 `01_schema.sql` 에 `CREATE TABLE IF NOT EXISTS` 로 추가한다 (감사 컬럼 7개, 모든 컬럼 COMMENT, 대문자 `UK_`·`IDX_`).
+- Entity · Repository · Service · Controller · DTO 를 같은 모양으로 만든다 (`SteamFuelDailyUsage*` 가 기준). API 는 `/steam-energy-api/**`, 응답은 `ApiResponse`.
+- README 의 표 목록과 매핑표(화면 항목 → 표.컬럼)에 먼저 적는다.
+- 화면은 `js/steam-energy-api.js` 로 부른다. 칸 하나만 고치는 화면은 `js/steam-row-store.js` (`SteamRowStore.create`)로 최신 행을 읽어 고친 칸만 바꿔 보낸다.
 
 ### 8. 올리기 전 확인
 
 1. 로컬 `steam` DB 에 **두 번** 실행 — 두 번째가 에러 없이 끝나는지.
 2. 지우는 SQL 이면 실행 전후 건수를 비교한다. 예상보다 많이 줄면 `WHERE` 가 넓은 것이다.
-3. 실행 순서 표·명령 블록·`CELL_CONVENTIONS.md` 를 같이 고쳤는지.
+3. 실행 순서 표·명령 블록·표 목록·매핑표를 같이 고쳤는지.
 4. 개발서버에 반영할 땐 **번호 순서대로, 아직 안 돌린 것만** 돌린다. 어디까지 돌렸는지는 배포 기록에 남긴다.
 
 ### 9. 데이터 이관 파일
@@ -187,8 +206,7 @@ DELETE FROM steam_price
 로컬 데이터를 통째로 옮기는 `steam-data-YYYYMMDD.sql` 은 이 폴더에 두지 않고(저장소 밖) 따로 전달한다.
 
 - `REPLACE INTO` 로 만들고, 여러 행을 한 문장에 묶어 한 트랜잭션으로 넣는다 (5만 건 기준 1초 안팎).
-- 스팀 표만 담는다 — `steam_cell_value`·`steam_unit_usage`·`steam_unit_usage_raw`·`steam_*`.
-  `core_*`·다른 모듈 표, 그리고 `steam_cell_value` 안의 `app_users`(옛 로그인 해시)는 **넣지 않는다.**
+- 스팀 표만 담는다 — `steam_*`. `core_*`·다른 모듈 표는 **넣지 않는다.**
 - 스키마·메뉴 SQL(01~06)을 모두 돌린 **다음에** 실행한다.
 
 ## 테이블
@@ -198,7 +216,6 @@ DELETE FROM steam_price
 | `steam_equipment` | 스팀 설비 마스터 | `EQUIPMENT_CODE` |
 | `steam_price` | 시설별 계약·구매 단가(연/월) | `(YEAR_NO, MONTH_NO, ITEM_CODE)` |
 | `steam_daily_usage` | 일일 스팀 사용 실적 | `(USAGE_DATE, EQUIPMENT_ID)` |
-| `steam_cell_value` | 이관 대시보드 화면들의 셀 저장소 — `table_name` 으로 논리 표를 나눈다 ([CELL_CONVENTIONS.md](CELL_CONVENTIONS.md)) | `(month, table_name, row_key, col_index)` |
 | `steam_unit_usage` | (퇴역 2026-11) 원단위 일지 — `steam_unit_daily_usage` 로 대체, 읽는 코드 없음 | `(month, day, machine_no)` |
 | `steam_unit_usage_raw` | (퇴역 2026-11) 원단위 원시값 — `steam_unit_daily_common` 으로 대체 | `(month, day)` |
 | `steam_unit_daily_usage` | 원단위 일지 — 호기별 일일 스팀 사용·생산 실적 (2026-11, 규격 전환) | `(USAGE_DATE, MACHINE_CODE)` |
@@ -1118,7 +1135,7 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 | `POST` | `/steam-energy-api/fluidized-srf-rates` | 행 전체 업서트 `(YEAR_NO, MONTH_NO)` |
 | `PUT` | `/steam-energy-api/fluidized-srf-rates/bulk` | 범위(한 해·한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
 | `GET` · `DELETE` | `/steam-energy-api/fluidized-srf-rates/{id}` | 단건 조회 · 소프트 삭제 |
-| `POST` · `GET` | `/steam/api/tables/fluidized-summary/{import,export}-excel` 등 (옛 경로 그대로) | 유동상 운영내역 워크북은 세부 운영내역(묶음 4) · 사고·개선(묶음 3-E) 시트가 함께 들어 있어 주소는 묶음 4 전환 때 옮긴다. 이 그룹의 시트는 이미 규격 표로 읽고 쓴다 (전체 가져오기 = 그 해의 사업계획·특이사항과 고른 달의 비고·지급현황·일별 도급비용·SRF 입고를 파일 기준으로 바꿈, 탭별 가져오기 = 읽은 칸만 고침) |
+| `POST` · `GET` | `/steam-energy-api/fluidized-excel/{import,export}-excel` · `{import,export}-compare-excel` · `{import,export}-contract-excel` | 유동상 운영내역 워크북 (2026-11-23 에 옛 `/steam/api/tables/fluidized-summary/*` 에서 옮김). 전체 가져오기는 그 해의 사업계획·특이사항과 고른 달의 지급현황·일별 도급비용·SRF 입고·세부 운영내역을 파일 기준으로 바꾼다 |
 
 ### 다른 화면과의 연동
 
@@ -1699,7 +1716,7 @@ DROP TABLE IF EXISTS steam_equipment;
 |------|-----|
 | 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹 44페이지 |
 | 메뉴 URL | `/steam/{page}.html` (SPA 가 iframe 으로 로드) |
-| API Prefix | `/steam-energy-api` (신규 JPA 영역) / `/steam/api/tables` (이관 대시보드) |
+| API Prefix | `/steam-energy-api` |
 | 등록 SQL | `04_menu_data.sql`(상위) + `05_submenus.sql`(하위) |
 | 역할 | `ROLE_ADMIN`, `ROLE_MANAGER`, `ROLE_USER` + 스팀 전용 3종(`06_roles.sql`) |
 
@@ -1711,20 +1728,128 @@ DROP TABLE IF EXISTS steam_equipment;
   core 에 제공되면 각 Service 의 저장·수정·삭제에서 채우면 된다.
   (업무 모듈에서 `SecurityContextHolder` 를 직접 다루지 않는다는 규칙에 따라 임의 구현하지 않음)
 
-### 규격에서 벗어난 부분 (이관 대시보드 한정)
+### 규격 맞춤 전환 현황 (2026-11-23 완료)
 
-`legacy/` 패키지는 기존 스팀 대시보드를 그대로 옮겨온 영역이라 아래가 규격과 다르다.
-화면 40여 개와 저장 데이터 5만 건이 얽혀 있어 한 번에 바꾸지 않고 남겨 둔 것이다.
+이관 대시보드 영역(화면 40개)은 예전에 범용 셀 저장소 `steam_cell_value` 와 범용 API `/steam/api/tables/{표}` 를 썼다. 2026-11 에 화면 묶음 단위로 실제 컬럼 표 + JPA + `/steam-energy-api` + `ApiResponse` 로 옮겼고, 2026-11-23 에 옛 API 와 `TableService` 를 없앴다.
 
-| 규격 | 현재 | 영향 |
-|------|------|------|
-| API prefix `/{모듈명}-api/**` | `/steam/api/tables/**` | 모든 화면 JS 가 이 경로를 사용 |
-| 응답은 `ApiResponse<T>` | `Map<String,Object>` 반환 | 화면 JS 가 `{data, total, page}` 형태를 직접 파싱 |
-| 예외는 `BusinessException` | `ResponseStatusException` | 화면이 HTTP 상태코드로 분기 |
-| 컬럼명 대문자 SNAKE_CASE | `steam_cell_value` 등 소문자 | 이름을 바꾸면 화면·서비스 전부 수정 필요 |
+| 묶음 | 화면 | 완료 |
+|---|---|---|
+| 1 | 원단위 일지 7개 | 2026-11-20 |
+| 2 | 에너지 회계비용 5개 | 2026-11-20 |
+| 3 | 복합보일러 · 소각로 위탁 · SRF 보일러 인보이스 · 유동상 운영 · 사고/정비/설비개선 | 2026-11-20 |
+| 4 | 폐합성소각로 운전일지 · 유동상 세부 운영내역 · 유동상 운전일지 | 2026-11-23 |
+| 정리 | 남은 주소 이동 (아래 표), 범용 셀 API · `TableService` · `02_legacy_schema.sql` 제거 | 2026-11-23 |
 
-바꾸려면 화면 JS 까지 함께 손봐야 하므로, 별도 과제로 잡고 단계적으로 옮기는 것을 권한다.
+2026-11-23 에 옮긴 주소:
 
-전환 진행: 묶음 1 원단위 일지 7개 화면, 묶음 2 에너지 회계비용 5개 화면, 묶음 3 일별 입력형 화면군(3-A 복합보일러 · 3-B 소각로 위탁 · 3-C SRF 보일러 인보이스 · 3-D 유동상 운영 · 3-E 사고·정비 이력과 설비개선) 모두 2026-11-20 완료.
+| 옛 주소 (`/steam/api/tables/…`) | 새 주소 |
+|---|---|
+| `fluidized-detail/rendered` | `GET /steam-energy-api/fluidized-detail/rendered?month=&view=` |
+| `fluidized-summary/detail-actuals` | `GET /steam-energy-api/fluidized-detail/actuals?year=` |
+| `fluidized-summary/{import,export}[-compare\|-contract]-excel` | `/steam-energy-api/fluidized-excel/…` |
+| `fluidized-daily-log/{import,export}-excel` | `/steam-energy-api/fluidized-daily-log-excel/…` |
+| `waste-incinerator-log/{import,export}-excel` | `/steam-energy-api/waste-incin-log-excel/…` |
+| `srf-boiler-invoice/{summary,operation}` | `GET /steam-energy-api/srf-invoice-view/{summary,operation}?year=&month=` |
+| `{표}` (범용 조회 · 저장 · 삭제), `steam_cell_value/row-group`, `by-table`, `server-date` | 없앰 — 표마다 `/steam-energy-api/{표-경로}` |
 
-남은 것: 묶음 4 양식형 — 유동상 세부 운영내역(`fluidized_detail_main`), 유동상 운전일지(`fluidized_daily_log`), 폐합성 운전일지(`waste_incin_log`). 이 셋이 옮겨지면 유동상 운영내역 워크북의 엑셀 주소(`/steam/api/tables/fluidized-summary/*`)와 범용 셀 API(`/steam/api/tables/{표}`), `steam_cell_value`, `02_legacy_schema.sql` 을 걷어 낸다. 그때까지 옛 셀 저장소에는 전환을 마친 표의 옛 데이터도 그대로 남아 있다(읽지 않는다, 지우지 않았다).
+남겨 둔 것:
+
+- `legacy/service/` 패키지 — 엑셀 서식의 칸 위치를 아는 가져오기/내보내기 서비스와 세부 운영내역 계산. 저장소만 규격 표로 바꿨고 (`service/table/*CellStore`), 안에서는 여전히 옛 셀 키로 일한다. 패키지 이름은 그대로 뒀다.
+- 화면 JS 도 옛 셀 키로 일하고 `js/*-store.js` 가 규격 API 로 옮긴다. 화면을 새로 고칠 때 `SteamEnergyApi` 를 직접 쓰게 바꾸면 된다.
+- `steam_daily_usage` · `steam_equipment` (초기 JPA 골격)는 쓰는 화면이 없다 — 통합 후보.
+- 세부 운영내역 계산 결과와 SRF 인보이스 서식 조회는 서식 배치가 그대로 실려 DTO 안에 맵으로 전달한다.
+
+알아 둘 것 (전환 전부터 있던 동작, 2026-11-23 로컬에서 확인):
+
+- 유동상 운영내역 워크북은 **내려받은 파일을 그대로 다시 올리면 값이 달라진다.** 내려받기는 세부 운영내역 값을 화면 표시 자릿수로 적고, SRF 입고 · 설비개선 · 사고이력 시트는 서식(원본 파일)의 내용을 그대로 싣는다. 2026년 3월로 시험하니 세부 운영내역 380칸, SRF 입고 228칸, 사고 · 설비개선 목록이 바뀌었다. 올리기는 원본 워크북으로만 한다.
+- 유동상 운전일지 엑셀도 내려받아 다시 올리면 탄산암모늄 전일 재고량이 달라진다 (서식의 수식이 다시 계산된 값이 들어온다). 나머지 항목은 같다.
+- 2026년 3 · 4 · 5월 세부 운영내역은 옛 가져오기 때문에 일부 행이 한 줄씩 밀려 저장돼 있었고, 그대로 옮겼다. 원본 워크북을 다시 올리면 바로잡힌다.
+
+### 자체 검수 체크리스트 결과 (2026-11-23)
+
+| 번호 | 검수 항목 | 결과 | 비고 |
+|---|---|---|---|
+| 1 | User/Auth/Role/Menu/Security 클래스 미생성 | 통과 |  |
+| 2 | SecurityConfig, JwtProvider, AuthController 미생성 | 통과 |  |
+| 3 | application.yml, application.properties 미생성 | 통과 |  |
+| 4 | Dockerfile, docker-compose.yml, Nginx 설정 미생성 | 통과 |  |
+| 5 | SpringBootApplication main class 미생성 | 통과 |  |
+| 6 | API URL /{모듈명}-api/** 규칙 준수 | 통과 | 모든 컨트롤러가 `/steam-energy-api/**`. 옛 `/steam/api/tables/**` 는 2026-11-23 제거 |
+| 7 | 금지 URL(/api, /admin, /auth 등) 미사용 | 통과 |  |
+| 8 | Entity에 @Setter 없음 | 통과 |  |
+| 9 | Entity에 @Data 없음 | 통과 |  |
+| 10 | Service에서 entity.setXxx() 미사용 | 통과 | 엔티티의 `update(...)` · `clearValues` · `delete` · `restore` 로만 바꾼다 |
+| 11 | 모든 Entity 컬럼에 @Column(name="UPPER_SNAKE_CASE") | 통과 |  |
+| 12 | 모든 업무 테이블에 공통 컬럼 포함 | 통과 | 45개 표 모두 |
+| 13 | DELETED_YN 기반 소프트 삭제 | 통과 | `@SQLRestriction("DELETED_YN = 'N'")` |
+| 14 | 모든 테이블·컬럼에 COMMENT 존재 | 통과 |  |
+| 15 | SQL에 DROP TABLE 없음 | 통과 | 옛 표를 지우는 SQL 은 두지 않았다 (DB 담당자가 백업 뒤 결정) |
+| 16 | SQL에 TRUNCATE TABLE 없음 | 통과 |  |
+| 17 | SQL에 무조건 DELETE 없음 | 통과 | `05_submenus.sql` 의 DELETE 는 `MENU_CODE LIKE 'STEAM_%'` 조건이 있다 |
+| 18 | SQL에 ALTER TABLE DROP COLUMN 없음 | 통과 |  |
+| 19 | core 테이블(core_user 등)에 FK 미생성 | 통과 |  |
+| 20 | Controller 응답이 ApiResponse<T> | 통과 | 엑셀 내려받기(파일 응답)만 예외 |
+| 21 | Entity 직접 반환 없음 | 통과 |  |
+| 22 | RuntimeException/IllegalArgumentException 직접 throw 없음 | 통과 | 모두 `BusinessException` |
+| 23 | ddl-auto 미의존, SQL DDL 제공 | 통과 |  |
+| 24 | core 모듈 미수정 | 통과 | core `SecurityConfig` 에 옛 `/steam/api/**` 경로가 남아 있으면 지워도 된다 (core 담당) |
+| 25 | app 모듈 미수정 | 통과 |  |
+| 26 | README에 메뉴/권한 등록 정보 작성 | 통과 |  |
+| 27 | core 추가 필요 사항 README 명시 | 통과 | `CurrentUserProvider` |
+| 28 | 메타(EAV) 테이블 없음 | 통과 | `steam_cell_value` 를 만들지도 읽지도 않는다. 이미 쓰던 DB 에는 옛 표가 데이터와 함께 남아 있다 |
+| 29 | 입력 항목 1개 = 실제 컬럼 1개 (4-1 매핑표 대조) | 통과 | 전환 절마다 매핑표. 계산값은 저장하지 않는다 (다른 화면이 읽는 계산값만 컬럼) |
+| 30 | 런타임 동적 SQL·런타임 DDL 없음 | 통과 | `TableService`(JdbcTemplate 로 표 이름 조립) 제거 |
+| 31 | 등록/수정 메뉴마다 대응 업무 테이블 존재 | 통과 |  |
+| 32 | 금지 식별자 없음 (table_name, column_name, attr_value, data_json, field1, tb_table) | 통과 | DDL · Entity · API 에 없다. 엑셀 서비스와 화면 저장소가 메모리에서 주고받는 옛 셀 모양 맵의 키 `table_name` 은 남아 있다 (저장되지 않는다) |
+
+**CREATE TABLE 목록** (`01_schema.sql`, 업무 테이블 45개 — 컬럼 수는 PK · 감사 컬럼 포함)
+
+| 테이블 | 컬럼 수 | COMMENT |
+|---|---|---|
+| `steam_equipment` | 14 | [module-steam-energy] 스팀 설비 마스터 |
+| `steam_price` | 17 | [module-steam-energy] 시설별 계약·구매 단가 (연/월별) |
+| `steam_daily_usage` | 15 | [module-steam-energy] 일일 스팀 사용 실적 |
+| `steam_unit_daily_usage` | 20 | [module-steam-energy] 원단위 일지 — 호기별 일일 스팀 사용·생산 실적 |
+| `steam_unit_daily_common` | 12 | [module-steam-energy] 원단위 일지 — 일자별 공통 계측값 |
+| `steam_lng_daily_usage` | 26 | [module-steam-energy] 일별 LNG 연료 사용량 |
+| `steam_fuel_daily_usage` | 19 | [module-steam-energy] 유동상·폐합성소각로·복합보일러·외부보일러 일일 스팀 구매량 |
+| `steam_energy_accounting_plan` | 31 | [module-steam-energy] 회계비용(연료비) 계획 — 연/월별 (백만원, 생산량 톤) |
+| `steam_energy_fuel_plan` | 39 | [module-steam-energy] 연료비 사업계획(안) — 연/월별 (스팀 톤, LNG ㎥, 단가 원, 비용 백만원) |
+| `steam_energy_ratio_boiler` | 29 | [module-steam-energy] 연료비 배분비율 — 보일러별 스팀생산량·연료비·스팀단가 (연/월별) |
+| `steam_energy_ratio_machine` | 32 | [module-steam-energy] 연료비 배분비율 — 호기별 연료비 배분·스팀사용량·제품생산량 (연/월별) |
+| `steam_energy_ratio_burner` | 23 | [module-steam-energy] 연료비 배분비율 — 버너 LNG 사용량·단가·비용·원단위 (연/월별) |
+| `steam_energy_ratio_steam_unit` | 17 | [module-steam-energy] 스팀사용량 원단위(톤·스팀/톤·제품, 기타 스팀량 포함) — 화면 계산값 저장, 다른 사이트와 공유 |
+| `steam_energy_ratio_ref2019` | 41 | [module-steam-energy] 연료비 배분비율 — 2019 호기별 참고 표(스팀생산량·사용비율·에너지비용 배분), 월별 입력 |
+| `steam_energy_month_compare` | 19 | [module-steam-energy] 월별 회계비용 마감 vs 실마감 — 입력값과 다른 화면이 읽는 계산값 (연/월별, 백만원) |
+| `steam_energy_month_compare_note` | 19 | [module-steam-energy] 월별 회계비용 마감비교 — 구분별 비고 (연도별 한 행) |
+| `steam_energy_fuel_summary` | 59 | [module-steam-energy] 연료비 요약 — 배분비율 기본값을 덮어쓰는 직접 입력값 (연/월별) |
+| `steam_combo_daily_production` | 27 | [module-steam-energy] 복합보일러 스팀생산실적 (일자별) |
+| `steam_combo_daily_downtime` | 18 | [module-steam-energy] 복합보일러 변동사항·운휴시간·디스퍼져·벤트 (일자별) |
+| `steam_combo_monthly_price` | 16 | [module-steam-energy] 복합보일러 월 연료단가·벤트 손실 단가 (연/월별) |
+| `steam_combo_recovery_loss` | 17 | [module-steam-energy] 복합보일러 스팀 회수 감소 내역 (연/월 · 줄 번호별, 한 건 한 행) |
+| `steam_combo_plan` | 17 | [module-steam-energy] 복합보일러·제스코 연간 계획과 LNG 사용량 (기준연도 · 대상 월별) |
+| `steam_incinerator_contract_daily` | 21 | [module-steam-energy] 폐합성수지 소각로 도급내역 — 결산 1·2호기와 실 스팀량 기준 (일자별) |
+| `steam_incinerator_plan_monthly` | 24 | [module-steam-energy] 폐합성수지 소각로 사업계획대비 실적·비고와 도급내역 월 인건비 (연/월별) |
+| `steam_incinerator_operation_monthly` | 20 | [module-steam-energy] 폐합성수지 소각로 계획대비 가동실적 (연/월별) |
+| `steam_incinerator_cost_monthly` | 49 | [module-steam-energy] 폐합성수지 소각로 총 운영비용 입력값 (연/월별) |
+| `steam_srf_invoice_summary` | 27 | [module-steam-energy] SRF 보일러 인보이스 Summary(VK) 입력값 (연/월별) |
+| `steam_srf_invoice_client_item` | 17 | [module-steam-energy] SRF 보일러 인보이스 Client Invoice 줄 (연/월 · 구분 · 줄 번호별, 한 달 16줄 고정) |
+| `steam_srf_invoice_operation_daily` | 10 | [module-steam-energy] SRF 보일러 인보이스 운영내역 — 일별 전력량 (나머지 열은 복합보일러 스팀생산실적에서 연동·계산) |
+| `steam_srf_invoice_monthly` | 31 | [module-steam-energy] SRF 보일러 인보이스 월별 운영내역 (연/월별 — 화면은 6월~다음해 5월을 한 해로 본다) |
+| `steam_srf_invoice_accumulated` | 13 | [module-steam-energy] SRF 보일러 인보이스 누계 스팀 공급량 (연/월별 — 화면은 6월~다음해 5월을 한 해로 본다) |
+| `steam_srf_invoice_bsc` | 10 | [module-steam-energy] SRF 보일러 인보이스 Base Service Charge Rate (연도별) |
+| `steam_srf_invoice_adjustment` | 14 | [module-steam-energy] SRF 보일러 인보이스 Adjustment Factor 항목 (연도 · 표 · 항목별) |
+| `steam_fluidized_month` | 27 | [module-steam-energy] 유동상 운영 — 월별 사업계획, 비고, 도급비용 지급현황, 월별 운영내역 입력값 (연/월별) |
+| `steam_fluidized_contract_daily` | 13 | [module-steam-energy] 유동상 소각로 도급비용 (일자별) |
+| `steam_fluidized_srf_inbound_daily` | 19 | [module-steam-energy] 유동상 SRF(비성형) 입고량 — 업체 칸 10개 (일자별) |
+| `steam_fluidized_srf_rate` | 20 | [module-steam-energy] 유동상 SRF(비성형) 처리단가 — 업체 칸 10개 (연/월별) |
+| `steam_incident` | 19 | [module-steam-energy] 사고·정비 이력 — 유동상 · SRF 보일러 · 폐합성수지 소각로 (연도 · 기록별, 한 건 한 행) |
+| `steam_fluidized_improvement_payment` | 16 | [module-steam-energy] 유동상 설비개선 비용현황 — 월별 지급·사용 내역 (연도 · 기록별, 한 건 한 행) |
+| `steam_fluidized_improvement_item` | 18 | [module-steam-energy] 유동상 설비개선 리스트 — 항목별 계획·실비용·완료여부 (연도 · 기록별, 한 건 한 행) |
+| `steam_waste_incin_daily_log` | 96 | [module-steam-energy] 폐합성소각로 운전일지 — 소각량·스팀·급수·전력·폐기물·약품·TMS·외부반입·폐기물발생 (일자별) |
+| `steam_fluidized_detail_daily` | 74 | [module-steam-energy] 유동상 세부 운영내역 — 일별 입력 (가동·스팀·소각량·단가·약품·소각재·전력·용수·슬러지위탁) |
+| `steam_fluidized_detail_month` | 60 | [module-steam-energy] 유동상 세부 운영내역 — 월별 입력 (항목 단가 · 설비개선비용 · 추가비용) |
+| `steam_fluidized_detail_custom_row` | 45 | [module-steam-energy] 유동상 세부 운영내역 — 사용자가 추가한 행 (월 · 구역 · 행별, 일자 값 31칸) |
+| `steam_fluidized_daily_log` | 84 | [module-steam-energy] 유동상 운전일지 — 근무자·약품 전일 재고·소각재·전력 지침·유틸리티 전일 사용량·함수율 (일자별) |
+
+4-1 매핑표와 DDL 컬럼 일치: 매핑표의 컬럼 행과 `01_schema.sql` 의 DDL 은 같은 명세에서 만들었고(전환 절마다 표 수 · 값 컬럼 수 기재), 이관 SQL 을 로컬 DB 에 적용해 옛 셀의 건수 · 합계와 대조했다.

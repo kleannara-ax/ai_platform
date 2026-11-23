@@ -137,60 +137,14 @@
 
     var ym = String(year) + "-" + pad2(month);
     var days = daysInMonth(year, month);
-    var tasks = [];
     // 전환된 일별 표는 서버가 한 번에 넣는다 (등록 단가는 이미 저장된 상태여야 한다).
     var dailyStep = link.daily
       ? applyPriceDaily(year, month, code).then(function (res) { return res && res.appliedDays ? res.appliedDays : 0; })
       : Promise.resolve(0);
-    function post(target, rowKey) {
-      return function () {
-        return fetch(TABLES_BASE + "/" + CELL_TABLE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            month: ym, year_no: Number(year), month_no: Number(month),
-            table_name: target.table,
-            row_key: rowKey,
-            col_index: target.col,
-            cell_value: clean,
-          }),
-        }).then(function (r) { if (!r.ok) throw new Error("단가 연동 저장 실패"); return r; });
-      };
-    }
-    // 그 달에 한 칸만 있는 자리(Invoice Summary(VK)) — 일자별로 쓰지 않는다.
-    (link.monthTargets || []).forEach(function (target) {
-      tasks.push(post(target, target.rowKey));
-    });
-    if (link.monthTargets && !link.targets && !link.daily) {
-      return runLimited(tasks, 6).then(function () {
-        return { applied: 1, cells: tasks.length, label: link.label, monthly: true };
-      });
-    }
-    (link.targets || []).forEach(function (target) {
-      for (var d = 1; d <= days; d++) {
-        (function (day) {
-          tasks.push(function () {
-            return fetch(TABLES_BASE + "/" + CELL_TABLE, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                month: ym, year_no: Number(year), month_no: Number(month),
-                table_name: target.table,
-                row_key: target.key(day),
-                col_index: target.col,
-                cell_value: clean,
-              }),
-            }).then(function (r) { if (!r.ok) throw new Error("단가 연동 저장 실패"); return r; });
-          });
-        })(d);
-      }
-    });
     return dailyStep.then(function (dailyDays) {
-      return runLimited(tasks, 6).then(function () {
-        // monthly = 그 달에 한 칸만 있는 자리(Invoice Summary(VK)) — 일수가 아니라 1건으로 알린다
-        if (link.monthly) return { applied: 1, cells: tasks.length + dailyDays, label: link.label, monthly: true };
-        return { applied: days, cells: tasks.length + dailyDays, label: link.label };
-      });
+      // monthly = 그 달에 한 칸만 있는 자리(Invoice Summary(VK)) — 일수가 아니라 1건으로 알린다
+      if (link.monthly) return { applied: 1, cells: dailyDays, label: link.label, monthly: true };
+      return { applied: days, cells: dailyDays, label: link.label };
     });
   }
 
