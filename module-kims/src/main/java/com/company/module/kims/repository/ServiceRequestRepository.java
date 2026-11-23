@@ -58,6 +58,9 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     /** 최근 요청 N건 (대시보드 "최근 요청 목록") */
     List<ServiceRequest> findTop10ByOrderByCreatedAtDesc();
 
+    /** 요청번호 목록으로 일괄 조회 (입출고 이력에 요청자·부서 표시용) */
+    List<ServiceRequest> findByRequestNoIn(java.util.Collection<String> requestNos);
+
     /** 처리상태별 건수: [RequestStatus, Long] */
     @Query("SELECT r.status, COUNT(r) FROM ServiceRequest r GROUP BY r.status")
     List<Object[]> countGroupByStatus();

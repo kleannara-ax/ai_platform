@@ -32,10 +32,14 @@ public class SupplyIssue extends BaseTimeEntity {
     @Column(name = "ISSUE_ID")
     private Long issueId;
 
-    /** 연결된 업무 요청 */
+    /** 연결된 업무 요청 (업무요청 없이 지급하면 null) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "REQUEST_ID", nullable = false)
+    @JoinColumn(name = "REQUEST_ID")
     private ServiceRequest serviceRequest;
+
+    /** 요청자명 (업무요청 연결 시 그 요청의 요청자, 없으면 지급 시 직접 입력) */
+    @Column(name = "REQUESTER_NAME", length = 50)
+    private String requesterName;
 
     /** 지급된 소모품 품목 */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -73,8 +77,9 @@ public class SupplyIssue extends BaseTimeEntity {
     @Builder
     private SupplyIssue(ServiceRequest serviceRequest, InventoryItem inventoryItem,
                         int quantity, String receiverName, String department,
-                        String issuedBy, LocalDate issuedAt, String subType) {
+                        String issuedBy, LocalDate issuedAt, String subType, String requesterName) {
         this.serviceRequest = serviceRequest;
+        this.requesterName = requesterName;
         this.inventoryItem = inventoryItem;
         this.quantity = quantity;
         this.receiverName = receiverName;
@@ -82,5 +87,20 @@ public class SupplyIssue extends BaseTimeEntity {
         this.issuedBy = issuedBy;
         this.issuedAt = issuedAt;
         this.subType = subType;
+    }
+
+    /**
+     * 지급 내역 수정 (입출고 이력 상세에서). 품목·수량·세부 구분은 재고와 연결되어 있어 바꾸지 않는다.
+     * <p>업무요청에 연결된 지급은 요청자명을 요청의 요청자로 유지한다.
+     */
+    public void update(String requesterName, String receiverName, String department,
+                       String issuedBy, LocalDate issuedAt) {
+        if (this.serviceRequest == null && requesterName != null && !requesterName.isBlank()) {
+            this.requesterName = requesterName.trim();
+        }
+        if (receiverName != null && !receiverName.isBlank()) this.receiverName = receiverName.trim();
+        this.department = (department == null || department.isBlank()) ? null : department.trim();
+        if (issuedBy != null && !issuedBy.isBlank()) this.issuedBy = issuedBy.trim();
+        if (issuedAt != null) this.issuedAt = issuedAt;
     }
 }

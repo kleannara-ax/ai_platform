@@ -9,6 +9,7 @@ import lombok.Getter;
  *   <li>IP_CHANGE  : 변경자의 현재 PC를 새 IP로 이동(기존 IP 회수)</li>
  *   <li>IP_NEW     : 생성자에게 신규 IP 부여</li>
  *   <li>PC_CHANGE  : 변경자 PC의 선택 항목(부서/스펙 등) 수정</li>
+ *   <li>PC_RETURN  : 퇴사 등으로 사용중인 PC를 반납/회수 — 세부구분은 {@link IpReturnType}(반납/회수)</li>
  *   <li>ETC        : 기타 변경(비고 기반 수기 처리 — 자동 반영 없음)</li>
  * </ul>
  */
@@ -18,6 +19,7 @@ public enum IpRequestKind {
     IP_CHANGE("IP변경"),
     IP_NEW("IP신규생성"),
     PC_CHANGE("PC변경"),
+    PC_RETURN("반납"),
     ETC("기타 변경");
 
     private final String label;

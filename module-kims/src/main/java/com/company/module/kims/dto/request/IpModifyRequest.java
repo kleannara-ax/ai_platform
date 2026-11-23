@@ -31,6 +31,11 @@ public class IpModifyRequest {
     private String pcAssetNo;
     private String monitorAssetNo;
 
+    /** 상주/임시 구분. null 이면 변경하지 않는다(PC 목록 표 직접 수정에서만 보냄). */
+    private String usageType;
+    /** 구입일(자유 형식 문자열). null 이면 변경하지 않는다(PC 목록 표 직접 수정에서만 보냄). */
+    private String purchaseDate;
+
     /** 품의 여부 (이번 변경이 품의된 것인지) */
     private boolean approved;
     private String approvalNo;

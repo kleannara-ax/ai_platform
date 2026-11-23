@@ -168,7 +168,7 @@ public class IpAddress extends BaseTimeEntity {
         this.approvalNo = approvalNo;
         this.remark = remark;
         this.noteDate = noteDate;
-        if (this.status == IpStatus.RECLAIMED) {
+        if (this.status == IpStatus.RECLAIMED || this.status == IpStatus.RETURNED) {
             this.status = IpStatus.IN_USE;
             this.reclaimedAt = null;
         } else {
@@ -195,20 +195,32 @@ public class IpAddress extends BaseTimeEntity {
         this.monitorAssetNo = monitorAssetNo;
     }
 
+    /** 상주/임시 구분·구입일 갱신. null 인 항목은 그대로 두고, 빈 문자열은 값을 비운다. */
+    public void updateUsageAndPurchase(String usageType, String purchaseDate) {
+        if (usageType != null) this.usageType = usageType.isBlank() ? null : usageType.trim();
+        if (purchaseDate != null) this.purchaseDate = purchaseDate.isBlank() ? null : purchaseDate.trim();
+    }
+
     /**
-     * PC+IP 반납 처리. PC/장비가 함께 반납되므로 사용자·장치·PC 스펙·자산정보를 모두 비운다.
-     * <p>회수(IP만)와 달리 PC 관련 정보를 남기지 않는다. 상태는 회수(RECLAIMED)로 둔다.
+     * PC+IP 반납 처리 (창고 또는 렌탈사로 반납). 상태를 반납(RETURNED)으로 바꾸고 IP 외의 정보는 모두 비운다.
+     * <p>상주/임시·사용자·부서·위치·장치·품의·비고·구입일·PC 스펙·렌탈사·자산번호를 비운다.
+     * 반납 사유는 변경 이력(ip_history)에만 남긴다.
      */
-    public void returnPc(String remark) {
+    public void returnPc() {
+        this.usageType = null;
         this.userName = null;
+        this.userId = null;
+        this.department = null;
+        this.location = null;
         this.device = null;
+        this.approved = false;
+        this.approvalNo = null;
+        this.remark = null;
+        this.noteDate = null;
+        this.purchaseDate = null;
         clearSpec();
-        this.status = IpStatus.RECLAIMED;
+        this.status = IpStatus.RETURNED;
         this.reclaimedAt = LocalDate.now();
-        if (remark != null && !remark.isBlank()) {
-            this.remark = remark;
-            this.noteDate = LocalDate.now();
-        }
     }
 
     /** IP 이동 시 원래 슬롯 비우기 (사용자·장치·스펙·자산 제거 → 가용) */
@@ -227,6 +239,28 @@ public class IpAddress extends BaseTimeEntity {
         this.hangulVersion = null; this.hangulSerial = null;
         this.rentalCompany = null;
         this.pcAssetNo = null; this.monitorAssetNo = null;
+    }
+
+    /**
+     * 업무요청 완료 처리 - 반납: 사용자(userName) 항목만 지정한 보관 표시값(예: "{부서}보관")으로 갱신한다.
+     * 부서·장치·PC 스펙·자산 등 나머지 정보는 그대로 유지한다. storageLabel 이 null/공백이면 사용자 항목을 비운다.
+     */
+    public void applyReturn(String storageLabel) {
+        this.userName = (storageLabel == null || storageLabel.isBlank()) ? null : storageLabel;
+        this.status = IpStatus.RECLAIMED;
+        this.reclaimedAt = LocalDate.now();
+    }
+
+    /**
+     * 업무요청 완료 처리 - 회수: 사용자·부서·장치·PC 스펙·자산 정보를 모두 비운다.
+     */
+    public void applyReclaim() {
+        this.userName = null;
+        this.department = null;
+        this.device = null;
+        clearSpec();
+        this.status = IpStatus.RECLAIMED;
+        this.reclaimedAt = LocalDate.now();
     }
 
     /** IP 회수 처리 (비고가 있으면 비고/비고작성일도 갱신) */

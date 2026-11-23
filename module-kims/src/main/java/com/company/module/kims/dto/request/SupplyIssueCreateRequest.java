@@ -1,6 +1,8 @@
 package com.company.module.kims.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -11,14 +13,24 @@ import java.time.LocalDate;
 
 /**
  * 소모품 지급 등록 요청 DTO.
- * <p>업무 요청(requestId)과 품목(itemId)을 연결하여 지급 내역을 등록한다.
+ * <p>업무 요청(requestId)에 연결해 지급하거나, 업무 요청 없이 요청자명(requesterName)만으로
+ * 지급할 수 있다. 둘 중 하나는 반드시 있어야 한다.
  */
 @Getter
 @Setter
 public class SupplyIssueCreateRequest {
 
-    @NotNull(message = "연결할 업무 요청 ID는 필수입니다.")
+    /** 연결할 업무 요청 ID (선택 — 업무요청 상세에서 지급할 때) */
     private Long requestId;
+
+    /** 요청자명 (업무 요청 없이 지급할 때 필수, 요청을 연결하면 그 요청의 요청자가 쓰인다) */
+    private String requesterName;
+
+    @JsonIgnore
+    @AssertTrue(message = "요청자명은 필수입니다.")
+    public boolean isRequesterPresent() {
+        return requestId != null || (requesterName != null && !requesterName.isBlank());
+    }
 
     @NotNull(message = "지급할 품목 ID는 필수입니다.")
     private Long itemId;

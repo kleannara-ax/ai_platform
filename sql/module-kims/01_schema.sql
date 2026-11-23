@@ -67,10 +67,13 @@ CREATE TABLE IF NOT EXISTS `inventory_item` (
 CREATE TABLE IF NOT EXISTS `inventory_transaction` (
   `TRANSACTION_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '변동 ID (PK)',
   `ITEM_ID` bigint(20) NOT NULL COMMENT '품목 ID (FK)',
+  `ISSUE_ID` bigint(20) DEFAULT NULL COMMENT '연결된 지급 내역 ID (출고만, FK)',
   `TRANSACTION_TYPE` varchar(20) NOT NULL COMMENT '변동유형 (INBOUND:입고, OUTBOUND:출고)',
   `QUANTITY` int(11) NOT NULL COMMENT '변동 수량 (양수)',
   `BEFORE_STOCK` int(11) NOT NULL COMMENT '변동 전 재고',
   `AFTER_STOCK` int(11) NOT NULL COMMENT '변동 후 재고',
+  `TRANSACTION_DATE` date DEFAULT NULL COMMENT '입출고일 (입고일/출고일, 화면 입력값)',
+  `SUB_TYPE` varchar(20) DEFAULT NULL COMMENT '세부 구분 (신형/구형/레노버/갤럭시)',
   `NOTE` varchar(255) DEFAULT NULL COMMENT '비고',
   `CREATED_AT` datetime NOT NULL DEFAULT current_timestamp() COMMENT '생성일시',
   `UPDATED_AT` datetime NOT NULL DEFAULT current_timestamp() COMMENT '수정일시',
@@ -81,7 +84,10 @@ CREATE TABLE IF NOT EXISTS `inventory_transaction` (
   `DELETED_BY` varchar(50) DEFAULT NULL COMMENT '삭제자(로그인ID)',
   PRIMARY KEY (`TRANSACTION_ID`),
   KEY `IDX_INVENTORY_TX_ITEM` (`ITEM_ID`),
-  CONSTRAINT `FK_INVENTORY_TX_ITEM` FOREIGN KEY (`ITEM_ID`) REFERENCES `inventory_item` (`ITEM_ID`)
+  KEY `IDX_INVENTORY_TX_ISSUE` (`ISSUE_ID`),
+  KEY `IDX_INVENTORY_TX_DATE` (`TRANSACTION_DATE`),
+  CONSTRAINT `FK_INVENTORY_TX_ITEM` FOREIGN KEY (`ITEM_ID`) REFERENCES `inventory_item` (`ITEM_ID`),
+  CONSTRAINT `FK_INVENTORY_TX_ISSUE` FOREIGN KEY (`ISSUE_ID`) REFERENCES `supply_issue` (`ISSUE_ID`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='소모품 재고 변동 이력';
 CREATE TABLE IF NOT EXISTS `ip_address` (
   `IP_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'IP ID (PK)',
@@ -245,7 +251,8 @@ CREATE TABLE IF NOT EXISTS `service_request` (
   `LOCATION` varchar(100) DEFAULT NULL COMMENT '위치',
   `REQUEST_TYPE` varchar(20) NOT NULL COMMENT '요청유형 (SUPPLY:소모품지급/IP:IP변경생성/PROGRAM:프로그램설치/ETC:기타불편사항/INTERNET:인터넷공사)',
   `ISSUE_TYPE` varchar(30) DEFAULT NULL COMMENT '세부 불편유형 (PC_USE/MONITOR/NETWORK/PROGRAM_INSTALL/PC_NEW/PRINTER/LABEL_PRINTER/KIOSK/PDA/ETC) - 요청유형 PROGRAM 일 때만',
-  `IP_KIND` varchar(20) DEFAULT NULL COMMENT '요청목록 (IP_CHANGE/IP_NEW/PC_CHANGE/ETC) — 요청유형 IP 일 때',
+  `IP_KIND` varchar(20) DEFAULT NULL COMMENT '요청목록 (IP_CHANGE/IP_NEW/PC_CHANGE/PC_RETURN/ETC) — 요청유형 IP 일 때',
+  `RETURN_TYPE` varchar(20) DEFAULT NULL COMMENT '반납유형 (RETURN:반납/RECLAIM:회수) — 요청목록이 PC_RETURN(반납) 일 때',
   `CHANGER_NAME` varchar(100) DEFAULT NULL COMMENT '변경자/생성자 (자동 반영 대상 사용자명)',
   `APPLIED_SNAPSHOT` mediumtext DEFAULT NULL COMMENT '완료 시 반영한 변경 전 스냅샷(JSON) — 취소 시 원복용',
   `CONTENT` text NOT NULL COMMENT '상세 요청내용',
@@ -270,7 +277,8 @@ CREATE TABLE IF NOT EXISTS `service_request` (
 ) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='전산업무 요청 마스터';
 CREATE TABLE IF NOT EXISTS `supply_issue` (
   `ISSUE_ID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '지급 ID (PK)',
-  `REQUEST_ID` bigint(20) NOT NULL COMMENT '연결된 업무요청 ID (FK)',
+  `REQUEST_ID` bigint(20) DEFAULT NULL COMMENT '연결된 업무요청 ID (FK, 선택 — 업무요청 없이 지급하면 NULL)',
+  `REQUESTER_NAME` varchar(50) DEFAULT NULL COMMENT '요청자명 (업무요청 연결 시 그 요청의 요청자, 없으면 직접 입력)',
   `ITEM_ID` bigint(20) NOT NULL COMMENT '지급 품목 ID (FK)',
   `QUANTITY` int(11) NOT NULL COMMENT '지급 수량',
   `RECEIVER_NAME` varchar(50) NOT NULL COMMENT '지급 대상자',

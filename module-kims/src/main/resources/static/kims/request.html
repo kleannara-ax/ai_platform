@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KIMS - 업무 요청 관리</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/kims-theme.css?v=20260915d" rel="stylesheet">
 </head>
 <body class="bg-light">
   <div id="nav"></div>
@@ -14,13 +15,14 @@
 
     <ul class="nav nav-tabs mb-3">
       <li class="nav-item"><button class="nav-link active" id="rtab-home" onclick="showRTab('home')">홈</button></li>
-      <li class="nav-item"><button class="nav-link" id="rtab-list" onclick="showRTab('list')">업무요청 목록</button></li>
-      <li class="nav-item"><button class="nav-link" id="rtab-monthly" onclick="showRTab('monthly')">당월 업무 요청 목록</button></li>
+      <!-- 목록 탭은 KIMS 관리자(공통코드 KIMS_PERM)만 — 확인 전까지 숨김 -->
+      <li class="nav-item d-none admin-tab"><button class="nav-link" id="rtab-list" onclick="showRTab('list')">업무요청 목록</button></li>
+      <li class="nav-item d-none admin-tab"><button class="nav-link" id="rtab-monthly" onclick="showRTab('monthly')">당월 업무 요청 목록</button></li>
     </ul>
 
     <!-- ===== 홈: 유형별 카드 ===== -->
     <div id="rpane-home">
-      <p class="text-muted small mb-3">유형 카드의 좌측 상단 숫자 = 신규(접수) 건수. 카드를 클릭하면 월별 요청 내역과 등록 화면이 열립니다.</p>
+      <p class="text-muted small mb-3">카드 우측의 '신규' 표시 = 신규(접수) 건수. 카드를 클릭하면 월별 요청 내역과 등록 화면이 열립니다.</p>
       <div class="row g-3" id="typeCards"></div>
     </div>
 
@@ -103,10 +105,19 @@
             <option value="IP_CHANGE">IP변경</option>
             <option value="IP_NEW">IP신규생성</option>
             <option value="PC_CHANGE">PC변경</option>
+            <option value="PC_RETURN">반납</option>
             <option value="ETC">기타 변경</option>
           </select></div>
         <div class="col" id="c-changer-col"><label class="form-label small mb-0" id="c-changer-label">변경자 *</label>
           <input id="c-changer" class="form-control form-control-sm" placeholder="변경 대상 사용자명"></div>
+      </div>
+      <!-- 반납: 반납유형(반납/회수) 선택 (요청목록=PC_RETURN 일 때만 표시) -->
+      <div id="c-returntype-block" class="row g-2 mt-0" style="display:none">
+        <div class="col"><label class="form-label small mb-0">반납유형 *</label>
+          <select id="c-returntype" class="form-select form-select-sm">
+            <option value="RETURN">반납</option>
+            <option value="RECLAIM">회수</option>
+          </select></div>
       </div>
       <div class="mb-2 mt-1"><label class="form-label small mb-0" id="c-content-label">상세 요청내용 *</label><textarea id="c-content" class="form-control form-control-sm" rows="3"></textarea></div>
       <div class="mb-2"><label class="form-label small mb-0">첨부파일 등록</label>
@@ -160,6 +171,7 @@
     let createModal, detailModal, typeModal, reasonModal, currentId = null, currentReq = null, curType = null;
     let pendingQuick = null; // 보류/반려 사유 입력 대기 컨텍스트 {id,status,btn,label}
     let homeLoaded = false, listLoaded = false, monthsLoaded = false;
+    let isKimsAdmin = false;   // KIMS_PERM 등록 여부 (목록 탭 노출)
     const TYPES = { SUPPLY:'전산소모품 지급', IP:'IP 변경/생성', PROGRAM:'PC관련 불편사항 조치', INTERNET:'인터넷 공사' };
     const TYPE_ICON = { SUPPLY:'🖱️', IP:'🌐', PROGRAM:'💻', INTERNET:'📡' };
     // PC관련 불편사항 조치(PROGRAM)의 세부 불편유형 (백엔드 IssueType enum 과 코드 일치)
@@ -188,6 +200,11 @@
       fillOpt('f-type', TYPES, true); fillOpt('f-status', STATUS_CHOICES, true); fillOpt('c-type', TYPES, false); fillOpt('c-channel', CHANNELS, false);
       // 기본 탭 = 홈
       homeLoaded = true; loadTypeCards();
+      // 업무요청 목록·당월 업무 요청 목록 탭은 KIMS 관리자에게만 노출
+      KIMS.isAdmin().then(ok => {
+        isKimsAdmin = ok;
+        if (ok) document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('d-none'));
+      });
       // 딥링크: ?open=<requestId> 이면 해당 요청 상세를 바로 연다 (대시보드 "오늘 접수"에서 이동)
       const openId = new URLSearchParams(location.search).get('open');
       if (openId) detail(Number(openId));
@@ -195,6 +212,7 @@
 
     // ---- 하위 탭 전환 ----
     function showRTab(t) {
+      if (t !== 'home' && !isKimsAdmin) t = 'home';
       ['home','list','monthly'].forEach(x => {
         document.getElementById('rpane-' + x).style.display = (x === t) ? '' : 'none';
         document.getElementById('rtab-' + x).classList.toggle('active', x === t);
@@ -301,13 +319,15 @@
         const data = await KIMS.api('/kims-api/requests/type-summary');
         const box = document.getElementById('typeCards');
         box.innerHTML = data.map(t => `
-          <div class="col-6 col-md-4 col-lg-2">
-            <div class="card h-100 position-relative" role="button" onclick="showTypeMonth('${t.type}','${E(t.label)}')">
-              ${t.newCount > 0 ? `<span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-danger" style="z-index:2">${t.newCount}<span class="visually-hidden">신규</span></span>` : ''}
-              <div class="card-body text-center py-3">
-                <div style="font-size:1.8rem">${TYPE_ICON[t.type]||'📋'}</div>
-                <div class="fw-bold small mt-1">${E(t.label)}</div>
-                <div class="text-muted small">신규 <span class="${t.newCount>0?'text-danger fw-bold':''}">${t.newCount}</span> / 전체 ${t.totalCount}</div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <div class="card h-100 kims-type-card" role="button" onclick="showTypeMonth('${t.type}','${E(t.label)}')">
+              <div class="card-body d-flex align-items-center gap-3">
+                <div class="kims-type-icon">${TYPE_ICON[t.type]||'📋'}</div>
+                <div class="flex-grow-1" style="min-width:0">
+                  <div class="kims-type-label">${E(t.label)}</div>
+                  <div class="kims-type-meta">전체 <b>${t.totalCount}</b>건</div>
+                </div>
+                ${t.newCount > 0 ? `<span class="kims-type-new">신규 ${t.newCount}</span>` : `<span class="kims-type-chevron">›</span>`}
               </div></div></div>`).join('');
       } catch (e) { KIMS.toast(e.message, false); }
     }
@@ -426,6 +446,7 @@
       const issueSel = document.getElementById('c-issue'); if (issueSel) issueSel.value = '';
       document.getElementById('c-ipkind').value = 'IP_CHANGE';
       document.getElementById('c-changer').value = '';
+      document.getElementById('c-returntype').value = 'RETURN';
       onCreateTypeChange();      // 유형에 맞춰 폼 구성(기본 SUPPLY → 품목/수량)
       createModal.show();
     }
@@ -451,14 +472,19 @@
         }
       }
     }
-    // 요청목록에 따라 변경자/생성자 입력칸 라벨 전환 (기타 변경은 숨김)
+    // 요청목록에 따라 변경자/생성자 입력칸 라벨 전환 (기타 변경은 숨김) + 반납유형 서브옵션 노출
     function onIpKindChange() {
       const k = document.getElementById('c-ipkind').value;
       const col = document.getElementById('c-changer-col');
+      const rtBlock = document.getElementById('c-returntype-block');
+      rtBlock.style.display = (k === 'PC_RETURN') ? '' : 'none';
+      if (k === 'PC_RETURN') document.getElementById('c-returntype').value = 'RETURN';
       if (k === 'ETC') { col.style.display = 'none'; return; }
       col.style.display = '';
-      document.getElementById('c-changer-label').textContent = (k === 'IP_NEW') ? '생성자 *' : '변경자 *';
-      document.getElementById('c-changer').placeholder = (k === 'IP_NEW') ? '신규 IP 부여 대상 사용자명' : '변경 대상 사용자명';
+      document.getElementById('c-changer-label').textContent =
+        (k === 'IP_NEW') ? '생성자 *' : (k === 'PC_RETURN') ? '반납자 *' : '변경자 *';
+      document.getElementById('c-changer').placeholder =
+        (k === 'IP_NEW') ? '신규 IP 부여 대상 사용자명' : (k === 'PC_RETURN') ? '반납/회수 대상 사용자명' : '변경 대상 사용자명';
     }
     async function loadCreateItems() {
       const sel = document.getElementById('c-item');
@@ -474,7 +500,7 @@
       const requesterName = document.getElementById('c-requester').value.trim();
       const type = document.getElementById('c-type').value;
       let content = document.getElementById('c-content').value.trim();
-      let issueType = null, ipKind = null, changerName = null;
+      let issueType = null, ipKind = null, changerName = null, returnType = null;
       if (!requesterName) { KIMS.toast('요청자명은 필수입니다.', false); return; }
 
       // 전산소모품 지급: 품목/수량을 필수로 받아 요청내용을 자동 구성
@@ -497,7 +523,10 @@
         ipKind = document.getElementById('c-ipkind').value;
         if (ipKind !== 'ETC') {
           changerName = document.getElementById('c-changer').value.trim();
-          if (!changerName) { KIMS.toast((ipKind === 'IP_NEW' ? '생성자' : '변경자') + '를 입력하세요.', false); return; }
+          if (!changerName) { KIMS.toast((ipKind === 'IP_NEW' ? '생성자' : ipKind === 'PC_RETURN' ? '반납자' : '변경자') + '를 입력하세요.', false); return; }
+        }
+        if (ipKind === 'PC_RETURN') {
+          returnType = document.getElementById('c-returntype').value;
         }
         if (!content) { KIMS.toast('상세 요청내용은 필수입니다.', false); return; }
       } else if (!content) {
@@ -510,7 +539,7 @@
         contact: document.getElementById('c-contact').value.trim(),
         location: document.getElementById('c-loc').value.trim(),
         requestType: type,
-        issueType, ipKind, changerName,
+        issueType, ipKind, changerName, returnType,
         receivedChannel: document.getElementById('c-channel').value,
         urgent: document.getElementById('c-urgent').checked,
       };
@@ -565,7 +594,7 @@
                 <tr><th>연락처</th><td>${E(d.contact)}</td><th>위치</th><td>${E(d.location)}</td></tr>
                 <tr><th>유형</th><td>${E(d.requestTypeLabel)}</td><th>긴급</th><td>${d.urgent?'<span class="text-danger">긴급</span>':'일반'}</td></tr>
                 ${d.issueTypeLabel ? `<tr><th>불편유형</th><td colspan="3">${E(d.issueTypeLabel)}</td></tr>` : ''}
-                ${d.ipKindLabel ? `<tr><th>요청목록</th><td>${E(d.ipKindLabel)}</td><th>${d.ipKind==='IP_NEW'?'생성자':'변경자'}</th><td>${E(d.changerName)}</td></tr>` : ''}
+                ${d.ipKindLabel ? `<tr><th>요청목록</th><td>${E(d.ipKindLabel)}${d.returnTypeLabel?(' / '+E(d.returnTypeLabel)):''}</td><th>${d.ipKind==='IP_NEW'?'생성자':d.ipKind==='PC_RETURN'?'반납자':'변경자'}</th><td>${E(d.changerName)}</td></tr>` : ''}
                 <tr><th>접수채널</th><td>${E(d.receivedChannelLabel)}</td><th>담당자</th><td>${E(d.assignee)}</td></tr>
                 <tr><th>완료일</th><td colspan="3">${E(d.completedAt)}</td></tr>
                 <tr><th>요청내용</th><td colspan="3" style="white-space:pre-wrap">${E(d.content)}</td></tr>
@@ -665,7 +694,11 @@
         return;
       }
       const opts = pcs.map(p => `<option value="${p.ipId}" data-ip="${E(p.ipAddress)}">${E(p.ipAddress)}${p.serialNo?(' / '+E(p.serialNo)):''}${p.department?(' / '+E(p.department)):''}</option>`).join('');
-      let inner = `<label class="form-label small mb-0">대상 PC (현재 IP) *</label>
+      let inner;
+      const targetLabel = (kind === 'PC_RETURN')
+        ? (d.returnType === 'RETURN' ? '반납대상 IP 및 사용자 *' : '회수대상 IP 및 사용자 *')
+        : '대상 PC (현재 IP) *';
+      inner = `<label class="form-label small mb-0">${targetLabel}</label>
         <select id="d-targetip" class="form-select form-select-sm">${opts}</select>`;
       if (kind === 'IP_CHANGE') {
         inner += `<label class="form-label small mb-0 mt-1">변경할 새 IP *</label>
@@ -679,6 +712,20 @@
               <input id="pcv-${k}" class="form-control form-control-sm py-0" placeholder="새 값">
             </div>`).join('')
           + `</div></div>`;
+      } else if (kind === 'PC_RETURN') {
+        // 반납: 요청자 부서를 기반으로 "{부서}보관" 값을 "사용자" 항목에 자동 채움(수정 가능). 부서/장치/스펙 등은 그대로 유지.
+        // 회수: 사용자·부서·장치·PC 스펙 정보를 모두 비움(수정 항목 없음).
+        const isReturn = d.returnType === 'RETURN';
+        const autoValue = isReturn ? ((d.department || '').trim() + '보관') : '';
+        const sectionTitle = isReturn ? '반납 처리' : '회수 처리';
+        const fieldLabel = '사용자 항목에 표시할 보관 값 (수정 가능)';
+        inner += isReturn
+          ? `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
+          <label class="form-label small mb-0">${fieldLabel}</label>
+          <input id="d-return-dept" class="form-control form-control-sm" value="${E(autoValue)}">
+          <div class="form-text">요청자 부서(${E(d.department || '')}) 기준으로 "사용자" 항목이 위 값으로 자동 변경되며, 필요 시 직접 수정할 수 있습니다. 부서·장치·PC 스펙 등 나머지 정보는 그대로 유지됩니다.</div>`
+          : `<hr class="my-2"><h6 class="small mb-1">${sectionTitle}</h6>
+          <div class="form-text text-danger">⚠ 회수 처리이므로 사용자·부서·장치·PC 스펙 정보가 모두 비워집니다(공란 처리).</div>`;
       }
       box.innerHTML = inner;
     }
@@ -807,6 +854,17 @@
         const names = Object.keys(fields).map(k => PC_CHANGE_FIELDS[k]).join(', ');
         if (!confirm(`${curIp} (${d.changerName}) 의 다음 항목을 변경합니다:\n${names}\n진행하시겠습니까?`)) return false;
         payload.targetIpId = targetIpId; payload.pcFields = fields;
+        return true;
+      }
+      if (d.ipKind === 'PC_RETURN') {
+        const isReturn = d.returnType === 'RETURN';
+        const returnDept = (document.getElementById('d-return-dept')||{}).value?.trim() || '';
+        const msg = isReturn
+          ? `${curIp} (${d.changerName}) 을(를) 반납 처리합니다.\n사용자: ${d.changerName} → ${returnDept || '(없음)'}\n부서·장치·PC 스펙 정보는 그대로 유지됩니다.\n진행하시겠습니까?`
+          : `${curIp} (${d.changerName}) 을(를) 회수 처리합니다.\n사용자·부서·장치·PC 스펙 정보가 모두 비워집니다.\n진행하시겠습니까?`;
+        if (!confirm(msg)) return false;
+        payload.targetIpId = targetIpId;
+        payload.returnDepartment = isReturn ? returnDept : '';
         return true;
       }
       return true;

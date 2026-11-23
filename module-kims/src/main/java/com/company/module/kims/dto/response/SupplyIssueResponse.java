@@ -16,8 +16,9 @@ public class SupplyIssueResponse {
 
     private final Long issueId;
 
-    private final Long requestId;
-    private final String requestNo;   // 연결된 요청번호
+    private final Long requestId;     // 연결된 요청 ID (업무요청 없이 지급하면 null)
+    private final String requestNo;   // 연결된 요청번호 (업무요청 없이 지급하면 null)
+    private final String requesterName; // 요청자명
 
     private final Long itemId;
     private final String itemName;    // 지급 품목명
@@ -38,8 +39,9 @@ public class SupplyIssueResponse {
     public static SupplyIssueResponse from(SupplyIssue entity) {
         return SupplyIssueResponse.builder()
                 .issueId(entity.getIssueId())
-                .requestId(entity.getServiceRequest().getRequestId())
-                .requestNo(entity.getServiceRequest().getRequestNo())
+                .requestId(entity.getServiceRequest() != null ? entity.getServiceRequest().getRequestId() : null)
+                .requestNo(entity.getServiceRequest() != null ? entity.getServiceRequest().getRequestNo() : null)
+                .requesterName(entity.getRequesterName())
                 .itemId(entity.getInventoryItem().getItemId())
                 .itemName(entity.getInventoryItem().getItemName())
                 .quantity(entity.getQuantity())
