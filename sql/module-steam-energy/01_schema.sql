@@ -641,6 +641,9 @@ CREATE TABLE IF NOT EXISTS steam_combo_daily_production (
     RUNTIME20             DECIMAL(18,6) NULL COMMENT '20톤(#2) 가동시간(H/D)',
     RUNTIME50             DECIMAL(18,6) NULL COMMENT '50톤(#3) 가동시간(H/D)',
     RUNTIME_FLUIDIZED     DECIMAL(18,6) NULL COMMENT '유동상 가동시간(H/D)',
+    WASTE_ROOM_STEAM2           DECIMAL(18,6) NULL COMMENT '폐합성소각로 기관실유량계 2호 스팀량(T/D) — 참고자료, 합계 제외',
+    FLUIDIZED_TOTAL_STEAM       DECIMAL(18,6) NULL COMMENT '유동상 보일러 총스팀량 FI-301 (T/D) — 참고자료, 합계 제외',
+    FLUIDIZED_TOTAL_CONDENSATE  DECIMAL(18,6) NULL COMMENT '유동상 보일러 응축수 FI-303 — 참고자료, 합계 제외',
     CREATED_AT            DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY            BIGINT        NULL COMMENT '생성자 사용자 ID',
     UPDATED_AT            DATETIME      NULL COMMENT '수정일시',
@@ -653,6 +656,11 @@ CREATE TABLE IF NOT EXISTS steam_combo_daily_production (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   COMMENT='[module-steam-energy] 복합보일러 스팀생산실적 (일자별)';
 CREATE INDEX IF NOT EXISTS IDX_STEAM_COMBO_DAILY_PRODUCTION_DELETED_YN ON steam_combo_daily_production (DELETED_YN);
+-- 2026-11-23 참고자료 3개 열 추가 (11월 양식: 폐합성소각로 기관실유량계, 유동상 보일러 총스팀량·응축수). 이미 만든 표에도 붙는다.
+ALTER TABLE steam_combo_daily_production
+    ADD COLUMN IF NOT EXISTS WASTE_ROOM_STEAM2 DECIMAL(18,6) NULL COMMENT '폐합성소각로 기관실유량계 2호 스팀량(T/D) — 참고자료, 합계 제외' AFTER RUNTIME_FLUIDIZED,
+    ADD COLUMN IF NOT EXISTS FLUIDIZED_TOTAL_STEAM DECIMAL(18,6) NULL COMMENT '유동상 보일러 총스팀량 FI-301 (T/D) — 참고자료, 합계 제외' AFTER WASTE_ROOM_STEAM2,
+    ADD COLUMN IF NOT EXISTS FLUIDIZED_TOTAL_CONDENSATE DECIMAL(18,6) NULL COMMENT '유동상 보일러 응축수 FI-303 — 참고자료, 합계 제외' AFTER FLUIDIZED_TOTAL_STEAM;
 
 CREATE TABLE IF NOT EXISTS steam_combo_daily_downtime (
     COMBO_DOWNTIME_ID  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '복합보일러 운휴·디스퍼져 ID (PK)',

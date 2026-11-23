@@ -117,7 +117,8 @@ public class ComboBoilerWorkbookService {
                 "externalSteam", "externalCondensate", "externalMakeup",
                 "wasteSteam1", "wasteSteam2", "kn20", "kn50",
                 "fluidizedSteam", "fluidizedCondensate",
-                "runtime20", "runtime50", "runtimeFluidized"
+                "runtime20", "runtime50", "runtimeFluidized",
+                "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate"   // 참고자료 (2026년 10·11월 양식)
         };
         imported += importDayFields(sheet, layout, PRODUCTION_TABLE, monthKey, year, month, fields);
 
@@ -220,7 +221,8 @@ public class ComboBoilerWorkbookService {
                 "externalSteam", "externalCondensate", "externalMakeup",
                 "wasteSteam1", "wasteSteam2", "kn20", "kn50",
                 "fluidizedSteam", "fluidizedCondensate",
-                "runtime20", "runtime50", "runtimeFluidized"
+                "runtime20", "runtime50", "runtimeFluidized",
+                "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate"   // 참고자료 (2026년 10·11월 양식)
         };
         fillDayFields(sheet, layout, cells, fields);
 

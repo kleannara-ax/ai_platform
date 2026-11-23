@@ -87,6 +87,18 @@ public class SteamComboDailyProduction {
     @Column(name = "RUNTIME_FLUIDIZED", precision = 18, scale = 6)
     private BigDecimal runtimeFluidized;
 
+    /** 폐합성소각로 기관실유량계 2호 스팀량(T/D) — 참고자료, 합계 제외 */
+    @Column(name = "WASTE_ROOM_STEAM2", precision = 18, scale = 6)
+    private BigDecimal wasteRoomSteam2;
+
+    /** 유동상 보일러 총스팀량 FI-301 (T/D) — 참고자료, 합계 제외 */
+    @Column(name = "FLUIDIZED_TOTAL_STEAM", precision = 18, scale = 6)
+    private BigDecimal fluidizedTotalSteam;
+
+    /** 유동상 보일러 응축수 FI-303 — 참고자료, 합계 제외 */
+    @Column(name = "FLUIDIZED_TOTAL_CONDENSATE", precision = 18, scale = 6)
+    private BigDecimal fluidizedTotalCondensate;
+
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -122,7 +134,7 @@ public class SteamComboDailyProduction {
     }
 
     /** 행 전체 값 갱신. null 은 빈 값으로 저장한다. */
-    public void update(BigDecimal comboSteam, BigDecimal comboCondensate, BigDecimal comboMakeup, BigDecimal comboDeaerator, BigDecimal comboProcess, BigDecimal comboDilution, BigDecimal externalSteam, BigDecimal externalCondensate, BigDecimal externalMakeup, BigDecimal wasteSteam1, BigDecimal wasteSteam2, BigDecimal kn20, BigDecimal kn50, BigDecimal fluidizedSteam, BigDecimal fluidizedCondensate, BigDecimal runtime20, BigDecimal runtime50, BigDecimal runtimeFluidized, Long updatedBy) {
+    public void update(BigDecimal comboSteam, BigDecimal comboCondensate, BigDecimal comboMakeup, BigDecimal comboDeaerator, BigDecimal comboProcess, BigDecimal comboDilution, BigDecimal externalSteam, BigDecimal externalCondensate, BigDecimal externalMakeup, BigDecimal wasteSteam1, BigDecimal wasteSteam2, BigDecimal kn20, BigDecimal kn50, BigDecimal fluidizedSteam, BigDecimal fluidizedCondensate, BigDecimal runtime20, BigDecimal runtime50, BigDecimal runtimeFluidized, BigDecimal wasteRoomSteam2, BigDecimal fluidizedTotalSteam, BigDecimal fluidizedTotalCondensate, Long updatedBy) {
         this.comboSteam = comboSteam;
         this.comboCondensate = comboCondensate;
         this.comboMakeup = comboMakeup;
@@ -141,12 +153,15 @@ public class SteamComboDailyProduction {
         this.runtime20 = runtime20;
         this.runtime50 = runtime50;
         this.runtimeFluidized = runtimeFluidized;
+        this.wasteRoomSteam2 = wasteRoomSteam2;
+        this.fluidizedTotalSteam = fluidizedTotalSteam;
+        this.fluidizedTotalCondensate = fluidizedTotalCondensate;
         this.updatedBy = updatedBy;
     }
 
     /** 값만 비운다 — 엑셀 가져오기에서 파일에 없는 행. */
     public void clearValues(Long updatedBy) {
-        update(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, updatedBy);
+        update(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, updatedBy);
     }
 
     public void delete(Long deletedBy) {

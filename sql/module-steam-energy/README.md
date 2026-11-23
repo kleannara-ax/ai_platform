@@ -232,7 +232,7 @@ DELETE FROM steam_price
 | `steam_energy_month_compare` | 회계비용 마감비교 — 월별 회계비용 마감 vs 실마감 차이 (energy-month-compare.html) (9개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_energy_month_compare_note` | 회계비용 마감비교 비고 — 월별 회계비용 마감 vs 실마감 차이 — 비고 (energy-month-compare.html) (10개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO)` |
 | `steam_energy_fuel_summary` | 연료비 요약 — 연료비 요약 (energy-fuel-summary.html) (49개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
-| `steam_combo_daily_production` | 복합보일러 스팀생산실적 — 복합보일러 › 스팀생산실적 (combo-boiler-steam-production.html) (18개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_combo_daily_production` | 복합보일러 스팀생산실적 — 복합보일러 › 스팀생산실적 (combo-boiler-steam-production.html) (21개 값 컬럼, 2026-11 규격 전환 · 11-23 참고자료 3개 추가) | `(USAGE_DATE)` |
 | `steam_combo_daily_downtime` | 복합보일러 운휴·디스퍼져 — 복합보일러 › 운휴시간·디스퍼져 (combo-boiler-downtime.html) (9개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
 | `steam_combo_monthly_price` | 복합보일러 월 연료단가 — 복합보일러 › 스팀생산실적 › N월 연료단가 (combo-boiler-steam-production.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_combo_recovery_loss` | 복합보일러 스팀 회수 감소 — 복합보일러 › 스팀 회수 감소 (combo-boiler-recovery-loss.html) (6개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, LINE_NO)` |
@@ -647,6 +647,21 @@ API 는 `/steam-energy-api/**`, 응답은 core `ApiResponse<T>`.
 | `RUNTIME20` | DECIMAL(18,6) | `runtime20` | 20톤(#2) 가동시간(H/D) |
 | `RUNTIME50` | DECIMAL(18,6) | `runtime50` | 50톤(#3) 가동시간(H/D) |
 | `RUNTIME_FLUIDIZED` | DECIMAL(18,6) | `runtimeFluidized` | 유동상 가동시간(H/D) |
+| `WASTE_ROOM_STEAM2` | DECIMAL(18,6) | `wasteRoomSteam2` | 폐합성소각로 기관실유량계 2호 스팀량(T/D) — **참고자료**, 합계 제외 (2026-11-23 추가) |
+| `FLUIDIZED_TOTAL_STEAM` | DECIMAL(18,6) | `fluidizedTotalSteam` | 유동상 보일러 총스팀량 FI-301 (T/D) — **참고자료**, 합계 제외 (2026-11-23 추가) |
+| `FLUIDIZED_TOTAL_CONDENSATE` | DECIMAL(18,6) | `fluidizedTotalCondensate` | 유동상 보일러 응축수 FI-303 — **참고자료**, 합계 제외 (2026-11-23 추가) |
+
+2026-11-23 추가분은 `01_schema.sql` 의 `ALTER TABLE steam_combo_daily_production ADD COLUMN IF NOT EXISTS …` 로 이미 만든 표에도 붙는다(재실행 안전).
+
+**스팀생산실적 시트의 양식 변화** — 엑셀 가져오기는 일별 표의 열을 머리글 세 줄(설비 / 항목 / 단위·세부)의 글자로 찾는다(`ComboBoilerLayout`). 열의 순서·위치에 기대지 않으므로 열이 추가·삭제되거나 자리가 바뀌어도 같은 항목으로 들어간다. 없는 항목은 건너뛴다(그 달 그 칸은 빈 값).
+
+| 양식 | 달라진 점 |
+|---|---|
+| ~ 2026년 9월 | 복합보일러 · 외부보일러 · 폐합성 소각로(1호·2호) · 깨끗한나라 보일러 · 유동상(스팀 생산량 · 응축수) |
+| 2026년 10월 | 폐합성 1호 없음. 유동상 보일러가 네 칸 — 총스팀량(FI-301) · 응축수(FI-303) · 스팀 생산량(FI-304) · 응축수(FI-07) |
+| 2026년 11월 ~ | 외부보일러 없음. `폐합성소각로 기관실유량계`(2호 스팀량 · 편차) 추가 |
+
+스팀총계 = 복합 + 외부 + 폐합성 1·2호 + 깨끗한나라 20·50톤 + 유동상 스팀 생산량(FI-304). 참고자료 세 칸은 넣지 않는다(원본 수식과 같다). 화면은 `구매 스팀 / 자체 생산 / 합계 · 연료단가 / 참고자료` 네 탭이다.
 
 **`steam_combo_daily_downtime`** — 복합보일러 운휴·디스퍼져 · 키 `(USAGE_DATE)` · 옛 저장소: `combo_boiler_downtime` 의 `<필드>-<일>`
 
@@ -1850,7 +1865,7 @@ DROP TABLE IF EXISTS steam_equipment;
 | `steam_energy_month_compare` | 19 | [module-steam-energy] 월별 회계비용 마감 vs 실마감 — 입력값과 다른 화면이 읽는 계산값 (연/월별, 백만원) |
 | `steam_energy_month_compare_note` | 19 | [module-steam-energy] 월별 회계비용 마감비교 — 구분별 비고 (연도별 한 행) |
 | `steam_energy_fuel_summary` | 59 | [module-steam-energy] 연료비 요약 — 배분비율 기본값을 덮어쓰는 직접 입력값 (연/월별) |
-| `steam_combo_daily_production` | 27 | [module-steam-energy] 복합보일러 스팀생산실적 (일자별) |
+| `steam_combo_daily_production` | 30 | [module-steam-energy] 복합보일러 스팀생산실적 (일자별) |
 | `steam_combo_daily_downtime` | 18 | [module-steam-energy] 복합보일러 변동사항·운휴시간·디스퍼져·벤트 (일자별) |
 | `steam_combo_monthly_price` | 16 | [module-steam-energy] 복합보일러 월 연료단가·벤트 손실 단가 (연/월별) |
 | `steam_combo_recovery_loss` | 17 | [module-steam-energy] 복합보일러 스팀 회수 감소 내역 (연/월 · 줄 번호별, 한 건 한 행) |

@@ -25,7 +25,7 @@ import java.util.function.Function;
 public class SteamComboDailyProductionAdapter implements SteamTableAdapter {
 
     private static final List<String> KEY_FIELDS = List.of("usageDate");
-    private static final List<String> VALUE_FIELDS = List.of("comboSteam", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution", "externalSteam", "externalCondensate", "externalMakeup", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam", "fluidizedCondensate", "runtime20", "runtime50", "runtimeFluidized");
+    private static final List<String> VALUE_FIELDS = List.of("comboSteam", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution", "externalSteam", "externalCondensate", "externalMakeup", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam", "fluidizedCondensate", "runtime20", "runtime50", "runtimeFluidized", "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate");
 
     private static final Map<String, Class<?>> TYPES = Map.ofEntries(
             Map.entry("usageDate", LocalDate.class),
@@ -46,7 +46,10 @@ public class SteamComboDailyProductionAdapter implements SteamTableAdapter {
             Map.entry("fluidizedCondensate", BigDecimal.class),
             Map.entry("runtime20", BigDecimal.class),
             Map.entry("runtime50", BigDecimal.class),
-            Map.entry("runtimeFluidized", BigDecimal.class)
+            Map.entry("runtimeFluidized", BigDecimal.class),
+            Map.entry("wasteRoomSteam2", BigDecimal.class),
+            Map.entry("fluidizedTotalSteam", BigDecimal.class),
+            Map.entry("fluidizedTotalCondensate", BigDecimal.class)
     );
 
     private static final Map<String, Function<SteamComboDailyProductionResponse, Object>> GETTERS = Map.ofEntries(
@@ -68,7 +71,10 @@ public class SteamComboDailyProductionAdapter implements SteamTableAdapter {
             Map.entry("fluidizedCondensate", r -> r.getFluidizedCondensate()),
             Map.entry("runtime20", r -> r.getRuntime20()),
             Map.entry("runtime50", r -> r.getRuntime50()),
-            Map.entry("runtimeFluidized", r -> r.getRuntimeFluidized())
+            Map.entry("runtimeFluidized", r -> r.getRuntimeFluidized()),
+            Map.entry("wasteRoomSteam2", r -> r.getWasteRoomSteam2()),
+            Map.entry("fluidizedTotalSteam", r -> r.getFluidizedTotalSteam()),
+            Map.entry("fluidizedTotalCondensate", r -> r.getFluidizedTotalCondensate())
     );
 
     private static final Map<String, BiConsumer<SteamComboDailyProductionSaveRequest, Object>> SETTERS = Map.ofEntries(
@@ -90,7 +96,10 @@ public class SteamComboDailyProductionAdapter implements SteamTableAdapter {
             Map.entry("fluidizedCondensate", (r, v) -> r.setFluidizedCondensate((BigDecimal) v)),
             Map.entry("runtime20", (r, v) -> r.setRuntime20((BigDecimal) v)),
             Map.entry("runtime50", (r, v) -> r.setRuntime50((BigDecimal) v)),
-            Map.entry("runtimeFluidized", (r, v) -> r.setRuntimeFluidized((BigDecimal) v))
+            Map.entry("runtimeFluidized", (r, v) -> r.setRuntimeFluidized((BigDecimal) v)),
+            Map.entry("wasteRoomSteam2", (r, v) -> r.setWasteRoomSteam2((BigDecimal) v)),
+            Map.entry("fluidizedTotalSteam", (r, v) -> r.setFluidizedTotalSteam((BigDecimal) v)),
+            Map.entry("fluidizedTotalCondensate", (r, v) -> r.setFluidizedTotalCondensate((BigDecimal) v))
     );
 
     private final SteamComboDailyProductionService service;

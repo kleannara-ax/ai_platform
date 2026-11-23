@@ -84,13 +84,13 @@ public class SteamComboDailyProductionService {
     private Upsert upsert(SteamComboDailyProductionSaveRequest r) {
         SteamComboDailyProduction active = repository.findActive(r.getUsageDate()).orElse(null);
         if (active != null) {
-            active.update(r.getComboSteam(), r.getComboCondensate(), r.getComboMakeup(), r.getComboDeaerator(), r.getComboProcess(), r.getComboDilution(), r.getExternalSteam(), r.getExternalCondensate(), r.getExternalMakeup(), r.getWasteSteam1(), r.getWasteSteam2(), r.getKn20(), r.getKn50(), r.getFluidizedSteam(), r.getFluidizedCondensate(), r.getRuntime20(), r.getRuntime50(), r.getRuntimeFluidized(), null);
+            active.update(r.getComboSteam(), r.getComboCondensate(), r.getComboMakeup(), r.getComboDeaerator(), r.getComboProcess(), r.getComboDilution(), r.getExternalSteam(), r.getExternalCondensate(), r.getExternalMakeup(), r.getWasteSteam1(), r.getWasteSteam2(), r.getKn20(), r.getKn50(), r.getFluidizedSteam(), r.getFluidizedCondensate(), r.getRuntime20(), r.getRuntime50(), r.getRuntimeFluidized(), r.getWasteRoomSteam2(), r.getFluidizedTotalSteam(), r.getFluidizedTotalCondensate(), null);
             return new Upsert(active, true);
         }
         SteamComboDailyProduction deleted = repository.findAnyByKey(r.getUsageDate()).orElse(null);
         if (deleted != null) {
             deleted.restore(null);
-            deleted.update(r.getComboSteam(), r.getComboCondensate(), r.getComboMakeup(), r.getComboDeaerator(), r.getComboProcess(), r.getComboDilution(), r.getExternalSteam(), r.getExternalCondensate(), r.getExternalMakeup(), r.getWasteSteam1(), r.getWasteSteam2(), r.getKn20(), r.getKn50(), r.getFluidizedSteam(), r.getFluidizedCondensate(), r.getRuntime20(), r.getRuntime50(), r.getRuntimeFluidized(), null);
+            deleted.update(r.getComboSteam(), r.getComboCondensate(), r.getComboMakeup(), r.getComboDeaerator(), r.getComboProcess(), r.getComboDilution(), r.getExternalSteam(), r.getExternalCondensate(), r.getExternalMakeup(), r.getWasteSteam1(), r.getWasteSteam2(), r.getKn20(), r.getKn50(), r.getFluidizedSteam(), r.getFluidizedCondensate(), r.getRuntime20(), r.getRuntime50(), r.getRuntimeFluidized(), r.getWasteRoomSteam2(), r.getFluidizedTotalSteam(), r.getFluidizedTotalCondensate(), null);
             return new Upsert(deleted, true);
         }
         SteamComboDailyProduction created = repository.save(SteamComboDailyProduction.builder()
@@ -113,6 +113,9 @@ public class SteamComboDailyProductionService {
                 .runtime20(r.getRuntime20())
                 .runtime50(r.getRuntime50())
                 .runtimeFluidized(r.getRuntimeFluidized())
+                .wasteRoomSteam2(r.getWasteRoomSteam2())
+                .fluidizedTotalSteam(r.getFluidizedTotalSteam())
+                .fluidizedTotalCondensate(r.getFluidizedTotalCondensate())
                 .build());
         return new Upsert(created, false);
     }

@@ -36,6 +36,9 @@ public class SteamComboDailyProductionResponse {
     private BigDecimal runtime20;
     private BigDecimal runtime50;
     private BigDecimal runtimeFluidized;
+    private BigDecimal wasteRoomSteam2;
+    private BigDecimal fluidizedTotalSteam;
+    private BigDecimal fluidizedTotalCondensate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isUpdate;
@@ -66,6 +69,9 @@ public class SteamComboDailyProductionResponse {
                 .runtime20(e.getRuntime20())
                 .runtime50(e.getRuntime50())
                 .runtimeFluidized(e.getRuntimeFluidized())
+                .wasteRoomSteam2(e.getWasteRoomSteam2())
+                .fluidizedTotalSteam(e.getFluidizedTotalSteam())
+                .fluidizedTotalCondensate(e.getFluidizedTotalCondensate())
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
                 .isUpdate(isUpdate)

@@ -37,4 +37,7 @@ public class SteamComboDailyProductionSaveRequest {
     private BigDecimal runtime20;
     private BigDecimal runtime50;
     private BigDecimal runtimeFluidized;
+    private BigDecimal wasteRoomSteam2;
+    private BigDecimal fluidizedTotalSteam;
+    private BigDecimal fluidizedTotalCondensate;
 }

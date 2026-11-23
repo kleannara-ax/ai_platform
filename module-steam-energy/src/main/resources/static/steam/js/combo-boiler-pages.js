@@ -29,7 +29,9 @@
   // 화면의 칸 키(항목-일, fuelPrice-설비, 항목-줄번호, combo-plan-행-칸)는 그대로 두고, 여기서 표의 행·필드로 옮긴다.
   const PRODUCTION_FIELDS = ["comboSteam", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution",
     "externalSteam", "externalCondensate", "externalMakeup", "wasteSteam1", "wasteSteam2", "kn20", "kn50",
-    "fluidizedSteam", "fluidizedCondensate", "runtime20", "runtime50", "runtimeFluidized"];
+    "fluidizedSteam", "fluidizedCondensate", "runtime20", "runtime50", "runtimeFluidized",
+    // 참고자료 (2026년 10·11월 양식에서 생긴 칸) — 스팀총계·원단위에 넣지 않는다
+    "wasteRoomSteam2", "fluidizedTotalSteam", "fluidizedTotalCondensate"];
   const DOWNTIME_FIELDS = ["changeCombo", "changeJesco", "down1", "down2", "disperserSteam", "runtimeMin"];
   const MONTHLY_FIELDS = ["fuelPriceLngBoiler", "fuelPriceFluidized", "fuelPriceCombo", "fuelPriceWaste", "fuelPriceExternal"];
   const RECOVERY_FIELDS = ["lossDate", "lossTime", "lossNote", "lossSteamRate", "lossBaseRate", "lossMinutes"];
@@ -94,42 +96,103 @@
   // 폐합성소각로 도급내역 — 2호 스팀 구입량(T/D) 의 기본값은 그 페이지 '실 스팀량 기준' 표의 2호기 스팀량에서 온다.
   const CONTRACT_TABLE = "incinerator_contract";
   let contractRows = [];
-  let activeSection = "combo";
+  let activeSection = "purchase";
   let recoveryRowCount = 12;
 
+  // 스팀생산실적 탭 — 탭마다 [설비 묶음, 그 묶음의 칸들]. 칸 정의는 productionFields.
   const productionSections = [
-    { id: "combo", label: "복합보일러", groups: [["복합보일러", 7]], fields: ["comboSteam", "comboSteamHour", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution"] },
-    { id: "external", label: "외부보일러", groups: [["외부보일러", 4]], fields: ["externalSteam", "externalSteamHour", "externalCondensate", "externalMakeup"] },
-    { id: "waste", label: "폐합성 소각로", groups: [["폐합성 소각로", 4]], fields: ["wasteSteam1", "wasteSteam1Hour", "wasteSteam2", "wasteSteam2Hour"] },
-    { id: "kn-fluidized", label: "깨끗한나라/유동상", groups: [["깨끗한나라 보일러", 2], ["유동상", 2]], fields: ["kn20", "kn50", "fluidizedSteam", "fluidizedCondensate"] },
-    { id: "total", label: "합계", groups: [["스팀총계", 2], ["당사 보일러 가동시간(H/D)", 3]], fields: ["totalSteam", "totalSteamHour", "runtime20", "runtime50", "runtimeFluidized"] },
+    { id: "purchase", label: "구매 스팀", groups: [
+      ["복합보일러", ["comboSteam", "comboSteamHour", "comboCondensate", "comboMakeup", "comboDeaerator", "comboProcess", "comboDilution"]],
+      ["폐합성 소각로", ["wasteSteam1", "wasteSteam1Hour", "wasteSteam2", "wasteSteam2Hour"]],
+      ["외부보일러", ["externalSteam", "externalSteamHour", "externalCondensate", "externalMakeup"]],
+    ] },
+    { id: "own", label: "자체 생산", groups: [
+      ["깨끗한나라 보일러", ["kn20", "kn50"]],
+      ["유동상", ["fluidizedSteam", "fluidizedCondensate"]],
+      ["당사 보일러 가동시간", ["runtime20", "runtime50", "runtimeFluidized"]],
+    ] },
+    { id: "total", label: "합계 · 연료단가", groups: [
+      ["설비별 스팀량", ["viewCombo", "viewWaste", "viewExternal", "viewKn", "viewFluidized"]],
+      ["스팀총계", ["totalSteam", "totalSteamHour"]],
+    ] },
+    { id: "reference", label: "참고자료",
+      note: "참고자료입니다. 스팀총계와 스팀 원단위에는 들어가지 않습니다.",
+      groups: [
+        ["폐합성소각로 기관실유량계", ["wasteRoomSteam2", "viewWaste2", "wasteRoomDiff"]],
+        ["유동상 보일러", ["fluidizedTotalSteam", "fluidizedTotalCondensate"]],
+      ] },
   ];
 
+  // 칸 → [이름, 단위, 종류]. input 은 저장하는 칸, calc 는 화면에서 계산만 하는 칸.
   const productionFields = {
-    comboSteam: ["스팀구매량(T/D)", "input"],
-    comboSteamHour: ["스팀구매량(T/H)", "calc"],
-    comboCondensate: ["응축수판매량", "input"],
-    comboMakeup: ["보충수판매량", "input"],
-    comboDeaerator: ["탈기기급수량", "input"],
-    comboProcess: ["공정수판매량", "input"],
-    comboDilution: ["희석수판매량", "input"],
-    externalSteam: ["스팀구매량(T/D)", "input"],
-    externalSteamHour: ["스팀구매량(T/H)", "calc"],
-    externalCondensate: ["응축수판매량", "input"],
-    externalMakeup: ["보충수판매량", "input"],
-    wasteSteam1: ["1호 스팀 구입량(T/D)", "input"],
-    wasteSteam1Hour: ["1호 스팀 구입량(T/H)", "calc"],
-    wasteSteam2: ["2호 스팀 구입량(T/D)", "input"],
-    wasteSteam2Hour: ["2호 스팀 구입량(T/H)", "calc"],
-    kn20: ["20톤(#2)", "input"],
-    kn50: ["50톤(#3)", "input"],
-    fluidizedSteam: ["스팀 생산량", "input"],
-    fluidizedCondensate: ["응축수", "input"],
-    totalSteam: ["스팀총계(T/D)", "calc"],
-    totalSteamHour: ["스팀총계(T/H)", "calc"],
-    runtime20: ["20톤(#2) 가동시간", "input"],
-    runtime50: ["50톤(#3) 가동시간", "input"],
-    runtimeFluidized: ["유동상 가동시간", "input"],
+    comboSteam: ["스팀구매량", "T/D", "input"],
+    comboSteamHour: ["스팀구매량", "T/H", "calc"],
+    comboCondensate: ["응축수판매량", "㎥/D", "input"],
+    comboMakeup: ["보충수판매량", "㎥/D", "input"],
+    comboDeaerator: ["탈기기급수량", "㎥/D", "input"],
+    comboProcess: ["공정수판매량", "㎥/D", "input"],
+    comboDilution: ["희석수판매량", "㎥/D", "input"],
+    externalSteam: ["스팀구매량", "T/D", "input"],
+    externalSteamHour: ["스팀구매량", "T/H", "calc"],
+    externalCondensate: ["응축수판매량", "㎥/D", "input"],
+    externalMakeup: ["보충수판매량", "㎥/D", "input"],
+    wasteSteam1: ["1호 스팀 구입량", "T/D", "input"],
+    wasteSteam1Hour: ["1호 스팀 구입량", "T/H", "calc"],
+    wasteSteam2: ["2호 스팀 구입량", "T/D", "input"],
+    wasteSteam2Hour: ["2호 스팀 구입량", "T/H", "calc"],
+    kn20: ["20톤(#2) 스팀생산량", "T/D", "input"],
+    kn50: ["50톤(#3) 스팀생산량", "T/D", "input"],
+    fluidizedSteam: ["스팀 생산량", "T/D", "input"],
+    fluidizedCondensate: ["응축수", "㎥/D", "input"],
+    runtime20: ["20톤(#2)", "H/D", "input"],
+    runtime50: ["50톤(#3)", "H/D", "input"],
+    runtimeFluidized: ["유동상", "H/D", "input"],
+    viewCombo: ["복합보일러", "T/D", "calc"],
+    viewWaste: ["폐합성 소각로", "T/D", "calc"],
+    viewExternal: ["외부보일러", "T/D", "calc"],
+    viewKn: ["깨끗한나라 보일러", "T/D", "calc"],
+    viewFluidized: ["유동상", "T/D", "calc"],
+    totalSteam: ["합계", "T/D", "calc"],
+    totalSteamHour: ["합계", "T/H", "calc"],
+    wasteRoomSteam2: ["2호 스팀량", "T/D", "input"],
+    viewWaste2: ["2호 스팀 구입량", "T/D", "calc"],
+    wasteRoomDiff: ["편차 (구입량 − 기관실)", "T/D", "calc"],
+    fluidizedTotalSteam: ["총스팀량 (FI-301)", "T/D", "input"],
+    fluidizedTotalCondensate: ["응축수 (FI-303)", "㎥/D", "input"],
+  };
+
+  // 스팀총계에 들어가는 일곱 칸 (참고자료 칸은 없다)
+  const TOTAL_STEAM_FIELDS = ["comboSteam", "externalSteam", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam"];
+
+  /** 칸들을 더한다. 값이 든 칸이 하나도 없으면 null (그날은 빈칸으로 둔다). */
+  function addFields(fields, day) {
+    let total = null;
+    fields.forEach((field) => {
+      const value = dayValue(field, day);
+      if (value !== null) total = (total ?? 0) + value;
+    });
+    return total;
+  }
+  function perHour(value) { return value === null ? null : value / 24; }
+
+  // 계산 칸 → 그날 값
+  const productionDerived = {
+    comboSteamHour: (day) => perHour(dayValue("comboSteam", day)),
+    externalSteamHour: (day) => perHour(dayValue("externalSteam", day)),
+    wasteSteam1Hour: (day) => perHour(dayValue("wasteSteam1", day)),
+    wasteSteam2Hour: (day) => perHour(dayValue("wasteSteam2", day)),
+    viewCombo: (day) => dayValue("comboSteam", day),
+    viewWaste: (day) => addFields(["wasteSteam1", "wasteSteam2"], day),
+    viewExternal: (day) => dayValue("externalSteam", day),
+    viewKn: (day) => addFields(["kn20", "kn50"], day),
+    viewFluidized: (day) => dayValue("fluidizedSteam", day),
+    totalSteam: (day) => addFields(TOTAL_STEAM_FIELDS, day),
+    totalSteamHour: (day) => perHour(addFields(TOTAL_STEAM_FIELDS, day)),
+    viewWaste2: (day) => dayValue("wasteSteam2", day),
+    wasteRoomDiff: (day) => {
+      const room = dayValue("wasteRoomSteam2", day);
+      return room === null ? null : (dayValue("wasteSteam2", day) ?? 0) - room;
+    },
   };
 
   const sectionConfig = {
@@ -165,9 +228,9 @@
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  function formatNumber(value, digits = 0) {
+  function formatNumber(value, digits = 0, minDigits = 0) {
     if (value === null || value === undefined || !Number.isFinite(Number(value))) return "";
-    return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: digits }).format(Number(value));
+    return new Intl.NumberFormat("ko-KR", { minimumFractionDigits: minDigits, maximumFractionDigits: digits }).format(Number(value));
   }
 
   function daysInMonth(year, month) {
@@ -189,9 +252,18 @@
     return valueOf(key) ?? 0;
   }
 
-  function setCalc(key, value, digits = 0) {
+  /** 일별 입력 칸의 값. 손으로 넣은 값이 없으면 연동값(도급내역)을 따른다 — 그 칸이 지금 탭에 없어도 같다. 비었으면 null. */
+  function dayValue(field, day) {
+    const key = `${field}-${day}`;
+    const own = valueOf(key);
+    if (own !== null) return own;
+    const linked = linkedValue(key);
+    return linked ? parseNumber(linked) : null;
+  }
+
+  function setCalc(key, value, digits = 0, minDigits = 0) {
     const cell = tableWrap.querySelector(`[data-calc="${CSS.escape(key)}"]`);
-    if (cell) cell.textContent = formatNumber(value, digits);
+    if (cell) cell.textContent = formatNumber(value, digits, minDigits);
   }
 
   /**
@@ -207,18 +279,18 @@
 
   const LINK_HINT = "폐합성소각로 도급내역 ▸ 실 스팀량 기준 2호기 스팀량에서 가져옵니다 (여기서 직접 고칠 수 있고, 비우면 다시 가져옵니다)";
 
-  function inputCell(key, className = "") {
+  function inputCell(key, className = "", cellClass = "") {
     const own = normalizeEditableValue(state[key]);
     const linked = linkedValue(key);
     // 손으로 넣은 값이 있으면 그 값, 없으면 연동값을 보여 준다.
     const value = own !== "" ? own : (linked ?? "");
     const linkAttrs = linked !== null ? ` title="${escapeHtml(LINK_HINT)}"` : "";
     const linkClass = linked !== null && own === "" ? " combo-linked" : "";
-    return `<td><input class="combo-input ${className}${linkClass}" type="text" data-key="${escapeHtml(key)}" value="${escapeHtml(value)}"${linkAttrs} /></td>`;
+    return `<td${cellClass ? ` class="${cellClass}"` : ""}><input class="combo-input ${className}${linkClass}" type="text" data-key="${escapeHtml(key)}" value="${escapeHtml(value)}"${linkAttrs} /></td>`;
   }
 
-  function calcCell(key) {
-    return `<td class="combo-readonly" data-calc="${escapeHtml(key)}"></td>`;
+  function calcCell(key, cellClass = "") {
+    return `<td class="combo-readonly${cellClass ? ` ${cellClass}` : ""}" data-calc="${escapeHtml(key)}"></td>`;
   }
 
   function loadSavedPeriod() {
@@ -454,28 +526,24 @@
     `).join("");
   }
 
-  function renderProductionTotalExtra(section) {
+  /** 합계 탭 위쪽 — 설비별 스팀 원단위와 그 달 연료단가. 월 단위 값이라 일별 표와 따로 둔다. */
+  function renderProductionFuelTable(section) {
     if (section.id !== "total") return "";
-    const fuelHeader = `${Number(monthSelect.value)}\uc6d4 \uc5f0\ub8cc\ub2e8\uac00`;
-    const rows = [
-      ["\u004c\u004e\u0047 \ubcf4\uc77c\ub7ec", "production-unit-lng-boiler", "fuelPrice-lngBoiler"],
-      ["\uc720\ub3d9\uc0c1\uc18c\uac01\ub85c", "production-unit-fluidized", "fuelPrice-fluidized"],
-      ["\ubcf5\ud569\ubcf4\uc77c\ub7ec", "production-unit-combo", "fuelPrice-combo"],
-      ["\ud3d0\ud569\uc131\uc18c\uac01\ub85c", "production-unit-waste", "fuelPrice-waste"],
-      ["\uc678\ubd80\ubcf4\uc77c\ub7ec", "production-unit-external", "fuelPrice-external"],
+    const columns = [
+      ["LNG 보일러", "production-unit-lng-boiler", "fuelPrice-lngBoiler"],
+      ["유동상소각로", "production-unit-fluidized", "fuelPrice-fluidized"],
+      ["복합보일러", "production-unit-combo", "fuelPrice-combo"],
+      ["폐합성소각로", "production-unit-waste", "fuelPrice-waste"],
+      ["외부보일러", "production-unit-external", "fuelPrice-external"],
     ];
     return `
-      <table class="combo-excel-table combo-production-extra-table">
+      <table class="combo-excel-table combo-production-fuel-table">
         <thead>
-          <tr>
-            <th>\uad6c&nbsp;&nbsp;\ubd84</th>
-            <th>\uc2a4\ud300 \uc6d0\ub2e8\uc704 (\ud1a4/hr)</th>
-            <th>${escapeHtml(fuelHeader)}</th>
-          </tr>
+          <tr><th>구분</th>${columns.map(([label]) => `<th>${label}</th>`).join("")}<th>합계</th></tr>
         </thead>
         <tbody>
-          ${rows.map(([label, unitKey, priceKey]) => `<tr><th>${label}</th>${calcCell(unitKey)}${inputCell(priceKey)}</tr>`).join("")}
-          <tr class="combo-summary-row"><th>\ud569&nbsp;&nbsp;&nbsp;&nbsp;\uacc4</th>${calcCell("production-unit-total")}<td></td></tr>
+          <tr><th>스팀 원단위 <span class="combo-th-unit">톤/hr</span></th>${columns.map(([_label, unitKey]) => calcCell(unitKey)).join("")}${calcCell("production-unit-total")}</tr>
+          <tr><th>${Number(monthSelect.value)}월 연료단가 <span class="combo-th-unit">원/톤</span></th>${columns.map(([_label, _unitKey, priceKey]) => inputCell(priceKey)).join("")}<td class="combo-blank"></td></tr>
         </tbody>
       </table>
     `;
@@ -484,62 +552,39 @@
   function renderProduction() {
     const days = daysInMonth(yearSelect.value, monthSelect.value);
     const section = productionSections.find((item) => item.id === activeSection) || productionSections[0];
+    // 칸마다 묶음의 첫 칸인지 표시 — 묶음 사이에 굵은 세로줄을 긋는다.
+    const columns = section.groups.flatMap(([_label, fields]) => fields.map((field, index) => ({ field, start: index === 0 })));
+    const cellOf = ({ field, start }, key) => {
+      const cellClass = start ? "combo-group-start" : "";
+      return productionFields[field][2] === "calc" ? calcCell(key, cellClass) : inputCell(key, "", cellClass);
+    };
     const rows = [];
     for (let day = 1; day <= days; day += 1) {
-      rows.push(`
-        <tr data-day="${day}">
-          <th scope="row">${day}</th>
-          ${section.fields.map((field) => {
-            const [label, type] = productionFields[field];
-            return type === "calc" ? calcCell(`${field}-${day}`) : inputCell(`${field}-${day}`);
-          }).join("")}
-        </tr>
-      `);
+      rows.push(`<tr data-day="${day}"><th scope="row">${day}</th>${columns.map((column) => cellOf(column, `${column.field}-${day}`)).join("")}</tr>`);
     }
-    rows.push(summaryRow(section.fields, "sum", "누계"));
-    rows.push(summaryRow(section.fields, "avg", "평균"));
-    const colWidths = productionColumnWidths(section);
+    const summary = (type, label) => `<tr class="combo-summary-row"><th scope="row">${label}</th>${columns.map(({ field, start }) => calcCell(`${type}-${field}`, start ? "combo-group-start" : "")).join("")}</tr>`;
     tableWrap.innerHTML = `
+      ${section.note ? `<p class="combo-section-note">${escapeHtml(section.note)}</p>` : ""}
+      ${renderProductionFuelTable(section)}
       <table class="combo-excel-table combo-production-table combo-production-${escapeHtml(section.id)}">
-        <colgroup>
-          <col class="combo-day-col" />
-          ${section.fields.map((field, index) => `<col class="combo-field-col combo-field-${escapeHtml(field)}" style="width:${escapeHtml(colWidths[index] || "1fr")};" />`).join("")}
-        </colgroup>
+        <colgroup><col class="combo-day-col" />${columns.map(() => "<col />").join("")}</colgroup>
         <thead>
-          <tr class="combo-section-title-row">
-            <th></th>
-            <th colspan="${section.fields.length}">${escapeHtml(section.label)}</th>
+          <tr class="combo-group-row">
+            <th rowspan="2">일</th>
+            ${section.groups.map(([label, fields]) => `<th colspan="${fields.length}" class="combo-group-start">${escapeHtml(label)}</th>`).join("")}
           </tr>
-          <tr class="combo-section-group-row">
-            <th>일자</th>
-            ${(section.groups || [[section.label, section.fields.length]]).map(([label, span]) => `<th colspan="${span}">${escapeHtml(label)}</th>`).join("")}
+          <tr class="combo-field-row">
+            ${columns.map(({ field, start }) => `<th${start ? ' class="combo-group-start"' : ""}>${escapeHtml(productionFields[field][0])}<span class="combo-th-unit">${escapeHtml(productionFields[field][1])}</span></th>`).join("")}
           </tr>
-          <tr><th></th>${section.fields.map((field) => `<th>${escapeHtml(productionFields[field][0])}</th>`).join("")}</tr>
         </thead>
-        <tbody>${rows.join("")}</tbody>
+        <tbody>${rows.join("")}${summary("sum", "누계")}${summary("avg", "평균")}</tbody>
       </table>
-      ${renderProductionTotalExtra(section)}
     `;
-  }
-
-  function productionColumnWidths(section) {
-    const widthMap = {
-      combo: ["11%", "10%", "15%", "15%", "15%", "17%", "17%"],
-      external: ["25%", "18%", "28%", "29%"],
-      waste: ["25%", "22%", "28%", "25%"],
-      "kn-fluidized": ["18%", "18%", "32%", "32%"],
-      total: ["18%", "16%", "22%", "22%", "22%"],
-    };
-    return widthMap[section.id] || section.fields.map(() => `${100 / section.fields.length}%`);
-  }
-
-  function summaryRow(fields, type, label) {
-    return `<tr class="combo-summary-row"><th scope="row">${label}</th>${fields.map((field) => calcCell(`${type}-${field}`)).join("")}</tr>`;
   }
 
   function dailyAverage(field, days) {
     let total = 0;
-    for (let day = 1; day <= days; day += 1) total += numberOf(`${field}-${day}`);
+    for (let day = 1; day <= days; day += 1) total += dayValue(field, day) ?? 0;
     return days ? total / days : 0;
   }
 
@@ -710,25 +755,17 @@
   function calculateProduction() {
     const days = daysInMonth(yearSelect.value, monthSelect.value);
     Object.keys(productionFields).forEach((field) => {
-      let sum = 0;
+      const derive = productionDerived[field];
+      // 시간당(T/H) 칸은 소수 둘째 자리까지 맞춰 적는다 — 한 열 안에서 자릿수가 들쭉날쭉하지 않게.
+      const minDigits = productionFields[field][1] === "T/H" ? 2 : 0;
+      let sum = null;                      // 값이 든 날이 하루도 없으면 누계·평균도 빈칸
       for (let day = 1; day <= days; day += 1) {
-        if (field === "comboSteamHour") setCalc(`${field}-${day}`, numberOf(`comboSteam-${day}`) / 24, 2);
-        if (field === "externalSteamHour") setCalc(`${field}-${day}`, numberOf(`externalSteam-${day}`) / 24, 2);
-        if (field === "wasteSteam1Hour") setCalc(`${field}-${day}`, numberOf(`wasteSteam1-${day}`) / 24, 2);
-        if (field === "wasteSteam2Hour") setCalc(`${field}-${day}`, numberOf(`wasteSteam2-${day}`) / 24, 2);
-        if (field === "totalSteam") {
-          const total = numberOf(`comboSteam-${day}`) + numberOf(`externalSteam-${day}`) + numberOf(`wasteSteam1-${day}`) + numberOf(`wasteSteam2-${day}`) + numberOf(`kn20-${day}`) + numberOf(`kn50-${day}`) + numberOf(`fluidizedSteam-${day}`);
-          setCalc(`${field}-${day}`, total, 2);
-        }
-        if (field === "totalSteamHour") {
-          const total = numberOf(`comboSteam-${day}`) + numberOf(`externalSteam-${day}`) + numberOf(`wasteSteam1-${day}`) + numberOf(`wasteSteam2-${day}`) + numberOf(`kn20-${day}`) + numberOf(`kn50-${day}`) + numberOf(`fluidizedSteam-${day}`);
-          setCalc(`${field}-${day}`, total / 24, 2);
-        }
-        const liveCalc = parseNumber(tableWrap.querySelector(`[data-calc="${CSS.escape(`${field}-${day}`)}"]`)?.textContent);
-        sum += liveCalc ?? numberOf(`${field}-${day}`);
+        const value = derive ? derive(day) : dayValue(field, day);
+        if (derive) setCalc(`${field}-${day}`, value, 2, minDigits);
+        if (value !== null) sum = (sum ?? 0) + value;
       }
-      setCalc(`sum-${field}`, sum, 2);
-      setCalc(`avg-${field}`, sum / days, 2);
+      setCalc(`sum-${field}`, sum, 2, minDigits);
+      setCalc(`avg-${field}`, sum === null ? null : sum / days, 2, minDigits);
     });
     // 스팀 원단위(톤/hr): Excel D42=(Q39+R39)/24=스팀생산량(20톤+50톤)/24, D43=S39/24=유동상 스팀생산량/24.
     // (가동시간 runtime* 이 아니라 스팀생산량 kn20/kn50/fluidizedSteam 사용)
