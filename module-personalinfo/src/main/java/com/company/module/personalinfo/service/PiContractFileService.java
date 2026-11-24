@@ -119,7 +119,7 @@ public class PiContractFileService {
                 .contentType(stored.contentType())
                 .fileSize(stored.size())
                 .fileHash(stored.sha256())
-                .description(PiContractService.trim(description))
+                .description(defaultDescription(description, period))
                 .signedDate(docDate)
                 .documentDate(documentDate)
                 .documentNote(checkNote(type, documentNote))
@@ -203,6 +203,15 @@ public class PiContractFileService {
         }
         f.changeDestructionPeriod(checkPeriod(c, f.getFileType(), destructionPeriod), userId);
         return ContractFileResponse.from(f, latestContractDocId(f.getContractId()));
+    }
+
+    /** 설명을 비워 두고 정기 파기 확인서를 올리면 '2026년 3분기 정기 파기 확인서' 로 채운다 (업로드 경로와 상관없이 같게) */
+    private static String defaultDescription(String description, String period) {
+        String d = PiContractService.trim(description);
+        if (d == null && period != null) {
+            return PiPeriodicDestruction.labelOf(period) + " 정기 파기 확인서";
+        }
+        return d;
     }
 
     /** 정기 파기 대상 기간 검증 (파기 확인서 + 정기 파기확인 계약만, 주기·계약기간 확인). 비었으면 null */
