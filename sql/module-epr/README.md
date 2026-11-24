@@ -145,6 +145,17 @@ FK 는 업무 표끼리만: `epr_product_master.PART_PREFIX → epr_part_categor
 
 원래 프로젝트의 ADMIN 권한은 "사용자 관리" 화면에만 쓰였고 그 화면은 제거했다.
 
+## 로그인 세션 (플랫폼 정책을 그대로 따른다)
+
+| 항목 | 플랫폼 기준 | EPR 화면 |
+|---|---|---|
+| 토큰 유효시간 | access 1시간 · refresh 7일 (`app/.../application.yml` 의 `jwt.*`) | 따로 정하지 않음 |
+| 401 을 받으면 | refresh token 으로 한 번 갱신하고 같은 요청을 다시 보냄 (플랫폼 `index.html` 의 `api()`) | 같음 (`epr.js` 의 `authFetch`) |
+| 갱신도 실패하면 | "세션이 만료되었습니다. 다시 로그인해주세요." 안내 후 로그아웃 | 플랫폼 안: `FIRE_AUTH_EXPIRED` 를 보내 플랫폼이 위 안내·로그아웃 (소방·스팀 모듈과 같음). 단독으로 연 화면: `/index.html?returnUrl=…` 로 이동 |
+| 토큰을 읽는 순서 | — | `sessionStorage.auth` → `localStorage.fireweb_user` (소방 모듈 `csrf.js` 와 같음). 갱신한 토큰은 두 곳에 다시 저장 |
+
+유효시간이나 갱신 정책을 바꾸려면 플랫폼(core · app) 쪽을 바꾼다. EPR 모듈에는 별도 설정이 없다.
+
 ## SQL 실행 순서
 
 | 순서 | 파일 | 내용 | 재실행 |
