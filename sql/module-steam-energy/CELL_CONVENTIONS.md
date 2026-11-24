@@ -1,0 +1,121 @@
+# module-steam-energy: steam_cell_value 네임스페이스 / col_index 규약
+
+> **2026-11-23: 모든 네임스페이스가 실제 컬럼 표로 옮겨졌다.** 이 문서는 이관 기록이다 — 옛 `steam_cell_value` 의 키가 무엇이었고 어느 표로 갔는지(아래 '전환 완료' 표)를 남겨 둔다. 새 화면은 셀 저장소를 쓰지 않는다 (README 7절).
+
+> 실행하는 SQL 이 아니라 **문서**다. 스팀 화면들이 `steam_cell_value` 한 표를 나눠 쓰기 때문에,
+> 어떤 화면이 어떤 `table_name` 과 `col_index` 를 쓰는지 여기에 적어 둔다.
+> `col_index` 는 화면 항목의 고정 번호라 **재배치하면 기존 데이터가 어긋난다.**
+> 항목을 추가·변경하면 이 문서도 같이 고칠 것.
+
+```text
+── table_name 별 용도 ───────────────────────────────────────
+ fluidized_daily_log        유동상 운전일지  row_key=일(2자리), col_index=항목번호
+ fluidized_detail_main      세부 운영내역    row_key=A1 셀 주소, col_index=일+2
+ flow_m_fluid_incinerator   유동상 스팀 송기량 등 흐름값  col_index=0
+ waste_incin_log            폐합성소각로 운전일지  row_key=일(1~31), col_index=아래 표
+
+── waste_incin_log col_index (엑셀 시트별 구간) ──────────────
+ [소각량 1~29]  (js/waste-incinerator-log-pages.js: SHEETS.burn)
+    1 폐1 자폐        2 폐1 재활용     3 폐1 발생량   4 폐1 가동시간  5 폐1 외폐재고
+   11 폐2 자폐       12 폐2 재활용    13 폐2 발생량  14 폐2 가동시간 15 폐2 자폐재고
+   21 합계 외폐        (합계 자폐/재활용 은 계산값 — 저장하지 않음)
+
+ [스팀량 100~]   ※ 스팀량(적산) 시트의 "생산량" 은 같은 번호를 공유한다(적산량은 계산값).
+  100 폐1 생산량   101 폐2-1 생산량   102 폐2-2 생산량   103 기관   104 저/고(문자)
+
+ [급수량 200~]
+  200 폐1-1   201 폐1-2   202 폐2-1   203 폐2-2
+
+ [전력 300~]
+  300 지침    301 폐#1    302 폐#2    303 EP
+
+ [폐기물 400~]
+  400 비산재 폐#1  401 비산재 폐#2  402 바닥재 폐#1  403 바닥재 폐#2
+
+ [약품 500~]   재고 행은 1일만 입력값(기초), 2일부터 전일재고+반입-사용 계산
+  500 요소수 반입  501 요소수 사용  502 요소수 재고
+  503 청관재 반입  504 청관재 사용  505 청관재 재고
+  506 소금 반입    507 소금 사용    508 소금 유동상   509 소금 재고
+  510 가성 반입    511 가성 사용    512 가성 재고
+  513 활성탄 반입  514 활성탄 사용  515 활성탄 재고
+  516 부생유 반입  517 부생유 폐1   518 부생유 폐2    519 부생유 슬1
+  520 부생유 슬2   521 부생유 재고량
+  522 크링커 측벽  523 크링커 낙차  524 크링커 반입   525 크링커 사용  526 크링커 재고
+      (크링커 투입비 = 525 × 2000 ÷ 소각량 폐1 발생량(3) — 계산값)
+
+ [TMS 600~]
+  600~605 폐#1 분진/CO/Nox/Sox/HCl/온도
+  606~611 폐#2 분진/CO/Nox/Sox/HCl/온도
+
+ [외부반입 700~]  업체별 반입량 (누계/합계는 계산값)
+  700 보노아  701 스라이브  702 나투라  703 대한제지  704 신성    705 그린이엔텍
+  706 금보산업 707 청원es    708 티와이  709 재운산업  710 현진RC  711 중앙이엔비
+  712 주원    713 태창
+
+ [폐기물발생 800~]
+  800 폐목재  801 생불  802 폐합성  803 리젝트  804 라가  805 재고량
+```
+
+## 규약에 없는 col_index 가 들어왔는지 점검
+
+```sql
+SELECT month, col_index, COUNT(*) AS cnt
+  FROM steam_cell_value
+ WHERE table_name = 'waste_incin_log'
+   AND col_index NOT IN (1,2,3,4,5,11,12,13,14,15,21,
+                         100,101,102,103,104,
+                         200,201,202,203,
+                         300,301,302,303,
+                         400,401,402,403,
+                         500,501,502,503,504,505,506,507,508,509,
+                         510,511,512,513,514,515,516,517,518,519,
+                         520,521,522,523,524,525,526,
+                         600,601,602,603,604,605,606,607,608,609,610,611,
+                         700,701,702,703,704,705,706,707,708,709,710,711,712,713,
+                         800,801,802,803,804,805)
+ GROUP BY month, col_index
+ ORDER BY month, col_index;
+```
+
+
+## 전환 완료 — 더 이상 쓰지 않는 네임스페이스 (2026-11-20, 원단위 일지 7개 화면 모두 전환됨)
+
+원단위 일지 7개 화면은 실제 컬럼 표(`steam_unit_daily_usage`·`steam_unit_daily_common`·`steam_lng_daily_usage`·`steam_fuel_daily_usage`·`steam_price`)로
+옮겼다 (README "원단위 일지 그룹 전환" 참고). 아래 네임스페이스는 새 화면이 쓰지 않으며, 남은 데이터는 다른 묶음 전환이 끝나면 정리한다.
+
+| 옛 네임스페이스 | 지금 |
+|---|---|
+| `usage_m_pm2`, `usage_m_pm3a`, `usage_m_pm3b`, `usage_m_tm`, `usage_m_tissue`, `usage_m_paper`, `usage_m_other` | `steam_unit_daily_usage` (가동시간·비고). 화장지 총합 가동시간은 TM 합으로 계산 |
+| `lng_m_boiler`, `lng_m_burner`, `lng_m_mix` | `steam_lng_daily_usage` |
+| `flow_m_fluid_incinerator`, `flow_m_combined`, `flow_m_boiler`, `flow_m_summary` | `steam_fuel_daily_usage`. 유동상 운전일지·세부 운영내역이 쓰던 `flow_m_fluid_incinerator` col 0 는 `FLUID_STEAM_TON` 으로 재연결 |
+| `unit_price`, `unit_price_detail` | `steam_price` (ITEM_CODE × YEAR_NO/MONTH_NO) |
+| `energy_accounting_plan` | `steam_energy_accounting_plan` (2026-11-20) |
+| `energy_fuel_plan` | `steam_energy_fuel_plan` |
+| `energy_fuel_ratio` | `steam_energy_ratio_boiler`(t01~t03) · `_machine`(t04~t06) · `_burner`(t10~t12) · `_steam_unit`(t17, 다른 사이트 공유) · `_ref2019`(t18~t20). 계산 전용 표(t07~t09, t13~t16)는 저장 안 함 |
+| `energy_month_compare` | `steam_energy_month_compare` (입력·연동값) + `steam_energy_month_compare_note` (비고, 연도 행) |
+| `energy_fuel_summary` | `steam_energy_fuel_summary` (직접 입력값) |
+| `combo_boiler_production` | `steam_combo_daily_production` + `steam_combo_monthly_price`(연료단가) (2026-11-20) |
+| `combo_boiler_downtime` | `steam_combo_daily_downtime` + `steam_combo_monthly_price`(벤트 손실 단가) |
+| `combo_boiler_recovery` | `steam_combo_recovery_loss` (월 + 줄 번호) |
+| `combo_boiler_etc` | `steam_combo_plan` (기준연도 + 대상 월) |
+| `incinerator_contract` | `steam_incinerator_contract_daily` + `steam_incinerator_plan_monthly.CONTRACT_LABOR` (2026-11-20) |
+| `incinerator_plan_vs` | `steam_incinerator_plan_monthly` (연/월 한 행으로 접음) |
+| `incinerator_yoy` | 저장 없음 (도급내역에서 계산) |
+| `incinerator_operation` | `steam_incinerator_operation_monthly` |
+| `incinerator_total_cost` | `steam_incinerator_cost_monthly` (입력 39개) |
+| `srf_boiler_invoice_summary` | `steam_srf_invoice_summary` (2026-11-20) |
+| `srf_boiler_invoice_client` | `steam_srf_invoice_client_item` (월 + 구분 + 줄 번호) |
+| `srf_boiler_invoice_operation` | `steam_srf_invoice_operation_daily` (전력량) |
+| `srf_boiler_invoice_monthly` | `steam_srf_invoice_monthly` (실제 연/월) |
+| `srf_boiler_invoice_accumulated` | `steam_srf_invoice_accumulated` (실제 연/월) |
+| `srf_boiler_invoice_bsc` | `steam_srf_invoice_bsc` (연도) |
+| `srf_boiler_invoice_adjustment` | `steam_srf_invoice_adjustment` (연도 + 표 + 항목) |
+| `fluidized_plan_actual`, `fluidized_plan_summary`, `fluidized_year_note`, `fluidized_contract_cost`, `fluidized_monthly_cache` | `steam_fluidized_month` (2026-11-20) |
+| `fluidized_contract_daily` | `steam_fluidized_contract_daily` |
+| `fluidized_srf_inbound` | `steam_fluidized_srf_inbound_daily` (입고량) + `steam_fluidized_srf_rate` (처리단가) |
+| `steam_cell_value` / 월 키 `YYYY-00` 의 `*-record:*` | `steam_incident` (FACILITY · KIND · RECORD_KEY) (2026-11-20) |
+| `steam_cell_value` / 월 키 `YYYY-00` 의 `improvement-monthly:*`, `improvement-item:*` | `steam_fluidized_improvement_payment`, `steam_fluidized_improvement_item` |
+| `waste_incin_log` | `steam_waste_incin_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-20) |
+| `fluidized_detail_main` | `steam_fluidized_detail_daily` (일별 입력), `steam_fluidized_detail_month` (단가 · 비용), `steam_fluidized_detail_custom_row` (추가 행) (2026-11-20) |
+| `fluidized_daily_log` | `steam_fluidized_daily_log` (USAGE_DATE, 항목별 컬럼) (2026-11-23) |
+| 물리 표 `steam_unit_usage`, `steam_unit_usage_raw` | `steam_unit_daily_usage`, `steam_unit_daily_common` |

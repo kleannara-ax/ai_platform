@@ -1,0 +1,143 @@
+/* ============================================================
+   steam-table-unified.css — 모든 화면의 표 모양을 하나로 맞춘다
+   기준: 복합보일러 › 스팀생산실적 (css/page-combo.css 의 .combo-production-table)
+
+   · 모든 화면이 <head> 의 맨 끝에서 이 파일을 읽는다 (페이지 안 <style> 보다 뒤).
+   · 맞추는 것: 글자 크기, 칸 선, 줄 높이, 머리글 바탕, 입력칸 모양, 기본 계산 칸(회색), 기본 합계 줄(연두).
+   · 빼는 화면: SRF 인보이스 Summary(srf-invoice), 유동상 세부 운영내역(fluidized-detail) — 엑셀 서식을 그대로 옮긴
+     양식 화면이라 표 격자가 아니다.
+   · 건드리지 않는 것: 페이지가 특정 줄·칸에 따로 준 강조색(소계 노랑, 실적 파랑, 연동 초록, 음수 빨강 …),
+     머리글 높이·고정 위치(sticky), 칸 너비, 가로 스크롤.
+   · 선택자 앞의 :not(#_) 는 우선순위를 올리려고 붙인 것이다 — 페이지마다 흩어진 스타일보다 이 파일이 이기게 한다.
+     그래서 여기서는 !important 를 꼭 필요한 곳(다른 파일이 !important 로 정한 값)만 쓴다.
+   ============================================================ */
+
+:root {
+  --stu-line: #dde7ef;            /* 세로선 */
+  --stu-line-row: #e6edf3;        /* 가로선 */
+  --stu-line-head: #c3d7e6;       /* 머리글 아래 선 */
+  --stu-head-group: #dcebf7;      /* 머리글 윗줄(설비 묶음) */
+  --stu-head-group-text: #123d5a;
+  --stu-head: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+  --stu-head-text: #173a54;
+  --stu-row-head-text: #45627a;
+  --stu-calc: #f1f5f8;            /* 계산 칸 */
+  --stu-calc-text: #4a6478;
+  --stu-sum: #e8f4ec;             /* 합계 줄 */
+  --stu-sum-text: #1f4d38;
+  --stu-sum-line: #a9cdb8;
+  --stu-focus: #3d93d1;
+  --stu-font: 12px;
+  --stu-row: 32px;
+}
+
+/* ── 글자 ── */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) :is(th, td),
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) :is(input, select, textarea) {
+  font-size: var(--stu-font) !important;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table :is(th, td, input) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 칸 선 ── */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table :is(th, td) {
+  border-right: 1px solid var(--stu-line);
+  border-bottom: 1px solid var(--stu-line-row);
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tr > :is(th, td):last-child {
+  border-right: 0;
+}
+
+/* ── 머리글 ── 높이·고정 위치는 페이지 것을 그대로 둔다 */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table thead th {
+  background: var(--stu-head) !important;
+  color: var(--stu-head-text) !important;
+  font-weight: 700 !important;
+  border-bottom-color: var(--stu-line-head) !important;
+}
+/* 머리글이 두 줄 이상이면 윗줄은 설비 묶음 색 */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table thead tr:first-child:not(:last-child) th {
+  background: var(--stu-head-group) !important;
+  color: var(--stu-head-group-text) !important;
+  font-weight: 800 !important;
+}
+
+/* ── 본문 칸 ── 운전일지 두 화면(fdl·wil)은 한 장에 인쇄하는 촘촘한 양식이라 줄 높이는 그대로 둔다 */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody :is(th, td) {
+  height: var(--stu-row);
+  padding: 2px 6px !important;
+  line-height: 1.3 !important;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody th {
+  color: var(--stu-row-head-text);
+}
+/* 입력칸이 든 칸은 여백 없이 칸 전체가 입력칸이다 (숨은 input 이 같이 들어 있어도 같다) */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody td:has(> input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])),
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody td:has(> select) {
+  padding: 0 !important;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody td > input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table:not(.fdl-table):not(.fdl-sum-table):not(.wil-table) tbody td > select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: calc(var(--stu-row) - 1px);
+  min-height: calc(var(--stu-row) - 1px) !important;
+  margin: 0;
+  padding: 0 6px !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody td > :is(input, select, textarea):focus {
+  outline: 2px solid var(--stu-focus);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* ── 기본 계산 칸 (회색) ── 페이지가 따로 색을 준 칸은 그 색이 남는다 */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody td:is(.computed, .calc, .combo-readonly, .excel-readonly-cell, .linked-cell):not([style*="background"]) {
+  background: var(--stu-calc) !important;
+  color: var(--stu-calc-text);
+  font-weight: 600;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody td > input.calc-input:not([style*="background"]) {
+  background: var(--stu-calc) !important;
+  color: var(--stu-calc-text) !important;
+  font-weight: 600 !important;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody td:has(> input.calc-input) {
+  background: var(--stu-calc);
+}
+
+/* ── 기본 합계 줄 (연두) ── 누계·평균·합계처럼 표 끝에 붙는 줄 */
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody tr:is(.summary-row, .combo-summary-row, .total-row, .is-summary, .avg-row, .subtotal-row) > :is(th, td) {
+  background: var(--stu-sum) !important;
+  color: var(--stu-sum-text) !important;
+  font-weight: 800 !important;
+}
+body.landing-body:not(#_):not([data-page-kind="srf-invoice"]):not([data-page-kind="fluidized-detail"]) table tbody tr:is(.summary-row, .combo-summary-row, .total-row, .is-summary, .avg-row, .subtotal-row) > td > input {
+  background: transparent !important;
+  color: var(--stu-sum-text) !important;
+  font-weight: 800 !important;
+}
+
+/* ── 화면별 보정 ── 입력칸에 옅은 파랑을 깔던 유동상 목록 화면들: 입력칸은 흰색, 계산 칸은 회색으로 맞춘다 */
+body.landing-body:not(#_) table:is(.improvement-table, .srf-workbook-table, .accident-table) tbody td > :is(input, select, textarea) {
+  background: #fff !important;
+}
+body.landing-body:not(#_) table.improvement-table tbody td:has(> .improvement-calc) {
+  background: var(--stu-calc);
+  text-align: right;
+}
+body.landing-body:not(#_) table.improvement-table tbody td > .improvement-calc {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--stu-calc-text);
+  font-weight: 600;
+}

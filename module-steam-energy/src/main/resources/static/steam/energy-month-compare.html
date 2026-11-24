@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>에너지 회계비용 - 월별 회계비용 마감 vs 실마감 차이</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260916-cardfit" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260916-cardfit" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <style>
+    /* 표 스크롤은 카드 안(.energy-table-wrap)에서 처리한다.
+       예전에는 thead sticky 를 위해 wrap 의 overflow 를 없애고 body 를 스크롤 컨테이너로 삼았는데,
+       .landing-body 가 height:100vh / overflow:hidden 이라 1900px 넓이의 표가 카드 밖으로
+       삐져나간 채 잘려 보였다. 운전일지(.wil-scroll)·유동상 일지(.fdl-sum-scroll) 와 같이
+       wrap 을 스크롤 컨테이너로 되돌리면 thead·좌측 열 sticky 는 wrap 기준으로 그대로 동작한다. */
+    body.landing-body[data-page-kind="energy-month-compare"] {
+      background: var(--inc-bg-page);
+      font-family: "Inter","Apple SD Gothic Neo","Pretendard",sans-serif;
+      color: var(--inc-text);
+    }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-main { padding:28px 24px 24px 30px; overflow:visible; height:auto; min-height:auto; }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas { padding:0; min-width:0; overflow:visible; background:transparent; box-shadow:none; }
+    body.landing-body[data-page-kind="energy-month-compare"] .landing-canvas-table { overflow:visible; min-width:0; }
+    /* 표 영역만 스크롤 — inc-design.css 의 overflow-y:hidden!important 를 되돌린다.
+       max-height 는 아래 fitTableHeight() 가 실제 화면 높이에 맞춰 다시 잡는다. */
+    body.landing-body[data-page-kind="energy-month-compare"] .energy-table-wrap {
+      overflow: auto !important;
+      max-height: calc(100vh - 250px);
+      overscroll-behavior: contain;
+    }
+    /* 셸 iframe: 바깥 높이는 화면에 맞추고, 스크롤은 표 영역이 담당 */
+    body.platform-embedded[data-page-kind="energy-month-compare"] { height:100vh !important; overflow:auto !important; }
+    html.platform-embedded { overflow:hidden !important; }
+
+    .emc-input {
+      width:100%; min-width:0; border:1px solid #b7d7ef; border-radius:5px;
+      background:#eef8ff; padding:3px 4px; text-align:right; color:#173a54;
+      font:600 11.5px Inter, sans-serif; box-sizing:border-box;
+    }
+    .emc-input:hover { background:#dff0fb; }
+    .emc-input:focus { outline:2px solid rgba(86,167,226,.26); border-color:#66b7e7; background:#fff; }
+    .emc-note { width:100%; border:1px solid #d6e2ec; border-radius:5px; background:#fafdff; padding:4px 6px; font:500 11px Inter,sans-serif; resize:vertical; min-height:32px; box-sizing:border-box; }
+    .emc-calc { display:block; font-weight:700; color:#1f3b57; overflow:hidden; text-overflow:ellipsis; }
+    .emc-calc.neg { color:#c0392b; }
+    .emc-calc.imported { color:#0a7a5f; background:#e8f7f1; border-radius:4px; padding:1px 3px; }
+    /* 카드 제목 줄 — 제목 왼쪽, 제스코 보기 단추 오른쪽 끝 (표 바로 위) */
+    .emc-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .emc-card-head .inc-section-title { margin:0; }
+    .emc-zesco-btn {
+      height:28px; padding:0 12px; border:1px solid #c7d6e4; border-radius:8px;
+      background:#fff; color:#41607d; font:600 11.5px Inter,"Apple SD Gothic Neo",sans-serif; cursor:pointer;
+    }
+    .emc-zesco-btn:hover { background:#f1f7fc; }
+    .emc-zesco-btn[aria-pressed="true"] { background:#1f4f82; border-color:#1f4f82; color:#fff; }
+    .energy-table tr.zesco-row td.label-cell,
+    .energy-table tr.zesco-row th.col-cat-sub { color:#7a8798; }
+    .emc-import-badge {
+      display:inline-block; margin-left:6px; padding:1px 6px;
+      background:#0a7a5f; color:#fff; font-size:10px; font-weight:700;
+      border-radius:10px; vertical-align:middle;
+    }
+
+    /* 표 폭/셀 폭 ─ 라벨은 줄바꿈 허용, 숫자/달셀은 충분히 넓게 */
+    .energy-table { min-width: 1620px; table-layout: fixed; }
+    .energy-table colgroup col.c-cat   { width: 96px; }
+    .energy-table colgroup col.c-label { width: 200px; }
+    .energy-table colgroup col.c-month { width: 88px; }
+    .energy-table colgroup col.c-sum   { width: 92px; }
+    .energy-table colgroup col.c-avg   { width: 86px; }
+    .energy-table colgroup col.c-note  { width: 220px; }
+    .energy-table th, .energy-table td {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .energy-table th.label-cell, .energy-table td.label-cell {
+      white-space: normal;          /* 긴 라벨은 줄바꿈 허용 */
+      word-break: keep-all;
+      line-height: 1.25;
+    }
+    .energy-table td.note-cell { white-space: normal; overflow: visible; }
+    .energy-table td.num { text-align:right; padding-right:6px; }
+    .energy-table td.num .emc-calc { font-size: 11px; }
+
+    /* ── 행/열 고정 (sticky) ─────────────────────────────────────────
+       body 가 세로 스크롤 컨테이너이므로 thead 의 sticky top:0 은 body 의 가장자리
+       (= 부모 iframe 의 topbar 바로 아래) 에 고정됨.
+       wrap 에는 overflow 를 주지 않아 sticky 컨테이닝 블록이 wrap 이 아닌 body 가 됨.
+       ────────────────────────────────────────────────────────────── */
+    .energy-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+      box-shadow: inset 0 -1px 0 rgba(120, 181, 217, .45);
+    }
+    .energy-table th.col-cat-sub,
+    .energy-table td.col-cat-sub {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      background: #eef3f8;
+    }
+    .energy-table th.label-cell,
+    .energy-table td.label-cell {
+      position: sticky;
+      left: 96px;
+      z-index: 4;
+      background: var(--inc-bg-header, #f3f7fa);
+    }
+    .energy-table thead th.col-cat-sub,
+    .energy-table thead th.label-cell {
+      z-index: 6;
+      background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%);
+    }
+    .energy-table thead th[colspan="2"].label-cell {
+      left: 0;
+      z-index: 7;
+    }
+
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/incinerator-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/srf-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/fluidized-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <script src="/steam/js/energy-cell-map.js?v=20261120-spec2"></script>
+  <script src="/steam/js/energy-store.js?v=20261120-spec2"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
+</head>
+<body class="landing-body" data-page-kind="energy-month-compare">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table">
+      <div class="inc-header">
+        <div class="inc-header-title">
+          <h1>월별 회계비용 마감 vs 실마감 차이</h1>
+          <p id="emcSubtitle">— 월별 회계비용 마감 vs 실마감 차이 (연료비)</p>
+        </div>
+        <div class="inc-toolbar">
+          <select id="emcYear" aria-label="조회 연도"></select>
+          <button type="button" id="emcReload" class="btn-secondary">조회</button>
+          <button type="button" id="emcReset" class="btn-secondary" title="현재 연도 데이터 초기화">초기화</button>
+          <button type="button" id="emcExcelDownload" class="btn-secondary">엑셀 다운로드</button>
+          <button type="button" id="emcExcelUpload" class="btn-secondary">엑셀 업로드</button>
+          <input type="file" id="emcExcelFileInput" accept=".xls,.xlsx,.xlsm" hidden />
+        </div>
+      </div>
+
+      <section class="energy-panel active" data-panel="fuel">
+        <div class="inc-card">
+          <div class="emc-card-head">
+            <h3 class="inc-section-title">연료비 — 회계비용 마감 vs 실마감 (백만원)</h3>
+            <!-- 제스코는 없어진 업체라 행을 숨겨 둔다. 계산에는 그대로 들어간다. -->
+            <button type="button" id="emcZescoToggle" class="emc-zesco-btn" aria-pressed="false">제스코 보기</button>
+          </div>
+          <div class="energy-table-wrap">
+            <table class="energy-table" data-section="fuel">
+              <colgroup id="emcFuelCols"></colgroup>
+              <thead><tr id="emcFuelHeader"></tr></thead>
+              <tbody id="emcFuelBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <style>
+    /* 전년 12월 열 — 작년 데이터에서 자동으로 채운 값 */
+    .emc-calc.prev-dec { color: #475569; font-style: italic; }
+  </style>
+  <script src="/steam/js/energy-linked-sources.js?v=20261120-spec3"></script>
+  <script>
+  (function () {
+    const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
+    // 제스코 행 표시 여부 — 없어진 업체라 기본은 숨김. 소계·실적 계산에는 숨겨도 그대로 들어간다.
+    let showZesco = false;
+    const PAGE_TABLE_NAME = "energy_month_compare";
+    // 2026-11 규격 전환: 입력·계산값은 steam_energy_month_compare, 비고는 steam_energy_month_compare_note (energy-store.js)
+    const store_ = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);   // 저장용 (화면 캐시 변수 store 와 구분)
+
+    const safeDiv = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? a / b : null;
+    const sumArr = (arr) => arr.reduce((s, v) => s + (Number.isFinite(v) ? v : 0), 0);
+    const avgArr = (arr) => {
+      const xs = arr.filter((v) => Number.isFinite(v));
+      return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null;
+    };
+
+    // === 외부 페이지에서 가져오기 ===
+    // unit-fluidized-monthly 의 도급비용 (contractCost = 가동시간 운영비 + 운휴 고정비 + 설비개선비 - 차감비 + 추가지급분)
+    //   원본 단위: 천원 → 백만원으로 변환
+    // 저장소: DB steam_cell_value (table_name=fluidized_monthly_cache, row_key=contractCost, col_index=1..12)
+    const __fmcCache = new Map();   // year → { 1: 값, … }
+    async function fetchFluidizedContract(year) {
+      const yk = String(year);
+      if (__fmcCache.has(yk)) return __fmcCache.get(yk);
+      try {
+        const params = new URLSearchParams({
+          month: String(year), tableNames: "fluidized_monthly_cache", limit: "1000",
+        });
+        // 규격 표 steam_fluidized_month.CONTRACT_COST — js/fluidized-store.js 가 옛 호출 모양으로 읽어 준다
+        const resp = await window.FluidizedStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (!resp.ok) { __fmcCache.set(yk, {}); return {}; }
+        const payload = await resp.json();
+        const out = {};
+        (payload.data || []).forEach((row) => {
+          if (row.table_name !== "fluidized_monthly_cache") return;
+          if (row.row_key !== "contractCost") return;
+          const m = Number(row.col_index);
+          if (!Number.isFinite(m) || m < 1 || m > 12) return;
+          const v = Number(row.cell_value);
+          if (Number.isFinite(v) && v !== 0) out[m] = v / 1000; // 천원 → 백만원
+        });
+        __fmcCache.set(yk, out);
+        return out;
+      } catch (e) {
+        console.error("[emc fetchFluidizedContract]", e);
+        return {};
+      }
+    }
+    function importFluidizedContract(year) {
+      // 동기 호출용 — 캐시된 데이터 반환 (loadAndRender 에서 사전 fetch).
+      return __fmcCache.get(String(year)) || {};
+    }
+
+    // 스팀생산실적(combo_boiler_production) → 월별 스팀총계.
+    //   row_key = `${field}-${day}`, month = 'YYYY-MM'. 스팀총계는 그 페이지의 totalSteam 과 같은 7개 항목의 합이다.
+    //   한 달에 값이 하나도 없으면 그 달은 비워 둔다(0 이 아니라 null).
+    const STEAM_TOTAL_FIELDS = ["comboSteam", "externalSteam", "wasteSteam1", "wasteSteam2", "kn20", "kn50", "fluidizedSteam"];
+    const __cbpCache = new Map();   // year → { 1: 값, … }
+    async function fetchComboProductionTotal(year) {
+      const yk = String(year);
+      if (__cbpCache.has(yk)) return __cbpCache.get(yk);
+      const out = {};
+      try {
+        // 규격 표 steam_combo_daily_production (일자별). 폐합성 2호(wasteSteam2)는 비어 있으면 스팀생산실적 화면처럼
+        // 소각로 도급내역의 2호기 실 스팀량(real|일|steam-2)을 쓴다 — 두 화면의 합계가 같아지게.
+        const linked = new Map();   // "월|일" → 도급내역 2호기 실 스팀량
+        try {
+          const params = new URLSearchParams({
+            fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
+          });
+          const resp = await window.IncineratorStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
+          if (resp.ok) {
+            ((await resp.json()).data || []).forEach((row) => {
+              const m = /^real\|(\d+)\|steam-2$/.exec(String(row.row_key));
+              if (!m) return;
+              const monthNo = Number(String(row.month).split("-")[1]);
+              const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+              if (monthNo >= 1 && monthNo <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= new Date(Number(yk), monthNo, 0).getDate()
+                  && String(row.cell_value ?? "").trim() !== "" && Number.isFinite(v)) linked.set(`${monthNo}|${Number(m[1])}`, v);
+            });
+          }
+        } catch (e) { console.error("[emc fetchComboProductionTotal] 도급내역", e); }
+        const rows = await window.SteamEnergyApi.get(`/combo-daily-productions?year=${yk}`);
+        const add = (monthNo, v) => { if (Number.isFinite(v)) out[monthNo] = (out[monthNo] || 0) + v; };
+        (rows || []).forEach((row) => {
+          const monthNo = window.SteamEnergyApi.monthOf(row.usageDate);
+          const dayKey = `${monthNo}|${window.SteamEnergyApi.dayOf(row.usageDate)}`;
+          STEAM_TOTAL_FIELDS.forEach((field) => {
+            let v = row[field];
+            if (field === "wasteSteam2") {
+              if (v === null || v === undefined) v = linked.get(dayKey);
+              linked.delete(dayKey);
+            }
+            if (v !== null && v !== undefined) add(monthNo, Number(v));
+          });
+        });
+        // 생산실적 행이 없는 날의 도급내역 값
+        linked.forEach((v, key) => add(Number(key.split("|")[0]), v));
+      } catch (e) { console.error("[emc fetchComboProductionTotal]", e); }
+      __cbpCache.set(yk, out);
+      return out;
+    }
+    function importComboProductionTotal(year) {
+      return __cbpCache.get(String(year)) || {};
+    }
+
+    // 폐합성소각로 도급내역(incinerator_contract) → 월별 결산 기준 총 운영비용(원).
+    //   row_key = `${section}|${day}|${field}` (section unit1/unit2), month = 'YYYY-MM'.
+    //   도급내역 페이지와 같은 식: 호기별 (스팀량×운영단가) + (운휴시간×시간당 고정비) 를 날마다 더한다.
+    //   1호기 운휴시간이 비어 있는 날은 그 페이지처럼 24 로 본다. 값이 하나도 없는 달은 비워 둔다.
+    const __incCache = new Map();   // year → { 1: 백만원, … }
+    async function fetchIncineratorContractTotal(year) {
+      const yk = String(year);
+      if (__incCache.has(yk)) return __incCache.get(yk);
+      const out = {};
+      try {
+        const params = new URLSearchParams({
+          fromMonth: `${yk}-01`, toMonth: `${yk}-12`, tableNames: "incinerator_contract", limit: "20000",
+        });
+        const resp = await window.IncineratorStore.fetch(`/tables/steam_cell_value?${params.toString()}`);
+        if (resp.ok) {
+          const payload = await resp.json();
+          const byMonth = new Map();   // monthNo → Map("unit1|5|steam" → 값)
+          (payload.data || []).forEach((row) => {
+            if (row.table_name !== "incinerator_contract") return;
+            const monthNo = Number(String(row.month).split("-")[1]);
+            if (!(monthNo >= 1 && monthNo <= 12)) return;
+            const v = Number(String(row.cell_value ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(v)) return;
+            if (!byMonth.has(monthNo)) byMonth.set(monthNo, new Map());
+            byMonth.get(monthNo).set(String(row.row_key), v);
+          });
+          byMonth.forEach((cells, monthNo) => {
+            const days = new Date(Number(yk), monthNo, 0).getDate();
+            let total = 0, has = false;
+            ["unit1", "unit2"].forEach((unit) => {
+              for (let day = 1; day <= days; day += 1) {
+                const g = (field) => cells.get(`${unit}|${day}|${field}`);
+                const steam = g("steam"), price = g("unit"), fixed = g("fixed");
+                let runtime = g("runtime");
+                if (unit === "unit1" && runtime === undefined) runtime = 24;
+                const oper = (steam !== undefined && price !== undefined) ? steam * price : null;
+                const stop = (runtime !== undefined && fixed !== undefined) ? runtime * fixed : null;
+                if (oper !== null || stop !== null) { total += (oper || 0) + (stop || 0); has = true; }
+              }
+            });
+            if (has) out[monthNo] = total / 1000000;   // 원 → 백만원
+          });
+        }
+      } catch (e) { console.error("[emc fetchIncineratorContractTotal]", e); }
+      __incCache.set(yk, out);
+      return out;
+    }
+    function importIncineratorContractTotal(year) {
+      return __incCache.get(String(year)) || {};
+    }
+
+    // 외부 import 디스패치 — row.importSource 에 따라 호출
+    // energy_fuel_ratio DB 캐시 — 한 번만 fetch
+    const __efrDataCache = new Map();   // year → Map("t04|r03|2" → 값)
+    async function fetchFuelRatio(year) {
+      const yk = String(year);
+      if (__efrDataCache.has(yk)) return __efrDataCache.get(yk);
+      try {
+        const legacy = await window.EnergyStore.fetchLegacy("energy_fuel_ratio", Number(year));   // "tNN|rNN|col" → 문자열
+        const map = new Map();
+        legacy.forEach((v, k) => map.set(k, Number(v)));
+        __efrDataCache.set(yk, map);
+        return map;
+      } catch (e) { return null; }
+    }
+    function getEfrSync(year, rowKey, col) {
+      const map = __efrDataCache.get(String(year));
+      if (!map) return null;
+      const v = map.get(`${rowKey}|${col}`);
+      return (typeof v === "number" && Number.isFinite(v)) ? v : null;
+    }
+    function importFuelRatioRow(year, rowKey, scale) {
+      // rowKey 예: "t04|r03" (호기별 연료비배분 / 제지 소계)
+      // 결과: { 1: value, ..., 12: value }
+      // col_index 매핑: efr col 1 = 24.12월, 2 = 1월, ..., 13 = 12월
+      // emc month 1 = 1월 → efr col 2
+      // → col = month + 1
+      const out = {};
+      for (let m = 1; m <= 12; m++) {
+        const v = getEfrSync(year, rowKey, m + 1);
+        if (v !== null) out[m] = scale ? v * scale : v;
+      }
+      return out;
+    }
+
+    // 작년 인보이스 연동값 스냅샷 — 공용 js(EnergyLinkedSources)는 한 해만 캐시하므로 먼저 받아 복사해 둔다
+    const __linkedPrev = { year: null, srf: {}, client: {} };
+    function importValues(importSource, year) {
+      if (String(year) === __linkedPrev.year) {
+        if (importSource === "srf-invoice-total") return __linkedPrev.srf;
+        if (importSource === "srf-client-non-power") return __linkedPrev.client;
+      }
+      if (importSource === "srf-invoice-total") return window.EnergyLinkedSources.compositeSteamPurchaseSync(year);
+      if (importSource === "srf-client-non-power") return window.EnergyLinkedSources.compositeLngEtcSync(year);
+      if (importSource === "fluidized-monthly") return importFluidizedContract(year);
+      if (importSource === "combo-production-total") return importComboProductionTotal(year);
+      if (importSource === "incinerator-contract-total") return importIncineratorContractTotal(year);
+      if (importSource === "fuel-ratio-paper") return importFuelRatioRow(year, "t04|r03");   // 호기별 연료비배분 / 제지 소계
+      if (importSource === "fuel-ratio-tissue") return importFuelRatioRow(year, "t04|r07");  // 호기별 연료비배분 / 화장지 소계
+      if (importSource === "fuel-ratio-lng-burner") return importFuelRatioRow(year, "t11|r09"); // 버너 LNG 비용 / 합계
+      if (importSource === "fuel-ratio-paper-prod") return importFuelRatioRow(year, "t06|r03", 1 / 1000);   // 제품생산량 / 제지 소계 (kg → 톤)
+      if (importSource === "fuel-ratio-tissue-prod") return importFuelRatioRow(year, "t06|r07", 1 / 1000);  // 제품생산량 / 화장지 소계 (kg → 톤)
+      return {};
+    }
+
+    // 각 row 정의:
+    //   key: 데이터 식별자 (저장 키)
+    //   label: 표시 라벨
+    //   cat: 좌측 카테고리 라벨 (rowspan으로 묶음)
+    //   kind: 'input' | 'sum' | 'formula'
+    //   srcKeys: sum 일 때 합산 대상 키
+    //   formula: formula 일 때 (rows, m) => 값
+    //   cls: 'subtotal' | 'total'
+    //   note: 비고 표시 여부 (기본 true). 비고는 같은 카테고리의 첫 row 에서만 rowspan
+    // 월마다 바뀌지 않는 차감비 — 연료비 배분비율 페이지도 같은 값을 써서 js/energy-linked-sources.js 에 둔다.
+    const { LAND_LEASE_FIXED, COMPOSITE_INCOME_FIXED, COMPOSITE_INVEST_FIXED } = window.EnergyLinkedSources;
+
+    // (당월 원단위 − 전월 원단위) × 당월 생산량 ÷ 1000 — 두 달 원단위가 모두 있어야 계산한다.
+    function unitDeltaProfit(unitRow, prodRow, m) {
+      if (m < 1) return null;
+      const cur = unitRow[m], prev = unitRow[m - 1], prod = prodRow[m];
+      if (!Number.isFinite(cur) || !Number.isFinite(prev) || !Number.isFinite(prod)) return null;
+      return (cur - prev) * prod / 1000;
+    }
+
+    const FUEL_ROWS = [
+      { key:"compositeSteam",  label:"복합보일러 스팀구매",          cat:"연료비",    kind:"imported",
+        importSource:"srf-invoice-total", importLabel:"SRF Boiler 인보이스 → Summary(VK) TOTAL SERVICE CHARGES FOR THE MONTH (원 → 백만원)" },
+      // 제스코(zesco:true) 행은 없어진 업체라 기본으로 숨긴다 — 값·수식은 그대로 두고 화면에서만 뺀다.
+      { key:"zescoSteam",      label:"제스코 스팀구매",              cat:"연료비",    kind:"input", zesco:true },
+      { key:"lngBuy",          label:"LNG 구매",                    cat:"연료비",    kind:"input" },
+      { key:"pyhsynSteam",     label:"폐합성소각로 스팀구매",        cat:"연료비",    kind:"imported",
+        importSource:"incinerator-contract-total", importLabel:"폐합성소각로 도급내역 → 결산 기준 총 운영비용 월 합계 (1호기 소계 + 2호기 소계, 원 → 백만원). 도급내역이 없는 달은 저장된 값",
+        fallbackStored:true },
+      { key:"fluidSteam",      label:"유동상소각로 스팀구매",        cat:"연료비",    kind:"imported",
+        importSource:"fluidized-monthly", importLabel:"유동상 운영내역 → 도급비용" },
+      { key:"fuelMonthlySum",  label:"연료비 월별 (소계)",           cat:"연료비",    kind:"sum",
+        srcKeys:["compositeSteam","zescoSteam","lngBuy","pyhsynSteam","fluidSteam"], cls:"subtotal" },
+
+      { key:"zescoOffset",     label:"제스코 상계비 (유틸리티)",     cat:"차감비",    kind:"input", zesco:true },
+      { key:"zescoPenalty",    label:"제스코 페널티",                cat:"차감비",    kind:"input", zesco:true },
+      { key:"compositeLngEtc", label:"복합 LNG 사용량, 처분부담금 등", cat:"차감비",  kind:"imported",
+        importSource:"srf-client-non-power", importLabel:"SRF Boiler Client Invoice → 1. Utilities(전력 제외) + 2. Other Charge 청구금액 합 (원 → 백만원)" },
+      // 아래 셋은 월마다 바뀌지 않는 고정 금액이다 — 입력칸이 아니라 상수로 둔다.
+      { key:"compositeInvest", label:"복합 투자비 감가상각",         cat:"차감비",    kind:"formula",
+        formula:() => COMPOSITE_INVEST_FIXED },
+      { key:"compositeIncome", label:"복합보일러 처분수익 연료비 차감분", cat:"차감비", kind:"formula",
+        formula:() => COMPOSITE_INCOME_FIXED },
+      { key:"landLease",       label:"토지 지상권 지료",             cat:"차감비",    kind:"formula",
+        formula:() => LAND_LEASE_FIXED },
+      { key:"deductSum",       label:"차감비 소계",                  cat:"차감비",    kind:"sum",
+        srcKeys:["zescoOffset","zescoPenalty","compositeLngEtc","compositeInvest","compositeIncome","landLease"], cls:"subtotal" },
+
+      { key:"fuelActual",      label:"연료비(회계비용) 실적",        cat:"실적",      kind:"formula", cls:"total",
+        formula:(r,m) => (r.fuelMonthlySum[m] ?? 0) - (r.deductSum[m] ?? 0) },
+      { key:"paperFuel",       label:"제지 연료비(스팀사용비율)",    cat:"스팀사용비율", kind:"imported",
+        importSource:"fuel-ratio-paper", importLabel:"연료비 배분비율 → 호기별 연료비배분 / 제지 소계" },
+      { key:"livingFuel",      label:"생활 연료비(스팀사용비율)",    cat:"스팀사용비율", kind:"imported",
+        importSource:"fuel-ratio-tissue", importLabel:"연료비 배분비율 → 호기별 연료비배분 / 화장지 소계" },
+
+      { key:"fuelPlan",        label:"연료비(회계비용) SG 계획금액", cat:"계획",      kind:"input" },
+      { key:"fuelVsPlan",      label:"회계비용 대비 증감",           cat:"계획",      kind:"formula",
+        formula:(r,m) => (r.fuelActual[m] ?? null) === null ? null : r.fuelActual[m] - (r.fuelPlan[m] ?? 0) },
+      { key:"fuelVsPrev",      label:"전월대비 증감",                cat:"계획",      kind:"formula",
+        formula:(r,m) => m > 0 && Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.fuelActual[m-1]) ? r.fuelActual[m] - r.fuelActual[m-1] : null },
+
+      { key:"prodTotal",       label:"생산량",                       cat:"생산량",    kind:"formula",
+        formula:(r,m) => (r.paperProd[m] ?? 0) + (r.tissueProd[m] ?? 0) },
+      // 연료비 배분비율 '제품생산량 (kg)' 표의 소계 — kg 을 톤으로
+      { key:"paperProd",       label:"제지 제품생산량",              cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-paper-prod", importLabel:"연료비 배분비율 → 제품생산량 / 제지 소계 (kg → 톤)" },
+      { key:"tissueProd",      label:"화장지 제품생산량",            cat:"제품생산량", kind:"imported",
+        importSource:"fuel-ratio-tissue-prod", importLabel:"연료비 배분비율 → 제품생산량 / 화장지 소계 (kg → 톤)" },
+
+      { key:"totalUnit",       label:"총 원단위 (연료비/생산량)",    cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.prodTotal[m] ?? 0) },
+      { key:"paperUnit",       label:"제지 원단위 (연료비/생산량)",  cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.paperFuel[m] ?? 0) * 1000, r.paperProd[m] ?? 0) },
+      { key:"livingUnit",      label:"생활 원단위 (연료비/생산량)",  cat:"원단위",    kind:"formula",
+        formula:(r,m) => safeDiv((r.livingFuel[m] ?? 0) * 1000, r.tissueProd[m] ?? 0) },
+
+      // 손익 — 엑셀 '회계비용 마감과 실마감 비교' r28~r30 과 같은 식.
+      //   (당월 원단위 − 전월 원단위) × 당월 생산량 ÷ 1000.  1월의 전월은 전년 12월(열 0, 작년 데이터).
+      { key:"profitDelta",     label:"전월대비 손익증감",            cat:"손익",      kind:"formula",
+        formula:(r,m) => unitDeltaProfit(r.totalUnit, r.prodTotal, m) },
+      { key:"paperProfit",     label:"제지손익",                     cat:"손익",      kind:"formula",
+        formula:(r,m) => unitDeltaProfit(r.paperUnit, r.paperProd, m) },
+      { key:"livingProfit",    label:"생활손익",                     cat:"손익",      kind:"formula",
+        formula:(r,m) => unitDeltaProfit(r.livingUnit, r.tissueProd, m) },
+      { key:"profitSum",       label:"손익합계 (제지+생활)",         cat:"손익",      kind:"sum",
+        srcKeys:["paperProfit","livingProfit"], cls:"subtotal" },
+
+      { key:"steamProd",       label:"스팀생산량",                   cat:"보조 분석", kind:"imported",
+        importSource:"combo-production-total", importLabel:"스팀생산실적 → 스팀총계 월 합계 (복합 + 외부 + 폐합성 1·2호 + 깨끗한나라 20·50톤 + 유동상)" },
+      { key:"lngBurner",       label:"LNG 직버너 사용 비용",         cat:"보조 분석", kind:"imported",
+        importSource:"fuel-ratio-lng-burner", importLabel:"연료비 배분비율 → 버너 LNG 비용 / 합계" },
+      // 엑셀 r34 = r16 − r33
+      { key:"boilerFuel",      label:"보일러 운영 연료비 (버너 제외)", cat:"보조 분석", kind:"formula",
+        formula:(r,m) => (Number.isFinite(r.fuelActual[m]) && Number.isFinite(r.lngBurner[m])) ? r.fuelActual[m] - r.lngBurner[m] : null },
+      { key:"boilerSteamUnit", label:"스팀톤당 보일러 연료비 (천원/톤)", cat:"보조 분석", kind:"formula",
+        formula:(r,m) => safeDiv((r.boilerFuel[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
+      { key:"fuelSteamUnit",   label:"스팀톤당 연료비 (천원/톤)",    cat:"보조 분석", kind:"formula",
+        formula:(r,m) => safeDiv((r.fuelActual[m] ?? 0) * 1000, r.steamProd[m] ?? 0) },
+    ];
+
+
+    const SECTION_DEFS = {
+      fuel: { rows: FUEL_ROWS, headerId: "emcFuelHeader", bodyId: "emcFuelBody", colId: "emcFuelCols", hasNote: true },
+    };
+
+    let currentYear = String(new Date().getFullYear());
+    let store = {}; // DB 캐시 — loadStoreFromDB() 로 채움
+    let computed = { fuel:{} };
+    let notes = {}; // notes[section][rowKey]
+
+    /* ── DB 저장소 (steam_cell_value / table_name=energy_month_compare) ─
+     *  row_key 형식:
+     *    데이터: `${section}|${rowKey}`  예: "fuel|compositeSteam"
+     *    비고  : `note|${section}|${cat}` 예: "note|fuel|연료비"
+     *  col_index: 0=전년12월, 1~12=1~12월, 13=다음해1월 / 비고는 0
+     */
+    async function loadStoreFromDB(year) {
+      const yearStr = String(year);
+      try {
+        const yearStore = window.EnergyStore.forLegacy(PAGE_TABLE_NAME);
+        await yearStore.load(Number(year));
+        store[yearStr] = { fuel:{}, notes:{ fuel:{} } };
+        const yd = store[yearStr];
+        yearStore.cells().forEach((row) => {
+          const rk = String(row.row_key);
+          const ci = Number(row.col_index);
+          const val = row.cell_value;
+          if (rk.startsWith("note|")) {
+            const parts = rk.split("|");
+            const sec = parts[1], cat = parts.slice(2).join("|");
+            if (yd.notes[sec]) yd.notes[sec][cat] = String(val == null ? "" : val);
+          } else {
+            const idx = rk.indexOf("|");
+            if (idx < 0) return;
+            const sec = rk.substring(0, idx), rowK = rk.substring(idx + 1);
+            if (!yd[sec]) return;
+            if (!yd[sec][rowK]) yd[sec][rowK] = {};
+            const num = Number(val);
+            yd[sec][rowK][ci] = Number.isFinite(num) ? num : null;
+          }
+        });
+        if (String(currentYear) === yearStr) await store_.load(Number(year));
+      } catch (e) { console.error("[emc loadStoreFromDB]", e); }
+    }
+    async function upsertCellToDB(section, rowKey, monthIdx, value) {
+      try {
+        if (store_.year() !== Number(currentYear)) await store_.load(Number(currentYear));
+        await store_.set(`${section}|${rowKey}`, monthIdx, (value === null || value === undefined || value === "") ? null : String(value));
+      } catch (e) { console.error("[emc upsertCell]", e); window.alert(`저장 실패: ${e.message || e}`); }
+    }
+    async function upsertNoteToDB(section, cat, text) {
+      try {
+        if (store_.year() !== Number(currentYear)) await store_.load(Number(currentYear));
+        await store_.set(`note|${section}|${cat}`, 0, String(text || ""));
+      } catch (e) { console.error("[emc upsertNote]", e); window.alert(`비고 저장 실패: ${e.message || e}`); }
+    }
+    // 초기화: 그 해 월 행의 값을 비운다 (비고와 이웃 연도 행은 그대로)
+    async function deleteYearFromDB(year) {
+      try {
+        if (store_.year() !== Number(year)) await store_.load(Number(year));
+        await store_.clearYear(Number(year));
+      } catch (e) { console.error("[emc deleteYear]", e); window.alert(`초기화 실패: ${e.message || e}`); }
+    }
+    function getYearState() {
+      if (!store[currentYear]) store[currentYear] = { fuel:{}, power:{}, total:{}, notes:{} };
+      const s = store[currentYear];
+      ["fuel"].forEach((sec) => { if (!s[sec]) s[sec] = {}; });
+      if (!s.notes) s.notes = {};
+      ["fuel"].forEach((sec) => { if (!s.notes[sec]) s.notes[sec] = {}; });
+      return s;
+    }
+
+    function buildHeader(section) {
+      const def = SECTION_DEFS[section];
+      const hasNote = def.hasNote;
+      // colgroup
+      const colHtml = [
+        `<col class="c-cat">`,
+        `<col class="c-label">`,
+        `<col class="c-month">`,           // prev year Dec
+        ...MONTHS.map(() => `<col class="c-month">`),
+        `<col class="c-month">`,           // next year Jan
+        `<col class="c-sum">`,
+        `<col class="c-avg">`,
+      ];
+      if (hasNote) colHtml.push(`<col class="c-note">`);
+      document.getElementById(def.colId).innerHTML = colHtml.join("");
+
+      // header row
+      const prevYear = String(Number(currentYear) - 1).slice(-2);
+      const nextYear = String(Number(currentYear) + 1).slice(-2);
+      const cols = [
+        `<th colspan="2" class="label-cell">구분</th>`,
+        `<th>${prevYear}.12월</th>`,
+        ...MONTHS.map((m) => `<th>${m}월</th>`),
+        `<th>${nextYear}.1월</th>`,
+        `<th>합계</th>`,
+        `<th>평균</th>`,
+      ];
+      if (hasNote) cols.push(`<th>비고</th>`);
+      document.getElementById(def.headerId).innerHTML = cols.join("");
+    }
+
+    function fmt(v, digits) {
+      if (v === null || v === undefined || Number.isNaN(v) || !Number.isFinite(v)) return "—";
+      const d = digits ?? 1;
+      const s = v.toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+      return s;
+    }
+
+    /** 표시용 1자리 반올림 (DB 저장값과 분리). 입력 시 raw 비교는 displayDigits 적용 후 수행 */
+    function roundDisplay(value) {
+      if (value === null || value === undefined || value === "") return "";
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value);
+      // 정수면 그대로, 소수면 한자리 반올림
+      return Number.isInteger(n) ? String(n) : (Math.round(n * 10) / 10).toString();
+    }
+    function inputHtml(section, rowKey, monthIdx, value) {
+      const display = roundDisplay(value);
+      const raw = (value === null || value === undefined) ? "" : String(value);
+      // data-raw-value: 원본 DB 값 (full precision) — 사용자가 변경 안 했을 때 저장 skip 비교용
+      return `<input class="emc-input" data-section="${section}" data-row="${rowKey}" data-month="${monthIdx}" type="text" value="${display}" data-raw-value="${raw}" inputmode="decimal">`;
+    }
+
+    function noteHtml(section, rowKey, rowspan, value) {
+      return `<td class="note-cell" rowspan="${rowspan}"><textarea class="emc-note" data-section="${section}" data-note="${rowKey}" placeholder="실적 대비 분석 메모">${value || ""}</textarea></td>`;
+    }
+
+    function getRowMonth(section, rowKey, monthIdx) {
+      // monthIdx: 0=prev year Dec, 1..12 = 1월~12월, 13=next year Jan
+      const sec = (computed[section] && computed[section][rowKey]) || {};
+      return sec[monthIdx];
+    }
+
+    /* 한 해의 섹션 값을 계산한다 — 입력/가져오기 값을 깔고 합계·수식을 순서대로.
+     *   secStore : 그 해의 DB 저장값 { rowKey: { monthIdx: 값 } }
+     *   year     : 가져오기(연료비 배분비율·인보이스·유동상) 연도
+     *   prevDec  : 전년 12월 열(열 0)에 덮어쓸 값 { rowKey: 값 } — 작년 데이터에서 계산한 작년 12월
+     * 엑셀의 '24. 12월' 열이 작년 시트의 12월 값인 것과 같다. 작년 값이 없는 행은 저장된 열 0 값을 그대로 쓴다. */
+    function computeSection(def, secStore, year, prevDec, target) {
+      const out = target || {};
+      def.rows.forEach((row) => {
+        if (!out[row.key]) out[row.key] = {};
+        if (row.kind === "input") {
+          // 0..13 (prev/12개월/next)
+          for (let m = 0; m <= 13; m++) {
+            const v = secStore[row.key]?.[m];
+            out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+          }
+        } else if (row.kind === "imported") {
+          // 외부 페이지에서 자동 가져오기 (1월~12월). 전년 12월(0)·다음해 1월(13)은 가져올 곳이 없으니
+          // 저장된 값(엑셀 업로드의 '24. 12월' 열 등)을 쓴다 — 작년 데이터가 있으면 아래에서 덮어쓴다.
+          const imported = importValues(row.importSource, year);
+          for (let m = 0; m <= 13; m++) {
+            if (m >= 1 && m <= 12) {
+              out[row.key][m] = imported[m] !== undefined ? imported[m] : null;
+              // fallbackStored 행: 가져올 데이터가 없는 달은 저장된 값(엑셀 업로드·예전 수기 입력)을 쓴다
+              if (out[row.key][m] === null && row.fallbackStored) {
+                const v = secStore[row.key]?.[m];
+                out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+              }
+            } else {
+              const v = secStore[row.key]?.[m];
+              out[row.key][m] = (v === undefined || v === "" || v === null) ? null : Number(v);
+            }
+          }
+        }
+        if (row.kind === "input" || row.kind === "imported") {
+          if (Number.isFinite(prevDec[row.key])) out[row.key][0] = prevDec[row.key];
+        }
+      });
+
+      // compute sum/formula in order
+      def.rows.forEach((row) => {
+        if (row.kind === "sum") {
+          for (let m = 0; m <= 13; m++) {
+            const vals = row.srcKeys.map((k) => out[k]?.[m]).filter(Number.isFinite);
+            out[row.key][m] = vals.length ? vals.reduce((s, v) => s + v, 0) : null;
+          }
+        } else if (row.kind === "formula") {
+          for (let m = 0; m <= 13; m++) {
+            try {
+              const v = row.formula(out, m);
+              out[row.key][m] = (v === null || !Number.isFinite(v)) ? null : v;
+            } catch (e) { out[row.key][m] = null; }
+          }
+        }
+        if (row.kind === "sum" || row.kind === "formula") {
+          if (Number.isFinite(prevDec[row.key])) out[row.key][0] = prevDec[row.key];
+          // 전년 12월·다음해 1월은 전월이 없어 못 구하는 수식(손익 등)이 있다 — 엑셀처럼 저장된 상수가 있으면 그걸 보여 준다
+          [0, 13].forEach((m) => {
+            if (out[row.key][m] !== null) return;
+            const v = secStore[row.key]?.[m];
+            if (!(v === undefined || v === "" || v === null) && Number.isFinite(Number(v))) out[row.key][m] = Number(v);
+          });
+        }
+      });
+      return out;
+    }
+
+    // 작년 12월 값 — 작년 저장값 + 작년 가져오기 값으로 섹션 전체를 계산해 12월 열만 뽑는다
+    const __prevDec = { year: null, values: {} };
+    function buildPrevDec(section) {
+      const def = SECTION_DEFS[section];
+      const prevYear = String(Number(currentYear) - 1);
+      const prevStore = (store[prevYear] && store[prevYear][section]) || {};
+      const prevComputed = computeSection(def, prevStore, prevYear, {}, {});
+      const values = {};
+      // 작년 12월에 입력·가져오기 값이 하나도 없으면 작년 데이터가 없는 것이다 — 수식 행이 0 으로 계산된
+      // 값을 전년 12월 열에 덮어쓰면 안 되므로 비워 둔다 (저장된 열 0 값을 그대로 쓴다).
+      const hasBase = def.rows.some((row) => (row.kind === "input" || row.kind === "imported") && Number.isFinite(prevComputed[row.key]?.[12]));
+      if (!hasBase) { __prevDec.year = currentYear; __prevDec.values = {}; return values; }
+      def.rows.forEach((row) => {
+        const v = prevComputed[row.key]?.[12];
+        if (Number.isFinite(v)) values[row.key] = v;
+      });
+      __prevDec.year = currentYear;
+      __prevDec.values = values;
+      return values;
+    }
+    function hasPrevDec(rowKey) {
+      return __prevDec.year === currentYear && Number.isFinite(__prevDec.values[rowKey]);
+    }
+
+    function renderSection(section) {
+      const def = SECTION_DEFS[section];
+      const body = document.getElementById(def.bodyId);
+      const ys = getYearState();
+      const secStore = ys[section];
+
+      const prevDec = buildPrevDec(section);
+      computeSection(def, secStore, currentYear, prevDec, computed[section]);
+      if (section === "fuel") persistComputed();
+
+      // group rows by cat for rowspan — 숨긴 제스코 행은 그리지 않는다(계산은 위에서 이미 끝났다)
+      const catGroups = [];
+      let curCat = null, curGroup = null;
+      def.rows.filter((row) => showZesco || !row.zesco).forEach((row) => {
+        if (row.cat !== curCat) {
+          curCat = row.cat;
+          curGroup = { cat: curCat, rows: [] };
+          catGroups.push(curGroup);
+        }
+        curGroup.rows.push(row);
+      });
+
+      const html = [];
+      catGroups.forEach((group) => {
+        group.rows.forEach((row, idx) => {
+          const tr = [];
+          const rowCls = [row.cls, row.zesco ? "zesco-row" : ""].filter(Boolean).join(" ");
+          tr.push(`<tr${rowCls ? ` class="${rowCls}"` : ""}>`);
+          if (idx === 0) {
+            tr.push(`<th rowspan="${group.rows.length}" class="col-cat-sub">${escapeHtml(group.cat)}</th>`);
+          }
+          // 라벨 셀 — imported row 면 출처 배지 추가
+          const labelExtra = row.kind === "imported"
+            ? `<span class="emc-import-badge" title="${escapeHtml(row.importLabel || row.importSource)}">🔗 자동</span>`
+            : "";
+          tr.push(`<td class="label-cell">${escapeHtml(row.label)}${labelExtra}</td>`);
+
+          // 0..13 monthly cells + 합계 + 평균
+          for (let m = 0; m <= 13; m++) {
+            if (row.kind === "input" && !(m === 0 && hasPrevDec(row.key))) {
+              const v = secStore[row.key]?.[m] ?? "";
+              tr.push(`<td>${inputHtml(section, row.key, m, v)}</td>`);
+            } else if (row.kind === "input") {
+              // 전년 12월 — 작년 데이터에서 계산한 값 (엑셀 '24. 12월' 열과 같은 뜻)
+              const v = computed[section][row.key][0];
+              tr.push(`<td class="num"><span class="emc-calc prev-dec${v !== null && v < 0 ? " neg" : ""}" title="작년 12월 값 (작년 데이터에서 자동)">${fmt(v, 1)}</span></td>`);
+            } else {
+              const v = computed[section][row.key][m];
+              const extraCls = row.kind === "imported" ? " imported" : "";
+              tr.push(`<td class="num"><span class="emc-calc${v !== null && v < 0 ? " neg" : ""}${extraCls}">${fmt(v, 1)}</span></td>`);
+            }
+          }
+          // 합계 (1..12)
+          const monthVals = [];
+          for (let m = 1; m <= 12; m++) {
+            const v = (row.kind === "input")
+              ? (secStore[row.key]?.[m] !== undefined && secStore[row.key][m] !== "" ? Number(secStore[row.key][m]) : null)
+              : computed[section][row.key][m];
+            monthVals.push(v);
+          }
+          const sumV = sumArr(monthVals);
+          const avgV = avgArr(monthVals);
+          tr.push(`<td class="num"><span class="emc-calc${sumV < 0 ? " neg" : ""}">${fmt(sumV, 1)}</span></td>`);
+          tr.push(`<td class="num"><span class="emc-calc${avgV !== null && avgV < 0 ? " neg" : ""}">${fmt(avgV, 1)}</span></td>`);
+
+          // 비고 (카테고리당 첫 row 에만 rowspan)
+          if (def.hasNote && idx === 0) {
+            const noteVal = ys.notes[section]?.[group.cat] || "";
+            tr.push(noteHtml(section, group.cat, group.rows.length, noteVal));
+          }
+          tr.push(`</tr>`);
+          html.push(tr.join(""));
+        });
+      });
+      body.innerHTML = html.join("");
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    // 마지막으로 포커스됐던 emc-input 좌표 추적 — change 시점에 activeElement 가
+    // 잠시 body 로 빠질 때 fallback 으로 사용.
+    let __lastFocusCoord = null;
+    document.addEventListener("focusin", (e) => {
+      const t = e.target;
+      if (t && t.classList && t.classList.contains("emc-input")) {
+        __lastFocusCoord = {
+          section: t.dataset.section, row: t.dataset.row, month: t.dataset.month,
+          selStart: t.selectionStart, selEnd: t.selectionEnd,
+        };
+      }
+    }, true);
+
+    // 다른 화면(연료비 배분비율)이 읽는 값은 규격 표에도 저장한다 — 실적·스팀톤당 연료비(계산), 폐합성·유동상 스팀구매(연동).
+    // 값이 달라진 달만, 행 단위로 모아 보낸다.
+    const PERSIST_KEYS = ["fuelActual", "fuelSteamUnit", "pyhsynSteam", "fluidSteam"];
+    let __persistQueue = Promise.resolve();
+    function persistComputed() {
+      const yd = store[currentYear];
+      if (!yd || !computed.fuel) return;
+      const jobs = [];
+      PERSIST_KEYS.forEach((key) => {
+        const vals = computed.fuel[key] || {};
+        for (let m = 1; m <= 12; m += 1) {
+          const v = vals[m];
+          const next = Number.isFinite(v) ? v : null;
+          const cur = yd.fuel[key] ? yd.fuel[key][m] : undefined;
+          if (next === null && (cur === null || cur === undefined)) continue;
+          if (next !== null && Number.isFinite(cur) && Math.abs(cur - next) < 1e-9) continue;
+          jobs.push({ row_key: `fuel|${key}`, col_index: m, cell_value: next === null ? null : String(next) });
+          if (!yd.fuel[key]) yd.fuel[key] = {};
+          yd.fuel[key][m] = next;
+        }
+      });
+      if (!jobs.length) return;
+      const year = Number(currentYear);
+      __persistQueue = __persistQueue.then(async () => {
+        try {
+          if (store_.year() !== year) await store_.load(year);
+          await store_.setMany(jobs);
+        } catch (e) { console.error("[emc] 계산값 저장 실패:", e); }
+      });
+    }
+
+    function renderAll() {
+      const active = document.activeElement;
+      let focusCoord = null;
+      if (active && active.classList && active.classList.contains("emc-input")) {
+        focusCoord = {
+          section: active.dataset.section, row: active.dataset.row, month: active.dataset.month,
+          selStart: active.selectionStart, selEnd: active.selectionEnd,
+        };
+      } else if (__lastFocusCoord) {
+        focusCoord = { ...__lastFocusCoord };
+      }
+      buildHeader("fuel");
+      renderSection("fuel");
+      if (focusCoord) {
+        const sel = `.emc-input[data-section="${focusCoord.section}"][data-row="${focusCoord.row}"][data-month="${focusCoord.month}"]`;
+        const next = document.querySelector(sel);
+        if (next) {
+          next.focus();
+          try {
+            if (Number.isFinite(focusCoord.selStart) && Number.isFinite(focusCoord.selEnd)) {
+              next.setSelectionRange(focusCoord.selStart, focusCoord.selEnd);
+            } else {
+              const len = next.value.length;
+              next.setSelectionRange(len, len);
+            }
+          } catch (e) {}
+          // 다음 frame 에서 한 번 더 — grid-arrow-nav 가 focus 를 가로채는 경우 대비
+          requestAnimationFrame(() => {
+            if (document.activeElement !== next && document.contains(next)) {
+              next.focus();
+            }
+          });
+        }
+      }
+    }
+
+
+    // 이벤트
+    function bind() {
+      // 입력 변경 → DB 저장 + 메모리 캐시 갱신 + 재계산
+      document.body.addEventListener("change", (e) => {
+        const t = e.target;
+        if (t.classList.contains("emc-input")) {
+          const sec = t.dataset.section, rowKey = t.dataset.row, m = Number(t.dataset.month);
+          const typed = t.value.replace(/,/g, "").trim();
+          // 사용자가 변경하지 않았다면 (typed == 표시값) skip — DB 의 full precision 보존
+          const rawDb = String(t.dataset.rawValue || "");
+          if (typed === roundDisplay(rawDb)) return;
+          const ys = getYearState();
+          if (!ys[sec][rowKey]) ys[sec][rowKey] = {};
+          let dbValue = null;
+          if (typed === "") {
+            delete ys[sec][rowKey][m];
+          } else if (!isNaN(Number(typed))) {
+            ys[sec][rowKey][m] = Number(typed);
+            dbValue = Number(typed);
+          }
+          upsertCellToDB(sec, rowKey, m, dbValue);
+          // 새 raw 갱신 (다음 비교용)
+          t.dataset.rawValue = dbValue == null ? "" : String(dbValue);
+          setTimeout(renderAll, 0);
+        } else if (t.classList.contains("emc-note")) {
+          const sec = t.dataset.section, cat = t.dataset.note;
+          const ys = getYearState();
+          ys.notes[sec][cat] = t.value;
+          upsertNoteToDB(sec, cat, t.value);
+        }
+      });
+
+
+      window.addEventListener("resize", fitTableHeight);
+
+      // 연도 / 조회 / 초기화
+      const yearSel = document.getElementById("emcYear");
+      yearSel.addEventListener("change", () => {
+        currentYear = yearSel.value;
+        saveYearToShared();
+        updateSubtitle();
+      });
+      document.getElementById("emcReload").addEventListener("click", loadAndRender);
+      // 도급비용은 DB 기반이라 storage 이벤트 불필요. 다른 탭에서 갱신된 값을 보려면 [조회] 클릭.
+      document.getElementById("emcReset").addEventListener("click", async () => {
+        if (!confirm(`${currentYear}년 데이터를 초기화할까요?`)) return;
+        await deleteYearFromDB(currentYear);
+        delete store[currentYear];
+        renderAll();
+      });
+
+      // 제스코 보기 — 없어진 업체라 기본은 숨김. 눌러야 지난 자료를 볼 수 있다(계산에는 늘 들어간다).
+      const zescoBtn = document.getElementById("emcZescoToggle");
+      zescoBtn.addEventListener("click", () => {
+        showZesco = !showZesco;
+        zescoBtn.setAttribute("aria-pressed", String(showZesco));
+        zescoBtn.textContent = showZesco ? "제스코 숨기기" : "제스코 보기";
+        renderAll();
+        fitTableHeight();
+      });
+    }
+
+    // 표 스크롤 영역을 화면 아래까지 채운다 — 바깥(body)에는 스크롤이 생기지 않게 한다.
+    function fitTableHeight() {
+      // 셸 iframe 안에서는 body 가, 단독으로 열면 html 이 스크롤 컨테이너라 둘을 더해 쓴다.
+      const docTop = (document.scrollingElement ? document.scrollingElement.scrollTop : 0)
+                   + (document.body ? document.body.scrollTop : 0);
+      document.querySelectorAll(".energy-panel.active .energy-table-wrap").forEach((wrap) => {
+        // 스크롤된 상태에서도 같은 값이 나오도록 문서 기준 위치로 계산한다.
+        const top = wrap.getBoundingClientRect().top + docTop;
+        wrap.style.maxHeight = `${Math.max(240, Math.floor(window.innerHeight - top - 24))}px`;
+      });
+    }
+
+    const SHARED_PERIOD_KEY = "steamlog:shared-period";
+    function initYearSelect() {
+      const sel = document.getElementById("emcYear");
+      const y = new Date().getFullYear();
+      // 다른 페이지와 공유하는 조회 연/월 (steamlog:shared-period) 또는 자체 저장값 사용
+      let targetYear = null;
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        if (shared.year) targetYear = String(shared.year);
+      } catch (e) {}
+      if (!targetYear) targetYear = String(y);
+      for (let yy = y - 5; yy <= y + 2; yy += 1) {
+        const opt = document.createElement("option");
+        opt.value = String(yy); opt.textContent = `${yy}년`;
+        if (String(yy) === targetYear) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      // 만일 targetYear 가 옵션 범위 밖이면 동적 추가
+      if (sel.value !== targetYear) {
+        const opt = document.createElement("option");
+        opt.value = targetYear; opt.textContent = `${targetYear}년`;
+        opt.selected = true;
+        sel.appendChild(opt);
+      }
+      currentYear = sel.value;
+    }
+    function saveYearToShared() {
+      try {
+        const shared = JSON.parse(localStorage.getItem(SHARED_PERIOD_KEY) || "{}");
+        shared.year = currentYear;
+        localStorage.setItem(SHARED_PERIOD_KEY, JSON.stringify(shared));
+      } catch (e) {}
+    }
+
+    function updateSubtitle() {
+      document.getElementById("emcSubtitle").textContent =
+        `${currentYear}년 월별 회계비용 마감 vs 실마감 차이 (연료비)`;
+    }
+
+    async function loadAndRender() {
+      // 캐시 무효화 후 올해 + 작년 fetch. 작년은 전년 12월 열(열 0)을 채우는 데 쓴다.
+      const prevYear = String(Number(currentYear) - 1);
+      __fmcCache.clear();
+      __efrDataCache.clear();
+      __cbpCache.clear();
+      __incCache.clear();
+      __prevDec.year = null; __prevDec.values = {};
+      window.EnergyLinkedSources.resetCache();
+      // 인보이스 연동(공용 js)은 한 해만 캐시 → 작년 것을 먼저 받아 복사해 두고 나서 올해 것을 받는다
+      const [prevSrf, prevClient] = await Promise.all([
+        window.EnergyLinkedSources.fetchCompositeSteamPurchase(prevYear).catch(() => ({})),
+        window.EnergyLinkedSources.fetchCompositeLngEtc(prevYear).catch(() => ({})),
+      ]);
+      __linkedPrev.year = prevYear;
+      __linkedPrev.srf = { ...(prevSrf || {}) };
+      __linkedPrev.client = { ...(prevClient || {}) };
+      await Promise.all([
+        window.EnergyLinkedSources.fetchCompositeSteamPurchase(currentYear).catch(() => {}),
+        window.EnergyLinkedSources.fetchCompositeLngEtc(currentYear).catch(() => {}),
+        loadStoreFromDB(currentYear).catch(() => {}),
+        loadStoreFromDB(prevYear).catch(() => {}),
+        fetchFuelRatio(currentYear).catch(() => {}),
+        fetchFuelRatio(prevYear).catch(() => {}),
+        fetchFluidizedContract(currentYear).catch(() => {}),
+        fetchFluidizedContract(prevYear).catch(() => {}),
+        fetchComboProductionTotal(currentYear).catch(() => {}),
+        fetchComboProductionTotal(prevYear).catch(() => {}),
+        fetchIncineratorContractTotal(currentYear).catch(() => {}),
+        fetchIncineratorContractTotal(prevYear).catch(() => {}),
+      ]);
+      renderAll();
+      fitTableHeight();
+    }
+
+    initYearSelect();
+    updateSubtitle();
+    bind();
+    loadAndRender();
+  })();
+  </script>
+  <script defer src="/steam/js/excel-upload-errors.js?v=20260916-cardfit"></script>
+  <script defer src="/steam/js/energy-excel-controls.js?v=20261120-spec2"></script>
+</body>
+</html>

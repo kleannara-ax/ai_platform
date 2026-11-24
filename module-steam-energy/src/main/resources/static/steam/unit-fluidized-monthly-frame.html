@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>월별 운영내역 프레임</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/steam/css/common.css?v=20260526-responsive-fix" />
+  <link rel="stylesheet" href="/steam/css/page-fluidized.css?v=20260520-split2-applied" />
+  <link rel="stylesheet" href="/steam/css/inc-design.css?v=20260526-revert-A-B" />
+  <style>
+    html,
+    body.monthly-frame-body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    body.monthly-frame-body {
+      font-family: "Inter", sans-serif;
+      color: #173a54;
+    }
+
+    .monthly-frame-shell {
+      padding: 0;
+    }
+  </style>
+  <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/fluidized-store.js?v=20261120-spec3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
+</head>
+<body class="monthly-frame-body">
+  <div class="monthly-frame-shell" id="monthlyFrameRoot"></div>
+  <script src="/steam/js/unit-fluidized-monthly-render.js?v=20261123-spec5"></script>
+  <script src="/steam/js/unit-fluidized-monthly-frame-pages.js?v=20260422-fluidized-monthly-frame2"></script>
+  <script src="/steam/js/grid-arrow-nav.js?v=20260428-grid-arrow"></script>
+</body>
+</html>

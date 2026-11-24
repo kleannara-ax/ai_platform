@@ -94,6 +94,10 @@ public class IpAddressService {
         ip.updateSpec(req.getModel(), req.getSerialNo(), req.getVendor(),
                 req.getOsVersion(), req.getOsSerial(), req.getOfficeVersion(), req.getOfficeSerial(),
                 req.getHangulVersion(), req.getHangulSerial(), req.getRentalCompany(), req.getPcAssetNo(), req.getMonitorAssetNo());
+        // IP 그룹(대역)을 IP 주소에서 채운다 — 비어 있으면 목록 정렬(그룹 → IP 순)에서 맨 앞에 오고 그룹 필터에서도 빠진다
+        if (req.getIpAddress() != null && !req.getIpAddress().isBlank()) {
+            ip.assignGroup(groupOf(req.getIpAddress().trim()));
+        }
         IpAddress saved = ipAddressRepository.save(ip);
 
         ipHistoryRepository.save(IpHistory.of(saved, findRequestOrNull(req.getRequestId()),
@@ -161,14 +165,14 @@ public class IpAddressService {
     }
 
     // ================================================================
-    // 반납 처리 (PC+IP 반납, 이력: 반납) — PC 정보까지 비운다
+    // 반납 처리 (PC+IP 반납, 이력: 반납) — 상태 '반납', IP 외 정보는 모두 비운다 (사유는 이력에만)
     // ================================================================
     @Transactional
     public IpAddressResponse returnPc(Long ipId, IpReclaimRequest req, Authentication authentication) {
         IpAddress ip = findIp(ipId);
         assertSiteAccess(authentication, ip.getSite());
         String beforeUser = ip.getUserName();
-        ip.returnPc(req.getReason());
+        ip.returnPc();
 
         String content = (req.getReason() != null && !req.getReason().isBlank())
                 ? req.getReason() : "PC+IP 반납";
@@ -618,11 +622,177 @@ public class IpAddressService {
     // Excel 다운로드 (IP 목록)
     // ================================================================
     public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup, String site, Authentication authentication) {
+        return exportExcel(keyword, searchField, status, department, ipGroup, site, null, authentication);
+    }
+
+    /** @param layout "ip" = IP관리 표, "pc" = PC관리 표 (서울 PC 관리), 그 외 = 전체 PC 목록 표 */
+    public byte[] exportExcel(String keyword, String searchField, IpStatus status, String department, String ipGroup,
+                              String site, String layout, Authentication authentication) {
         List<IpAddress> list = ipAddressRepository
                 .search(emptyToNull(keyword), emptyToNull(searchField), status, emptyToNull(department),
                         emptyToNull(ipGroup), null, resolveSite(authentication, site), Pageable.unpaged())
                 .getContent();
-        return excelExportService.buildIpListExcel(list);
+        return excelExportService.buildIpListExcel(list, layout);
+    }
+
+    // ================================================================
+    // Excel 업로드 — 서울 PC 관리 'IP관리' / 'PC관리' 표 (표별 양식, 기존 행도 갱신)
+    // ================================================================
+    @Transactional
+    public IpExcelUploadResult importExcel(MultipartFile file, String site, String changedBy,
+                                           Authentication authentication, String layout) {
+        if (!"ip".equals(layout) && !"pc".equals(layout)) {
+            return importExcel(file, site, changedBy, authentication);
+        }
+        String resolved = resolveSite(authentication, site);
+        String s = (resolved == null || resolved.isBlank()) ? "청주" : resolved;
+        String[] headers = "ip".equals(layout) ? ExcelExportService.IP_SHEET_HEADERS : ExcelExportService.PC_SHEET_HEADERS;
+        List<String> expected = List.of(headers);
+        DataFormatter fmt = new DataFormatter();
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            Row header = (sheet != null) ? sheet.getRow(sheet.getFirstRowNum()) : null;
+            List<String> actual = new ArrayList<>();
+            if (header != null) {
+                for (int c = 0; c < expected.size(); c++) actual.add(cellStr(header.getCell(c), fmt));
+            }
+            if (!expected.equals(actual)) {
+                return IpExcelUploadResult.headerMismatch(expected, actual);
+            }
+            int[] counts = new int[3];   // [신규, 갱신, 제외]
+            List<String> reasons = new ArrayList<>();
+            for (int r = header.getRowNum() + 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                java.util.Map<String, String> v = new java.util.LinkedHashMap<>();
+                boolean blank = true;
+                for (int c = 0; c < headers.length; c++) {
+                    String val = trimToNull(cellStr(row.getCell(c), fmt));
+                    v.put(headers[c], val);
+                    if (val != null) blank = false;
+                }
+                if (blank) continue;   // 빈 줄
+                String skip = "ip".equals(layout)
+                        ? importIpSheetRow(v, s, changedBy, authentication, counts)
+                        : importPcSheetRow(v, s, changedBy, authentication, counts);
+                if (skip != null) {
+                    counts[2]++;
+                    if (reasons.size() < 20) reasons.add((r + 1) + "행: " + skip);
+                }
+            }
+            return IpExcelUploadResult.success(counts[0], counts[1], counts[2], reasons);
+        } catch (IOException ex) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다: " + ex.getMessage());
+        }
+    }
+
+    /** IP관리 표 한 줄: IP주소로 기존 행을 찾아 부서·사용자·비고를 갱신, 없으면 신규 등록. 제외 시 사유 반환. */
+    private String importIpSheetRow(java.util.Map<String, String> v, String site, String changedBy,
+                                    Authentication authentication, int[] counts) {
+        String ipAddr = v.get("IP주소");
+        if (ipAddr == null) return "IP주소 없음";
+        java.util.Optional<IpAddress> found = ipAddressRepository.findFirstByIpAddress(ipAddr);
+        if (found.isEmpty()) {
+            String rowSite = isSeoulBandIp(ipAddr) ? "서울" : site;
+            if (!kimsPerm.canWorkOnSite(authentication, rowSite)) return "다른 사업장 IP";
+            String userName = v.get("사용자");
+            IpAddress e = IpAddress.builder()
+                    .ipAddress(ipAddr)
+                    .ipGroup(v.get("IP그룹") != null ? v.get("IP그룹") : groupOf(ipAddr))
+                    .status((userName != null) ? IpStatus.IN_USE : IpStatus.AVAILABLE)
+                    .department(v.get("부서"))
+                    .userName(userName)
+                    .remark(v.get("비고"))
+                    .approved(false)
+                    .site(rowSite)
+                    .build();
+            IpAddress saved = ipAddressRepository.save(e);
+            ipHistoryRepository.save(IpHistory.of(saved, null, IpChangeType.CREATED,
+                    "[엑셀 업로드-IP관리] 신규 등록", false, null, changedBy));
+            counts[0]++;
+            return null;
+        }
+        IpAddress e = found.get();
+        if (!site.equals(e.getSite()) || !kimsPerm.canWorkOnSite(authentication, e.getSite())) return "다른 사업장 IP";
+        java.util.Map<String, String> changes = new java.util.LinkedHashMap<>();
+        putIfChanged(changes, "부서", e.getDepartment(), v.get("부서"));
+        putIfChanged(changes, "사용자", e.getUserName(), v.get("사용자"));
+        putIfChanged(changes, "비고", e.getRemark(), v.get("비고"));
+        if (!changes.isEmpty()) {
+            modify(e.getIpId(), modifyRequestFromSheet(e, changes, "[엑셀 업로드-IP관리]", changedBy), authentication);
+            counts[1]++;
+        }
+        return null;
+    }
+
+    /** PC관리 표 한 줄: 사업장 안에서 제조번호로 기존 행을 찾아 PC 정보를 갱신 (IP가 없어 신규 등록은 불가). 제외 시 사유 반환. */
+    private String importPcSheetRow(java.util.Map<String, String> v, String site, String changedBy,
+                                    Authentication authentication, int[] counts) {
+        String serial = v.get("제조번호");
+        if (serial == null) return "제조번호 없음";
+        List<IpAddress> found = ipAddressRepository.findBySerialNoAndSite(serial, site);
+        if (found.isEmpty()) return "제조번호 미등록(" + serial + ") — IP관리에서 먼저 등록 필요";
+        if (found.size() > 1) return "제조번호 중복(" + serial + ", " + found.size() + "건)";
+        IpAddress e = found.get(0);
+        if (!kimsPerm.canWorkOnSite(authentication, e.getSite())) return "다른 사업장 PC";
+        String rental = v.get("렌탈사");
+        java.util.Map<String, String> changes = new java.util.LinkedHashMap<>();
+        putIfChanged(changes, "렌탈사", e.getRentalCompany(), "자산".equals(rental) ? null : rental);
+        for (String h : ExcelExportService.PC_SHEET_HEADERS) {
+            if ("렌탈사".equals(h) || "제조번호".equals(h)) continue;
+            putIfChanged(changes, h, ExcelExportService.ipSheetValue(e, h), v.get(h));
+        }
+        if (!changes.isEmpty()) {
+            modify(e.getIpId(), modifyRequestFromSheet(e, changes, "[엑셀 업로드-PC관리]", changedBy), authentication);
+            counts[1]++;
+        }
+        return null;
+    }
+
+    private static void putIfChanged(java.util.Map<String, String> changes, String label, String before, String after) {
+        String b = (before == null || before.isBlank()) ? null : before.trim();
+        if (!java.util.Objects.equals(b, after)) changes.put(label, after);
+    }
+
+    /**
+     * 엑셀 업로드 갱신용 변경 요청 — 현재 값을 그대로 두고 바뀐 칸만 덮어쓴다 (표 직접 수정 저장과 같은 방식).
+     * 이력 내용: "[엑셀 업로드-PC관리] 모델: A → B, 사용자: (없음) → 홍길동"
+     */
+    private IpModifyRequest modifyRequestFromSheet(IpAddress e, java.util.Map<String, String> changes,
+                                                   String prefix, String changedBy) {
+        java.util.function.BiFunction<String, String, String> pick = (label, cur) -> changes.containsKey(label) ? changes.get(label) : cur;
+        IpModifyRequest req = new IpModifyRequest();
+        req.setUserName(pick.apply("사용자", e.getUserName()));
+        req.setDepartment(pick.apply("부서", e.getDepartment()));
+        req.setLocation(e.getLocation());
+        req.setDevice(pick.apply("장치구분", e.getDevice()));
+        req.setApproved(e.isApproved());
+        req.setApprovalNo(e.getApprovalNo());
+        req.setRemark(pick.apply("비고", e.getRemark()));
+        req.setNoteDate(changes.containsKey("비고") ? java.time.LocalDate.now() : e.getNoteDate());
+        req.setModel(pick.apply("모델", e.getModel()));
+        req.setSerialNo(e.getSerialNo());
+        req.setVendor(pick.apply("구입업체", e.getVendor()));
+        req.setOsVersion(pick.apply("OS버전", e.getOsVersion()));
+        req.setOsSerial(pick.apply("OS시리얼", e.getOsSerial()));
+        req.setOfficeVersion(pick.apply("OFFICE버전", e.getOfficeVersion()));
+        req.setOfficeSerial(pick.apply("OFFICE시리얼", e.getOfficeSerial()));
+        req.setHangulVersion(pick.apply("한글버전", e.getHangulVersion()));
+        req.setHangulSerial(pick.apply("한글시리얼", e.getHangulSerial()));
+        req.setRentalCompany(pick.apply("렌탈사", e.getRentalCompany()));
+        req.setPcAssetNo(pick.apply("PC자산번호", e.getPcAssetNo()));
+        req.setMonitorAssetNo(pick.apply("모니터자산번호", e.getMonitorAssetNo()));
+        if (changes.containsKey("구입일")) req.setPurchaseDate(changes.get("구입일") == null ? "" : changes.get("구입일"));
+        req.setChangedBy(changedBy);
+        req.setReason(prefix + " " + changes.entrySet().stream()
+                .map(en -> {
+                    String before = ExcelExportService.ipSheetValue(e, en.getKey());
+                    if ("렌탈사".equals(en.getKey())) before = e.getRentalCompany();
+                    return en.getKey() + ": " + (before == null || before.isBlank() ? "(없음)" : before)
+                            + " → " + (en.getValue() == null ? "(없음)" : en.getValue());
+                })
+                .collect(java.util.stream.Collectors.joining(", ")));
+        return req;
     }
 
     // ================================================================
@@ -663,7 +833,8 @@ public class IpAddressService {
                 String rowSite = isSeoulBandIp(ip) ? "서울" : s;
                 IpAddress e = IpAddress.builder()
                         .ipAddress(ip)
-                        .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)))
+                        .ipGroup(trimToNull(cellStr(row.getCell(0), fmt)) != null
+                                ? trimToNull(cellStr(row.getCell(0), fmt)) : groupOf(ip))   // 그룹 칸이 비면 IP에서 채움
                         .status(statusFromLabel(cellStr(row.getCell(2), fmt), userName))
                         .usageType(trimToNull(cellStr(row.getCell(3), fmt)))
                         .department(trimToNull(cellStr(row.getCell(4), fmt)))
