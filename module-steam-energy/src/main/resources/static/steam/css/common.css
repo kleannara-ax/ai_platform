@@ -1786,7 +1786,7 @@ body {
 
 .data-table input.calc-input,
 .yearly-table input.calc-input {
-  background: #eef2ff;
+  background: #f1f5f8;
   color: #1e293b;
   font-weight: 600;
 }
@@ -2451,7 +2451,7 @@ body.table-resizing-row * {
 /* ============================================================================
    표 셀 색상 전역 통일 (2026-05-18)
    - editable 입력칸  -> 흰 배경 (#ffffff) + 옅은 파란 테두리
-   - calc/readonly    -> 라벤더 (#eef2ff) + bold (auto-calculated, linked, summary)
+   - calc/readonly    -> 라벤더 (#f1f5f8) + bold (auto-calculated, linked, summary)
    주 의: 특수 페이지 (data-page-kind="fluidized-summary", .fluidized-clean-main,
           .fluidized-plain-page) 은 의도적으로 input 배경이 transparent 디자인이라
           그대로 둔다 (더 specific 한 별도 셀렉터가 이 규칙을 덮는다).
@@ -2481,7 +2481,7 @@ body.table-resizing-row * {
 .landing-body .unit-table tbody td:nth-child(n+19):nth-child(-n+30) input.calc-input,
 .landing-body .unit-table tbody tr.summary-row td:nth-child(n+19):nth-child(-n+30) input.calc-input,
 .landing-body .unit-table tbody tr.summary-row td:nth-child(n+31):nth-child(-n+36) input.calc-input {
-  background: #eef2ff !important;
+  background: #f1f5f8 !important;
   color: #1e293b !important;
   font-weight: 600 !important;
 }
@@ -2505,7 +2505,7 @@ body.table-resizing-row * {
 .landing-body .steam-lng-mix-table tbody tr.summary-row td,
 .landing-body .flow-table tbody tr.summary-row td,
 .landing-body .yearly-table tbody tr.summary-row td {
-  background: #f5f7ff !important;
+  background: #e8f4ec !important;
 }
 
 /* ============================================================

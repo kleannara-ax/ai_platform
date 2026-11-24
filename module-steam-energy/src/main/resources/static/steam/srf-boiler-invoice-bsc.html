@@ -71,7 +71,7 @@
       border:1px solid #d8dee9; text-align:right; vertical-align:middle; color:#0f172a;
     }
     table.bsc-table tbody td.col-desc { text-align:left; font-weight:600; background:#f8fafc; }
-    table.bsc-table tbody td.computed { background:#eef2ff; color:#1e293b; font-weight:600; }
+    table.bsc-table tbody td.computed { background:#f1f5f8; color:#1e293b; font-weight:600; }
     /* 입력 칸 — 다른 페이지와 동일하게 흰색 + 검정 테두리 */
     table.bsc-table tbody td.input-cell { padding:0; background:#fff; }
     .bsc-input {
@@ -110,6 +110,8 @@
   <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/srf-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
 </head>
 <body class="landing-body" data-page-kind="srf-invoice-bsc">
   <main class="invoice-workspace">

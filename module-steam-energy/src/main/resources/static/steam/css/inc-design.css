@@ -16,8 +16,8 @@
   --inc-border-card: rgba(120, 181, 217, .28);
   --inc-bg-card: #ffffff;
   --inc-bg-page: #f6f9fc;
-  --inc-bg-computed: #eef2ff;
-  --inc-bg-summary: linear-gradient(180deg, #fffbe5 0%, #fff5cc 100%);
+  --inc-bg-computed: #f1f5f8;
+  --inc-bg-summary: #e8f4ec;
   --inc-bg-header: #f3f6ff;
   --inc-bg-row-hover: #f8fafd;
   --inc-shadow-card: 0 8px 24px rgba(23, 65, 95, .07);
@@ -293,8 +293,8 @@ body.landing-body.inc-page .landing-canvas {
 .inc-table tbody tr.summary-row th {
   background: var(--inc-bg-summary) !important;
   font-weight: 800;
-  color: #7c5a00;
-  border-bottom: 1.5px solid #f0d674;
+  color: #1f4d38;
+  border-bottom: 1.5px solid #a9cdb8;
 }
 .inc-table tbody tr:last-child td { border-bottom: none; }
 
@@ -1209,7 +1209,7 @@ body.landing-body[data-page-kind="unit"] .data-table tbody tr.summary-row td:fir
 body.landing-body[data-page-kind="unit"] .data-table tbody tr.total-row td:first-child,
 body.landing-body[data-page-kind="unit"] .data-table tbody tr.is-summary td:first-child,
 body.landing-body[data-page-kind="combo-boiler"] .data-table tbody tr.summary-row td:first-child {
-  background-color: #fff5cc !important;
+  background-color: #e8f4ec !important;
 }
 /* row hover 시 sticky 칸도 함께 강조 */
 body.landing-body[data-page-kind="unit"] .data-table tbody tr:hover td:first-child,
@@ -1371,7 +1371,7 @@ body.platform-embedded[data-page-kind="srf-invoice-client"] .invoice-canvas {
   color: var(--inc-text-strong);
 }
 .energy-table tr.subtotal td {
-  background: var(--inc-bg-summary, #fff8e3);
+  background: linear-gradient(180deg, #fffbe5 0%, #fff5cc 100%);   /* 소계 강조 — 기본 합계색(연두)과 따로 둔다 */
   font-weight: 700;
   color: #7c5a00;
 }
