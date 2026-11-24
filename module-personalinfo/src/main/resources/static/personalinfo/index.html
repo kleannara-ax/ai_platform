@@ -249,6 +249,26 @@
   </div></div>
 </div>
 
+<!-- 첨부 업로드 전 내용 확인 결과 (서류 종류·업체명·날짜·중복 파일) -->
+<div class="modal fade" id="file-check-modal" tabindex="-1" aria-labelledby="file-check-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="file-check-title">파일 내용 확인</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+    <div class="modal-body">
+      <p class="small text-muted mb-2" id="file-check-file"></p>
+      <div id="file-check-body" aria-live="polite"></div>
+      <div class="form-check mt-3 d-none p-3 border rounded bg-light" id="file-check-confirm-wrap">
+        <input class="form-check-input ms-0 me-2" type="checkbox" id="file-check-confirm">
+        <label class="form-check-label fw-semibold" for="file-check-confirm">내용 직접 확인했습니다 <small class="text-muted fw-normal">(서류 종류·업체명·날짜가 맞는지 파일을 열어 확인함)</small></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-light" data-bs-dismiss="modal" id="file-check-cancel">닫기</button>
+      <button type="button" class="btn btn-primary d-none" id="file-check-ok" disabled><i class="fas fa-upload me-1"></i>업로드</button>
+    </div>
+  </div></div>
+</div>
+
 <!-- 양식 관리: 새 버전 등록 팝업 (#/forms) -->
 <div class="modal fade" id="form-template-modal" tabindex="-1" aria-labelledby="form-template-modal-title" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">

@@ -72,10 +72,10 @@ public class PiContractDocAnalyzer {
     private static final DateTimeFormatter DOT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     /** 2026년 3월 1일 / 2026 년 03 월 01 일 */
-    private static final Pattern KOREAN_DATE =
+    static final Pattern KOREAN_DATE =
             Pattern.compile("(?<!\\d)((?:19|20)\\d{2})\\s*년\\s*(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일");
     /** 2026.03.01 / 2026. 3. 1. / 2026-03-01 / 2026/3/1 */
-    private static final Pattern NUMERIC_DATE =
+    static final Pattern NUMERIC_DATE =
             Pattern.compile("(?<!\\d)((?:19|20)\\d{2})\\s*([./\\-])\\s*(\\d{1,2})\\s*\\2\\s*(\\d{1,2})(?!\\d)");
 
     private static final List<String> SIGNED_KEYWORDS =

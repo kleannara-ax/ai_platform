@@ -74,10 +74,15 @@ public class PiContractFile extends PiBaseEntity {
     @Column(name = "DESTRUCTION_PERIOD", length = 10)
     private String destructionPeriod;
 
+    /** 업로드 내용 확인 결과: AUTO 자동 확인 통과 / MANUAL 담당자가 내용 직접 확인 (이전 파일은 null) */
+    @Column(name = "CONTENT_CHECK", length = 10)
+    private String contentCheck;
+
     @Builder
     private PiContractFile(Long contractId, ContractFileType fileType, String originalName, String storedPath,
                            String contentType, Long fileSize, String fileHash, String description, LocalDate signedDate,
-                           LocalDate documentDate, String documentNote, String destructionPeriod, Long createdBy) {
+                           LocalDate documentDate, String documentNote, String destructionPeriod, String contentCheck,
+                           Long createdBy) {
         this.contractId = contractId;
         this.fileType = fileType == null ? ContractFileType.CONTRACT : fileType;
         this.originalName = originalName;
@@ -90,6 +95,7 @@ public class PiContractFile extends PiBaseEntity {
         this.documentDate = this.fileType.hasDocumentDate() ? documentDate : null;
         this.documentNote = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? documentNote : null;
         this.destructionPeriod = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? destructionPeriod : null;
+        this.contentCheck = contentCheck;
         markCreatedBy(createdBy);
     }
 

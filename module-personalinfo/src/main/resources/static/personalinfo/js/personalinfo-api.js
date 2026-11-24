@@ -88,6 +88,7 @@ const PI_API = (() => {
     reopenContract: (id) => request('/contracts/' + id + '/reopen', { method: 'POST' }),
     deleteContract: (id) => request('/contracts/' + id, { method: 'DELETE' }),
     uploadFile: (id, form) => request('/contracts/' + id + '/files', { method: 'POST', form }),
+    checkFile: (id, form) => request('/contracts/' + id + '/files/check', { method: 'POST', form }),
     analyzeContractDoc: (form) => request('/contract-doc/analyze', { method: 'POST', form }),
     updateFileDocumentDate: (fileId, documentDate, documentNote) => request('/files/' + fileId + '/document-date',
       { method: 'PATCH', body: documentNote === undefined ? { documentDate } : { documentDate, documentNote } }),

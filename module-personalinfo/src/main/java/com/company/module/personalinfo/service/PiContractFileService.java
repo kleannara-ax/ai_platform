@@ -4,6 +4,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.EntityNotFoundException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.personalinfo.dto.ContractFileResponse;
+import com.company.module.personalinfo.dto.FileCheckResponse;
 import com.company.module.personalinfo.entity.ContractFileType;
 import com.company.module.personalinfo.entity.PiContract;
 import com.company.module.personalinfo.entity.PiContractFile;
@@ -31,6 +32,7 @@ public class PiContractFileService {
     private static final int MAX_FILES_PER_CONTRACT = 50;
 
     private final PiContractFileRepository fileRepository;
+    private final PiFileContentChecker contentChecker;
     private final PiContractRepository contractRepository;
     private final PiFileStorage storage;
     private final PiContractDocAnalyzer docAnalyzer;
@@ -92,6 +94,30 @@ public class PiContractFileService {
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, LocalDate documentDate, String documentNote,
                                        String destructionPeriod, Long userId) {
+        return upload(contractId, file, fileType, description, signedDate, documentDate, documentNote, destructionPeriod, false, userId);
+    }
+
+    /**
+     * 업로드 전 파일 내용 확인 (저장하지 않음). 화면은 파일을 고르면 먼저 이 결과를 보여주고,
+     * 업로드 때 서버가 같은 확인을 다시 한다.
+     */
+    public FileCheckResponse checkFile(Long contractId, MultipartFile file, String fileType,
+                                       LocalDate signedDate, LocalDate documentDate) {
+        PiContract contract = ensureContract(contractId);
+        return contentChecker.check(contract, file, parseType(fileType), documentDate, signedDate);
+    }
+
+    /**
+     * 첨부 업로드 (내용 확인 포함).
+     * <ul>
+     *   <li>서류 종류 불일치·중복 파일·날짜 불일치·업체명 불일치면 저장하지 않고 400</li>
+     *   <li>글자를 읽을 수 없거나 서류 종류를 알아볼 수 없으면 contentConfirmed=true(담당자 직접 확인)일 때만 저장</li>
+     * </ul>
+     */
+    @Transactional
+    public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
+                                       LocalDate signedDate, LocalDate documentDate, String documentNote,
+                                       String destructionPeriod, boolean contentConfirmed, Long userId) {
         PiContract contract = ensureContract(contractId);
         if (fileRepository.countByContractIdAndDeletedYn(contractId, N) >= MAX_FILES_PER_CONTRACT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
@@ -104,6 +130,15 @@ public class PiContractFileService {
         }
         if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "서류 일자는 오늘보다 늦을 수 없습니다.");
+        }
+        FileCheckResponse check = contentChecker.check(contract, file, type, documentDate, signedDate);
+        if (check.isBlocked()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 수 없습니다. "
+                    + String.join(" / ", check.getErrors().stream().map(FileCheckResponse.Issue::getMessage).toList()));
+        }
+        if (check.isNeedsManualConfirm() && !contentConfirmed) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "파일 내용을 자동으로 확인할 수 없습니다. 서류 종류·업체명·날짜를 직접 확인한 뒤 '내용 직접 확인했습니다'에 체크하고 올리세요.");
         }
         PiFileStorage.StoredFile stored = storage.store(file, "contract", PiFileStorage.CONTRACT_EXTENSIONS,
                 storage.getMaxContractFileBytes());
@@ -124,6 +159,7 @@ public class PiContractFileService {
                 .documentDate(documentDate)
                 .documentNote(checkNote(type, documentNote))
                 .destructionPeriod(period)
+                .contentCheck(check.isNeedsManualConfirm() ? "MANUAL" : "AUTO")
                 .createdBy(userId)
                 .build());
         if (type == ContractFileType.CONTRACT) {

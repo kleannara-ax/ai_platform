@@ -693,7 +693,9 @@
           const fd = new FormData();
           fd.append('file', file); fd.append('fileType', 'CONTRACT');
           if (docState && docState.docDate) fd.append('signedDate', docState.docDate);
-          try { await PI_API.uploadFile(saved.contractId, fd); } catch (err) { notify('계약은 저장되었으나 파일 업로드 실패: ' + err.message, 'warning'); }
+          try {
+            if (!(await guardedUpload(saved.contractId, fd))) notify('계약은 저장되었으나 계약서 파일은 올리지 않았습니다. 상세 화면 첨부에서 맞는 파일을 다시 올리세요.', 'warning');
+          } catch (err) { notify('계약은 저장되었으나 파일 업로드 실패: ' + err.message, 'warning'); }
         }
         notify(isEdit ? '수정되었습니다.' : '등록되었습니다.');
         go('#/contracts/' + saved.contractId);
@@ -906,6 +908,49 @@
       <ul class="mb-0 small">${items.join('')}</ul></section>`;
   }
 
+  /**
+   * 업로드 전 파일 내용 확인 → 통과하면 업로드.
+   * 서류 종류·업체명·날짜가 다르거나 같은 파일이 이미 있으면 오류창을 띄우고 올리지 않는다.
+   * 글자를 읽을 수 없는 파일은 '내용 직접 확인했습니다'에 체크해야 올라간다. (서버도 업로드 때 같은 확인을 다시 함)
+   * @returns 업로드 결과, 올리지 않았으면 null
+   */
+  async function guardedUpload(contractId, fd) {
+    const ck = new FormData();
+    ['file', 'fileType', 'signedDate', 'documentDate'].forEach((k) => { const v = fd.get(k); if (v) ck.append(k, v); });
+    const r = await PI_API.checkFile(contractId, ck);
+    if (!(await showFileCheck(r))) return null;
+    if (r.needsManualConfirm) fd.set('contentConfirmed', 'Y');
+    return PI_API.uploadFile(contractId, fd);
+  }
+
+  /** 내용 확인 결과 창. 통과면 바로 true, 막힘이면 오류창(닫기만), 직접 확인 필요면 체크 후 업로드 → true */
+  function showFileCheck(r) {
+    if (r.ok) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const $ = (id) => document.getElementById(id);
+      const dup = (r.errors || []).find((x) => x.code === 'DUPLICATE');
+      $('file-check-title').innerHTML = r.blocked
+        ? `<i class="fas fa-circle-xmark text-danger me-1"></i>${dup && r.errors.length === 1 ? '중복된 파일입니다 — 확인하세요' : '업로드할 수 없습니다'}`
+        : '<i class="fas fa-triangle-exclamation text-warning me-1"></i>내용을 직접 확인해 주세요';
+      $('file-check-file').textContent = `파일: ${r.fileName || ''} · 고른 구분: ${r.fileTypeLabel}${r.detectedTypeLabel ? ' · 문서 내용: ' + r.detectedTypeLabel : ''}`;
+      const errs = (r.errors || []).map((x) => `<li>${esc(x.message)}</li>`).join('');
+      const notes = (r.notes || []).map((x) => `<li>${esc(x)}</li>`).join('');
+      $('file-check-body').innerHTML = (r.blocked
+        ? `<div class="alert alert-danger py-2 mb-2" role="alert"><b>아래 문제를 고친 뒤 다시 올리세요.</b><ul class="mb-0 mt-1 small">${errs}</ul></div>`
+        : `<div class="alert alert-warning py-2 mb-2" role="alert">이 파일은 자동으로 내용을 확인하지 못했습니다. 파일을 열어 <b>서류 종류(${esc(r.fileTypeLabel)})·업체명·날짜</b>가 맞는지 확인한 뒤 체크하세요.</div>`)
+        + (notes ? `<ul class="small text-muted mb-0">${notes}</ul>` : '');
+      const wrap = $('file-check-confirm-wrap'); const cb = $('file-check-confirm'); const ok = $('file-check-ok');
+      wrap.classList.toggle('d-none', r.blocked); ok.classList.toggle('d-none', r.blocked);
+      cb.checked = false; ok.disabled = true;
+      cb.onchange = () => { ok.disabled = !cb.checked; };
+      $('file-check-cancel').textContent = r.blocked ? '확인' : '취소';
+      let done = false;
+      ok.onclick = () => { if (!cb.checked) return; done = true; modal('file-check-modal').hide(); resolve(true); };
+      $('file-check-modal').addEventListener('hidden.bs.modal', () => { if (!done) resolve(false); }, { once: true });
+      modal('file-check-modal').show();
+    });
+  }
+
   /** 상세: 정기 파기확인 현황 섹션 틀 (정기 파기확인 계약이거나 정기 파기 확인서가 있을 때) */
   function periodicSectionShell(c) {
     if (c.periodicDestructionYn !== 'Y' && !(c.files || []).some((f) => f.destructionPeriod)) return '';
@@ -964,7 +1009,7 @@
         fd.append('file', f); fd.append('fileType', 'DESTRUCTION_CONFIRM'); fd.append('destructionPeriod', b.dataset.periodicUpload);
         fd.append('description', b.dataset.label + ' 정기 파기 확인서');
         if (ans.date) fd.append('documentDate', ans.date);
-        try { await PI_API.uploadFile(c.contractId, fd); notify(`${b.dataset.label} 파기 확인서를 올렸습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
+        try { if (await guardedUpload(c.contractId, fd)) { notify(`${b.dataset.label} 파기 확인서를 올렸습니다.`); reload(); } else inp.value = ''; } catch (e) { fail(e); inp.value = ''; }
       };
       inp.click();
     }));
@@ -1381,7 +1426,7 @@
       fd.append('file', f); fd.append('fileType', it.fileType); fd.append('description', '계약만료시 점검 제출');
       if (ans.date) fd.append('documentDate', ans.date);
       if (ans.note) fd.append('documentNote', ans.note);
-      try { await PI_API.uploadFile(id, fd); notify(`${it.label}을(를) 업로드했습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
+      try { if (await guardedUpload(id, fd)) { notify(`${it.label}을(를) 업로드했습니다.`); reload(); } else inp.value = ''; } catch (e) { fail(e); inp.value = ''; }
     }));
   }
 
@@ -1723,7 +1768,7 @@
           if (ans.date) fd.append('documentDate', ans.date);
           if (ans.note) fd.append('documentNote', ans.note);
         }
-        try { await PI_API.uploadFile(id, fd); notify('업로드되었습니다.'); reload(); } catch (err) { fail(err); }
+        try { if (await guardedUpload(id, fd)) { notify('업로드되었습니다.'); reload(); } } catch (err) { fail(err); }
       });
     }
     // 위수탁 계약서 체결일 수정

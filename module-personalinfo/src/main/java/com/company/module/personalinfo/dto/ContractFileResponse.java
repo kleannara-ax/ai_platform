@@ -33,6 +33,8 @@ public class ContractFileResponse {
     private String destructionPeriod;
     /** 정기 파기 확인서 대상 기간 이름 (예: 2026년 3분기) */
     private String destructionPeriodLabel;
+    /** 업로드 내용 확인: AUTO 자동 확인 / MANUAL 담당자 직접 확인 / null 확인 기능 이전 파일 */
+    private String contentCheck;
     private Long createdBy;
     private LocalDateTime createdAt;
 
@@ -56,6 +58,7 @@ public class ContractFileResponse {
                 .documentDateLabel(f.getFileType().getDocumentDateLabel())
                 .documentNote(f.getDocumentNote())
                 .destructionPeriod(f.getDestructionPeriod())
+                .contentCheck(f.getContentCheck())
                 .destructionPeriodLabel(com.company.module.personalinfo.service.PiPeriodicDestruction.labelOf(f.getDestructionPeriod()))
                 .createdBy(f.getCreatedBy())
                 .createdAt(f.getCreatedAt())

@@ -52,6 +52,7 @@
 | - | **업로드 파일 내용 확인** | 확장자만 바꾼 파일을 막기 위해 저장 전에 파일 내용(서명 바이트·내부 구조)을 확인합니다. pdf: 앞 1KB 안 `%PDF-` / docx·xlsx·hwpx: ZIP 이면서 각각 `word/`·`xl/`·`Contents/`(또는 `mimetype`) 항목 / zip: ZIP 서명 / doc·xls·hwp: OLE2 복합 문서 서명 / jpg·png: 이미지 서명. 맞지 않으면 저장하지 않고 400('파일 내용이 확장자(.x)와 맞지 않습니다…'). 계약서·증빙, 점검 체크리스트, 양식 관리 업로드에 모두 적용됩니다. |
 | - | **자동연장 기간 · 만료 대상 제외** | 원계약 영역에 **자동연장 기간**(숫자 + 년/개월, 기본 **1년**, 1개월~10년, `pi_contract.AUTO_RENEW_PERIOD_MONTHS`) 칸을 추가했습니다. 자동연장 Y 일 때만 입력할 수 있고 수정할 수 있습니다. **자동연장 Y + 종료 처리 안 한 계약**은 원계약 종료일이 지나도 추가 계약 없이 그 기간 단위로 계약기간이 이어지는 것으로 보고 **만료임박·만료 상태, 만료 서류 미수취, 파기 기한·확인서 회신 기한, 만료 알림 메일, 만료 서류 독촉 메일, 기준 연도 '종료' 집계에서 모두 뺍니다**(계약중으로 표시). **현재 계약 종료일** = 원계약 종료일 + 연장 횟수 × 자동연장 기간(월말 기준 유지, 예: 2025.12.31 → 2026.12.31)으로 계산해 상세 화면('원계약 기간' 아래 **'현재 계약기간'** 줄 — 시작일 ~ 현재 종료일 + '자동연장 N회 반영' / 아직 연장 전이면 '원계약 기간과 같음 · ○○ 이후 1년 단위 자동연장'), **목록 '계약기간' 열**과 **같은 업체 계약 표의 '계약기간' 열**(상세 섹션·목록 '계약 N건' 팝업·등록 화면 안내 공통, 시작일 ~ 현재 종료일 + '연장N' 칩, 마우스를 올리면 원계약 기간 표시), 만료까지(일, 옆에 '자동연장' 표시), 엑셀 **'현재 계약 종료일'** 열(원계약 종료일 다음, 연장 없으면 원계약 종료일과 같음)과 '자동연장' 열(Y (1년)), 확약서·파기 확인서 양식의 계약기간·계약종료일에 씁니다. 실제로 계약이 끝나면 **[계약 종료 처리]** 를 해야 만료 대상이 되며, 이때 종료일 기본값은 현재(연장된) 계약 종료일입니다. 기존 계약은 기간 12개월(1년)로 채워집니다(SQL `11`). **자동연장 예정 확인 메일**: 자동연장 중이고 만료 알림을 사용하는 계약은 현재 계약 종료일이 만료 알림 기준일(기본 30일) 안에 들어오면 담당자 + 추가 수신자 + 보안팀에게 "○○ 이후 1년 연장 — 계속 유지하는지 확인" 메일을 **연장 주기마다 1회** 보냅니다(유지 / 해지 시 종료 처리·만료 서류 / 조건 변경 안내, 연장 후 종료일 표시). 종료 처리하거나 만료 알림을 끄면 보내지 않습니다. |
 | - | **정기 파기확인 (월/분기/반기)** | 이벤트 대행처럼 계약 중에도 개인정보를 주기적으로 파기하는 협력사용입니다. 계약 등록·수정 화면 **'위탁업무 내용' 옆에 [정기 파기확인]** 체크, **주기(월/분기/반기, 기본 분기)**, **요청·독촉 메일 발송** 체크를 두었습니다(`pi_contract.PERIODIC_DESTRUCTION_YN/CYCLE/MAIL_YN`). **체크한 날이 관리 시작일**(`PERIODIC_DESTRUCTION_FROM`)이 되고, 그 날 이후에 끝나는 기간부터 미수취를 따집니다. 체크를 끄고 다시 켜면 그 날부터 다시 시작합니다. **수취 기한 = 기간 마지막 날 + 20일**(설정값 `periodic-destruction.reply-days`, 예: 3분기 → 10/20). 대상 기간은 계약기간(시작일 ~ 종료 처리일, 없으면 자동연장 반영 현재 종료일)과 겹치는 기간입니다. **업로드**: 상세 화면 **[정기 파기확인 현황]** 표(연도 선택, 기간·기간 일자·수취 기한·상태·파기 확인서)에서 기간 행의 [올리기]로 올리거나, 첨부 업로드에서 '개인정보 파기 확인서'를 고르면 나오는 **대상 기간** 선택(기본 직전에 끝난 기간, '계약 종료 파기' 선택 가능)으로 올립니다(`pi_contract_file.DESTRUCTION_PERIOD`, 예: `2026-07` / `2026-Q3` / `2026-H2`). 설명을 비워 두면 어느 경로로 올려도 '2026년 3분기 정기 파기 확인서'처럼 기간 설명이 자동으로 들어갑니다. **관리 시작 전에 끝난 지난 기간도 올릴 수 있고**(상태 '관리 전', 미수취로 보지 않음), 주기가 다른 기간·아직 시작 안 한 기간·계약기간 밖·정기 파기확인이 아닌 계약은 400입니다. 상태: 받음 / 미수취(기한 지남) / 기한 전 / 진행 중 / 관리 전. 정기 파기 확인서는 **계약 종료 만료 서류의 파기 확인서로 세지 않습니다**(계약만료시 점검·파기 기한 판정과 별개). **확인 필요**: 카드·목록 필터 **'정기 파기확인서 미수취'**, 목록 칩('정기파기 분기' / '정기파기 미수취 N'), 상세 처리 필요 항목(미수취 기간·기한 + 현황으로 이동). **메일**: 메일 발송 Y 이면 기간이 끝나면 **제출 요청**, 수취 기한이 지나면 **미수취 독촉**을 기간마다 1회 담당자 + 추가 수신자 + 보안팀에게 보냅니다(파기 확인서 양식 첨부). 메일 발송 N 이면 화면 표시만 합니다. **엑셀**: '정기 파기확인'(Y (분기)), '정기 파기확인서 수취 기간'(받은 기간 전부, 예: 2건: 2026년 3분기, 2026년 2분기 · 없으면 '수취 이력 없음'), '정기 파기확인서 미수취 기간'(수취 기한이 지났는데 못 받은 기간, 없으면 '미수취 없음') 열 추가. |
+| - | **업로드 내용 확인** | 첨부를 올리기 전에 서버가 파일 내용을 읽어 확인하고, 맞지 않으면 **저장하지 않습니다**(계약 상세 첨부, 계약만료시 점검, 정기 파기확인 현황, 계약 등록 화면의 계약서 업로드 모두 같은 확인, 화면을 거치지 않고 API로 올려도 서버가 다시 확인). ① **서류 종류**: 문서 제목(앞부분)의 핵심 문구로 위수탁 계약서·재위탁 동의서·정보보호 및 비밀유지 확약서·개인정보 파기 확인서를 구분해, 고른 파일 구분과 다르면 막고 맞는 구분을 안내합니다. ② **날짜**: 입력한 파기 완료일·서명일·체결일이 문서에 적힌 날짜 중에 없으면 막고 문서의 날짜를 보여줍니다(서류 일자는 계약기간 날짜 제외). ③ **업체명**: 문서의 '수탁업체명' 등 표기가 계약 업체와 다르면 막습니다(㈜·(주)·주식회사·띄어쓰기 무시, 업체명 표기를 못 찾으면 확인 생략). ④ **중복 파일**: 이 계약에 같은 내용(SHA-256)의 파일이 이미 있으면 '중복된 파일입니다 — 확인하세요' 오류창으로 막습니다. ①~④는 '내용 직접 확인'으로도 넘길 수 없습니다. **글자를 읽을 수 없는 파일**(스캔 PDF·jpg·png·zip·암호 파일)이나 서류 종류를 알아볼 수 없는 문서는 **'내용 직접 확인했습니다'에 체크해야** 올라갑니다. '기타' 구분은 중복만 확인합니다. 확인 결과는 `pi_contract_file.CONTENT_CHECK`(AUTO 자동 확인 / MANUAL 직접 확인 / NULL 이 기능 이전 파일)에 남습니다(SQL `13`). API: `POST /personalinfo-api/contracts/{id}/files/check`(저장 없이 확인), 업로드에 `contentConfirmed=Y`(직접 확인). |
 | - | 계약 종료 처리 | 종료 처리하면 만료 알림이 멈춥니다. "계약변경·만료 점검"(양식 3번 시트) 업로드를 지원합니다. |
 | - | 점검 후속조치 | 조치 예정일과 조치 완료 여부를 관리합니다. |
 
@@ -258,6 +259,7 @@
 | 10 | `10_destruction_delay_reason.sql` | **파기 지연 사유** — `pi_contract_file.DOCUMENT_NOTE` 컬럼(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함) 추가. 데이터 변경 없음. 두 번 실행해도 오류 없음 |
 | 11 | `11_auto_renew_period.sql` | **자동연장 기간** — `pi_contract.AUTO_RENEW_PERIOD_MONTHS` 컬럼(`ADD COLUMN IF NOT EXISTS`, INT NOT NULL DEFAULT 12, COMMENT 포함) 추가. 기존 계약은 12(1년)로 채워짐. 업무 데이터 변경·삭제 없음. 두 번 실행해도 오류 없음 |
 | 12 | `12_periodic_destruction.sql` | **정기 파기확인** — `pi_contract` 에 `PERIODIC_DESTRUCTION_YN`(CHAR(1) NOT NULL DEFAULT 'N'), `PERIODIC_DESTRUCTION_CYCLE`(VARCHAR(10) NOT NULL DEFAULT 'QUARTER'), `PERIODIC_DESTRUCTION_MAIL_YN`(CHAR(1) NOT NULL DEFAULT 'Y'), `PERIODIC_DESTRUCTION_FROM`(DATE NULL), `pi_contract_file` 에 `DESTRUCTION_PERIOD`(VARCHAR(10) NULL) 추가(`ADD COLUMN IF NOT EXISTS`, COMMENT 포함). 기존 계약은 정기 파기확인 N, 기존 파기 확인서는 계약 종료 파기 확인서로 그대로. 업무 데이터 변경·삭제 없음. 두 번 실행해도 오류 없음 |
+| 13 | `13_file_content_check.sql` | **업로드 내용 확인 결과** — `pi_contract_file.CONTENT_CHECK`(VARCHAR(10) NULL, COMMENT 포함) 추가(`ADD COLUMN IF NOT EXISTS`). 기존 파일은 NULL(확인 기능 이전). 업무 데이터 변경·삭제 없음. 두 번 실행해도 오류 없음 |
 
 ```bash
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/01_schema.sql
@@ -272,6 +274,7 @@ mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/10_destruction_delay_reason.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/11_auto_renew_period.sql
 mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/12_periodic_destruction.sql
+mysql -u platform_user --default-character-set=utf8mb4 platform_db < sql/module-personalinfo/13_file_content_check.sql
 ```
 
 > ⚠️ `--default-character-set=utf8mb4` 를 꼭 붙이세요. 빠지면 한글 메뉴명이 깨집니다.
@@ -380,7 +383,7 @@ module-personalinfo/
         ├── personalinfo/security-pledge-template.docx      정보보호 및 비밀유지 확약서 양식 ({{수탁업체명}} 등 자리표시자)
         ├── personalinfo/destruction-confirm-template.docx  개인정보 파기 확인서 양식
         └── static/personalinfo/                      화면 (index.html, css, js — personalinfo-table.js: 목록 열 너비·순서 편집)
-sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, 09_security_followup.sql, 10_destruction_delay_reason.sql, 11_auto_renew_period.sql, 12_periodic_destruction.sql, README.md
+sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_upload.sql, 04_contact_history.sql, 05_contact_history_contract_period.sql, 06_contract_file_signed_date.sql, 07_contract_name.sql, 08_form_template.sql, 09_security_followup.sql, 10_destruction_delay_reason.sql, 11_auto_renew_period.sql, 12_periodic_destruction.sql, 13_file_content_check.sql, README.md
 ```
 
 ---
@@ -391,7 +394,8 @@ sql/module-personalinfo/  01_schema.sql, 02_seed_data.sql, 03_vendor_checklist_u
 |---|---|
 | 컴파일 (Java 17 타깃, core compileOnly) | 통과 |
 | Hibernate `ddl-auto=validate` (Entity ↔ 01_schema.sql 컬럼·타입 일치) | 통과 |
-| 통합 테스트 27건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **27/27 통과** |
+| 통합 테스트 28건: core + 모듈 기동, MariaDB, 실제 체크리스트 양식, 로컬 SMTP(GreenMail) | **28/28 통과** |
+| 업로드 내용 확인(테스트 28): 서류 종류 불일치(파기 확인서를 확약서·계약서로) 400·맞는 구분 안내, 파기 완료일 불일치 400·문서 날짜 표시, 일치 문서 자동 통과(㈜/주식회사 차이 무시)·AUTO 기록, 같은 파일 중복 400·기존 파일 안내, 업체명 불일치 400, 확약서 서명일 일치, 이미지 파일 직접 확인 없이 400·체크 시 저장·MANUAL 기록, 서류 종류 모르는 문서 직접 확인 필요, 기타 구분 중복만 확인, ①~④는 직접 확인 체크로도 400, 막힌 업로드 미저장. 기존 테스트의 업로드는 직접 확인 체크로 처리. SQL 13 두 번 실행 오류 없음. 브라우저: 서류 종류·중복·업체명 오류창, 이미지 파일 직접 확인 체크 창, 막힌 업로드 미저장 | **통과** |
 | 자동연장 현재 계약기간 표시: 목록 '계약기간' 열(현재 종료일 + 연장N 칩), 같은 업체 계약 표 '계약기간' 열, 상세 '현재 계약기간' 줄, 엑셀 '현재 계약 종료일' 열 (통합 테스트 25에서 엑셀 열 위치·값 검증, 브라우저 확인) | **통과** |
 | 정기 파기확인(테스트 27): 등록 시 관리 시작일, 분기 미수취 판정(종료 + 20일)·목록 필터·요약 카드, 기간 지정 업로드 후 받음 처리·만료 서류와 분리, 관리 시작 전 지난 기간 업로드 허용, 주기 불일치·미래 기간·형식 오류·확약서 기간 지정·일반 계약 기간 지정 400, 현황 API(연도별 상태·업로드 선택지), 수정 시 시작일 유지/재체크 시 오늘, 엑셀 열, 월 주기 요청 메일 1건·독촉 메일 2개 기간·메일 끔 미발송·재실행 중복 없음. SQL 12 두 번 실행 오류 없음. 브라우저: 등록 폼 체크·주기·메일·안내 문구, 상세 정기 파기확인 줄·현황 표, 첨부 업로드 대상 기간 선택, 목록 칩·확인 필요 카드 | **통과** |
 | 　- 자동연장 확인 메일: 원계약 종료 20일 전 자동연장 계약 → 확인 메일 1건(담당자+보안팀, 제목 종료일·'1년 연장', 본문 유지 확인·종료 처리 안내·연장 후 종료일) / 이미 연장돼 현재 종료일 355일 남은 계약·만료 알림 미사용 계약 미발송 / 만료 알림 메일 미발송 / 같은 주기 재실행 0건·이력 1건 / 다음 주기(현재 종료일 15일 전) 발송 / 알림 이력 종류 '자동연장 확인' / 종료 처리 후 미발송 | 통과 |

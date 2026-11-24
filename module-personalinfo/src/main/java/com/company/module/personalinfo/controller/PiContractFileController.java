@@ -61,6 +61,7 @@ public class PiContractFileController {
      *   <li>fileType : CONTRACT / SUBCONTRACT_CONSENT / SECURITY_PLEDGE / DESTRUCTION_CONFIRM / ETC (기본 CONTRACT)</li>
      *   <li>description : 설명 (선택)</li>
      *   <li>signedDate : 계약서상 체결일 yyyy-MM-dd (선택, 위수탁 계약서만. 없으면 파일에서 읽음)</li>
+     *   <li>contentConfirmed : Y 면 담당자가 내용을 직접 확인함 (글자를 읽을 수 없는 파일은 Y 일 때만 저장)</li>
      *   <li>destructionPeriod : 정기 파기 확인서 대상 기간 (선택, 예: 2026-07 / 2026-Q3 / 2026-H2. 정기 파기확인 계약의 파기 확인서만)</li>
      * </ul>
      */
@@ -75,10 +76,26 @@ public class PiContractFileController {
             @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate,
             @RequestParam(value = "documentNote", required = false) String documentNote,
             @RequestParam(value = "destructionPeriod", required = false) String destructionPeriod,
+            @RequestParam(value = "contentConfirmed", required = false) String contentConfirmed,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
                 fileService.upload(contractId, file, fileType, description, signedDate, documentDate, documentNote,
-                        destructionPeriod, currentUserId)));
+                        destructionPeriod, "Y".equalsIgnoreCase(contentConfirmed), currentUserId)));
+    }
+
+    /**
+     * 업로드 전 파일 내용 확인 (저장하지 않음): 서류 종류·업체명·날짜·중복 파일.
+     * blocked 면 업로드 불가, needsManualConfirm 이면 '내용 직접 확인' 체크 후 업로드 가능.
+     */
+    @PostMapping(value = "/contracts/{contractId}/files/check", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<com.company.module.personalinfo.dto.FileCheckResponse>> checkFile(
+            @PathVariable Long contractId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "fileType", required = false) String fileType,
+            @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
+            @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate) {
+        return ResponseEntity.ok(ApiResponse.success(fileService.checkFile(contractId, file, fileType, signedDate, documentDate)));
     }
 
     /**

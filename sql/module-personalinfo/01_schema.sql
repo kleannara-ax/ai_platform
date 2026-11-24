@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS pi_contract_file (
     DOCUMENT_DATE  DATE          NULL                    COMMENT '받은 서류의 일자 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일)',
     DOCUMENT_NOTE  VARCHAR(500)  NULL                    COMMENT '서류 일자 관련 메모 (개인정보 파기 확인서: 파기 기한(계약 종료 + 5일)보다 늦게 파기한 사유)',
     DESTRUCTION_PERIOD VARCHAR(10) NULL                  COMMENT '정기 파기 확인서 대상 기간 (예: 2026-07 월 / 2026-Q3 분기 / 2026-H2 반기). NULL 이면 계약 종료 파기 확인서',
+    CONTENT_CHECK  VARCHAR(10)   NULL                    COMMENT '업로드 내용 확인 결과 (AUTO 자동 확인 통과 / MANUAL 담당자 직접 확인 / NULL 확인 기능 이전 파일)',
 
     CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY     BIGINT        NULL                    COMMENT '생성자 사용자 ID',
