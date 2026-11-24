@@ -25,6 +25,7 @@ dependencies {
     implementation project(':module-dailyreport')
     implementation project(':module-kims')
     implementation project(':module-safety')
+    implementation project(':module-steam-energy')
 
     // MariaDB Driver (런타임)
     runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'

@@ -19,6 +19,22 @@ import java.util.Optional;
  */
 public interface ExtinguisherRepository extends JpaRepository<Extinguisher, Long> {
 
+    /** Unified list: fetch the matching inventory without a nullable collection expression. */
+    @Query("SELECT e FROM Extinguisher e JOIN FETCH e.building b JOIN FETCH e.floor f " +
+           "WHERE (:allBuildings = true OR b.buildingId IN :buildingIds) " +
+           "AND (:floorId IS NULL OR f.floorId = :floorId) " +
+           "AND (:keyword IS NULL OR " +
+           "LOWER(b.buildingName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(f.floorName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(e.extinguisherType) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(e.note) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<Extinguisher> searchForListQuery(@Param("allBuildings") boolean allBuildings,
+            @Param("buildingIds") List<Long> buildingIds, @Param("floorId") Long floorId,
+            @Param("keyword") String keyword);
+
+    @Query("SELECT DISTINCT e.extinguisherType FROM Extinguisher e ORDER BY e.extinguisherType")
+    List<String> findDistinctTypes();
+
     Optional<Extinguisher> findBySerialNumber(String serialNumber);
 
     Optional<Extinguisher> findByNoteKey(String noteKey);
