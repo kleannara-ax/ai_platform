@@ -65,6 +65,12 @@ function init() {
 
   // ===== ⚙ 기준값 설정 탭 =====
   document.getElementById('saveRefBtn').addEventListener('click', onSaveSettings);
+  document.getElementById('adminAddBtn').addEventListener('click', onAddAdmin);
+  document.getElementById('adminListBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('.admin-remove-btn');
+    if (!btn) return;
+    onRemoveAdmin(btn.dataset.loginid);
+  });
 
   // ===== 재검사 취소 =====
   document.getElementById('reinspectCancelBtn').addEventListener('click', cancelReinspect);
@@ -517,15 +523,76 @@ async function refreshSettingsUI() {
   badge.className = 'role-badge role-readonly';
 
   cachedIsAdmin = await CCKB.isAdmin();
-  badge.textContent = cachedIsAdmin ? '수정 가능 (CCKB_PERM 관리자)' : '조회 전용';
+  badge.textContent = cachedIsAdmin ? '수정 가능 (관리자)' : '조회 전용';
   badge.className = 'role-badge ' + (cachedIsAdmin ? 'role-edit' : 'role-readonly');
   SETTINGS_FIELD_IDS.forEach((fid) => {
     document.getElementById(fid).disabled = !cachedIsAdmin;
   });
   document.getElementById('saveRefBtn').disabled = !cachedIsAdmin;
 
+  // 관리자 명단 관리 섹션은 관리자에게만 표시한다.
+  document.getElementById('adminMgmtSection').style.display = cachedIsAdmin ? '' : 'none';
+  if (cachedIsAdmin) await renderAdminList();
+
   // 설정 탭을 열 때마다 최신값으로 새로고침 (다른 사용자가 바꿨을 수 있으므로)
   await loadActiveStandard();
+}
+
+async function renderAdminList() {
+  const tbody = document.getElementById('adminListBody');
+  tbody.innerHTML = '<tr><td colspan="4">불러오는 중...</td></tr>';
+  try {
+    const admins = await CCKB.api('/cckb-api/admins');
+    if (!admins || admins.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4">등록된 관리자가 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = admins.map((a) => `
+      <tr>
+        <td>${CCKB.escapeHtml(a.loginId)}</td>
+        <td>${CCKB.escapeHtml(a.name)}</td>
+        <td>${a.active ? '활성' : '비활성'}</td>
+        <td><button class="ghost admin-remove-btn" data-loginid="${CCKB.escapeHtml(a.loginId)}" style="padding:6px 10px; font-size:12px;">제외</button></td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4">불러오기 실패: ${CCKB.escapeHtml(e.message || '')}</td></tr>`;
+  }
+}
+
+async function onAddAdmin() {
+  const loginIdEl = document.getElementById('adminAddLoginId');
+  const nameEl = document.getElementById('adminAddName');
+  const loginId = loginIdEl.value.trim();
+  if (!loginId) {
+    alert('추가할 로그인 ID를 입력해 주세요.');
+    return;
+  }
+  const btn = document.getElementById('adminAddBtn');
+  btn.disabled = true;
+  try {
+    await CCKB.api('/cckb-api/admins', { method: 'POST', body: { loginId, name: nameEl.value.trim() } });
+    loginIdEl.value = '';
+    nameEl.value = '';
+    CCKB.toast('관리자가 추가되었습니다.');
+    await renderAdminList();
+  } catch (e) {
+    CCKB.toast(e.message || '관리자 추가 중 오류가 발생했습니다.', false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function onRemoveAdmin(loginId) {
+  if (!loginId) return;
+  if (!confirm(`'${loginId}' 님을 CCKB 관리자 명단에서 제외할까요?`)) return;
+  try {
+    await CCKB.api('/cckb-api/admins/' + encodeURIComponent(loginId), { method: 'DELETE' });
+    CCKB.toast('관리자가 제외되었습니다.');
+    await renderAdminList();
+  } catch (e) {
+    CCKB.toast(e.message || '관리자 제외 중 오류가 발생했습니다.', false);
+  }
 }
 
 async function onSaveSettings() {
