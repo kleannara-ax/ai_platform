@@ -1,0 +1,32 @@
+// ============================================================
+// module-cckb: CCKB 후면 색상검사 모듈
+// 패키지: com.company.module.cckb
+// URL Prefix: /cckb-api/**  (업무 API, 인증 필수 — permitAll 예외 없음)
+// 화면: /cckb/**            (플랫폼 SPA 안에서 iframe 으로 로드, Method B: cckb:: 동적 prefix)
+// DB Table: inspection_standard, judgment_code, image, inspection_record, standard_audit_log
+// ============================================================
+
+dependencies {
+    // core 공통 클래스 참조 (컴파일 전용: 순환 의존 방지)
+    compileOnly project(':core')
+
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // CCKB_PERM 관리자 권한 조회용 JdbcTemplate
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// spring-boot 플러그인 미적용 서브모듈: plain jar만 생성
+jar {
+    enabled = true
+}
