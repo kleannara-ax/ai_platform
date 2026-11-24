@@ -28,21 +28,39 @@ const JUDGMENT_CLASS = {
 };
 
 function init() {
-  // ===== 탭 전환 =====
+  // ===== 탭 전환 (색상 검사 / 검사 이력) =====
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabPanels = {
     inspect: document.getElementById('tab-inspect'),
-    history: document.getElementById('tab-history'),
-    settings: document.getElementById('tab-settings')
+    history: document.getElementById('tab-history')
   };
   function switchTab(name) {
+    // '기준값 설정'은 더 이상 탭이 아니라 팝업(모달)이므로 여기서는 팝업을 연다.
+    if (name === 'settings') { openSettingsModal(); return; }
     tabButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === name));
     Object.entries(tabPanels).forEach(([key, el]) => el.classList.toggle('active', key === name));
     if (name === 'history') renderHistoryList();
-    if (name === 'settings') refreshSettingsUI();
   }
   tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
   window.__cckbSwitchTab = switchTab;
+
+  // ===== ⚙ 기준값 설정 팝업(모달) 열기/닫기 =====
+  const settingsOverlay = document.getElementById('settingsModalOverlay');
+  function openSettingsModal() {
+    settingsOverlay.classList.add('open');
+    refreshSettingsUI();
+  }
+  function closeSettingsModal() {
+    settingsOverlay.classList.remove('open');
+  }
+  document.getElementById('openSettingsBtn').addEventListener('click', openSettingsModal);
+  document.getElementById('settingsModalCloseBtn').addEventListener('click', closeSettingsModal);
+  settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) closeSettingsModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && settingsOverlay.classList.contains('open')) closeSettingsModal();
+  });
 
   // ===== 검사 이력 탭 =====
   document.getElementById('histSearchBtn').addEventListener('click', () => { historyCurrentPage = 0; renderHistoryList(); });
