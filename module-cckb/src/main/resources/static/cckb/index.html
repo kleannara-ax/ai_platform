@@ -52,10 +52,14 @@
     /* ===== Tabs ===== */
     .tabbar {
       display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
       gap:4px;
       border-bottom:2px solid var(--line);
       margin-bottom:20px;
     }
+    .tabbar-left { display:flex; gap:4px; }
+    #openSettingsBtn { margin-bottom:8px; padding:9px 16px; font-size:13px; }
     .tab-btn {
       background:transparent;
       border:0;
@@ -419,6 +423,17 @@
     .user-selected-chip .chip-remove { background:none; border:none; color:var(--accent-dark); cursor:pointer; font-size:16px; line-height:1; padding:0 2px; opacity:.6; }
     .user-selected-chip .chip-remove:hover { opacity:1; }
 
+    /* ===== ⚙ 기준값 설정 - 팭업 모달 오버레이 ===== */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; z-index:1500;
+      background: rgba(15,23,42,0.55);
+      align-items:flex-start; justify-content:center;
+      padding:40px 20px;
+      overflow-y:auto;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal-box { width:100%; max-height:none; }
+
     /* ===== 플랫폼 공용 알림 바 ===== */
     #msg {
       position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -455,9 +470,11 @@
     </div>
 
     <div class="tabbar">
-      <button class="tab-btn active" data-tab="inspect">색상 검사</button>
-      <button class="tab-btn" data-tab="history">검사 이력</button>
-      <button class="tab-btn" data-tab="settings">⚙ 기준값 설정</button>
+      <div class="tabbar-left">
+        <button class="tab-btn active" data-tab="inspect">색상 검사</button>
+        <button class="tab-btn" data-tab="history">검사 이력</button>
+      </div>
+      <button id="openSettingsBtn" class="secondary">⚙ 기준값 설정</button>
     </div>
 
     <!-- ===================== TAB 1: 색상 검사 ===================== -->
@@ -689,14 +706,15 @@
       </div>
     </div>
 
-    <!-- ===================== TAB 3: ⚙ 기준값 설정 ===================== -->
-    <div id="tab-settings" class="tab-panel">
-      <div class="panel" style="margin-bottom:0; max-width:680px;">
+    <!-- ===================== ⚙ 기준값 설정 (팭업 모달) ===================== -->
+    <div id="settingsModalOverlay" class="modal-overlay">
+      <div class="panel modal-box" style="margin-bottom:0; max-width:680px;">
         <div class="head">
           <div>
             <h2>⚙ 기준값 설정</h2>
             <p>판정에 사용되는 고정 기준 LAB 값을 변경합니다. </p>
           </div>
+          <button id="settingsModalCloseBtn" class="ghost" style="padding:6px 12px; font-size:16px; line-height:1;">✕</button>
         </div>
         <div class="body">
           <div class="settings-user-row">
