@@ -189,3 +189,6 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-periodic-box{border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;background:#fafafa;height:100%;}
 .pi-periodic-box legend{font-size:.875rem;float:none;width:auto;}
 #periodic-table td{vertical-align:middle;}
+/* 첨부 업로드: 돋보기(파일 찾기) 버튼 + 파일 칸 */
+.pi-file-pick{flex-wrap:nowrap;min-width:260px;}
+.pi-file-pick .btn{padding-left:.6rem;padding-right:.6rem;}

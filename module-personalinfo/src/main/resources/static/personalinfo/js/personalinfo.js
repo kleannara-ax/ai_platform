@@ -1463,7 +1463,10 @@
               <option value="CONTRACT">위수탁 계약서</option><option value="SUBCONTRACT_CONSENT">재위탁 동의서</option>
               <option value="SECURITY_PLEDGE">정보보호 및 비밀유지 확약서</option><option value="DESTRUCTION_CONFIRM">개인정보 파기 확인서</option>
               <option value="ETC">기타</option></select>
-            <input type="file" class="form-control form-control-sm" name="file" required aria-label="파일" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip">
+            <div class="input-group input-group-sm pi-file-pick">
+              <button type="button" class="btn btn-outline-primary" id="btn-file-browse" title="파일 찾기 (내 PC에서 파일 고르기)" aria-label="파일 찾기"><i class="fas fa-magnifying-glass"></i></button>
+              <input type="file" class="form-control form-control-sm" name="file" id="upload-file-input" required aria-label="파일" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip">
+            </div>
             <input type="date" class="form-control form-control-sm w-auto" name="signedDate" id="upload-signed-date" title="계약서 체결일 (위수탁 계약서만, 파일을 고르면 자동 입력)" aria-label="계약서 체결일">
             ${c.periodicDestructionYn === 'Y' ? '<select class="form-select form-select-sm w-auto d-none" name="destructionPeriod" id="upload-destruction-period" aria-label="파기 확인서 대상 기간" title="정기 파기 확인서면 대상 기간, 계약이 끝나서 받은 것이면 계약 종료 파기"></select>' : ''}
             <button class="btn btn-sm btn-primary text-nowrap" type="submit"><i class="fas fa-upload me-1"></i>업로드</button></form>` : ''}
@@ -1675,6 +1678,8 @@
     if (fileForm) {
       const typeSel = fileForm.querySelector('[name="fileType"]');
       const fileSel = fileForm.querySelector('[name="file"]');
+      // 돋보기 버튼 → 파일 고르기 창 열기
+      document.getElementById('btn-file-browse')?.addEventListener('click', () => fileSel.click());
       const dateSel = document.getElementById('upload-signed-date');
       const periodSel = document.getElementById('upload-destruction-period');
       const syncDateBox = () => {
