@@ -1,0 +1,356 @@
+/* Auto-generated from common.css. Group: combo */
+
+.combo-year-only-filter .combo-hidden-period-part {
+  display: none;
+}.landing-body[data-page-kind="combo-boiler"] {
+  height: auto;
+  min-height: 100vh;
+  align-items: stretch;
+  overflow: visible;
+}.landing-body[data-page-kind="combo-boiler"] .sidebar-shell {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  min-height: 100vh;
+}.landing-body[data-page-kind="combo-boiler"] .landing-main {
+  padding: 24px 18px 18px 26px;
+  overflow: visible;
+  height: auto;
+  min-height: 100vh;
+}.combo-canvas {
+  padding: 14px;
+  overflow: visible;
+}.combo-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}.combo-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(120, 181, 217, 0.24);
+  border-radius: 14px;
+  background: #fff;
+}.combo-section-note {
+  margin: 0;
+  padding: 9px 14px;
+  border-bottom: 1px solid #e6dcc3;
+  border-radius: 14px 14px 0 0;
+  background: #fbf6e9;
+  color: #6b5a2c;
+  font-size: 13px;
+}
+/* ── 스팀생산실적 일별 표 ──
+   머리글 두 줄(설비 / 항목+단위), 칸 너비는 고르게, 설비 묶음 사이만 굵은 세로줄.
+   글자 크기·머리글 바탕은 공용 스킨(inc-design.css)을 따르고, 그 스킨이 !important 로 정한
+   칸 여백 · 첫 열 너비 · 머리글 고정 위치만 이 표에 맞게 다시 정한다. */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table th,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table td {
+  height: 32px;
+  padding: 0 !important;
+  border: 0;
+  border-right: 1px solid #dde7ef;
+  border-bottom: 1px solid #e6edf3;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table tr > :last-child {
+  border-right: 0;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-day-col {
+  width: 46px;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table th:first-child,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table td:first-child {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+/* 머리글 두 줄을 모두 고정한다 — 항목 이름이 설비마다 같아서(스팀구매량 …) 설비 줄이 같이 보여야 한다 */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table thead tr.combo-group-row th {
+  top: 0;
+  height: 32px;
+  background: #dcebf7 !important;
+  color: #123d5a !important;
+  font-weight: 800 !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table thead tr.combo-field-row th {
+  top: 32px;
+  height: 42px;
+  padding: 0 3px !important;
+  white-space: normal;
+  line-height: 1.25;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table thead tr.combo-field-row th:first-child {
+  background: linear-gradient(180deg, #fafcff 0%, #eef3f9 100%) !important;
+  font-weight: 700;
+}
+.combo-th-unit {
+  display: block;
+  margin-top: 2px;
+  color: #7d95a7;
+  font-size: 10px;
+  font-weight: 600;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-group-start {
+  border-left: 2px solid #a9c6da;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table tbody th {
+  color: #45627a;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table tbody td:first-child {
+  background: #fff;
+  font-weight: 400;
+}
+/* 닷새마다 가로줄을 조금 진하게 — 날짜를 눈으로 따라가기 쉽게 */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table tbody tr[data-day]:nth-child(5n) > * {
+  border-bottom-color: #bfd3e2;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 31px;
+  min-height: 31px !important;
+  padding: 0 6px !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-input:focus {
+  outline: 2px solid #3d93d1;
+  outline-offset: -2px;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table td.combo-readonly {
+  min-width: 0;
+  padding: 0 6px !important;
+  background: #f1f5f8;
+  color: #4a6478;
+  font-weight: 600;
+  text-align: right;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-summary-row > * {
+  background: #e8f4ec;
+  color: #1f4d38;
+  font-weight: 800;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-summary-row:not(.combo-summary-row ~ .combo-summary-row) > * {
+  border-top: 2px solid #a9cdb8;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table .combo-summary-row:last-child > * {
+  border-bottom: 0;
+}
+/* 참고자료 탭 — 머리글 색을 달리해 합계에 들어가는 표와 구분한다 */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table.combo-production-reference thead tr.combo-group-row th {
+  background: #efe8d4 !important;
+  color: #5a4a1e !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-table.combo-production-reference thead tr.combo-field-row th {
+  background: #f9f5e9 !important;
+  color: #6b5a2c !important;
+}
+/* ── 합계 탭 위쪽: 설비별 원단위 · 연료단가 (월 단위 값) ── */
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table {
+  margin-bottom: 14px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-bottom: 1px solid #c9dbe8;
+  font-variant-numeric: tabular-nums;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table th,
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table td {
+  height: 34px;
+  padding: 0 8px !important;
+  border: 0;
+  border-right: 1px solid #dde7ef;
+  border-bottom: 1px solid #e6edf3;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table tr > :last-child {
+  border-right: 0;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table thead th {
+  position: static;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table th:first-child {
+  width: 190px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  white-space: nowrap;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table tbody th .combo-th-unit {
+  display: inline;
+  margin-left: 4px;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table td {
+  padding: 0 !important;
+  background: #fff;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table td.combo-readonly {
+  padding: 0 6px !important;
+  background: #f1f5f8;
+  color: #4a6478;
+  font-weight: 600;
+  text-align: right;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table td.combo-blank {
+  background: #f8fafc;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table .combo-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  min-height: 33px !important;
+  padding: 0 6px !important;
+}
+body.landing-body[data-page-kind="combo-boiler"] .combo-excel-table.combo-production-fuel-table .combo-input:focus {
+  outline: 2px solid #3d93d1;
+  outline-offset: -2px;
+}
+@media (max-width: 1280px) {
+
+.landing-body[data-page-kind="combo-boiler"] .landing-main {
+    padding-right: 12px;
+    padding-left: 18px;
+  }.combo-canvas {
+    padding: 10px;
+  }
+
+}@media (max-width: 980px) {
+
+.combo-production-table {
+    min-width: 760px;
+  }
+
+}.combo-excel-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 15px;
+  color: #173a54;
+}.combo-excel-table th,
+.combo-excel-table td {
+  border: 1px solid rgba(159, 190, 212, 0.72);
+  padding: 5px 6px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}.combo-excel-table thead th {
+  background: #eaf6ff;
+  font-weight: 800;
+}.combo-excel-table .combo-section-title-row th {
+  background: #d8eefc;
+  color: #123d5a;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}.combo-excel-table .combo-section-group-row th {
+  background: #edf8ff;
+  color: #214c66;
+}.combo-excel-table tbody th {
+  background: #f5fbff;
+  font-weight: 800;
+}.combo-excel-table .combo-plan-group-cell {
+  background: #e4f4ff;
+  color: #123d5a;
+  font-weight: 900;
+}.combo-excel-table .combo-plan-item-cell {
+  background: #f5fbff;
+  font-weight: 800;
+}.combo-input {
+  width: 100%;
+  min-width: 78px;
+  border: 0;
+  background: #fffdf3;
+  padding: 4px 5px;
+  text-align: right;
+  font: inherit;
+  color: #173a54;
+}.combo-text-input {
+  min-width: 180px;
+  text-align: left;
+}.combo-wide-input {
+  min-width: 360px;
+}.combo-readonly {
+  min-width: 78px;
+  background: #e9f1f7;
+  color: #38566c;
+  font-weight: 700;
+  user-select: none;
+}.combo-summary-row th,
+.combo-summary-row td {
+  background: #edf8f2;
+  font-weight: 800;
+}.combo-grid {
+  display: grid;
+  gap: 14px;
+}.combo-card {
+  overflow: auto;
+  border: 1px solid rgba(120, 181, 217, 0.24);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}.combo-card h3 {
+  margin: 0 0 10px;
+  color: #173a54;
+}.combo-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  background: #fff;
+}.combo-add-row-button {
+  min-height: 34px;
+}.combo-recovery-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}.combo-recovery-table th,
+.combo-recovery-table td {
+  padding: clamp(3px, 0.42vw, 5px) clamp(3px, 0.48vw, 6px);
+}.combo-recovery-table thead th {
+  white-space: normal;
+  line-height: 1.2;
+  word-break: keep-all;
+}.combo-recovery-table .combo-input,
+.combo-recovery-table .combo-readonly {
+  min-width: 0;
+  width: 100%;
+  font-size: clamp(13px, 1.05vw, 16px);
+}.combo-recovery-no-col {
+  width: clamp(34px, 3.6vw, 46px);
+}.combo-recovery-date-col {
+  width: clamp(72px, 7.5vw, 102px);
+}.combo-recovery-time-col {
+  width: clamp(102px, 10vw, 138px);
+}.combo-recovery-note-col {
+  width: auto;
+}.combo-recovery-small-col {
+  width: clamp(66px, 6.5vw, 92px);
+}.combo-recovery-table .combo-text-input {
+  min-width: 0;
+}.combo-recovery-table .combo-wide-input {
+  min-width: 160px;
+}@media (max-width: 1180px) {
+
+.combo-recovery-table {
+    min-width: 900px;
+  }
+
+}.landing-body.embedded-mode[data-page-kind="combo-boiler"] {
+  display: block;
+  min-height: auto;
+  background: transparent;
+}.landing-body.embedded-mode[data-page-kind="combo-boiler"] .sidebar-shell,
+.landing-body.embedded-mode[data-page-kind="combo-boiler"] .landing-page-copy {
+  display: none !important;
+}.landing-body.embedded-mode[data-page-kind="combo-boiler"] .landing-main,
+.landing-body.embedded-mode[data-page-kind="combo-boiler"] .combo-canvas {
+  padding: 0;
+  min-height: auto;
+  box-shadow: none;
+  background: transparent;
+}

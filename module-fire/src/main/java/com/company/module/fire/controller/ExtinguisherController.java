@@ -1,6 +1,10 @@
 package com.company.module.fire.controller;
 
 import com.company.core.common.response.ApiResponse;
+import com.company.core.common.exception.BusinessException;
+import com.company.core.common.exception.ErrorCode;
+import com.company.module.fire.service.ExtinguisherListService;
+import com.company.module.fire.service.ExtinguisherListQuery;
 import com.company.module.fire.dto.ExtinguisherInspectRequest;
 import com.company.module.fire.dto.ExtinguisherInspectionUpdateRequest;
 import com.company.module.fire.dto.ExtinguisherResponse;
@@ -48,7 +52,34 @@ public class ExtinguisherController {
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
 
     private final ExtinguisherService extinguisherService;
+    private final ExtinguisherListService listService;
     private final InspectorNameResolver inspectorNameResolver;
+
+    @GetMapping("/snapshot")
+    public ResponseEntity<ApiResponse<ExtinguisherListQuery.Snapshot>> snapshot() {
+        return ResponseEntity.ok(ApiResponse.success(listService.snapshot()));
+    }
+
+    /** Unified list/export query; legacy list endpoint remains compatible for other consumers. */
+    @GetMapping("/query")
+    public ResponseEntity<ApiResponse<ExtinguisherListQuery.Result>> query(
+            @RequestParam(required = false) List<Long> buildingIds,
+            @RequestParam(required = false) Long floorId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "extinguisherId") String sort,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "200") int size,
+            @RequestParam(defaultValue = "false") boolean exportAll) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(listService.query(buildingIds, floorId, q,
+                    type, status, sort, direction, page, size, exportAll)));
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, ex.getMessage());
+        }
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ExtinguisherResponse>>> getList(
