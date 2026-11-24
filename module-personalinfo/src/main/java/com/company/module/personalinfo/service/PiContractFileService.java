@@ -103,8 +103,14 @@ public class PiContractFileService {
      */
     public FileCheckResponse checkFile(Long contractId, MultipartFile file, String fileType,
                                        LocalDate signedDate, LocalDate documentDate) {
+        return checkFile(contractId, file, fileType, signedDate, documentDate, null);
+    }
+
+    public FileCheckResponse checkFile(Long contractId, MultipartFile file, String fileType,
+                                       LocalDate signedDate, LocalDate documentDate, String destructionPeriod) {
         PiContract contract = ensureContract(contractId);
-        return contentChecker.check(contract, file, parseType(fileType), documentDate, signedDate);
+        return contentChecker.check(contract, file, parseType(fileType), documentDate, signedDate,
+                PiContractService.trim(destructionPeriod));
     }
 
     /**
@@ -118,6 +124,18 @@ public class PiContractFileService {
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, LocalDate documentDate, String documentNote,
                                        String destructionPeriod, boolean contentConfirmed, Long userId) {
+        return upload(contractId, file, fileType, description, signedDate, documentDate, documentNote, destructionPeriod,
+                contentConfirmed, false, userId);
+    }
+
+    /**
+     * periodConfirmed: 정기 파기 확인서의 파기 일자가 수취 기한(기간 종료 + 20일)을 지났을 때
+     * '해당 파기확인서가 맞습니까'에 맞다고 답했는지 (막지 않고 확인만 받음)
+     */
+    @Transactional
+    public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
+                                       LocalDate signedDate, LocalDate documentDate, String documentNote,
+                                       String destructionPeriod, boolean contentConfirmed, boolean periodConfirmed, Long userId) {
         PiContract contract = ensureContract(contractId);
         if (fileRepository.countByContractIdAndDeletedYn(contractId, N) >= MAX_FILES_PER_CONTRACT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
@@ -131,7 +149,7 @@ public class PiContractFileService {
         if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "서류 일자는 오늘보다 늦을 수 없습니다.");
         }
-        FileCheckResponse check = contentChecker.check(contract, file, type, documentDate, signedDate);
+        FileCheckResponse check = contentChecker.check(contract, file, type, documentDate, signedDate, period);
         if (check.isBlocked()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 수 없습니다. "
                     + String.join(" / ", check.getErrors().stream().map(FileCheckResponse.Issue::getMessage).toList()));
@@ -139,6 +157,9 @@ public class PiContractFileService {
         if (check.isNeedsManualConfirm() && !contentConfirmed) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "파일 내용을 자동으로 확인할 수 없습니다. 서류 종류·업체명·날짜를 직접 확인한 뒤 '내용 직접 확인했습니다'에 체크하고 올리세요.");
+        }
+        if (check.getPeriodWarning() != null && !periodConfirmed) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, check.getPeriodWarning() + " 맞으면 확인 후 다시 올리세요.");
         }
         PiFileStorage.StoredFile stored = storage.store(file, "contract", PiFileStorage.CONTRACT_EXTENSIONS,
                 storage.getMaxContractFileBytes());

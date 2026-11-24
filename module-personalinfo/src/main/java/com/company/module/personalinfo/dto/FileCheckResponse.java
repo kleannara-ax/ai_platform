@@ -44,6 +44,11 @@ public class FileCheckResponse {
     private List<String> notes;
     /** 같은 파일 (중복일 때) */
     private DuplicateFile duplicate;
+    /**
+     * 정기 파기 확인서의 파기 일자가 수취 기한(기간 종료 + 20일)을 지남 — 막지 않고 '해당 파기확인서가 맞습니까' 확인을 받는다
+     * (업로드 때 periodConfirmed=Y 필요). 문제 없으면 null
+     */
+    private String periodWarning;
 
     @Getter
     @Builder

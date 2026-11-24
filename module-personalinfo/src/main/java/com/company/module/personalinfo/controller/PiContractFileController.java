@@ -62,6 +62,7 @@ public class PiContractFileController {
      *   <li>description : 설명 (선택)</li>
      *   <li>signedDate : 계약서상 체결일 yyyy-MM-dd (선택, 위수탁 계약서만. 없으면 파일에서 읽음)</li>
      *   <li>contentConfirmed : Y 면 담당자가 내용을 직접 확인함 (글자를 읽을 수 없는 파일은 Y 일 때만 저장)</li>
+     *   <li>periodConfirmed : Y 면 정기 파기 확인서의 파기 일자가 수취 기한을 지났어도 '해당 파기확인서가 맞다'고 확인함</li>
      *   <li>destructionPeriod : 정기 파기 확인서 대상 기간 (선택, 예: 2026-07 / 2026-Q3 / 2026-H2. 정기 파기확인 계약의 파기 확인서만)</li>
      * </ul>
      */
@@ -77,10 +78,11 @@ public class PiContractFileController {
             @RequestParam(value = "documentNote", required = false) String documentNote,
             @RequestParam(value = "destructionPeriod", required = false) String destructionPeriod,
             @RequestParam(value = "contentConfirmed", required = false) String contentConfirmed,
+            @RequestParam(value = "periodConfirmed", required = false) String periodConfirmed,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
                 fileService.upload(contractId, file, fileType, description, signedDate, documentDate, documentNote,
-                        destructionPeriod, "Y".equalsIgnoreCase(contentConfirmed), currentUserId)));
+                        destructionPeriod, "Y".equalsIgnoreCase(contentConfirmed), "Y".equalsIgnoreCase(periodConfirmed), currentUserId)));
     }
 
     /**
@@ -94,8 +96,9 @@ public class PiContractFileController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "fileType", required = false) String fileType,
             @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
-            @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate) {
-        return ResponseEntity.ok(ApiResponse.success(fileService.checkFile(contractId, file, fileType, signedDate, documentDate)));
+            @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate,
+            @RequestParam(value = "destructionPeriod", required = false) String destructionPeriod) {
+        return ResponseEntity.ok(ApiResponse.success(fileService.checkFile(contractId, file, fileType, signedDate, documentDate, destructionPeriod)));
     }
 
     /**

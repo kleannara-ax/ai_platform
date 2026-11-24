@@ -916,10 +916,15 @@
    */
   async function guardedUpload(contractId, fd) {
     const ck = new FormData();
-    ['file', 'fileType', 'signedDate', 'documentDate'].forEach((k) => { const v = fd.get(k); if (v) ck.append(k, v); });
+    ['file', 'fileType', 'signedDate', 'documentDate', 'destructionPeriod'].forEach((k) => { const v = fd.get(k); if (v) ck.append(k, v); });
     const r = await PI_API.checkFile(contractId, ck);
     if (!(await showFileCheck(r))) return null;
     if (r.needsManualConfirm) fd.set('contentConfirmed', 'Y');
+    // 정기 파기 확인서 파기 일자가 수취 기한(기간 종료 + 20일)을 지남 → 막지 않고 맞는지 확인
+    if (r.periodWarning) {
+      if (!confirm(r.periodWarning + '\n\n[확인]을 누르면 업로드합니다.')) return null;
+      fd.set('periodConfirmed', 'Y');
+    }
     return PI_API.uploadFile(contractId, fd);
   }
 

@@ -61,6 +61,7 @@ public class PiFileContentChecker {
 
     private final PiContractFileRepository fileRepository;
     private final PiFileStorage storage;
+    private final PiPeriodicDestruction periodic;
 
     /**
      * 파일 내용 확인.
@@ -69,6 +70,12 @@ public class PiFileContentChecker {
      */
     public FileCheckResponse check(PiContract c, MultipartFile file, ContractFileType type,
                                    LocalDate documentDate, LocalDate signedDate) {
+        return check(c, file, type, documentDate, signedDate, null);
+    }
+
+    /** @param destructionPeriod 정기 파기 확인서 대상 기간 (예: 2026-Q3) — 파기 일자가 수취 기한을 지났는지 확인 */
+    public FileCheckResponse check(PiContract c, MultipartFile file, ContractFileType type,
+                                   LocalDate documentDate, LocalDate signedDate, String destructionPeriod) {
         List<FileCheckResponse.Issue> errors = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         String name = PiFileStorage.sanitizeOriginalName(file == null ? null : file.getOriginalFilename());
@@ -88,6 +95,9 @@ public class PiFileContentChecker {
             errors.add(issue("FILE", "파일 크기는 " + (storage.getMaxContractFileBytes() / 1024 / 1024) + "MB 이하만 올릴 수 있습니다."));
             return res.blocked(true).build();
         }
+        String periodKey = type == ContractFileType.DESTRUCTION_CONFIRM && destructionPeriod != null
+                ? destructionPeriod.trim().toUpperCase(java.util.Locale.ROOT) : null;
+        res.periodWarning(periodWarning(periodKey, documentDate));
         byte[] data;
         try {
             data = file.getBytes();
@@ -174,6 +184,9 @@ public class PiFileContentChecker {
                     .filter(s -> type == ContractFileType.CONTRACT || !"PERIOD".equals(s.kind()))   // 서류 일자는 계약기간 날짜 제외
                     .map(PiContractDocAnalyzer.Scored::date).distinct().sorted().toList();
             res.documentDates(dates);
+            if (entered == null && periodKey != null && !dates.isEmpty()) {
+                res.periodWarning(periodWarning(periodKey, dates.get(dates.size() - 1)));   // 파기 완료일 미입력이면 문서의 마지막 날짜로
+            }
             String label = type == ContractFileType.CONTRACT ? "체결일" : type.getDocumentDateLabel();
             if (entered == null) {
                 if (!dates.isEmpty() && type != ContractFileType.CONTRACT) {
@@ -189,6 +202,23 @@ public class PiFileContentChecker {
             }
         }
         return finish(res, errors, manual, false);
+    }
+
+    /** 정기 파기 확인서 파기 일자가 수취 기한(기간 종료 + 기한 일수)을 지났으면 확인 문구, 아니면 null */
+    String periodWarning(String periodKey, LocalDate date) {
+        LocalDate start = PiPeriodicDestruction.startOf(periodKey);
+        if (start == null || date == null) {
+            return null;
+        }
+        LocalDate end = PiPeriodicDestruction.periodEnd(PiPeriodicDestruction.cycleOf(periodKey), start);
+        LocalDate due = end.plusDays(periodic.getReplyDays());
+        if (!date.isAfter(due)) {
+            return null;
+        }
+        String label = PiPeriodicDestruction.labelOf(periodKey);
+        return "날짜가 " + periodic.getReplyDays() + "일 이상 경과했습니다. 파기 일자 " + date.format(DOT) + "은(는) " + label
+                + " 종료일(" + end.format(DOT) + ")로부터 " + java.time.temporal.ChronoUnit.DAYS.between(end, date) + "일 지났습니다(수취 기한 "
+                + due.format(DOT) + "). 해당 기간(" + label + ")의 파기확인서가 맞습니까?";
     }
 
     private static FileCheckResponse finish(FileCheckResponse.FileCheckResponseBuilder res, List<FileCheckResponse.Issue> errors,
