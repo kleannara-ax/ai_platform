@@ -58,4 +58,6 @@ public class DashboardResponse {
     private long consentMissingCount;
     /** 파기 완료일이 허용 기한보다 늦은 계약 */
     private long destructionLateCount;
+    /** 정기 파기 확인서 미수취 기간이 있는 계약 (월/분기/반기, 기간 종료 + 20일 지남) */
+    private long periodicDestructionMissingCount;
 }

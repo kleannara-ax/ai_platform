@@ -94,6 +94,18 @@ public class ContractSaveRequest {
     @Max(120)
     private Integer autoRenewPeriodMonths = 12;
 
+    /** 정기 파기확인 대상 여부 (Y 면 주기마다 개인정보 파기 확인서를 받아 관리) */
+    @Pattern(regexp = YN)
+    private String periodicDestructionYn = "N";
+
+    /** 정기 파기확인 주기 (MONTH 월 / QUARTER 분기 / HALF 반기) */
+    @Pattern(regexp = "^$|^(MONTH|QUARTER|HALF)$", message = "정기 파기확인 주기는 MONTH, QUARTER, HALF 중 하나입니다.")
+    private String periodicDestructionCycle = "QUARTER";
+
+    /** 정기 파기확인 요청·독촉 메일 발송 여부 */
+    @Pattern(regexp = YN)
+    private String periodicDestructionMailYn = "Y";
+
     /** 개인정보처리 위탁계약서 작성 여부 */
     @Pattern(regexp = YN)
     private String contractDocYn = "N";

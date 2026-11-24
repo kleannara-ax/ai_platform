@@ -39,6 +39,16 @@ public class ContractDetailResponse {
     private int autoRenewCount;
     /** 현재 계약 종료일 (자동연장 반영) */
     private LocalDate currentEndDate;
+    /** 정기 파기확인 대상 여부 (Y/N) */
+    private String periodicDestructionYn;
+    /** 정기 파기확인 주기 (MONTH / QUARTER / HALF) */
+    private String periodicDestructionCycle;
+    /** 정기 파기확인 주기 이름 (월 / 분기 / 반기) */
+    private String periodicDestructionCycleLabel;
+    /** 정기 파기확인 요청·독촉 메일 발송 여부 */
+    private String periodicDestructionMailYn;
+    /** 정기 파기확인 관리 시작일 (이 날 이후에 끝나는 기간부터 미수취 판정) */
+    private LocalDate periodicDestructionFrom;
     private String contractDocYn;
     private LocalDate contractSignedDate;
     private String subcontractYn;
@@ -104,6 +114,11 @@ public class ContractDetailResponse {
                 .autoRenewing(c.isAutoRenewing())
                 .autoRenewCount(c.autoRenewCount(today))
                 .currentEndDate(c.getContractEndDate() == null ? null : c.currentEndDate(today))
+                .periodicDestructionYn(c.getPeriodicDestructionYn())
+                .periodicDestructionCycle(c.destructionCycle().name())
+                .periodicDestructionCycleLabel(c.destructionCycle().getLabel())
+                .periodicDestructionMailYn(c.getPeriodicDestructionMailYn())
+                .periodicDestructionFrom(c.getPeriodicDestructionFrom())
                 .contractDocYn(c.getContractDocYn())
                 .contractSignedDate(c.getContractSignedDate())
                 .subcontractYn(c.getSubcontractYn())

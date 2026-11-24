@@ -34,6 +34,16 @@ public class ContractSummaryResponse {
     private Integer autoRenewCount;
     /** 현재 계약 종료일 (자동연장 중이면 연장된 종료일, 아니면 원계약 종료일) */
     private LocalDate currentEndDate;
+    /** 정기 파기확인 대상 여부 (Y/N) */
+    private String periodicDestructionYn;
+    /** 정기 파기확인 주기 (MONTH / QUARTER / HALF) */
+    private String periodicDestructionCycle;
+    /** 정기 파기확인 주기 이름 (월 / 분기 / 반기) */
+    private String periodicDestructionCycleLabel;
+    /** 정기 파기확인 요청·독촉 메일 발송 여부 */
+    private String periodicDestructionMailYn;
+    /** 정기 파기확인 관리 시작일 (이 날 이후에 끝나는 기간부터 미수취 판정) */
+    private LocalDate periodicDestructionFrom;
     private String contractDocYn;
     private String subcontractYn;
     private String subcontractorName;
@@ -64,6 +74,10 @@ public class ContractSummaryResponse {
     private Boolean destructionLate;
     /** 파기 확인서 회신 기한(종료 + 30일)이 지났는데 파기 확인서 미수취 */
     private Boolean confirmReplyOverdue;
+    /** 정기 파기 확인서 미수취 기간 수 (수취 기한 지남) */
+    private Integer periodicDestructionOverdueCount;
+    /** 가장 최근에 받은 정기 파기 확인서의 기간 이름 (예: 2026년 3분기) */
+    private String periodicDestructionLastLabel;
 
     /** 확인 필요 상태 채우기 (응답 DTO) */
     public ContractSummaryResponse withFollowUp(FollowUpResponse f) {
@@ -75,6 +89,8 @@ public class ContractSummaryResponse {
             this.consentMissing = f.isConsentMissing();
             this.destructionLate = f.isDestructionLate();
             this.confirmReplyOverdue = f.isConfirmReplyOverdue();
+            this.periodicDestructionOverdueCount = f.getPeriodicDestructionOverdueCount();
+            this.periodicDestructionLastLabel = f.getPeriodicDestructionLastLabel();
         }
         return this;
     }
@@ -107,6 +123,11 @@ public class ContractSummaryResponse {
                 .autoRenewing(c.isAutoRenewing())
                 .autoRenewCount(c.autoRenewCount(today))
                 .currentEndDate(c.getContractEndDate() == null ? null : c.currentEndDate(today))
+                .periodicDestructionYn(c.getPeriodicDestructionYn())
+                .periodicDestructionCycle(c.destructionCycle().name())
+                .periodicDestructionCycleLabel(c.destructionCycle().getLabel())
+                .periodicDestructionMailYn(c.getPeriodicDestructionMailYn())
+                .periodicDestructionFrom(c.getPeriodicDestructionFrom())
                 .contractDocYn(c.getContractDocYn())
                 .subcontractYn(c.getSubcontractYn())
                 .subcontractorName(c.getSubcontractorName())

@@ -12,7 +12,9 @@ public enum AlertType {
     ACTION_OVERDUE("조치 지연"),
     REGULAR_INSPECTION("정기 점검 요청"),
     REGULAR_SUMMARY("정기 점검 요약"),
-    AUTO_RENEW_NOTICE("자동연장 확인");
+    AUTO_RENEW_NOTICE("자동연장 확인"),
+    PERIODIC_DESTRUCTION_REQUEST("정기 파기확인 요청"),
+    PERIODIC_DESTRUCTION_OVERDUE("정기 파기확인 독촉");
 
     private final String label;
 }

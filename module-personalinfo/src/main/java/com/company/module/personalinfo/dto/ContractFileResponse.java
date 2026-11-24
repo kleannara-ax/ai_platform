@@ -29,6 +29,10 @@ public class ContractFileResponse {
     private String documentDateLabel;
     /** 서류 일자 메모 (파기 확인서: 파기 지연 사유) */
     private String documentNote;
+    /** 정기 파기 확인서 대상 기간 키 (예: 2026-Q3, 없으면 계약 종료 파기 확인서) */
+    private String destructionPeriod;
+    /** 정기 파기 확인서 대상 기간 이름 (예: 2026년 3분기) */
+    private String destructionPeriodLabel;
     private Long createdBy;
     private LocalDateTime createdAt;
 
@@ -51,6 +55,8 @@ public class ContractFileResponse {
                 .documentDate(f.getDocumentDate())
                 .documentDateLabel(f.getFileType().getDocumentDateLabel())
                 .documentNote(f.getDocumentNote())
+                .destructionPeriod(f.getDestructionPeriod())
+                .destructionPeriodLabel(com.company.module.personalinfo.service.PiPeriodicDestruction.labelOf(f.getDestructionPeriod()))
                 .createdBy(f.getCreatedBy())
                 .createdAt(f.getCreatedAt())
                 .build();

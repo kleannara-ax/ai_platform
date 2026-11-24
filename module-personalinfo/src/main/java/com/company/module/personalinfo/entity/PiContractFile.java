@@ -70,10 +70,14 @@ public class PiContractFile extends PiBaseEntity {
     @Column(name = "DOCUMENT_NOTE", length = 500)
     private String documentNote;
 
+    /** 정기 파기 확인서 대상 기간 (예: 2026-07 / 2026-Q3 / 2026-H2). null 이면 계약 종료 시 받는 파기 확인서(만료 서류) */
+    @Column(name = "DESTRUCTION_PERIOD", length = 10)
+    private String destructionPeriod;
+
     @Builder
     private PiContractFile(Long contractId, ContractFileType fileType, String originalName, String storedPath,
                            String contentType, Long fileSize, String fileHash, String description, LocalDate signedDate,
-                           LocalDate documentDate, String documentNote, Long createdBy) {
+                           LocalDate documentDate, String documentNote, String destructionPeriod, Long createdBy) {
         this.contractId = contractId;
         this.fileType = fileType == null ? ContractFileType.CONTRACT : fileType;
         this.originalName = originalName;
@@ -85,6 +89,7 @@ public class PiContractFile extends PiBaseEntity {
         this.signedDate = this.fileType == ContractFileType.CONTRACT ? signedDate : null;
         this.documentDate = this.fileType.hasDocumentDate() ? documentDate : null;
         this.documentNote = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? documentNote : null;
+        this.destructionPeriod = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? destructionPeriod : null;
         markCreatedBy(createdBy);
     }
 
@@ -105,6 +110,22 @@ public class PiContractFile extends PiBaseEntity {
         this.documentDate = documentDate;
         this.documentNote = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? documentNote : null;
         markUpdatedBy(updatedBy);
+    }
+
+    /** 정기 파기 확인서 대상 기간 변경 (null 이면 계약 종료 파기 확인서로) */
+    public void changeDestructionPeriod(String destructionPeriod, Long updatedBy) {
+        this.destructionPeriod = this.fileType == ContractFileType.DESTRUCTION_CONFIRM ? destructionPeriod : null;
+        markUpdatedBy(updatedBy);
+    }
+
+    /** 정기 파기 확인서인지 (대상 기간 있음) */
+    public boolean isPeriodicDestruction() {
+        return fileType == ContractFileType.DESTRUCTION_CONFIRM && destructionPeriod != null;
+    }
+
+    /** 계약 종료 시 받는 파기 확인서인지 (만료 서류) */
+    public boolean isTerminationDestruction() {
+        return fileType == ContractFileType.DESTRUCTION_CONFIRM && destructionPeriod == null;
     }
 
     public boolean isContractDoc() {

@@ -77,16 +77,31 @@ public class PiContractFileService {
         return upload(contractId, file, fileType, description, signedDate, documentDate, null, userId);
     }
 
-    /** 첨부 업로드 + 서류 일자(확약서 서명일 / 파기 확인서 파기 완료일) + 파기 지연 사유 */
     @Transactional
     public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
                                        LocalDate signedDate, LocalDate documentDate, String documentNote, Long userId) {
-        ensureContract(contractId);
+        return upload(contractId, file, fileType, description, signedDate, documentDate, documentNote, null, userId);
+    }
+
+    /**
+     * 첨부 업로드 + 서류 일자(확약서 서명일 / 파기 확인서 파기 완료일) + 파기 지연 사유 + 정기 파기 대상 기간.
+     * destructionPeriod(예: 2026-Q3)를 보내면 정기 파기 확인서로 저장한다(계약 종료 만료 서류로 세지 않음).
+     * 관리 시작 전에 끝난 지난 기간도 올릴 수 있다.
+     */
+    @Transactional
+    public ContractFileResponse upload(Long contractId, MultipartFile file, String fileType, String description,
+                                       LocalDate signedDate, LocalDate documentDate, String documentNote,
+                                       String destructionPeriod, Long userId) {
+        PiContract contract = ensureContract(contractId);
         if (fileRepository.countByContractIdAndDeletedYn(contractId, N) >= MAX_FILES_PER_CONTRACT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "계약 1건당 첨부파일은 최대 " + MAX_FILES_PER_CONTRACT + "개까지 등록할 수 있습니다.");
         }
         ContractFileType type = parseType(fileType);
+        String period = checkPeriod(contract, type, destructionPeriod);
+        if (period != null && StringUtils.hasText(documentNote)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "파기 지연 사유는 계약 종료 파기 확인서에만 입력합니다.");
+        }
         if (documentDate != null && documentDate.isAfter(LocalDate.now())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "서류 일자는 오늘보다 늦을 수 없습니다.");
         }
@@ -108,6 +123,7 @@ public class PiContractFileService {
                 .signedDate(docDate)
                 .documentDate(documentDate)
                 .documentNote(checkNote(type, documentNote))
+                .destructionPeriod(period)
                 .createdBy(userId)
                 .build());
         if (type == ContractFileType.CONTRACT) {
@@ -175,6 +191,38 @@ public class PiContractFileService {
             f.changeDocumentDate(documentDate, userId);
         }
         return ContractFileResponse.from(f, latestContractDocId(f.getContractId()));
+    }
+
+    /** 파기 확인서 대상 기간 변경 (null/빈 값이면 계약 종료 파기 확인서로) */
+    @Transactional
+    public ContractFileResponse changeDestructionPeriod(Long fileId, String destructionPeriod, Long userId) {
+        PiContractFile f = findActive(fileId);
+        PiContract c = ensureContract(f.getContractId());
+        if (f.getFileType() != ContractFileType.DESTRUCTION_CONFIRM) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "대상 기간은 개인정보 파기 확인서에만 지정할 수 있습니다.");
+        }
+        f.changeDestructionPeriod(checkPeriod(c, f.getFileType(), destructionPeriod), userId);
+        return ContractFileResponse.from(f, latestContractDocId(f.getContractId()));
+    }
+
+    /** 정기 파기 대상 기간 검증 (파기 확인서 + 정기 파기확인 계약만, 주기·계약기간 확인). 비었으면 null */
+    private static String checkPeriod(PiContract c, ContractFileType type, String period) {
+        String p = PiContractService.trim(period);
+        if (p == null) {
+            return null;
+        }
+        p = p.toUpperCase(Locale.ROOT);
+        if (type != ContractFileType.DESTRUCTION_CONFIRM) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "대상 기간은 개인정보 파기 확인서에만 지정할 수 있습니다.");
+        }
+        if (!c.isPeriodicDestruction()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "정기 파기확인 대상 계약이 아닙니다. 계약 수정에서 [정기 파기확인]을 먼저 체크하세요.");
+        }
+        String err = PiPeriodicDestruction.validatePeriod(c, p, LocalDate.now());
+        if (err != null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, err);
+        }
+        return p;
     }
 
     private LocalDate readSignedDate(MultipartFile file) {

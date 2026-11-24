@@ -52,6 +52,7 @@ public class ContractSearchCondition {
      * ACTION_OVERDUE      : 점검 조치 예정일 지남(조치 미완료)
      * CONSENT_MISSING     : 재위탁 Y 인데 재위탁 동의서 파일 없음
      * DESTRUCTION_LATE    : 파기 확인서의 파기 완료일이 허용 기한보다 늦음
+     * PERIODIC_DESTRUCTION_MISSING : 정기 파기확인(월/분기/반기) 계약에서 수취 기한이 지난 기간의 파기 확인서 미수취
      */
     private String followUp;
 }

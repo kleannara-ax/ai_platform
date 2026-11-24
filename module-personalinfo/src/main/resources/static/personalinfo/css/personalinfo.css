@@ -183,3 +183,9 @@ body{font-family:'Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;backgro
 .pi-followup-panel li{margin-bottom:4px;}
 .pi-followup-desc{font-size:13px;color:#6b7280;margin:0 0 8px;}
 #access-log-table tr.pi-access-excel td{background:#fffbeb;}
+/* 정기 파기확인 (월/분기/반기) */
+.pi-term-chip.periodic{background:#ede9fe;color:#5b21b6;}
+.pi-term-chip.muted{background:#f3f4f6;color:#4b5563;}
+.pi-periodic-box{border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;background:#fafafa;height:100%;}
+.pi-periodic-box legend{font-size:.875rem;float:none;width:auto;}
+#periodic-table td{vertical-align:middle;}

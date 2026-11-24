@@ -74,9 +74,11 @@ public class PiContractService {
     private final PiContactHistoryRepository contactHistoryRepository;
     private final PiAccessScopeResolver accessScope;
     private final PiFollowUpRules followUps;
+    private final PiPeriodicDestruction periodicDestruction;
 
     /** 확인 필요 목록 조건 */
-    static final Set<String> FOLLOW_UPS = Set.of("EXPIRY_DOCS_MISSING", "ACTION_OVERDUE", "CONSENT_MISSING", "DESTRUCTION_LATE");
+    static final Set<String> FOLLOW_UPS = Set.of("EXPIRY_DOCS_MISSING", "ACTION_OVERDUE", "CONSENT_MISSING", "DESTRUCTION_LATE",
+            "PERIODIC_DESTRUCTION_MISSING");
 
     static boolean matchesFollowUp(String followUp, com.company.module.personalinfo.dto.FollowUpResponse f) {
         if (f == null) {
@@ -87,6 +89,7 @@ public class PiContractService {
             case "ACTION_OVERDUE" -> f.getActionOverdueCount() > 0;
             case "CONSENT_MISSING" -> f.isConsentMissing();
             case "DESTRUCTION_LATE" -> f.isDestructionLate();
+            case "PERIODIC_DESTRUCTION_MISSING" -> f.getPeriodicDestructionOverdueCount() > 0;
             default -> true;
         };
     }
@@ -185,6 +188,56 @@ public class PiContractService {
                 .stream().map(PiInspection::getContractId).collect(Collectors.toSet());
     }
 
+    /** 정기 파기확인 현황 (기준 연도의 기간별 수취 상태 + 업로드 때 고를 기간) */
+    public com.company.module.personalinfo.dto.PeriodicDestructionResponse getPeriodicDestruction(Long contractId, Integer year) {
+        PiContract c = findActive(contractId);
+        LocalDate today = LocalDate.now();
+        List<com.company.module.personalinfo.entity.PiContractFile> files = fileRepository
+                .findByContractIdAndDeletedYnOrderByFileIdDesc(contractId, N).stream()
+                .filter(com.company.module.personalinfo.entity.PiContractFile::isPeriodicDestruction).toList();
+        int firstYear = c.getContractStartDate() == null ? today.getYear() : Math.min(c.getContractStartDate().getYear(), today.getYear());
+        LocalDate last = PiPeriodicDestruction.contractLastDay(c, today);
+        int lastYear = last == null || last.isAfter(today) ? today.getYear() : last.getYear();
+        List<Integer> years = new ArrayList<>();
+        for (int y = lastYear; y >= Math.max(firstYear, lastYear - 15); y--) years.add(y);
+        int y = year == null ? lastYear : year;
+        if (y < 1990 || y > 2100) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "기준 연도가 올바르지 않습니다: " + y);
+        }
+        java.util.function.Function<PiPeriodicDestruction.Period, com.company.module.personalinfo.dto.PeriodicDestructionResponse.PeriodItem> item = p ->
+                com.company.module.personalinfo.dto.PeriodicDestructionResponse.PeriodItem.builder()
+                        .key(p.getKey()).label(p.getLabel()).startDate(p.getStartDate()).endDate(p.getEndDate()).dueDate(p.getDueDate())
+                        .status(p.getStatus().name()).statusLabel(p.getStatusLabel()).managed(p.isManaged())
+                        .files(p.getFiles().stream().map(ContractFileResponse::from).toList()).build();
+        // 업로드 때 고를 기간: 최근 연도부터 계약기간 안의 시작한 기간 (최대 36개)
+        List<com.company.module.personalinfo.dto.PeriodicDestructionResponse.PeriodOption> options = new ArrayList<>();
+        String defaultKey = null;
+        for (int yy : years) {
+            for (PiPeriodicDestruction.Period p : periodicDestruction.periodsOfYear(c, yy, files, today)) {
+                if (options.size() >= 36) break;
+                options.add(com.company.module.personalinfo.dto.PeriodicDestructionResponse.PeriodOption.builder()
+                        .key(p.getKey()).label(p.getLabel()).status(p.getStatus().name()).statusLabel(p.getStatusLabel()).build());
+                if (defaultKey == null && p.getEndDate().isBefore(today)) defaultKey = p.getKey();
+            }
+        }
+        if (defaultKey == null && !options.isEmpty()) defaultKey = options.get(0).getKey();
+        return com.company.module.personalinfo.dto.PeriodicDestructionResponse.builder()
+                .contractId(contractId)
+                .periodicDestructionYn(c.getPeriodicDestructionYn())
+                .cycle(c.destructionCycle().name())
+                .cycleLabel(c.destructionCycle().getLabel())
+                .mailYn(c.getPeriodicDestructionMailYn())
+                .managedFrom(c.getPeriodicDestructionFrom())
+                .replyDays(periodicDestruction.getReplyDays())
+                .year(y)
+                .availableYears(years)
+                .periods(periodicDestruction.periodsOfYear(c, y, files, today).stream().map(item).toList())
+                .defaultPeriod(defaultKey)
+                .selectablePeriods(options)
+                .overdueCount(periodicDestruction.overdue(c, files, today).size())
+                .build();
+    }
+
     public ContractDetailResponse getDetail(Long contractId) {
         PiContract c = findActive(contractId);
         Long latestDocId = fileRepository
@@ -228,6 +281,9 @@ public class PiContractService {
                 .autoRenewYn(r.getAutoRenewYn())
                 .autoRenewNote(trim(r.getAutoRenewNote()))
                 .autoRenewPeriodMonths(r.getAutoRenewPeriodMonths())
+                .periodicDestructionYn(r.getPeriodicDestructionYn())
+                .periodicDestructionCycle(r.getPeriodicDestructionCycle())
+                .periodicDestructionMailYn(r.getPeriodicDestructionMailYn())
                 .contractDocYn(r.getContractDocYn())
                 .contractSignedDate(r.getContractSignedDate())
                 .subcontractYn(r.getSubcontractYn())
@@ -267,6 +323,8 @@ public class PiContractService {
                 emptyToNull(r.getSubcontractConsentYn()),
                 r.getAlertYn(), r.getAlertDaysBefore(), trim(r.getAlertExtraEmails()), trim(r.getRemark()),
                 userId);
+        c.changePeriodicDestruction(r.getPeriodicDestructionYn(), r.getPeriodicDestructionCycle(),
+                r.getPeriodicDestructionMailYn(), LocalDate.now(), userId);
         recordContactChange(c, before, userName, userId);
         return getDetail(contractId);
     }
@@ -472,6 +530,7 @@ public class PiContractService {
                 .actionOverdueCount(fu.values().stream().filter(f -> f.getActionOverdueCount() > 0).count())
                 .consentMissingCount(fu.values().stream().filter(com.company.module.personalinfo.dto.FollowUpResponse::isConsentMissing).count())
                 .destructionLateCount(fu.values().stream().filter(com.company.module.personalinfo.dto.FollowUpResponse::isDestructionLate).count())
+                .periodicDestructionMissingCount(fu.values().stream().filter(f -> f.getPeriodicDestructionOverdueCount() > 0).count())
                 .year(year)
                 .totalCount(all.size())
                 .activeCount(byStatus.getOrDefault(ContractStatus.ACTIVE, 0L))

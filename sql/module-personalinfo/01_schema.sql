@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS pi_contract (
     AUTO_RENEW_YN           CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '자동연장 여부 (Y/N)',
     AUTO_RENEW_NOTE         VARCHAR(200)  NULL                    COMMENT '자동연장 비고 (예: 1개월 단위)',
     AUTO_RENEW_PERIOD_MONTHS INT          NOT NULL DEFAULT 12     COMMENT '자동연장 기간 (개월, 기본 12 = 1년 단위). 자동연장 Y 이면 원계약 종료일 후 이 기간 단위로 계약기간이 자동 연장됨',
+    PERIODIC_DESTRUCTION_YN CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '정기 파기확인 대상 여부 (Y/N). Y 면 주기마다 개인정보 파기 확인서를 받아 관리',
+    PERIODIC_DESTRUCTION_CYCLE VARCHAR(10) NOT NULL DEFAULT 'QUARTER' COMMENT '정기 파기확인 주기 (MONTH 월 / QUARTER 분기 / HALF 반기)',
+    PERIODIC_DESTRUCTION_MAIL_YN CHAR(1)  NOT NULL DEFAULT 'Y'    COMMENT '정기 파기확인 요청·독촉 메일 발송 여부 (Y/N)',
+    PERIODIC_DESTRUCTION_FROM DATE        NULL                    COMMENT '정기 파기확인 관리 시작일 (체크한 날). 이 날 이후에 끝나는 기간부터 미수취 판정',
     CONTRACT_DOC_YN         CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '위탁 계약서 작성 여부 (Y/N)',
     CONTRACT_SIGNED_DATE    DATE          NULL                    COMMENT '위수탁 계약 체결일',
     SUBCONTRACT_YN          CHAR(1)       NOT NULL DEFAULT 'N'    COMMENT '재위탁 여부 (Y/N)',
@@ -89,6 +93,7 @@ CREATE TABLE IF NOT EXISTS pi_contract_file (
     SIGNED_DATE    DATE          NULL                    COMMENT '계약서상 체결일 (위수탁 계약서만 사용. 체결일 표기가 없으면 계약기간 시작일)',
     DOCUMENT_DATE  DATE          NULL                    COMMENT '받은 서류의 일자 (정보보호 및 비밀유지 확약서 서명일 / 개인정보 파기 확인서 파기 완료일)',
     DOCUMENT_NOTE  VARCHAR(500)  NULL                    COMMENT '서류 일자 관련 메모 (개인정보 파기 확인서: 파기 기한(계약 종료 + 5일)보다 늦게 파기한 사유)',
+    DESTRUCTION_PERIOD VARCHAR(10) NULL                  COMMENT '정기 파기 확인서 대상 기간 (예: 2026-07 월 / 2026-Q3 분기 / 2026-H2 반기). NULL 이면 계약 종료 파기 확인서',
 
     CREATED_AT     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY     BIGINT        NULL                    COMMENT '생성자 사용자 ID',
@@ -194,7 +199,7 @@ CREATE TABLE IF NOT EXISTS pi_inspection_item (
 CREATE TABLE IF NOT EXISTS pi_alert_log (
     ALERT_ID        BIGINT        NOT NULL AUTO_INCREMENT COMMENT '알림 ID',
     CONTRACT_ID     BIGINT        NULL                    COMMENT '위수탁 계약 ID (pi_contract, 관리자 요약 메일처럼 특정 계약이 없으면 NULL)',
-    ALERT_TYPE      VARCHAR(30)   NOT NULL DEFAULT 'EXPIRY' COMMENT '알림 종류 (EXPIRY 만료 알림 / EXPIRY_DOCS 만료 서류 독촉 / ACTION_OVERDUE 조치 지연 / REGULAR_INSPECTION 정기 점검 요청 / REGULAR_SUMMARY 정기 점검 요약)',
+    ALERT_TYPE      VARCHAR(30)   NOT NULL DEFAULT 'EXPIRY' COMMENT '알림 종류 (EXPIRY 만료 알림 / EXPIRY_DOCS 만료 서류 독촉 / ACTION_OVERDUE 조치 지연 / REGULAR_INSPECTION 정기 점검 요청 / REGULAR_SUMMARY 정기 점검 요약 / AUTO_RENEW_NOTICE 자동연장 확인 / PERIODIC_DESTRUCTION_REQUEST 정기 파기확인 요청 / PERIODIC_DESTRUCTION_OVERDUE 정기 파기확인 독촉)',
     TRIGGER_TYPE    VARCHAR(10)   NOT NULL                COMMENT '발송 경로 (AUTO:자동 / MANUAL:수동)',
     ALERT_STAGE     VARCHAR(20)   NOT NULL                COMMENT '알림 단계 (D-30, D-7, D-1, D-DAY, EXPIRED, MANUAL)',
     TARGET_END_DATE DATE          NULL                    COMMENT '알림 당시 계약 종료일',

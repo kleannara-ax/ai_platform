@@ -26,4 +26,8 @@ public class AlertRunResponse {
     private int regularSummaryCount;
     /** 자동연장 예정 확인 메일 발송 건수 */
     private int autoRenewNoticeCount;
+    /** 정기 파기확인 요청 메일 발송 건수 (기간 종료 후, 기간마다 1회) */
+    private int periodicDestructionRequestCount;
+    /** 정기 파기확인 독촉 메일 발송 건수 (수취 기한 지남, 기간마다 1회) */
+    private int periodicDestructionOverdueCount;
 }

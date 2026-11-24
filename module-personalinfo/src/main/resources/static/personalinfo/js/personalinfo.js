@@ -22,6 +22,8 @@
   const defaultCond = () => ({ yearStatus: 'ACTIVE' });
   let listState = { page: 0, size: 50, sort: 'contractEndDate,asc', cond: defaultCond(), baseYear: new Date().getFullYear() };
   let currentContract = null;
+  /** 정기 파기 확인서 수취 기한 (기간 종료 + N일, 서버 설정 기본 20일 — 상세 응답 값으로 갱신) */
+  let PERIODIC_REPLY_DAYS = 20;
 
   // ──────────────── 공통 유틸 ────────────────
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -219,6 +221,7 @@
         ['ACTION_OVERDUE', '조치 지연', d.actionOverdueCount, 'fa-hourglass-end', '점검 결과 조치 필요 항목의 조치 예정일이 지났는데 조치 완료가 아닌 계약'],
         ['CONSENT_MISSING', '재위탁 동의서 누락', d.consentMissingCount, 'fa-file-contract', '재위탁 Y 인데 재위탁 동의서 파일이 없는 계약'],
         ['DESTRUCTION_LATE', '파기 지연', d.destructionLateCount, 'fa-clock-rotate-left', '파기 확인서의 파기 완료일이 파기 기한(계약 종료 + 5일, 표준 개인정보 보호지침 제10조)보다 늦은 계약'],
+        ['PERIODIC_DESTRUCTION_MISSING', '정기 파기확인서 미수취', d.periodicDestructionMissingCount || 0, 'fa-calendar-xmark', '정기 파기확인(월·분기·반기) 계약 중 기간 종료 + 20일이 지났는데 그 기간 파기 확인서를 받지 못한 계약'],
       ];
       document.getElementById('pi-followup-bar')?.remove();
       el.insertAdjacentHTML('afterend', `<section class="pi-followup-bar" id="pi-followup-bar" aria-label="보안팀 확인 필요">
@@ -252,7 +255,7 @@
   }
 
   /** 현재 카드 필터 안내 (목록 제목 옆) */
-  const FOLLOW_UP_LABEL = { EXPIRY_DOCS_MISSING: '만료 서류 미수취', ACTION_OVERDUE: '조치 지연', CONSENT_MISSING: '재위탁 동의서 누락', DESTRUCTION_LATE: '파기 지연' };
+  const FOLLOW_UP_LABEL = { EXPIRY_DOCS_MISSING: '만료 서류 미수취', ACTION_OVERDUE: '조치 지연', CONSENT_MISSING: '재위탁 동의서 누락', DESTRUCTION_LATE: '파기 지연', PERIODIC_DESTRUCTION_MISSING: '정기 파기확인서 미수취' };
   function yearFilterLabel() {
     const c = listState.cond; const y = listState.baseYear;
     if (c.followUp) return `확인 필요 · ${FOLLOW_UP_LABEL[c.followUp] || c.followUp} (오늘 기준)`;
@@ -358,6 +361,11 @@
     if (r.consentMissing) out.push('<span class="pi-term-chip warn" title="재위탁 Y 인데 재위탁 동의서 파일 없음"><i class="fas fa-file-contract"></i>동의서 누락</span>');
     if (r.confirmReplyOverdue) out.push('<span class="pi-term-chip miss" title="계약 종료 + 30일(확인서 회신 기한)이 지났는데 파기 확인서 미수취"><i class="fas fa-envelope-open-text"></i>파기확인서 회신지연</span>');
     if (r.destructionLate) out.push('<span class="pi-term-chip warn" title="파기 완료일이 파기 기한(계약 종료 + 5일)보다 늦음"><i class="fas fa-clock-rotate-left"></i>파기지연</span>');
+    if (r.periodicDestructionYn === 'Y') {
+      out.push(r.periodicDestructionOverdueCount
+        ? `<span class="pi-term-chip miss" title="정기 파기확인(${esc(r.periodicDestructionCycleLabel)}) 확인서 미수취 ${r.periodicDestructionOverdueCount}개 기간 (기간 종료 + 20일 지남)"><i class="fas fa-calendar-xmark"></i>정기파기 미수취 ${r.periodicDestructionOverdueCount}</span>`
+        : `<span class="pi-term-chip periodic" title="정기 파기확인 ${esc(r.periodicDestructionCycleLabel)}별${r.periodicDestructionLastLabel ? ' · 최근 수취 ' + esc(r.periodicDestructionLastLabel) : ''}"><i class="fas fa-calendar-check"></i>정기파기 ${esc(r.periodicDestructionCycleLabel)}</span>`);
+    }
     return out.length ? '<div class="pi-fu-chips">' + out.join('') + '</div>' : '';
   }
 
@@ -450,10 +458,10 @@
   }
 
   async function runAlerts() {
-    if (!confirm('오늘 기준 알림 메일을 실행합니다.\n(만료 알림, 만료 서류 독촉, 조치 지연, 정기 점검 요청, 자동연장 확인 — 이미 보낸 알림은 다시 보내지 않습니다)')) return;
+    if (!confirm('오늘 기준 알림 메일을 실행합니다.\n(만료 알림, 만료 서류 독촉, 조치 지연, 정기 점검 요청, 자동연장 확인, 정기 파기확인 요청·독촉 — 이미 보낸 알림은 다시 보내지 않습니다)')) return;
     try {
       const r = await PI_API.runAlerts();
-      notify(`알림 실행 완료\n· 만료 알림: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}\n· 만료 서류 독촉 ${r.docsReminderCount}건 · 조치 지연 ${r.actionOverdueCount}건 · 정기 점검 요청 ${r.regularInspectionCount}건${r.regularSummaryCount ? ' (관리자 요약 발송)' : ''} · 자동연장 확인 ${r.autoRenewNoticeCount}건`);
+      notify(`알림 실행 완료\n· 만료 알림: 대상 ${r.candidateCount}건 / 발송 ${r.sentCount} / 실패 ${r.failedCount} / 미발송 ${r.skippedCount} / 기발송 ${r.alreadySentCount}\n· 만료 서류 독촉 ${r.docsReminderCount}건 · 조치 지연 ${r.actionOverdueCount}건 · 정기 점검 요청 ${r.regularInspectionCount}건${r.regularSummaryCount ? ' (관리자 요약 발송)' : ''} · 자동연장 확인 ${r.autoRenewNoticeCount}건 · 정기 파기확인 요청 ${r.periodicDestructionRequestCount || 0}건 / 독촉 ${r.periodicDestructionOverdueCount || 0}건`);
     } catch (e) { fail(e); }
   }
 
@@ -482,7 +490,7 @@
     if (!perm.canWrite) { notify('등록/수정 권한이 없습니다.', 'warning'); go(c ? '#/contracts/' + c.contractId : '#/contracts'); return; }
     if (!canCreate()) { notify('소속부서가 지정되지 않아 계약을 등록·수정할 수 없습니다. 관리자에게 부서 지정을 요청하세요.', 'warning'); go('#/contracts'); return; }
     const isEdit = !!c;
-    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', autoRenewPeriodMonths: 12, contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
+    const v = c || { ismsScopeYn: 'Y', autoRenewYn: 'N', autoRenewPeriodMonths: 12, periodicDestructionYn: 'N', periodicDestructionCycle: 'QUARTER', periodicDestructionMailYn: 'Y', contractDocYn: 'N', subcontractYn: 'N', alertYn: 'Y', alertDaysBefore: 30, vendorName: presetVendor || '' };
     crumb.innerHTML = `<a href="#/contracts">계약 목록</a> &gt; ${isEdit ? `<a href="#/contracts/${c.contractId}">${esc(c.vendorName)}</a> &gt; 수정` : '계약 등록'}`;
     const radio = (name, value) => `
       <div class="btn-group btn-group-sm" role="group" aria-label="${name}">
@@ -503,8 +511,23 @@
             <div class="col-md-2">${input('serviceName', '관련 서비스', v.serviceName, 'maxlength="200" placeholder="예: 자사몰, OMS"')}</div>
             <div class="col-md-2"><label class="form-label d-block">ISMS 범위</label>${radio('ismsScopeYn', v.ismsScopeYn)}</div>
             <div class="col-12 d-none" id="same-vendor-hint" role="status" aria-live="polite"></div>
-            <div class="col-12"><label class="form-label pi-required" for="f-entrustedTask">위탁업무 내용</label>
-              <textarea class="form-control" id="f-entrustedTask" name="entrustedTask" rows="2" maxlength="1000" required>${esc(v.entrustedTask)}</textarea></div>
+            <div class="col-md-8"><label class="form-label pi-required" for="f-entrustedTask">위탁업무 내용</label>
+              <textarea class="form-control" id="f-entrustedTask" name="entrustedTask" rows="3" maxlength="1000" required>${esc(v.entrustedTask)}</textarea></div>
+            <div class="col-md-4"><fieldset class="pi-periodic-box" id="periodic-destruction-box">
+              <legend class="form-label mb-1">정기 파기확인</legend>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="f-periodicDestructionYn" ${v.periodicDestructionYn === 'Y' ? 'checked' : ''}>
+                <label class="form-check-label fw-semibold" for="f-periodicDestructionYn">주기별 개인정보 파기 확인서 받기</label></div>
+              <div class="d-flex gap-2 align-items-center mt-1 flex-wrap">
+                <label class="small text-muted" for="f-periodicDestructionCycle">주기</label>
+                <select class="form-select form-select-sm w-auto" id="f-periodicDestructionCycle" aria-label="정기 파기확인 주기">
+                  ${[['MONTH', '월'], ['QUARTER', '분기'], ['HALF', '반기']].map(([k, l]) => `<option value="${k}" ${(v.periodicDestructionCycle || 'QUARTER') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" id="f-periodicDestructionMailYn" ${v.periodicDestructionMailYn === 'N' ? '' : 'checked'}>
+                  <label class="form-check-label small" for="f-periodicDestructionMailYn">요청·독촉 메일 발송</label></div>
+              </div>
+              <small class="text-muted d-block mt-1" id="periodic-destruction-hint"></small>
+            </fieldset></div>
           </div>
 
           <div class="pi-form-section mt-3"><h3>당사 담당 / 수탁사 담당</h3>
@@ -594,6 +617,23 @@
     form.querySelectorAll('input[name="autoRenewYn"]').forEach((r) => r.addEventListener('change', syncRenew));
     syncRenew();
 
+    // 정기 파기확인: 체크하면 주기·메일 발송을 고른다. 체크한 날 이후에 끝나는 기간부터 미수취를 따진다.
+    const syncPeriodic = () => {
+      const on = document.getElementById('f-periodicDestructionYn').checked;
+      ['f-periodicDestructionCycle', 'f-periodicDestructionMailYn'].forEach((id) => { document.getElementById(id).disabled = !on; });
+      const cyc = { MONTH: '월', QUARTER: '분기', HALF: '반기' }[document.getElementById('f-periodicDestructionCycle').value];
+      const mail = document.getElementById('f-periodicDestructionMailYn').checked;
+      const since = isEdit && c.periodicDestructionYn === 'Y' && c.periodicDestructionFrom ? fmtDate(c.periodicDestructionFrom) : '오늘';
+      document.getElementById('periodic-destruction-hint').innerHTML = on
+        ? `이벤트 대행처럼 계약 중에도 개인정보를 주기적으로 파기하는 협력사용입니다. <b>${cyc}${cyc === '월' ? '이' : '가'} 끝나고 ${PERIODIC_REPLY_DAYS}일 안</b>에 파기 확인서를 받아 상세 화면 [정기 파기확인 현황]에 올립니다.
+           <b>${since}</b> 이후에 끝나는 ${cyc}부터 미수취로 봅니다(그 전 기간도 업로드 가능).
+           ${mail ? '기간이 끝나면 요청 메일, 기한이 지나면 독촉 메일을 기간마다 1회 담당자에게 보냅니다.' : '<span class="text-warning-emphasis">메일은 보내지 않고 화면에만 표시합니다.</span>'}`
+        : '체크하면 월·분기·반기마다 파기 확인서를 받아 관리합니다(예: 이벤트 경품 발송 후 개인정보 파기).';
+    };
+    ['f-periodicDestructionYn', 'f-periodicDestructionCycle', 'f-periodicDestructionMailYn']
+      .forEach((id) => document.getElementById(id).addEventListener('change', syncPeriodic));
+    syncPeriodic();
+
     // 재위탁 업체명·업무·동의서: 재위탁 여부가 Y 일 때만 입력 가능
     const SUB_FIELDS = ['f-subcontractorName', 'f-subcontractTask', 'f-subcontractConsentYn'];
     const subcontractOn = () => form.querySelector('input[name="subcontractYn"]:checked')?.value === 'Y';
@@ -632,6 +672,9 @@
         }
         body.autoRenewPeriodMonths = months >= 1 && months <= 120 ? months : 12;
       }
+      body.periodicDestructionYn = document.getElementById('f-periodicDestructionYn').checked ? 'Y' : 'N';
+      body.periodicDestructionCycle = document.getElementById('f-periodicDestructionCycle').value;
+      body.periodicDestructionMailYn = document.getElementById('f-periodicDestructionMailYn').checked ? 'Y' : 'N';
       if (body.subcontractYn === 'Y' && !body.subcontractorName && !body.subcontractTask) {
         notify('재위탁이 Y 이면 재위탁 업체명 또는 재위탁 업무를 입력하세요.', 'warning');
         document.getElementById('f-subcontractorName').focus();
@@ -756,9 +799,10 @@
    * 파기 기한보다 늦은 날짜면 지연 사유 칸을 열고 저장 전에 한 번 더 확인한다.
    * @returns Promise<{date, note}|null> (취소하면 null)
    */
-  function askDocDate({ fileType, fileName, current, note }) {
+  function askDocDate({ fileType, fileName, current, note, periodLabel }) {
     return new Promise((resolve) => {
       const isDest = fileType === 'DESTRUCTION_CONFIRM';
+      const periodic = isDest && !!periodLabel;   // 정기 파기 확인서: 계약 종료 파기 기한·지연 사유 없음
       const label = isDest ? '파기 완료일' : '서명일';
       const f = (currentContract && currentContract.followUp) || {};
       const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -771,7 +815,10 @@
         ? '파기 확인서에 적힌 실제 파기 일자를 입력하세요(업로드한 날이 아님). 모르면 비워 두고 나중에 첨부 목록의 연필 버튼으로 입력할 수 있습니다.'
         : '확약서에 서명한 날짜를 입력하세요. 모르면 비워 두고 나중에 첨부 목록의 연필 버튼으로 입력할 수 있습니다.';
       const box = $('doc-date-deadline');
-      if (isDest && f.destructionDeadline) {
+      if (periodic) {
+        box.innerHTML = `<i class="fas fa-calendar-check me-1"></i><b>${esc(periodLabel)}</b> 정기 파기 확인서입니다. 그 기간에 파기한 실제 파기 일자를 입력하세요.`;
+        box.classList.remove('d-none');
+      } else if (isDest && f.destructionDeadline) {
         box.innerHTML = `<i class="fas fa-calendar-check me-1"></i>계약 종료일 <b>${fmtDate(f.endBaseDate)}</b> 기준<br>
           · <b>파기 기한</b> ${fmtDate(f.destructionDeadline)}까지 <span class="text-muted">(종료 + ${f.destructionDays}일, 표준 개인정보 보호지침 제10조 '5일 이내 파기')</span><br>
           · <b>확인서 회신 기한</b> ${fmtDate(f.confirmReplyDeadline)}까지 <span class="text-muted">(종료 + ${f.confirmReplyDays}일, 협력사가 파기 확인서를 보내오는 기간)</span>`;
@@ -788,7 +835,7 @@
       noteEl.value = note || '';
       let late = false;
       const check = () => {
-        late = isDest && !!input.value && !!f.destructionDeadline && input.value > f.destructionDeadline;
+        late = isDest && !periodic && !!input.value && !!f.destructionDeadline && input.value > f.destructionDeadline;
         $('doc-date-late').classList.toggle('d-none', !late);
         if (late) {
           const days = Math.round((new Date(input.value) - new Date(f.destructionDeadline)) / 86400000);
@@ -845,13 +892,82 @@
       items.push(`<li><b>파기 확인서 회신 기한 지남</b>: 회신 기한 ${fmtDate(f.confirmReplyDeadline)}(계약 종료 + ${f.confirmReplyDays}일)이 지났는데 파기 확인서를 받지 못했습니다.
         <a href="#expiry-check-section" class="ms-1 pi-fu-jump" data-target="expiry-check-section">[계약만료시 점검으로]</a></li>`);
     }
+    if (f.periodicDestructionOverdueCount) {
+      const list = (f.periodicDestructionOverdue || []);
+      items.push(`<li><b>정기 파기확인서 미수취 ${f.periodicDestructionOverdueCount}개 기간</b>: ${list.slice(0, 6).map((p) => `${esc(p.label)} <small class="text-muted">(기한 ${fmtDate(p.dueDate)})</small>`).join(', ')}${list.length > 6 ? ' 외' : ''}
+        <a href="#periodic-destruction-section" class="ms-1 pi-fu-jump" data-target="periodic-destruction-section">[정기 파기확인 현황으로]</a></li>`);
+    }
     (f.documentDateMissing || []).forEach((m) => items.push(`<li class="text-muted"><b>${esc(m)} 미입력</b>: 첨부 목록의 연필 버튼으로 입력하세요.</li>`));
     if (!items.length) return '';
-    const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate || f.confirmReplyOverdue;
+    const serious = f.expiryDocsMissing || f.actionOverdueCount || f.consentMissing || f.destructionLate || f.confirmReplyOverdue || f.periodicDestructionOverdueCount;
     return `<section class="pi-card pi-followup-panel ${serious ? 'serious' : ''}" id="follow-up-section" role="status">
       <h2 class="mb-1"><i class="fas fa-clipboard-list"></i>처리 필요 항목</h2>
       <p class="pi-followup-desc">계약 만료·점검 이후 아직 끝나지 않은 일입니다. 담당자가 협력사로부터 서류를 받아 올리거나 조치를 완료하면 이 목록에서 자동으로 사라집니다.</p>
       <ul class="mb-0 small">${items.join('')}</ul></section>`;
+  }
+
+  /** 상세: 정기 파기확인 현황 섹션 틀 (정기 파기확인 계약이거나 정기 파기 확인서가 있을 때) */
+  function periodicSectionShell(c) {
+    if (c.periodicDestructionYn !== 'Y' && !(c.files || []).some((f) => f.destructionPeriod)) return '';
+    return `<section class="pi-card" id="periodic-destruction-section">
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <h2 class="mb-0"><i class="fas fa-calendar-check"></i>정기 파기확인 현황 <small class="text-muted fw-normal" id="periodic-summary"></small></h2>
+        <div class="d-flex gap-2 align-items-center">
+          <label class="small text-muted" for="periodic-year">연도</label>
+          <select class="form-select form-select-sm w-auto" id="periodic-year" aria-label="정기 파기확인 연도"></select>
+          <button class="btn btn-sm btn-outline-secondary" data-expiry-form="destruction-confirm" id="btn-periodic-form"><i class="fas fa-file-word me-1"></i>파기 확인서 양식</button>
+        </div>
+      </div>
+      <div id="periodic-body"><div class="pi-empty">불러오는 중...</div></div>
+      <input type="file" class="d-none" id="periodic-file-input" accept=".pdf,.doc,.docx,.hwp,.hwpx,.jpg,.jpeg,.png,.zip" aria-label="정기 파기 확인서 파일">
+    </section>`;
+  }
+
+  const PERIODIC_STATUS_CLASS = { RECEIVED: 'ok', OVERDUE: 'miss', WAITING: 'warn', IN_PROGRESS: 'muted', NOT_MANAGED: 'muted' };
+
+  /** 정기 파기확인 현황 불러오기 (기간별 수취 상태 + 기간별 업로드) */
+  async function loadPeriodic(c, year, reload) {
+    const body = document.getElementById('periodic-body');
+    if (!body) return;
+    let pd;
+    try { pd = await PI_API.periodicDestruction(c.contractId, year); } catch (e) { body.innerHTML = `<div class="pi-empty">${esc(e.message)}</div>`; return; }
+    PERIODIC_REPLY_DAYS = pd.replyDays;
+    const ysel = document.getElementById('periodic-year');
+    ysel.innerHTML = pd.availableYears.map((y) => `<option value="${y}" ${y === pd.year ? 'selected' : ''}>${y}년</option>`).join('');
+    ysel.onchange = () => loadPeriodic(c, Number(ysel.value), reload);
+    document.getElementById('btn-periodic-form').onclick = () => PI_API.downloadExpiryForm(c.contractId, 'destruction-confirm').catch(fail);
+    document.getElementById('periodic-summary').innerHTML = pd.periodicDestructionYn === 'Y'
+      ? `${esc(pd.cycleLabel)}별 · 기간 종료 + ${pd.replyDays}일 안 수취 · ${fmtDate(pd.managedFrom)} 이후 끝나는 기간부터 관리 · 메일 ${pd.mailYn === 'N' ? '안 보냄' : '발송'}${pd.overdueCount ? ` · <span class="text-danger fw-semibold">미수취 ${pd.overdueCount}</span>` : ''}`
+      : '<span class="text-warning-emphasis">정기 파기확인이 꺼져 있습니다 (이력만 표시)</span>';
+    const rows = pd.periods.map((p) => `
+      <tr class="${p.status === 'OVERDUE' ? 'table-danger' : ''}">
+        <td class="fw-semibold text-nowrap">${esc(p.label)}</td>
+        <td class="text-nowrap">${fmtDate(p.startDate)} ~ ${fmtDate(p.endDate)}</td>
+        <td class="text-nowrap">${fmtDate(p.dueDate)}</td>
+        <td class="text-nowrap"><span class="pi-term-chip ${PERIODIC_STATUS_CLASS[p.status] || ''}">${esc(p.statusLabel)}</span>${p.status === 'NOT_MANAGED' ? ' <small class="text-muted" title="정기 파기확인을 체크하기 전에 끝난 기간이라 미수취로 보지 않습니다. 받은 확인서는 올릴 수 있습니다.">미수취 판정 안 함</small>' : ''}</td>
+        <td>${p.files.length ? p.files.map((f) => `<div class="text-nowrap"><a href="#" data-dl-file="${f.fileId}" data-name="${esc(f.originalName)}"><i class="fas fa-file me-1"></i>${esc(f.originalName)}</a>
+            <small class="text-muted ms-1">파기일 ${fmtDate(f.documentDate)}</small></div>`).join('') : '<span class="text-muted">-</span>'}</td>
+        <td class="text-end text-nowrap">${perm.canWrite ? `<button class="btn btn-sm ${p.status === 'OVERDUE' ? 'btn-danger' : 'btn-outline-primary'}" data-periodic-upload="${esc(p.key)}" data-label="${esc(p.label)}"><i class="fas fa-upload me-1"></i>${p.files.length ? '추가' : '올리기'}</button>` : ''}</td>
+      </tr>`).join('');
+    body.innerHTML = `<div class="table-responsive"><table class="pi-table" id="periodic-table"><thead><tr><th>기간</th><th>기간 일자</th><th>수취 기한</th><th>상태</th><th>파기 확인서</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="pi-empty">${pd.year}년에는 계약기간 안의 기간이 없습니다.</td></tr>`}</tbody></table></div>
+      <small class="text-muted"><i class="fas fa-circle-info me-1"></i>기간이 끝나면 협력사로부터 그 기간의 개인정보 파기 확인서를 받아 해당 기간 행의 [올리기]로 올리세요. 관리 시작 전에 끝난 지난 기간도 올릴 수 있습니다. 계약이 끝나서 받는 파기 확인서는 [계약만료시 점검]에 올립니다.</small>`;
+    body.querySelectorAll('[data-dl-file]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); PI_API.downloadFile(a.dataset.dlFile, a.dataset.name).catch(fail); }));
+    const inp = document.getElementById('periodic-file-input');
+    body.querySelectorAll('[data-periodic-upload]').forEach((b) => b.addEventListener('click', () => {
+      inp.value = '';
+      inp.onchange = async () => {
+        const f = inp.files?.[0]; if (!f) return;
+        const ans = await askDocDate({ fileType: 'DESTRUCTION_CONFIRM', fileName: f.name, periodLabel: b.dataset.label });
+        if (!ans) { inp.value = ''; return; }
+        const fd = new FormData();
+        fd.append('file', f); fd.append('fileType', 'DESTRUCTION_CONFIRM'); fd.append('destructionPeriod', b.dataset.periodicUpload);
+        fd.append('description', b.dataset.label + ' 정기 파기 확인서');
+        if (ans.date) fd.append('documentDate', ans.date);
+        try { await PI_API.uploadFile(c.contractId, fd); notify(`${b.dataset.label} 파기 확인서를 올렸습니다.`); reload(); } catch (e) { fail(e); inp.value = ''; }
+      };
+      inp.click();
+    }));
   }
 
   /** 같은 업체 계약 표 (상세 섹션·팝업·등록 안내 공통) */
@@ -1206,7 +1322,7 @@
         status = i ? `${badge(i.result, i.resultLabel)} <small class="text-muted ms-1">${fmtDate(i.inspectionDate)}</small>` : '<span class="pi-status NONE">미수취</span>';
         if (i) latest = `<button class="btn btn-link btn-sm p-0 text-truncate pi-expiry-file" data-dl-ins="${i.inspectionId}" data-name="${esc(i.originalName)}" title="${esc(i.originalName)}"><i class="fas fa-download me-1"></i>${esc(i.originalName)}</button>`;
       } else {
-        const list = c.files.filter((f) => f.fileType === it.fileType).sort(byDateDesc);
+        const list = c.files.filter((f) => f.fileType === it.fileType && !f.destructionPeriod).sort(byDateDesc);
         count = list.length;
         const f = list[0];
         status = f ? `<span class="pi-status PASS">수취 완료</span> <small class="text-muted ms-1">${fmtDate(f.createdAt)}</small>
@@ -1223,7 +1339,7 @@
     });
     const done = EXPIRY_ITEMS.filter((it) => it.key === 'checklist'
       ? c.inspections.some((i) => i.inspectionType === 'TERMINATION')
-      : c.files.some((f) => f.fileType === it.fileType)).length;
+      : c.files.some((f) => f.fileType === it.fileType && !f.destructionPeriod)).length;
     return `
       <section class="pi-card" id="expiry-check-section">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -1304,6 +1420,10 @@
                 + (c.alertYn === 'Y' ? `<br><small class="text-muted"><i class="fas fa-envelope me-1"></i>연장일 ${c.alertDaysBefore}일 전 담당자에게 유지 여부 확인 메일</small>` : '<br><small class="text-warning-emphasis">만료 알림 미사용 — 자동연장 확인 메일도 보내지 않음</small>')
               : ''}`
             : yn(c.autoRenewYn) + (c.autoRenewNote ? ' (' + esc(c.autoRenewNote) + ')' : ''))}${row('개인정보처리 위탁계약서 작성 / 체결일', yn(c.contractDocYn) + ' / ' + fmtDate(c.contractSignedDate))}
+          ${row('정기 파기확인', c.periodicDestructionYn === 'Y'
+            ? `Y · <b>${esc(c.periodicDestructionCycleLabel)}별</b> <small class="text-muted">(기간 종료 + ${PERIODIC_REPLY_DAYS}일 안에 수취 · ${fmtDate(c.periodicDestructionFrom)} 이후 끝나는 기간부터 관리)</small>
+               <br><small class="${c.periodicDestructionMailYn === 'N' ? 'text-warning-emphasis' : 'text-muted'}"><i class="fas fa-envelope me-1"></i>요청·독촉 메일 ${c.periodicDestructionMailYn === 'N' ? '보내지 않음 (화면 표시만)' : '발송'}</small>`
+            : 'N')}${row('', '')}
           ${row('재위탁', c.subcontractYn === 'Y' ? esc(c.subcontractorName || '') + (c.subcontractTask ? ' — ' + esc(c.subcontractTask) : '') : 'N')}${row('재위탁 동의서', yn(c.subcontractConsentYn))}
           ${row('만료 알림', c.alertYn === 'Y' ? `사용 (만료 ${c.alertDaysBefore}일 전부터)` : '미사용')}${row('추가 수신자', esc(c.alertExtraEmails || '-'))}
           ${c.terminatedYn === 'Y' ? row('종료일 / 사유', fmtDate(c.terminatedDate) + ' / ' + esc(c.terminationReason || '-'))
@@ -1345,12 +1465,13 @@
               <option value="ETC">기타</option></select>
             <input type="file" class="form-control form-control-sm" name="file" required aria-label="파일" accept=".pdf,.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.jpg,.jpeg,.png,.zip">
             <input type="date" class="form-control form-control-sm w-auto" name="signedDate" id="upload-signed-date" title="계약서 체결일 (위수탁 계약서만, 파일을 고르면 자동 입력)" aria-label="계약서 체결일">
+            ${c.periodicDestructionYn === 'Y' ? '<select class="form-select form-select-sm w-auto d-none" name="destructionPeriod" id="upload-destruction-period" aria-label="파기 확인서 대상 기간" title="정기 파기 확인서면 대상 기간, 계약이 끝나서 받은 것이면 계약 종료 파기"></select>' : ''}
             <button class="btn btn-sm btn-primary text-nowrap" type="submit"><i class="fas fa-upload me-1"></i>업로드</button></form>` : ''}
         </div>
         <p class="small text-muted mb-2" id="contract-doc-rule"><i class="fas fa-circle-info me-1"></i>위수탁 계약서는 체결일자별로 여러 건 올릴 수 있으며, 계약의 <b>개인정보처리 위탁계약 체결일</b>은 <b>체결일이 가장 최근인 위수탁 계약서</b>의 날짜로 표시됩니다. 업로드할 때 계약서에서 날짜를 읽고(체결일 표기가 없으면 계약기간 시작일), 직접 고칠 수도 있습니다.</p>
         <div class="table-responsive"><table class="pi-table" id="file-table"><thead><tr><th>구분</th><th>파일명</th><th>계약서 체결일 / 서류 일자</th><th>크기</th><th>설명</th><th>등록일시</th><th></th></tr></thead>
           <tbody>${c.files.length ? sortFiles(c.files).map((f) => `
-            <tr class="${f.latestContractDoc ? 'pi-latest-doc' : ''}"><td>${esc(f.fileTypeLabel)}</td><td>${esc(f.originalName)}</td>
+            <tr class="${f.latestContractDoc ? 'pi-latest-doc' : ''}"><td>${esc(f.fileTypeLabel)}${f.destructionPeriod ? `<br><span class="pi-term-chip periodic" title="정기 파기 확인서 대상 기간"><i class="fas fa-calendar-check"></i>${esc(f.destructionPeriodLabel)}</span>` : (f.fileType === 'DESTRUCTION_CONFIRM' && c.periodicDestructionYn === 'Y' ? '<br><small class="text-muted">계약 종료 파기</small>' : '')}</td><td>${esc(f.originalName)}</td>
               <td class="text-nowrap">${f.fileType === 'CONTRACT' ? signedDateCell(f) : (f.documentDateLabel ? documentDateCell(f) : '<span class="text-muted">-</span>')}</td>
               <td>${fmtSize(f.fileSize)}</td><td>${esc(f.description || '')}</td>
               <td>${fmtDateTime(f.createdAt)}</td>
@@ -1381,6 +1502,7 @@
       </section>
 
       ${expirySection(c)}
+      ${periodicSectionShell(c)}
 
       <section class="pi-card" id="alert-log-section">
         <h2><i class="fas fa-bell"></i>알림 발송 이력 <small class="text-muted fw-normal">(최근 20건)</small></h2>
@@ -1554,7 +1676,21 @@
       const typeSel = fileForm.querySelector('[name="fileType"]');
       const fileSel = fileForm.querySelector('[name="file"]');
       const dateSel = document.getElementById('upload-signed-date');
-      const syncDateBox = () => { const on = typeSel.value === 'CONTRACT'; dateSel.disabled = !on; if (!on) dateSel.value = ''; };
+      const periodSel = document.getElementById('upload-destruction-period');
+      const syncDateBox = () => {
+        const on = typeSel.value === 'CONTRACT'; dateSel.disabled = !on; if (!on) dateSel.value = '';
+        dateSel.classList.toggle('d-none', !on && !!periodSel && typeSel.value === 'DESTRUCTION_CONFIRM');
+        if (periodSel) {
+          const show = typeSel.value === 'DESTRUCTION_CONFIRM';
+          periodSel.classList.toggle('d-none', !show);
+          if (show && !periodSel.options.length) {
+            PI_API.periodicDestruction(id).then((pd) => {
+              periodSel.innerHTML = '<option value="">계약 종료 파기 (만료 서류)</option>'
+                + pd.selectablePeriods.map((o) => `<option value="${esc(o.key)}" ${o.key === pd.defaultPeriod ? 'selected' : ''}>정기 · ${esc(o.label)} (${esc(o.statusLabel)})</option>`).join('');
+            }).catch(fail);
+          }
+        }
+      };
       typeSel.addEventListener('change', syncDateBox); syncDateBox();
       // 위수탁 계약서를 고르면 파일에서 체결일을 읽어 채움 (직접 고칠 수 있음)
       let aseq = 0;
@@ -1575,8 +1711,9 @@
         const fd = new FormData(fileForm);
         if (!fd.get('signedDate')) fd.delete('signedDate');
         const ft = fd.get('fileType');
+        if (ft !== 'DESTRUCTION_CONFIRM' || !fd.get('destructionPeriod')) fd.delete('destructionPeriod');
         if (ft === 'SECURITY_PLEDGE' || ft === 'DESTRUCTION_CONFIRM') {
-          const ans = await askDocDate({ fileType: ft, fileName: fileSel.files?.[0]?.name });
+          const ans = await askDocDate({ fileType: ft, fileName: fileSel.files?.[0]?.name, periodLabel: fd.get('destructionPeriod') ? periodSel.selectedOptions[0].textContent : null });
           if (!ans) return;
           if (ans.date) fd.append('documentDate', ans.date);
           if (ans.note) fd.append('documentNote', ans.note);
@@ -1642,6 +1779,7 @@
     }));
     document.querySelectorAll('tr[data-ins]').forEach((tr) => tr.addEventListener('click', () => showInspection(tr.dataset.ins)));
     bindExpiry(c, reload);
+    if (c.periodicDestructionYn === 'Y' || (c.files || []).some((f) => f.destructionPeriod)) loadPeriodic(c, null, reload);
 
     // 메일
     document.getElementById('btn-mail')?.addEventListener('click', () => {

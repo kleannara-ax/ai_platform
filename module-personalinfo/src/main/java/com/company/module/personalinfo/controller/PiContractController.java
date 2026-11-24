@@ -133,7 +133,15 @@ public class PiContractController {
         return ResponseEntity.ok(ApiResponse.success(contractService.update(contractId, request, currentUserId, currentUserName)));
     }
 
-    /** 협력사 담당자 변경 이력 (vendorWide=true 이면 같은 업체의 모든 계약 이력) */
+    /** 정기 파기확인 현황 (year 없으면 최근 연도) */
+    @GetMapping("/contracts/{contractId}/periodic-destruction")
+    @PreAuthorize(PiRoles.CAN_READ)
+    public ResponseEntity<ApiResponse<com.company.module.personalinfo.dto.PeriodicDestructionResponse>> periodicDestruction(
+            @PathVariable Long contractId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "year", required = false) Integer year) {
+        return ResponseEntity.ok(ApiResponse.success(contractService.getPeriodicDestruction(contractId, year)));
+    }
+
     /** 같은 업체의 계약 목록 (이 계약 포함, 업체명 정규화 기준) */
     @GetMapping("/contracts/{contractId}/same-vendor")
     @PreAuthorize(PiRoles.CAN_READ)

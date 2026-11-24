@@ -38,6 +38,7 @@ public class PiFollowUpRules {
 
     private final PiContractFileRepository fileRepository;
     private final PiInspectionRepository inspectionRepository;
+    private final PiPeriodicDestruction periodic;
 
     /**
      * 파기 기한 (계약 종료 기준일 + N일, 기본 5일).
@@ -111,7 +112,16 @@ public class PiFollowUpRules {
                                    List<PiInspection> inspections, boolean detail) {
         boolean checklist = inspections.stream().anyMatch(i -> i.getInspectionType() == InspectionType.TERMINATION);
         List<PiContractFile> pledges = ofType(files, ContractFileType.SECURITY_PLEDGE);
-        List<PiContractFile> destructions = ofType(files, ContractFileType.DESTRUCTION_CONFIRM);
+        // 만료 서류의 파기 확인서 = 계약 종료 파기 확인서만 (정기 파기 확인서는 기간별로 따로 관리)
+        List<PiContractFile> destructions = ofType(files, ContractFileType.DESTRUCTION_CONFIRM).stream()
+                .filter(PiContractFile::isTerminationDestruction).toList();
+        List<PiContractFile> periodicFiles = ofType(files, ContractFileType.DESTRUCTION_CONFIRM).stream()
+                .filter(PiContractFile::isPeriodicDestruction).toList();
+        List<PiPeriodicDestruction.Period> periodicOverdue = periodic.overdue(c, periodicFiles, today);
+        String lastPeriodic = periodicFiles.stream().map(PiContractFile::getDestructionPeriod)
+                .filter(k -> PiPeriodicDestruction.startOf(k) != null)
+                .max(java.util.Comparator.comparing(PiPeriodicDestruction::startOf))
+                .map(PiPeriodicDestruction::labelOf).orElse(null);
         boolean needed = expiryDocsNeeded(c, today);
         List<String> missing = new ArrayList<>();
         if (!checklist) missing.add(DOC_CHECKLIST);
@@ -161,6 +171,11 @@ public class PiFollowUpRules {
                 .destructionDays(destructionDays)
                 .confirmReplyDays(confirmReplyDays)
                 .documentDateMissing(dateMissing)
+                .periodicDestructionOverdueCount(periodicOverdue.size())
+                .periodicDestructionOverdue(periodicOverdue.stream().map(p -> FollowUpResponse.PeriodRef.builder()
+                        .key(p.getKey()).label(p.getLabel()).endDate(p.getEndDate()).dueDate(p.getDueDate()).build()).toList())
+                .periodicDestructionLastLabel(lastPeriodic)
+                .periodicDestructionReplyDays(periodic.getReplyDays())
                 .build();
     }
 

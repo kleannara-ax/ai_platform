@@ -14,6 +14,7 @@ import java.util.List;
  *   <li>재위탁 동의서 누락: 재위탁 Y 인데 재위탁 동의서 파일이 없음</li>
  *   <li>파기 지연: 파기 확인서의 파기 완료일이 파기 기한(계약 종료 기준일 + 5일, 표준 개인정보 보호지침 제10조)보다 늦음</li>
  *   <li>확인서 회신 지연: 회신 기한(계약 종료 기준일 + 30일)이 지났는데 파기 확인서를 받지 못함</li>
+ *   <li>정기 파기확인 미수취: 정기 파기확인(월/분기/반기) 계약에서 기간 종료 + 20일이 지났는데 그 기간 파기 확인서를 받지 못함</li>
  * </ul>
  */
 @Getter
@@ -57,6 +58,25 @@ public class FollowUpResponse {
     private int confirmReplyDays;
     /** 받았지만 서류 일자(서명일·파기 완료일)를 입력하지 않은 서류 */
     private List<String> documentDateMissing;
+
+    // ── 정기 파기확인 (월/분기/반기) ──
+    /** 정기 파기 확인서 미수취 기간 수 (관리 시작 후 수취 기한이 지난 기간) */
+    private int periodicDestructionOverdueCount;
+    /** 미수취 기간 (오래된 기간 먼저) */
+    private List<PeriodRef> periodicDestructionOverdue;
+    /** 가장 최근에 받은 정기 파기 확인서의 기간 이름 */
+    private String periodicDestructionLastLabel;
+    /** 정기 파기 확인서 수취 기한 일수 (기간 종료 + N일, 설정값) */
+    private int periodicDestructionReplyDays;
+
+    @Getter
+    @Builder
+    public static class PeriodRef {
+        private String key;
+        private String label;
+        private LocalDate endDate;
+        private LocalDate dueDate;
+    }
 
     @Getter
     @Builder

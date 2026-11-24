@@ -14,6 +14,7 @@ import com.company.module.personalinfo.entity.ContractFileType;
 import com.company.module.personalinfo.entity.InspectionType;
 import com.company.module.personalinfo.entity.PiAlertLog;
 import com.company.module.personalinfo.entity.PiContract;
+import com.company.module.personalinfo.entity.PiContractFile;
 import com.company.module.personalinfo.repository.PiAlertLogRepository;
 import com.company.module.personalinfo.repository.PiContractFileRepository;
 import com.company.module.personalinfo.repository.PiContractRepository;
@@ -88,6 +89,7 @@ public class PiAlertMailService {
     private final PiInspectionRepository inspectionRepository;
     private final PiFollowUpRules followUps;
     private final PiChecklistTemplateService checklistTemplates;
+    private final PiPeriodicDestruction periodicDestruction;
 
     /** 만료 서류 독촉·조치 지연 알림: 종료(또는 조치 예정일) 후 이 기간까지만 주 1회 보낸다 (오래된 데이터 대량 발송 방지) */
     private final int followUpRemindDays;
@@ -113,6 +115,7 @@ public class PiAlertMailService {
                               PiInspectionRepository inspectionRepository,
                               PiFollowUpRules followUps,
                               PiChecklistTemplateService checklistTemplates,
+                              PiPeriodicDestruction periodicDestruction,
                               @Value("${personalinfo.alert.follow-up-remind-days:90}") int followUpRemindDays,
                               @Value("${personalinfo.regular-inspection.enabled:true}") boolean regularEnabled,
                               @Value("${personalinfo.regular-inspection.notice-date:04-10}") String regularNoticeDate,
@@ -131,6 +134,7 @@ public class PiAlertMailService {
         this.inspectionRepository = inspectionRepository;
         this.followUps = followUps;
         this.checklistTemplates = checklistTemplates;
+        this.periodicDestruction = periodicDestruction;
         this.followUpRemindDays = Math.max(followUpRemindDays, 1);
         this.regularEnabled = regularEnabled;
         String[] md = (regularNoticeDate == null || !regularNoticeDate.matches("\\d{1,2}-\\d{1,2}") ? "04-10" : regularNoticeDate).split("-");
@@ -183,12 +187,14 @@ public class PiAlertMailService {
         int[] overdue = safeRun("조치 지연", () -> runActionOverdueAlerts(today));
         int[] regular = safeRun("정기 점검", () -> runRegularInspectionAlerts(today));
         int[] renew = safeRun("자동연장 확인", () -> runAutoRenewNotices(today));
+        int[] periodic = safeRun("정기 파기확인", () -> runPeriodicDestructionAlerts(today));
         return AlertRunResponse.builder()
                 .baseDate(today).candidateCount(considered)
                 .sentCount(sent).failedCount(failed).skippedCount(skipped).alreadySentCount(already)
                 .docsReminderCount(docs[0]).actionOverdueCount(overdue[0])
                 .regularInspectionCount(regular[0]).regularSummaryCount(regular[1])
                 .autoRenewNoticeCount(renew[0])
+                .periodicDestructionRequestCount(periodic[0]).periodicDestructionOverdueCount(periodic[1])
                 .build();
     }
 
@@ -515,6 +521,84 @@ public class PiAlertMailService {
         return new int[]{sent, 0};
     }
 
+    // ─────────────────────────────────────────────────────────────
+    //  정기 파기확인 (월/분기/반기) 요청·독촉
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * 정기 파기확인 계약(메일 발송 Y)에 기간이 끝나면 요청 메일, 수취 기한(기간 종료 + 20일)이 지나도 못 받으면 독촉 메일을
+     * 기간마다 1회씩 보낸다. 관리 시작일 전에 끝난 기간은 보내지 않는다. 파기 확인서 양식을 첨부한다.
+     * @return [요청 발송 건수, 독촉 발송 건수]
+     */
+    int[] runPeriodicDestructionAlerts(LocalDate today) {
+        int req = 0, ovd = 0;
+        for (PiContract c : contractRepository.findByDeletedYnOrderByContractIdAsc("N")) {
+            if (!c.isPeriodicDestruction() || "N".equals(c.getPeriodicDestructionMailYn())) {
+                continue;
+            }
+            List<PiContractFile> files = fileRepository.findByContractIdAndDeletedYnOrderByFileIdDesc(c.getContractId(), "N").stream()
+                    .filter(PiContractFile::isPeriodicDestruction).toList();
+            for (PiPeriodicDestruction.Period p : periodicDestruction.waiting(c, files, today)) {
+                if (sendPeriodic(c, p, false, today)) req++;
+            }
+            for (PiPeriodicDestruction.Period p : periodicDestruction.overdue(c, files, today)) {
+                if (sendPeriodic(c, p, true, today)) ovd++;
+            }
+        }
+        return new int[]{req, ovd};
+    }
+
+    private boolean sendPeriodic(PiContract c, PiPeriodicDestruction.Period p, boolean overdue, LocalDate today) {
+        Set<String> recipients = recipientsOf(c, null);
+        String subject = subjectPrefix + (overdue ? " 정기 파기확인서 미수취 독촉 - " : " 정기 파기확인서 제출 요청 - ") + c.getVendorName()
+                + (StringUtils.hasText(c.getContractName()) ? " / " + c.getContractName() : "")
+                + " (" + p.getLabel() + (overdue ? ", 기한 " + fmt(p.getDueDate()) + " 지남)" : ", " + fmt(p.getDueDate()) + "까지)");
+        AlertType type = overdue ? AlertType.PERIODIC_DESTRUCTION_OVERDUE : AlertType.PERIODIC_DESTRUCTION_REQUEST;
+        String dedup = (overdue ? "PDOVD:" : "PDREQ:") + c.getContractId() + ":" + p.getKey();
+        Optional<Long> id = claimOther(c.getContractId(), type, (overdue ? "PDO-" : "PDR-") + p.getKey(), p.getEndDate(),
+                dedup, recipients, subject);
+        if (id.isEmpty()) {
+            return false;
+        }
+        List<PiFileStorage.DownloadFile> attachments = expiryForms.mailAttachments(c).stream()
+                .filter(a -> a.fileName().startsWith("개인정보 파기 확인서")).toList();
+        return sendAndRecord(id.get(), recipients, subject, periodicBody(c, p, overdue, today, attachments), attachments,
+                attachments.isEmpty() ? null : expiryForms.versionSummary()) == AlertSendStatus.SENT;
+    }
+
+    private String periodicBody(PiContract c, PiPeriodicDestruction.Period p, boolean overdue, LocalDate today,
+                                List<PiFileStorage.DownloadFile> attachments) {
+        String cycle = c.destructionCycle().getLabel();
+        StringBuilder sb = mailHead(overdue ? "정기 파기확인서 미수취 안내" : "정기 파기확인서 제출 요청");
+        if (overdue) {
+            sb.append("<p>아래 협력사의 <b>").append(esc(p.getLabel())).append("</b> 개인정보 파기 확인서를 수취 기한 <b>")
+              .append(fmt(p.getDueDate())).append("</b>이 지나도록 받지 못했습니다(<b>")
+              .append(java.time.temporal.ChronoUnit.DAYS.between(p.getDueDate(), today)).append("일 지남</b>). ")
+              .append("협력사에 파기 확인서를 요청해 시스템에 올려 주세요.</p>");
+        } else {
+            sb.append("<p>아래 협력사는 <b>").append(esc(cycle)).append("별 정기 파기확인</b> 대상입니다. <b>").append(esc(p.getLabel()))
+              .append("</b>(").append(fmt(p.getStartDate())).append(" ~ ").append(fmt(p.getEndDate())).append(")이 끝났으니 ")
+              .append("협력사로부터 그 기간에 파기한 개인정보의 <b>개인정보 파기 확인서</b>를 받아 <b>").append(fmt(p.getDueDate()))
+              .append("까지</b> 시스템 계약 상세의 [정기 파기확인 현황]에 올려 주세요.</p>");
+        }
+        sb.append(infoTable(List.of(
+                new String[]{"수탁업체명", c.getVendorName()},
+                new String[]{"계약명", StringUtils.hasText(c.getContractName()) ? c.getContractName() : nz(c.getServiceName())},
+                new String[]{"위탁업무 내용", c.getEntrustedTask()},
+                new String[]{"담당부서 / 담당자", nz(c.getDeptName()) + " / " + nz(c.getManagerName())},
+                new String[]{"정기 파기확인", cycle + "별 (기간 종료 + " + periodicDestruction.getReplyDays() + "일 안에 수취)"},
+                new String[]{"대상 기간", p.getLabel() + " (" + fmt(p.getStartDate()) + " ~ " + fmt(p.getEndDate()) + ")"},
+                new String[]{"수취 기한", fmt(p.getDueDate())})));
+        if (!attachments.isEmpty()) {
+            sb.append("<p style=\"margin-top:12px\">첨부한 <b>개인정보 파기 확인서 양식</b>을 협력사에 전달해 작성받으세요.</p>");
+        }
+        sb.append("<p style=\"color:#6b7280;font-size:12px\">").append(overdue
+                ? "이 안내는 미수취 기간마다 1회 발송됩니다."
+                : "이 안내는 기간이 끝나면 기간마다 1회 발송되며, 수취 기한까지 받지 못하면 독촉 메일을 1회 더 보냅니다.")
+          .append(" 메일을 받지 않으려면 계약 수정에서 '정기 파기확인 메일 발송'을 끄세요.</p>");
+        return mailTail(sb, c.getContractId());
+    }
+
     private String autoRenewBody(PiContract c, LocalDate today, LocalDate end, LocalDate next, long left) {
         String unit = PiContract.renewPeriodLabel(c.autoRenewMonths());
         StringBuilder sb = mailHead("위수탁 계약 자동연장 예정 안내");
@@ -839,7 +923,7 @@ public class PiAlertMailService {
                 .findByContractIdInAndInspectionTypeAndDeletedYn(List.of(id), InspectionType.TERMINATION, "N").isEmpty();
         var files = fileRepository.findByContractIdAndDeletedYnOrderByFileIdDesc(id, "N");
         boolean pledge = files.stream().anyMatch(f -> f.getFileType() == ContractFileType.SECURITY_PLEDGE);
-        boolean destruction = files.stream().anyMatch(f -> f.getFileType() == ContractFileType.DESTRUCTION_CONFIRM);
+        boolean destruction = files.stream().anyMatch(PiContractFile::isTerminationDestruction);
         return new boolean[]{checklist, pledge, destruction};
     }
 

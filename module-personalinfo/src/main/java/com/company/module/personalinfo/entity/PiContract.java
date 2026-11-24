@@ -89,6 +89,22 @@ public class PiContract extends PiBaseEntity {
     @Column(name = "AUTO_RENEW_PERIOD_MONTHS", nullable = false)
     private Integer autoRenewPeriodMonths;
 
+    /** 정기 파기확인 대상 여부 (Y 면 주기마다 개인정보 파기 확인서를 받아 관리) */
+    @Column(name = "PERIODIC_DESTRUCTION_YN", nullable = false, length = 1, columnDefinition = "CHAR(1)")
+    private String periodicDestructionYn = "N";
+
+    /** 정기 파기확인 주기 (MONTH / QUARTER / HALF) */
+    @Column(name = "PERIODIC_DESTRUCTION_CYCLE", nullable = false, length = 10)
+    private String periodicDestructionCycle = DestructionCycle.QUARTER.name();
+
+    /** 정기 파기확인 요청·독촉 메일 발송 여부 */
+    @Column(name = "PERIODIC_DESTRUCTION_MAIL_YN", nullable = false, length = 1, columnDefinition = "CHAR(1)")
+    private String periodicDestructionMailYn = "Y";
+
+    /** 정기 파기확인 관리 시작일 (체크한 날). 이 날 이후에 끝나는 기간부터 미수취를 따진다 */
+    @Column(name = "PERIODIC_DESTRUCTION_FROM")
+    private LocalDate periodicDestructionFrom;
+
     @Column(name = "CONTRACT_DOC_YN", nullable = false, length = 1, columnDefinition = "CHAR(1)")
     private String contractDocYn;
 
@@ -151,6 +167,7 @@ public class PiContract extends PiBaseEntity {
                        String vendorContactName, String vendorContactEmail, String vendorContactPhone,
                        LocalDate contractStartDate, LocalDate contractEndDate, String contractPeriodNote,
                        String autoRenewYn, String autoRenewNote, Integer autoRenewPeriodMonths,
+                       String periodicDestructionYn, String periodicDestructionCycle, String periodicDestructionMailYn,
                        String contractDocYn, LocalDate contractSignedDate,
                        String subcontractYn, String subcontractorName, String subcontractTask, String subcontractConsentYn,
                        String alertYn, Integer alertDaysBefore, String alertExtraEmails, String remark,
@@ -184,6 +201,10 @@ public class PiContract extends PiBaseEntity {
         this.remark = remark;
         this.terminatedYn = "N";
         this.expiryDocsRemindYn = "Y";
+        this.periodicDestructionYn = "N";
+        this.periodicDestructionCycle = DestructionCycle.QUARTER.name();
+        this.periodicDestructionMailYn = "Y";
+        applyPeriodicDestruction(periodicDestructionYn, periodicDestructionCycle, periodicDestructionMailYn, LocalDate.now());
         markCreatedBy(createdBy);
     }
 
@@ -253,6 +274,35 @@ public class PiContract extends PiBaseEntity {
     public void changeSubcontract(String subcontractYn, Long updatedBy) {
         this.subcontractYn = yn(subcontractYn, this.subcontractYn);
         markUpdatedBy(updatedBy);
+    }
+
+    /**
+     * 정기 파기확인 설정 변경. N → Y 로 바꾸는 날이 관리 시작일이 된다(그 날 이후에 끝나는 기간부터 미수취 판정).
+     * 값이 null 이면 그대로 둔다.
+     */
+    public void changePeriodicDestruction(String yn, String cycle, String mailYn, LocalDate today, Long updatedBy) {
+        applyPeriodicDestruction(yn, cycle, mailYn, today);
+        markUpdatedBy(updatedBy);
+    }
+
+    private void applyPeriodicDestruction(String yn, String cycle, String mailYn, LocalDate today) {
+        String next = yn(yn, this.periodicDestructionYn);
+        if ("Y".equals(next) && (!"Y".equals(this.periodicDestructionYn) || this.periodicDestructionFrom == null)) {
+            this.periodicDestructionFrom = today;
+        }
+        this.periodicDestructionYn = next;
+        if (cycle != null && !cycle.isBlank()) {
+            this.periodicDestructionCycle = DestructionCycle.of(cycle).name();
+        }
+        this.periodicDestructionMailYn = yn(mailYn, this.periodicDestructionMailYn);
+    }
+
+    public boolean isPeriodicDestruction() {
+        return "Y".equals(periodicDestructionYn);
+    }
+
+    public DestructionCycle destructionCycle() {
+        return DestructionCycle.of(periodicDestructionCycle);
     }
 
     /** 계약 종료 처리 (위탁업무 종료) */

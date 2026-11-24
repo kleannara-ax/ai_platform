@@ -61,6 +61,7 @@ public class PiContractFileController {
      *   <li>fileType : CONTRACT / SUBCONTRACT_CONSENT / SECURITY_PLEDGE / DESTRUCTION_CONFIRM / ETC (기본 CONTRACT)</li>
      *   <li>description : 설명 (선택)</li>
      *   <li>signedDate : 계약서상 체결일 yyyy-MM-dd (선택, 위수탁 계약서만. 없으면 파일에서 읽음)</li>
+     *   <li>destructionPeriod : 정기 파기 확인서 대상 기간 (선택, 예: 2026-07 / 2026-Q3 / 2026-H2. 정기 파기확인 계약의 파기 확인서만)</li>
      * </ul>
      */
     @PostMapping(value = "/contracts/{contractId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -73,9 +74,11 @@ public class PiContractFileController {
             @RequestParam(value = "signedDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate signedDate,
             @RequestParam(value = "documentDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate documentDate,
             @RequestParam(value = "documentNote", required = false) String documentNote,
+            @RequestParam(value = "destructionPeriod", required = false) String destructionPeriod,
             @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
         return ResponseEntity.ok(ApiResponse.created(
-                fileService.upload(contractId, file, fileType, description, signedDate, documentDate, documentNote, currentUserId)));
+                fileService.upload(contractId, file, fileType, description, signedDate, documentDate, documentNote,
+                        destructionPeriod, currentUserId)));
     }
 
     /**
@@ -99,6 +102,17 @@ public class PiContractFileController {
         boolean noteGiven = body != null && body.containsKey("documentNote");
         return ResponseEntity.ok(ApiResponse.success(fileService.changeDocumentDate(fileId, date,
                 noteGiven ? body.get("documentNote") : null, noteGiven, currentUserId)));
+    }
+
+    /** 파기 확인서 대상 기간 변경 {"destructionPeriod":"2026-Q3"} (빈 값이면 계약 종료 파기 확인서로) */
+    @PatchMapping("/files/{fileId}/destruction-period")
+    @PreAuthorize(PiRoles.CAN_WRITE)
+    public ResponseEntity<ApiResponse<ContractFileResponse>> changeDestructionPeriod(
+            @PathVariable Long fileId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal(expression = "userId") Long currentUserId) {
+        return ResponseEntity.ok(ApiResponse.success(fileService.changeDestructionPeriod(fileId,
+                body == null ? null : body.get("destructionPeriod"), currentUserId)));
     }
 
     /** 위수탁 계약서 체결일 변경 {"signedDate":"yyyy-MM-dd"} (빈 값이면 비움). 계약 체결일은 최신 계약서 기준으로 다시 맞춘다. */
