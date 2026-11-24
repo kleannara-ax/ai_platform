@@ -104,26 +104,22 @@ const CCKB = (() => {
   }
 
   // ---- CCKB 관리자 판정 ----
-  // 공통코드 그룹 'CCKB_PERM' 에 등록된 로그인 ID 만 관리자다 (서버 CckbPermission 과 같은 기준).
-  // 플랫폼 ROLE_ADMIN 이라도 이 명단에 없으면 관리자가 아니다.
+  // 서버 /cckb-api/admins/me 가 CckbPermission.isAdmin() 과 동일한 기준으로 판정한다:
+  //  - 플랫폼 ROLE_ADMIN 이면 무조건 관리자
+  //  - 그 외에는 공통코드 그룹 'CCKB_PERM' 명단에 등록된 로그인 ID 만 관리자
   let _adminCache = null;
   async function isAdmin() {
     if (_adminCache !== null) return _adminCache;
-    const loginId = String(getLoginId() || '').trim().toLowerCase();
-    if (!loginId) return (_adminCache = false);
     try {
-      const res = await fetch('/common-api/codes/lookup/CCKB_PERM', {
-        headers: { 'Authorization': 'Bearer ' + getToken() },
-      });
-      const json = await res.json();
-      const list = (json && json.success && Array.isArray(json.data)) ? json.data : [];
-      _adminCache = list.some(d => String(d.code || '').trim().toLowerCase() === loginId);
+      const data = await api('/cckb-api/admins/me');
+      _adminCache = !!(data && data.isAdmin);
     } catch (e) {
-      console.warn('CCKB_PERM 조회 실패', e);
+      console.warn('CCKB 관리자 여부 조회 실패', e);
       _adminCache = false;
     }
     return _adminCache;
   }
+  function resetAdminCache() { _adminCache = null; }
 
   const logout = () => { (window.top || window).location.href = '/'; };
 

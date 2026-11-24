@@ -734,7 +734,42 @@
           <button id="saveRefBtn" class="primary" style="margin-top:20px; width:100%;">저장</button>
 
           <div class="notice" style="margin-top:16px;">
-            검사 결과의 ΔL*/Δa*/Δb*, ΔE00은 모두 이 기준값과 검사 사진 측정값의 차이로 계산됩니다. 정상/불량 판정 조건도 이 탭에서 함께 변경할 수 있으며, 저장하면 이후 모든 판정에 즉시 적용됩니다. (기준값 수정은 공통코드 그룹 <strong>CCKB_PERM</strong>에 등록된 관리자만 가능하며, 서버에서 권한을 검증합니다. 변경 이력은 모두 감사 로그(standard_audit_log)에 기록됩니다.)
+            검사 결과의 ΔL*/Δa*/Δb*, ΔE00은 모두 이 기준값과 검사 사진 측정값의 차이로 계산됩니다. 정상/불량 판정 조건도 이 탭에서 함께 변경할 수 있으며, 저장하면 이후 모든 판정에 즉시 적용됩니다. (기준값 수정은 플랫폼 <strong>관리자(ROLE_ADMIN)</strong> 또는 아래 <strong>CCKB 관리자 명단</strong>에 등록된 사람만 가능하며, 서버에서 권한을 검증합니다. 변경 이력은 모두 감사 로그(standard_audit_log)에 기록됩니다.)
+          </div>
+
+          <div id="adminMgmtSection" style="display:none;">
+            <div class="settings-section-title">CCKB 관리자 명단</div>
+            <div class="notice" style="margin-bottom:12px;">
+              여기 등록된 로그인 ID를 가진 사람은 기준값을 수정할 수 있습니다. 플랫폼 관리자(ROLE_ADMIN)는 이 명단과 무관하게 항상 수정할 수 있고, 명단에 등록된 사람도 새 관리자를 추가할 수 있습니다.
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>로그인 ID</th>
+                    <th>이름</th>
+                    <th>상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="adminListBody">
+                  <tr><td colspan="4">불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="threshold-grid" style="grid-template-columns: 1fr 1fr auto; margin-top:14px;">
+              <div class="form-field" style="margin:0;">
+                <label>추가할 로그인 ID</label>
+                <input type="text" id="adminAddLoginId" placeholder="예: hong.gildong" />
+              </div>
+              <div class="form-field" style="margin:0;">
+                <label>이름(선택)</label>
+                <input type="text" id="adminAddName" placeholder="예: 홍길동" />
+              </div>
+              <div class="form-field" style="margin:0; align-self:end;">
+                <button id="adminAddBtn" class="secondary" style="width:100%;">추가</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

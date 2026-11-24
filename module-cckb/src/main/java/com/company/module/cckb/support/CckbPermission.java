@@ -64,14 +64,26 @@ public class CckbPermission {
     }
 
     /** 현재 인증 주체가 CCKB_PERM 그룹에 등록된 관리자인지 */
-    public boolean isAdmin(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
+        public boolean isAdmin(Authentication authentication) {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return false;
+            }
+            // 플랫폼 ROLE_ADMIN 은 CCKB_PERM 명단과 무관하게 항상 관리자로 인정한다.
+            boolean hasPlatformRoleAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+            if (hasPlatformRoleAdmin) {
+                return true;
+            }
+            String name = authentication.getName();
+            if (name == null || name.isBlank()) {
+                return false;
+            }
+            return adminLoginIds().contains(name.trim().toLowerCase(Locale.ROOT));
         }
-        String name = authentication.getName();
-        if (name == null || name.isBlank()) {
-            return false;
+
+        /** CCKB_PERM 명단을 즉시 다시 읽도록 캐시를 무효화한다 (관리자 추가 직후 호출). */
+        public void invalidateCache() {
+            cachedIds = Collections.emptySet();
+            cachedAt = 0L;
         }
-        return adminLoginIds().contains(name.trim().toLowerCase(Locale.ROOT));
     }
-}
