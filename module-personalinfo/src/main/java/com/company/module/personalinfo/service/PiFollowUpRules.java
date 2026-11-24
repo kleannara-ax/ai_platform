@@ -175,6 +175,10 @@ public class PiFollowUpRules {
                 .periodicDestructionOverdue(periodicOverdue.stream().map(p -> FollowUpResponse.PeriodRef.builder()
                         .key(p.getKey()).label(p.getLabel()).endDate(p.getEndDate()).dueDate(p.getDueDate()).build()).toList())
                 .periodicDestructionLastLabel(lastPeriodic)
+                .periodicDestructionReceivedLabels(periodicFiles.stream().map(PiContractFile::getDestructionPeriod)
+                        .filter(k -> PiPeriodicDestruction.startOf(k) != null).distinct()
+                        .sorted(java.util.Comparator.comparing(PiPeriodicDestruction::startOf).reversed())
+                        .map(PiPeriodicDestruction::labelOf).toList())
                 .periodicDestructionReplyDays(periodic.getReplyDays())
                 .build();
     }

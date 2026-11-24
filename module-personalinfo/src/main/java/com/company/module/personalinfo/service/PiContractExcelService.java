@@ -40,9 +40,9 @@ public class PiContractExcelService {
             "번호", "ISMS\n범위", "수탁업체 명", "계약명", "관련 서비스", "위탁업무 내용", "담당부서", "담당자",
             "원계약\n시작일", "원계약\n종료일", "현재 계약\n종료일", "원계약 기간 비고", "자동연장", "개인정보처리\n위탁계약서 작성",
             "재위탁 여부", "재위탁 업체 명", "계약상태", "만료까지(일)", "최근 점검일", "최근 점검결과",
-            "정기\n파기확인", "정기 파기확인서\n최근 수취 기간", "정기 파기확인서\n미수취"
+            "정기\n파기확인", "정기 파기확인서\n수취 기간", "정기 파기확인서\n미수취 기간"
     };
-    private static final int[] WIDTHS = {6, 7, 22, 24, 16, 40, 14, 10, 12, 12, 12, 24, 10, 10, 8, 24, 10, 10, 12, 12, 10, 16, 12};
+    private static final int[] WIDTHS = {6, 7, 22, 24, 16, 40, 14, 10, 12, 12, 12, 24, 10, 10, 8, 24, 10, 10, 12, 12, 10, 30, 24};
 
     private final PiContractService contractService;
     private final PiAccessLogService accessLog;
@@ -122,9 +122,13 @@ public class PiContractExcelService {
                 set(row, col++, x.getLastInspectionResultLabel(), center);
                 boolean pd = "Y".equals(x.getPeriodicDestructionYn());
                 set(row, col++, pd ? "Y (" + x.getPeriodicDestructionCycleLabel() + ")" : "N", center);
-                set(row, col++, pd ? (x.getPeriodicDestructionLastLabel() == null ? "-" : x.getPeriodicDestructionLastLabel()) : "", center);
-                set(row, col, pd ? (x.getPeriodicDestructionOverdueCount() == null || x.getPeriodicDestructionOverdueCount() == 0
-                        ? "없음" : x.getPeriodicDestructionOverdueCount() + "개 기간") : "", center);
+                // 수취 기간: 받은 기간 전부 (최근 먼저), 없으면 '수취 이력 없음'
+                List<String> got = x.getPeriodicDestructionReceivedLabels() == null ? List.of() : x.getPeriodicDestructionReceivedLabels();
+                set(row, col++, !pd && got.isEmpty() ? "" : got.isEmpty() ? "수취 이력 없음"
+                        : got.size() + "건: " + String.join(", ", got), body);
+                // 미수취 기간: 수취 기한(기간 종료 + 20일)이 지났는데 못 받은 기간
+                List<String> miss = x.getPeriodicDestructionOverdueLabels() == null ? List.of() : x.getPeriodicDestructionOverdueLabels();
+                set(row, col, !pd ? "" : miss.isEmpty() ? "미수취 없음" : miss.size() + "건: " + String.join(", ", miss), body);
             }
             sheet.createFreezePane(3, 3);
             wb.write(out);

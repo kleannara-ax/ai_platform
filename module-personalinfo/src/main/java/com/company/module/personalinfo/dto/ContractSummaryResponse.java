@@ -78,6 +78,10 @@ public class ContractSummaryResponse {
     private Integer periodicDestructionOverdueCount;
     /** 가장 최근에 받은 정기 파기 확인서의 기간 이름 (예: 2026년 3분기) */
     private String periodicDestructionLastLabel;
+    /** 정기 파기 확인서를 받은 기간 이름 (최근 기간 먼저) */
+    private java.util.List<String> periodicDestructionReceivedLabels;
+    /** 정기 파기 확인서 미수취 기간 이름 (오래된 기간 먼저) */
+    private java.util.List<String> periodicDestructionOverdueLabels;
 
     /** 확인 필요 상태 채우기 (응답 DTO) */
     public ContractSummaryResponse withFollowUp(FollowUpResponse f) {
@@ -91,6 +95,9 @@ public class ContractSummaryResponse {
             this.confirmReplyOverdue = f.isConfirmReplyOverdue();
             this.periodicDestructionOverdueCount = f.getPeriodicDestructionOverdueCount();
             this.periodicDestructionLastLabel = f.getPeriodicDestructionLastLabel();
+            this.periodicDestructionReceivedLabels = f.getPeriodicDestructionReceivedLabels();
+            this.periodicDestructionOverdueLabels = f.getPeriodicDestructionOverdue() == null ? null
+                    : f.getPeriodicDestructionOverdue().stream().map(FollowUpResponse.PeriodRef::getLabel).toList();
         }
         return this;
     }

@@ -66,6 +66,8 @@ public class FollowUpResponse {
     private List<PeriodRef> periodicDestructionOverdue;
     /** 가장 최근에 받은 정기 파기 확인서의 기간 이름 */
     private String periodicDestructionLastLabel;
+    /** 정기 파기 확인서를 받은 기간 이름 (최근 기간 먼저, 중복 없음) */
+    private List<String> periodicDestructionReceivedLabels;
     /** 정기 파기 확인서 수취 기한 일수 (기간 종료 + N일, 설정값) */
     private int periodicDestructionReplyDays;
 
