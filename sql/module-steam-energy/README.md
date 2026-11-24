@@ -45,7 +45,8 @@ done
 
 - 원단위 일지 7개 화면(묶음 1)은 이관 SQL 이 없다 — `원단위 일지 누계(YYYY년).xls` 를 화면에서 다시 올려 채운다.
 - 이관이 끝나고 화면에서 값을 확인한 뒤에는 옛 표(`steam_cell_value`, `steam_unit_usage`, `steam_unit_usage_raw`)를 읽는 코드가 없다.
-  표를 지울지는 DB 담당자가 백업 뒤에 정한다 (이 폴더에는 표를 지우는 SQL 을 두지 않는다).
+  지우려면 백업을 받은 뒤 `cleanup/drop_legacy_tables.sql` 을 **따로 한 번** 실행한다 (번호 파일처럼 순서대로 돌리는 대상이 아니다.
+  이관 SQL 은 옛 표를 읽으므로 반드시 이관을 끝낸 뒤에 지운다. 실행 전 확인 사항은 그 파일 머리말에 있다).
 
 **전제** — 플랫폼 공통 표(`core_menu`·`core_role_menu`·`code_group`·`code_detail`)가 먼저 있어야 한다.
 04~06 이 거기에 메뉴·역할을 넣는다. `--default-character-set=utf8mb4` 를 붙여 한글 메뉴명이 깨지지 않게 한다.
@@ -1825,7 +1826,7 @@ DROP TABLE IF EXISTS steam_equipment;
 | 12 | 모든 업무 테이블에 공통 컬럼 포함 | 통과 | 45개 표 모두 |
 | 13 | DELETED_YN 기반 소프트 삭제 | 통과 | `@SQLRestriction("DELETED_YN = 'N'")` |
 | 14 | 모든 테이블·컬럼에 COMMENT 존재 | 통과 |  |
-| 15 | SQL에 DROP TABLE 없음 | 통과 | 옛 표를 지우는 SQL 은 두지 않았다 (DB 담당자가 백업 뒤 결정) |
+| 15 | SQL에 DROP TABLE 없음 | 통과 | 번호 파일(01~06)과 이관 SQL 에는 없다. 퇴역한 옛 표 3개를 지우는 `cleanup/drop_legacy_tables.sql` 만 따로 두었다 (2026-11-24, 순서 실행 대상 아님) |
 | 16 | SQL에 TRUNCATE TABLE 없음 | 통과 |  |
 | 17 | SQL에 무조건 DELETE 없음 | 통과 | `05_submenus.sql` 의 DELETE 는 `MENU_CODE LIKE 'STEAM_%'` 조건이 있다 |
 | 18 | SQL에 ALTER TABLE DROP COLUMN 없음 | 통과 |  |
