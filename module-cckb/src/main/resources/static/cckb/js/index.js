@@ -71,6 +71,7 @@ function init() {
     if (!btn) return;
     onRemoveAdmin(btn.dataset.loginid);
   });
+  initAdminUserSearch();
 
   // ===== 재검사 취소 =====
   document.getElementById('reinspectCancelBtn').addEventListener('click', cancelReinspect);
@@ -532,7 +533,10 @@ async function refreshSettingsUI() {
 
   // 관리자 명단 관리 섹션은 관리자에게만 표시한다.
   document.getElementById('adminMgmtSection').style.display = cachedIsAdmin ? '' : 'none';
-  if (cachedIsAdmin) await renderAdminList();
+  if (cachedIsAdmin) {
+    await renderAdminList();
+    await ensurePlatformUsersLoaded();
+  }
 
   // 설정 탭을 열 때마다 최신값으로 새로고침 (다른 사용자가 바꿨을 수 있으므로)
   await loadActiveStandard();
@@ -560,20 +564,125 @@ async function renderAdminList() {
   }
 }
 
+// ===== 관리자 추가 - 사용자 검색 (세부공장일보 컬럼관리 '권한추가'와 동일 패턴) =====
+let platformUsers = [];
+let platformUsersLoaded = false;
+let adminSearchSelectedUser = null; // { userId, loginId, userName }
+let adminSearchFocusIdx = -1;
+
+async function ensurePlatformUsersLoaded() {
+  if (platformUsersLoaded) return;
+  try {
+    platformUsers = await CCKB.api('/cckb-api/admins/platform-users');
+    platformUsersLoaded = true;
+  } catch (e) {
+    console.warn('플랫폼 사용자 목록 로드 실패', e);
+    platformUsers = [];
+  }
+}
+
+function initAdminUserSearch() {
+  const input = document.getElementById('adminUserSearchInput');
+  const dropdown = document.getElementById('adminUserSearchDropdown');
+  if (!input || !dropdown) return;
+
+  input.addEventListener('input', () => {
+    adminSearchFocusIdx = -1;
+    renderAdminUserDropdown(input.value.trim());
+  });
+  input.addEventListener('focus', () => renderAdminUserDropdown(input.value.trim()));
+  input.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.user-search-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      adminSearchFocusIdx = Math.min(adminSearchFocusIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('focused', i === adminSearchFocusIdx));
+      items[adminSearchFocusIdx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      adminSearchFocusIdx = Math.max(adminSearchFocusIdx - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('focused', i === adminSearchFocusIdx));
+      items[adminSearchFocusIdx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (adminSearchFocusIdx >= 0 && items[adminSearchFocusIdx]) items[adminSearchFocusIdx].click();
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('open');
+      input.blur();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('adminUserSearchWrap')?.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+}
+
+function renderAdminUserDropdown(query) {
+  const dropdown = document.getElementById('adminUserSearchDropdown');
+  const q = (query || '').toLowerCase();
+  const filtered = platformUsers.filter((u) => {
+    if (!q) return true;
+    return (u.userName || '').toLowerCase().includes(q) || (u.loginId || '').toLowerCase().includes(q);
+  });
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = `<div class="user-search-empty">${q ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}</div>`;
+  } else {
+    dropdown.innerHTML = filtered.map((u) => `
+      <div class="user-search-item" data-userid="${u.userId}">
+        <div><span class="us-name">${CCKB.escapeHtml(u.userName)}</span></div>
+        <span class="us-id">(${CCKB.escapeHtml(u.loginId)})</span>
+      </div>
+    `).join('');
+    dropdown.querySelectorAll('.user-search-item').forEach((el) => {
+      el.addEventListener('click', () => {
+        const userId = Number(el.dataset.userid);
+        const u = platformUsers.find((p) => p.userId === userId);
+        if (u) selectAdminUser(u);
+      });
+    });
+  }
+  dropdown.classList.add('open');
+}
+
+function selectAdminUser(user) {
+  adminSearchSelectedUser = user;
+  const input = document.getElementById('adminUserSearchInput');
+  input.value = '';
+  document.getElementById('adminUserSearchDropdown').classList.remove('open');
+  renderAdminSelectedChip();
+}
+
+function renderAdminSelectedChip() {
+  const wrap = document.getElementById('adminUserSelectedChip');
+  if (!adminSearchSelectedUser) { wrap.innerHTML = ''; return; }
+  const u = adminSearchSelectedUser;
+  wrap.innerHTML = `<div class="user-selected-chip">
+    <span>${CCKB.escapeHtml(u.userName)} (${CCKB.escapeHtml(u.loginId)})</span>
+    <button class="chip-remove" type="button" id="adminUserChipRemove">&times;</button>
+  </div>`;
+  document.getElementById('adminUserChipRemove').addEventListener('click', () => {
+    adminSearchSelectedUser = null;
+    renderAdminSelectedChip();
+  });
+}
+
 async function onAddAdmin() {
-  const loginIdEl = document.getElementById('adminAddLoginId');
-  const nameEl = document.getElementById('adminAddName');
-  const loginId = loginIdEl.value.trim();
-  if (!loginId) {
-    alert('추가할 로그인 ID를 입력해 주세요.');
+  if (!adminSearchSelectedUser) {
+    alert('추가할 사용자를 검색하여 선택해 주세요.');
     return;
   }
   const btn = document.getElementById('adminAddBtn');
   btn.disabled = true;
   try {
-    await CCKB.api('/cckb-api/admins', { method: 'POST', body: { loginId, name: nameEl.value.trim() } });
-    loginIdEl.value = '';
-    nameEl.value = '';
+    await CCKB.api('/cckb-api/admins', {
+      method: 'POST',
+      body: { loginId: adminSearchSelectedUser.loginId, name: adminSearchSelectedUser.userName }
+    });
+    adminSearchSelectedUser = null;
+    renderAdminSelectedChip();
     CCKB.toast('관리자가 추가되었습니다.');
     await renderAdminList();
   } catch (e) {

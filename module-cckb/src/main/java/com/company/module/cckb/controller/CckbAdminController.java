@@ -5,6 +5,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.core.common.response.ApiResponse;
 import com.company.module.cckb.dto.request.CckbAdminAddRequest;
 import com.company.module.cckb.dto.response.CckbAdminResponse;
+import com.company.module.cckb.dto.response.CckbUserOptionResponse;
 import com.company.module.cckb.service.CckbAdminService;
 import com.company.module.cckb.support.CckbPermission;
 import jakarta.validation.Valid;
@@ -56,6 +57,15 @@ public class CckbAdminController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<CckbAdminResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(cckbAdminService.listAdmins()));
+    }
+
+    /**
+     * 관리자 추가 모달의 사용자 검색(이름/아이디)용 — AI플랫폼 전체 활성 사용자 목록.
+     * (세부공장일보 컬럼관리 '권한추가'의 사용자 검색 박스와 동일한 용도)
+     */
+    @GetMapping("/platform-users")
+    public ResponseEntity<ApiResponse<List<CckbUserOptionResponse>>> platformUsers() {
+        return ResponseEntity.ok(ApiResponse.success(cckbAdminService.listPlatformUsers()));
     }
 
     /** 관리자 추가 — ROLE_ADMIN 이거나 CCKB_PERM 기존 등록자만 가능 */
