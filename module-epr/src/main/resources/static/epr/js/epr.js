@@ -15,14 +15,78 @@
   const dateTime = (value) => (value ? new Date(value).toLocaleString('ko-KR') : '');
   const currentYear = new Date().getFullYear();
 
+  // ───────────── 플랫폼 토큰 ─────────────
+  // access token 은 1시간이면 끝난다. 플랫폼 화면은 자기 요청이 401 을 받을 때만 갱신하므로,
+  // EPR 화면에만 오래 머물면 토큰이 끝난 채로 남는다. 그래서 401 이면 여기서 refresh token 으로 한 번 갱신하고 다시 보낸다.
+  // (스팀 모듈 platform-iframe-compat.js 와 같은 방식. 갱신한 토큰은 플랫폼과 같은 저장소에 다시 넣어 둘이 같이 쓴다.)
+  function readJson(storage, key) {
+    try { return JSON.parse(storage.getItem(key) || 'null') || {}; } catch (e) { return {}; }
+  }
+
   function platformToken() {
-    try { return (JSON.parse(localStorage.getItem('fireweb_user') || '{}') || {}).token || ''; }
-    catch (e) { return ''; }
+    return readJson(localStorage, 'fireweb_user').token || readJson(sessionStorage, 'auth').token || '';
+  }
+
+  function refreshTokenValue() {
+    const auth = readJson(sessionStorage, 'auth');
+    const user = readJson(localStorage, 'fireweb_user');
+    return auth.refreshTk || auth.refreshToken || user.refreshTk || user.refreshToken || '';
+  }
+
+  function saveTokens(accessToken, refreshToken) {
+    try {
+      const auth = readJson(sessionStorage, 'auth');
+      if (auth.token) {
+        auth.token = accessToken;
+        if (refreshToken) auth.refreshTk = refreshToken;
+        sessionStorage.setItem('auth', JSON.stringify(auth));
+      }
+      const user = readJson(localStorage, 'fireweb_user');
+      if (user.token) {
+        user.token = accessToken;
+        localStorage.setItem('fireweb_user', JSON.stringify(user));
+      }
+    } catch (e) { /* 저장 실패는 무시 — 이번 요청은 새 토큰으로 다시 보낸다 */ }
+  }
+
+  let refreshing = null;
+  function refreshAccessToken() {
+    if (refreshing) return refreshing;
+    const refreshToken = refreshTokenValue();
+    if (!refreshToken) return Promise.resolve(false);
+    refreshing = fetch('/api/auth/refresh', { method: 'POST', headers: { 'X-Refresh-Token': refreshToken }, cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const data = json && json.success ? json.data : null;
+        if (!data || !data.accessToken) return false;
+        saveTokens(data.accessToken, data.refreshToken);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => { refreshing = null; });
+    return refreshing;
+  }
+
+  /** 로그인 세션이 끝났다 — 플랫폼 화면에 알려 로그인 화면으로 보낸다 (소방·스팀 모듈과 같은 신호). */
+  function sessionExpired() {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); }
+    catch (e) { /* 단독으로 연 경우 */ }
   }
 
   function authHeaders(extra) {
     const token = platformToken();
     return Object.assign(token ? { Authorization: 'Bearer ' + token } : {}, extra || {});
+  }
+
+  /** 인증 헤더를 붙여 보내고, 401 이면 토큰을 한 번 갱신해 다시 보낸다. */
+  async function authFetch(path, init = {}) {
+    const send = () => fetch(path, Object.assign({}, init, { headers: authHeaders(init.headers), cache: 'no-store' }));
+    const response = await send();
+    if (response.status !== 401) return response;
+    if (!(await refreshAccessToken())) { sessionExpired(); return response; }
+    const retried = await send();
+    if (retried.status === 401) sessionExpired();
+    return retried;
   }
 
   class ApiError extends Error {
@@ -35,17 +99,21 @@
     if (response.status === 401) return new ApiError('로그인이 만료되었습니다. 플랫폼에서 다시 로그인하세요.', 401);
     if (response.status === 403) return new ApiError('EPR 메뉴 사용 권한이 없습니다. 관리자에게 접근 권한을 요청하세요.', 403);
     if (response.status === 413) return new ApiError('파일이 너무 커서 서버가 받지 못했습니다. (20MB 이하)', 413);
+    // 입력 검증 오류는 칸별 메시지가 data 에 온다 — 일반 문구 대신 그 내용을 보여 준다.
+    if (json && json.data && typeof json.data === 'object' && !Array.isArray(json.data)) {
+      const fieldMessages = Object.values(json.data).filter((value) => typeof value === 'string');
+      if (fieldMessages.length) return new ApiError(fieldMessages.join(' / '), response.status);
+    }
     return new ApiError((json && json.message) || `요청을 처리하지 못했습니다. (HTTP ${response.status})`, response.status);
   }
 
   /** ApiResponse 를 풀어 data 를 돌려준다. body 가 FormData 면 그대로, 객체면 JSON 으로 보낸다. */
   async function api(path, { method = 'GET', body } = {}) {
     const isForm = body instanceof FormData;
-    const response = await fetch(path, {
+    const response = await authFetch(path, {
       method,
-      headers: authHeaders(body !== undefined && !isForm ? { 'Content-Type': 'application/json; charset=utf-8' } : null),
+      headers: body !== undefined && !isForm ? { 'Content-Type': 'application/json; charset=utf-8' } : null,
       body: body === undefined ? undefined : (isForm ? body : JSON.stringify(body)),
-      cache: 'no-store',
     });
     if (!response.ok) throw await readError(response);
     let json = null;
@@ -59,7 +127,7 @@
     const oldHtml = button ? button.innerHTML : '';
     if (button) { button.disabled = true; button.textContent = '내려받는 중…'; }
     try {
-      const response = await fetch(path, { headers: authHeaders(), cache: 'no-store' });
+      const response = await authFetch(path);
       if (!response.ok) throw await readError(response);
       const disposition = response.headers.get('Content-Disposition') || '';
       const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition) || /filename="?([^";]+)"?/i.exec(disposition);
@@ -218,7 +286,7 @@
     const code = row.dataset.productCode;
     button.disabled = true;
     try {
-      await api(`/epr-api/products/${encodeURIComponent(code)}`, { method: 'PUT', body: readProduct(row, code) });
+      await api('/epr-api/products', { method: 'POST', body: readProduct(row, code) });
       showAlert('master-alert', 'success', `${code} 제품 마스터를 저장했습니다.`);
     } catch (error) {
       showAlert('master-alert', 'danger', `${code}: ${error.message}`);

@@ -93,23 +93,39 @@ public class EprMasterService {
         String companyType = EprProductMaster.normalizeCompanyType(request.getCompanyType());
         EprProductMaster product = productRepository.findAllAnyByProductCodeIn(List.of(code)).stream()
                 .findFirst().orElse(null);
+        Integer eaPerBag = count(request.getEaPerBag(), "EA/BAG");
+        Integer bagPerBox = count(request.getBagPerBox(), "BAG/BOX");
+        Integer eaPerBox = count(request.getEaPerBox(), "EA/BOX");
+        Integer bagPerPlt = count(request.getBagPerPlt(), "BAG/PLT");
+        Integer boxPerPlt = count(request.getBoxPerPlt(), "BOX/PLT");
         if (product == null) {
             product = EprProductMaster.builder()
                     .productCode(code).productName(request.getProductName())
-                    .eaPerBag(request.getEaPerBag()).bagPerBox(request.getBagPerBox()).eaPerBox(request.getEaPerBox())
-                    .bagPerPlt(request.getBagPerPlt()).boxPerPlt(request.getBoxPerPlt())
+                    .eaPerBag(eaPerBag).bagPerBox(bagPerBox).eaPerBox(eaPerBox)
+                    .bagPerPlt(bagPerPlt).boxPerPlt(boxPerPlt)
                     .bagWeight(request.getBagWeight()).boxWeight(request.getBoxWeight())
                     .companyType(companyType).createdBy(userId)
                     .build();
         } else {
             if (product.isDeleted()) product.restore(userId);
-            product.update(request.getProductName(), request.getEaPerBag(), request.getBagPerBox(),
-                    request.getEaPerBox(), request.getBagPerPlt(), request.getBoxPerPlt(),
+            product.update(request.getProductName(), eaPerBag, bagPerBox, eaPerBox, bagPerPlt, boxPerPlt,
                     request.getBagWeight(), request.getBoxWeight(), companyType, userId);
         }
         String partName = ensurePart(product.getPartPrefix(), userId).getPartName();
         EprProductMaster saved = productRepository.save(product);
         return ProductMasterResponse.from(saved, partName);
+    }
+
+    /** 입수량 — 빈 값은 0, 음수·소수·너무 큰 값은 거부 (요청 검증을 거치지 않고 불린 경우까지 막는다) */
+    private static Integer count(java.math.BigDecimal value, String label) {
+        if (value == null) return 0;
+        try {
+            int result = value.intValueExact();
+            if (result < 0) throw new ArithmeticException();
+            return result;
+        } catch (ArithmeticException exception) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, label + " 은(는) 0 이상의 정수로 입력하세요.");
+        }
     }
 
     // ───────────────────────── 엑셀 ─────────────────────────
@@ -121,8 +137,9 @@ public class EprMasterService {
         List<UploadIssue> issues = new ArrayList<>(parseIssues);
         for (MasterExcelRow row : rows) {
             String code = EprProductMaster.normalizeCode(row.productCode());
-            if (code.isBlank() || code.length() > 30) {
-                issues.add(new UploadIssue(row.rowNumber(), code, "제품코드는 1~30자여야 합니다."));
+            // 단건 등록·판매수량 계산과 같은 기준 (앞 3자리가 파트코드). 1~2자 코드는 계산에서 쓰이지 못한다.
+            if (code.length() < 3 || code.length() > 30) {
+                issues.add(new UploadIssue(row.rowNumber(), code, "제품코드는 3~30자여야 합니다. (앞 3자리 파트코드 필요)"));
                 continue;
             }
             if (row.productName() == null || row.productName().isBlank() || row.productName().length() > 255) {

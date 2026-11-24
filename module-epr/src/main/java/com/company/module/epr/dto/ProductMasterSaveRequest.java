@@ -1,7 +1,7 @@
 package com.company.module.epr.dto;
 
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -23,20 +23,26 @@ public class ProductMasterSaveRequest {
     @Size(max = 255, message = "제품명은 255자 이내여야 합니다.")
     private String productName;
 
-    @Min(value = 0, message = "EA/BAG 은 0 이상 입력하세요.")
-    private Integer eaPerBag = 0;
+    // 입수량은 정수. Integer 로 받으면 JSON 1.5 가 말없이 1 로 잘려 들어오므로 BigDecimal 로 받아 소수를 거부한다.
+    @DecimalMin(value = "0", message = "EA/BAG 은 0 이상 입력하세요.")
+    @Digits(integer = 9, fraction = 0, message = "EA/BAG 은 정수로 입력하세요.")
+    private BigDecimal eaPerBag = BigDecimal.ZERO;
 
-    @Min(value = 0, message = "BAG/BOX 는 0 이상 입력하세요.")
-    private Integer bagPerBox = 0;
+    @DecimalMin(value = "0", message = "BAG/BOX 는 0 이상 입력하세요.")
+    @Digits(integer = 9, fraction = 0, message = "BAG/BOX 는 정수로 입력하세요.")
+    private BigDecimal bagPerBox = BigDecimal.ZERO;
 
-    @Min(value = 0, message = "EA/BOX 는 0 이상 입력하세요.")
-    private Integer eaPerBox = 0;
+    @DecimalMin(value = "0", message = "EA/BOX 는 0 이상 입력하세요.")
+    @Digits(integer = 9, fraction = 0, message = "EA/BOX 는 정수로 입력하세요.")
+    private BigDecimal eaPerBox = BigDecimal.ZERO;
 
-    @Min(value = 0, message = "BAG/PLT 는 0 이상 입력하세요.")
-    private Integer bagPerPlt = 0;
+    @DecimalMin(value = "0", message = "BAG/PLT 는 0 이상 입력하세요.")
+    @Digits(integer = 9, fraction = 0, message = "BAG/PLT 는 정수로 입력하세요.")
+    private BigDecimal bagPerPlt = BigDecimal.ZERO;
 
-    @Min(value = 0, message = "BOX/PLT 는 0 이상 입력하세요.")
-    private Integer boxPerPlt = 0;
+    @DecimalMin(value = "0", message = "BOX/PLT 는 0 이상 입력하세요.")
+    @Digits(integer = 9, fraction = 0, message = "BOX/PLT 는 정수로 입력하세요.")
+    private BigDecimal boxPerPlt = BigDecimal.ZERO;
 
     @DecimalMin(value = "0.0", message = "BAG 포장중량은 0 이상 입력하세요.")
     private BigDecimal bagWeight = BigDecimal.ZERO;

@@ -102,8 +102,7 @@ FK 는 업무 표끼리만: `epr_product_master.PART_PREFIX → epr_part_categor
 |---|---|---|
 | GET | `/epr-api/products?q=&part=` | 제품 마스터 목록 (제품코드·제품명 검색, 파트 필터) |
 | GET | `/epr-api/products/overview` | 등록 제품 수 |
-| POST | `/epr-api/products` | 단건 등록 (같은 제품코드가 있으면 수정) |
-| PUT | `/epr-api/products/{productCode}` | 단건 수정 |
+| POST | `/epr-api/products` | 단건 등록 · 수정 (같은 제품코드가 있으면 수정). 제품코드에 `/` 가 들어갈 수 있어 주소에 코드를 넣는 PUT 은 두지 않았다 |
 | GET | `/epr-api/parts` | 파트 코드 목록과 파트별 등록 SKU 수 |
 | POST | `/epr-api/parts` | 파트 추가 · 파트명 수정 (삭제된 코드면 되살림) |
 | DELETE | `/epr-api/parts/{partPrefix}` | 파트 소프트 삭제 (쓰는 제품이 있으면 거부) |

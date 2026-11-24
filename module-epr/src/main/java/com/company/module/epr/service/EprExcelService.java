@@ -13,6 +13,7 @@ import com.company.module.epr.dto.WeightExcelRow;
 import com.company.module.epr.entity.EprProductMaster;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
@@ -219,15 +220,50 @@ public class EprExcelService {
         return null;
     }
 
+    /** 글자 칸(제품코드·제품명·구분). 수식 칸은 엑셀이 저장해 둔 결과값을 쓴다. */
     private String cell(Row row, Map<String, Integer> columns, String header) {
         Integer column = columns.get(canonical(header));
         if (column == null || row.getCell(column) == null) return "";
-        return formatter.formatCellValue(row.getCell(column)).trim();
+        return text(row.getCell(column));
+    }
+
+    private String text(Cell cell) {
+        if (cell.getCellType() == CellType.FORMULA) {
+            return switch (cell.getCachedFormulaResultType()) {
+                case STRING -> cell.getStringCellValue().trim();
+                case NUMERIC -> plainNumber(cell.getNumericCellValue());
+                case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+                default -> "";
+            };
+        }
+        return formatter.formatCellValue(cell).trim();
+    }
+
+    /**
+     * 숫자 칸(입수량·중량·EA). 엑셀 표시 형식(소수 자릿수, 천 단위, 회계 서식의 "-")을 거치지 않고 저장된 값 그대로 읽는다.
+     * 수식 칸은 저장된 결과값, 오류 칸(#N/A 등)은 숫자가 아닌 값으로 돌려줘 그 행을 확인 필요로 남긴다.
+     */
+    private String number(Row row, Map<String, Integer> columns, String header) {
+        Integer column = columns.get(canonical(header));
+        if (column == null || row.getCell(column) == null) return "";
+        Cell cell = row.getCell(column);
+        CellType type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
+        return switch (type) {
+            case NUMERIC -> plainNumber(cell.getNumericCellValue());
+            case STRING -> cell.getStringCellValue().trim().replace(",", "");
+            case BLANK -> "";
+            default -> "#" + type;
+        };
+    }
+
+    /** double → 소수 6자리에서 반올림한 일반 표기 (0.1+0.2 같은 부동소수 꼬리 제거) */
+    private static String plainNumber(double value) {
+        return BigDecimal.valueOf(value).setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
     }
 
     /** 빈 칸은 0 */
     private Integer integer(Row row, Map<String, Integer> columns, String header) {
-        String raw = cell(row, columns, header).replace(",", "");
+        String raw = number(row, columns, header);
         if (raw.isBlank()) return 0;
         try {
             return new BigDecimal(raw).intValueExact();
@@ -237,7 +273,7 @@ public class EprExcelService {
     }
 
     private BigDecimal salesQuantity(Row row, Map<String, Integer> columns, String header) {
-        String raw = cell(row, columns, header).replace(",", "");
+        String raw = number(row, columns, header);
         if (raw.isBlank()) throw new BusinessException(ErrorCode.INVALID_INPUT, header + " 값이 비어 있습니다.");
         BigDecimal value;
         try {
@@ -251,7 +287,7 @@ public class EprExcelService {
 
     /** 빈 칸은 0, 소수점 4자리 */
     private BigDecimal decimal(Row row, Map<String, Integer> columns, String header) {
-        String raw = cell(row, columns, header).replace(",", "");
+        String raw = number(row, columns, header);
         if (raw.isBlank()) return BigDecimal.ZERO;
         BigDecimal value;
         try {
@@ -270,12 +306,13 @@ public class EprExcelService {
     }
 
     private String safeCell(Row row, Integer column) {
-        return column == null || row.getCell(column) == null ? "" : formatter.formatCellValue(row.getCell(column)).trim();
+        return column == null || row.getCell(column) == null ? "" : text(row.getCell(column));
     }
 
+    /** 값이 하나도 없는 행 (수식이 빈 글자를 돌려주는 행도 빈 행으로 본다) */
     private boolean isBlank(Row row) {
         if (row == null) return true;
-        for (Cell cell : row) if (!formatter.formatCellValue(cell).isBlank()) return false;
+        for (Cell cell : row) if (!text(cell).isBlank()) return false;
         return true;
     }
 

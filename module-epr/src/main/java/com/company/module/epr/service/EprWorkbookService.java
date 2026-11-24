@@ -87,6 +87,13 @@ public class EprWorkbookService {
             throw unreadable();
         }
         SalesCalculationResult result = calculationService.calculate(reportYear, parsed.rows(), parsed.issues());
+        // 쓸 수 있는 행이 하나도 없으면 저장하지 않는다 — 잘못 고른 파일로 기존 연도 실적이 0 으로 덮이는 것을 막는다.
+        if (result.acceptedRows() == 0) {
+            String firstIssue = result.issues().isEmpty() ? ""
+                    : " (예: " + result.issues().get(0).rowNumber() + "행 " + result.issues().get(0).message() + ")";
+            throw new BusinessException(ErrorCode.INVALID_INPUT,
+                    "계산할 수 있는 판매 행이 없어 저장하지 않았습니다. 확인 필요 " + result.issues().size() + "행" + firstIssue);
+        }
         annualSalesService.replaceYear(reportYear, result, replaceExisting, userId);
         return result;
     }
