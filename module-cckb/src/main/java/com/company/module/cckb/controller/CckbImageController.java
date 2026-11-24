@@ -42,7 +42,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/cckb-api/images")
 @RequiredArgsConstructor
-public class ImageController {
+public class CckbImageController {
 
     private final CckbImageRepository cckbImageRepository;
     private final CckbFileStorageService fileStorageService;
