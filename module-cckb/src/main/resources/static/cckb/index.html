@@ -393,11 +393,11 @@
 
     /* ===== 관리자 추가 - 사용자 검색 박스 (세부공장일보 컬럼관리 '권한추가'와 동일 패턴) ===== */
     .user-search-wrap { position:relative; }
-    .user-search-input {
+    input.user-search-input {
       width:100%; padding:10px 14px 10px 36px; border-radius:var(--radius); border:1px solid var(--line);
       background: var(--panel2); color: var(--text); font-size:14px; font-family: inherit;
     }
-    .user-search-input:focus { outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
+    input.user-search-input:focus { outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
     .user-search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted2); font-size:13px; pointer-events:none; }
     .user-search-dropdown {
       position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50;
@@ -691,7 +691,7 @@
 
     <!-- ===================== TAB 3: ⚙ 기준값 설정 ===================== -->
     <div id="tab-settings" class="tab-panel">
-      <div class="panel" style="margin:0 auto; max-width:680px;">
+      <div class="panel" style="margin-bottom:0; max-width:680px;">
         <div class="head">
           <div>
             <h2>⚙ 기준값 설정</h2>
@@ -761,15 +761,8 @@
 
           <button id="saveRefBtn" class="primary" style="margin-top:20px; width:100%;">저장</button>
 
-          <div class="notice" style="margin-top:16px;">
-            검사 결과의 ΔL*/Δa*/Δb*, ΔE00은 모두 이 기준값과 검사 사진 측정값의 차이로 계산됩니다. 정상/불량 판정 조건도 이 탭에서 함께 변경할 수 있으며, 저장하면 이후 모든 판정에 즉시 적용됩니다. (기준값 수정은 플랫폼 <strong>관리자(ROLE_ADMIN)</strong> 또는 아래 <strong>CCKB 관리자 명단</strong>에 등록된 사람만 가능하며, 서버에서 권한을 검증합니다. 변경 이력은 모두 감사 로그(standard_audit_log)에 기록됩니다.)
-          </div>
-
           <div id="adminMgmtSection" style="display:none;">
-            <div class="settings-section-title">CCKB 관리자 명단</div>
-            <div class="notice" style="margin-bottom:12px;">
-              여기 등록된 로그인 ID를 가진 사람은 기준값을 수정할 수 있습니다. 플랫폼 관리자(ROLE_ADMIN)는 이 명단과 무관하게 항상 수정할 수 있고, 명단에 등록된 사람도 새 관리자를 추가할 수 있습니다.
-            </div>
+            <div class="settings-section-title" style="margin-top:24px;">CCKB 관리자 명단</div>
             <div class="table-wrap">
               <table>
                 <thead>
