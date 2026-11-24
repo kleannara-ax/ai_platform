@@ -76,7 +76,7 @@
     }
     .invoice-table td.editable-cell { background:#ffffff !important; padding:0 !important; }
     .invoice-table td.formula-cell,
-    .invoice-table td.linked-cell { background:#eef2ff !important; color:#1e293b !important; font-weight:600 !important; }
+    .invoice-table td.linked-cell { background:#f1f5f8 !important; color:#1e293b !important; font-weight:600 !important; }
     .invoice-cell-input { width:100%; height:100%; min-height:22px; border:0; background:transparent; color:#173a54; font:inherit; text-align:inherit; padding:6px 8px; outline:0; }
     .invoice-cell-input:focus { box-shadow:inset 0 0 0 2px #2563eb; background:#fff; }
     .invoice-empty { padding:34px 16px; text-align:center; color:#64748b; font-size:13px; }
@@ -103,6 +103,8 @@
   <script src="/steam/js/steam-row-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/srf-store.js?v=20261120-spec3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
 </head>
 <body class="landing-body" data-page-kind="srf-invoice-operation">
   <main class="invoice-workspace">

@@ -11,8 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
   <style>
-    /* === 셀 구분(다른 페이지와 통일): 자동계산 = 앱 표준 calc 색 #eef2ff, 직접입력 = 흰색 박스 === */
-    body[data-page-kind="unit"] .unit-table tbody tr:not(.summary-row) td { background:#eef2ff; }
+    /* === 셀 구분(다른 페이지와 통일): 자동계산 = 앱 표준 calc 색 #f1f5f8, 직접입력 = 흰색 박스 === */
+    body[data-page-kind="unit"] .unit-table tbody tr:not(.summary-row) td { background:#f1f5f8; }
     /* 일자(첫 열) 및 직접입력 셀 = 흰색 */
     body[data-page-kind="unit"] .unit-table tbody tr:not(.summary-row) td:first-child { background:#ffffff; }
     body[data-page-kind="unit"] .unit-table tbody tr td:has(> .table-edit-input:not([readonly])) { background:#ffffff; }
@@ -22,6 +22,8 @@
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
   <script src="/steam/js/steam-energy-api.js?v=20261120-spec1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
 </head>
 <body class="landing-body" data-page-kind="unit">
   <main class="landing-main">

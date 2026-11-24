@@ -332,7 +332,7 @@
       border-color: rgba(111, 191, 245, 0.65);
     }
     .excel-table .excel-readonly-cell {
-      background: #eef2ff;
+      background: #f1f5f8;
       color: #1e293b;
       font-weight: 600;
     }
@@ -344,7 +344,7 @@
     }
     .excel-table .excel-readonly-cell.excel-sticky-col-a,
     .excel-table .excel-readonly-cell.excel-sticky-col-b {
-      background: #eef2ff;
+      background: #f1f5f8;
     }
     body.landing-body.detail-page-scroll.embedded-mode {
       min-width: 0 !important;
@@ -764,7 +764,7 @@
     .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell,
     .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell.excel-sticky-col-a,
     .detailframe-page .excel-table-fluidized_detail_main .excel-readonly-cell.excel-sticky-col-b {
-      background: #eef2ff !important;
+      background: #f1f5f8 !important;
       color: #1e293b !important;
     }
     /* 유동상 운전일지 연동 셀은 위 readonly 색상보다 뒤에서 덮어써야 한다 */
@@ -971,6 +971,8 @@
   </style>
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
   <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
 </head>
 <body class="landing-body detail-page-scroll detailframe-page" data-page-kind="fluidized-detail">
   <div class="detail-page-shell detailframe-page-shell">

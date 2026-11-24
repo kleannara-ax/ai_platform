@@ -254,9 +254,9 @@
       }
       .monthly-workbook-table tbody tr.monthly-summary-row th,
       .monthly-workbook-table tbody tr.monthly-summary-row td {
-        background: var(--inc-bg-summary, #fff8e3);
+        background: var(--inc-bg-summary, #e8f4ec);
         font-weight: 700;
-        color: #7c5a00;
+        color: #1f4d38;
       }
       .monthly-workbook-table tbody tr.monthly-average-row th,
       .monthly-workbook-table tbody tr.monthly-average-row td {
