@@ -63,6 +63,12 @@
 |------|------|------------|------|
 | 19 | [스팀에너지 공유 데이터](./19_스팀에너지_공유데이터.md) | `/steam-energy-api/prices`, `/steam-energy-api/energy-ratio-steam-units` | 단가 입력 · 스팀사용량 원단위(기타 스팀량 포함) 조회/저장, 없어진 옛 API(`/steam/api/tables`) 대체 방법, DB 직접 조회 |
 
+### Module-EPR (EPR 포장재 중량 신고) (`/epr-api/*`)
+
+| 번호 | 문서 | URL Prefix | 설명 |
+|------|------|------------|------|
+| 20 | [EPR 포장재 중량 신고](./20_EPR_포장재신고.md) | `/epr-api/products`, `/epr-api/parts`, `/epr-api/excel`, `/epr-api/annual` | 제품 마스터 · 파트 코드 · 엑셀 양식/업로드 · 판매수량 신고중량 계산 · 연도별 비교 |
+
 ### 헬스체크
 
 | 번호 | 문서 | URL Prefix | 설명 |

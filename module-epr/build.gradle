@@ -1,0 +1,35 @@
+// ============================================================
+// module-epr: EPR 포장재 중량 신고 모듈
+// 패키지: com.company.module.epr
+// URL Prefix: /epr-api/**  (업무 API, 플랫폼 JWT 인증 필수)
+// 화면: /epr/**            (플랫폼 SPA 안에서 iframe 으로 로드, epr:: 접두사)
+// DB Table: epr_part_category, epr_product_master, epr_annual_sales, epr_annual_sales_detail
+// ============================================================
+
+dependencies {
+    // core 공통 클래스 참조 (컴파일 전용: 순환 의존 방지)
+    compileOnly project(':core')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // SecurityConfig/JWT 구현 금지 — @PreAuthorize·모듈 화면 경로 체인을 위한 컴파일 참조만
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+
+    // POI: 엑셀 양식 내려받기·올리기·결과 리포트 (module-steam-energy 와 같은 버전)
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation project(':core')   // 테스트에서 core 의 BusinessException 을 쓰기 위해 (테스트 범위만)
+}
+
+// spring-boot 플러그인 미적용 서브모듈: plain jar 만 생성
+jar {
+    enabled = true
+}
