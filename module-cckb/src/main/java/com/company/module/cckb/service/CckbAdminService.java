@@ -4,6 +4,7 @@ import com.company.core.common.exception.BusinessException;
 import com.company.core.common.exception.ErrorCode;
 import com.company.module.cckb.dto.request.CckbAdminAddRequest;
 import com.company.module.cckb.dto.response.CckbAdminResponse;
+import com.company.module.cckb.dto.response.CckbUserOptionResponse;
 import com.company.module.cckb.support.CckbPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -105,6 +106,20 @@ public class CckbAdminService {
         log.info("[CCKB] CCKB_PERM 관리자 비활성화: loginId={}", loginId);
         cckbPermission.invalidateCache();
         return listAdmins();
+    }
+
+    /**
+     * 관리자 추가 모달의 "사용자 검색" 드롭다운용 — AI플랫폼 전체 활성 사용자 목록.
+     * (module-dailyreport의 UserListService와 동일 패턴: core_user를 직접 조회)
+     */
+    public List<CckbUserOptionResponse> listPlatformUsers() {
+        return jdbcTemplate.query(
+                "SELECT USER_ID, LOGIN_ID, USER_NAME FROM core_user WHERE ENABLED = 1 ORDER BY USER_NAME",
+                (rs, rowNum) -> CckbUserOptionResponse.builder()
+                        .userId(rs.getLong("USER_ID"))
+                        .loginId(rs.getString("LOGIN_ID"))
+                        .userName(rs.getString("USER_NAME"))
+                        .build());
     }
 
     private int nextSortOrder(Long groupId) {

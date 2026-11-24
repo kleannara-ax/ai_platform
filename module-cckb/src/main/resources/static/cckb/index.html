@@ -391,6 +391,34 @@
     .settings-section-title { font-size:13px; font-weight:800; color:var(--accent-hover); margin:24px 0 12px; }
     .settings-section-title:first-of-type { margin-top:0; }
 
+    /* ===== 관리자 추가 - 사용자 검색 박스 (세부공장일보 컬럼관리 '권한추가'와 동일 패턴) ===== */
+    .user-search-wrap { position:relative; }
+    .user-search-input {
+      width:100%; padding:10px 14px 10px 36px; border-radius:var(--radius); border:1px solid var(--line);
+      background: var(--panel2); color: var(--text); font-size:14px; font-family: inherit;
+    }
+    .user-search-input:focus { outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
+    .user-search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted2); font-size:13px; pointer-events:none; }
+    .user-search-dropdown {
+      position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50;
+      background:#fff; border:1px solid var(--line2); border-radius:var(--radius);
+      box-shadow:0 10px 28px rgba(15,23,42,0.14); max-height:260px; overflow-y:auto; display:none;
+    }
+    .user-search-dropdown.open { display:block; }
+    .user-search-item { padding:10px 14px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line); transition:background .1s; }
+    .user-search-item:last-child { border-bottom:none; }
+    .user-search-item:hover, .user-search-item.focused { background: var(--accent-light); }
+    .user-search-item .us-name { font-weight:700; color:var(--text); }
+    .user-search-item .us-id { color:var(--muted); font-size:11px; }
+    .user-search-empty { padding:16px; text-align:center; color:var(--muted2); font-size:13px; }
+    .user-selected-chip {
+      display:inline-flex; align-items:center; gap:8px; padding:8px 14px; margin-top:10px;
+      background: var(--accent-light); border:1px solid var(--accent); border-radius:var(--radius);
+      font-size:13px; font-weight:700; color:var(--accent-dark);
+    }
+    .user-selected-chip .chip-remove { background:none; border:none; color:var(--accent-dark); cursor:pointer; font-size:16px; line-height:1; padding:0 2px; opacity:.6; }
+    .user-selected-chip .chip-remove:hover { opacity:1; }
+
     /* ===== 플랫폼 공용 알림 바 ===== */
     #msg {
       position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -663,7 +691,7 @@
 
     <!-- ===================== TAB 3: ⚙ 기준값 설정 ===================== -->
     <div id="tab-settings" class="tab-panel">
-      <div class="panel" style="margin-bottom:0; max-width:680px;">
+      <div class="panel" style="margin:0 auto; max-width:680px;">
         <div class="head">
           <div>
             <h2>⚙ 기준값 설정</h2>
@@ -757,17 +785,18 @@
                 </tbody>
               </table>
             </div>
-            <div class="threshold-grid" style="grid-template-columns: 1fr 1fr auto; margin-top:14px;">
-              <div class="form-field" style="margin:0;">
-                <label>추가할 로그인 ID</label>
-                <input type="text" id="adminAddLoginId" placeholder="예: hong.gildong" />
+            <div class="form-field" style="margin-top:14px;">
+              <label>추가할 사용자 검색</label>
+              <div class="user-search-wrap" id="adminUserSearchWrap">
+                <span class="user-search-icon">🔍</span>
+                <input type="text" class="user-search-input" id="adminUserSearchInput"
+                       placeholder="이름 또는 아이디로 검색..." autocomplete="off" />
+                <div class="user-search-dropdown" id="adminUserSearchDropdown"></div>
               </div>
-              <div class="form-field" style="margin:0;">
-                <label>이름(선택)</label>
-                <input type="text" id="adminAddName" placeholder="예: 홍길동" />
-              </div>
-              <div class="form-field" style="margin:0; align-self:end;">
-                <button id="adminAddBtn" class="secondary" style="width:100%;">추가</button>
+              <div id="adminUserSelectedChip"></div>
+              <small>AI플랫폼에 등록된 사용자 중 CCKB 관리자로 추가할 사람을 검색하여 선택하세요.</small>
+              <div class="btn-row" style="grid-template-columns:1fr; margin-top:10px;">
+                <button id="adminAddBtn" class="secondary">선택한 사용자 추가</button>
               </div>
             </div>
           </div>
