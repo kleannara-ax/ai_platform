@@ -582,6 +582,10 @@
     body.push(summary("합계", (v) => v, 0), summary("일 평균 (T/D)", (v) => v / dim, 0), summary("시간 평균 (T/H)", (v) => v / dim / 24, 1));
 
     $("mpDayTable").innerHTML = `<thead><tr>${head1.join("")}</tr><tr>${head2.join("")}</tr></thead><tbody>${body.join("")}</tbody>`;
+    // 머리글 틀고정: 둘째 줄을 첫 줄 높이만큼 내려 붙인다
+    const firstRow = $("mpDayTable").tHead.rows[0];
+    const subHead = firstRow.querySelector("th:not([rowspan])");
+    if (subHead) $("mpDayTable").style.setProperty("--mp-head1", subHead.getBoundingClientRect().height + "px");
   }
 
   function hoursCell(day, field, value, kind, label) {

@@ -48,7 +48,7 @@ body.embedded-mode[data-page-kind="move-plan"] .mp-canvas { padding:0; min-heigh
 .mp-table th, .mp-table td { text-align:center; vertical-align:middle; white-space:nowrap; }
 .mp-table thead th { padding:6px 8px; line-height:1.3; }
 .mp-day-table { width:max-content; min-width:100%; }
-.mp-day-wrap { max-height:none; }
+.mp-day-wrap { max-height:calc(100vh - 90px); overflow:auto; }   /* 표 안에서 세로로 넘겨 머리글을 고정한다 */
 
 .mp-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin:0 0 10px; font-size:13px; color:#34536b; }
 .mp-controls select { height:30px; padding:0 8px; border:1px solid #c5d6e3; border-radius:8px; background:#fff; color:#173a54; font:inherit; }
@@ -111,7 +111,9 @@ body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody t
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr.mp-row-actual td.mp-hours-idle .mp-idle-tons { color:#16232e; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-idle-pick { cursor:pointer; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-idle-pick:hover { box-shadow:inset 0 0 0 2px #f0a99d; }
-body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table thead th { position:sticky; top:0; z-index:2; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table thead th { position:sticky; top:0; z-index:3; }
+/* 머리글 둘째 줄은 첫 줄 높이만큼 아래에 붙는다 (높이는 그릴 때 --mp-head1 로 넣는다) */
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table thead tr:nth-child(2) th { top:var(--mp-head1, 31px); z-index:2; }
 
 /* 월별 표 */
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody tr.mp-month-row { cursor:pointer; }
