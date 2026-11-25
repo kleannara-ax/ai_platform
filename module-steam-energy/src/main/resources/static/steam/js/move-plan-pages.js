@@ -26,7 +26,7 @@
   const MACHINES = Calc.MACHINES;
   const BOILERS = Calc.BOILERS;
 
-  /** 실적도 단가도 없을 때 쓰는 값 */
+  /** 기본값 — 하루 최대는 사람이 세운 계획서 기준(폐합성2 384, 복합 1,704, 유동상 432)으로 고정, LNG 는 설비 용량 */
   const FALLBACK = {
     maxTonDay: { WASTE1: 0, WASTE2: 384, COMBO: 1704, FLUID: 432, LNG20: 480, LNG50: 1200 },
     minTonDay: { WASTE1: 0, WASTE2: 336, COMBO: 0, FLUID: 300, LNG20: 0, LNG50: 0 },
@@ -34,8 +34,6 @@
     fluidBillTonHour: 21.1,
     lngM3PerTon: 66,
   };
-  /** 최근 실적에서 하루 최대를 잡는 보일러 (LNG 는 남는 양을 받는 보일러라 설비 용량을 쓴다) */
-  const CAP_FROM_ACTUAL = ["WASTE2", "COMBO", "FLUID"];
   const STEAM_PRICE_CODE = { WASTE2: "waste2_steam", FLUID: "fluid_steam" };
   const IDLE_PRICE_CODE = { WASTE1: "waste1_fixed_hr", WASTE2: "waste2_fixed_hr", FLUID: "fluid_fixed_hr" };
   const DAY_FIELDS = MACHINES.map((m) => m.down).concat(BOILERS.map((b) => b.stop));
@@ -152,7 +150,7 @@
     return { value: null, exact: false, ym: null };
   }
 
-  /** 계획 달 직전 12개월의 실적 요약 — 하루 최대 기본값과 정산 기준 기본값의 근거 */
+  /** 계획 달 직전 12개월의 실적 요약 — 참고 열(실적)과 정산 기준 기본값의 근거 */
   function recentStats(year, month, yd, prev) {
     const daily = {};
     const monthly = {};
@@ -214,15 +212,10 @@
     const machines = {};
     MACHINES.forEach((m) => {
       const saved = yd.machines.get(`${month}|${m.code}`) || {};
+      // 전년 같은 달 값만 쓴다. 없으면 비워 두고 '입력 필요'로 표시한다 (평균으로 채우지 않음)
       let lastYear = num(unitRow[m.unit]);
-      let source = lastYear !== null && lastYear > 0 ? "lastYear" : null;
-      if (!source) {
-        // 전년 같은 달 값이 없으면(그 달에 안 돌린 호기) 전년에 값이 있는 달의 평균
-        const values = [];
-        lastYearUnits.forEach((row) => { const v = num(row[m.unit]); if (v !== null && v > 0) values.push(v); });
-        lastYear = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-        source = lastYear !== null ? "lastYearAverage" : null;
-      }
+      if (lastYear !== null && lastYear <= 0) lastYear = null;
+      const source = lastYear !== null ? "lastYear" : null;
       const override = num(saved.unitOverride);
       machines[m.code] = {
         productionTon: num(saved.productionTon), runtimeHours: num(saved.runtimeHours), planKind: saved.planKind || null,
@@ -234,11 +227,9 @@
     const boilers = {};
     BOILERS.forEach((b) => {
       const saved = yd.boilers.get(`${month}|${b.code}`) || {};
-      const top = stats.topAverage[b.code];
       const defaults = {
         use: b.code !== "WASTE1",
-        maxTonDay: CAP_FROM_ACTUAL.includes(b.code) && top ? Math.round(top) : FALLBACK.maxTonDay[b.code],
-        maxFromActual: CAP_FROM_ACTUAL.includes(b.code) && !!top,
+        maxTonDay: FALLBACK.maxTonDay[b.code],
         minTonDay: FALLBACK.minTonDay[b.code],
         steamUnitPrice: STEAM_PRICE_CODE[b.code] ? priceOf(STEAM_PRICE_CODE[b.code], year, month, yd, prev).value : null,
         idleHourPrice: IDLE_PRICE_CODE[b.code] ? priceOf(IDLE_PRICE_CODE[b.code], year, month, yd, prev).value : null,
@@ -392,8 +383,11 @@
     const box = $("mpSummary");
     const cards = [];
     const hasPlan = result.demandTarget !== null;
+    const needUnit = MACHINES.filter((m) => current.resolved.machines[m.code].unit === null
+      && current.resolved.machines[m.code].productionTon !== null).map((m) => m.label);
     cards.push(card("월 필요 스팀량", hasPlan ? fmt0(result.demandTarget) + " 톤" : "—",
-      hasPlan ? "생산량 × 원단위" : "생산계획이 없습니다"));
+      needUnit.length ? `원단위 입력 필요: ${needUnit.join(", ")} (빠져 있음)` : hasPlan ? "생산량 × 원단위" : "생산계획이 없습니다",
+      needUnit.length ? "warn" : ""));
     if (result.actualUntilDay > 0 && result.actualSum > 0) {
       cards.push(card(`실적 누계 (1~${result.actualUntilDay}일)`, fmt0(result.actualSum) + " 톤", "복합보일러 › 스팀생산실적"));
       cards.push(card("남은 날 계획", fmt0(result.planSum) + " 톤",
@@ -421,7 +415,8 @@
     const rows = result.machines.map((m) => {
       const r = resolved.machines[m.code];
       const lastYearText = r.lastYearUnit === null ? "" : fmtN(r.lastYearUnit, 4);
-      const tag = r.lastYearSource === "lastYearAverage" ? ' <span class="mp-tag">연평균</span>' : "";
+      const needInput = r.unit === null;
+      const tag = needInput ? '<span class="mp-tag mp-tag-need">입력 필요</span>' : "";
       const hoursDiff = m.planHours !== null && Math.abs(m.runHours - m.planHours) >= 24;
       return `<tr>
         <th>${esc(m.label)}${r.planKind ? ` <span class="mp-tag mp-tag-soft">${esc(r.planKind)}</span>` : ""}</th>
@@ -429,7 +424,7 @@
         <td>${input("machine", m.code, "runtimeHours", plain(r.runtimeHours, 1), "")}</td>
         <td class="computed${hoursDiff ? " mp-warn-text" : ""}" title="일별 계획에서 고른 운휴를 뺀 가동시간">${fmt0(m.runHours)}</td>
         <td class="computed" title="${year - 1}년 ${month}월 종합 원단위 (기타 스팀량 포함)">${lastYearText}${tag}</td>
-        <td>${input("machine", m.code, "unitOverride", plain(r.unitOverride), lastYearText)}</td>
+        <td${needInput ? ' class="mp-need-cell"' : ""}>${input("machine", m.code, "unitOverride", plain(r.unitOverride), needInput ? "입력 필요" : lastYearText)}</td>
         <td class="computed mp-strong">${m.steamTon === null ? "" : fmt0(m.steamTon)}</td>
       </tr>`;
     });
@@ -442,12 +437,10 @@
       <th>${year - 1}년 ${month}월<br>원단위</th><th>원단위<br>직접 입력</th><th>필요 스팀량(톤)</th>
     </tr></thead><tbody>${rows.join("")}</tbody>`;
 
-    const averaged = MACHINES.filter((m) => resolved.machines[m.code].lastYearSource === "lastYearAverage").map((m) => m.label);
-    const missing = MACHINES.filter((m) => resolved.machines[m.code].unit === null && resolved.machines[m.code].productionTon !== null).map((m) => m.label);
+    const missing = MACHINES.filter((m) => resolved.machines[m.code].unit === null).map((m) => m.label);
     const unplaced = result.machines.filter((m) => m.unplaced).map((m) => m.label);
     const notes = [`원단위는 연료비 배분비율 › 종합 원단위의 ${year - 1}년 ${month}월 값(기타 스팀량 포함)입니다. 직접 입력하면 그 값이 우선합니다.`];
-    if (averaged.length) notes.push(`${averaged.join(", ")}: ${year - 1}년 ${month}월 값이 없어 ${year - 1}년 평균을 썼습니다.`);
-    if (missing.length) notes.push(`${missing.join(", ")}: 전년 원단위가 없습니다. 원단위를 직접 입력하세요.`);
+    if (missing.length) notes.push(`${missing.join(", ")}: ${year - 1}년 ${month}월 원단위가 없어 비워 두었습니다. 원단위를 직접 입력하세요 — 입력 전에는 필요 스팀량에서 빠집니다.`);
     if (unplaced.length) notes.push(`${unplaced.join(", ")}: 한 달 내내 운휴로 골라 스팀량을 넣을 날이 없습니다.`);
     // 계획 가동시간과 하루 넘게 차이 나는 호기 — 운휴일을 고르라는 안내
     const gaps = result.machines.filter((m) => m.planHours !== null && m.productionTon !== null && m.runHours - m.planHours >= 24)

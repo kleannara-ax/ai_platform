@@ -64,6 +64,9 @@ body.embedded-mode[data-page-kind="move-plan"] .mp-canvas { padding:0; min-heigh
 
 .mp-tag { display:inline-block; padding:0 5px; margin-left:3px; border-radius:6px; background:#fff1d6; color:#8a5a00; font-size:10.5px; font-weight:600; line-height:16px; }
 .mp-tag-soft { background:#e8f0f7; color:#48657e; }
+.mp-tag-need { background:#fde3de; color:#a52a1b; margin-left:0; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody td.mp-need-cell { background:#fff4f2 !important; box-shadow:inset 0 0 0 2px #f0a99d; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody td.mp-need-cell > input.mp-input::placeholder { color:#c0503f; font-weight:700; }
 
 /* ── 표 안 ── */
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table :is(th, td).mp-left { text-align:left; padding-left:10px !important; }
