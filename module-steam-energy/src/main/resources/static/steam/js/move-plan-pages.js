@@ -39,7 +39,7 @@
   /** 일별 계획 표에 보이는 보일러 — 폐합성 1호기는 쓰지 않아 숨긴다 (계산·보일러 기준값·비용 표에는 남는다) */
   const SHOWN_BOILERS = BOILERS.filter((b) => b.code !== "WASTE1");
   const DAY_FIELDS = MACHINES.map((m) => m.down).concat(BOILERS.map((b) => b.stop), BOILERS.map((b) => b.idle));
-  const MONTH_FIELDS = ["actualUntilDay", "adjustYn", "waste2BillCapTon", "comboGuaranteeTon", "comboBscPrice", "comboAscPrice",
+  const MONTH_FIELDS = ["actualUntilDay", "waste2BillCapTon", "comboGuaranteeTon", "comboBscPrice", "comboAscPrice",
     "fluidBillTonHour", "fluidImprovementCost", "lngM3PerTon", "lngUnitPrice", "note"];
 
   let activeTab = "daily";
@@ -266,7 +266,6 @@
     const settings = {
       saved: savedMonth, defaults: settingDefaults,
       actualUntilDay: num(savedMonth.actualUntilDay),
-      adjust: savedMonth.adjustYn !== "N",
       waste2BillCapTon: pickSetting("waste2BillCapTon"),
       comboGuaranteeTon: pickSetting("comboGuaranteeTon"),
       comboBscPrice: pickSetting("comboBscPrice"),
@@ -330,7 +329,7 @@
     refresh();
     const body = { yearNo: year, monthNo: month };
     MONTH_FIELDS.forEach((f) => {
-      body[f] = f === "adjustYn" || f === "note" ? (row[f] || null) : num(row[f]);
+      body[f] = f === "note" ? (row[f] || null) : num(row[f]);
     });
     await persist(() => Api.post("/move-plan-months", body));
   }
@@ -392,8 +391,8 @@
       needUnit.length ? "warn" : ""));
     if (result.actualUntilDay > 0 && result.actualSum > 0) {
       cards.push(card(`실적 누계 (1~${result.actualUntilDay}일)`, fmt0(result.actualSum) + " 톤", "복합보일러 › 스팀생산실적"));
-      cards.push(card("남은 날 계획", fmt0(result.planSum) + " 톤",
-        result.adjust && Math.abs(result.adjustFactor - 1) > 0.0005 ? `보정 ×${result.adjustFactor.toFixed(3)}` : ""));
+      const restDays = result.days.filter((x) => !x.isActual).length;
+      cards.push(card("남은 날 계획", fmt0(result.planSum) + " 톤", `남은 ${restDays}일 · 하루 생산량은 계획대로`));
     }
     cards.push(card(`${month}월 합계`, fmt0(result.totalSteam) + " 톤",
       !hasPlan ? "" : Math.abs(result.diff) < 0.5 ? "필요 스팀량과 같음"
@@ -502,7 +501,6 @@
     for (let d = 1; d <= result.daysInMonth; d += 1) options.push(`<option value="${d}">${d}일까지</option>`);
     select.innerHTML = options.join("");
     select.value = saved === null ? "" : String(saved);
-    $("mpAdjust").checked = resolved.settings.adjust;
   }
 
   function renderDays() {
@@ -726,8 +724,6 @@
           saveDay(Number(data.day), data.field, hours === null || hours <= 0 ? null : Math.min(24, hours), null);
         } else if (id === "mpActualUntil") {
           saveMonthSetting("actualUntilDay", value === "" ? null : Number(value));
-        } else if (id === "mpAdjust") {
-          saveMonthSetting("adjustYn", checked ? "Y" : "N");
         }
       }, 0);
     });

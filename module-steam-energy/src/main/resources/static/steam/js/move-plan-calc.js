@@ -72,7 +72,7 @@
    *   year, month,
    *   machines: { "PM-2": { productionTon, runtimeHours, unit }, … },       // unit = 적용 원단위
    *   boilers:  { WASTE1: { use, maxTonDay, minTonDay, steamUnitPrice, idleHourPrice }, … },
-   *   settings: { actualUntilDay, adjust, waste2BillCapTon, comboGuaranteeTon, comboBscPrice, comboAscPrice,
+   *   settings: { actualUntilDay, waste2BillCapTon, comboGuaranteeTon, comboBscPrice, comboAscPrice,
    *               fluidBillTonHour, fluidImprovementCost, lngM3PerTon, lngUnitPrice },
    *   days:     { 1: { downPm2, …, stopWaste1, …, idleWaste1, … }, … },     // 시간(0~24). idle* = 우리 사정 운휴(수동)
    *   actuals:  { 1: { WASTE1, WASTE2, COMBO, FLUID, LNG20, LNG50, EXT, fluidRunHours,          // 톤, 없으면 null
@@ -142,18 +142,10 @@
       }
       modelDemand[d] = sum;
     }
+    // 남은 날은 보정하지 않는다 — 하루 생산량은 계획대로 고정 (월 계획 ÷ 가동시간 × 그 날 가동시간).
+    // 운휴가 없으면 남은 날 합계 = 월 계획 × 남은 날 수 ÷ 그 달 일수. 실적이 많고 적음에 끌려가지 않는다.
     let actualSum = 0;
-    let planModelSum = 0;
-    for (let d = 1; d <= dim; d += 1) {
-      if (isActualDay(d)) actualSum += actualTotals[d];
-      else planModelSum += modelDemand[d];
-    }
-    // 남은 날 보정: 월 필요 스팀량에서 실적을 뺀 나머지를 남은 날에 같은 비율로 나눈다.
-    const adjust = settings.adjust !== false;
-    let adjustFactor = 1;
-    if (adjust && demandTarget !== null && actualSum > 0 && planModelSum > EPS) {
-      adjustFactor = Math.max(0, (demandTarget - actualSum) / planModelSum);
-    }
+    for (let d = 1; d <= dim; d += 1) if (isActualDay(d)) actualSum += actualTotals[d];
 
     // ── 4. 보일러 기준값 ──
     const boilers = BOILERS.map((b) => {
@@ -198,7 +190,7 @@
         ext = Math.max(0, num(a.EXT) || 0);
         demand = actualTotals[d];
       } else {
-        demand = modelDemand[d] * adjustFactor;
+        demand = modelDemand[d];
         const on = [];
         for (const b of boilers) {
           alloc[b.code] = 0;
@@ -268,7 +260,7 @@
 
       const total = boilers.reduce((s, b) => s + alloc[b.code], 0) + ext;
       const scaled = {};
-      for (const m of machines) scaled[m.code] = machineDemand[d][m.code] * (actual ? 1 : adjustFactor);
+      for (const m of machines) scaled[m.code] = machineDemand[d][m.code];
       days.push({
         day: d, isActual: actual, noPlan, demandModel: modelDemand[d], demand, machineDemand: scaled,
         alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, manualIdle, runHours, fluidRunHours,
@@ -355,7 +347,7 @@
     return {
       year, month, daysInMonth: dim,
       machines, demandTarget,
-      actualUntilDay, lastActualDay, actualSum, planSum, adjust, adjustFactor,
+      actualUntilDay, lastActualDay, actualSum, planSum,
       totalSteam, diff: demandTarget === null ? null : totalSteam - demandTarget,
       shortageSum, lngTons: sumOf((x) => x.lng), extTons,
       days, boilers: boilerTotals, combo,

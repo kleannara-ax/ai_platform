@@ -72,30 +72,32 @@ test("11월 계획서와 같은 조건 — 월 합계와 비용", () => {
   }
   const r = calc.computeMonth({
     year: 2026, month: 11, machines: NOV_MACHINES, boilers: BOILERS,
-    settings: Object.assign({ actualUntilDay: 9, adjust: true }, SETTINGS), days, actuals,
+    settings: Object.assign({ actualUntilDay: 9 }, SETTINGS), days, actuals,
   });
   const by = Object.fromEntries(r.boilers.map((b) => [b.code, b]));
 
   near(r.demandTarget, 69585.17, 2, "월 필요 스팀량");           // 시트 M49 (시트 원단위는 소수 자리가 더 길다)
   near(r.actualSum, 19306, 0.5, "1~9일 실적");
-  near(r.totalSteam, r.demandTarget, 0.5, "실적 + 계획 = 월 필요량 (남은 날 보정)");
+  near(r.planSum, r.days.filter((x) => !x.isActual).reduce((s, x) => s + x.demandModel, 0), 1e-6, "남은 날은 계획 그대로");
   assert.equal(r.actualUntilDay, 9);
   // 평소 날: 폐합성 384, 복합 1,704, 유동상 432 를 다 채우고 남는 양만 LNG (사람 계획 190)
   const normal = r.days[15];   // 16일
   assert.equal(Math.round(normal.alloc.WASTE2), 384);
   assert.equal(Math.round(normal.alloc.COMBO), 1704);
   assert.equal(Math.round(normal.alloc.FLUID), 432);
-  near(normal.lng, 190, 10, "평소 날 LNG");
+  // 사람 계획(190)은 남은 날을 월 목표에 맞춰 늘린 값이다. 보정 없이 하루 생산량을 고정하면 120
+  near(normal.lng, 119.9, 1, "평소 날 LNG");
   // 제지2 운휴 날: LNG 없이, 유동상은 최소 운용량, 나머지는 복합
   const down = r.days[13];     // 14일
   assert.equal(down.lng, 0);
   assert.equal(Math.round(down.alloc.FLUID), 300);
-  near(down.alloc.COMBO, 1392, 60, "제지2 운휴 날 복합");
-  // 월 합계가 사람 계획과 1% 안쪽
-  near(by.COMBO.tons, 46978, 470, "복합");
-  near(by.WASTE2.tons, 11472, 1, "폐합성 2호기");
-  near(by.FLUID.tons, 7804, 100, "유동상");
-  near(r.lngTons, 3220, 100, "LNG");
+  near(down.alloc.COMBO, 1315.2, 1, "제지2 운휴 날 복합 (사람 계획 1,392 — 보정 차이)");
+  // 월 합계 — 1~9일 실적이 계획보다 적어 월 합계(68,337)가 필요량(69,586)보다 적다. 남은 날을 늘려 맞추지 않는다.
+  near(r.totalSteam, 68336.8, 1, "실적 + 남은 날 계획");
+  near(by.COMBO.tons, 46705.7, 1, "복합 (사람 계획 46,978)");
+  near(by.WASTE2.tons, 11472, 1, "폐합성 2호기 (사람 계획과 같음)");
+  near(by.FLUID.tons, 7752, 1, "유동상 (사람 계획 7,804)");
+  near(r.lngTons, 2407.1, 1, "LNG (사람 계획 3,220)");
   // 비용: 시트 아래 "3. 소각로 운영비" 블록과 같다
   assert.equal(Math.round(by.WASTE1.cost), 36504000);            // 720 h × 50,700
   assert.equal(Math.round(by.WASTE2.billTons), 10080);           // 14 t/h × 24 × 30 (하루 336톤 상한)
@@ -194,20 +196,19 @@ test("모든 보일러를 최대로 돌려도 모자라면 부족량으로 남�
   assert.equal(Math.round(r.shortageSum), 300 * 30);
 });
 
-test("실적 반영 — 실적이 있는 날은 실적, 남은 날은 월 필요량에 맞춰 보정", () => {
+test("실적 반영 — 실적이 있는 날은 실적, 남은 날은 보정 없이 계획 그대로", () => {
   const actuals = {};
   for (let d = 1; d <= 10; d += 1) actuals[d] = { COMBO: 1500, WASTE2: 380, FLUID: 400, LNG20: 0, LNG50: 0, WASTE1: 0 };
-  const r = flatMonth(2000, { actuals });   // 목표 60,000 / 실적 22,800 → 남은 20일에 37,200
+  const r = flatMonth(2000, { actuals });   // 월 계획 60,000 (하루 2,000) / 실적 10일 22,800
   assert.equal(r.actualUntilDay, 10);
   assert.equal(r.actualSum, 22800);
-  near(r.adjustFactor, 37200 / 40000, 1e-9, "보정 계수");
-  near(r.totalSteam, 60000, 1e-6, "합계");
+  // 남은 20일 = 월 계획 × 20/30 = 40,000 — 실적이 많았다고 줄이지 않는다
+  near(r.planSum, 40000, 1e-6, "남은 날 = 월 계획 × 남은 날/일수");
+  near(r.days[20].demand, 2000, 1e-6, "하루 생산량 고정");
+  near(r.totalSteam, 62800, 1e-6, "합계 = 실적 + 남은 날 계획");
+  near(r.diff, 2800, 1e-6, "필요량과의 차이는 그대로 보여 준다");
   assert.equal(r.days[0].isActual, true);
   assert.equal(r.days[0].alloc.COMBO, 1500);
-  // 보정을 끄면 남은 날은 가동시간 비례 값 그대로
-  const off = flatMonth(2000, { actuals, settings: Object.assign({ adjust: false }, SETTINGS) });
-  assert.equal(off.adjustFactor, 1);
-  near(off.days[20].demand, 2000, 1e-6, "보정 없음");
   // 실적을 쓰지 않도록 고르면 전부 계획
   const ignore = flatMonth(2000, { actuals, settings: Object.assign({ actualUntilDay: 0 }, SETTINGS) });
   assert.equal(ignore.days.filter((x) => x.isActual).length, 0);
