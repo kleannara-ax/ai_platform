@@ -149,7 +149,7 @@ mysql -u {user} -p --default-character-set=utf8mb4 {database} < steam-data-YYYYM
 플랫폼과 다른 모듈이 같이 쓰는 표다. **우리 코드(`STEAM_` 접두)만 건드린다.**
 
 - 상위 메뉴 1건은 `ON DUPLICATE KEY UPDATE` 로 넣는다 (`04_menu_data.sql`).
-- 하위 메뉴 44건은 **자기 코드를 지우고 다시 넣는 "전체 재등록"** 방식이다 (`05_submenus.sql`).
+- 하위 메뉴 45건(그룹 6 + 그룹 안 페이지 38 + 상위 바로 아래 페이지 1)은 **자기 코드를 지우고 다시 넣는 "전체 재등록"** 방식이다 (`05_submenus.sql`).
   `DELETE … WHERE MENU_CODE LIKE 'STEAM_%' AND MENU_CODE <> 'STEAM_ENERGY_MGMT'` 뒤에 `INSERT … SELECT` 를 하므로
   재실행해도 중복되지 않는다. 메뉴 이름·순서를 바꿀 때는 이 파일을 고치지 말고 **새 번호 파일에 UPDATE** 로 넣는다.
 - 역할 권한(`core_role_menu`)도 메뉴와 같이 지우고 같이 넣는다. 메뉴만 지우고 권한을 남기면 고아 행이 생긴다.
@@ -261,7 +261,7 @@ DELETE FROM steam_price
 | `steam_fluidized_detail_month` | 유동상 세부 운영내역 (월별 단가·비용) — 유동상 운영내역 › 세부 운영내역 (unit-fluidized-detail.html) (50개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_fluidized_detail_custom_row` | 유동상 세부 운영내역 (추가 행) — 유동상 운영내역 › 세부 운영내역 — 사용자가 추가한 행 (unit-fluidized-detail.html) (33개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` |
 | `steam_fluidized_daily_log` | 유동상 운전일지 — 유동상 운영내역 › 운전일지 (fluidized-daily-log.html) (75개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
-| `steam_move_plan_month` | 이동계획 월 기준값 — 에너지 회계비용 › 이동계획 수립 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
+| `steam_move_plan_month` | 이동계획 월 기준값 — 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
 | `steam_move_plan_machine` | 이동계획 호기별 생산계획 — 생산량 · 가동시간 · 원단위 직접 입력 (4개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, MACHINE_CODE)` |
 | `steam_move_plan_boiler` | 이동계획 보일러별 기준값 — 배분 여부 · 하루 최대 · 최소 운용량 · 단가 (5개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, BOILER_CODE)` |
 | `steam_move_plan_day` | 이동계획 일자별 운휴 — 생산설비 5개 · 보일러 6개의 운휴시간 (12개 값 컬럼, 2026-11 신규) | `(PLAN_DATE)` |
@@ -1738,7 +1738,7 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 
 ## 이동계획 수립 (2026-11-25 신규)
 
-화면: 에너지 회계비용 › 이동계획 수립 (`energy-move-plan.html`, 메뉴 코드 `STEAM_ENE_MOVE_PLAN`)
+화면: 스팀에너지관리 › 이동계획 수립 (`energy-move-plan.html`, 메뉴 코드 `STEAM_MOVE_PLAN`) — 그룹에 넣지 않고 상위 메뉴 바로 아래, 그룹들 뒤에 둔다
 
 생산계획이 나오면 **호기별 생산량 × 전년 원단위 = 월 필요 스팀량**을 구하고, 그 양을 날짜별로 나눈 뒤
 **폐합성 → 복합 → 유동상 → LNG** 순서로 보일러에 배분해 예상 비용까지 본다. 일별 계획과 월별 요약 두 가지로 본다.
@@ -1860,7 +1860,7 @@ DROP TABLE IF EXISTS steam_equipment;
 
 | 항목 | 값 |
 |------|-----|
-| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹 45페이지 |
+| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹(그룹 안 페이지 38개) + 상위 바로 아래 페이지 1개(이동계획 수립) |
 | 메뉴 URL | `/steam/{page}.html` (SPA 가 iframe 으로 로드) |
 | API Prefix | `/steam-energy-api` |
 | 등록 SQL | `04_menu_data.sql`(상위) + `05_submenus.sql`(하위) |

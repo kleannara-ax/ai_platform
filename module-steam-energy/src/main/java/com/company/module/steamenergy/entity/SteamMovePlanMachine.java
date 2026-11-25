@@ -11,7 +11,7 @@ import java.time.ZoneId;
 /**
  * 이동계획 호기별 생산계획 — 연·월·호기별 한 행. 생산계획 엑셀(생산계획 시트)을 올리거나 화면에서 직접 넣는다.
  *
- * <p>화면: 에너지 회계비용 › 이동계획 수립 (energy-move-plan.html) — 생산계획 영역
+ * <p>화면: 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) — 생산계획 영역
  * <p>Table: steam_move_plan_machine
  * <p>PK: MOVE_PLAN_MACHINE_ID, UNIQUE: (YEAR_NO, MONTH_NO, MACHINE_CODE)
  */

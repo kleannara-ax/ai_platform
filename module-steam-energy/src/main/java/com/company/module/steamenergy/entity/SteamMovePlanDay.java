@@ -12,7 +12,7 @@ import java.time.ZoneId;
 /**
  * 이동계획 일자별 운휴 — 일자별 한 행. 생산설비 운휴시간과 보일러 정비 운휴시간을 날짜별로 고른다 (하루 종일 = 24).
  *
- * <p>화면: 에너지 회계비용 › 이동계획 수립 (energy-move-plan.html) — 일별 계획 표
+ * <p>화면: 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) — 일별 계획 표
  * <p>Table: steam_move_plan_day
  * <p>PK: MOVE_PLAN_DAY_ID, UNIQUE: (PLAN_DATE)
  */

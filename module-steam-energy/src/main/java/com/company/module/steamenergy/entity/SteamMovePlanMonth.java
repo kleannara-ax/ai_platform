@@ -11,7 +11,7 @@ import java.time.ZoneId;
 /**
  * 이동계획 월 기준값 — 연·월별 한 행. 비운 칸은 화면이 기본값(단가 입력·실적에서 구한 값)을 쓴다.
  *
- * <p>화면: 에너지 회계비용 › 이동계획 수립 (energy-move-plan.html) — 기준값 영역
+ * <p>화면: 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) — 기준값 영역
  * <p>Table: steam_move_plan_month
  * <p>PK: MOVE_PLAN_MONTH_ID, UNIQUE: (YEAR_NO, MONTH_NO)
  */
