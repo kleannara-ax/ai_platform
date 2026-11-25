@@ -739,7 +739,7 @@ function renderSidebarMenus() {
     const children = Array.isArray(menu.children) ? menu.children.slice() : [];
     const hasChildren = children.length > 0;
     const groupId = 'grp_' + menu.menuCode + '_' + indexPath.replace(/[^a-zA-Z0-9_]/g, '_');
-    const isOpen = menuGroupState[groupId] === true || ['FIRE_MGMT', 'FIRE_EQUIPMENT_GROUP', 'OTHER_EQUIPMENT_GROUP'].includes(normalizedCode);
+    const isOpen = menuGroupState[groupId] === true;
     const childClass = level > 0 ? ' nav-child' : '';
     const indent = level > 0 ? ` style="padding-left:${24 + level * 20}px"` : '';
     if (hasChildren) {

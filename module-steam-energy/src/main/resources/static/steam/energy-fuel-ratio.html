@@ -673,7 +673,11 @@
       if (!cell) return null;
       const input = cell.firstElementChild;
       if (input && input.classList && input.classList.contains("energy-table-input")) return num(input.value);
-      if (input && input.classList && input.classList.contains("efr-calc")) return num(input.textContent);
+      // 계산칸은 화면 글자(반올림)가 아니라 계산 원값(data-raw)을 읽는다 — 다음 표 계산에 반올림 오차가 번지지 않게
+      if (input && input.classList && input.classList.contains("efr-calc")) {
+        if (input.dataset.raw !== undefined) return input.dataset.raw === "" ? null : num(input.dataset.raw);
+        return num(input.textContent);
+      }
       const text = (cell.textContent || "").trim();
       return text === "—" ? null : num(text);
     }

@@ -596,7 +596,7 @@
       </div>
       <div class="modal-body pt-0 pb-3">
         <div id="hydrantDetailImageZoomStage" class="position-relative mx-auto" style="width:100%; height:min(88vh,1200px); overflow:hidden;">
-          <img id="hydrantDetailImageZoomTarget" alt="확대 이미지" style="width:100%;height:100%;object-fit:contain;display:block;" />
+          <img id="hydrantDetailImageZoomTarget" alt="확대 이미지" draggable="false" style="width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;" />
           <div id="hydrantDetailImageZoomMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;"></div>
         </div>
       </div>
@@ -2538,6 +2538,7 @@ hydZoomStageEl?.addEventListener('wheel', (e) => {
 }, {passive:false});
 hydZoomStageEl?.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
+  e.preventDefault();   // 이미지 끌어다 놓기·글자 선택이 시작되지 않게 — 드래그는 화면 이동에만 쓴다
   hydZoomDrag = true; hydZoomMoved = false;
   hydZoomDragSX = e.clientX; hydZoomDragSY = e.clientY;
   hydZoomDragPX = hydZoomPanX; hydZoomDragPY = hydZoomPanY;
@@ -2558,6 +2559,8 @@ window.addEventListener('mouseup', () => {
   document.body.style.userSelect = '';
 });
 if (hydZoomStageEl) hydZoomStageEl.style.cursor = 'grab';
+// 이미지를 끌면 브라우저가 '이미지 끌어다 놓기'를 시작해 화면 이동이 끊긴다 — 막는다
+hydZoomStageEl?.addEventListener('dragstart', (e) => e.preventDefault());
 hydZoomModalEl?.addEventListener('shown.bs.modal', () => {
   if (hydZoomTargetEl) renderHydZoomMarker(hydZoomTargetEl);
 });
