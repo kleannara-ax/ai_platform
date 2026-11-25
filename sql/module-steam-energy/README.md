@@ -13,6 +13,7 @@
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
 | 5 | `05_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
 | 6 | `06_roles.sql` | 스팀 전용 역할 3종을 공통코드 ROLE 그룹에 등록 |
+| 7 | `07_operation_optimization.sql` | 운영 최적화 표 4개 + 메뉴 `STEAM_MOVE_PLAN` + 역할 권한 (2026-11-25). 01 · 05 에 이미 있는 내용이라 새 DB 에서는 바뀌는 것이 없고, 이미 설치된 DB 에는 이것만 실행해도 된다 |
 
 ```bash
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 01_schema.sql
@@ -20,6 +21,7 @@ mysql -u {user} -p --default-character-set=utf8mb4 {database} < 03_seed_data.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 04_menu_data.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 05_submenus.sql
 mysql -u {user} -p --default-character-set=utf8mb4 {database} < 06_roles.sql
+mysql -u {user} -p --default-character-set=utf8mb4 {database} < 07_operation_optimization.sql
 ```
 
 표를 만들고(01) 데이터를 넣고(03), 메뉴·권한(04~06)을 등록하는 순서다.
@@ -29,13 +31,8 @@ mysql -u {user} -p --default-character-set=utf8mb4 {database} < 06_roles.sql
 
 ### 이미 설치된 DB 에 운영 최적화만 더할 때 (2026-11-25)
 
-`migration/2026-11-25_operation_optimization.sql` 하나만 실행한다. 표 4개(`steam_move_plan_*`)와
-메뉴 `STEAM_MOVE_PLAN`(스팀에너지관리 › 운영 최적화) · 역할 권한 6개를 넣는다. 다른 스팀 메뉴는 건드리지 않으며
-여러 번 실행해도 된다 (`IF NOT EXISTS` · `NOT EXISTS`). 새로 설치하는 DB 는 01 ~ 06 에 이미 들어 있어 필요 없다.
-
-```bash
-mysql -u {user} -p --default-character-set=utf8mb4 {database} < migration/2026-11-25_operation_optimization.sql
-```
+`07_operation_optimization.sql` 만 실행해도 된다. 01 ~ 07 모두 다시 실행해도 안전하므로 헷갈리면 순서대로 전부 실행한다.
+(단, `05_submenus.sql` 은 스팀 하위 메뉴를 지우고 다시 넣는다 — 서버에서 스팀 메뉴를 직접 고친 적이 있으면 07 만 실행한다.)
 
 ### 옛 셀 저장소를 쓰던 DB 를 옮길 때 (개발서버 등)
 
