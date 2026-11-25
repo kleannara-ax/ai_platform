@@ -532,8 +532,10 @@
         // 우리 사정 운휴로 고른 칸 — 시간 칸으로 보여 준다 (누르면 해제, 숫자를 치면 그 시간만)
         const manual = num(row[b.idle]);
         if (manual !== null && manual > 0 && status !== "maint") {
-          const ran = value > 0.05 ? ` — 나머지 시간에 ${fmt0(value)}톤` : "";
-          cells.push(hoursCell(x.day, b.idle, manual, "idle", `${b.label} 우리 사정 운휴시간 (고정비 발생)${ran}`));
+          // 일부 시간만 세우면 나머지 시간에 보낸 양을 옆에 같이 보여 준다
+          const ran = value > 0.05 ? ` — 나머지 ${fmt0(24 - manual)}시간에 ${fmt0(value)}톤` : "";
+          const cell = hoursCell(x.day, b.idle, manual, "idle", `${b.label} 우리 사정 운휴 ${fmt0(manual)}시간 (고정비 발생)${ran}`);
+          cells.push(value > 0.05 ? cell.replace(/<\/td>$/, `<span class="mp-idle-tons">${fmt0(value)}</span></td>`) : cell);
           return;
         }
         let text = value > 0.05 ? fmt0(value) : "";
