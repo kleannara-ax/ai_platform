@@ -427,15 +427,17 @@
         <td class="computed" title="${year - 1}년 ${month}월 종합 원단위 (기타 스팀량 포함)">${lastYearText}${tag}</td>
         <td${needInput ? ' class="mp-need-cell"' : ""}>${input("machine", m.code, "unitOverride", plain(r.unitOverride), needInput ? "입력 필요" : lastYearText)}</td>
         <td class="computed mp-strong">${m.steamTon === null ? "" : fmt0(m.steamTon)}</td>
+        <td class="computed" title="필요 스팀량 ÷ ${m.planHours ? "계획 가동시간" : "한 달 시간(가동시간 미입력)"} × 24 — 일별 계획의 가동한 날 스팀량">${m.dailyTon === null ? "" : fmt0(m.dailyTon)}</td>
       </tr>`;
     });
     const production = result.machines.reduce((s, m) => s + (m.productionTon || 0), 0);
     rows.push(`<tr class="summary-row"><th>합계</th><td>${production ? fmt0(production) : ""}</td><td></td><td></td>
       <td>${result.demandTarget !== null && production ? fmtN(result.demandTarget / production, 4) : ""}</td><td></td>
-      <td>${result.demandTarget === null ? "" : fmt0(result.demandTarget)}</td></tr>`);
+      <td>${result.demandTarget === null ? "" : fmt0(result.demandTarget)}</td>
+      <td>${result.demandTarget === null ? "" : fmt0(result.machines.reduce((s, m) => s + (m.dailyTon || 0), 0))}</td></tr>`);
     $("mpMachineTable").innerHTML = `<thead><tr>
       <th>호기</th><th>생산량(톤)</th><th>계획 가동시간(Hr)</th><th>운휴 반영<br>가동시간(Hr)</th>
-      <th>${year - 1}년 ${month}월<br>원단위</th><th>원단위<br>직접 입력</th><th>필요 스팀량(톤)</th>
+      <th>${year - 1}년 ${month}월<br>원단위</th><th>원단위<br>직접 입력</th><th>필요 스팀량(톤)</th><th>하루 예상<br>스팀량(톤)</th>
     </tr></thead><tbody>${rows.join("")}</tbody>`;
 
   }

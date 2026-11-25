@@ -95,10 +95,16 @@
       const steamTon = productionTon !== null && unit !== null ? productionTon * unit : null;
       let runHours = 0;
       for (let d = 1; d <= dim; d += 1) runHours += 24 - clampHours((dayInput[d] || {})[m.down]);
+      // 시간당 스팀량은 생산계획의 예상 가동시간으로 고정한다 (하루 예상 생산량 = 생산량 ÷ 가동시간 × 24).
+      // 일별 표에서 운휴를 더 골라도 남은 날에 몰아 주지 않고 그 날 몫만 빠진다. 가동시간이 없으면 한 달 내내 가동으로 본다.
+      const planHours = num(src.runtimeHours);
+      const basisHours = planHours !== null && planHours > 0 ? planHours : dim * 24;
       return {
         code: m.code, label: m.label, productionTon, unit, steamTon,
-        planHours: num(src.runtimeHours), runHours,
-        ratePerHour: steamTon !== null && runHours > 0 ? steamTon / runHours : 0,
+        planHours, runHours, basisHours,
+        ratePerHour: steamTon !== null ? steamTon / basisHours : 0,
+        dailyTon: steamTon !== null ? (steamTon / basisHours) * 24 : null,   // 하루(24시간) 예상 스팀량
+        planSteamTon: steamTon !== null ? (steamTon / basisHours) * runHours : null,   // 일별 표 운휴를 반영한 월 스팀량
         unplaced: steamTon !== null && steamTon > 0 && runHours <= 0,   // 한 달 내내 운휴로 골라 넣을 날이 없다
       };
     });

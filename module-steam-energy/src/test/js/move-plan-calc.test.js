@@ -40,10 +40,11 @@ const SETTINGS = {
 };
 const NOV_MACHINES = {
   "PM-2": { productionTon: 4349, runtimeHours: 333, unit: 2.21 },
-  "PM-3": { productionTon: 26990, runtimeHours: 675, unit: 1.9307 },
-  "TM-3": { productionTon: 656, runtimeHours: 305, unit: 2.3076 },
-  "TM-4": { productionTon: 914, runtimeHours: 401, unit: 2.5072 },
-  "TM-5": { productionTon: 2401, runtimeHours: 700, unit: 1.691 },
+  // 제지3·화장지는 계획서에 운휴일 표시가 없어 가동시간을 비운다 (한 달 내내 가동으로 본다)
+  "PM-3": { productionTon: 26990, unit: 1.9307 },
+  "TM-3": { productionTon: 656, unit: 2.3076 },
+  "TM-4": { productionTon: 914, unit: 2.5072 },
+  "TM-5": { productionTon: 2401, unit: 1.691 },
 };
 
 /** 하루 필요량이 정확히 demand 가 되는 한 달 (2026년 6월, 30일) — 제지3 한 호기만 */
@@ -85,19 +86,19 @@ test("11월 계획서와 같은 조건 — 월 합계와 비용", () => {
   assert.equal(Math.round(normal.alloc.WASTE2), 384);
   assert.equal(Math.round(normal.alloc.COMBO), 1704);
   assert.equal(Math.round(normal.alloc.FLUID), 432);
-  // 사람 계획(190)은 남은 날을 월 목표에 맞춰 늘린 값이다. 보정 없이 하루 생산량을 고정하면 120
-  near(normal.lng, 119.9, 1, "평소 날 LNG");
+  // 하루 예상 생산량 고정 (제지2 = 생산량 ÷ 계획 가동 333시간 × 24). 사람 계획 190
+  near(normal.lng, 171.9, 1, "평소 날 LNG");
   // 제지2 운휴 날: LNG 없이, 유동상은 최소 운용량, 나머지는 복합
   const down = r.days[13];     // 14일
   assert.equal(down.lng, 0);
   assert.equal(Math.round(down.alloc.FLUID), 300);
   near(down.alloc.COMBO, 1315.2, 1, "제지2 운휴 날 복합 (사람 계획 1,392 — 보정 차이)");
-  // 월 합계 — 1~9일 실적이 계획보다 적어 월 합계(68,337)가 필요량(69,586)보다 적다. 남은 날을 늘려 맞추지 않는다.
-  near(r.totalSteam, 68336.8, 1, "실적 + 남은 날 계획");
+  // 월 합계 — 1~9일 실적이 계획보다 적어 필요량(69,586)보다 적다. 남은 날을 늘려 맞추지 않는다.
+  near(r.totalSteam, 68908.3, 1, "실적 + 남은 날 계획");
   near(by.COMBO.tons, 46705.7, 1, "복합 (사람 계획 46,978)");
   near(by.WASTE2.tons, 11472, 1, "폐합성 2호기 (사람 계획과 같음)");
   near(by.FLUID.tons, 7752, 1, "유동상 (사람 계획 7,804)");
-  near(r.lngTons, 2407.1, 1, "LNG (사람 계획 3,220)");
+  near(r.lngTons, 2978.6, 1, "LNG (사람 계획 3,220)");
   // 비용: 시트 아래 "3. 소각로 운영비" 블록과 같다
   assert.equal(Math.round(by.WASTE1.cost), 36504000);            // 720 h × 50,700
   assert.equal(Math.round(by.WASTE2.billTons), 10080);           // 14 t/h × 24 × 30 (하루 336톤 상한)
@@ -218,18 +219,29 @@ test("실적 반영 — 실적이 있는 날은 실적, 남은 날은 보정 없
   assert.equal(warmup.days[0].fluidRunHours, 22);
 });
 
-test("설비 운휴 — 그 호기의 스팀량을 가동한 날에 몰아 준다 (월 합계는 그대로)", () => {
+test("설비 운휴 — 하루 예상 생산량은 고정, 운휴를 고른 날은 그 몫만 빠진다", () => {
   const days = {};
   for (let d = 1; d <= 15; d += 1) days[d] = { downPm2: 24 };
   const r = calc.computeMonth({
     year: 2026, month: 6,
-    machines: { "PM-2": { productionTon: 3000, unit: 2 }, "PM-3": { productionTon: 30000, unit: 2 } },
+    machines: { "PM-2": { productionTon: 3000, runtimeHours: 360, unit: 2 }, "PM-3": { productionTon: 30000, unit: 2 } },
     boilers: BOILERS, settings: SETTINGS, days, actuals: {},
   });
+  // 제지2: 6,000톤 ÷ 계획 가동 360시간 × 24 = 하루 400톤
+  near(r.machines[0].dailyTon, 400, 1e-9, "제지2 하루 예상");
   near(r.days[0].demand, 2000, 1e-6, "제지2 운휴 날");            // 제지3 60,000 / 30
-  near(r.days[20].demand, 2000 + 6000 / 15, 1e-6, "제지2 가동 날");
-  near(r.totalSteam, 66000, 1e-6, "월 합계");
+  near(r.days[20].demand, 2400, 1e-6, "제지2 가동 날");
+  near(r.totalSteam, 66000, 1e-6, "운휴일이 계획 가동시간과 맞으면 월 합계 = 필요량");
   assert.equal(r.machines[0].runHours, 15 * 24);
+  // 운휴를 하루 더 고르면 그 날 400톤만 빠진다 (다른 날로 옮기지 않는다)
+  const more = Object.assign({}, days, { 16: { downPm2: 24 } });
+  const r2 = calc.computeMonth({
+    year: 2026, month: 6,
+    machines: { "PM-2": { productionTon: 3000, runtimeHours: 360, unit: 2 }, "PM-3": { productionTon: 30000, unit: 2 } },
+    boilers: BOILERS, settings: SETTINGS, days: more, actuals: {},
+  });
+  near(r2.days[20].demand, 2400, 1e-6, "다른 날은 그대로");
+  near(r2.totalSteam, 65600, 1e-6, "월 합계가 하루 몫만큼 준다");
   // 한 달 내내 운휴로 고르면 넣을 날이 없다고 알려 준다
   const all = {};
   for (let d = 1; d <= 30; d += 1) all[d] = { downPm2: 24 };
