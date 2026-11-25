@@ -264,7 +264,7 @@ DELETE FROM steam_price
 | `steam_move_plan_month` | 이동계획 월 기준값 — 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
 | `steam_move_plan_machine` | 이동계획 호기별 생산계획 — 생산량 · 가동시간 · 원단위 직접 입력 (4개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, MACHINE_CODE)` |
 | `steam_move_plan_boiler` | 이동계획 보일러별 기준값 — 배분 여부 · 하루 최대 · 최소 운용량 · 단가 (5개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, BOILER_CODE)` |
-| `steam_move_plan_day` | 이동계획 일자별 운휴 — 생산설비 5개 · 보일러 6개의 운휴시간 (12개 값 컬럼, 2026-11 신규) | `(PLAN_DATE)` |
+| `steam_move_plan_day` | 이동계획 일자별 운휴 — 생산설비 5개 운휴 · 보일러 6개 정비 · 보일러 6개 우리 사정 운휴시간 (18개 값 컬럼, 2026-11 신규) | `(PLAN_DATE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1760,6 +1760,7 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 | 실적 반영 | 스팀생산실적이 있는 날은 실적을 그대로 쓴다 (기본: 실적이 있는 마지막 날까지). 남은 날은 `(월 필요 스팀량 − 실적 누계)` 에 맞춰 같은 비율로 보정한다 (끌 수 있다) |
 | 배분 | 그 날 쓸 수 있는 보일러(정비 아님)에 ① 하루 최소 운용량을 먼저 주고 ② 남은 양을 순서대로 하루 최대까지 채운다. 최소 운용량의 합이 필요량보다 크면 **뒤 순서 보일러부터 세운다** (우리 사정 운휴). 다 채우고도 남으면 "부족" |
 | 보일러 정비 | 정비로 고른 시간만큼 그 날 하루 최대 · 최소가 줄어든다. 정비 시간에는 고정비가 없다 |
+| 우리 사정 운휴 (수동) | 일별 표의 보일러 T/D 칸을 누르면 그 날 24시간(숫자를 치면 그 시간) 우리 사정 운휴가 된다. 그 시간만큼 하루 최대 · 최소가 줄고, 남는 양은 다음 순서 보일러가 받는다. 폐합성 · 유동상은 그 시간만큼 운휴 고정비가 나간다. 복합은 시간당 고정비가 없고 보증량도 줄이지 않는다(정비와 다름). 같은 날 정비를 고르면 정비가 먼저다 |
 | 운휴 고정비 | 폐합성 1 · 2호기와 유동상. 정비가 아닌데 스팀을 받지 않은 시간(우리 사정) × 운휴시간당 고정비. 폐합성 1호기는 배분하지 않아도 매일 24시간 나간다 (도급내역 화면의 기본 24시간과 같다). 실적일에 도급내역의 운휴시간이 적혀 있으면 그 값을 쓴다 |
 | 폐합성 2호기 스팀비 | `Σ min(일 스팀량, 정산 상한 336) × 스팀단가` — 도급내역 화면의 결산 기준과 같다 |
 | 복합보일러 | `BSC 적용단가 × 보증량 + ASC 적용단가 × (스팀량 − 보증량, 0 이상)`. 보증량에 못 미쳐도 보증량만큼 낸다. 정비로 세운 시간만큼 보증량을 줄인다 |
@@ -1798,6 +1799,7 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 | ③ 일별 계획 | `steam_move_plan_day` | `PLAN_DATE` | DATE | 키 (일자) |
 | | | `DOWN_PM2` `DOWN_PM3` `DOWN_TM3` `DOWN_TM4` `DOWN_TM5` | DECIMAL(6,2) | 생산설비 운휴시간 (0~24) |
 | | | `STOP_WASTE1` `STOP_WASTE2` `STOP_COMBO` `STOP_FLUID` `STOP_LNG20` `STOP_LNG50` | DECIMAL(6,2) | 보일러 정비 운휴시간 (0~24) |
+| | | `IDLE_WASTE1` `IDLE_WASTE2` `IDLE_COMBO` `IDLE_FLUID` `IDLE_LNG20` `IDLE_LNG50` | DECIMAL(6,2) | 보일러 우리 사정 운휴시간 (0~24) — 2026-11-25 추가, `01_schema.sql` 의 `ALTER TABLE … ADD COLUMN IF NOT EXISTS` 로 이미 만든 표에도 붙는다 |
 | | | `NOTE` | VARCHAR(500) | 비고 |
 
 ### API
@@ -2003,6 +2005,6 @@ DROP TABLE IF EXISTS steam_equipment;
 | `steam_move_plan_month` | 21 | [module-steam-energy] 이동계획 월 기준값 |
 | `steam_move_plan_machine` | 15 | [module-steam-energy] 이동계획 호기별 생산계획 |
 | `steam_move_plan_boiler` | 16 | [module-steam-energy] 이동계획 보일러별 기준값 |
-| `steam_move_plan_day` | 21 | [module-steam-energy] 이동계획 일자별 운휴 |
+| `steam_move_plan_day` | 27 | [module-steam-energy] 이동계획 일자별 운휴 |
 
 4-1 매핑표와 DDL 컬럼 일치: 매핑표의 컬럼 행과 `01_schema.sql` 의 DDL 은 같은 명세에서 만들었고(전환 절마다 표 수 · 값 컬럼 수 기재), 이관 SQL 을 로컬 DB 에 적용해 옛 셀의 건수 · 합계와 대조했다.

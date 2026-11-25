@@ -26,16 +26,16 @@
 
   /**
    * 보일러 — 배열 순서가 배분 순서다 (앞에서부터 채운다).
-   * stop: 일자별 보일러 정비 운휴시간 필드, actual: 스팀생산실적(combo-daily-productions) 필드,
+   * stop: 일자별 보일러 정비 운휴시간 필드, idle: 일자별 우리 사정 운휴시간 필드(수동), actual: 스팀생산실적(combo-daily-productions) 필드,
    * idleFee: 우리 사정으로 세우면 운휴시간당 고정비가 나가는 보일러
    */
   const BOILERS = [
-    { code: "WASTE1", label: "폐합성 1호기", short: "폐합성1", stop: "stopWaste1", actual: "wasteSteam1", idleFee: true },
-    { code: "WASTE2", label: "폐합성 2호기", short: "폐합성2", stop: "stopWaste2", actual: "wasteSteam2", idleFee: true },
-    { code: "COMBO", label: "복합보일러", short: "복합", stop: "stopCombo", actual: "comboSteam", idleFee: false },
-    { code: "FLUID", label: "유동상", short: "유동상", stop: "stopFluid", actual: "fluidizedSteam", idleFee: true },
-    { code: "LNG20", label: "LNG 20톤(#2)", short: "LNG 20톤", stop: "stopLng20", actual: "kn20", idleFee: false, lng: true },
-    { code: "LNG50", label: "LNG 50톤(#3)", short: "LNG 50톤", stop: "stopLng50", actual: "kn50", idleFee: false, lng: true },
+    { code: "WASTE1", label: "폐합성 1호기", short: "폐합성1", stop: "stopWaste1", idle: "idleWaste1", actual: "wasteSteam1", idleFee: true },
+    { code: "WASTE2", label: "폐합성 2호기", short: "폐합성2", stop: "stopWaste2", idle: "idleWaste2", actual: "wasteSteam2", idleFee: true },
+    { code: "COMBO", label: "복합보일러", short: "복합", stop: "stopCombo", idle: "idleCombo", actual: "comboSteam", idleFee: false },
+    { code: "FLUID", label: "유동상", short: "유동상", stop: "stopFluid", idle: "idleFluid", actual: "fluidizedSteam", idleFee: true },
+    { code: "LNG20", label: "LNG 20톤(#2)", short: "LNG 20톤", stop: "stopLng20", idle: "idleLng20", actual: "kn20", idleFee: false, lng: true },
+    { code: "LNG50", label: "LNG 50톤(#3)", short: "LNG 50톤", stop: "stopLng50", idle: "idleLng50", actual: "kn50", idleFee: false, lng: true },
   ];
 
   const EPS = 1e-6;
@@ -74,7 +74,7 @@
    *   boilers:  { WASTE1: { use, maxTonDay, minTonDay, steamUnitPrice, idleHourPrice }, … },
    *   settings: { actualUntilDay, adjust, waste2BillCapTon, comboGuaranteeTon, comboBscPrice, comboAscPrice,
    *               fluidBillTonHour, fluidImprovementCost, lngM3PerTon, lngUnitPrice },
-   *   days:     { 1: { downPm2, …, stopWaste1, … }, … },                    // 시간(0~24)
+   *   days:     { 1: { downPm2, …, stopWaste1, …, idleWaste1, … }, … },     // 시간(0~24). idle* = 우리 사정 운휴(수동)
    *   actuals:  { 1: { WASTE1, WASTE2, COMBO, FLUID, LNG20, LNG50, EXT, fluidRunHours,          // 톤, 없으면 null
    *                    idleHours: { WASTE1, WASTE2, FLUID } }, … }                              // 도급내역에 적힌 운휴시간
    * }
@@ -179,12 +179,18 @@
       const alloc = {};
       const status = {};
       const idleHours = {};
-      const availHours = {};
+      const availHours = {};   // 정비를 뺀 시간
+      const manualIdle = {};   // 일별 표에서 고른 우리 사정 운휴시간
+      const runHours = {};     // 정비·우리 사정 운휴를 뺀, 배분에 쓰는 시간
       let demand;
       let shortage = 0;
       let ext = 0;
 
-      for (const b of boilers) availHours[b.code] = 24 - clampHours(row[b.stop]);
+      for (const b of boilers) {
+        availHours[b.code] = 24 - clampHours(row[b.stop]);
+        manualIdle[b.code] = Math.min(clampHours(row[b.idle]), availHours[b.code]);
+        runHours[b.code] = availHours[b.code] - manualIdle[b.code];
+      }
 
       if (actual) {
         const a = actualInput[d] || {};
@@ -196,8 +202,8 @@
         const on = [];
         for (const b of boilers) {
           alloc[b.code] = 0;
-          if (!b.use || availHours[b.code] <= 0) continue;
-          const frac = availHours[b.code] / 24;
+          if (!b.use || runHours[b.code] <= 0) continue;
+          const frac = runHours[b.code] / 24;
           const cap = b.maxTonDay * frac;
           on.push({ code: b.code, cap, min: Math.min(b.minTonDay * frac, cap) });
         }
@@ -230,20 +236,23 @@
       // 유동상 정산 가동시간: 실적일에 가동시간 실적이 있으면 그 값, 아니면 돌린 날의 가용시간
       const actualFluidHours = actual ? num((actualInput[d] || {}).fluidRunHours) : null;
       const fluidRunHours = actualFluidHours !== null
-        ? Math.min(24, Math.max(0, actualFluidHours)) : (alloc.FLUID > EPS ? availHours.FLUID : 0);
+        ? Math.min(24, Math.max(0, actualFluidHours)) : (alloc.FLUID > EPS ? runHours.FLUID : 0);
 
       const recordedIdle = actual ? ((actualInput[d] || {}).idleHours || {}) : {};
       const idleRecorded = {};
       for (const b of boilers) {
         // 스팀을 보내지 않았어도 보일러를 돌린 시간(유동상 가동시간 실적)은 운휴가 아니다.
         const ranHours = b.code === "FLUID" ? fluidRunHours : 0;
-        let idle = b.idleFee && alloc[b.code] <= EPS ? Math.max(0, availHours[b.code] - ranHours) : 0;
+        // 고른 우리 사정 운휴시간 + 스팀을 받지 않은 나머지 시간
+        const auto = b.idleFee && alloc[b.code] <= EPS ? Math.max(0, runHours[b.code] - ranHours) : 0;
+        let idle = b.idleFee ? manualIdle[b.code] + auto : 0;
         // 실적일: 도급내역에 운휴시간이 적혀 있으면 그 값이 실제 정산이다. 이 화면에서 정비로 고른 시간은 그래도 뺀다.
         const recorded = b.idleFee ? num(recordedIdle[b.code]) : null;
         idleRecorded[b.code] = recorded !== null;
         if (recorded !== null) idle = Math.min(Math.max(0, recorded), availHours[b.code]);
         if (alloc[b.code] > EPS) status[b.code] = "run";
         else if (availHours[b.code] <= 0) status[b.code] = "maint";        // 보일러 정비 — 고정비 없음
+        else if (manualIdle[b.code] >= availHours[b.code] - EPS) status[b.code] = "idle";   // 일별 표에서 고른 우리 사정 운휴
         else if (idle > EPS) status[b.code] = b.use ? "idle" : "unused";   // 우리 사정 운휴 · 미가동 — 고정비 발생
         else status[b.code] = "off";
         idleHours[b.code] = idle;
@@ -253,7 +262,7 @@
       if (noPlan) {
         for (const b of boilers) {
           idleHours[b.code] = 0;
-          status[b.code] = availHours[b.code] <= 0 ? "maint" : "off";
+          status[b.code] = availHours[b.code] <= 0 ? "maint" : manualIdle[b.code] > EPS ? "idle" : "off";
         }
       }
 
@@ -262,7 +271,7 @@
       for (const m of machines) scaled[m.code] = machineDemand[d][m.code] * (actual ? 1 : adjustFactor);
       days.push({
         day: d, isActual: actual, noPlan, demandModel: modelDemand[d], demand, machineDemand: scaled,
-        alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, fluidRunHours,
+        alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, manualIdle, runHours, fluidRunHours,
         lng: alloc.LNG20 + alloc.LNG50,
         waste2BillTon: waste2Cap !== null ? Math.min(alloc.WASTE2, waste2Cap) : alloc.WASTE2,
       });

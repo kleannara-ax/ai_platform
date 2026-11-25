@@ -66,6 +66,30 @@ public class SteamMovePlanDay {
     @Column(name = "STOP_LNG50", precision = 6, scale = 2)
     private BigDecimal stopLng50;
 
+    /** 폐합성 1호기 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_WASTE1", precision = 6, scale = 2)
+    private BigDecimal idleWaste1;
+
+    /** 폐합성 2호기 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_WASTE2", precision = 6, scale = 2)
+    private BigDecimal idleWaste2;
+
+    /** 복합보일러 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_COMBO", precision = 6, scale = 2)
+    private BigDecimal idleCombo;
+
+    /** 유동상 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_FLUID", precision = 6, scale = 2)
+    private BigDecimal idleFluid;
+
+    /** LNG 20톤(#2) 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_LNG20", precision = 6, scale = 2)
+    private BigDecimal idleLng20;
+
+    /** LNG 50톤(#3) 우리 사정 운휴시간(0~24) — 고정비 발생 */
+    @Column(name = "IDLE_LNG50", precision = 6, scale = 2)
+    private BigDecimal idleLng50;
+
     @Column(name = "NOTE", length = 500)
     private String note;
 
@@ -104,7 +128,7 @@ public class SteamMovePlanDay {
     }
 
     /** 행 전체 값 갱신. null 은 빈 값으로 저장한다. */
-    public void update(BigDecimal downPm2, BigDecimal downPm3, BigDecimal downTm3, BigDecimal downTm4, BigDecimal downTm5, BigDecimal stopWaste1, BigDecimal stopWaste2, BigDecimal stopCombo, BigDecimal stopFluid, BigDecimal stopLng20, BigDecimal stopLng50, String note, Long updatedBy) {
+    public void update(BigDecimal downPm2, BigDecimal downPm3, BigDecimal downTm3, BigDecimal downTm4, BigDecimal downTm5, BigDecimal stopWaste1, BigDecimal stopWaste2, BigDecimal stopCombo, BigDecimal stopFluid, BigDecimal stopLng20, BigDecimal stopLng50, BigDecimal idleWaste1, BigDecimal idleWaste2, BigDecimal idleCombo, BigDecimal idleFluid, BigDecimal idleLng20, BigDecimal idleLng50, String note, Long updatedBy) {
         this.downPm2 = downPm2;
         this.downPm3 = downPm3;
         this.downTm3 = downTm3;
@@ -116,13 +140,19 @@ public class SteamMovePlanDay {
         this.stopFluid = stopFluid;
         this.stopLng20 = stopLng20;
         this.stopLng50 = stopLng50;
+        this.idleWaste1 = idleWaste1;
+        this.idleWaste2 = idleWaste2;
+        this.idleCombo = idleCombo;
+        this.idleFluid = idleFluid;
+        this.idleLng20 = idleLng20;
+        this.idleLng50 = idleLng50;
         this.note = note;
         this.updatedBy = updatedBy;
     }
 
     /** 값만 비운다 — 일괄 저장에서 목록에 없는 행. */
     public void clearValues(Long updatedBy) {
-        update(null, null, null, null, null, null, null, null, null, null, null, null, updatedBy);
+        update(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, updatedBy);
     }
 
     public void delete(Long deletedBy) {

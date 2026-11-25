@@ -53,6 +53,24 @@ public class SteamMovePlanDaySaveRequest {
     @DecimalMin(value = "0", message = "stopLng50 은(는) 0 이상이어야 합니다.")
     @DecimalMax(value = "24", message = "stopLng50 은(는) 24 이하여야 합니다.")
     private BigDecimal stopLng50;
+    @DecimalMin(value = "0", message = "idleWaste1 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleWaste1 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleWaste1;
+    @DecimalMin(value = "0", message = "idleWaste2 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleWaste2 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleWaste2;
+    @DecimalMin(value = "0", message = "idleCombo 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleCombo 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleCombo;
+    @DecimalMin(value = "0", message = "idleFluid 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleFluid 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleFluid;
+    @DecimalMin(value = "0", message = "idleLng20 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleLng20 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleLng20;
+    @DecimalMin(value = "0", message = "idleLng50 은(는) 0 이상이어야 합니다.")
+    @DecimalMax(value = "24", message = "idleLng50 은(는) 24 이하여야 합니다.")
+    private BigDecimal idleLng50;
     @Size(max = 500)
     private String note;
 }

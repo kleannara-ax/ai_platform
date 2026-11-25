@@ -29,6 +29,12 @@ public class SteamMovePlanDayResponse {
     private BigDecimal stopFluid;
     private BigDecimal stopLng20;
     private BigDecimal stopLng50;
+    private BigDecimal idleWaste1;
+    private BigDecimal idleWaste2;
+    private BigDecimal idleCombo;
+    private BigDecimal idleFluid;
+    private BigDecimal idleLng20;
+    private BigDecimal idleLng50;
     private String note;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -53,6 +59,12 @@ public class SteamMovePlanDayResponse {
                 .stopFluid(e.getStopFluid())
                 .stopLng20(e.getStopLng20())
                 .stopLng50(e.getStopLng50())
+                .idleWaste1(e.getIdleWaste1())
+                .idleWaste2(e.getIdleWaste2())
+                .idleCombo(e.getIdleCombo())
+                .idleFluid(e.getIdleFluid())
+                .idleLng20(e.getIdleLng20())
+                .idleLng50(e.getIdleLng50())
                 .note(e.getNote())
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())

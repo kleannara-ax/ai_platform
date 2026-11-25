@@ -38,7 +38,7 @@
   const IDLE_PRICE_CODE = { WASTE1: "waste1_fixed_hr", WASTE2: "waste2_fixed_hr", FLUID: "fluid_fixed_hr" };
   /** 일별 계획 표에 보이는 보일러 — 폐합성 1호기는 쓰지 않아 숨긴다 (계산·보일러 기준값·비용 표에는 남는다) */
   const SHOWN_BOILERS = BOILERS.filter((b) => b.code !== "WASTE1");
-  const DAY_FIELDS = MACHINES.map((m) => m.down).concat(BOILERS.map((b) => b.stop));
+  const DAY_FIELDS = MACHINES.map((m) => m.down).concat(BOILERS.map((b) => b.stop), BOILERS.map((b) => b.idle));
   const MONTH_FIELDS = ["actualUntilDay", "adjustYn", "waste2BillCapTon", "comboGuaranteeTon", "comboBscPrice", "comboAscPrice",
     "fluidBillTonHour", "fluidImprovementCost", "lngM3PerTon", "lngUnitPrice", "note"];
 
@@ -529,6 +529,13 @@
         cells.push(hoursCell(x.day, b.stop, row[b.stop], "maint", `${b.label} 정비 운휴시간`));
         const status = x.status[b.code];
         const value = x.alloc[b.code];
+        // 우리 사정 운휴로 고른 칸 — 시간 칸으로 보여 준다 (누르면 해제, 숫자를 치면 그 시간만)
+        const manual = num(row[b.idle]);
+        if (manual !== null && manual > 0 && status !== "maint") {
+          const ran = value > 0.05 ? ` — 나머지 시간에 ${fmt0(value)}톤` : "";
+          cells.push(hoursCell(x.day, b.idle, manual, "idle", `${b.label} 우리 사정 운휴시간 (고정비 발생)${ran}`));
+          return;
+        }
         let text = value > 0.05 ? fmt0(value) : "";
         let cls = "computed mp-num";
         let title = "";
@@ -537,7 +544,14 @@
         else if (status === "idle") { text = "운휴"; cls += " mp-cell-idle"; title = `우리 사정 운휴 ${fmt0(x.idleHours[b.code])}시간 — 고정비 발생${recorded}`; }
         else if (status === "unused") { text = "미가동"; cls += " mp-cell-unused"; title = `배분하지 않는 보일러 — 운휴 ${fmt0(x.idleHours[b.code])}시간 고정비 발생${recorded}`; }
         else if (b.lng && value > 0.05) { cls += " mp-cell-lng"; title = "LNG 보일러 가동"; }
-        cells.push(`<td class="${cls}" title="${esc(title)}">${text}</td>`);
+        // 정비가 아닌 칸은 누르면 우리 사정 운휴(24시간)로 바뀐다
+        if (status !== "maint" && !x.noPlan) {
+          cls += " mp-idle-pick";
+          title = (title ? title + " · " : "") + "누르면 우리 사정 운휴(24시간)";
+          cells.push(`<td class="${cls}" data-day="${x.day}" data-field="${b.idle}" title="${esc(title)}">${text}</td>`);
+        } else {
+          cells.push(`<td class="${cls}" title="${esc(title)}">${text}</td>`);
+        }
       });
       if (showExt) cells.push(`<td class="computed mp-num">${x.ext > 0.05 ? fmt0(x.ext) : ""}</td>`);
       cells.push(`<td class="computed mp-num mp-strong">${x.noPlan ? "" : fmt0(x.total)}</td>`);
@@ -717,6 +731,16 @@
     });
     // 운휴 칸: 누르면 24시간 ↔ 해제. 눌러서 24 가 된 칸은 글자가 선택돼 있어 숫자를 치면 그 시간으로 바뀐다.
     $("mpDayTable").addEventListener("mousedown", (event) => {
+      // 보일러 T/D 칸: 누르면 우리 사정 운휴 24시간
+      const pick = event.target instanceof Element ? event.target.closest(".mp-idle-pick") : null;
+      if (pick) {
+        event.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement && active.classList.contains("mp-hours")) active.blur();
+        const day = Number(pick.dataset.day);
+        saveDay(day, pick.dataset.field, 24, `${day}-${pick.dataset.field}`);
+        return;
+      }
       const cell = event.target instanceof Element ? event.target.closest(".mp-hours-cell") : null;
       if (!cell) return;
       const el = cell.querySelector(".mp-hours");

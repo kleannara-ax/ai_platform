@@ -104,6 +104,11 @@ body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody t
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-cell:hover { background:#f1f7fb; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-down.is-on { background:#bdeeff; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-maint.is-on { background:#dfe4ea; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-idle { width:auto; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-idle.is-on { background:#fde3de; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-hours-idle > input.mp-hours { width:100%; color:#a52a1b; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-idle-pick { cursor:pointer; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody td.mp-idle-pick:hover { box-shadow:inset 0 0 0 2px #f0a99d; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table thead th { position:sticky; top:0; z-index:2; }
 
 /* 월별 표 */

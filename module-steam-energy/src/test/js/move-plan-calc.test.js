@@ -253,6 +253,29 @@ test("생산계획이 없는 달 — 실적만 보여 주고 남은 날은 계�
   assert.equal(r.boilers.find((b) => b.code === "FLUID").idleHours, 0);
 });
 
+test("우리 사정 운휴(일별 표에서 고름) — 그 보일러는 배분에서 빠지고 운휴 고정비가 나간다", () => {
+  // 하루 2,100톤: 1일 폐합성2 종일, 2일 유동상 12시간, 3일 복합 종일을 우리 사정 운휴로 고른다
+  const r = flatMonth(2100, { days: { 1: { idleWaste2: 24 }, 2: { idleFluid: 12 }, 3: { idleCombo: 24 } } });
+  const d1 = r.days[0];
+  assert.equal(d1.alloc.WASTE2, 0);
+  assert.equal(d1.status.WASTE2, "idle");
+  assert.equal(d1.idleHours.WASTE2, 24);                 // 고른 24시간이 그대로 고정비
+  near(d1.alloc.COMBO + d1.alloc.FLUID + d1.alloc.LNG20 + d1.alloc.LNG50, 2100, 0.01, "다른 보일러가 받는다");
+  const d2 = r.days[1];
+  assert.ok(d2.alloc.FLUID <= 216 + 1e-6, "12시간만 돌리면 하루 최대의 절반까지");
+  assert.equal(d2.idleHours.FLUID, 12);                  // 돌린 날도 고른 12시간은 고정비
+  assert.equal(d2.fluidRunHours, 12);                    // 정산 가동시간도 12시간
+  const d3 = r.days[2];
+  assert.equal(d3.alloc.COMBO, 0);
+  assert.equal(d3.status.COMBO, "idle");
+  assert.equal(d3.idleHours.COMBO, 0);                   // 복합은 시간당 고정비가 없다 (보증량 BSC 로 낸다)
+  assert.equal(r.combo.maintHours, 0);                   // 우리 사정이라 보증량을 줄이지 않는다
+  // 정비와 같이 고르면 정비가 먼저 — 정비 시간에는 고정비가 없다
+  const m = flatMonth(2100, { days: { 1: { stopWaste2: 24, idleWaste2: 24 } } });
+  assert.equal(m.days[0].status.WASTE2, "maint");
+  assert.equal(m.days[0].idleHours.WASTE2, 0);
+});
+
 test("하루 최대 기본값 — 0 보다 큰 실적의 상위 10% 평균", () => {
   const values = [];
   for (let i = 1; i <= 100; i += 1) values.push(i);
