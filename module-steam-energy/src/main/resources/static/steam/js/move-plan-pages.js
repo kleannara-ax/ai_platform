@@ -437,16 +437,6 @@
       <th>${year - 1}년 ${month}월<br>원단위</th><th>원단위<br>직접 입력</th><th>필요 스팀량(톤)</th>
     </tr></thead><tbody>${rows.join("")}</tbody>`;
 
-    const missing = MACHINES.filter((m) => resolved.machines[m.code].unit === null).map((m) => m.label);
-    const unplaced = result.machines.filter((m) => m.unplaced).map((m) => m.label);
-    const notes = [`원단위는 연료비 배분비율 › 종합 원단위의 ${year - 1}년 ${month}월 값(기타 스팀량 포함)입니다. 직접 입력하면 그 값이 우선합니다.`];
-    if (missing.length) notes.push(`${missing.join(", ")}: ${year - 1}년 ${month}월 원단위가 없어 비워 두었습니다. 원단위를 직접 입력하세요 — 입력 전에는 필요 스팀량에서 빠집니다.`);
-    if (unplaced.length) notes.push(`${unplaced.join(", ")}: 한 달 내내 운휴로 골라 스팀량을 넣을 날이 없습니다.`);
-    // 계획 가동시간과 하루 넘게 차이 나는 호기 — 운휴일을 고르라는 안내
-    const gaps = result.machines.filter((m) => m.planHours !== null && m.productionTon !== null && m.runHours - m.planHours >= 24)
-      .map((m) => `${m.label} 약 ${Math.round((m.runHours - m.planHours) / 24)}일`);
-    if (gaps.length) notes.push(`계획 가동시간보다 길게 잡혀 있습니다 — 일별 계획에서 운휴일을 고르세요: ${gaps.join(", ")}.`);
-    $("mpMachineHint").textContent = notes.join(" ");
   }
 
   function input(kind, code, field, value, placeholder, extra) {
