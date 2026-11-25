@@ -1,15 +1,15 @@
 -- ============================================================
--- module-steam-energy: 운영 최적화 메뉴 반영 (2026-11-25)
+-- module-steam-energy 07: 운영 최적화 (2026-11-25)
 --
--- 이미 스팀 모듈이 설치된 DB(개발서버 · 운영)에 이번 작업분만 더한다. 여러 번 실행해도 된다.
+-- 이미 스팀 모듈이 설치된 DB(개발서버 · 운영)에는 이 파일만 실행해도 된다. 여러 번 실행해도 된다.
 --   1) 표 4개: steam_move_plan_month · steam_move_plan_machine · steam_move_plan_boiler · steam_move_plan_day
 --      (CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
 --   2) 메뉴 1개: 스팀에너지관리 › 운영 최적화 (STEAM_MOVE_PLAN, /steam/energy-move-plan.html)
 --      — 있으면 이름 · 위치 · 순서만 맞추고, 없으면 넣는다. 다른 스팀 메뉴는 건드리지 않는다.
 --   3) 역할 권한: 스팀 메뉴를 쓰는 6개 역할 — 이미 있으면 넣지 않는다.
 --
--- 내용은 01_schema.sql 17절 · 05_submenus.sql 의 STEAM_MOVE_PLAN 줄과 같다
--- (새로 설치하는 DB 는 01 ~ 06 만 실행하면 되고 이 파일은 필요 없다).
+-- 실행 순서의 마지막(7번). 내용은 01_schema.sql 17절 · 05_submenus.sql 의 STEAM_MOVE_PLAN 줄과 같아서
+-- 새로 설치하는 DB 에서 01 ~ 06 뒤에 실행해도 아무것도 바뀌지 않는다 — 어느 DB 든 01 ~ 07 을 순서대로 실행하면 된다.
 -- DROP · 무조건 DELETE 없음.
 -- ============================================================
 
