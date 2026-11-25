@@ -23,9 +23,8 @@
     try { return JSON.parse(storage.getItem(key) || 'null') || {}; } catch (e) { return {}; }
   }
 
-  // 플랫폼 refreshToken() 은 sessionStorage auth 를 먼저 갱신하므로 그쪽을 먼저 읽는다 (소방 모듈 csrf.js 와 같은 순서).
   function platformToken() {
-    return readJson(sessionStorage, 'auth').token || readJson(localStorage, 'fireweb_user').token || '';
+    return readJson(localStorage, 'fireweb_user').token || readJson(sessionStorage, 'auth').token || '';
   }
 
   function refreshTokenValue() {
@@ -68,19 +67,10 @@
     return refreshing;
   }
 
-  /**
-   * 로그인 세션이 끝났다 (플랫폼 정책: access 1시간 → 401 이면 refresh token 으로 한 번 갱신 → 그것도 실패하면 로그아웃).
-   * 플랫폼 안(iframe)이면 FIRE_AUTH_EXPIRED 를 보내 플랫폼이 "세션이 만료되었습니다" 안내 후 로그아웃하게 하고,
-   * 단독으로 연 화면이면 로그인 화면으로 보낸 뒤 다시 이 화면으로 돌아오게 한다 (소방 모듈 csrf.js 와 같다).
-   */
+  /** 로그인 세션이 끝났다 — 플랫폼 화면에 알려 로그인 화면으로 보낸다 (소방·스팀 모듈과 같은 신호). */
   function sessionExpired() {
-    let inIframe = true;
-    try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
-    if (inIframe) {
-      try { window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); } catch (e) { /* 무시 */ }
-      return;
-    }
-    window.location.href = '/index.html?returnUrl=' + encodeURIComponent(window.location.pathname + window.location.search);
+    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'FIRE_AUTH_EXPIRED' }, '*'); }
+    catch (e) { /* 단독으로 연 경우 */ }
   }
 
   function authHeaders(extra) {
@@ -543,8 +533,7 @@
     document.getElementById('to-year').value = currentYear;
     setResultYear(resultYear);
     if (!platformToken()) {
-      showAlert('page-alert', 'warning', '플랫폼 로그인 정보가 없습니다. 로그인 화면으로 이동합니다.');
-      sessionExpired();
+      showAlert('page-alert', 'warning', '플랫폼 로그인 정보가 없습니다. 플랫폼 화면에서 로그인한 뒤 EPR 메뉴로 들어오세요.');
       return;
     }
     const tasks = [
