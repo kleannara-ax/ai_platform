@@ -28,8 +28,8 @@
 
   /** 기본값 — 하루 최대는 사람이 세운 계획서 기준(폐합성2 384, 복합 1,704, 유동상 432)으로 고정, LNG 는 설비 용량 */
   const FALLBACK = {
-    maxTonDay: { WASTE1: 0, WASTE2: 384, COMBO: 1704, FLUID: 432, LNG20: 480, LNG50: 1200 },
-    minTonDay: { WASTE1: 0, WASTE2: 336, COMBO: 0, FLUID: 300, LNG20: 0, LNG50: 0 },
+    maxTonDay: { WASTE1: 0, WASTE2: 384, COMBO: 1704, FLUID: 432, LNG: 1680 },   // LNG = (20 + 50톤/시간) × 24
+    minTonDay: { WASTE1: 0, WASTE2: 336, COMBO: 0, FLUID: 300, LNG: 0 },
     waste2BillCapTon: 336,
     fluidBillTonHour: 21.1,
     lngM3PerTon: 66,
@@ -129,11 +129,11 @@
     const fluidContract = yd.fluidContract.get(date) || {};
     const a = {
       WASTE1: num(p.wasteSteam1), WASTE2: waste2, COMBO: num(p.comboSteam), FLUID: num(p.fluidizedSteam),
-      LNG20: num(p.kn20), LNG50: num(p.kn50), EXT: num(p.externalSteam), fluidRunHours: num(p.runtimeFluidized),
+      LNG: num(p.kn20) === null && num(p.kn50) === null ? null : (num(p.kn20) || 0) + (num(p.kn50) || 0), EXT: num(p.externalSteam), fluidRunHours: num(p.runtimeFluidized),
       // 도급내역 화면에 적힌 운휴시간 — 있으면 그 날의 고정비는 이 시간으로 계산한다
       idleHours: { WASTE1: num(contract.u1Runtime), WASTE2: num(contract.u2Runtime), FLUID: num(fluidContract.stopHours) },
     };
-    const has = ["WASTE1", "WASTE2", "COMBO", "FLUID", "LNG20", "LNG50", "EXT"].some((k) => a[k] !== null);
+    const has = ["WASTE1", "WASTE2", "COMBO", "FLUID", "LNG", "EXT"].some((k) => a[k] !== null);
     return has ? a : null;
   }
 
@@ -184,7 +184,7 @@
             fluidHours += a.fluidRunHours;
           }
           const lngRow = source.lng.get(date);
-          const steam = (a.LNG20 || 0) + (a.LNG50 || 0);
+          const steam = a.LNG || 0;
           if (lngRow && steam > 0) {
             const gas = (num(lngRow.boiler20t1) || 0) + (num(lngRow.boiler20t2) || 0) + (num(lngRow.boiler50t) || 0);
             if (gas > 0) { lngM3 += gas; lngSteam += steam; }
@@ -546,6 +546,7 @@
         else if (status === "idle") { text = "운휴"; cls += " mp-cell-idle"; title = `우리 사정 운휴 ${fmt0(x.idleHours[b.code])}시간 — 고정비 발생${recorded}`; }
         else if (status === "unused") { text = "미가동"; cls += " mp-cell-unused"; title = `배분하지 않는 보일러 — 운휴 ${fmt0(x.idleHours[b.code])}시간 고정비 발생${recorded}`; }
         else if (b.lng && value > 0.05) { cls += " mp-cell-lng"; title = "LNG 보일러 가동"; }
+        else if (b.code === "COMBO" && status === "off" && !x.isActual && !x.noPlan) { text = "정지"; cls += " mp-cell-unused"; title = "폐합성·유동상으로 감당되는 날이라 복합보일러를 먼저 세웠습니다"; }
         // 정비가 아닌 칸은 누르면 우리 사정 운휴(24시간)로 바뀐다
         if (status !== "maint" && !x.noPlan) {
           cls += " mp-idle-pick";
@@ -657,7 +658,7 @@
       const tissue = machine["TM-3"] + machine["TM-4"] + machine["TM-5"];
       const waste = byCode.WASTE1.tons + byCode.WASTE2.tons;
       const cWaste = (byCode.WASTE1.cost || 0) + (byCode.WASTE2.cost || 0);
-      const cLng = (byCode.LNG20.cost || 0) + (byCode.LNG50.cost || 0);
+      const cLng = byCode.LNG.cost || 0;
       totals.paper += paper; totals.tissue += tissue; totals.demand += result.demandTarget || 0;
       totals.waste += waste; totals.combo += byCode.COMBO.tons; totals.fluid += byCode.FLUID.tons;
       totals.lng += result.lngTons; totals.ext += result.extTons; totals.total += result.totalSteam;

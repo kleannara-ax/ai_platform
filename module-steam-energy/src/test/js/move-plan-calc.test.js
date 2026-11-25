@@ -31,8 +31,7 @@ const BOILERS = {
   WASTE2: { maxTonDay: 384, minTonDay: 336, steamUnitPrice: 11700, idleHourPrice: 96000 },
   COMBO: { maxTonDay: 1704, minTonDay: 0 },
   FLUID: { maxTonDay: 432, minTonDay: 300, steamUnitPrice: 18760, idleHourPrice: 160000 },
-  LNG20: { maxTonDay: 480 },
-  LNG50: { maxTonDay: 1200 },
+  LNG: { maxTonDay: 1680 },
 };
 const SETTINGS = {
   waste2BillCapTon: 336, comboGuaranteeTon: 41200, comboBscPrice: 19910, comboAscPrice: 12650,
@@ -58,7 +57,7 @@ function flatMonth(demandPerDay, overrides) {
 
 test("11월 계획서와 같은 조건 — 월 합계와 비용", () => {
   const pm2Down = [1, 5, 6, 7, 8, 13, 14, 15, 20, 21, 22, 26, 27, 28, 29];
-  const actualRows = {   // [복합, 폐합성2, LNG20, LNG50, 유동상]
+  const actualRows = {   // [복합, 폐합성2, LNG 20톤, LNG 50톤, 유동상]
     1: [1544, 352, 0, 10, 0], 2: [1769, 371, 140, 0, 0], 3: [1769, 375, 180, 0, 0], 4: [1749, 371, 60, 310, 0],
     5: [1287, 376, 0, 2, 0], 6: [1563, 387, 0, 0, 0], 7: [1699, 391, 12, 0, 0], 8: [1705, 385, 3, 11, 0], 9: [1725, 400, 0, 360, 0],
   };
@@ -68,7 +67,7 @@ test("11월 계획서와 같은 조건 — 월 합계와 비용", () => {
     days[d] = { downPm2: pm2Down.includes(d) ? 24 : 0, stopFluid: d <= 9 ? 24 : 0 };
     if (actualRows[d]) {
       const [combo, w2, k20, k50, fluid] = actualRows[d];
-      actuals[d] = { COMBO: combo, WASTE2: w2, LNG20: k20, LNG50: k50, FLUID: fluid, WASTE1: 0 };
+      actuals[d] = { COMBO: combo, WASTE2: w2, LNG: k20 + k50, FLUID: fluid, WASTE1: 0 };
     }
   }
   const r = calc.computeMonth({
@@ -114,9 +113,23 @@ test("순서대로 채운다 — 폐합성 → 복합 → 유동상 → LNG", ()
   // 유동상은 최소 운용량(300), 폐합성은 최대(384), 나머지는 복합
   assert.deepEqual([d.alloc.WASTE2, d.alloc.COMBO, d.alloc.FLUID, d.lng].map(Math.round), [384, 316, 300, 0]);
   const full = flatMonth(2800).days[0];
-  assert.deepEqual([full.alloc.WASTE2, full.alloc.COMBO, full.alloc.FLUID, full.alloc.LNG20, full.alloc.LNG50].map(Math.round), [384, 1704, 432, 280, 0]);
-  const over = flatMonth(3200).days[0];
-  assert.deepEqual([over.alloc.LNG20, over.alloc.LNG50].map(Math.round), [480, 200]);   // 20톤을 다 채운 뒤 50톤
+  assert.deepEqual([full.alloc.WASTE2, full.alloc.COMBO, full.alloc.FLUID, full.alloc.LNG].map(Math.round), [384, 1704, 432, 280]);
+  const over = flatMonth(4300).days[0];   // LNG 하루 최대 1,680 (20 + 50톤/시간 × 24)
+  assert.equal(Math.round(over.alloc.LNG), 1680);
+  assert.equal(Math.round(over.shortage), 100);
+});
+
+test("복합보일러를 먼저 세운다 — 폐합성·유동상으로 감당되면 복합·LNG 없이", () => {
+  const d = flatMonth(700).days[0];   // 폐합성 384 + 유동상 최소 300 ~ 최대 432 → 700 감당
+  assert.deepEqual([d.alloc.WASTE2, d.alloc.COMBO, d.alloc.FLUID, d.lng].map(Math.round), [384, 0, 316, 0]);
+  assert.equal(d.idleHours.FLUID, 0);
+  const edge = flatMonth(816).days[0];   // 384 + 432 = 816 까지는 복합 없이
+  assert.equal(Math.round(edge.alloc.COMBO), 0);
+  const more = flatMonth(900).days[0];   // 넘으면 복합을 돌린다 (평소 순서)
+  assert.deepEqual([more.alloc.WASTE2, more.alloc.COMBO, more.alloc.FLUID].map(Math.round), [384, 216, 300]);
+  // 최소 운용량 때문에 유동상까지 세워야 하면 복합 없이는 못 하므로 복합을 돌린다
+  const low = flatMonth(500).days[0];
+  assert.deepEqual([low.alloc.WASTE2, low.alloc.COMBO, low.alloc.FLUID].map(Math.round), [384, 116, 0]);
 });
 
 test("최소 운용량을 못 채우면 뒤 순서 보일러를 세우고 고정비가 나간다", () => {
@@ -199,7 +212,7 @@ test("모든 보일러를 최대로 돌려도 모자라면 부족량으로 남�
 
 test("실적 반영 — 실적이 있는 날은 실적, 남은 날은 보정 없이 계획 그대로", () => {
   const actuals = {};
-  for (let d = 1; d <= 10; d += 1) actuals[d] = { COMBO: 1500, WASTE2: 380, FLUID: 400, LNG20: 0, LNG50: 0, WASTE1: 0 };
+  for (let d = 1; d <= 10; d += 1) actuals[d] = { COMBO: 1500, WASTE2: 380, FLUID: 400, LNG: 0, WASTE1: 0 };
   const r = flatMonth(2000, { actuals });   // 월 계획 60,000 (하루 2,000) / 실적 10일 22,800
   assert.equal(r.actualUntilDay, 10);
   assert.equal(r.actualSum, 22800);
@@ -273,7 +286,7 @@ test("우리 사정 운휴(일별 표에서 고름) — 그 보일러는 배분�
   assert.equal(d1.alloc.WASTE2, 0);
   assert.equal(d1.status.WASTE2, "idle");
   assert.equal(d1.idleHours.WASTE2, 24);                 // 고른 24시간이 그대로 고정비
-  near(d1.alloc.COMBO + d1.alloc.FLUID + d1.alloc.LNG20 + d1.alloc.LNG50, 2100, 0.01, "다른 보일러가 받는다");
+  near(d1.alloc.COMBO + d1.alloc.FLUID + d1.alloc.LNG, 2100, 0.01, "다른 보일러가 받는다");
   const d2 = r.days[1];
   assert.ok(d2.alloc.FLUID <= 216 + 1e-6, "12시간만 돌리면 하루 최대의 절반까지");
   assert.equal(d2.idleHours.FLUID, 12);                  // 돌린 날도 고른 12시간은 고정비

@@ -30,7 +30,7 @@ public class SteamMovePlanBoilerService {
     private final SteamMovePlanBoilerRepository repository;
 
     /** 쓸 수 있는 보일러 코드 */
-    public static final List<String> CODES = List.of("WASTE1", "WASTE2", "COMBO", "FLUID", "LNG20", "LNG50");
+    public static final List<String> CODES = List.of("WASTE1", "WASTE2", "COMBO", "FLUID", "LNG");
 
     private static void requireCode(String code) {
         if (code == null || !CODES.contains(code)) {

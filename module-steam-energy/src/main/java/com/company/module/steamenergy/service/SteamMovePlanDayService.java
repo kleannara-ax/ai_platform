@@ -84,13 +84,13 @@ public class SteamMovePlanDayService {
     private Upsert upsert(SteamMovePlanDaySaveRequest r) {
         SteamMovePlanDay active = repository.findActive(r.getPlanDate()).orElse(null);
         if (active != null) {
-            active.update(r.getDownPm2(), r.getDownPm3(), r.getDownTm3(), r.getDownTm4(), r.getDownTm5(), r.getStopWaste1(), r.getStopWaste2(), r.getStopCombo(), r.getStopFluid(), r.getStopLng20(), r.getStopLng50(), r.getIdleWaste1(), r.getIdleWaste2(), r.getIdleCombo(), r.getIdleFluid(), r.getIdleLng20(), r.getIdleLng50(), r.getNote(), null);
+            active.update(r.getDownPm2(), r.getDownPm3(), r.getDownTm3(), r.getDownTm4(), r.getDownTm5(), r.getStopWaste1(), r.getStopWaste2(), r.getStopCombo(), r.getStopFluid(), r.getStopLng(), r.getIdleWaste1(), r.getIdleWaste2(), r.getIdleCombo(), r.getIdleFluid(), r.getIdleLng(), r.getNote(), null);
             return new Upsert(active, true);
         }
         SteamMovePlanDay deleted = repository.findAnyByKey(r.getPlanDate()).orElse(null);
         if (deleted != null) {
             deleted.restore(null);
-            deleted.update(r.getDownPm2(), r.getDownPm3(), r.getDownTm3(), r.getDownTm4(), r.getDownTm5(), r.getStopWaste1(), r.getStopWaste2(), r.getStopCombo(), r.getStopFluid(), r.getStopLng20(), r.getStopLng50(), r.getIdleWaste1(), r.getIdleWaste2(), r.getIdleCombo(), r.getIdleFluid(), r.getIdleLng20(), r.getIdleLng50(), r.getNote(), null);
+            deleted.update(r.getDownPm2(), r.getDownPm3(), r.getDownTm3(), r.getDownTm4(), r.getDownTm5(), r.getStopWaste1(), r.getStopWaste2(), r.getStopCombo(), r.getStopFluid(), r.getStopLng(), r.getIdleWaste1(), r.getIdleWaste2(), r.getIdleCombo(), r.getIdleFluid(), r.getIdleLng(), r.getNote(), null);
             return new Upsert(deleted, true);
         }
         SteamMovePlanDay created = repository.save(SteamMovePlanDay.builder()
@@ -104,14 +104,12 @@ public class SteamMovePlanDayService {
                 .stopWaste2(r.getStopWaste2())
                 .stopCombo(r.getStopCombo())
                 .stopFluid(r.getStopFluid())
-                .stopLng20(r.getStopLng20())
-                .stopLng50(r.getStopLng50())
+                .stopLng(r.getStopLng())
                 .idleWaste1(r.getIdleWaste1())
                 .idleWaste2(r.getIdleWaste2())
                 .idleCombo(r.getIdleCombo())
                 .idleFluid(r.getIdleFluid())
-                .idleLng20(r.getIdleLng20())
-                .idleLng50(r.getIdleLng50())
+                .idleLng(r.getIdleLng())
                 .note(r.getNote())
                 .build());
         return new Upsert(created, false);

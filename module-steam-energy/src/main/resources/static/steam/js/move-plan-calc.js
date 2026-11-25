@@ -34,8 +34,8 @@
     { code: "WASTE2", label: "폐합성 2호기", short: "폐합성2", stop: "stopWaste2", idle: "idleWaste2", actual: "wasteSteam2", idleFee: true },
     { code: "COMBO", label: "복합보일러", short: "복합", stop: "stopCombo", idle: "idleCombo", actual: "comboSteam", idleFee: false },
     { code: "FLUID", label: "유동상", short: "유동상", stop: "stopFluid", idle: "idleFluid", actual: "fluidizedSteam", idleFee: true },
-    { code: "LNG20", label: "LNG 20톤(#2)", short: "LNG 20톤", stop: "stopLng20", idle: "idleLng20", actual: "kn20", idleFee: false, lng: true },
-    { code: "LNG50", label: "LNG 50톤(#3)", short: "LNG 50톤", stop: "stopLng50", idle: "idleLng50", actual: "kn50", idleFee: false, lng: true },
+    // LNG 는 20톤·50톤(시간당 최대) 두 대를 하나로 본다 — 단가가 같고 하루 최대 (20 + 50) × 24 = 1,680톤
+    { code: "LNG", label: "LNG 보일러", short: "LNG", stop: "stopLng", idle: "idleLng", actual: "kn20+kn50", idleFee: false, lng: true },
   ];
 
   const EPS = 1e-6;
@@ -75,7 +75,7 @@
    *   settings: { actualUntilDay, waste2BillCapTon, comboGuaranteeTon, comboBscPrice, comboAscPrice,
    *               fluidBillTonHour, fluidImprovementCost, lngM3PerTon, lngUnitPrice },
    *   days:     { 1: { downPm2, …, stopWaste1, …, idleWaste1, … }, … },     // 시간(0~24). idle* = 우리 사정 운휴(수동)
-   *   actuals:  { 1: { WASTE1, WASTE2, COMBO, FLUID, LNG20, LNG50, EXT, fluidRunHours,          // 톤, 없으면 null
+   *   actuals:  { 1: { WASTE1, WASTE2, COMBO, FLUID, LNG, EXT, fluidRunHours,          // 톤, 없으면 null
    *                    idleHours: { WASTE1, WASTE2, FLUID } }, … }                              // 도급내역에 적힌 운휴시간
    * }
    */
@@ -119,7 +119,7 @@
       if (!a) continue;
       let total = 0;
       let has = false;
-      for (const key of ["WASTE1", "WASTE2", "COMBO", "FLUID", "LNG20", "LNG50", "EXT"]) {
+      for (const key of ["WASTE1", "WASTE2", "COMBO", "FLUID", "LNG", "EXT"]) {
         const v = num(a[key]);
         if (v === null) continue;
         has = true;
@@ -206,16 +206,26 @@
           on.push({ code: b.code, cap, min: Math.min(b.minTonDay * frac, cap) });
         }
         // 최소 운용량을 다 채울 수 없으면 뒤 순서 보일러부터 세운다 (우리 사정 운휴).
-        let minSum = on.reduce((s, x) => s + x.min, 0);
-        while (minSum > demand + EPS) {
-          let dropIndex = -1;
-          for (let i = on.length - 1; i >= 0; i -= 1) {
-            if (on[i].min > EPS) { dropIndex = i; break; }
+        const dropForMinimum = (list) => {
+          let minSum = list.reduce((s, x) => s + x.min, 0);
+          while (minSum > demand + EPS) {
+            let dropIndex = -1;
+            for (let i = list.length - 1; i >= 0; i -= 1) {
+              if (list[i].min > EPS) { dropIndex = i; break; }
+            }
+            if (dropIndex < 0) break;
+            minSum -= list[dropIndex].min;
+            list.splice(dropIndex, 1);
           }
-          if (dropIndex < 0) break;
-          minSum -= on[dropIndex].min;
-          on.splice(dropIndex, 1);
-        }
+          return list;
+        };
+        // 복합보일러를 먼저 세운다 — 용량이 커서 가장 먼저 멈춘다. 복합·LNG 없이 나머지(폐합성·유동상)로
+        // 최소 운용량을 지키면서 하루 필요량을 감당할 수 있는 날은 복합(과 LNG)을 돌리지 않는다.
+        const withoutCombo = dropForMinimum(on.filter((x) => x.code !== "COMBO" && x.code !== "LNG"));
+        const comboStopped = on.some((x) => x.code === "COMBO")
+          && withoutCombo.reduce((s, x) => s + x.cap, 0) >= demand - EPS;
+        if (comboStopped) on.splice(0, on.length, ...withoutCombo);
+        else dropForMinimum(on);
         let rest = demand;
         for (const x of on) {
           const v = Math.min(x.min, Math.max(0, rest));
@@ -270,7 +280,7 @@
       days.push({
         day: d, isActual: actual, noPlan, demandModel: modelDemand[d], demand, machineDemand: scaled,
         alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, manualIdle, runHours, fluidRunHours,
-        lng: alloc.LNG20 + alloc.LNG50,
+        lng: alloc.LNG,
         waste2BillTon: waste2Cap !== null ? Math.min(alloc.WASTE2, waste2Cap) : alloc.WASTE2,
       });
     }

@@ -1755,7 +1755,7 @@ CREATE TABLE IF NOT EXISTS steam_move_plan_boiler (
     MOVE_PLAN_BOILER_ID      BIGINT        NOT NULL AUTO_INCREMENT COMMENT '이동계획 보일러별 기준값 ID (PK)',
     YEAR_NO                  INT           NOT NULL COMMENT '연도',
     MONTH_NO                 INT           NOT NULL COMMENT '월 (1~12)',
-    BOILER_CODE              VARCHAR(20)   NOT NULL COMMENT '보일러 코드 (WASTE1 / WASTE2 / COMBO / FLUID / LNG20 / LNG50)',
+    BOILER_CODE              VARCHAR(20)   NOT NULL COMMENT '보일러 코드 (WASTE1 / WASTE2 / COMBO / FLUID / LNG — LNG 는 20톤·50톤 보일러를 합친 하나)',
     USE_YN                   CHAR(1)       NULL COMMENT '배분 대상 여부 (Y/N) — 비우면 폐합성 1호기만 N',
     MAX_TON_DAY              DECIMAL(18,6) NULL COMMENT '하루 최대 공급량(톤/일) — 비우면 최근 12개월 일 실적 상위 10% 평균',
     MIN_TON_DAY              DECIMAL(18,6) NULL COMMENT '하루 최소 운용량(톤/일) — 비우면 기본값',
@@ -1787,14 +1787,12 @@ CREATE TABLE IF NOT EXISTS steam_move_plan_day (
     STOP_WASTE2              DECIMAL(6,2)  NULL COMMENT '폐합성 2호기 보일러 정비 운휴시간(0~24)',
     STOP_COMBO               DECIMAL(6,2)  NULL COMMENT '복합보일러 정비 운휴시간(0~24)',
     STOP_FLUID               DECIMAL(6,2)  NULL COMMENT '유동상 보일러 정비 운휴시간(0~24)',
-    STOP_LNG20               DECIMAL(6,2)  NULL COMMENT 'LNG 20톤(#2) 보일러 정비 운휴시간(0~24)',
-    STOP_LNG50               DECIMAL(6,2)  NULL COMMENT 'LNG 50톤(#3) 보일러 정비 운휴시간(0~24)',
+    STOP_LNG                 DECIMAL(6,2)  NULL COMMENT 'LNG 보일러(20톤 + 50톤 합침) 정비 운휴시간(0~24)',
     IDLE_WASTE1               DECIMAL(6,2)  NULL COMMENT '폐합성 1호기 우리 사정 운휴시간(0~24) — 일별 계획 T/D 칸을 눌러 고른다. 그 시간은 배분하지 않고 운휴 고정비가 나간다',
     IDLE_WASTE2               DECIMAL(6,2)  NULL COMMENT '폐합성 2호기 우리 사정 운휴시간(0~24)',
     IDLE_COMBO                DECIMAL(6,2)  NULL COMMENT '복합보일러 우리 사정 운휴시간(0~24)',
     IDLE_FLUID                DECIMAL(6,2)  NULL COMMENT '유동상 우리 사정 운휴시간(0~24)',
-    IDLE_LNG20                DECIMAL(6,2)  NULL COMMENT 'LNG 20톤(#2) 우리 사정 운휴시간(0~24)',
-    IDLE_LNG50                DECIMAL(6,2)  NULL COMMENT 'LNG 50톤(#3) 우리 사정 운휴시간(0~24)',
+    IDLE_LNG                 DECIMAL(6,2)  NULL COMMENT 'LNG 보일러(20톤 + 50톤 합침) 우리 사정 운휴시간(0~24)',
     NOTE                     VARCHAR(500)  NULL COMMENT '비고',
     CREATED_AT               DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     CREATED_BY               BIGINT        NULL COMMENT '생성자 사용자 ID',
@@ -1810,9 +1808,11 @@ CREATE TABLE IF NOT EXISTS steam_move_plan_day (
 CREATE INDEX IF NOT EXISTS IDX_STEAM_MOVE_PLAN_DAY_DELETED_YN ON steam_move_plan_day (DELETED_YN);
 -- 2026-11-25 우리 사정 운휴시간 컬럼 추가 — 위 CREATE 전에 만든 표에도 붙인다 (재실행 안전)
 ALTER TABLE steam_move_plan_day
-    ADD COLUMN IF NOT EXISTS IDLE_WASTE1 DECIMAL(6,2) NULL COMMENT '폐합성 1호기 우리 사정 운휴시간(0~24) — 일별 계획 T/D 칸을 눌러 고른다. 그 시간은 배분하지 않고 운휴 고정비가 나간다' AFTER STOP_LNG50,
+    ADD COLUMN IF NOT EXISTS IDLE_WASTE1 DECIMAL(6,2) NULL COMMENT '폐합성 1호기 우리 사정 운휴시간(0~24) — 일별 계획 T/D 칸을 눌러 고른다. 그 시간은 배분하지 않고 운휴 고정비가 나간다' AFTER STOP_FLUID,
     ADD COLUMN IF NOT EXISTS IDLE_WASTE2 DECIMAL(6,2) NULL COMMENT '폐합성 2호기 우리 사정 운휴시간(0~24)' AFTER IDLE_WASTE1,
     ADD COLUMN IF NOT EXISTS IDLE_COMBO DECIMAL(6,2) NULL COMMENT '복합보일러 우리 사정 운휴시간(0~24)' AFTER IDLE_WASTE2,
     ADD COLUMN IF NOT EXISTS IDLE_FLUID DECIMAL(6,2) NULL COMMENT '유동상 우리 사정 운휴시간(0~24)' AFTER IDLE_COMBO,
-    ADD COLUMN IF NOT EXISTS IDLE_LNG20 DECIMAL(6,2) NULL COMMENT 'LNG 20톤(#2) 우리 사정 운휴시간(0~24)' AFTER IDLE_FLUID,
-    ADD COLUMN IF NOT EXISTS IDLE_LNG50 DECIMAL(6,2) NULL COMMENT 'LNG 50톤(#3) 우리 사정 운휴시간(0~24)' AFTER IDLE_LNG20;
+    ADD COLUMN IF NOT EXISTS IDLE_LNG DECIMAL(6,2) NULL COMMENT 'LNG 보일러(20톤 + 50톤 합침) 우리 사정 운휴시간(0~24)' AFTER IDLE_FLUID,
+    ADD COLUMN IF NOT EXISTS STOP_LNG DECIMAL(6,2) NULL COMMENT 'LNG 보일러(20톤 + 50톤 합침) 정비 운휴시간(0~24)' AFTER STOP_FLUID;
+-- 2026-11-25 LNG 20톤·50톤을 하나(STOP_LNG · IDLE_LNG)로 합쳤다. 그 전에 만든 표에 남은 STOP_LNG20 · STOP_LNG50 ·
+-- IDLE_LNG20 · IDLE_LNG50 은 쓰지 않는다 (지우지 않음 — 값이 들어간 적 없음).
