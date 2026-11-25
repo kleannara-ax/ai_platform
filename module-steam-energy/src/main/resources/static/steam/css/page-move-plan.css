@@ -121,3 +121,19 @@ body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody tr.mp
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody tr.mp-month-row.is-current > th { box-shadow:inset 3px 0 0 #3d93d1; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-table tbody td.mp-kind { font-size:11.5px !important; color:#5b7186; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.computed.mp-num.mp-cell-unused { background:#faf4f2 !important; color:#b08078; text-align:center; font-weight:500; font-size:11px !important; }
+
+/* 일별 표 '비교' — 실적일 칸에 실적 / 계획, 차이(실적 − 계획). 많으면 빨강, 적으면 초록 */
+.mp-compare-btn { margin-left:auto; align-self:center; }
+.mp-compare-legend { margin:-4px 0 10px; font-size:12px; color:#5b7186; }
+.mp-cmp-over-text { color:#c0392b; font-weight:700; margin-left:8px; }
+.mp-cmp-under-text { color:#1e8449; font-weight:700; margin-left:8px; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.computed.mp-num.mp-cmp { padding:2px 6px !important; line-height:1.15; text-align:right; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp .mp-cmp-vals { display:block; font-size:10.5px; font-weight:500; color:#5b6b78; white-space:nowrap; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp .mp-cmp-a { color:#16232e; font-weight:700; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp .mp-cmp-a::after { content:" / "; color:#a3b1bd; font-weight:400; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp .mp-cmp-gap { display:block; font-size:12.5px; font-weight:800; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.computed.mp-num.mp-cmp-over { background:#fdecea !important; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp-over .mp-cmp-gap { color:#c0392b; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.computed.mp-num.mp-cmp-under { background:#e9f7ef !important; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp-under .mp-cmp-gap { color:#1e8449; }
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp-same .mp-cmp-gap { color:#94a3b0; }

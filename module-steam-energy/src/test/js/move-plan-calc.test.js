@@ -223,6 +223,12 @@ test("실적 반영 — 실적이 있는 날은 실적, 남은 날은 보정 없
   near(r.diff, 2800, 1e-6, "필요량과의 차이는 그대로 보여 준다");
   assert.equal(r.days[0].isActual, true);
   assert.equal(r.days[0].alloc.COMBO, 1500);
+  // 실적일에도 계획이었다면의 배분을 남긴다 (일별 표 '비교')
+  near(r.days[0].plan.demand, 2000, 1e-6, "실적일의 계획 필요량");
+  near(r.days[0].plan.total, 2000, 1e-6, "실적일의 계획 배분 합");
+  assert.deepEqual([r.days[0].plan.alloc.WASTE2, r.days[0].plan.alloc.COMBO, r.days[0].plan.alloc.FLUID].map(Math.round), [384, 1316, 300]);
+  near(r.actualPlanSum, 20000, 1e-6, "실적 10일의 계획 합");
+  assert.equal(r.days[20].plan, null);
   // 실적을 쓰지 않도록 고르면 전부 계획
   const ignore = flatMonth(2000, { actuals, settings: Object.assign({ actualUntilDay: 0 }, SETTINGS) });
   assert.equal(ignore.days.filter((x) => x.isActual).length, 0);

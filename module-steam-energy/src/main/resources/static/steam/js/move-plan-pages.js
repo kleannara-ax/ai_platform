@@ -43,6 +43,7 @@
     "fluidBillTonHour", "fluidImprovementCost", "lngM3PerTon", "lngUnitPrice", "note"];
 
   let activeTab = "daily";
+  let compareMode = false;   // 일별 표 '비교' — 실적일에 계획값·실적값·차이를 같이 보여 준다
   let current = null;   // { year, month, yd, prev, resolved, result }
   const yearCache = new Map();
 
@@ -114,6 +115,17 @@
       prices: priceMap,
       units: new Map((units || []).map((r) => [r.monthNo, r])),
     };
+  }
+
+  /** 원단위만 필요한 해(2년 전) — 종합 원단위 표만 읽는다 */
+  const unitCache = new Map();
+  function loadUnits(year) {
+    if (!unitCache.has(year)) {
+      unitCache.set(year, Api.get(`/energy-ratio-steam-units?year=${year}`)
+        .then((rows) => new Map((rows || []).map((r) => [r.monthNo, r])))
+        .catch((error) => { console.warn("[move-plan] 원단위 불러오기 실패", year, error); return new Map(); }));
+    }
+    return unitCache.get(year);
   }
 
   /** 그 날의 보일러별 실적. 값이 하나도 없으면 null. */
@@ -214,10 +226,14 @@
     const machines = {};
     MACHINES.forEach((m) => {
       const saved = yd.machines.get(`${month}|${m.code}`) || {};
-      // 전년 같은 달 값만 쓴다. 없으면 비워 두고 '입력 필요'로 표시한다 (평균으로 채우지 않음)
-      let lastYear = num(unitRow[m.unit]);
-      if (lastYear !== null && lastYear <= 0) lastYear = null;
-      const source = lastYear !== null ? "lastYear" : null;
+      // 전년 같은 달 → 없으면 2년 전 같은 달 → 그것도 없으면 비워 두고 '입력 필요'로 표시한다 (평균으로 채우지 않음)
+      const positive = (v) => (v !== null && v > 0 ? v : null);
+      let lastYear = positive(num(unitRow[m.unit]));
+      let source = lastYear !== null ? "lastYear" : null;
+      if (lastYear === null && prev && prev.olderUnits) {
+        lastYear = positive(num((prev.olderUnits.get(month) || {})[m.unit]));
+        if (lastYear !== null) source = "twoYearsAgo";
+      }
       const override = num(saved.unitOverride);
       machines[m.code] = {
         productionTon: num(saved.productionTon), runtimeHours: num(saved.runtimeHours), planKind: saved.planKind || null,
@@ -386,19 +402,28 @@
     const hasPlan = result.demandTarget !== null;
     const needUnit = MACHINES.filter((m) => current.resolved.machines[m.code].unit === null
       && current.resolved.machines[m.code].productionTon !== null).map((m) => m.label);
-    cards.push(card("월 필요 스팀량", hasPlan ? fmt0(result.demandTarget) + " 톤" : "—",
+    cards.push(card("보일러 이동계획", hasPlan ? fmt0(result.demandTarget) + " 톤" : "—",
       needUnit.length ? `원단위 입력 필요: ${needUnit.join(", ")} (빠져 있음)` : hasPlan ? "생산량 × 원단위" : "생산계획이 없습니다",
       needUnit.length ? "warn" : ""));
     if (result.actualUntilDay > 0 && result.actualSum > 0) {
       cards.push(card(`실적 누계 (1~${result.actualUntilDay}일)`, fmt0(result.actualSum) + " 톤", "복합보일러 › 스팀생산실적"));
       const restDays = result.days.filter((x) => !x.isActual).length;
-      cards.push(card("남은 날 계획", fmt0(result.planSum) + " 톤", `남은 ${restDays}일 · 하루 생산량은 계획대로`));
+      cards.push(card("잔여 계획량", fmt0(result.planSum) + " 톤", `남은 ${restDays}일 · 하루 생산량은 계획대로`));
     }
-    cards.push(card(`${month}월 합계`, fmt0(result.totalSteam) + " 톤",
-      !hasPlan ? "" : Math.abs(result.diff) < 0.5 ? "필요 스팀량과 같음"
-        : `필요 스팀량보다 ${fmt0(Math.abs(result.diff))} 톤 ${result.diff > 0 ? "많음" : "적음"}`));
-    const lngShare = result.totalSteam > 0 ? (result.lngTons / result.totalSteam) * 100 : 0;
-    cards.push(card("LNG 보일러", fmt0(result.lngTons) + " 톤", `전체의 ${lngShare.toFixed(1)}%`, result.lngTons > 0.5 ? "warn" : "good"));
+    cards.push(card("예상 스팀량", fmt0(result.totalSteam) + " 톤",
+      !hasPlan ? `${month}월 실적 + 잔여 계획` : Math.abs(result.diff) < 0.5 ? "보일러 이동계획과 같음"
+        : `이동계획보다 ${fmt0(Math.abs(result.diff))} 톤 ${result.diff > 0 ? "많음" : "적음"}`));
+    // 예상치 실적치 비교 — 실적이 있는 날의 계획 필요량과 실제 스팀량
+    const actualDays = result.days.filter((x) => x.isActual).length;
+    if (hasPlan && actualDays > 0) {
+      const gap = result.actualSum - result.actualPlanSum;
+      const rate = result.actualPlanSum > 0 ? (gap / result.actualPlanSum) * 100 : 0;
+      cards.push(card("예상치 실적치 비교", (gap > 0 ? "+" : gap < 0 ? "−" : "") + fmt0(Math.abs(gap)) + " 톤",
+        `실적 ${fmt0(result.actualSum)} / 예상 ${fmt0(result.actualPlanSum)} (${rate > 0 ? "+" : ""}${rate.toFixed(1)}%, ${actualDays}일)`,
+        Math.abs(gap) < 0.5 ? "" : gap > 0 ? "bad" : "good"));
+    } else {
+      cards.push(card("예상치 실적치 비교", "—", hasPlan ? "실적이 있는 날이 없습니다" : "생산계획이 없습니다"));
+    }
     if (result.shortageSum > 0.5) {
       cards.push(card("공급 부족", fmt0(result.shortageSum) + " 톤", "모든 보일러를 최대로 돌려도 모자랍니다", "bad"));
     }
@@ -417,7 +442,8 @@
       const r = resolved.machines[m.code];
       const lastYearText = r.lastYearUnit === null ? "" : fmtN(r.lastYearUnit, 4);
       const needInput = r.unit === null;
-      const tag = needInput ? '<span class="mp-tag mp-tag-need">입력 필요</span>' : "";
+      const tag = needInput ? '<span class="mp-tag mp-tag-need">입력 필요</span>'
+        : r.lastYearSource === "twoYearsAgo" ? ` <span class="mp-tag" title="${year - 1}년 ${month}월 값이 없어 ${year - 2}년 ${month}월 값을 씁니다">${year - 2}년</span>` : "";
       const hoursDiff = m.planHours !== null && Math.abs(m.runHours - m.planHours) >= 24;
       return `<tr>
         <th>${esc(m.label)}${r.planKind ? ` <span class="mp-tag mp-tag-soft">${esc(r.planKind)}</span>` : ""}</th>
@@ -524,11 +550,14 @@
       const cells = [`<th class="mp-day${anyDown ? " mp-day-down" : ""}">${x.day}</th>`,
         `<td class="mp-kind">${x.isActual ? "실적" : x.noPlan ? "계획 없음" : "계획"}</td>`];
       MACHINES.forEach((m) => cells.push(hoursCell(x.day, m.down, row[m.down], "down", `${m.label} 운휴시간`)));
-      cells.push(`<td class="computed mp-num mp-demand">${x.noPlan ? "" : fmt0(x.demand)}</td>`);
+      const cmp = compareMode && x.isActual && x.plan;
+      cells.push(cmp ? compareCell(x.demand, x.plan.demand, "mp-demand", "필요 스팀량")
+        : `<td class="computed mp-num mp-demand">${x.noPlan ? "" : fmt0(x.demand)}</td>`);
       SHOWN_BOILERS.forEach((b) => {
         cells.push(hoursCell(x.day, b.stop, row[b.stop], "maint", `${b.label} 정비 운휴시간`));
         const status = x.status[b.code];
         const value = x.alloc[b.code];
+        if (cmp) { cells.push(compareCell(value, x.plan.alloc[b.code], "", b.label)); return; }
         // 우리 사정 운휴로 고른 칸 — 시간 칸으로 보여 준다 (누르면 해제, 숫자를 치면 그 시간만)
         const manual = num(row[b.idle]);
         if (manual !== null && manual > 0 && status !== "maint") {
@@ -557,7 +586,8 @@
         }
       });
       if (showExt) cells.push(`<td class="computed mp-num">${x.ext > 0.05 ? fmt0(x.ext) : ""}</td>`);
-      cells.push(`<td class="computed mp-num mp-strong">${x.noPlan ? "" : fmt0(x.total)}</td>`);
+      cells.push(cmp ? compareCell(x.total, x.plan.total, "mp-strong", "합계")
+        : `<td class="computed mp-num mp-strong">${x.noPlan ? "" : fmt0(x.total)}</td>`);
       cells.push(`<td class="computed mp-num${x.shortage > 0.5 ? " mp-cell-short" : ""}">${x.shortage > 0.5 ? fmt0(x.shortage) : ""}</td>`);
       return `<tr class="${x.isActual ? "mp-row-actual" : "mp-row-plan"}">${cells.join("")}</tr>`;
     });
@@ -587,6 +617,18 @@
     const firstRow = $("mpDayTable").tHead.rows[0];
     const subHead = firstRow.querySelector("th:not([rowspan])");
     if (subHead) $("mpDayTable").style.setProperty("--mp-head1", subHead.getBoundingClientRect().height + "px");
+  }
+
+  /** 비교 칸 — 실적 / 계획 을 작게, 차이(실적 − 계획)를 빨강(많음)·초록(적음)으로 */
+  function compareCell(actual, plan, extraClass, label) {
+    const a = actual || 0;
+    const p = plan || 0;
+    const gap = a - p;
+    const tone = Math.abs(gap) < 0.5 ? "same" : gap > 0 ? "over" : "under";
+    const gapText = tone === "same" ? "0" : (gap > 0 ? "+" : "−") + fmt0(Math.abs(gap));
+    return `<td class="computed mp-num mp-cmp mp-cmp-${tone}${extraClass ? " " + extraClass : ""}" title="${esc(label)} — 실적 ${fmt0(a)} / 계획 ${fmt0(p)} / 차이 ${gapText}">`
+      + `<span class="mp-cmp-vals"><span class="mp-cmp-a">${fmt0(a)}</span><span class="mp-cmp-p">${fmt0(p)}</span></span>`
+      + `<span class="mp-cmp-gap">${gapText}</span></td>`;
   }
 
   function hoursCell(day, field, value, kind, label) {
@@ -701,6 +743,12 @@
 
   // ───────────────────────── 이벤트 ─────────────────────────
   function bindEvents() {
+    $("mpCompare").addEventListener("click", () => {
+      compareMode = !compareMode;
+      $("mpCompare").setAttribute("aria-pressed", String(compareMode));
+      $("mpCompareLegend").hidden = !compareMode;
+      renderDays();
+    });
     document.querySelectorAll("[data-mp-tab]").forEach((button) => {
       button.addEventListener("click", () => setTab(button.dataset.mpTab));
     });
@@ -863,7 +911,8 @@
     const month = Number(monthSelect.value);
     try { localStorage.setItem(PERIOD_KEY, JSON.stringify({ year: yearSelect.value, month: monthSelect.value })); } catch (e) { /* 저장 못 해도 화면은 쓴다 */ }
     try {
-      const [yd, prev] = await Promise.all([loadYear(year), loadYear(year - 1)]);
+      const [yd, prev, older] = await Promise.all([loadYear(year), loadYear(year - 1), loadUnits(year - 2)]);
+      prev.olderUnits = older;   // 전년 원단위가 없는 달은 2년 전 같은 달을 쓴다
       current = { year, month, yd, prev };
       const failed = yd.failed.concat(prev.failed);
       showMessage(failed.length ? `일부 자료를 불러오지 못했습니다 (${failed.length}건). 해당 값은 빈 값으로 계산했습니다.` : "", failed.length ? "error" : "");

@@ -169,6 +169,54 @@
     const waste2Cap = num(settings.waste2BillCapTon);
     const fluidBillTonHour = num(settings.fluidBillTonHour);
 
+    /** 하루 필요량을 보일러에 나눈다 (계획일 배분 — 실적일 비교에도 쓴다) */
+    function allocate(demand, runHours) {
+      const alloc = {};
+      const on = [];
+      for (const b of boilers) {
+        alloc[b.code] = 0;
+        if (!b.use || runHours[b.code] <= 0) continue;
+        const frac = runHours[b.code] / 24;
+        const cap = b.maxTonDay * frac;
+        on.push({ code: b.code, cap, min: Math.min(b.minTonDay * frac, cap) });
+      }
+      // 최소 운용량을 다 채울 수 없으면 뒤 순서 보일러부터 세운다 (우리 사정 운휴).
+      const dropForMinimum = (list) => {
+        let minSum = list.reduce((s, x) => s + x.min, 0);
+        while (minSum > demand + EPS) {
+          let dropIndex = -1;
+          for (let i = list.length - 1; i >= 0; i -= 1) {
+            if (list[i].min > EPS) { dropIndex = i; break; }
+          }
+          if (dropIndex < 0) break;
+          minSum -= list[dropIndex].min;
+          list.splice(dropIndex, 1);
+        }
+        return list;
+      };
+      // 복합보일러를 먼저 세운다 — 용량이 커서 가장 먼저 멈춘다. 복합·LNG 없이 나머지(폐합성·유동상)로
+      // 최소 운용량을 지키면서 하루 필요량을 감당할 수 있는 날은 복합(과 LNG)을 돌리지 않는다.
+      const withoutCombo = dropForMinimum(on.filter((x) => x.code !== "COMBO" && x.code !== "LNG"));
+      const comboStopped = on.some((x) => x.code === "COMBO")
+        && withoutCombo.reduce((s, x) => s + x.cap, 0) >= demand - EPS;
+      if (comboStopped) on.splice(0, on.length, ...withoutCombo);
+      else dropForMinimum(on);
+      let rest = demand;
+      for (const x of on) {
+        const v = Math.min(x.min, Math.max(0, rest));
+        alloc[x.code] = v;
+        rest -= v;
+      }
+      for (const x of on) {
+        if (rest <= EPS) break;
+        const add = Math.min(x.cap - alloc[x.code], rest);
+        alloc[x.code] += add;
+        rest -= add;
+      }
+      const total = Object.keys(alloc).reduce((s, k) => s + alloc[k], 0);
+      return { alloc, total, shortage: rest > EPS ? rest : 0 };
+    }
+
     // ── 5. 날짜별 배분 ──
     const days = [];
     for (let d = 1; d <= dim; d += 1) {
@@ -197,49 +245,12 @@
         demand = actualTotals[d];
       } else {
         demand = modelDemand[d];
-        const on = [];
-        for (const b of boilers) {
-          alloc[b.code] = 0;
-          if (!b.use || runHours[b.code] <= 0) continue;
-          const frac = runHours[b.code] / 24;
-          const cap = b.maxTonDay * frac;
-          on.push({ code: b.code, cap, min: Math.min(b.minTonDay * frac, cap) });
-        }
-        // 최소 운용량을 다 채울 수 없으면 뒤 순서 보일러부터 세운다 (우리 사정 운휴).
-        const dropForMinimum = (list) => {
-          let minSum = list.reduce((s, x) => s + x.min, 0);
-          while (minSum > demand + EPS) {
-            let dropIndex = -1;
-            for (let i = list.length - 1; i >= 0; i -= 1) {
-              if (list[i].min > EPS) { dropIndex = i; break; }
-            }
-            if (dropIndex < 0) break;
-            minSum -= list[dropIndex].min;
-            list.splice(dropIndex, 1);
-          }
-          return list;
-        };
-        // 복합보일러를 먼저 세운다 — 용량이 커서 가장 먼저 멈춘다. 복합·LNG 없이 나머지(폐합성·유동상)로
-        // 최소 운용량을 지키면서 하루 필요량을 감당할 수 있는 날은 복합(과 LNG)을 돌리지 않는다.
-        const withoutCombo = dropForMinimum(on.filter((x) => x.code !== "COMBO" && x.code !== "LNG"));
-        const comboStopped = on.some((x) => x.code === "COMBO")
-          && withoutCombo.reduce((s, x) => s + x.cap, 0) >= demand - EPS;
-        if (comboStopped) on.splice(0, on.length, ...withoutCombo);
-        else dropForMinimum(on);
-        let rest = demand;
-        for (const x of on) {
-          const v = Math.min(x.min, Math.max(0, rest));
-          alloc[x.code] = v;
-          rest -= v;
-        }
-        for (const x of on) {
-          if (rest <= EPS) break;
-          const add = Math.min(x.cap - alloc[x.code], rest);
-          alloc[x.code] += add;
-          rest -= add;
-        }
-        shortage = rest > EPS ? rest : 0;
+        const planned = allocate(demand, runHours);
+        Object.assign(alloc, planned.alloc);
+        shortage = planned.shortage;
       }
+      // 실적일에도 계획이었다면 어땠을지 — 일별 표 '비교' 에 쓴다
+      const plan = actual ? Object.assign({ demand: modelDemand[d] }, allocate(modelDemand[d], runHours)) : null;
 
       // 유동상 정산 가동시간: 실적일에 가동시간 실적이 있으면 그 값, 아니면 돌린 날의 가용시간
       const actualFluidHours = actual ? num((actualInput[d] || {}).fluidRunHours) : null;
@@ -279,7 +290,7 @@
       for (const m of machines) scaled[m.code] = machineDemand[d][m.code];
       days.push({
         day: d, isActual: actual, noPlan, demandModel: modelDemand[d], demand, machineDemand: scaled,
-        alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, manualIdle, runHours, fluidRunHours,
+        alloc, ext, total, shortage, status, idleHours, idleRecorded, availHours, manualIdle, runHours, fluidRunHours, plan,
         lng: alloc.LNG,
         waste2BillTon: waste2Cap !== null ? Math.min(alloc.WASTE2, waste2Cap) : alloc.WASTE2,
       });
@@ -364,6 +375,7 @@
       year, month, daysInMonth: dim,
       machines, demandTarget,
       actualUntilDay, lastActualDay, actualSum, planSum,
+      actualPlanSum: days.reduce((s, x) => s + (x.plan ? x.plan.demand : 0), 0),   // 실적일의 계획 필요량 합 (예상치 실적치 비교)
       totalSteam, diff: demandTarget === null ? null : totalSteam - demandTarget,
       shortageSum, lngTons: sumOf((x) => x.lng), extTons,
       days, boilers: boilerTotals, combo,
