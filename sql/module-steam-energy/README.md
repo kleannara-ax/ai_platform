@@ -27,6 +27,16 @@ mysql -u {user} -p --default-character-set=utf8mb4 {database} < 06_roles.sql
 `02_legacy_schema.sql` (옛 셀 저장소 `steam_cell_value` 와 퇴역 표 2개를 만들던 파일)은 2026-11-23 에 없앴다 —
 모든 화면이 `01_schema.sql` 의 실제 컬럼 표를 쓴다. 새로 설치하는 DB 에는 옛 표를 만들지 않는다.
 
+### 이미 설치된 DB 에 운영 최적화만 더할 때 (2026-11-25)
+
+`migration/2026-11-25_operation_optimization.sql` 하나만 실행한다. 표 4개(`steam_move_plan_*`)와
+메뉴 `STEAM_MOVE_PLAN`(스팀에너지관리 › 운영 최적화) · 역할 권한 6개를 넣는다. 다른 스팀 메뉴는 건드리지 않으며
+여러 번 실행해도 된다 (`IF NOT EXISTS` · `NOT EXISTS`). 새로 설치하는 DB 는 01 ~ 06 에 이미 들어 있어 필요 없다.
+
+```bash
+mysql -u {user} -p --default-character-set=utf8mb4 {database} < migration/2026-11-25_operation_optimization.sql
+```
+
 ### 옛 셀 저장소를 쓰던 DB 를 옮길 때 (개발서버 등)
 
 `steam_cell_value` 에 데이터가 있는 DB 는 `01_schema.sql` 을 실행한 뒤 `migration/` 의 이관 SQL 을 **한 번씩** 돌린다.
