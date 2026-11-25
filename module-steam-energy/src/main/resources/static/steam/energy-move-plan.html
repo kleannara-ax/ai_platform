@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>이동계획 수립</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />
+  <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
+  <link rel="stylesheet" href="css/page-move-plan.css?v=20261125-mp1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
+  <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
+  <script src="/steam/js/steam-negative-sign.js?v=20261030-neg1"></script>
+  <!-- 표 모양 통일 — 페이지 안 <style> 보다 뒤에 읽혀야 한다 -->
+  <link rel="stylesheet" href="/steam/css/steam-table-unified.css?v=20261124-stu1" />
+</head>
+<body class="landing-body" data-page-kind="move-plan">
+  <main class="landing-main">
+    <div class="landing-canvas landing-canvas-table mp-canvas">
+      <div class="landing-page-header">
+        <div class="landing-page-copy">
+          <h1>이동계획 수립</h1>
+          <p>생산계획 × 전년 원단위로 필요 스팀량을 구하고, 폐합성 → 복합 → 유동상 → LNG 순서로 보일러에 나눕니다.</p>
+        </div>
+        <div class="landing-filter-box">
+          <span class="landing-filter-title">조회</span>
+          <select id="filterYear" aria-label="연도"></select>
+          <span class="landing-filter-dot">.</span>
+          <select id="filterMonth" aria-label="월"></select>
+          <button type="button" class="landing-filter-action" id="filterSubmit">조회</button>
+        </div>
+        <div class="landing-filter-box landing-upload-box">
+          <span class="landing-filter-title">생산계획 엑셀</span>
+          <button type="button" class="landing-filter-action" id="mpPlanUpload">올리기</button>
+          <input type="file" id="mpPlanFile" accept=".xlsx,.xlsm,.xls" style="display:none" />
+        </div>
+      </div>
+
+      <div class="mp-tabs" role="tablist">
+        <button type="button" class="period-tab-button" data-mp-tab="daily" aria-pressed="true">일별 계획</button>
+        <button type="button" class="period-tab-button" data-mp-tab="monthly" aria-pressed="false">월별 요약</button>
+      </div>
+
+      <div id="mpMessage" class="mp-message" hidden></div>
+
+      <!-- ============ 일별 계획 ============ -->
+      <section id="mpDaily" class="mp-view">
+        <div id="mpSummary" class="mp-summary"></div>
+
+        <div class="mp-grid-2">
+          <div class="mp-card">
+            <h3 class="mp-card-title">① 생산계획 · 필요 스팀량</h3>
+            <div class="mp-table-wrap"><table class="mp-table" id="mpMachineTable"></table></div>
+            <p class="mp-hint" id="mpMachineHint"></p>
+          </div>
+          <div class="mp-card">
+            <h3 class="mp-card-title">② 보일러 기준값 <span class="mp-card-sub">위에서부터 순서대로 채웁니다. 비운 칸은 회색 글자의 기본값을 씁니다.</span></h3>
+            <div class="mp-table-wrap"><table class="mp-table" id="mpBoilerTable"></table></div>
+            <div class="mp-table-wrap mp-gap"><table class="mp-table" id="mpSettingTable"></table></div>
+          </div>
+        </div>
+
+        <div class="mp-card">
+          <h3 class="mp-card-title">③ 일별 계획
+            <span class="mp-card-sub">운휴 칸을 누르면 하루 종일(24시간) 운휴로 바뀌고, 한 번 더 누르면 풀립니다. 일부만 세울 때는 시간을 숫자로 넣습니다.</span>
+          </h3>
+          <div class="mp-controls">
+            <label>실적 반영 <select id="mpActualUntil"></select></label>
+            <label class="mp-check"><input type="checkbox" id="mpAdjust" /> 남은 날을 월 필요 스팀량에 맞춰 보정</label>
+            <span class="mp-legend"><i class="mp-dot mp-dot-actual"></i>실적 <i class="mp-dot mp-dot-plan"></i>계획 <i class="mp-dot mp-dot-down"></i>설비 운휴 <i class="mp-dot mp-dot-maint"></i>보일러 정비 <i class="mp-dot mp-dot-idle"></i>우리 사정 운휴(고정비) <i class="mp-dot mp-dot-lng"></i>LNG 가동</span>
+          </div>
+          <div class="mp-table-wrap mp-day-wrap"><table class="mp-table mp-day-table" id="mpDayTable"></table></div>
+        </div>
+
+        <div class="mp-card">
+          <h3 class="mp-card-title">④ 예상 비용 <span class="mp-card-sub">스팀 구매·운영 요금만 계산합니다. 차감비·유틸리티 정산은 들어 있지 않습니다.</span></h3>
+          <div class="mp-table-wrap"><table class="mp-table" id="mpCostTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ============ 월별 요약 ============ -->
+      <section id="mpMonthly" class="mp-view" hidden>
+        <div class="mp-card">
+          <h3 class="mp-card-title"><span id="mpMonthlyTitle"></span> <span class="mp-card-sub">달을 누르면 그 달의 일별 계획으로 갑니다.</span></h3>
+          <div class="mp-table-wrap"><table class="mp-table" id="mpMonthlyTable"></table></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
+  <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
+  <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
+  <script src="/steam/js/move-plan-calc.js?v=20261125-mp1"></script>
+  <script src="/steam/js/move-plan-pages.js?v=20261125-mp1"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 // module-steam-energy: 스팀에너지관리 모듈
 // 패키지: com.company.module.steamenergy
 // URL Prefix: /steam-energy-api/**
-// DB Table: steam_* 45개 (sql/module-steam-energy/01_schema.sql)
+// DB Table: steam_* 49개 (sql/module-steam-energy/01_schema.sql)
 // ============================================================
 
 dependencies {

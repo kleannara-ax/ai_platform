@@ -8,7 +8,7 @@
 
 | 순서 | 파일 | 설명 |
 |------|------|------|
-| 1 | `01_schema.sql` | 업무 표 45개 + 인덱스. 모든 표에 감사·소프트 삭제 컬럼, 모든 컬럼에 COMMENT |
+| 1 | `01_schema.sql` | 업무 표 49개 + 인덱스. 모든 표에 감사·소프트 삭제 컬럼, 모든 컬럼에 COMMENT |
 | 3 | `03_seed_data.sql` | 초기 데이터 (설비 마스터 12건 + 단가 샘플 6건) |
 | 4 | `04_menu_data.sql` | 플랫폼 상위 메뉴 등록 (STEAM_ENERGY_MGMT) + 역할 권한 |
 | 5 | `05_submenus.sql` | 스팀 하위 메뉴(그룹 + 페이지) 전체 재등록 + 역할 권한 |
@@ -261,6 +261,10 @@ DELETE FROM steam_price
 | `steam_fluidized_detail_month` | 유동상 세부 운영내역 (월별 단가·비용) — 유동상 운영내역 › 세부 운영내역 (unit-fluidized-detail.html) (50개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_fluidized_detail_custom_row` | 유동상 세부 운영내역 (추가 행) — 유동상 운영내역 › 세부 운영내역 — 사용자가 추가한 행 (unit-fluidized-detail.html) (33개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` |
 | `steam_fluidized_daily_log` | 유동상 운전일지 — 유동상 운영내역 › 운전일지 (fluidized-daily-log.html) (75개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
+| `steam_move_plan_month` | 이동계획 월 기준값 — 에너지 회계비용 › 이동계획 수립 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
+| `steam_move_plan_machine` | 이동계획 호기별 생산계획 — 생산량 · 가동시간 · 원단위 직접 입력 (4개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, MACHINE_CODE)` |
+| `steam_move_plan_boiler` | 이동계획 보일러별 기준값 — 배분 여부 · 하루 최대 · 최소 운용량 · 단가 (5개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, BOILER_CODE)` |
+| `steam_move_plan_day` | 이동계획 일자별 운휴 — 생산설비 5개 · 보일러 6개의 운휴시간 (12개 값 컬럼, 2026-11 신규) | `(PLAN_DATE)` |
 
 - 컬럼명 대문자 `UPPER_SNAKE_CASE`, 테이블명 소문자 `snake_case`
 - `ENGINE=InnoDB`, `CHARSET=utf8mb4`, `COLLATE=utf8mb4_general_ci`
@@ -1732,6 +1736,106 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 
 `migration/2026-11-23_fluidized_daily_log_cells_to_table.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 숫자 칸의 글자(`-`)는 옮기지 않는다.
 
+## 이동계획 수립 (2026-11-25 신규)
+
+화면: 에너지 회계비용 › 이동계획 수립 (`energy-move-plan.html`, 메뉴 코드 `STEAM_ENE_MOVE_PLAN`)
+
+생산계획이 나오면 **호기별 생산량 × 전년 원단위 = 월 필요 스팀량**을 구하고, 그 양을 날짜별로 나눈 뒤
+**폐합성 → 복합 → 유동상 → LNG** 순서로 보일러에 배분해 예상 비용까지 본다. 일별 계획과 월별 요약 두 가지로 본다.
+
+### 설계 규칙
+
+- **입력값만 저장한다.** 필요 스팀량 · 배분량 · 비용은 화면(`js/move-plan-calc.js`)이 계산하고 저장하지 않는다.
+- 비운 칸은 "기본값을 따른다"는 뜻이다. 기본값은 다른 화면의 값(단가 입력, 스팀생산실적, 종합 원단위)에서 구한다 — 아래 "다른 화면과의 연동".
+- 호기 코드는 원단위 일지와 같다 (`PM-2` `PM-3` `TM-3` `TM-4` `TM-5`). 보일러 코드는 `WASTE1` `WASTE2` `COMBO` `FLUID` `LNG20` `LNG50` 이고, 이 순서가 배분 순서다.
+- 운휴는 **시간(0~24)** 으로 저장한다. 하루 종일이면 24, 일부만 세우면 그 시간.
+- 데이터 이관 없음 — 새로 만든 화면이라 옛 셀이 없다.
+
+### 계산 규칙 (`js/move-plan-calc.js`)
+
+| 단계 | 규칙 |
+|---|---|
+| 월 필요 스팀량 | 호기별 `생산량(톤) × 원단위`. 원단위는 직접 입력값, 없으면 전년 같은 달 종합 원단위(기타 스팀량 포함), 그것도 없으면(그 달에 안 돌린 호기) 전년 평균 |
+| 날짜별 필요 스팀량 | 호기의 월 스팀량을 **가동시간(24 − 운휴시간)에 비례**해 날짜에 나눈다. 운휴로 고른 날은 그 호기 몫이 빠지고, 월 합계는 그대로다 |
+| 실적 반영 | 스팀생산실적이 있는 날은 실적을 그대로 쓴다 (기본: 실적이 있는 마지막 날까지). 남은 날은 `(월 필요 스팀량 − 실적 누계)` 에 맞춰 같은 비율로 보정한다 (끌 수 있다) |
+| 배분 | 그 날 쓸 수 있는 보일러(정비 아님)에 ① 하루 최소 운용량을 먼저 주고 ② 남은 양을 순서대로 하루 최대까지 채운다. 최소 운용량의 합이 필요량보다 크면 **뒤 순서 보일러부터 세운다** (우리 사정 운휴). 다 채우고도 남으면 "부족" |
+| 보일러 정비 | 정비로 고른 시간만큼 그 날 하루 최대 · 최소가 줄어든다. 정비 시간에는 고정비가 없다 |
+| 운휴 고정비 | 폐합성 1 · 2호기와 유동상. 정비가 아닌데 스팀을 받지 않은 시간(우리 사정) × 운휴시간당 고정비. 폐합성 1호기는 배분하지 않아도 매일 24시간 나간다 (도급내역 화면의 기본 24시간과 같다). 실적일에 도급내역의 운휴시간이 적혀 있으면 그 값을 쓴다 |
+| 폐합성 2호기 스팀비 | `Σ min(일 스팀량, 정산 상한 336) × 스팀단가` — 도급내역 화면의 결산 기준과 같다 |
+| 복합보일러 | `BSC 적용단가 × 보증량 + ASC 적용단가 × (스팀량 − 보증량, 0 이상)`. 보증량에 못 미쳐도 보증량만큼 낸다. 정비로 세운 시간만큼 보증량을 줄인다 |
+| 유동상 | `정산 가동시간 × 시간당 정산 스팀량 × 스팀단가 + 운휴 고정비 + 설비개선비`. 도급 정산은 송기량이 아니라 보일러 생산량 기준이라 시간당 정산량(직전 12개월 도급 스팀량 ÷ 가동시간)을 쓴다 |
+| LNG 보일러 | `스팀량 × 스팀 톤당 LNG 사용량 × LNG 단가`. 20톤(#2)을 다 채운 뒤 50톤(#3) |
+
+확인: `node module-steam-energy/src/test/js/move-plan-calc.test.js` — 사람이 세운 11월 계획서(스팀생산실적(11월) 시트)와 같은 조건으로 월 합계 · 소각로 운영비가 맞는지 본다.
+
+### 매핑표 (화면 입력항목 ↔ 컬럼)
+
+공통 감사 컬럼 7개(`CREATED_AT` `CREATED_BY` `UPDATED_AT` `UPDATED_BY` `DELETED_YN` `DELETED_AT` `DELETED_BY`)는 네 표 모두에 있고 아래에서는 뺐다.
+
+| 화면 영역 | 테이블 | 컬럼 | 타입 | 항목 |
+|---|---|---|---|---|
+| ① 생산계획 | `steam_move_plan_machine` | `YEAR_NO` `MONTH_NO` `MACHINE_CODE` | INT · INT · VARCHAR(20) | 키 (연 · 월 · 호기) |
+| | | `PRODUCTION_TON` | DECIMAL(18,6) | 생산량(톤) |
+| | | `RUNTIME_HOURS` | DECIMAL(12,4) | 계획 가동시간(Hr) |
+| | | `PLAN_KIND` | VARCHAR(10) | 구분 (예상/실적) — 생산계획 엑셀의 월 머리글 아랫줄 |
+| | | `UNIT_OVERRIDE` | DECIMAL(18,6) | 원단위 직접 입력 |
+| ② 보일러 기준값 | `steam_move_plan_boiler` | `YEAR_NO` `MONTH_NO` `BOILER_CODE` | INT · INT · VARCHAR(20) | 키 (연 · 월 · 보일러) |
+| | | `USE_YN` | CHAR(1) | 배분 (Y/N, 비우면 폐합성 1호기만 N) |
+| | | `MAX_TON_DAY` | DECIMAL(18,6) | 하루 최대(톤/일) — 비우면 직전 12개월 일 실적 상위 10% 평균 (LNG 는 480 · 1,200) |
+| | | `MIN_TON_DAY` | DECIMAL(18,6) | 하루 최소 운용량(톤/일) — 비우면 폐합성 2호기 336, 유동상 300, 그 밖은 0 |
+| | | `STEAM_UNIT_PRICE` | DECIMAL(18,6) | 스팀단가(원/톤) — 비우면 단가 입력 |
+| | | `IDLE_HOUR_PRICE` | DECIMAL(18,6) | 운휴 고정비(원/시간) — 비우면 단가 입력 |
+| 정산 기준 · 실적 반영 | `steam_move_plan_month` | `YEAR_NO` `MONTH_NO` | INT · INT | 키 (연 · 월) |
+| | | `ACTUAL_UNTIL_DAY` | INT | 실적 반영 마지막 날 (0 = 쓰지 않음, 비우면 자동) |
+| | | `ADJUST_YN` | CHAR(1) | 남은 날 보정 (비우면 Y) |
+| | | `WASTE2_BILL_CAP_TON` | DECIMAL(18,6) | 폐합성 2호기 정산 상한(톤/일) |
+| | | `COMBO_GUARANTEE_TON` | DECIMAL(18,6) | 복합 보증량(톤/월) |
+| | | `COMBO_BSC_PRICE` · `COMBO_ASC_PRICE` | DECIMAL(18,6) | 복합 BSC · ASC 적용단가(원/톤) |
+| | | `FLUID_BILL_TON_HOUR` | DECIMAL(18,6) | 유동상 정산 스팀량(톤/시간) |
+| | | `FLUID_IMPROVEMENT_COST` | DECIMAL(18,6) | 유동상 설비개선비(원/월) |
+| | | `LNG_M3_PER_TON` · `LNG_UNIT_PRICE` | DECIMAL(18,6) | LNG 스팀 톤당 사용량(N㎥/톤) · LNG 단가(원/N㎥) |
+| | | `NOTE` | VARCHAR(500) | 비고 |
+| ③ 일별 계획 | `steam_move_plan_day` | `PLAN_DATE` | DATE | 키 (일자) |
+| | | `DOWN_PM2` `DOWN_PM3` `DOWN_TM3` `DOWN_TM4` `DOWN_TM5` | DECIMAL(6,2) | 생산설비 운휴시간 (0~24) |
+| | | `STOP_WASTE1` `STOP_WASTE2` `STOP_COMBO` `STOP_FLUID` `STOP_LNG20` `STOP_LNG50` | DECIMAL(6,2) | 보일러 정비 운휴시간 (0~24) |
+| | | `NOTE` | VARCHAR(500) | 비고 |
+
+### API
+
+네 표 모두 같은 모양이다 (`{표}` = `move-plan-months` · `move-plan-machines` · `move-plan-boilers` · `move-plan-days`).
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/steam-energy-api/{표}?year=[&month=]` | 조회 (한 해 또는 한 달) |
+| `POST` | `/steam-energy-api/{표}` | 행 전체 업서트 (UNIQUE 키 기준, 보내지 않은 항목은 비워진다) |
+| `PUT` | `/steam-energy-api/{표}/bulk` | 범위(한 해 · 한 달) 일괄 저장 `{year, month?, clearMissing, rows}` |
+| `GET` · `DELETE` | `/steam-energy-api/{표}/{id}` | 단건 조회 · 소프트 삭제 |
+| `POST` | `/steam-energy-api/move-plan-excel/import-production-plan` | 생산계획 엑셀 가져오기 (multipart `file`, `year`) → `{sheetName, months[], inserted, updated}` |
+
+쓰기는 `STEAM_ENERGY_MGMT` 메뉴 권한이 필요하다.
+
+**생산계획 엑셀 읽는 법** (`service/excel/ProductionPlanWorkbookReader`) — 칸 위치가 아니라 글자로 찾는다.
+
+- 시트: 이름에 "생산계획" 이 든 보이는 시트 (없으면 월 머리글이 있는 첫 시트)
+- 월 머리글: `25년 12월`, `1월` … `12월`, `27년 1월`. 연도가 적힌 칸을 기준으로 앞뒤 칸의 연도를 정하고, 연도가 한 칸도 없으면 화면에서 고른 연도
+- 머리글 아랫줄의 `예상` / `실적` → `PLAN_KIND`
+- 묶음 `제지2` `제지3` → `PM-2` `PM-3`, `화장지3~5` → `TM-3~5`. 계 · 가공 · 생리대 묶음은 읽지 않는다
+- 묶음 안의 줄 `생산량` · `점보롤` → 생산량(톤), `가동시간` → 가동시간(Hr). `생산성` 줄은 읽지 않는다
+- 파일에 값이 있는 (연 · 월 · 호기)만 바꾼다. 직접 넣은 원단위와 파일에 없는 달은 그대로 둔다
+
+### 다른 화면과의 연동 (읽기만 한다)
+
+| 가져오는 값 | 출처 화면 · API | 쓰는 곳 |
+|---|---|---|
+| 전년 종합 원단위 (기타 스팀량 포함) | 연료비 배분비율 › 종합 원단위 — `/energy-ratio-steam-units?year={전년}` | 원단위 기본값. 이 표는 그 화면을 열거나 엑셀을 올릴 때 갱신된다 |
+| 보일러별 일 실적 (복합 · 외부 · 폐합성 1·2 · LNG 20톤·50톤 · 유동상 · 유동상 가동시간) | 복합보일러 › 스팀생산실적 — `/combo-daily-productions` | 실적일의 스팀량, 하루 최대 기본값(직전 12개월 상위 10% 평균), 월 최대 참고값 |
+| 폐합성 2호기 실 스팀량 · 1·2호기 운휴시간 | 폐합성소각로 › 도급내역 — `/incinerator-contract-dailies` | 스팀생산실적의 2호 칸이 비었을 때 실적, 실적일의 운휴 고정비 |
+| 유동상 도급 스팀량 · 운휴시간 | 유동상 › 운영실적 — `/fluidized-contract-dailies` | 시간당 정산 스팀량 기본값, 실적일의 운휴 고정비 |
+| LNG 사용량 | LNG 연료 사용 비용 — `/lng-daily-usages` | 스팀 톤당 LNG 사용량 기본값 |
+| 단가 | 단가 입력 — `/prices/year/{연도}` (`waste1_fixed_hr` `waste2_steam` `waste2_fixed_hr` `fluid_steam` `fluid_fixed_hr` `comb_bsc` `comb_bsc_factor` `comb_bsc_guarantee` `comb_asc` `comb_asc_factor` `lng_unit`) | 스팀단가 · 고정비 · 보증량 기본값. 그 달 값이 없으면 가장 가까운 앞 달 |
+
+이 화면이 다른 화면의 표를 고치는 일은 없다.
+
 ## 메뉴 / 권한
 
 - 메뉴 코드: `STEAM_ENERGY_MGMT` → URL `/steam-energy/page`
@@ -1756,7 +1860,7 @@ DROP TABLE IF EXISTS steam_equipment;
 
 | 항목 | 값 |
 |------|-----|
-| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹 44페이지 |
+| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹 45페이지 |
 | 메뉴 URL | `/steam/{page}.html` (SPA 가 iframe 으로 로드) |
 | API Prefix | `/steam-energy-api` |
 | 등록 SQL | `04_menu_data.sql`(상위) + `05_submenus.sql`(하위) |
@@ -1810,6 +1914,8 @@ DROP TABLE IF EXISTS steam_equipment;
 
 ### 자체 검수 체크리스트 결과 (2026-11-23)
 
+2026-11-25 에 이동계획 수립(표 4개, 컨트롤러 5개)을 더한 뒤 같은 항목을 다시 봤고 결과는 같다 (새 표도 감사·소프트 삭제 컬럼과 COMMENT 를 갖고, API 는 `/steam-energy-api/move-plan-*`, 응답은 `ApiResponse`).
+
 | 번호 | 검수 항목 | 결과 | 비고 |
 |---|---|---|---|
 | 1 | User/Auth/Role/Menu/Security 클래스 미생성 | 통과 |  |
@@ -1823,7 +1929,7 @@ DROP TABLE IF EXISTS steam_equipment;
 | 9 | Entity에 @Data 없음 | 통과 |  |
 | 10 | Service에서 entity.setXxx() 미사용 | 통과 | 엔티티의 `update(...)` · `clearValues` · `delete` · `restore` 로만 바꾼다 |
 | 11 | 모든 Entity 컬럼에 @Column(name="UPPER_SNAKE_CASE") | 통과 |  |
-| 12 | 모든 업무 테이블에 공통 컬럼 포함 | 통과 | 45개 표 모두 |
+| 12 | 모든 업무 테이블에 공통 컬럼 포함 | 통과 | 49개 표 모두 |
 | 13 | DELETED_YN 기반 소프트 삭제 | 통과 | `@SQLRestriction("DELETED_YN = 'N'")` |
 | 14 | 모든 테이블·컬럼에 COMMENT 존재 | 통과 |  |
 | 15 | SQL에 DROP TABLE 없음 | 통과 | 번호 파일(01~06)과 이관 SQL 에는 없다. 퇴역한 옛 표 3개를 지우는 `cleanup/drop_legacy_tables.sql` 만 따로 두었다 (2026-11-24, 순서 실행 대상 아님) |
@@ -1845,7 +1951,7 @@ DROP TABLE IF EXISTS steam_equipment;
 | 31 | 등록/수정 메뉴마다 대응 업무 테이블 존재 | 통과 |  |
 | 32 | 금지 식별자 없음 (table_name, column_name, attr_value, data_json, field1, tb_table) | 통과 | DDL · Entity · API 에 없다. 엑셀 서비스와 화면 저장소가 메모리에서 주고받는 옛 셀 모양 맵의 키 `table_name` 은 남아 있다 (저장되지 않는다) |
 
-**CREATE TABLE 목록** (`01_schema.sql`, 업무 테이블 45개 — 컬럼 수는 PK · 감사 컬럼 포함)
+**CREATE TABLE 목록** (`01_schema.sql`, 업무 테이블 49개 — 컬럼 수는 PK · 감사 컬럼 포함)
 
 | 테이블 | 컬럼 수 | COMMENT |
 |---|---|---|
@@ -1894,5 +2000,9 @@ DROP TABLE IF EXISTS steam_equipment;
 | `steam_fluidized_detail_month` | 60 | [module-steam-energy] 유동상 세부 운영내역 — 월별 입력 (항목 단가 · 설비개선비용 · 추가비용) |
 | `steam_fluidized_detail_custom_row` | 45 | [module-steam-energy] 유동상 세부 운영내역 — 사용자가 추가한 행 (월 · 구역 · 행별, 일자 값 31칸) |
 | `steam_fluidized_daily_log` | 84 | [module-steam-energy] 유동상 운전일지 — 근무자·약품 전일 재고·소각재·전력 지침·유틸리티 전일 사용량·함수율 (일자별) |
+| `steam_move_plan_month` | 21 | [module-steam-energy] 이동계획 월 기준값 |
+| `steam_move_plan_machine` | 15 | [module-steam-energy] 이동계획 호기별 생산계획 |
+| `steam_move_plan_boiler` | 16 | [module-steam-energy] 이동계획 보일러별 기준값 |
+| `steam_move_plan_day` | 21 | [module-steam-energy] 이동계획 일자별 운휴 |
 
 4-1 매핑표와 DDL 컬럼 일치: 매핑표의 컬럼 행과 `01_schema.sql` 의 DDL 은 같은 명세에서 만들었고(전환 절마다 표 수 · 값 컬럼 수 기재), 이관 SQL 을 로컬 DB 에 적용해 옛 셀의 건수 · 합계와 대조했다.
