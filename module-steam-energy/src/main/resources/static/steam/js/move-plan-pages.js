@@ -36,6 +36,8 @@
   };
   const STEAM_PRICE_CODE = { WASTE2: "waste2_steam", FLUID: "fluid_steam" };
   const IDLE_PRICE_CODE = { WASTE1: "waste1_fixed_hr", WASTE2: "waste2_fixed_hr", FLUID: "fluid_fixed_hr" };
+  /** 일별 계획 표에 보이는 보일러 — 폐합성 1호기는 쓰지 않아 숨긴다 (계산·보일러 기준값·비용 표에는 남는다) */
+  const SHOWN_BOILERS = BOILERS.filter((b) => b.code !== "WASTE1");
   const DAY_FIELDS = MACHINES.map((m) => m.down).concat(BOILERS.map((b) => b.stop));
   const MONTH_FIELDS = ["actualUntilDay", "adjustYn", "waste2BillCapTon", "comboGuaranteeTon", "comboBscPrice", "comboAscPrice",
     "fluidBillTonHour", "fluidImprovementCost", "lngM3PerTon", "lngUnitPrice", "note"];
@@ -509,8 +511,8 @@
     const head1 = [`<th rowspan="2">일</th>`, `<th rowspan="2">구분</th>`,
       `<th colspan="${MACHINES.length}">설비 운휴시간</th>`, `<th rowspan="2">필요 스팀량<br>(T/D)</th>`];
     const head2 = MACHINES.map((m) => `<th>${esc(m.label)}</th>`);
-    BOILERS.forEach((b, index) => {
-      head1.push(`<th colspan="2">${index + 1}. ${esc(b.short)}</th>`);
+    SHOWN_BOILERS.forEach((b, index) => {
+      head1.push(`<th colspan="2">${BOILERS.indexOf(b) + 1}. ${esc(b.short)}</th>`);
       head2.push(`<th title="보일러 정비 운휴시간 — 고정비가 없습니다">정비</th>`, `<th>T/D</th>`);
     });
     if (showExt) head1.push(`<th rowspan="2">외부<br>보일러</th>`);
@@ -523,7 +525,7 @@
         `<td class="mp-kind">${x.isActual ? "실적" : x.noPlan ? "계획 없음" : "계획"}</td>`];
       MACHINES.forEach((m) => cells.push(hoursCell(x.day, m.down, row[m.down], "down", `${m.label} 운휴시간`)));
       cells.push(`<td class="computed mp-num mp-demand">${x.noPlan ? "" : fmt0(x.demand)}</td>`);
-      BOILERS.forEach((b) => {
+      SHOWN_BOILERS.forEach((b) => {
         cells.push(hoursCell(x.day, b.stop, row[b.stop], "maint", `${b.label} 정비 운휴시간`));
         const status = x.status[b.code];
         const value = x.alloc[b.code];
@@ -551,7 +553,7 @@
         cells.push(`<td>${label === "합계" && hours > 0 ? fmt0(hours) : ""}</td>`);
       });
       cells.push(`<td>${fmtN(pick(result.days.reduce((s, x) => s + x.demand, 0)), digits)}</td>`);
-      BOILERS.forEach((b) => {
+      SHOWN_BOILERS.forEach((b) => {
         const stop = result.days.reduce((s, x) => s + (num((resolved.days[x.day] || {})[b.stop]) || 0), 0);
         const tons = result.days.reduce((s, x) => s + x.alloc[b.code], 0);
         cells.push(`<td>${label === "합계" && stop > 0 ? fmt0(stop) : ""}</td>`, `<td>${tons > 0.05 ? fmtN(pick(tons), digits) : ""}</td>`);
