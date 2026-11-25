@@ -1,5 +1,5 @@
 /* ============================================================
-   move-plan-pages.js — 이동계획 수립 화면 (energy-move-plan.html)
+   move-plan-pages.js — 운영 최적화 화면 (energy-move-plan.html)
 
    · 저장하는 것: 호기별 생산계획, 보일러 기준값, 월 기준값, 일자별 운휴 (/steam-energy-api/move-plan-*)
    · 가져다 쓰는 것 (다른 화면의 값, 읽기만):

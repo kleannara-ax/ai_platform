@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Locale;
 
 /**
- * 이동계획 수립 엑셀 가져오기 — 생산계획 파일("생산계획" 시트)
+ * 운영 최적화 엑셀 가져오기 — 생산계획 파일("생산계획" 시트)
  *
  * <p>URL Prefix: /steam-energy-api/move-plan-excel
  * <p>호기별 생산량·가동시간을 steam_move_plan_machine 에 넣는다. 파일에 값이 있는 달만 바꾼다.

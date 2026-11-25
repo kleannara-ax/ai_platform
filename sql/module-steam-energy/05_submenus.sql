@@ -1,7 +1,7 @@
 -- ============================================================
 --  module-steam-energy: 스팀에너지관리 하위 메뉴 (그룹 + 페이지)
 --  STEAM_ENERGY_MGMT(상위) 아래 그룹, 각 그룹 아래 페이지 메뉴.
---  이동계획 수립만 그룹 없이 상위 바로 아래에 둔다 (2026-11-25).
+--  운영 최적화(옛 이름 이동계획 수립)만 그룹 없이 상위 바로 아래에 둔다 (2026-11-25).
 --  각 페이지 menu_url = /steam/{page}.html  (SPA 가 iframe 으로 로드)
 --  재실행 안전: 기존 STEAM_ 하위 메뉴/권한 삭제 후 재삽입.
 --  ※ 운영 DB 에서 메뉴를 바꿨다면 이 파일도 함께 갱신할 것.
@@ -70,7 +70,7 @@ INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYP
 INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYPE, SORT_ORDER, IS_VISIBLE, IS_ACTIVE, CREATED_AT) SELECT 'STEAM_ENE_ACCOUNTING_PLAN', '회계비용 계획', MENU_ID, '/steam/energy-accounting-plan.html', 'steam_energy', 'MENU', 5, 1, 1, NOW() FROM core_menu WHERE MENU_CODE='STEAM_GRP_ENERGY';
 
 -- 페이지 (parent = STEAM_ENERGY_MGMT — 그룹 없이 상위 바로 아래, 그룹들 뒤에 놓는다)
-INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYPE, SORT_ORDER, IS_VISIBLE, IS_ACTIVE, CREATED_AT) SELECT 'STEAM_MOVE_PLAN', '이동계획 수립', MENU_ID, '/steam/energy-move-plan.html', 'steam_energy', 'MENU', 7, 1, 1, NOW() FROM core_menu WHERE MENU_CODE='STEAM_ENERGY_MGMT';
+INSERT INTO core_menu (MENU_CODE, MENU_NAME, PARENT_ID, MENU_URL, ICON, MENU_TYPE, SORT_ORDER, IS_VISIBLE, IS_ACTIVE, CREATED_AT) SELECT 'STEAM_MOVE_PLAN', '운영 최적화', MENU_ID, '/steam/energy-move-plan.html', 'steam_energy', 'MENU', 7, 1, 1, NOW() FROM core_menu WHERE MENU_CODE='STEAM_ENERGY_MGMT';
 
 -- 역할별 접근 권한
 INSERT INTO core_role_menu (ROLE, MENU_ID) SELECT 'ROLE_ADMIN', MENU_ID FROM core_menu WHERE MENU_CODE LIKE 'STEAM_%' AND MENU_CODE <> 'STEAM_ENERGY_MGMT';

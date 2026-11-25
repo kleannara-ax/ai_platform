@@ -11,7 +11,7 @@ import java.time.ZoneId;
 /**
  * 이동계획 보일러별 기준값 — 연·월·보일러별 한 행. 비운 칸은 화면이 기본값(최근 실적·단가 입력)을 쓴다.
  *
- * <p>화면: 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) — 보일러 기준값 영역
+ * <p>화면: 스팀에너지관리 › 운영 최적화 (energy-move-plan.html) — 보일러 기준값 영역
  * <p>Table: steam_move_plan_boiler
  * <p>PK: MOVE_PLAN_BOILER_ID, UNIQUE: (YEAR_NO, MONTH_NO, BOILER_CODE)
  */

@@ -1,4 +1,4 @@
-/* 이동계획 수립 계산(move-plan-calc.js) 확인.
+/* 운영 최적화 계산(move-plan-calc.js) 확인.
  *
  * 실행:  node module-steam-energy/src/test/js/move-plan-calc.test.js
  * (gradle 테스트에는 묶여 있지 않다 — 계산 규칙을 고쳤을 때 손으로 돌린다. Node 18 이상.)

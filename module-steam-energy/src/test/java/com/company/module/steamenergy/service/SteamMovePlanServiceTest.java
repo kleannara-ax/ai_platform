@@ -25,7 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 이동계획 수립 서비스 — 일자별 운휴 업서트, 보일러 코드 검사, 생산계획 엑셀 반영 규칙.
+ * 운영 최적화 서비스 — 일자별 운휴 업서트, 보일러 코드 검사, 생산계획 엑셀 반영 규칙.
  * Spring 컨텍스트 없이 리포지토리를 Mockito 로 대신한다.
  */
 class SteamMovePlanServiceTest {

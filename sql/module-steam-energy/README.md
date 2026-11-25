@@ -261,7 +261,7 @@ DELETE FROM steam_price
 | `steam_fluidized_detail_month` | 유동상 세부 운영내역 (월별 단가·비용) — 유동상 운영내역 › 세부 운영내역 (unit-fluidized-detail.html) (50개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO)` |
 | `steam_fluidized_detail_custom_row` | 유동상 세부 운영내역 (추가 행) — 유동상 운영내역 › 세부 운영내역 — 사용자가 추가한 행 (unit-fluidized-detail.html) (33개 값 컬럼, 2026-11 규격 전환) | `(YEAR_NO, MONTH_NO, SECTION, ROW_KEY)` |
 | `steam_fluidized_daily_log` | 유동상 운전일지 — 유동상 운영내역 › 운전일지 (fluidized-daily-log.html) (75개 값 컬럼, 2026-11 규격 전환) | `(USAGE_DATE)` |
-| `steam_move_plan_month` | 이동계획 월 기준값 — 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
+| `steam_move_plan_month` | 이동계획 월 기준값 — 스팀에너지관리 › 운영 최적화 (energy-move-plan.html) (11개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO)` |
 | `steam_move_plan_machine` | 이동계획 호기별 생산계획 — 생산량 · 가동시간 · 원단위 직접 입력 (4개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, MACHINE_CODE)` |
 | `steam_move_plan_boiler` | 이동계획 보일러별 기준값 — 배분 여부 · 하루 최대 · 최소 운용량 · 단가 (5개 값 컬럼, 2026-11 신규) | `(YEAR_NO, MONTH_NO, BOILER_CODE)` |
 | `steam_move_plan_day` | 이동계획 일자별 운휴 — 생산설비 5개 운휴 · 보일러 6개 정비 · 보일러 6개 우리 사정 운휴시간 (18개 값 컬럼, 2026-11 신규) | `(PLAN_DATE)` |
@@ -1736,9 +1736,9 @@ SRF Boiler invoice 7개 화면(Summary · Client Invoice · 운영내역 · 월�
 
 `migration/2026-11-23_fluidized_daily_log_cells_to_table.sql` — 옛 셀을 새 표로 옮긴다 (재실행 안전: 비어 있는 칸만 채움). 숫자 칸의 글자(`-`)는 옮기지 않는다.
 
-## 이동계획 수립 (2026-11-25 신규)
+## 운영 최적화 (2026-11-25 신규 — 처음 이름은 "이동계획 수립")
 
-화면: 스팀에너지관리 › 이동계획 수립 (`energy-move-plan.html`, 메뉴 코드 `STEAM_MOVE_PLAN`) — 그룹에 넣지 않고 상위 메뉴 바로 아래, 그룹들 뒤에 둔다
+화면: 스팀에너지관리 › 운영 최적화 (`energy-move-plan.html`, 메뉴 코드 `STEAM_MOVE_PLAN`) — 그룹에 넣지 않고 상위 메뉴 바로 아래, 그룹들 뒤에 둔다
 
 생산계획이 나오면 **호기별 생산량 × 전년 원단위 = 월 필요 스팀량**을 구하고, 그 양을 날짜별로 나눈 뒤
 **폐합성 → 복합 → 유동상 → LNG** 순서로 보일러에 배분해 예상 비용까지 본다. 일별 계획과 월별 요약 두 가지로 본다.
@@ -1862,7 +1862,7 @@ DROP TABLE IF EXISTS steam_equipment;
 
 | 항목 | 값 |
 |------|-----|
-| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹(그룹 안 페이지 38개) + 상위 바로 아래 페이지 1개(이동계획 수립) |
+| 메뉴명 | 스팀에너지관리 (상위 그룹) + 하위 6그룹(그룹 안 페이지 38개) + 상위 바로 아래 페이지 1개(운영 최적화) |
 | 메뉴 URL | `/steam/{page}.html` (SPA 가 iframe 으로 로드) |
 | API Prefix | `/steam-energy-api` |
 | 등록 SQL | `04_menu_data.sql`(상위) + `05_submenus.sql`(하위) |
@@ -1916,7 +1916,7 @@ DROP TABLE IF EXISTS steam_equipment;
 
 ### 자체 검수 체크리스트 결과 (2026-11-23)
 
-2026-11-25 에 이동계획 수립(표 4개, 컨트롤러 5개)을 더한 뒤 같은 항목을 다시 봤고 결과는 같다 (새 표도 감사·소프트 삭제 컬럼과 COMMENT 를 갖고, API 는 `/steam-energy-api/move-plan-*`, 응답은 `ApiResponse`).
+2026-11-25 에 운영 최적화(표 4개, 컨트롤러 5개)를 더한 뒤 같은 항목을 다시 봤고 결과는 같다 (새 표도 감사·소프트 삭제 컬럼과 COMMENT 를 갖고, API 는 `/steam-energy-api/move-plan-*`, 응답은 `ApiResponse`).
 
 | 번호 | 검수 항목 | 결과 | 비고 |
 |---|---|---|---|

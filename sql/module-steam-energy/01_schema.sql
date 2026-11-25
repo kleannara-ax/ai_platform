@@ -1693,8 +1693,8 @@ CREATE TABLE IF NOT EXISTS steam_fluidized_daily_log (
 CREATE INDEX IF NOT EXISTS IDX_STEAM_FLUIDIZED_DAILY_LOG_DELETED_YN ON steam_fluidized_daily_log (DELETED_YN);
 
 -- ────────────────────────────────────────────────
--- 17) 이동계획 수립 (2026-11 신규)
---     화면: 스팀에너지관리 › 이동계획 수립 (energy-move-plan.html)
+-- 17) 운영 최적화 (2026-11 신규)
+--     화면: 스팀에너지관리 › 운영 최적화 (energy-move-plan.html)
 --     생산계획(호기별 생산량) × 전년 원단위 = 필요 스팀량 → 폐합성 → 복합 → 유동상 → LNG 순으로 배분한다.
 --     입력값만 저장한다. 필요 스팀량·배분량·비용은 화면이 계산하고 저장하지 않는다.
 -- ────────────────────────────────────────────────
