@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>카카오톡 사용자 현황</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body class="lr-page">
+<main class="sl-main" id="dlpKakaoPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-comment"></i></span><span>카카오톡 사용자 현황</span></h1>
+  </header>
+
+  <nav class="sl-tabs" aria-label="DLP 모니터링 메뉴">
+    <a href="dlp.html"><i class="fas fa-user-lock"></i> DLP 모니터링</a>
+    <a href="dlp-report.html"><i class="fas fa-file-powerpoint"></i> 보고서 작성</a>
+    <a href="dlp-kakao.html" class="active" aria-current="page"><i class="fas fa-comment"></i> 카카오톡 사용자 현황</a>
+  </nav>
+
+  <!-- 승인 대장 -->
+  <section id="viewLedger" aria-label="카카오톡 사용 승인 대장">
+    <section class="lr-rules rp-sec" aria-label="승인 대장 요약">
+      <div class="rp-kpis" id="lgKpi"></div>
+      <p class="rp-note" id="lgToday"></p>
+    </section>
+    <section class="lr-rules rp-sec kk-dept-sec" aria-labelledby="dpTitle">
+      <button type="button" class="kk-dept-toggle" id="dpToggle" aria-expanded="false" aria-controls="dpPanel">
+        <i class="fas fa-chevron-right kk-dept-ico" aria-hidden="true"></i>
+        <span class="lr-rules-title m-0" id="dpTitle">부서별 사용 중 현황</span>
+        <span class="dm-sub" id="dpSum"></span>
+        <span class="kk-dept-hint" id="dpHint">펼치기</span>
+      </button>
+      <div id="dpPanel" class="hidden">
+        <div class="table-responsive"><table class="table rp-tbl align-middle">
+          <thead><tr><th>사업부</th><th>부서</th><th>사용 중 인원</th><th>7일 내 만료</th><th class="text-start">사용 중 인원 (이름 · 종료일)</th></tr></thead>
+          <tbody id="dpBody"></tbody>
+        </table></div>
+        <p class="rp-note">사용 중 = 오늘 기준 신청 기간 안 (7일 내 만료 포함) · 같은 사람은 1명으로 셈 · 사용 중 인원이 많은 부서 순</p>
+      </div>
+    </section>
+    <section class="lr-rules rp-sec" aria-labelledby="lgTitle">
+      <h3 class="lr-rules-title" id="lgTitle">카카오톡 사용 승인 대장 <span class="dm-sub" id="lgCnt"></span></h3>
+      <div class="kk-filter" role="search" aria-label="대장 거르기">
+        <select class="form-select form-select-sm" id="lgState" aria-label="상태"><option value="">상태 전체</option><option value="ACTIVE">사용 중</option><option value="EXPIRING">7일 내 만료</option><option value="EXPIRED">만료</option><option value="BEFORE">시작 전</option></select>
+        <label class="form-check m-0"><input class="form-check-input" type="checkbox" id="lgLatest" checked> <span class="form-check-label">최신 건만</span></label>
+        <input class="form-control form-control-sm" id="lgQ" placeholder="사업부·부서·이름·문서번호 검색" aria-label="대장 검색">
+        <span class="kk-filter-gap"></span>
+        <button type="button" class="btn-m btn-outline-m btn-xs" id="lgExportBtn"><i class="fas fa-file-excel"></i>엑셀 내려받기</button>
+        <button type="button" class="btn-m btn-primary-m btn-xs hidden" id="lgAddBtn"><i class="fas fa-plus"></i>등록</button>
+      </div>
+      <div class="table-responsive"><table class="table rp-tbl align-middle">
+        <thead><tr><th>사업부</th><th>부서</th><th>이름</th><th>신청 시작일</th><th>신청 종료일</th><th>신청 상태</th><th>최신여부</th><th>상태</th><th>전자결재 문서번호</th><th>사유</th><th></th></tr></thead>
+        <tbody id="lgBody"></tbody>
+      </table></div>
+      <ul class="rp-note-list">
+        <li>전자결재로 승인되면 [등록] → 목록 맨 위 입력 줄에 바로 입력 후 [저장] (Enter = 저장, Esc = 취소, 신청 상태 = 신청중)</li>
+        <li>사업부·부서 = 드롭다운에서 선택 (사업부를 고르면 그 사업부의 부서만 나옴) · 목록은 <a href="dlp-admin.html#org">DLP 관리 &gt; 사업부·부서 관리</a>에서 추가·변경</li>
+        <li>날짜 = 숫자 8자리만 입력하면 바로 적용 (20261001 → 2026-10-01) 또는 달력 버튼으로 선택</li>
+        <li>정렬 = 신청 종료일이 늦은 순 (최신 먼저)</li>
+        <li>상태·최신여부는 날짜로 자동 계산 (최신 = 같은 부서·이름 중 종료일이 가장 늦은 건)</li>
+        <li>[엑셀 내려받기] = 지금 화면의 거르기(상태·최신 건만·검색) 그대로 엑셀 파일로 저장 · 누구나 가능</li>
+      </ul>
+    </section>
+  </section>
+</main>
+
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, fmtYm, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const st = {};
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  const dash = '<span class="lr-r-zero">-</span>';
+  const kpi = (items) => items.map(([l, v, cls]) => `<div class="rp-kpi ${cls || ''}"><span>${l}</span><b>${fmtNum(v)}</b></div>`).join('');
+  const canWrite = SECLOG.canWrite(), isAdmin = SECLOG.isAdmin();
+  // ---------------- 승인 대장
+  const lg = { d: null, editId: null, adding: false };
+  const stBadge = (r) => `<span class="badge-st kk-st-${r.state.toLowerCase()}">${esc(r.stateLabel)}</span>${r.state === 'EXPIRING' ? `<div class="lr-r-sub">${r.daysLeft}일 남음</div>` : ''}`;
+  if (canWrite) $('lgAddBtn').classList.remove('hidden');
+
+  async function loadLedger() {
+    loading(true);
+    try {
+      const [d, orgs] = await Promise.all([api('/dlp-leak/kakao-approvals'), canWrite ? api('/dlp-leak/orgs') : Promise.resolve([])]);
+      lg.d = d; lg.orgs = orgs;
+      $('lgKpi').innerHTML = kpi([['사용 중', d.activeCount], ['7일 내 만료', d.expiringCount, 'red'], ['만료', d.expiredCount], ['시작 전', d.beforeCount]]);
+      $('lgToday').textContent = `오늘(${d.today}) 기준 · 신청 상태 '신청중' 건만`;
+      renderLedger(); renderDept();
+    } catch (e) { toast(e.message, 'error'); } finally { loading(false); }
+  }
+
+  // 부서별 사용 중 현황: 오늘 사용 중(7일 내 만료 포함)인 사람을 부서별로 묶음 (같은 부서·이름 = 1명, 종료일 가장 늦은 건 기준)
+  function renderDept() {
+    const people = new Map();
+    (lg.d.rows || []).filter(r => r.state === 'ACTIVE' || r.state === 'EXPIRING').forEach(r => {
+      const k = (r.deptName + '|' + r.userName).replace(/\s+/g, '').toLowerCase();
+      const p = people.get(k);
+      if (!p || r.endDate > p.endDate) people.set(k, r);
+    });
+    const depts = new Map();
+    people.forEach(r => {
+      const d = depts.get(r.deptName) || { dept: r.deptName, divs: new Set(), list: [], expiring: 0 };
+      if (r.divisionName) d.divs.add(r.divisionName);
+      d.list.push(r); if (r.state === 'EXPIRING') d.expiring++;
+      depts.set(r.deptName, d);
+    });
+    const rows = [...depts.values()].sort((a, b) => b.list.length - a.list.length || a.dept.localeCompare(b.dept));
+    $('dpSum').textContent = `· ${fmtNum(rows.length)}개 부서 · ${fmtNum(people.size)}명 사용 중`;
+    $('dpBody').innerHTML = rows.length ? rows.map(d => `<tr>
+        <td>${esc([...d.divs].join(', ') || '-')}</td><th scope="row">${esc(d.dept)}</th>
+        <td class="text-center"><b>${fmtNum(d.list.length)}명</b></td>
+        <td class="text-center">${d.expiring ? `<span class="rp-red">${fmtNum(d.expiring)}명</span>` : dash}</td>
+        <td>${d.list.sort((a, b) => a.endDate.localeCompare(b.endDate)).map(r => `<span class="kk-person ${r.state === 'EXPIRING' ? 'is-exp' : ''}">${esc(r.userName)} <small>~${esc(r.endDate)}</small></span>`).join('')}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="lr-r-empty">오늘 사용 중인 승인 건 없음</td></tr>';
+  }
+
+  function renderLedger() {
+    const q = $('lgQ').value.trim().toLowerCase(), stf = $('lgState').value, latest = $('lgLatest').checked;
+    // 정렬: 신청 종료일 늦은 순 → 시작일 늦은 순 → 나중 등록 순
+    const list = (lg.d.rows || []).filter(r => (!stf || r.state === stf) && (!latest || r.latestYn === 'Y')
+      && (!q || [r.divisionName, r.deptName, r.userName, r.approvalDocNo].some(v => (v || '').toLowerCase().includes(q))))
+      .sort((a, b) => b.endDate.localeCompare(a.endDate) || b.startDate.localeCompare(a.startDate) || b.kakaoApprovalId - a.kakaoApprovalId);
+    $('lgCnt').textContent = `${fmtNum(list.length)}건 / 전체 ${fmtNum((lg.d.rows || []).length)}건`;
+    const addRow = lg.adding ? editRow(null) : '';
+    $('lgBody').innerHTML = addRow + (list.length ? list.map(r => r.kakaoApprovalId === lg.editId ? editRow(r) : `<tr class="${r.state === 'EXPIRED' ? 'kk-row-off' : ''}">
+        <td>${esc(r.divisionName || '-')}</td><td>${esc(r.deptName)}</td><td><b>${esc(r.userName)}</b></td>
+        <td class="text-nowrap text-center">${esc(r.startDate)}</td><td class="text-nowrap text-center">${esc(r.endDate)}</td>
+        <td class="text-center">${esc(r.applyStatus)}</td><td class="text-center">${r.latestYn}</td><td class="text-center">${stBadge(r)}</td>
+        <td>${esc(r.approvalDocNo || '') || dash}</td><td>${esc(r.reason || '') || dash}</td>
+        <td class="text-nowrap">${canWrite ? `<button class="btn-m btn-outline-m btn-xs lg-edit" data-id="${r.kakaoApprovalId}">수정</button>` : ''}
+          ${isAdmin ? `<button class="btn-m btn-outline-m btn-xs lg-del" data-id="${r.kakaoApprovalId}" data-name="${esc(r.userName)}">삭제</button>` : ''}</td></tr>`).join('')
+      : (lg.adding ? '' : `<tr><td colspan="11" class="lr-r-empty">${(lg.d.rows || []).length ? '조건에 맞는 건 없음' : '등록된 승인 건 없음' + (canWrite ? ' → [등록]' : '')}</td></tr>`));
+    const first = $('lgBody').querySelector('.lg-row-edit select, .lg-row-edit input');
+    if (first) first.focus();
+  }
+
+  // 날짜 칸: 숫자 8자리 입력 → 바로 YYYY-MM-DD (20261001 → 2026-10-01), 달력 버튼으로도 선택
+  const dateCell = (f, val, label) => `<div class="lg-date">
+      <input type="text" class="form-control form-control-sm lg-date-text" data-f="${f}" value="${esc(val || '')}" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" aria-label="${label} (숫자 8자리)" required>
+      <button type="button" class="lg-date-btn" tabindex="-1" aria-label="${label} 달력"><i class="far fa-calendar"></i></button>
+      <input type="date" class="lg-date-pick" tabindex="-1" aria-hidden="true" value="${esc(val || '')}"></div>`;
+  const fmtDateInput = (raw) => {
+    const d = raw.replace(/\D/g, '').slice(0, 8);
+    return d.length > 6 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : d.length > 4 ? `${d.slice(0, 4)}-${d.slice(4)}` : d;
+  };
+  const isDate = (v) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const [y, m, d] = v.split('-').map(Number), t = new Date(y, m - 1, d);
+    return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d;
+  };
+
+  // 사업부·부서 드롭다운 (DLP 관리 > 사업부·부서 관리 목록, 사용 중만 / 수정 중인 기존 값이 목록에 없으면 '목록에 없음'으로 함께 표시)
+  const opt = (val, cur, label) => `<option value="${esc(val)}" ${val === cur ? 'selected' : ''}>${esc(label || val)}</option>`;
+  const activeDivs = () => (lg.orgs || []).filter(d => d.useYn === 'Y');
+  function divOptions(cur) {
+    const list = activeDivs(), names = list.map(d => d.orgName);
+    return `<option value="">사업부 선택 *</option>` + list.map(d => opt(d.orgName, cur)).join('')
+      + (cur && !names.includes(cur) ? opt(cur, cur, `${cur} (목록에 없음)`) : '');
+  }
+  function deptOptions(div, cur) {
+    const d = activeDivs().find(x => x.orgName === div);
+    const list = d ? d.depts.filter(t => t.useYn === 'Y').map(t => t.orgName) : [];
+    if (!div) return `<option value="">사업부 먼저 선택</option>`;
+    return `<option value="">부서 선택 *</option>` + list.map(n => opt(n, cur)).join('')
+      + (cur && !list.includes(cur) ? opt(cur, cur, `${cur} (목록에 없음)`) : '');
+  }
+
+  // 목록 안 입력 줄 (r = null → 새로 등록)
+  function editRow(r) {
+    const v = (k) => esc(r?.[k] || '');
+    return `<tr class="lg-row-edit" data-id="${r ? r.kakaoApprovalId : ''}">
+      <td><select class="form-select form-select-sm lg-div-sel" data-f="divisionName" aria-label="사업부" required>${divOptions(r?.divisionName)}</select></td>
+      <td><select class="form-select form-select-sm lg-dept-sel" data-f="deptName" aria-label="부서" required>${deptOptions(r?.divisionName, r?.deptName)}</select></td>
+      <td><input class="form-control form-control-sm" data-f="userName" value="${v('userName')}" maxlength="200" placeholder="이름 *" aria-label="이름" required></td>
+      <td>${dateCell('startDate', r?.startDate, '신청 시작일')}</td>
+      <td>${dateCell('endDate', r?.endDate, '신청 종료일')}</td>
+      <td class="text-center">신청중</td><td class="text-center lr-r-sub">자동</td><td class="text-center lr-r-sub">자동</td>
+      <td><input class="form-control form-control-sm" data-f="approvalDocNo" value="${v('approvalDocNo')}" maxlength="100" placeholder="문서번호" aria-label="전자결재 문서번호"></td>
+      <td><input class="form-control form-control-sm" data-f="reason" value="${v('reason')}" maxlength="500" placeholder="사유" aria-label="사유"></td>
+      <td class="text-nowrap"><button class="btn-m btn-primary-m btn-xs lg-save">저장</button> <button class="btn-m btn-outline-m btn-xs lg-cancel">취소</button></td></tr>`;
+  }
+
+  async function saveRow(tr) {
+    const body = {};
+    tr.querySelectorAll('[data-f]').forEach(el => { body[el.dataset.f] = el.value.trim(); });
+    if (!body.divisionName || !body.deptName || !body.userName || !body.startDate || !body.endDate) { toast('사업부·부서·이름·신청 시작일·신청 종료일을 입력', 'error'); return; }
+    const bad = ['startDate', 'endDate'].find(k => !isDate(body[k]));
+    if (bad) { toast(`${bad === 'startDate' ? '신청 시작일' : '신청 종료일'}이 올바른 날짜가 아님 (예: 20261001 → 2026-10-01)`, 'error'); tr.querySelector(`[data-f=${bad}]`).focus(); return; }
+    if (body.endDate < body.startDate) { toast('신청 종료일이 시작일보다 앞', 'error'); return; }
+    const id = tr.dataset.id;
+    tr.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    try {
+      await api(id ? `/dlp-leak/kakao-approvals/${id}` : '/dlp-leak/kakao-approvals', { method: id ? 'PUT' : 'POST', body });
+      toast(id ? '수정 완료' : '등록 완료'); lg.adding = false; lg.editId = null; await loadLedger(); 
+    } catch (e) { toast(e.message, 'error'); tr.querySelectorAll('button').forEach(b => { b.disabled = false; }); }
+  }
+
+  function cancelEdit() { lg.adding = false; lg.editId = null; renderLedger(); }
+
+  $('lgAddBtn').onclick = () => {
+    if (!activeDivs().length) { toast('사업부·부서 목록이 비어 있음 → DLP 관리 > 사업부·부서 관리에서 먼저 등록', 'error'); return; }
+    lg.adding = true; lg.editId = null; renderLedger();
+  };
+  // 사업부를 바꾸면 그 사업부의 부서만 다시 채움
+  $('lgBody').addEventListener('change', (e) => {
+    const s = e.target.closest('.lg-div-sel'); if (!s) return;
+    const dept = s.closest('tr').querySelector('.lg-dept-sel');
+    dept.innerHTML = deptOptions(s.value, ''); if (s.value) dept.focus();
+  });
+  // 날짜 칸: 입력하는 대로 자동 서식 / 달력 선택 반영 / 잘못된 날짜 표시
+  $('lgBody').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.classList.contains('lg-date-text')) {
+      t.value = fmtDateInput(t.value);
+      t.classList.toggle('is-invalid', t.value.length === 10 && !isDate(t.value));
+      const pick = t.parentElement.querySelector('.lg-date-pick'); if (isDate(t.value)) pick.value = t.value;
+    } else if (t.classList.contains('lg-date-pick') && t.value) {
+      const txt = t.parentElement.querySelector('.lg-date-text'); txt.value = t.value; txt.classList.remove('is-invalid');
+    }
+  });
+  $('lgBody').addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (t.classList.contains('lg-date-text')) t.classList.toggle('is-invalid', !!t.value && !isDate(t.value));
+  });
+  $('lgBody').addEventListener('click', (e) => {
+    const b = e.target.closest('.lg-date-btn'); if (!b) return;
+    const pick = b.parentElement.querySelector('.lg-date-pick');
+    try { pick.showPicker(); } catch (err) { pick.focus(); pick.click(); }
+  });
+  $('lgBody').onkeydown = (e) => {
+    const tr = e.target.closest('.lg-row-edit'); if (!tr) return;
+    if (e.key === 'Enter') { e.preventDefault(); saveRow(tr); } else if (e.key === 'Escape') cancelEdit();
+  };
+  $('lgBody').onclick = async (e) => {
+    const sv = e.target.closest('.lg-save'); if (sv) { saveRow(sv.closest('tr')); return; }
+    if (e.target.closest('.lg-cancel')) { cancelEdit(); return; }
+    const ed = e.target.closest('.lg-edit');
+    if (ed) { lg.adding = false; lg.editId = +ed.dataset.id; renderLedger(); return; }
+    const del = e.target.closest('.lg-del');
+    if (del && confirm(`'${del.dataset.name}' 승인 건을 삭제할까?`)) {
+      try { await api(`/dlp-leak/kakao-approvals/${del.dataset.id}`, { method: 'DELETE' }); toast('삭제 완료'); await loadLedger();  }
+      catch (err) { toast(err.message, 'error'); }
+    }
+  };
+  // 엑셀 내려받기: 화면 거르기(상태·최신 건만·검색) 그대로
+  $('lgExportBtn').onclick = async () => {
+    const p = new URLSearchParams({ latestOnly: $('lgLatest').checked });
+    if ($('lgState').value) p.set('state', $('lgState').value);
+    if ($('lgQ').value.trim()) p.set('q', $('lgQ').value.trim());
+    loading(true);
+    try {
+      const f = await api(`/dlp-leak/kakao-approvals/export?${p}`);
+      const bin = atob(f.contentBase64), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const a = document.createElement('a'); a.href = url; a.download = f.fileName; a.click(); URL.revokeObjectURL(url);
+      toast('엑셀 내려받기 완료');
+    } catch (e) { toast(e.message, 'error'); } finally { loading(false); }
+  };
+  ['lgQ'].forEach(k => { $(k).oninput = renderLedger; });
+  ['lgState', 'lgLatest'].forEach(k => { $(k).onchange = renderLedger; });
+
+  // 부서별 사용 중 현황 (접힘 → 펼치기)
+  $('dpToggle').onclick = () => {
+    const open = $('dpToggle').getAttribute('aria-expanded') !== 'true';
+    $('dpToggle').setAttribute('aria-expanded', String(open));
+    $('dpPanel').classList.toggle('hidden', !open);
+    $('dpHint').textContent = open ? '접기' : '펼치기';
+  };
+
+  loadLedger();
+})();
+</script>
+</body>
+</html>

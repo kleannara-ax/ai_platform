@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ISMS 로그 점검 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main" id="dashboardPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-shield-halved"></i></span>ISMS 로그 점검 대시보드</h1>
+    <div class="header-actions">
+      <span class="text-muted-m" style="font-size:.78rem" id="updatedAt"></span>
+      <button class="btn-m btn-gray-m btn-sm-m" id="btnRefresh" title="새로고침"><i class="fas fa-rotate"></i></button>
+      <button class="btn-m btn-primary-m btn-sm-m hidden" id="btnUpload" title="시스템 로그 파일 업로드 (월 1회)"><i class="fas fa-upload"></i>로그 올리기</button>
+      <button class="btn-m btn-outline-m btn-sm-m" id="btnManual" title="로그 검토자 점검 순서 안내" data-bs-toggle="modal" data-bs-target="#manualModal"><i class="fas fa-book-open"></i>점검 매뉴얼</button>
+      <button class="btn-m btn-outline-m btn-sm-m" id="btnExport" title="월 점검 결과 엑셀 내보내기 (ISMS 증적)"><i class="fas fa-file-excel"></i>월 점검 결과 내보내기</button>
+      <div class="ym-nav">
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnPrevYm" title="이전 달"><i class="fas fa-chevron-left"></i></button>
+        <span class="ym-label" id="ymLabel"></span>
+        <button class="btn-m btn-gray-m btn-sm-m" id="btnNextYm" title="다음 달"><i class="fas fa-chevron-right"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <div class="guide-box">
+    <i class="fas fa-circle-info"></i>
+    <div>선택한 달의 로그 점검이 <b>어디까지 왔는지</b>와 <b>지금 먼저 볼 것</b>을 보여 줍니다. 위에서 아래 순서대로 보시면 됩니다.
+      <div class="guide-steps"><span>① 로그 올리기</span><span>② 분석 결과 검토</span><span>③ 검토 완료(마감)</span></div></div>
+  </div>
+
+  <!-- 점검 월 진행 3단계 -->
+  <section class="flow3" id="flow3"></section>
+
+  <section class="dash-grid">
+    <!-- 지금 먼저 볼 것 -->
+    <article class="card-m span-12" id="todoCard">
+      <div class="section-title"><h2><i class="fas fa-bell"></i>지금 먼저 볼 것 <span class="text-muted-m" style="font-size:.78rem;font-weight:600" id="todoCount"></span></h2>
+        <span id="ddayBadge"></span></div>
+      <div class="aging" id="agingBox"></div>
+      <div class="now-list" id="todoList"></div>
+      <button type="button" class="now-more hidden" id="btnTodoMore"></button>
+    </article>
+
+    <!-- 위험 접속 계정 TOP 10 -->
+    <article class="card-m span-7" id="riskCard">
+      <div class="section-title"><h2><i class="fas fa-user-shield"></i>주의할 계정 TOP 10</h2><a href="detail.html">분석 결과 메뉴 <i class="fas fa-angle-right"></i></a></div>
+      <p class="text-muted-m mb-2" style="font-size:.76rem">로그인 실패가 많거나, 업무시간 외·외부 IP·허용되지 않은 IP에서 접속한 계정입니다. 줄을 누르면 그 로그의 접속 행위 분석으로 갑니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>시스템</th><th>계정</th><th class="num">성공</th><th class="num">실패</th><th>주의 이유</th><th>마지막 접속</th></tr></thead>
+          <tbody id="riskBody"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <!-- 특권 계정 활동 -->
+    <article class="card-m span-5" id="privCard">
+      <div class="section-title"><h2><i class="fas fa-crown"></i>관리자·공용 계정 접속</h2><span class="text-muted-m" style="font-size:.72rem" title="root, admin, administrator, sa, sys, system, oracle, postgres, dba, superuser, guest">root·admin 등</span></div>
+      <p class="text-muted-m mb-2" style="font-size:.76rem">권한이 큰 계정의 이 달 접속 횟수입니다. 빨간 숫자가 있으면 확인하세요.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>시스템</th><th>계정</th><th class="num">성공</th><th class="num">실패</th><th class="num" title="업무시간 외(22~06시)">시간 외</th><th class="num">외부 IP</th></tr></thead>
+          <tbody id="privBody"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <!-- 이번 달 일별 추이 -->
+    <article class="card-m span-12" id="trendCard">
+      <div class="section-title"><h2><i class="fas fa-chart-column"></i>날짜별 추이 (선택한 달)</h2>
+        <div class="legend" id="sevLegend"></div></div>
+      <div class="chart-box"><canvas id="trendChart" aria-label="선택한 달 일별 로그인 실패·탐지 추이 차트"></canvas></div>
+      <div class="rule-strip" id="ruleStrip"></div>
+    </article>
+  </section>
+</main>
+
+</div>
+
+<!-- 점검 매뉴얼 (로그 검토자 점검 순서) -->
+<div class="modal fade" id="manualModal" tabindex="-1" aria-labelledby="manualTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="manualTitle"><i class="fas fa-book-open me-2" style="color:var(--brand)"></i>점검 매뉴얼 · 로그 검토자 점검 순서</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+      </div>
+      <div class="modal-body manual" id="manualBody">
+        <p class="mn-lead">원칙: <b>급한 것부터</b>, <b>큰 그림 → 세부</b> 순서로 봅니다.</p>
+        <nav class="mn-toc" aria-label="매뉴얼 목차">
+          <a href="#mn1">1. 지난달 점검 상황 보기</a><a href="#mn2">2. 볼 시스템 정하기</a><a href="#mn3">3. 시스템 상세 검토</a>
+          <a href="#mn4">4. 월 마감</a><a href="#mn5">위험도별 처리 시한</a><a href="#mn6">주의할 점</a>
+        </nav>
+
+        <section class="mn-step" id="mn1">
+          <h6><span class="mn-no">1</span>대시보드에서 지난달 점검 상황 보기</h6>
+          <ol>
+            <li><b>확인이 필요한 항목</b>부터 봅니다 (할 일 목록).
+              <ul>
+                <li>로그 미등록: 아직 안 올라온 시스템이 있는지</li>
+                <li>기간 확인: 올라온 로그에 그 달 날짜가 빠졌거나 다른 달 로그가 섞였는지</li>
+                <li>미검토 탐지: 위험 계정이나 탐지가 남은 시스템</li>
+                <li>검토완료 가능: 위험이 없어 바로 마감할 수 있는 시스템</li>
+              </ul>
+            </li>
+            <li>맨 위 파란 안내(<b>예: 2026년 10월 로그를 올려 주세요</b>)에서 이번에 점검할 달을 확인합니다. 화면을 처음 열면 그 달(지난달)이 먼저 보입니다.</li>
+            <li>그 아래 <b>진행 3단계</b>(로그 올리기 → 분석 결과 검토 → 검토 완료)에서 어디까지 왔는지 봅니다. 칸을 누르면 남은 시스템으로 갑니다.</li>
+            <li>시스템별로 로그가 올라왔는지, 기간이 맞는지는 상단 <b>[월별 점검 현황]</b> 탭에서 확인합니다.</li>
+            <li><b>주의할 계정 TOP 10 / 관리자·공용 계정 접속</b>: 이 달 요주의 계정을 먼저 머리에 넣어 둡니다.</li>
+          </ol>
+        </section>
+
+        <section class="mn-step" id="mn2">
+          <h6><span class="mn-no">2</span>어느 시스템부터 볼지 정하기</h6>
+          <ul>
+            <li>상단 <b>[분석 결과]</b> 메뉴(위험도 높은 순으로 보여 줌)에서 <b>최고 위험도가 높은 로그부터</b> 엽니다:
+              <span class="badge-sev sev-critical">심각</span> → <span class="badge-sev sev-high">높음</span> → <span class="badge-sev sev-medium">보통</span></li>
+            <li>위험도가 같으면 미검토 건수가 많은 것부터 봅니다.</li>
+          </ul>
+        </section>
+
+        <section class="mn-step" id="mn3">
+          <h6><span class="mn-no">3</span>시스템 상세 화면 <span class="mn-key">가장 중요</span></h6>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th class="center" style="width:56px">순서</th><th style="width:220px">볼 곳</th><th>확인할 내용</th></tr></thead>
+              <tbody>
+                <tr><td class="center">①</td><td><b>업로드 정보</b></td><td>대상 연월과 시스템이 맞는지, 파일이 맞는지</td></tr>
+                <tr><td class="center">②</td><td><b>룰별 탐지 건수</b> 중 <span class="badge-sev sev-critical">심각</span> <span class="badge-sev sev-high">높음</span></td><td>실제 침해나 중요 변경일 수 있어 가장 먼저 봅니다</td></tr>
+                <tr><td class="center">③</td><td><b>① 접속 행위 분석</b></td><td>위험 표시 계정(IP 제한 위반, 특권 계정, 외부 IP, 로그인 실패 5회 이상, 심야)을 <b>계정마다 검토</b>합니다. 계정을 골라 '정상 확인 / 이상 확인 / 조치완료'와 소명·조치 내용을 저장하세요(위험 계정을 모두 검토해야 마감 가능).<br><span class="text-muted-m">예: 로그인 실패 뒤에 정상 로그인했다면 단순 비밀번호 오입력</span></td></tr>
+                <tr><td class="center">④</td><td><b>룰별 탐지 건수</b> 중 <span class="badge-sev sev-medium">보통</span> <span class="badge-sev sev-low">낮음</span></td><td>대부분 정상 업무입니다. 룰 단위로 확인하고 한 번에 처리합니다</td></tr>
+                <tr><td class="center">⑤</td><td><b>검토 현황 → 최종 검토완료</b></td><td>미검토 탐지와 미검토 위험 계정이 모두 0이 되면 ADMIN이 검토 의견을 쓰고 마감합니다</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mn-sub">
+            <div class="mn-sub-title"><i class="fas fa-layer-group"></i>룰 하나를 처리하는 방법</div>
+            <ol>
+              <li><b>[로그 보기]</b>로 그 룰의 로그를 훑어봅니다.</li>
+              <li>모두 같은 사유이면 <b>[룰 일괄 검토]</b>로 한 번에 처리합니다. 대상은 '미검토 건만'을 고릅니다.</li>
+              <li>수상한 줄이 섞여 있으면 <b>그 줄만 먼저 줄 단위로</b> '이상징후 확인'으로 처리합니다. 나머지는 [룰 일괄 검토]에서 '미검토 건만'으로 '오탐'이나 '조치완료' 처리합니다.</li>
+            </ol>
+          </div>
+
+          <div class="mn-sub">
+            <div class="mn-sub-title"><i class="fas fa-clipboard-check"></i>검토 상태 고르는 기준</div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th style="width:140px">상태</th><th>언제 쓰나</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="badge-rv rv-fp">오탐</span></td><td>정상 업무이거나 단순 실수로 확인됨 (예: 비밀번호 오입력, 승인된 작업)</td></tr>
+                  <tr><td><span class="badge-rv rv-resolved">조치완료</span></td><td>문제가 있었지만 조치가 끝남 (예: 계정 회수, 정책 원복)</td></tr>
+                  <tr><td><span class="badge-rv rv-confirmed">이상징후 확인</span></td><td>실제 이상으로 보여 조치가 필요하고 아직 진행 중. 이 상태로 두면 나중에 다시 확인할 대상이 됩니다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="mn-step" id="mn4">
+          <h6><span class="mn-no">4</span>월 마감</h6>
+          <ol>
+            <li>상단 <b>[월별 점검 현황]</b> 탭에서 모든 시스템이 '마감 완료'인지 확인합니다.</li>
+            <li><b>[월 점검 결과 내보내기]</b>로 엑셀을 받습니다.</li>
+            <li>엑셀 요약 시트의 검토자, 검토일, 승인자 서명란을 채워 ISMS 증적으로 보관합니다.</li>
+          </ol>
+        </section>
+
+        <section class="mn-step" id="mn5">
+          <h6><i class="fas fa-stopwatch mn-ic"></i>위험도별 처리 시한</h6>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:90px">위험도</th><th style="width:300px">언제까지</th><th>예</th></tr></thead>
+              <tbody>
+                <tr><td><span class="badge-sev sev-critical">심각</span></td><td><b>당일</b> 확인, 침해사고 대응 절차 검토</td><td>로그 삭제·감사 설정 변경, 랜섬웨어, 전체 개방</td></tr>
+                <tr><td><span class="badge-sev sev-high">높음</span></td><td><b>3일 이내</b>, 담당자 소명</td><td>관리자 계정·권한 변경, 인증 실패 다발, 허용 외 IP</td></tr>
+                <tr><td><span class="badge-sev sev-medium">보통</span></td><td>월 점검 때 승인·작업 내역과 대조</td><td>정책 변경, 데이터 다운로드</td></tr>
+                <tr><td><span class="badge-sev sev-low">낮음</span></td><td>추이만 확인, 반복되면 위험도 상향 검토</td><td>심야 접근, 사용자 정보 변경</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mn-note"><i class="fas fa-bell"></i>월말 점검과 별도로, <b>로그가 올라올 때마다 대시보드에서 심각·높음이 있는지는 바로 보는 것</b>을 권합니다.</p>
+        </section>
+
+        <section class="mn-step" id="mn6">
+          <h6><i class="fas fa-triangle-exclamation mn-ic"></i>주의할 점</h6>
+          <ul>
+            <li><b>룰별 탐지 건수 표는 탐지된 룰만 '건수가 많은 순'으로 보여줍니다</b>(탐지 없는 룰은 표 아래 버튼으로 펼침). 위 순서대로 보려면 위험도 배지를 보고 골라야 합니다. 건수가 많은 룰이 보통·낮음일 때가 많습니다 (예: DLP 정책 변경 65건은 '보통').</li>
+            <li>시스템 전용 룰이 <b>초안</b>인 시스템(설명에 '[샘플 확인 전 초안]' 표시)은 <b>탐지 0건이 '이상 없음'이라는 뜻이 아닙니다.</b> 이런 시스템은 ① 접속 행위 분석의 위험 계정을 더 꼼꼼히 봐 주세요. 실제 로그로 맞춘 시스템은 현재 홈페이지와 DLP 입니다.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-m btn-primary-m" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span id="loadingText">불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/seclog.js"></script>
+<script src="js/upload-modal.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, fmtYm, fmtDt, toast, shiftYm, riskBadges } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('dashboard');
+  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.reviewYm(), todoAll: false, todos: [] };
+  const isAdmin = SECLOG.isAdmin();
+  let trendChart = null;
+  if (window.Chart) Chart.defaults.font.family = "'Noto Sans KR', 'Malgun Gothic', sans-serif";
+  const loading = (on, t) => { $('loadingText').textContent = t || '불러오는 중...'; $('loading').classList.toggle('show', on); };
+
+  function render(d) {
+    const n = d.systemCount || 0;
+    $('updatedAt').innerHTML = `<i class="fas fa-clock"></i> 기준 ${fmtDt(d.generatedAt)} <span class="text-muted-m">(한국시간)</span>`;
+
+    // ---- 마감 D-day
+    renderDDay(d);
+
+    // ---- 3. 미검토 지연
+    const a = d.aging || {};
+    const seg = (l, v, c) => `<div class="ag-seg ${c}" title="${l} ${v}건"><span>${l}</span><b>${fmtNum(v)}</b></div>`;
+    $('agingBox').innerHTML = a.total
+      ? `<span class="ag-title">미검토 탐지 ${fmtNum(a.total)}건 경과</span>` + seg('3일 이내', a.within3, 'g0') + seg('4~7일', a.d4to7, 'g1') + seg('8~14일', a.d8to14, 'g2') + seg('15일↑', a.over14, 'g3')
+      : '<span class="ag-title"><i class="fas fa-circle-check" style="color:#16a34a"></i> 미검토 탐지가 없습니다.</span>';
+
+    // ---- 지금 먼저 볼 것
+    renderTodos(d.todos || []);
+
+    // ---- 점검 월 진행 3단계
+    renderFlow(d);
+
+    // ---- 위험 계정
+    const risk = d.topRiskAccounts || [];
+    $('riskBody').innerHTML = risk.length === 0
+      ? '<tr class="empty-row"><td colspan="6"><i class="fas fa-circle-check" style="color:#16a34a"></i> 이 달 주의할 계정이 없습니다.</td></tr>'
+      : risk.map(r => `<tr class="clickable" data-href="detail.html?id=${r.latestUploadId}#access">
+          <td><b>${esc(r.systemName)}</b></td><td class="mono"><b>${esc(r.accountId)}</b></td>
+          <td class="num">${fmtNum(r.successCount)}</td><td class="num" style="color:${r.failCount >= 5 ? '#dc2626' : 'inherit'}">${fmtNum(r.failCount)}</td>
+          <td>${riskBadges(r.riskFlags)}</td><td style="font-size:.76rem;white-space:nowrap">${esc(r.lastSeen || '-')}</td></tr>`).join('');
+
+    // ---- 6. 특권 계정
+    const priv = d.privAccounts || [];
+    const hot = (v) => v > 0 ? `<b style="color:#dc2626">${fmtNum(v)}</b>` : '0';
+    $('privBody').innerHTML = priv.length === 0
+      ? '<tr class="empty-row"><td colspan="6"><i class="fas fa-circle-check" style="color:#16a34a"></i> 이 달 특권 계정 접속 기록이 없습니다.</td></tr>'
+      : priv.slice(0, 8).map(p => `<tr class="clickable" data-href="detail.html?id=${p.latestUploadId}#access" title="최종 접속 ${esc(p.lastSeen || '-')}">
+          <td><b>${esc(p.systemName)}</b></td><td class="mono"><b>${esc(p.accountId)}</b></td>
+          <td class="num">${fmtNum(p.successCount)}</td><td class="num">${p.failCount >= 5 ? hot(p.failCount) : fmtNum(p.failCount)}</td>
+          <td class="num">${hot(p.offHourCount)}</td><td class="num">${hot(p.externalIpCount)}</td></tr>`).join('');
+
+    // ---- 일별 추이 + 탐지 요약
+    $('sevLegend').innerHTML = [['CRITICAL', '심각', d.criticalCount, '#dc2626'], ['HIGH', '높음', d.highCount, '#f97316'], ['MEDIUM', '보통', d.mediumCount, '#eab308'], ['LOW', '낮음', d.lowCount, '#3b82f6']]
+      .map(([k, l, v, c]) => `<span data-sev="${k}" tabindex="0"><i class="fas fa-square" style="color:${c}"></i> ${l} <b>${fmtNum(v)}</b></span>`).join('')
+      + `<span>· 탐지 합계 <b>${fmtNum(d.detectionCount)}</b></span>`;
+    const rules = (d.topRules || []).slice(0, 3);
+    $('ruleStrip').innerHTML = rules.length === 0 ? '' : '<span class="text-muted-m">많이 탐지된 룰</span>'
+      + rules.map(r => `<span class="rule-chip">${SECLOG.sevBadge(r.severity)} ${esc(r.ruleName)} <b>${fmtNum(r.hitCount)}</b></span>`).join('');
+    renderTrend(d.dailyTrend || []);
+  }
+
+  // 지금 먼저 볼 것: 할 일 종류별 쉬운 제목·아이콘·버튼
+  const TODO_KIND = {
+    REVIEW_DELAY: ['fa-hourglass-end', '검토가 늦어지고 있어요', '검토하기'],
+    LOG_PERIOD_CHECK: ['fa-calendar-xmark', '올린 로그의 날짜를 확인하세요', '확인하기'],
+    PENDING_DETECTION: ['fa-user-shield', '주의할 계정·탐지를 검토하세요', '검토하기'],
+    PENDING_ACCOUNT: ['fa-user-shield', '위험 접속 계정을 검토하세요', '검토하기'],
+    PENDING_PII: ['fa-file-arrow-down', '개인정보 다운로드 사유를 확인하세요', '확인하기'],
+    NO_PII_SHEET: ['fa-file-circle-question', '개인정보 다운로드 내역 탭이 없어요', '확인하기'],
+    NO_DATA: ['fa-file-circle-plus', '로그가 아직 안 올라왔어요', '올리기'],  // 제목은 renderTodos 에서 'N월 로그를 올려 주세요'로 바꿈
+    READY_TO_CLOSE: ['fa-stamp', '문제없음 · 마감할 수 있어요', '마감하기'],
+  };
+  // 'N월 로그를 올려 주세요' (쓰기 권한 없으면 '아직 안 올라왔어요')
+  const monthAsk = (ym) => SECLOG.canWrite() ? `${SECLOG.monthOf(ym)} 로그를 올려 주세요` : `${SECLOG.monthOf(ym)} 로그가 아직 안 올라왔어요`;
+  const TODO_SHOW = 5;
+  function renderTodos(todos) {
+    state.todos = todos;
+    $('todoCount').textContent = todos.length ? `(${todos.length}건)` : '';
+    if (todos.length === 0) {
+      $('todoList').innerHTML = `<div class="all-ok"><i class="fas fa-circle-check"></i>지금 확인할 것이 없습니다. ${fmtYm(state.ym)} 점검이 잘 진행되고 있어요.</div>`;
+      $('btnTodoMore').classList.add('hidden');
+      return;
+    }
+    const list = state.todoAll ? todos : todos.slice(0, TODO_SHOW);
+    $('todoList').innerHTML = list.map(t => {
+      const k = [...(TODO_KIND[t.kind] || ['fa-circle-info', '확인 필요', '보기'])];
+      if (t.kind === 'NO_DATA') k[1] = monthAsk(state.ym);
+      return `<a class="now-item ${t.level}" href="${esc(t.link)}">
+          <span class="ni-ic"><i class="fas ${k[0]}"></i></span>
+          <span class="ni-body"><span class="ni-title">${esc(t.systemName)} · ${k[1]}</span><span class="ni-msg">${esc(t.message)}</span></span>
+          <span class="ni-go">${k[2]} <i class="fas fa-angle-right"></i></span></a>`;
+    }).join('');
+    const more = todos.length - TODO_SHOW;
+    $('btnTodoMore').classList.toggle('hidden', more <= 0);
+    $('btnTodoMore').innerHTML = state.todoAll ? '<i class="fas fa-chevron-up"></i> 접기' : `<i class="fas fa-chevron-down"></i> ${more}건 더 보기`;
+  }
+  $('btnTodoMore').onclick = () => { state.todoAll = !state.todoAll; renderTodos(state.todos); };
+
+  // 점검 월 진행 3단계 (올리기 → 검토 → 마감)
+  function renderFlow(d) {
+    const n = d.systemCount || 0, u = d.uploadSummary || {}, rc = d.reviewCounts || {};
+    const up = u.uploadedCount || 0;
+    const tot = Object.values(rc).reduce((a, b) => a + b, 0), pend = rc.PENDING || 0;
+    // ② 검토 대상 = 탐지 건 + 위험 표시 계정
+    const ra = d.riskAccountCount || 0, rp = d.riskPendingCount || 0;
+    const all = tot + ra, left = pend + rp;
+    const done = d.accessReviewed || 0;
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    // ② 분석 결과 검토 = 사용 중 시스템 기준 (로그를 올리고 미검토 탐지·위험 계정·개인정보 다운로드가 0 이거나 마감한 시스템 / 사용 중 시스템)
+    //   로그를 안 올린 시스템은 검토 미완료로 셈 → 모든 사용 중 시스템이 검토를 마쳐야 100%
+    const riskBy = {};
+    // 위험 계정 미검토 + 개인정보 다운로드 미검토(자사몰·임직원몰) 합계
+    (d.systems || []).forEach(x => { riskBy[x.systemId] = (x.accessRiskPending || 0) + (x.piiPending || 0); });
+    const rvRows = d.reviews || [];
+    const noLog = rvRows.filter(x => x.accessStatus === 'NONE').length;
+    const rvDone = rvRows.filter(x => x.accessStatus !== 'NONE'
+      && (x.accessStatus === 'REVIEWED' || ((x.detectionPending || 0) === 0 && (riskBy[x.systemId] || 0) === 0))).length;
+    const rvLeft = n - rvDone;
+    const rvSub = !n ? '사용 중인 점검 대상 시스템이 없습니다'
+      : !rvLeft ? '모든 시스템 분석 결과 검토 완료'
+      : `검토 남은 시스템 ${rvLeft}개` + (noLog ? ` (로그 미등록 ${noLog}개 포함)` : '')
+        + (pend || rp ? ` · 미검토 탐지 ${fmtNum(pend)}건 · 위험 계정 ${fmtNum(rp)}개` : '');
+    const dd = d.closeDDay;
+    const ddTxt = d.closed ? '마감 완료' : dd < 0 ? `${-dd}일 지남` : `마감까지 D-${dd}`;
+    const step = (no, cls, href, title, val, sub, p, cta, attr = '') => `<a class="f3-step ${cls}" href="${href}"${attr}>
+        <div class="f3-head"><span class="f3-no">${cls === 'done' ? '<i class="fas fa-check"></i>' : no}</span>${title}</div>
+        <div class="f3-val">${val}</div><div class="f3-sub">${sub}</div>
+        <div class="progress-m"><span style="width:${p}%"></span></div><div class="f3-cta">${cta}</div></a>`;
+    // ① 로그 올리기 카드: 관리자·담당자는 누르면 로그 올리기 창, 조회 사용자는 기존처럼 월별 점검 현황으로 이동
+    const canUp = SECLOG.canWrite();
+    const upAttr = canUp ? ' data-upload="" role="button" aria-haspopup="dialog" title="로그 올리기 창 열기"' : '';
+    const upCta = (done) => canUp
+      ? (done ? '완료 <span class="f3-cta-up"><i class="fas fa-upload"></i> 로그 올리기</span>' : '<i class="fas fa-upload"></i> 로그 올리기')
+      : (done ? '완료' : '안 올린 시스템 보기 <i class="fas fa-angle-right"></i>');
+    $('flow3').innerHTML =
+      step(1, n && up >= n ? 'done' : 'todo', `status.html?ym=${d.targetYm}&f=${up >= n ? 'ALL' : 'NONE'}`, '로그 올리기', `${up} <small>/ ${n}개 시스템</small>`,
+        up >= n ? '모든 시스템 로그가 올라왔습니다' : `아직 안 올린 시스템 ${n - up}개`, pct(up, n),
+        upCta(up >= n), upAttr) +
+      step(2, n && !rvLeft ? 'done' : 'todo', `detail.html?ym=${d.targetYm}`, '분석 결과 검토', n ? `${pct(rvDone, n)}<small>%</small>` : '-',
+        rvSub, pct(rvDone, n),
+        n && !rvLeft ? '완료 <span class="f3-cta-up">분석 결과 보기 <i class="fas fa-angle-right"></i></span>' : '분석 결과 보기 <i class="fas fa-angle-right"></i>',
+        ' title="분석 결과 (접속 행위·이상징후) 화면으로 이동"') +
+      step(3, n && done >= n ? 'done' : 'todo', `status.html?ym=${d.targetYm}&f=${n && done >= n ? 'DONE' : 'TODO'}`, '검토 완료(마감)', `${done} <small>/ ${n}개 시스템</small>`,
+        `${ddTxt} · 기준일 ${d.closeDueDate ? d.closeDueDate.slice(5).replace('-', '/') : '-'}`, pct(done, n),
+        n && done >= n ? '완료' : '남은 시스템 보기 <i class="fas fa-angle-right"></i>');
+  }
+
+
+  // 마감 D-day 배지 ('지금 먼저 볼 것' 오른쪽)
+  function renderDDay(d) {
+    const dd = d.closeDDay;
+    let cls = 'ok', txt;
+    if (d.closed) txt = `<i class="fas fa-circle-check"></i> 마감 완료`;
+    else if (dd < 0) { cls = 'over'; txt = `마감 ${-dd}일 지남`; }
+    else { cls = dd <= 3 ? 'over' : dd <= 7 ? 'warn' : 'ok'; txt = `D-${dd}`; }
+    $('ddayBadge').innerHTML = `<span class="dday-pill ${cls}" title="마감 기준일 ${d.closeDueDate} · 마감이 남은 시스템 ${d.closeRemainCount}개"><b>${txt}</b> 마감 기준일 ${d.closeDueDate.slice(5).replace('-', '/')} · 남은 시스템 ${d.closeRemainCount}개</span>`;
+  }
+
+  function renderTrend(t) {
+    if (!window.Chart) return;
+    const labels = t.map(x => +x.date.slice(8) + '일');
+    const todayStr = SECLOG.kstToday();
+    const v = (x, k) => x.date >= todayStr ? null : x[k]; // 오늘 이후는 비워 둔다
+    const data = {
+      labels,
+      datasets: [
+        { type: 'bar', label: '로그인 실패', data: t.map(x => v(x, 'fail')), backgroundColor: '#fca5a5', borderRadius: 4, yAxisID: 'y', stack: 'a' },
+        { type: 'bar', label: '업무시간 외 로그인', data: t.map(x => v(x, 'offHour')), backgroundColor: '#fde68a', borderRadius: 4, yAxisID: 'y', stack: 'b' },
+        { type: 'line', label: '탐지 건수', data: t.map(x => v(x, 'detections')), borderColor: '#4f46e5', backgroundColor: '#4f46e5', cubicInterpolationMode: 'monotone', yAxisID: 'y', pointRadius: 2 },
+      ],
+    };
+    const opts = {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { x: { ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+    };
+    if (trendChart) { trendChart.data = data; trendChart.update(); } else { trendChart = new Chart($('trendChart'), { data, options: opts }); }
+  }
+
+  // ---- 로그 올리기 창 (공통 js/upload-modal.js) : ADMIN / MANAGER
+  const openUpload = (systemId) => SECLOG_UPLOAD.open({
+    ym: state.ym, systemId, onDone: (r) => (r.targetYm !== state.ym ? setYm(r.targetYm) : load()) });
+  if (SECLOG.canWrite()) {
+    $('btnUpload').classList.remove('hidden');
+    $('btnUpload').onclick = () => openUpload(null);
+    // [data-upload] (로그 올리기 카드·시스템별 버튼) → 업로드 창 (값이 있으면 그 시스템을 골라 둔 채로)
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-upload]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      openUpload(b.dataset.upload || null);
+    }, true);
+  }
+
+  async function load() {
+    loading(true);
+    try { render(await api('/dashboard?targetYm=' + state.ym)); }
+    catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+
+  // ---- 월 점검 결과 내보내기 (엑셀)
+  $('btnExport').onclick = async () => {
+    loading(true, '월 점검 결과 엑셀을 만드는 중...');
+    try {
+      const f = await api('/dashboard/export?targetYm=' + state.ym);
+      const bin = atob(f.contentBase64), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const a = document.createElement('a'); a.href = url; a.download = f.fileName; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast(`${f.fileName} 을(를) 내려받았습니다.`);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  };
+
+  const setYm = (ym) => { state.ym = ym; sessionStorage.setItem('seclog_ym', ym); $('ymLabel').textContent = fmtYm(ym); SECLOG.reviewNotice(ym, setYm); load(); };
+  $('btnPrevYm').onclick = () => setYm(shiftYm(state.ym, -1));
+  $('btnNextYm').onclick = () => setYm(shiftYm(state.ym, 1));
+  $('btnRefresh').onclick = load;
+  // 점검 매뉴얼: 목차 클릭 시 팝업 안에서만 이동
+  $('manualBody').querySelector('.mn-toc').onclick = (e) => {
+    const a = e.target.closest('a[href^="#mn"]');
+    if (!a) return;
+    e.preventDefault();
+    $('manualBody').querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const go = (e) => { const tr = e.target.closest('tr[data-href]'); if (tr) location.href = tr.dataset.href; };
+  $('riskBody').onclick = go;
+  $('privBody').onclick = go;
+  setYm(state.ym);
+  // 화면을 열어 둔 상태에서도 최신 상태 유지 (5분마다)
+  setInterval(() => { if (!document.hidden) load(); }, 300000);
+})();
+</script>
+</body>
+</html>

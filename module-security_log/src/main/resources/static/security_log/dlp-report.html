@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DLP 보고서 작성</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body class="lr-page">
+<main class="sl-main" id="dlpReportPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-file-powerpoint"></i></span><span>DLP 보고서 작성</span></h1>
+    <div class="lr-filters" role="search" aria-label="모니터링 월 선택">
+      <label class="lr-f"><span>모니터링 월</span><input type="month" class="form-control" id="rpYm" aria-label="모니터링 월 (연월)"></label>
+    </div>
+    <div class="header-actions">
+      <button class="btn-m btn-outline-m hidden" id="btnSave"><i class="fas fa-floppy-disk"></i>입력 저장</button>
+      <button class="btn-m btn-primary-m" id="btnPpt" disabled><i class="fas fa-file-powerpoint"></i>PPT 내려받기</button>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" aria-label="DLP 모니터링 메뉴">
+    <a href="dlp.html"><i class="fas fa-user-lock"></i> DLP 모니터링</a>
+    <a href="dlp-report.html" class="active" aria-current="page"><i class="fas fa-file-powerpoint"></i> 보고서 작성</a>
+    <a href="dlp-kakao.html"><i class="fas fa-comment"></i> 카카오톡 사용자 현황</a>
+  </nav>
+
+  <div class="lr-empty hidden" id="rpEmpty"></div>
+  <ul class="rp-guide" id="rpGuide">
+    <li>회색 칸 = 유출 로그로 자동 계산 · 흰 칸 = 직접 입력 (입력 후 [입력 저장])</li>
+    <li>Privacy-I 재설치(03)·장기 미접속(04) = DLP 모니터링 ② 에서 올린 Privacy-I Agent 현황 파일 1개로 채움</li>
+    <li>PPT = 8장 (표지 · 목차 · 01~06) · 흰 바탕 깔끔한 디자인 · 이 화면 내용만 들어감 (02 는 미승인 사용자만)</li>
+  </ul>
+
+  <div id="rpBody" class="hidden">
+    <!-- 표지 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secCover">
+      <h3 class="lr-rules-title" id="secCover">표지</h3>
+      <div class="row g-3">
+        <div class="col-md-3"><label class="form-label">보고 기간</label><input class="form-control rp-auto" id="cvPeriod" readonly></div>
+        <div class="col-md-3"><label class="form-label" for="cvType">보고 구분</label><input class="form-control rp-in" id="cvType" maxlength="100" placeholder="예: 월간 정기 보고"></div>
+        <div class="col-md-3"><label class="form-label" for="cvSystem">대상 시스템</label><input class="form-control rp-in" id="cvSystem" maxlength="200" placeholder="예: DLP (Privacy-I)"></div>
+        <div class="col-md-3"><label class="form-label" for="cvDept">작성 부서</label><input class="form-control rp-in" id="cvDept" maxlength="200" placeholder="예: 정보보안팀"></div>
+        <div class="col-12"><label class="form-label" for="cvKw">회사 식별 단어 <span class="dm-sub">(쉼표 구분 · 생성형 AI 업로드 파일 이름에 있으면 보안 위험도 '상' 제안)</span></label>
+          <input class="form-control rp-in" id="cvKw" maxlength="500" placeholder="예: 회사명, 영문 회사명, 브랜드명"></div>
+      </div>
+      <p class="rp-note hidden" id="cvCarry"><i class="fas fa-circle-info"></i> 이전 달 표지 정보를 이어서 표시 · [입력 저장] 시 이 달 값으로 저장</p>
+    </section>
+
+    <!-- 01 외장하드 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secUsb">
+      <h3 class="lr-rules-title" id="secUsb"><span class="rp-no">01</span> Removable Drive (외장하드 및 USB) 사용 현황</h3>
+      <div class="rp-kpis" id="usbKpi"></div>
+      <h4 class="rp-sub">등록 안 된 외장하드로 파일 업로드한 인원 <span class="rp-red" id="usbCnt"></span></h4>
+      <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서</th><th>이름</th><th>건 수</th><th>승인여부</th><th>검토 결과</th></tr></thead><tbody id="usbBody"></tbody></table></div>
+      <p class="rp-note">대상 = 채널·서브 채널에 USB·이동식·외장·Removable·Media · 차단 = 대응 행동 '차단' · 등록 여부 = '이동식 저장 매체 등록 여부' 열</p>
+    </section>
+
+    <!-- 02 카카오톡 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secKakao">
+      <h3 class="lr-rules-title" id="secKakao"><span class="rp-no">02</span> PC 카카오톡 사용 현황</h3>
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <h4 class="rp-sub">사용 부서 현황 <span class="rp-basis" id="kkBasis"></span></h4>
+          <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서</th><th>사용 인원</th><th>부서 인원</th></tr></thead><tbody id="kkDeptBody"></tbody></table></div>
+          <p class="rp-note">사용 인원 = <a href="dlp-kakao.html">카카오톡 사용자 현황</a>(승인 대장) 최신 기준 · 보고서를 만든 날 신청 기간 안인 사람 · 부서 인원은 한 번 입력하면 다음 달에도 이어서 사용</p>
+        </div>
+        <div class="col-lg-7">
+          <h4 class="rp-sub">사용자 (사전승인 · 대장 자동) <span class="rp-red" id="kkCnt"></span></h4>
+          <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서</th><th>이름</th><th>건 수</th><th>사전승인</th><th>사유</th></tr></thead><tbody id="kkUserBody"></tbody></table></div>
+          <p class="rp-note">사전승인·사유는 <a href="dlp-kakao.html">승인 대장</a>으로 자동 판정 (부서 + 이름, 사용한 날이 신청 기간 안 = 승인) · 직접 고르면 그 값 우선 · 보고서 '미승인 사용자 현황'에는 '승인'이 아닌 사람만 표시 · <b>담당자 확인 필요</b> = 승인 기간 밖에 사용 / 같은 이름이 다른 부서로만 대장에 있음 → 확인 후 승인·미승인을 고르고 [입력 저장]하면 태그가 사라짐</p>
+        </div>
+      </div>
+      <p class="rp-note">사용자(사전승인) 대상 = 그 달 유출 로그 중 채널·서브 채널·내용·상세 내용·파일·정책에 '카카오' 또는 'kakao'</p>
+    </section>
+
+    <!-- 03 Privacy-I 재설치 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secRe">
+      <h3 class="lr-rules-title" id="secRe"><span class="rp-no">03</span> Privacy-I 재설치 인원 현황 <span class="rp-red" id="reCnt"></span></h3>
+      <div class="rp-file" data-kind="REINSTALL"><span class="rp-file-name" id="reFile">목록 파일 없음</span></div>
+      <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서 이름</th><th>사용자 이름</th><th>설치 일시</th><th>검토내용</th></tr></thead><tbody id="reBody"></tbody></table></div>
+      <p class="rp-note">DLP 모니터링 ② Privacy-I Agent 현황 파일에서 <b>설치 일시가 이 달인 사람</b>만 표시 · 다시 올리면 이 달 목록 교체</p>
+    </section>
+
+    <!-- 04 Privacy-I 장기 미접속 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secOff">
+      <h3 class="lr-rules-title" id="secOff"><span class="rp-no">04</span> Privacy-I 장기 미접속 인원 현황 <span class="rp-red" id="offCnt"></span></h3>
+      <div class="rp-file" data-kind="OFFLINE"><span class="rp-file-name" id="offFile">목록 파일 없음</span></div>
+      <div class="rp-kpis" id="offKpi"></div>
+      <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>순위</th><th>부서 이름</th><th>사용자 이름</th><th>최종 오프라인 일시</th><th>미접속일</th><th>조치 구분</th><th>조치 내용</th></tr></thead><tbody id="offBody"></tbody></table></div>
+      <p class="rp-note">목록 파일 = Privacy-I 'Agent List' 엑셀 그대로 (위쪽 부서별 요약 표 아래 머리글: 부서 이름 / 사용자 이름 / 사용자 아이디 / 최종 오프라인 일시 / 미접속일) · <b>미접속일 7일 이상인 사람만</b> 장기 미접속으로 표시 (미접속일이 비어 있으면 최종 오프라인 일시로 계산) · 미접속일 긴 순 · 조치 구분이 비어 있으면 '미조치 및 보류'로 집계</p>
+    </section>
+
+    <!-- 05 생성형 AI 사용현황 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secAi">
+      <h3 class="lr-rules-title" id="secAi"><span class="rp-no">05</span> 생성형 AI 사용현황 <span class="dm-sub" id="aiCnt"></span></h3>
+      <div class="row g-3">
+        <div class="col-lg-5"><h4 class="rp-sub">서비스 별 사용현황</h4>
+          <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>순위</th><th>주요 AI 서비스</th><th>업로드 건수</th></tr></thead><tbody id="aiSvcBody"></tbody></table></div></div>
+        <div class="col-lg-7"><h4 class="rp-sub">부서 별 사용현황 (상위 10개 부서)</h4>
+          <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>순위</th><th>부서</th><th>접속 건수</th><th>주 사용 서비스</th></tr></thead><tbody id="aiDeptBody"></tbody></table></div></div>
+      </div>
+      <p class="rp-note" id="aiNote"></p>
+    </section>
+
+    <!-- 06 생성형 AI 업로드 파일 -->
+    <section class="lr-rules rp-sec" aria-labelledby="secAiF">
+      <h3 class="lr-rules-title" id="secAiF"><span class="rp-no">06</span> 생성형 AI 업로드 파일 내역 (이용 빈도 상위 10명)</h3>
+      <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서</th><th>이름</th><th>건 수</th><th>보안 위험도</th><th>주요 업로드 파일 이름</th><th>사용 서비스</th></tr></thead><tbody id="aiUserBody"></tbody></table></div>
+      <ul class="rp-note-list">
+        <li><b class="rp-red">상</b>: 회사명 등 식별정보가 포함된 업무 관련 파일</li>
+        <li><b>중</b>: 업무 관련 파일이나 회사 식별정보가 없는 경우</li>
+        <li><b>하</b>: 개인용 또는 회사 업무와 관련성이 낮은 파일</li>
+        <li>처음엔 파일 이름으로 자동 제안 (회사 식별 단어 → 상, 업무 문서·업무 단어 → 중, 그 외 → 하) · 파일 내용을 보고 직접 고쳐서 저장</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, fmtYm, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const canWrite = SECLOG.canWrite();
+  const st = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_dlp_ym') || SECLOG.reviewYm(), d: null, dirty: false };
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  const toInput = (ym) => ym.slice(0, 4) + '-' + ym.slice(4);
+  const dis = canWrite ? '' : 'disabled';
+  const person = (n, id) => `${esc(n || '-')}${id ? `<div class="lr-r-sub mono">${esc(id)}</div>` : ''}`;
+  const sel = (sec, key, opts, v, label) => `<select class="form-select form-select-sm rp-in" data-sec="${sec}" data-key="${esc(key)}" data-f="v1" aria-label="${label}" ${dis}><option value="">선택</option>${opts.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  // 카카오톡 사전승인: 첫 칸 = 승인 대장 자동 판정 (값 없음 = 저장 안 함), 승인/미승인 = 직접 선택
+  const kkSel = (p) => {
+    const auto = p.autoApproval || '확인 필요';
+    return `<select class="form-select form-select-sm rp-in" data-sec="KAKAO_USER" data-key="${esc(p.itemKey)}" data-f="v1" aria-label="사전승인" ${dis}>
+      <option value="">대장 자동: ${auto}</option>${['승인', '미승인'].map(o => `<option ${o === p.manual1 ? 'selected' : ''}>${o}</option>`).join('')}</select>
+      ${p.needConfirm && !p.manual1 ? '<span class="badge-st kk-confirm"><i class="fas fa-exclamation-circle"></i> 담당자 확인 필요</span>' : ''}
+      <div class="lr-r-sub ${p.source === 'CHECK' ? 'rp-red' : ''}">${esc(p.autoNote || '')}${p.needConfirm && !p.manual1 ? ' → 확인 후 승인/미승인을 골라 주세요' : ''}</div>`;
+  };
+  const inp = (sec, key, v, ph, f = 'v2', cls = '') => `<input class="form-control form-control-sm rp-in ${cls}" data-sec="${sec}" data-key="${esc(key)}" data-f="${f}" value="${esc(v || '')}" placeholder="${ph}" maxlength="${f === 'v1' ? 6 : 1000}" ${dis}>`;
+  const empty = (n, t = '해당 없음') => `<tr><td colspan="${n}" class="lr-r-empty">${t}</td></tr>`;
+  const kpi = (items) => items.map(([l, v, cls, sub, unit, desc]) => `<div class="rp-kpi ${cls || ''}"><span>${l}</span>${desc ? `<i class="rp-kpi-desc">(${desc})</i>` : ''}<b>${fmtNum(v)}${unit ? `<em>${unit}</em>` : ''}</b>${sub ? `<small>${sub}</small>` : ''}</div>`).join('');
+
+  if (canWrite) { $('btnSave').classList.remove('hidden'); }
+  else { document.querySelectorAll('#rpBody .rp-in').forEach(e => { e.disabled = true; }); $('rpGuide').insertAdjacentHTML('beforeend', '<li>조회 전용 · 입력은 담당자만 가능</li>'); }
+
+  async function load() {
+    loading(true);
+    try {
+      sessionStorage.setItem('seclog_dlp_ym', st.ym);
+      const d = st.d = await api(`/dlp-leak/report-data?targetYm=${st.ym}`);
+      st.dirty = false;
+      $('btnPpt').disabled = !d.upload;
+      $('rpEmpty').classList.toggle('hidden', !!d.upload);
+      $('rpBody').classList.toggle('hidden', !d.upload);
+      if (!d.upload) { $('rpEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 유출 로그 없음 → [DLP 모니터링]에서 유출 로그를 먼저 올리기`; return; }
+      render(d);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+
+  function render(d) {
+    const c = d.cover;
+    $('cvPeriod').value = c.reportPeriod; $('cvType').value = c.reportType || ''; $('cvSystem').value = c.targetSystem || '';
+    $('cvDept').value = c.writerDept || ''; $('cvKw').value = c.companyKeywords || '';
+    $('cvCarry').classList.toggle('hidden', !c.carriedOver);
+
+    const u = d.usb;
+    $('usbKpi').innerHTML = kpi([['업로드 차단', u.blocked, '', '차단', '건', '외장하드 및 USB로 업로드 시 차단된 건수'],
+      ['등록된 외장하드로 업로드', u.allowedRegistered, '', '허용', '건', '등록된 외장하드로 업로드 시 허용된 건수'],
+      ['등록 안 된 외장하드로 업로드', u.allowedUnregistered, 'red', '허용', '건', '등록되지 않은 외장하드로 업로드된 건수'],
+      ['외장하드·USB 업로드 전체', u.total, 'navy', `차단 ${fmtNum(u.blocked)}건 · 허용 ${fmtNum(u.allowedRegistered + u.allowedUnregistered)}건`, '건', '외장하드 및 USB 사용 건의 차단·허용 건수 합계']]);
+    $('usbCnt').textContent = `(총 ${u.unregUsers.length}명)`;
+    $('usbBody').innerHTML = u.unregUsers.length ? u.unregUsers.map(p => `<tr><td class="rp-auto">${esc(p.deptName || '-')}</td><td class="rp-auto">${person(p.userName, p.userId)}</td><td class="rp-auto">${fmtNum(p.count)}</td>
+        <td>${sel('USB_UNREG', p.itemKey, ['승인', '미승인'], p.value1, '승인여부')}</td><td>${inp('USB_UNREG', p.itemKey, p.value2, '검토 결과')}</td></tr>`).join('') : empty(5);
+
+    const k = d.kakao;
+    $('kkBasis').textContent = k.basisDate ? `${k.basisDate} 기준` : '';
+    $('kkDeptBody').innerHTML = k.depts.length ? k.depts.map(r => `<tr><td class="rp-auto">${esc(r.deptName)}</td><td class="rp-auto">${fmtNum(r.userCount)}</td>
+        <td>${inp('DEPT_HEADCOUNT', r.deptName, r.headcount ?? '', '인원', 'v1', 'rp-num')}</td></tr>`).join('') : empty(3, '오늘 사용 중인 승인 건 없음');
+    $('kkCnt').textContent = `(사용 ${k.users.length}명 · 미승인 ${k.unapprovedCount}명)`;
+    $('kkUserBody').innerHTML = k.users.length ? k.users.map(p => `<tr><td class="rp-auto">${esc(p.deptName || '-')}</td><td class="rp-auto">${person(p.userName, p.userId)}</td><td class="rp-auto">${fmtNum(p.count)}</td>
+        <td>${kkSel(p)}</td><td>${inp('KAKAO_USER', p.itemKey, p.manual2, p.autoReason ? '대장: ' + p.autoReason : '사유')}</td></tr>`).join('') : empty(5);
+
+    const re = d.reinstall;
+    $('reFile').innerHTML = re.fileName ? `<i class="fas fa-file-excel"></i> ${esc(re.fileName)}` : '목록 파일 없음';
+    $('reCnt').textContent = `(총 ${re.rows.length}명)`;
+    $('reBody').innerHTML = re.rows.length ? re.rows.map(r => `<tr><td class="rp-auto">${esc(r.deptName || '-')}</td><td class="rp-auto">${person(r.userName, r.userId)}</td><td class="rp-auto">${esc(r.eventAt || '-')}</td>
+        <td>${inp('PI_REINSTALL', r.itemKey, r.value2, '검토내용')}</td></tr>`).join('') : empty(4, re.fileName ? '해당 없음' : '재설치 목록 파일을 올리면 표시');
+
+    const off = d.offline;
+    $('offFile').innerHTML = off.fileName ? `<i class="fas fa-file-excel"></i> ${esc(off.fileName)}` : '목록 파일 없음';
+    $('offCnt').textContent = `(총 ${off.rows.length}명)`;
+    $('offKpi').innerHTML = kpi([['장기 미접속 (7일 이상)', off.longOffline, 'navy'], ['조치완료', off.actionDone], ['휴직 및 퇴사', off.leaveOrQuit], ['미조치 및 보류', off.pending, 'red']]);
+    $('offBody').innerHTML = off.rows.length ? off.rows.map(r => `<tr><td class="rp-auto">${r.rank}</td><td class="rp-auto">${esc(r.deptName || '-')}</td><td class="rp-auto">${person(r.userName, r.userId)}</td>
+        <td class="rp-auto">${esc(r.eventAt || '-')}</td><td class="rp-auto">${r.offlineDays == null ? '-' : r.offlineDays + '일'}</td>
+        <td>${sel('PI_OFFLINE', r.itemKey, ['조치완료', '휴직 및 퇴사', '미조치 및 보류'], r.value1, '조치 구분')}</td><td>${inp('PI_OFFLINE', r.itemKey, r.value2, '조치 내용')}</td></tr>`).join('') : empty(7, off.fileName ? '해당 없음' : '장기 미접속 목록 파일을 올리면 표시');
+
+    const a = d.ai;
+    $('aiCnt').textContent = `(생성형 AI 업로드 ${fmtNum(a.eventCount)}건)`;
+    $('aiSvcBody').innerHTML = a.services.length ? a.services.map(r => `<tr><td>${r.rank}</td><td>${esc(r.name)}</td><td>${fmtNum(r.count)}</td></tr>`).join('') : empty(3);
+    $('aiDeptBody').innerHTML = a.depts.length ? a.depts.map(r => `<tr><td>${r.rank}</td><td>${esc(r.deptName)}</td><td>${fmtNum(r.count)}</td><td>${esc(r.mainService || '-')}</td></tr>`).join('') : empty(4);
+    $('aiNote').textContent = `판정: 유출 로그의 접속 주소(URL)를 주요 생성형 AI 서비스 ${d.aiCatalogSize}종 목록과 대조 (ChatGPT·Gemini·Claude·Copilot·Perplexity·DeepSeek·뤼튼·CLOVA X 등)`;
+    $('aiUserBody').innerHTML = a.users.length ? a.users.map(r => `<tr><td class="rp-auto">${esc(r.deptName || '-')}</td><td class="rp-auto">${person(r.userName, r.userId)}</td><td class="rp-auto">${fmtNum(r.count)}</td>
+        <td>${sel('AI_USER', r.itemKey, ['상', '중', '하'], r.riskManual ? r.risk : '', '보안 위험도').replace('<option value="">선택</option>', `<option value="">제안: ${r.riskSuggested}</option>`)}
+          <div class="lr-r-sub" title="${esc(r.riskReason)}">${r.riskManual ? '직접 입력' : '자동 제안'} · ${esc(r.riskReason)}</div></td>
+        <td class="rp-auto rp-files">${esc((r.files || []).join(', ') || '-')}</td><td class="rp-auto">${esc((r.services || []).join(', '))}</td></tr>`).join('') : empty(6);
+    if (!canWrite) document.querySelectorAll('#rpBody .rp-in').forEach(e => { e.disabled = true; });
+  }
+
+  function collect() {
+    const items = [...document.querySelectorAll('#rpBody [data-sec]')].reduce((m, el) => {
+      const k = el.dataset.sec + '|' + el.dataset.key;
+      const it = m[k] = m[k] || { section: el.dataset.sec, itemKey: el.dataset.key, value1: null, value2: null };
+      it[el.dataset.f === 'v1' ? 'value1' : 'value2'] = el.value.trim() || null;
+      return m;
+    }, {});
+    return { cover: { reportType: $('cvType').value, targetSystem: $('cvSystem').value, writerDept: $('cvDept').value, companyKeywords: $('cvKw').value }, items: Object.values(items) };
+  }
+
+  async function save(silent) {
+    const body = collect();
+    const bad = body.items.find(i => i.section === 'DEPT_HEADCOUNT' && i.value1 && !/^\d{1,6}$/.test(i.value1));
+    if (bad) { toast(`부서 인원은 숫자로 입력 (${bad.itemKey})`, 'error'); return false; }
+    loading(true);
+    try {
+      st.d = await api(`/dlp-leak/report-data?targetYm=${st.ym}`, { method: 'PUT', body });
+      render(st.d); st.dirty = false;
+      if (!silent) toast('입력 저장 완료');
+      return true;
+    } catch (e) { toast(e.message, 'error'); return false; }
+    finally { loading(false); }
+  }
+
+  function saveBase64(f) {
+    const bin = atob(f.contentBase64); const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr]));
+    const a = document.createElement('a'); a.href = url; a.download = f.fileName; a.click(); URL.revokeObjectURL(url);
+  }
+
+  $('btnSave').onclick = () => save(false);
+  $('btnPpt').onclick = async () => {
+    if (canWrite && st.dirty && !(await save(true))) return;
+    loading(true);
+    try { saveBase64(await api(`/dlp-leak/report?targetYm=${st.ym}`)); toast('보고서 내려받기 완료'); }
+    catch (e) { toast(e.message, 'error'); } finally { loading(false); }
+  };
+  $('rpBody').addEventListener('input', () => { st.dirty = true; });
+  $('rpBody').addEventListener('change', () => { st.dirty = true; });
+  window.addEventListener('beforeunload', (e) => { if (st.dirty && canWrite) { e.preventDefault(); e.returnValue = ''; } });
+  $('rpYm').value = toInput(st.ym);
+  $('rpYm').onchange = async () => {
+    const v = ($('rpYm').value || '').replace('-', '');
+    if (!/^\d{6}$/.test(v)) return;
+    if (st.dirty && canWrite && confirm('저장하지 않은 입력이 있음. 저장 후 이동할까?')) await save(true);
+    st.ym = v; load();
+  };
+  load();
+})();
+</script>
+</body>
+</html>

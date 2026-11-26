@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>보안로그 점검</title>
+<script>
+  /* '접속·보안 로그' 메뉴는 삭제됨(2026-11). 예전 주소·즐겨찾기·플랫폼 메뉴로 들어오면 [분석 결과] 로그 고르기 화면으로 이동 */
+  (function () {
+    var ym = new URLSearchParams(location.search).get('ym');
+    location.replace('detail.html' + (ym && /^\d{6}$/.test(ym) ? '?ym=' + ym : ''));
+  })();
+</script>
+</head>
+<body></body>
+</html>

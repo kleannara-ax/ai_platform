@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>룰셋 분석 근거</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body class="lr-page">
+<main class="sl-main">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-magnifying-glass-chart"></i></span><span><small class="crumb">로그 분석 및 검토 ›</small> 룰셋 분석 근거</span></h1>
+    <div class="header-actions">
+      <a href="detail.html" class="btn-m btn-gray-m" id="btnBack"><i class="fas fa-arrow-left"></i>로그 분석 및 검토로</a>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <div id="evView">
+    <!-- 1. 룰 요약 -->
+    <section class="ev-head" id="evHead" aria-label="룰 요약"><div class="text-muted-m">불러오는 중...</div></section>
+
+    <!-- 2. 왜 검토 대상인가 -->
+    <section class="ev-card" aria-labelledby="whyTitle">
+      <h2 class="ev-card-title" id="whyTitle"><i class="fas fa-circle-question"></i>왜 검토 대상인가</h2>
+      <ul class="ev-reasons" id="evReasons"></ul>
+      <dl class="ev-cond" id="evCond"></dl>
+      <ul class="ev-notes hidden" id="evNotes"></ul>
+    </section>
+
+    <!-- 3. 개인정보 다운로드 이력 (자사몰·임직원몰 연동 룰셋만) -->
+    <section class="ev-card hidden" id="pii" aria-labelledby="piiTitle">
+      <div class="ev-log-head">
+        <h2 class="ev-card-title mb-0" id="piiTitle"><i class="fas fa-file-arrow-down"></i>개인정보 다운로드 이력 <span class="ev-cnt" id="piiCnt"></span></h2>
+        <div class="ev-tools">
+          <div class="lr-seg" role="tablist" aria-label="검토 여부 거르기" id="piiSeg">
+            <button type="button" data-f="ALL" role="tab" class="is-active">전체</button>
+            <button type="button" data-f="PENDING" role="tab">미검토</button>
+            <button type="button" data-f="DONE" role="tab">검토 완료</button>
+          </div>
+        </div>
+      </div>
+      <p class="ev-legend" id="piiNote"></p>
+      <div class="review-panel hidden" id="piiPanel">
+        <span style="font-weight:700;font-size:.85rem">선택 <span id="piiSelCount">0</span>건</span>
+        <select class="form-select" id="piiRvStatus" style="width:210px" aria-label="다운로드 검토 결과">
+          <option value="NORMAL">정상 업무 (사유 확인)</option><option value="CONFIRMED">사유 불명확 · 조치 필요</option>
+          <option value="RESOLVED">조치완료</option><option value="PENDING">미검토로 되돌리기</option>
+        </select>
+        <input type="text" class="form-control" id="piiRvComment" maxlength="2000" placeholder="다운로드 사유·확인 내용 (예: 10월 정산 업무, 담당자 확인)" style="flex:1;min-width:240px">
+        <button class="btn-m btn-primary-m" id="btnPiiSave" disabled><i class="fas fa-check"></i>선택 건 검토 저장</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl ev-log-tbl pii-ev-tbl">
+          <thead><tr><th class="center pii-chk-col hidden" style="width:40px"><input type="checkbox" class="form-check-input" id="piiChkAll" aria-label="보이는 건 모두 선택"></th>
+            <th class="num">행</th><th>다운로드 일시</th><th>운영자 ID</th><th>접속 IP</th><th style="min-width:240px">다운로드한 개인정보 파일</th><th style="min-width:220px">검토 여부</th></tr></thead>
+          <tbody id="piiBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. 근거 로그 -->
+    <section class="ev-card" id="logSec" aria-labelledby="logTitle">
+      <div class="ev-log-head">
+        <h2 class="ev-card-title mb-0" id="logTitle"><i class="fas fa-file-lines"></i>근거 로그 <span class="ev-cnt" id="evCnt"></span></h2>
+        <div class="ev-tools">
+          <div class="lr-seg" role="tablist" aria-label="검토 상태 거르기" id="evSeg">
+            <button type="button" data-f="ALL" role="tab" class="is-active">전체</button>
+            <button type="button" data-f="PENDING" role="tab">미검토</button>
+            <button type="button" data-f="DONE" role="tab">검토 완료</button>
+          </div>
+          <select class="form-select hidden" id="evAcc" aria-label="계정 거르기"></select>
+          <input type="search" class="form-control" id="evQ" placeholder="로그 내용 검색" aria-label="로그 내용 검색">
+        </div>
+      </div>
+      <p class="ev-legend"><mark class="ev-mark">노란 표시</mark> = 룰에 걸린 부분 · 행 번호 = <span id="evRowLabel">로그 줄</span> · 원문은 [원문] 눌러 확인</p>
+      <div class="tbl-wrap">
+        <table class="tbl ev-log-tbl">
+          <thead id="evThead"></thead>
+          <tbody id="evBody"><tr class="empty-row"><td colspan="7">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager" id="evPager"></div>
+    </section>
+  </div>
+</main>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtDt, fmtNum, fmtYm, sevBadge, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  SECLOG.renderTabs('result');
+  const id = SECLOG.qs('id'), ruleCode = SECLOG.qs('rule');
+  $('btnBack').href = id ? `detail.html?id=${encodeURIComponent(id)}#lrRules` : 'detail.html';
+  if (!id || !ruleCode) {
+    $('evView').innerHTML = '<section class="ev-card text-center"><h5>볼 룰이 지정되지 않음</h5><a href="detail.html" class="btn-m btn-outline-m mt-2">로그 분석 및 검토로</a></section>';
+    return;
+  }
+
+  const PAGE = 50;
+  const st = { d: null, f: 'ALL', acc: '', q: '', page: 0 };
+  const RV = { PENDING: ['미검토', 'rv-pending'], CONFIRMED: ['이상 확인', 'rv-confirmed'], RESOLVED: ['조치완료', 'rv-resolved'], FALSE_POSITIVE: ['정상 확인', 'rv-fp'] };
+  const rvBadge = (s) => { const [l, c] = RV[s] || [s, '']; return `<span class="badge-rv ${c}">${esc(l)}</span>`; };
+
+  /** 원문에서 일치 부분만 노란 표시 (나머지는 그대로 이스케이프) */
+  function hl(text, s, e) {
+    const t = String(text || '');
+    if (!(s >= 0) || !(e > s) || e > t.length) return esc(t);
+    return esc(t.slice(0, s)) + '<mark class="ev-mark">' + esc(t.slice(s, e)) + '</mark>' + esc(t.slice(e));
+  }
+  /** 화면용 내용 칸에서 일치 문자열 표시 (DLP: 엑셀 '내용' 칸 안에서 찾음) */
+  function hlIn(text, needle) {
+    const t = String(text || '');
+    if (!needle) return esc(t);
+    const i = t.toLowerCase().indexOf(String(needle).toLowerCase());
+    return i < 0 ? esc(t) : hl(t, i, i + needle.length);
+  }
+
+  function renderHead(d) {
+    const r = d.rule;
+    const done = d.detectionCount - d.detectionPending;
+    const accN = d.dlp ? new Set(d.items.map(x => x.account)).size : null;
+    const piiN = d.pii ? d.pii.totalCount : 0, piiDone = d.pii ? d.pii.totalCount - d.pii.pendingCount : 0;
+    const target = (d.dlp ? accN : d.detectionCount) + piiN;
+    const doneItems = (d.dlp ? [...new Set(d.items.map(x => x.account))].filter(a => d.items.filter(x => x.account === a).every(x => x.reviewStatus !== 'PENDING')).length : done) + piiDone;
+    $('evHead').innerHTML = `
+      <div class="ev-head-main">
+        <div class="ev-head-top">${sevBadge(r.severity)}${r.scopeLabel ? `<span class="ev-scope">${esc(r.scopeLabel)}</span>` : ''}
+          <span class="ev-status st-${esc((d.status || '').toLowerCase())}">${esc(d.statusLabel || '')}</span>${r.deleted ? '<span class="ev-scope ev-del">삭제된 룰</span>' : ''}</div>
+        <div class="ev-rule-name">${esc(r.ruleName)}</div>
+        <div class="ev-meta"><span><i class="fas fa-server"></i> ${esc(d.systemName)}</span><span><i class="fas fa-calendar"></i> ${esc(fmtYm(d.targetYm))}</span>
+          <span class="ev-file" title="${esc(d.fileName)}"><i class="fas fa-file"></i> ${esc(d.fileName)}</span><span><i class="fas fa-clock"></i> 분석 ${esc(fmtDt(d.analyzedAt))}</span></div>
+      </div>
+      <div class="ev-kpis">
+        <div class="ev-kpi"><span>검토 대상</span><b class="lr-orange">${fmtNum(target)}<small>건</small></b>${d.pii ? `<em>개인정보 다운로드 ${fmtNum(piiN)}건 + 탐지 ${fmtNum(d.detectionCount)}줄</em>` : d.dlp ? `<em>계정별 묶음 · 탐지 ${fmtNum(d.detectionCount)}줄</em>` : '<em>탐지된 로그 줄</em>'}</div>
+        <div class="ev-kpi"><span>검토 완료</span><b class="${doneItems ? 'lr-blue' : 'ev-gray'}">${fmtNum(doneItems)}<small>건</small></b><em>미검토 ${fmtNum(target - doneItems)}건</em></div>
+        ${d.pii ? `<div class="ev-kpi"><span>개인정보 다운로드</span><b>${fmtNum(piiN)}<small>건</small></b><em>미검토 ${fmtNum(d.pii.pendingCount)}건</em></div>` : ''}
+        <div class="ev-kpi"><span>일치한 로그</span><b>${d.matchCount != null ? fmtNum(d.matchCount) : fmtNum(d.detectionCount)}<small>줄</small></b><em>탐지 기준 ${fmtNum(r.thresholdCount)}줄 이상</em></div>
+      </div>`;
+    document.title = `${r.ruleName} - 룰셋 분석 근거`;
+  }
+
+  function renderWhy(d) {
+    const r = d.rule;
+    $('evReasons').innerHTML = (d.reasons || []).map(t => `<li>${esc(t)}</li>`).join('');
+    const rows = [];
+    if (r.description) rows.push(['룰 설명 · 점검 포인트', esc(r.description)]);
+    if (r.howText) rows.push(['찾는 방식', `${esc(r.howText)} <span class="text-muted-m">(${esc(r.matchTypeLabel)})</span>`]);
+    if (r.pattern != null) rows.push([r.matchType === 'EXTERNAL_IP' ? '대상 줄 조건' : r.matchType === 'KEYWORD' ? '키워드' : '찾는 문장 형태 (정규식)',
+      `<code class="ev-pattern">${esc(r.pattern)}</code>`]);
+    if (r.matchType === 'EXTERNAL_IP') rows.push(['내부 IP 기준', (d.internalIps || []).length ? d.internalIps.map(esc).join('<br>') : '<span class="text-muted-m">사용 중 대역 없음</span>']);
+    rows.push(['탐지 기준', `같은 로그 파일에서 ${fmtNum(r.thresholdCount)}줄 이상 일치할 때 탐지`]);
+    rows.push(['룰 코드', `<span class="mono">${esc(r.ruleCode)}</span> <a href="rules.html" class="ms-1">[관리 › 탐지 룰셋 편집]</a>`]);
+    $('evCond').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+    const notes = d.notes || [];
+    $('evNotes').classList.toggle('hidden', !notes.length);
+    $('evNotes').innerHTML = notes.map(t => `<li><i class="fas fa-circle-info"></i> ${esc(t)}</li>`).join('');
+  }
+
+  function filtered() {
+    const q = st.q.toLowerCase();
+    return st.d.items.filter(x => (st.f === 'ALL' || (st.f === 'PENDING' ? x.reviewStatus === 'PENDING' : x.reviewStatus !== 'PENDING'))
+      && (!st.acc || x.account === st.acc)
+      && (!q || [x.logContent, x.content, x.detail, x.account, x.name, x.ip, x.type].some(v => v && String(v).toLowerCase().includes(q))));
+  }
+
+  function matchCell(x, d) {
+    if (!x.matched) return '<span class="ev-nomatch" title="현재 룰·설정으로 다시 확인 시 불일치 (분석 이후 변경)">현재 기준 불일치</span>';
+    if (d.rule.matchType === 'EXTERNAL_IP') return `<span class="ev-chip"><i class="fas fa-globe"></i> ${esc(x.matchIp)}</span><div class="ev-sub">내부 대역 밖</div>`;
+    return `<span class="ev-chip">${esc(x.matchText)}</span>`;
+  }
+  const rawBtn = (x) => `<details class="ev-raw"><summary>원문</summary><div class="log-line">${hl(x.logContent, x.matchStart, x.matchEnd)}</div></details>`;
+  const reviewCell = (x) => `${rvBadge(x.reviewStatus)}${x.actionContent ? `<div class="ev-sub" title="${esc(x.actionContent)}">${esc(x.actionContent)}</div>` : ''}`;
+
+  function renderList() {
+    const d = st.d, rows = filtered();
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    if (st.page >= pages) st.page = pages - 1;
+    const view = rows.slice(st.page * PAGE, st.page * PAGE + PAGE);
+    $('evCnt').textContent = `${fmtNum(rows.length)}줄${rows.length !== d.items.length ? ` / 전체 ${fmtNum(d.items.length)}줄` : ''}`;
+    const cols = d.dlp ? 7 : 4;
+    $('evThead').innerHTML = d.dlp
+      ? '<tr><th class="num">행</th><th>발생 일시</th><th>계정</th><th>IP</th><th style="min-width:260px">내용</th><th>걸린 부분</th><th>검토</th></tr>'
+      : '<tr><th class="num">줄</th><th style="min-width:360px">로그 원문</th><th>걸린 부분</th><th>검토</th></tr>';
+    if (!d.items.length) {
+      $('evBody').innerHTML = `<tr class="empty-row"><td colspan="${cols}">이 룰로 검토 대상이 된 로그 없음</td></tr>`;
+      $('evPager').innerHTML = '';
+      return;
+    }
+    $('evBody').innerHTML = view.length ? view.map(x => d.dlp
+      ? `<tr class="${x.reviewStatus === 'PENDING' ? '' : 'is-reviewed'}">
+          <td class="num mono">${fmtNum(x.row)}</td><td class="mono ev-nowrap">${esc(x.time || '-')}</td>
+          <td><span class="mono">${esc(x.account || '-')}</span>${x.name ? `<div class="ev-sub">${esc(x.name)}</div>` : ''}</td>
+          <td class="mono ev-nowrap">${d.rule.matchType === 'EXTERNAL_IP' ? hlIn(x.ip, x.matchIp) : esc(x.ip || '-')}</td>
+          <td>${x.type ? `<span class="ev-type">${esc(x.type)}</span> ` : ''}${d.rule.matchType === 'EXTERNAL_IP' ? esc(x.content || '') : hlIn(x.content, x.matchText)}
+            ${x.detail ? `<div class="ev-sub ev-detail">${d.rule.matchType === 'EXTERNAL_IP' ? esc(x.detail) : hlIn(x.detail, x.matchText)}</div>` : ''}${rawBtn(x)}</td>
+          <td>${matchCell(x, d)}</td><td class="ev-rv">${reviewCell(x)}</td></tr>`
+      : `<tr class="${x.reviewStatus === 'PENDING' ? '' : 'is-reviewed'}">
+          <td class="num mono">${fmtNum(x.row)}</td><td><div class="log-line">${hl(x.logContent, x.matchStart, x.matchEnd)}</div></td>
+          <td>${matchCell(x, d)}</td><td class="ev-rv">${reviewCell(x)}</td></tr>`).join('')
+      : `<tr class="empty-row"><td colspan="${cols}">조건에 맞는 로그 없음</td></tr>`;
+    if (pages <= 1) { $('evPager').innerHTML = ''; return; }
+    const cur = st.page, start = Math.max(0, Math.min(cur - 4, pages - 9)), end = Math.min(pages, start + 9);
+    let h = `<button ${cur === 0 ? 'disabled' : ''} data-p="${cur - 1}" aria-label="이전 쪽"><i class="fas fa-chevron-left"></i></button>`;
+    for (let i = start; i < end; i++) h += `<button class="${i === cur ? 'active' : ''}" data-p="${i}">${i + 1}</button>`;
+    h += `<button ${cur >= pages - 1 ? 'disabled' : ''} data-p="${cur + 1}" aria-label="다음 쪽"><i class="fas fa-chevron-right"></i></button>`;
+    $('evPager').innerHTML = h;
+  }
+
+  // ===== 개인정보 다운로드 이력 (연동 룰셋) =====
+  const PII_RV = { PENDING: ['미검토', 'rv-pending'], NORMAL: ['정상 업무', 'rv-resolved'], CONFIRMED: ['사유 불명확·조치 필요', 'rv-confirmed'], RESOLVED: ['조치완료', 'rv-resolved'] };
+  const piiSel = new Set();
+  let piiF = 'ALL', piiFocus = null;
+  const piiLocked = () => !SECLOG.canWrite() || !st.d.pii || st.d.pii.locked;
+  const updPiiSel = () => { $('piiSelCount').textContent = piiSel.size; $('btnPiiSave').disabled = piiSel.size === 0; };
+  function renderPii() {
+    const p = st.d.pii;
+    $('pii').classList.toggle('hidden', !p);
+    if (!p) return;
+    const lock = piiLocked(), all = p.items || [];
+    const items = all.filter(x => piiF === 'ALL' || (piiF === 'PENDING' ? x.reviewStatus === 'PENDING' : x.reviewStatus !== 'PENDING'));
+    $('piiCnt').textContent = `${fmtNum(items.length)}건${items.length !== all.length ? ` / 전체 ${fmtNum(all.length)}건` : ''} · 검토 ${fmtNum(p.totalCount - p.pendingCount)} / ${fmtNum(p.totalCount)}`;
+    $('piiNote').innerHTML = p.sheetStatus === 'FOUND'
+      ? `출처: 올린 엑셀의 <b>'${esc(p.sheetName)}'</b> 탭 · 다운로드 1건마다 사유 확인 필요 · <b>미검토가 남으면 최종 검토완료(마감) 불가</b>${lock ? (SECLOG.canWrite() ? ' · 최종 검토완료된 로그 (변경은 검토취소 후)' : ' · 조회 권한 (검토는 담당자·관리자)') : ''}`
+      : p.sheetStatus === 'NOT_FOUND' ? '<i class="fas fa-circle-exclamation" style="color:#d97706"></i> 올린 파일에 개인정보 다운로드 내역 탭 없음 (탭 이름·1~3행 제목에 \'개인정보\'와 \'다운로드\'가 들어간 탭 필요)'
+      : '<i class="fas fa-circle-info"></i> 이 기능 이전에 올린 로그 · [재분석] 시 다운로드 내역 탭 읽음';
+    $('piiPanel').classList.toggle('hidden', lock || !all.length);
+    document.querySelectorAll('.pii-chk-col').forEach(el => el.classList.toggle('hidden', lock));
+    const ids = new Set(items.map(x => String(x.piiDownloadId)));
+    [...piiSel].forEach(k => { if (!ids.has(k)) piiSel.delete(k); });
+    updPiiSel();
+    $('piiChkAll').checked = items.length > 0 && items.every(x => piiSel.has(String(x.piiDownloadId)));
+    $('piiBody').innerHTML = !all.length ? `<tr class="empty-row"><td colspan="7">${p.sheetStatus === 'FOUND' ? '다운로드 기록 없음' : '개인정보 다운로드 이력 없음'}</td></tr>`
+      : !items.length ? '<tr class="empty-row"><td colspan="7">조건에 맞는 다운로드 없음</td></tr>'
+      : items.map(x => {
+        const k = String(x.piiDownloadId), [l, c] = PII_RV[x.reviewStatus] || [x.reviewStatusLabel, ''];
+        const dt = x.downloadAt ? fmtDt(x.downloadAt).slice(0, 16) : (x.downloadAtText || '-');
+        return `<tr id="pii-row-${k}" class="${x.reviewStatus === 'PENDING' ? '' : 'is-reviewed'}${piiFocus === k ? ' is-focus' : ''}">
+          <td class="center ${lock ? 'hidden' : ''}"><input type="checkbox" class="form-check-input pii-chk" value="${k}" ${piiSel.has(k) ? 'checked' : ''} aria-label="${x.rowNo}행 선택"></td>
+          <td class="num mono">${fmtNum(x.rowNo)}</td><td class="mono ev-nowrap">${esc(dt)}</td>
+          <td class="mono"><b>${esc(x.adminId || '-')}</b></td><td class="mono ev-nowrap">${esc(x.accessIp || '-')}</td>
+          <td><span class="pii-ev-file"><i class="fas fa-file-excel" style="color:#16a34a"></i> ${esc(x.formName || '(파일명 없음)')}</span>${x.downloadReason ? `<div class="ev-sub">원본 사유: ${esc(x.downloadReason)}</div>` : ''}</td>
+          <td class="ev-rv"><span class="badge-rv ${c}">${esc(l)}</span>${x.reviewComment ? `<div class="ev-sub" title="${esc(x.reviewComment)}">${esc(x.reviewComment)}</div><div class="ev-sub">${fmtDt(x.reviewedAt)} · 검토자 ID ${esc(x.reviewedBy)}</div>` : ''}</td></tr>`;
+      }).join('');
+  }
+  $('piiSeg').onclick = (e) => {
+    const b = e.target.closest('button[data-f]');
+    if (!b) return;
+    piiF = b.dataset.f;
+    document.querySelectorAll('#piiSeg button').forEach(x => { x.classList.toggle('is-active', x === b); x.setAttribute('aria-selected', x === b); });
+    renderPii();
+  };
+  $('piiBody').onchange = (e) => {
+    if (!e.target.classList.contains('pii-chk')) return;
+    e.target.checked ? piiSel.add(e.target.value) : piiSel.delete(e.target.value);
+    updPiiSel();
+  };
+  $('piiChkAll').onchange = (e) => {
+    document.querySelectorAll('.pii-chk').forEach(c => { c.checked = e.target.checked; e.target.checked ? piiSel.add(c.value) : piiSel.delete(c.value); });
+    updPiiSel();
+  };
+  $('btnPiiSave').onclick = async () => {
+    if (!piiSel.size) return;
+    const status = $('piiRvStatus').value, comment = $('piiRvComment').value.trim();
+    if (status !== 'PENDING' && !comment) { $('piiRvComment').focus(); return toast('다운로드 사유·확인 내용을 입력해 주세요.', 'error'); }
+    const n = piiSel.size;
+    $('loading').classList.add('show');
+    try {
+      await api(`/uploads/${encodeURIComponent(id)}/pii-downloads/review`, { method: 'PUT', body: { piiDownloadIds: [...piiSel].map(Number), reviewStatus: status, reviewComment: comment || null } });
+      piiSel.clear(); $('piiRvComment').value = '';
+      toast(status === 'PENDING' ? `다운로드 ${n}건을 미검토로 되돌렸습니다.` : `다운로드 ${n}건 검토를 저장했습니다.`);
+      await load();
+    } catch (er) { toast(er.message, 'error'); }
+    finally { $('loading').classList.remove('show'); }
+  };
+
+  $('evSeg').onclick = (e) => {
+    const b = e.target.closest('button[data-f]');
+    if (!b) return;
+    st.f = b.dataset.f; st.page = 0;
+    document.querySelectorAll('#evSeg button').forEach(x => { x.classList.toggle('is-active', x === b); x.setAttribute('aria-selected', x === b); });
+    renderList();
+  };
+  $('evAcc').onchange = () => { st.acc = $('evAcc').value; st.page = 0; renderList(); };
+  let qt;
+  $('evQ').oninput = () => { clearTimeout(qt); qt = setTimeout(() => { st.q = $('evQ').value.trim(); st.page = 0; renderList(); }, 200); };
+  $('evPager').onclick = (e) => { const b = e.target.closest('button[data-p]'); if (b && !b.disabled) { st.page = +b.dataset.p; renderList(); window.scrollTo({ top: $('logTitle').getBoundingClientRect().top + scrollY - 20 }); } };
+
+  async function load() {
+    const d = await api(`/uploads/${encodeURIComponent(id)}/rule-results/evidence?ruleCode=${encodeURIComponent(ruleCode)}`);
+    st.d = d;
+    renderHead(d); renderWhy(d); renderPii(); renderList();
+    // 연동 룰셋인데 탐지 로그가 없으면 근거 로그 칸 숨김 (다운로드 이력만 표시)
+    $('logSec').classList.toggle('hidden', !!d.pii && !d.items.length);
+    return d;
+  }
+  (async () => {
+    $('loading').classList.add('show');
+    try {
+      // 요약 카드 목록에서 다운로드 1건을 골라 들어온 경우 (#pii-{id}): 그 건 강조 + 선택
+      const hm = /^#pii-(\d+)$/.exec(location.hash);
+      if (hm) piiFocus = hm[1];
+      const d = await load();
+      $('evRowLabel').textContent = d.rowLabel;
+      if (d.dlp) {
+        const accs = [...new Set(d.items.map(x => x.account))];
+        if (accs.length > 1) {
+          $('evAcc').innerHTML = '<option value="">계정 전체</option>' + accs.map(a => `<option value="${esc(a)}">${esc(a)} (${fmtNum(d.items.filter(x => x.account === a).length)}줄)</option>`).join('');
+          $('evAcc').classList.remove('hidden');
+        }
+      }
+      if (d.pii && piiFocus && !piiLocked()) { piiSel.add(piiFocus); renderPii(); }
+      if (d.pii && (location.hash === '#pii' || piiFocus)) {
+        const el = piiFocus ? $('pii-row-' + piiFocus) : $('pii');
+        (el || $('pii')).scrollIntoView({ block: 'center' });
+      }
+    } catch (e) {
+      toast(e.message, 'error');
+      $('evView').innerHTML = `<section class="ev-card text-center"><h5>${esc(e.message)}</h5><a href="${esc($('btnBack').href)}" class="btn-m btn-outline-m mt-2">로그 분석 및 검토로</a></section>`;
+    } finally { $('loading').classList.remove('show'); }
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리 · 탐지 룰셋 편집</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body>
+<main class="sl-main">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-sliders"></i></span><span><small class="crumb">관리 ›</small> 탐지 룰셋 편집</span></h1>
+    <div class="header-actions">
+      <button class="btn-m btn-primary-m hidden" id="btnNewRule"><i class="fas fa-plus"></i>룰 등록</button>
+    </div>
+  </header>
+
+  <nav class="sl-tabs" id="slTabs"></nav>
+
+  <details class="rule-help" id="ruleGuide">
+    <summary><i class="fas fa-lightbulb"></i>룰셋 도움말 <span class="text-muted-m">(눌러서 보기)</span></summary>
+    <ul>
+      <li>여기 등록된 룰 중 <b>사용</b>인 룰로 로그를 분석 (DLP 점검 보고서도 같은 룰 결과로 작성)</li>
+      <li><b>공통</b>: 로그 유형이 같은 모든 시스템에 적용 · <b>전용</b>: 그 시스템에만 적용</li>
+      <li><b>키워드</b>: 쉼표(,)로 구분한 단어 중 하나라도 있으면 일치 · <b>정규식</b>: Java 정규식 · 모두 대소문자 무시</li>
+      <li><b>내부 IP 외 접속</b>: 줄에서 처음 나오는 IP 가 [관리 › 내부 IP 설정] 대역 밖이면 일치 · 패턴 칸 = 대상 줄 조건(정규식, 모든 줄은 <span class="mono">.*</span>)</li>
+      <li><b>임계 건수</b>: 파일 안에서 일치한 줄이 이 수 이상일 때만 탐지 (예: 로그인 실패 10회 이상)</li>
+      <li>룰 변경은 <b>이후 업로드·재분석부터</b> 적용</li>
+    </ul>
+  </details>
+  <div class="rule-ro-note hidden" id="readonlyNote"><i class="fas fa-lock"></i> 룰 편집은 관리자(ROLE_ADMIN)만 가능 · 현재 조회만 가능</div>
+
+  <!-- 시스템별 룰셋 -->
+  <details class="card-m rs-fold" id="rulesetCard">
+    <summary class="rs-fold-sum"><i class="fas fa-chevron-right rs-fold-arrow"></i><i class="fas fa-layer-group"></i><b>시스템별 룰셋 설정</b>
+      <span class="text-muted-m">공통·전용 룰셋 켜고 끄기 (눌러서 펼치기)</span></summary>
+    <div class="tbl-wrap mt-3">
+      <table class="tbl">
+        <thead><tr><th>시스템</th><th>로그 유형</th><th class="center">공통 룰셋</th><th class="center">시스템 전용 룰셋</th><th>분석에 적용되는 룰</th><th class="center">룰 보기</th></tr></thead>
+        <tbody id="rsBody"><tr class="empty-row"><td colspan="6">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </details>
+
+  <section class="card-m">
+    <div class="rs-tabs" id="scopeTabs">
+      <button data-scope="" class="active">전체</button><button data-scope="COMMON">공통 룰</button><button data-scope="SYSTEM">시스템 전용 룰</button>
+    </div>
+    <div class="filter-bar mb-3">
+      <div class="f-item">
+        <label for="fSystem">시스템</label>
+        <select class="form-select" id="fSystem" style="width:170px"><option value="">전체</option></select>
+      </div>
+      <div class="f-item">
+        <label for="fQ">검색</label>
+        <input type="text" class="form-control" id="fQ" placeholder="룰 코드 / 룰명" style="width:220px">
+      </div>
+      <div class="f-item">
+        <label for="fLogType">적용 로그 유형</label>
+        <select class="form-select" id="fLogType" style="width:170px"><option value="">전체</option><option value="ALL">공통(ALL)</option></select>
+      </div>
+      <div class="f-item">
+        <label for="fUse">사용 여부</label>
+        <select class="form-select" id="fUse" style="width:110px"><option value="">전체</option><option value="Y">사용</option><option value="N">미사용</option></select>
+      </div>
+      <button class="btn-m btn-primary-m" id="btnSearch"><i class="fas fa-search"></i>조회</button>
+      <span class="text-muted-m ms-auto" style="font-size:.82rem" id="ruleTotal"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl rule-list">
+        <thead>
+          <tr><th style="width:170px">시스템</th><th>룰 이름</th>
+            <th style="width:110px">위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th><th class="center" style="width:90px">사용</th><th style="width:36px"></th></tr>
+        </thead>
+        <tbody id="ruleBody"><tr class="empty-row"><td colspan="5">불러오는 중...</td></tr></tbody>
+      </table>
+      <div class="rule-list-hint"><i class="fas fa-hand-pointer"></i> 룰을 누르면 패턴·임계 건수 등 상세 정보 표시</div>
+    </div>
+  </section>
+</main>
+
+<!-- 룰 상세 (오른쪽 패널) -->
+<div class="offcanvas offcanvas-end rule-drawer" tabindex="-1" id="ruleDrawer" aria-labelledby="rdTitle">
+  <div class="offcanvas-header">
+    <div><div class="rd-badges" id="rdBadges"></div><h5 class="offcanvas-title" id="rdTitle">룰 상세</h5></div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+  </div>
+  <div class="offcanvas-body" id="rdBody"></div>
+  <div class="rd-foot hidden" id="rdFoot">
+    <button class="btn-m btn-danger-m" id="rdDel"><i class="fas fa-trash"></i>삭제</button>
+    <button class="btn-m btn-primary-m ms-auto" id="rdEdit"><i class="fas fa-pen"></i>수정 · 패턴 테스트</button>
+  </div>
+</div>
+
+<!-- 룰 등록/수정 모달 -->
+<div class="modal fade" id="ruleModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="ruleModalTitle">룰 등록</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <form id="ruleForm" novalidate class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="rCode">룰 코드<span class="req">*</span></label>
+                <input type="text" class="form-control mono" id="rCode" maxlength="50" placeholder="예: LNX_SSH_BRUTE" style="text-transform:uppercase">
+                <div class="form-text">영문 대문자/숫자/_ 3~50자 · 등록 후 변경 불가</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="rName">룰명<span class="req">*</span></label>
+                <input type="text" class="form-control" id="rName" maxlength="200">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="rScope">룰 구분<span class="req">*</span></label>
+                <select class="form-select" id="rScope"><option value="">공통 룰 (로그 유형으로 적용)</option></select>
+                <div class="form-text" id="scopeHint">같은 로그 유형의 모든 시스템에 적용됩니다.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="rLogType">적용 로그 유형<span class="req">*</span></label>
+                <select class="form-select" id="rLogType"><option value="ALL">공통(ALL)</option></select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="rMatch">매칭 방식<span class="req">*</span></label>
+                <select class="form-select" id="rMatch"><option value="KEYWORD">키워드</option><option value="REGEX">정규식</option><option value="EXTERNAL_IP">내부 IP 외 접속</option></select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="rSeverity">위험도<span class="req">*</span><i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></label>
+                <select class="form-select" id="rSeverity" aria-describedby="sevGuide">
+                  <option value="CRITICAL">심각</option><option value="HIGH">높음</option><option value="MEDIUM" selected>보통</option><option value="LOW">낮음</option>
+                </select>
+                <div class="sev-guide" id="sevGuide" aria-live="polite"></div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="rPattern">탐지 패턴<span class="req">*</span></label>
+                <textarea class="form-control mono" id="rPattern" rows="3" maxlength="1000"></textarea>
+                <div class="form-text" id="patternHint">쉼표로 구분: mimikatz, meterpreter, nc -e</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="rThreshold">임계 건수</label>
+                <input type="number" class="form-control" id="rThreshold" min="1" max="100000" value="1">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="rSort">정렬 순서</label>
+                <input type="number" class="form-control" id="rSort" min="0" max="99999" value="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="rUse">사용 여부</label>
+                <select class="form-select" id="rUse"><option value="Y">사용</option><option value="N">미사용</option></select>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="rDesc">설명 / 탐지 근거</label>
+                <textarea class="form-control" id="rDesc" rows="2" maxlength="1000"></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="col-lg-6">
+            <div class="card-m mb-0" style="background:#fafbff">
+              <h2><i class="fas fa-flask"></i>패턴 사전 테스트 <span class="text-muted-m" style="font-size:.75rem;font-weight:600">(저장하지 않음)</span></h2>
+              <label class="form-label" for="tSample">샘플 로그 (여러 줄 붙여넣기)</label>
+              <textarea class="form-control mono" id="tSample" rows="9" style="font-size:.76rem" placeholder="Oct  1 10:00:01 web01 sshd[124]: Invalid user test from 1.2.3.4"></textarea>
+              <button type="button" class="btn-m btn-outline-m mt-2" id="btnTest"><i class="fas fa-play"></i>테스트 실행</button>
+              <div id="testResult" class="mt-3"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button class="btn-m btn-primary-m" id="btnSaveRule"><i class="fas fa-floppy-disk"></i>저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>처리 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  SECLOG.renderTabs('admin', 'rules');
+  const { api, esc, fmtDt, sevBadge, toast, LOG_TYPES } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const isAdmin = SECLOG.isAdmin();
+  const modal = new bootstrap.Modal($('ruleModal'));
+  // 룰 등록/수정: 고른 위험도의 기준을 바로 아래에 표시
+  const renderSevGuide = () => {
+    const v = SECLOG.SEVERITY[$('rSeverity').value];
+    $('sevGuide').innerHTML = v ? `<b>${v.label}</b> · ${v.meaning}<br><span class="text-muted-m">예) ${v.examples} · 권장 대응: ${v.action}</span>` : '';
+  };
+  $('rSeverity').addEventListener('change', renderSevGuide);
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  let rules = [], editing = null, rulesets = [], scope = SECLOG.qs('scope') || '';
+
+  LOG_TYPES.forEach(([v, l]) => {
+    $('fLogType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`);
+    $('rLogType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`);
+  });
+  if (isAdmin) $('btnNewRule').classList.remove('hidden');
+  else {
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+    $('readonlyNote').classList.remove('hidden');
+  }
+
+  // ---- 시스템별 룰셋
+  async function loadRulesets() {
+    try {
+      rulesets = await api('/rules/rulesets');
+      if ($('fSystem').options.length <= 1) {
+        const opts = rulesets.map(r => `<option value="${r.systemId}">${esc(r.systemName)}</option>`).join('');
+        $('fSystem').insertAdjacentHTML('beforeend', opts);
+        $('rScope').insertAdjacentHTML('beforeend', rulesets.map(r => `<option value="${r.systemId}" data-type="${r.logType}">시스템 전용 · ${esc(r.systemName)}</option>`).join(''));
+        if (SECLOG.qs('systemId')) $('fSystem').value = SECLOG.qs('systemId');
+      }
+      const sw = (r, k) => isAdmin
+        ? `<div class="form-check form-switch d-inline-block m-0"><input class="form-check-input rs-toggle" type="checkbox" data-id="${r.systemId}" data-k="${k}" ${r[k] === 'Y' ? 'checked' : ''}></div>`
+        : `<span class="badge-st ${r[k] === 'Y' ? 'use-y' : 'use-n'}">${r[k] === 'Y' ? '사용' : '미사용'}</span>`;
+      $('rsBody').innerHTML = rulesets.length === 0 ? '<tr class="empty-row"><td colspan="6">사용 중인 점검 대상 시스템이 없습니다.</td></tr>'
+        : rulesets.map(r => {
+          const c = r.commonRuleYn === 'Y' ? r.commonRuleActive : 0, s = r.systemRuleYn === 'Y' ? r.systemRuleActive : 0;
+          return `<tr><td><b>${esc(r.systemName)}</b><div class="text-muted-m mono" style="font-size:.7rem">${esc(r.systemCode)}</div></td>
+            <td><span class="badge-type">${esc(r.logType)}</span></td>
+            <td class="center">${sw(r, 'commonRuleYn')}<div class="rs-cnt">사용 룰 ${r.commonRuleActive} / ${r.commonRuleCount}</div></td>
+            <td class="center">${sw(r, 'systemRuleYn')}<div class="rs-cnt">사용 룰 ${r.systemRuleActive} / ${r.systemRuleCount}</div></td>
+            <td><b style="font-size:1.05rem">${c + s}</b>개 <span class="text-muted-m" style="font-size:.76rem">= 공통 ${c} + 전용 ${s}</span>
+              ${c + s === 0 ? '<div style="color:#dc2626;font-size:.72rem"><i class="fas fa-triangle-exclamation"></i> 적용되는 룰이 없어 탐지가 되지 않습니다</div>' : ''}</td>
+            <td class="center" style="white-space:nowrap"><button class="btn-m btn-outline-m btn-sm-m rs-view" data-id="${r.systemId}"><i class="fas fa-list"></i> 전용 룰</button>
+              ${isAdmin ? `<button class="btn-m btn-primary-m btn-sm-m rs-add" data-id="${r.systemId}" title="시스템 전용 룰 등록"><i class="fas fa-plus"></i></button>` : ''}</td></tr>`;
+        }).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  $('rsBody').onchange = async (e) => {
+    if (!e.target.classList.contains('rs-toggle')) return;
+    const id = +e.target.dataset.id, k = e.target.dataset.k, v = e.target.checked ? 'Y' : 'N';
+    const r = rulesets.find(x => x.systemId === id);
+    const label = k === 'commonRuleYn' ? '공통 룰셋' : '시스템 전용 룰셋';
+    if (v === 'N' && !confirm(`${r.systemName}: ${label}을 끄시겠습니까?\n다음 로그 업로드/재분석부터 이 룰셋으로는 탐지하지 않습니다.`)) { e.target.checked = true; return; }
+    try {
+      await api('/rules/rulesets/' + id, { method: 'PATCH', body: { [k]: v } });
+      toast(`${r.systemName}: ${label} ${v === 'Y' ? '사용' : '미사용'}`); loadRulesets();
+    } catch (er) { toast(er.message, 'error'); e.target.checked = !e.target.checked; }
+  };
+  $('rsBody').onclick = (e) => {
+    const v = e.target.closest('.rs-view'), a = e.target.closest('.rs-add');
+    if (v) { setScope('SYSTEM'); $('fSystem').value = v.dataset.id; load(); document.querySelector('#scopeTabs').scrollIntoView({ behavior: 'smooth' }); }
+    if (a) openModal(null, +a.dataset.id);
+  };
+  const setScope = (sc) => {
+    scope = sc;
+    document.querySelectorAll('#scopeTabs button').forEach(b => b.classList.toggle('active', b.dataset.scope === sc));
+    if (sc === 'COMMON') $('fSystem').value = '';
+    $('fSystem').disabled = sc === 'COMMON';
+  };
+  $('scopeTabs').onclick = (e) => { const b = e.target.closest('button[data-scope]'); if (b) { setScope(b.dataset.scope); load(); } };
+
+  async function load() {
+    const p = new URLSearchParams({ size: 500 });
+    if (scope) p.set('scope', scope);
+    if ($('fSystem').value) { p.set('systemId', $('fSystem').value); if (!scope) p.set('scope', 'SYSTEM'); }
+    if ($('fQ').value.trim()) p.set('q', $('fQ').value.trim());
+    if ($('fLogType').value) p.set('logType', $('fLogType').value);
+    if ($('fUse').value) p.set('useYn', $('fUse').value);
+    try {
+      const data = await api('/rules?' + p.toString());
+      rules = data.content || [];
+      $('ruleTotal').textContent = `총 ${data.totalElements}개 (사용 ${rules.filter(r => r.useYn === 'Y').length}개)`;
+      $('ruleBody').innerHTML = rules.length === 0 ? '<tr class="empty-row"><td colspan="5">등록된 룰이 없습니다.</td></tr>' :
+        rules.map(r => `<tr class="rule-row ${r.useYn === 'Y' ? '' : 'is-off'}" data-id="${r.ruleId}" tabindex="0" title="눌러서 상세 보기">
+          <td>${scopeBadge(r)}</td>
+          <td class="rule-name">${esc(r.ruleName)}</td>
+          <td>${sevBadge(r.severity)}</td>
+          <td class="center">${isAdmin
+            ? `<div class="form-check form-switch d-inline-block m-0"><input class="form-check-input use-toggle" type="checkbox" data-id="${r.ruleId}" ${r.useYn === 'Y' ? 'checked' : ''} aria-label="사용 여부"></div>`
+            : `<span class="badge-st ${r.useYn === 'Y' ? 'use-y' : 'use-n'}">${r.useYn === 'Y' ? '사용' : '미사용'}</span>`}</td>
+          <td class="center rule-go"><i class="fas fa-chevron-right"></i></td></tr>`).join('');
+      if (drawerRule) { const cur = rules.find(x => x.ruleId === drawerRule.ruleId); if (cur) renderDrawer(cur); }
+    } catch (e) { toast(e.message, 'error'); $('ruleBody').innerHTML = `<tr class="empty-row"><td colspan="5">${esc(e.message)}</td></tr>`; }
+  }
+
+  const hint = () => {
+    const m = $('rMatch').value;
+    $('patternHint').textContent = m === 'REGEX' ? 'Java 정규식 (대소문자 무시): (failed password|authentication failure)'
+      : m === 'EXTERNAL_IP' ? '대상 줄 조건 (정규식) · 모든 줄: .*  · 로그인만: 로그인 · 내부 IP 기준 = [관리 › 내부 IP 설정]'
+      : '쉼표로 구분: mimikatz, meterpreter, nc -e';
+    if (m === 'EXTERNAL_IP' && !$('rPattern').value.trim()) $('rPattern').value = '.*';
+  };
+  $('rMatch').onchange = hint;
+
+  const syncScope = () => {
+    const sys = $('rScope').value;
+    const o = $('rScope').selectedOptions[0];
+    $('rLogType').disabled = !!sys;
+    if (sys) $('rLogType').value = o.dataset.type || $('rLogType').value;
+    $('scopeHint').textContent = sys ? '이 시스템 로그에만 적용됩니다. 그 시스템 로그 형식에 맞춰 패턴을 작성하세요.' : '같은 로그 유형의 모든 시스템에 적용됩니다.';
+  };
+  $('rScope').onchange = syncScope;
+
+  function openModal(rule, systemId) {
+    editing = rule || null;
+    $('ruleModalTitle').textContent = rule ? `룰 수정 — ${rule.ruleCode}` : '룰 등록';
+    $('rCode').value = rule?.ruleCode || ''; $('rCode').disabled = !!rule;
+    $('rName').value = rule?.ruleName || '';
+    $('rLogType').value = rule?.logType || 'ALL';
+    $('rScope').value = rule ? (rule.systemId || '') : (systemId || ($('fSystem').value && scope !== 'COMMON' ? $('fSystem').value : ''));
+    $('rMatch').value = rule?.matchType || 'KEYWORD';
+    $('rSeverity').value = rule?.severity || 'MEDIUM';
+    renderSevGuide();
+    $('rPattern').value = rule?.pattern || '';
+    $('rThreshold').value = rule?.thresholdCount ?? 1;
+    $('rSort').value = rule?.sortOrder ?? 0;
+    $('rUse').value = rule?.useYn || 'Y';
+    $('rDesc').value = rule?.description || '';
+    $('testResult').innerHTML = '';
+    hint(); syncScope(); modal.show();
+  }
+
+  $('btnNewRule').onclick = () => openModal(null);
+  // ---- 룰 상세 패널
+  const drawer = new bootstrap.Offcanvas($('ruleDrawer'));
+  let drawerRule = null;
+  const scopeBadge = (r) => r.scope === 'SYSTEM'
+    ? `<span class="badge-type scope-s" title="이 시스템에만 적용">전용 · ${esc(r.systemName || '')}</span>`
+    : '<span class="badge-type scope-c" title="로그 유형이 같은 모든 시스템에 적용">공통</span>';
+  const logTypeName = (v) => v === 'ALL' ? '전체 (모든 로그)' : ((LOG_TYPES.find(x => x[0] === v) || [])[1] || v);
+  function renderDrawer(r) {
+    drawerRule = r;
+    const sev = SECLOG.SEVERITY[r.severity] || {};
+    const kv = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+    $('rdTitle').textContent = r.ruleName;
+    $('rdBadges').innerHTML = `${scopeBadge(r)} ${sevBadge(r.severity)} <span class="badge-st ${r.useYn === 'Y' ? 'use-y' : 'use-n'}">${r.useYn === 'Y' ? '사용' : '미사용'}</span>`;
+    $('rdBody').innerHTML = `
+      ${r.description ? `<section class="rd-sec"><h6><i class="fas fa-circle-info"></i>설명 · 점검 포인트</h6><p class="rd-desc">${esc(r.description)}</p></section>` : ''}
+      <section class="rd-sec"><h6><i class="fas fa-magnifying-glass"></i>탐지 방법</h6>
+        <dl class="rd-kv">
+          ${kv('찾는 방식', r.matchType === 'REGEX' ? '정규식 (대소문자 무시)' : r.matchType === 'EXTERNAL_IP'
+            ? '내부 IP 외 접속 — 줄에서 처음 나오는 IP 가 <a href="internal-ip.html">[관리 › 내부 IP 설정]</a> 대역 밖이고, 아래 대상 줄 조건에 맞으면 일치' : '키워드 (쉼표로 구분, 하나라도 있으면 일치)')}
+          ${kv('탐지 기준', r.thresholdCount > 1 ? `파일 안에서 <b>${fmtNum(r.thresholdCount)}줄 이상</b> 일치할 때 탐지` : '1줄이라도 일치하면 탐지')}
+        </dl>
+        <div class="rd-pattern-label">${r.matchType === 'EXTERNAL_IP' ? '대상 줄 조건 (정규식, .* = IP 가 있는 모든 줄)' : '패턴'}</div>
+        <pre class="rd-pattern">${esc(r.pattern)}</pre>
+      </section>
+      <section class="rd-sec"><h6><i class="fas fa-gauge-high"></i>위험도 · ${esc(sev.label || r.severity)}</h6>
+        <p class="rd-desc">${esc(sev.meaning || '')}${sev.action ? `<br><span class="text-muted-m">권장 대응: ${esc(sev.action)}</span>` : ''}</p></section>
+      <section class="rd-sec"><h6><i class="fas fa-tag"></i>기본 정보</h6>
+        <dl class="rd-kv">
+          ${kv('룰 코드', `<span class="mono">${esc(r.ruleCode)}</span>`)}
+          ${kv('적용 범위', r.scope === 'SYSTEM' ? `${esc(r.systemName || '')} 전용` : '공통 (로그 유형이 같은 모든 시스템)')}
+          ${kv('적용 로그 유형', r.scope === 'SYSTEM' ? '해당 시스템 로그' : esc(logTypeName(r.logType)))}
+          ${kv('정렬 순서', r.sortOrder)}
+          ${kv('최근 수정', esc(fmtDt(r.updatedAt || r.createdAt)))}
+        </dl></section>`;
+    $('rdFoot').classList.toggle('hidden', !isAdmin);
+  }
+  function openDrawer(id) {
+    const r = rules.find(x => x.ruleId === id);
+    if (!r) return;
+    renderDrawer(r);
+    drawer.show();
+  }
+  $('ruleDrawer').addEventListener('hidden.bs.offcanvas', () => { drawerRule = null; });
+  $('rdEdit').onclick = () => { if (drawerRule) { const r = drawerRule; drawer.hide(); openModal(r); } };
+  $('rdDel').onclick = async () => {
+    const r = drawerRule;
+    if (!r || !confirm(`'${r.ruleName}' 룰을 삭제하시겠습니까?\n(소프트 삭제 · 같은 룰 코드는 다시 쓸 수 없습니다)`)) return;
+    loading(true);
+    try { await api('/rules/' + r.ruleId, { method: 'DELETE' }); drawer.hide(); toast('삭제되었습니다.'); await load(); loadRulesets(); }
+    catch (er) { toast(er.message, 'error'); } finally { loading(false); }
+  };
+  $('ruleBody').onclick = (e) => {
+    if (e.target.closest('.form-switch, .use-toggle, [data-sev-help]')) return;
+    const tr = e.target.closest('tr.rule-row');
+    if (tr) openDrawer(+tr.dataset.id);
+  };
+  $('ruleBody').onkeydown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr.rule-row');
+    if (tr && e.target === tr) { e.preventDefault(); openDrawer(+tr.dataset.id); }
+  };
+  $('ruleBody').onchange = async (e) => {
+    if (!e.target.classList.contains('use-toggle')) return;
+    const useYn = e.target.checked ? 'Y' : 'N';
+    try { await api(`/rules/${e.target.dataset.id}/use-yn`, { method: 'PATCH', body: { useYn } }); toast(useYn === 'Y' ? '사용으로 변경했습니다.' : '미사용으로 변경했습니다.'); load(); loadRulesets(); }
+    catch (er) { toast(er.message, 'error'); e.target.checked = !e.target.checked; }
+  };
+
+  $('btnTest').onclick = async () => {
+    const pattern = $('rPattern').value.trim(), sampleLog = $('tSample').value;
+    if (!pattern) return toast('탐지 패턴을 입력하세요.', 'error');
+    if (!sampleLog.trim()) return toast('샘플 로그를 입력하세요.', 'error');
+    try {
+      const r = await api('/rules/test', { method: 'POST', body: { matchType: $('rMatch').value, pattern, sampleLog } });
+      const th = +$('rThreshold').value || 1;
+      const ok = r.matchedCount >= th;
+      $('testResult').innerHTML = `
+        <div class="alert-m ${r.matchedCount ? (ok ? 'alert-ok' : 'alert-warn') : 'alert-info'} mb-2"><i class="fas ${r.matchedCount ? 'fa-bullseye' : 'fa-circle-info'} mt-1"></i>
+          <div>${r.totalLineCount}줄 중 <b>${r.matchedCount}줄</b> 매칭 ${r.matchedCount ? (ok ? `→ 임계 ${th}건 이상, <b>탐지됨</b>` : `→ 임계 ${th}건 미만, <b>탐지 안 됨</b>`) : ''}</div></div>
+        ${r.matchedLines.map(m => `<div class="d-flex gap-2 mb-1"><span class="text-muted-m mono" style="min-width:36px;text-align:right">${m.lineNumber}</span><div class="log-line flex-grow-1">${esc(m.content)}</div></div>`).join('')}`;
+    } catch (er) { $('testResult').innerHTML = `<div class="alert-m alert-warn"><i class="fas fa-triangle-exclamation mt-1"></i><div>${esc(er.message)}</div></div>`; }
+  };
+
+  $('btnSaveRule').onclick = async () => {
+    const body = {
+      ruleCode: $('rCode').value.trim().toUpperCase() || null,
+      systemId: $('rScope').value ? +$('rScope').value : null,
+      ruleName: $('rName').value.trim(), description: $('rDesc').value.trim() || null,
+      logType: $('rLogType').value, matchType: $('rMatch').value, pattern: $('rPattern').value.trim(),
+      severity: $('rSeverity').value, thresholdCount: +$('rThreshold').value || 1,
+      useYn: $('rUse').value, sortOrder: +$('rSort').value || 0,
+    };
+    if (!editing && !/^[A-Z0-9_]{3,50}$/.test(body.ruleCode || '')) return toast('룰 코드는 영문 대문자/숫자/_ 3~50자입니다.', 'error');
+    if (!body.ruleName) return toast('룰명을 입력하세요.', 'error');
+    if (!body.pattern) return toast('탐지 패턴을 입력하세요.', 'error');
+    if (editing) body.ruleCode = null;
+    loading(true);
+    try {
+      if (editing) await api('/rules/' + editing.ruleId, { method: 'PUT', body });
+      else await api('/rules', { method: 'POST', body });
+      modal.hide(); toast(editing ? '수정되었습니다.' : '등록되었습니다.'); await load(); loadRulesets();
+    } catch (er) { toast(er.message, 'error'); } finally { loading(false); }
+  };
+
+  $('btnSearch').onclick = load;
+  $('fQ').onkeydown = (e) => { if (e.key === 'Enter') load(); };
+  $('fLogType').onchange = $('fUse').onchange = load;
+  $('fSystem').onchange = () => { if ($('fSystem').value && scope === '') setScope('SYSTEM'); load(); };
+  setScope(scope);
+  loadRulesets().then(load);
+})();
+</script>
+</body>
+</html>
