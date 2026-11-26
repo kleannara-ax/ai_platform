@@ -26,8 +26,8 @@
 
   /**
    * 보일러 — 배열 순서가 배분 순서다 (앞에서부터 채운다).
-   * stop: 일자별 보일러 정비 운휴시간 필드, idle: 일자별 우리 사정 운휴시간 필드(수동), actual: 스팀생산실적(combo-daily-productions) 필드,
-   * idleFee: 우리 사정으로 세우면 운휴시간당 고정비가 나가는 보일러
+   * stop: 일자별 보일러 정비 운휴시간 필드, idle: 일자별 자체 운휴시간 필드(수동), actual: 스팀생산실적(combo-daily-productions) 필드,
+   * idleFee: 자체 운휴로 세우면 운휴시간당 고정비가 나가는 보일러
    */
   const BOILERS = [
     { code: "WASTE1", label: "폐합성 1호기", short: "폐합성1", stop: "stopWaste1", idle: "idleWaste1", actual: "wasteSteam1", idleFee: true },
@@ -74,7 +74,7 @@
    *   boilers:  { WASTE1: { use, maxTonDay, minTonDay, steamUnitPrice, idleHourPrice }, … },
    *   settings: { actualUntilDay, waste2BillCapTon, comboGuaranteeTon, comboBscPrice, comboAscPrice,
    *               fluidBillTonHour, fluidImprovementCost, lngM3PerTon, lngUnitPrice },
-   *   days:     { 1: { downPm2, …, stopWaste1, …, idleWaste1, … }, … },     // 시간(0~24). idle* = 우리 사정 운휴(수동)
+   *   days:     { 1: { downPm2, …, stopWaste1, …, idleWaste1, … }, … },     // 시간(0~24). idle* = 자체 운휴(수동)
    *   actuals:  { 1: { WASTE1, WASTE2, COMBO, FLUID, LNG, EXT, fluidRunHours,          // 톤, 없으면 null
    *                    idleHours: { WASTE1, WASTE2, FLUID } }, … }                              // 도급내역에 적힌 운휴시간
    * }
@@ -180,7 +180,7 @@
         const cap = b.maxTonDay * frac;
         on.push({ code: b.code, cap, min: Math.min(b.minTonDay * frac, cap) });
       }
-      // 최소 운용량을 다 채울 수 없으면 뒤 순서 보일러부터 세운다 (우리 사정 운휴).
+      // 최소 운용량을 다 채울 수 없으면 뒤 순서 보일러부터 세운다 (자체 운휴).
       const dropForMinimum = (list) => {
         let minSum = list.reduce((s, x) => s + x.min, 0);
         while (minSum > demand + EPS) {
@@ -226,8 +226,8 @@
       const status = {};
       const idleHours = {};
       const availHours = {};   // 정비를 뺀 시간
-      const manualIdle = {};   // 일별 표에서 고른 우리 사정 운휴시간
-      const runHours = {};     // 정비·우리 사정 운휴를 뺀, 배분에 쓰는 시간
+      const manualIdle = {};   // 일별 표에서 고른 자체 운휴시간
+      const runHours = {};     // 정비·자체 운휴를 뺀, 배분에 쓰는 시간
       let demand;
       let shortage = 0;
       let ext = 0;
@@ -262,7 +262,7 @@
       for (const b of boilers) {
         // 스팀을 보내지 않았어도 보일러를 돌린 시간(유동상 가동시간 실적)은 운휴가 아니다.
         const ranHours = b.code === "FLUID" ? fluidRunHours : 0;
-        // 고른 우리 사정 운휴시간 + 스팀을 받지 않은 나머지 시간
+        // 고른 자체 운휴시간 + 스팀을 받지 않은 나머지 시간
         const auto = b.idleFee && alloc[b.code] <= EPS ? Math.max(0, runHours[b.code] - ranHours) : 0;
         let idle = b.idleFee ? manualIdle[b.code] + auto : 0;
         // 실적일: 도급내역에 운휴시간이 적혀 있으면 그 값이 실제 정산이다. 이 화면에서 정비로 고른 시간은 그래도 뺀다.
@@ -271,8 +271,8 @@
         if (recorded !== null) idle = Math.min(Math.max(0, recorded), availHours[b.code]);
         if (alloc[b.code] > EPS) status[b.code] = "run";
         else if (availHours[b.code] <= 0) status[b.code] = "maint";        // 보일러 정비 — 고정비 없음
-        else if (manualIdle[b.code] >= availHours[b.code] - EPS) status[b.code] = "idle";   // 일별 표에서 고른 우리 사정 운휴
-        else if (idle > EPS) status[b.code] = b.use ? "idle" : "unused";   // 우리 사정 운휴 · 미가동 — 고정비 발생
+        else if (manualIdle[b.code] >= availHours[b.code] - EPS) status[b.code] = "idle";   // 일별 표에서 고른 자체 운휴
+        else if (idle > EPS) status[b.code] = b.use ? "idle" : "unused";   // 자체 운휴 · 미가동 — 고정비 발생
         else status[b.code] = "off";
         idleHours[b.code] = idle;
       }
@@ -309,7 +309,7 @@
     const bscPrice = num(settings.comboBscPrice);
     const ascPrice = num(settings.comboAscPrice);
     const hasGuarantee = guaranteeFull !== null && guaranteeFull > 0;
-    // 복합보일러를 정비로 세운 시간은 보일러 쪽 사정이라 그만큼 보증량을 줄인다 (우리 사정이 아니면 기본 금액이 없다).
+    // 복합보일러를 정비로 세운 시간은 보일러 쪽 사정이라 그만큼 보증량을 줄인다 (자체 운휴가 아니면 기본 금액이 없다).
     const comboMaintHours = sumOf((x) => 24 - x.availHours.COMBO);
     const guarantee = hasGuarantee ? guaranteeFull * (1 - comboMaintHours / (dim * 24)) : null;
     const combo = {

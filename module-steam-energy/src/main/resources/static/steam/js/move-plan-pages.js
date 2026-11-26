@@ -558,12 +558,12 @@
         const status = x.status[b.code];
         const value = x.alloc[b.code];
         if (cmp) { cells.push(compareCell(value, x.plan.alloc[b.code], "", b.label)); return; }
-        // 우리 사정 운휴로 고른 칸 — 시간 칸으로 보여 준다 (누르면 해제, 숫자를 치면 그 시간만)
+        // 자체 운휴로 고른 칸 — 시간 칸으로 보여 준다 (누르면 해제, 숫자를 치면 그 시간만)
         const manual = num(row[b.idle]);
         if (manual !== null && manual > 0 && status !== "maint") {
           // 일부 시간만 세우면 나머지 시간에 보낸 양을 옆에 같이 보여 준다
           const ran = value > 0.05 ? ` — 나머지 ${fmt0(24 - manual)}시간에 ${fmt0(value)}톤` : "";
-          const cell = hoursCell(x.day, b.idle, manual, "idle", `${b.label} 우리 사정 운휴 ${fmt0(manual)}시간 (고정비 발생)${ran}`);
+          const cell = hoursCell(x.day, b.idle, manual, "idle", `${b.label} 자체 운휴 ${fmt0(manual)}시간 (고정비 발생)${ran}`);
           cells.push(value > 0.05 ? cell.replace(/<\/td>$/, `<span class="mp-idle-tons">${fmt0(value)}</span></td>`) : cell);
           return;
         }
@@ -572,14 +572,14 @@
         let title = "";
         const recorded = x.idleRecorded[b.code] ? " (도급내역에 적힌 운휴시간)" : "";
         if (status === "maint") { text = "정비"; cls += " mp-cell-maint"; title = "보일러 정비 — 고정비 없음"; }
-        else if (status === "idle") { text = "운휴"; cls += " mp-cell-idle"; title = `우리 사정 운휴 ${fmt0(x.idleHours[b.code])}시간 — 고정비 발생${recorded}`; }
+        else if (status === "idle") { text = "운휴"; cls += " mp-cell-idle"; title = `자체 운휴 ${fmt0(x.idleHours[b.code])}시간 — 고정비 발생${recorded}`; }
         else if (status === "unused") { text = "미가동"; cls += " mp-cell-unused"; title = `배분하지 않는 보일러 — 운휴 ${fmt0(x.idleHours[b.code])}시간 고정비 발생${recorded}`; }
         else if (b.lng && value > 0.05) { cls += " mp-cell-lng"; title = "LNG 보일러 가동"; }
         else if (b.code === "COMBO" && status === "off" && !x.isActual && !x.noPlan) { text = "정지"; cls += " mp-cell-unused"; title = "폐합성·유동상으로 감당되는 날이라 복합보일러를 먼저 세웠습니다"; }
-        // 정비가 아닌 칸은 누르면 우리 사정 운휴(24시간)로 바뀐다
+        // 정비가 아닌 칸은 누르면 자체 운휴(24시간)로 바뀐다
         if (status !== "maint" && !x.noPlan) {
           cls += " mp-idle-pick";
-          title = (title ? title + " · " : "") + "누르면 우리 사정 운휴(24시간)";
+          title = (title ? title + " · " : "") + "누르면 자체 운휴(24시간)";
           cells.push(`<td class="${cls}" data-day="${x.day}" data-field="${b.idle}" title="${esc(title)}">${text}</td>`);
         } else {
           cells.push(`<td class="${cls}" title="${esc(title)}">${text}</td>`);
@@ -664,7 +664,7 @@
       <td>${fmtN(result.costTotal / 1e6, 1)}</td><td>${result.costPerTon ? fmt0(result.costPerTon) : ""}</td>
       <td class="mp-left">${result.costKnown ? "" : "단가가 없는 항목은 합계에서 빠졌습니다"}</td></tr>`);
     $("mpCostTable").innerHTML = `<thead><tr>
-      <th>보일러</th><th>스팀량(톤)</th><th>정산량(톤)</th><th>스팀비(원)</th><th>우리 사정<br>운휴(시간)</th><th>운휴 고정비(원)</th>
+      <th>보일러</th><th>스팀량(톤)</th><th>정산량(톤)</th><th>스팀비(원)</th><th>자체<br>운휴(시간)</th><th>운휴 고정비(원)</th>
       <th>설비개선비(원)</th><th>합계(백만원)</th><th>톤당(원/톤)</th><th>비고</th>
     </tr></thead><tbody>${rows.join("")}</tbody>`;
     function money(v) {
@@ -784,7 +784,7 @@
     });
     // 운휴 칸: 누르면 24시간 ↔ 해제. 눌러서 24 가 된 칸은 글자가 선택돼 있어 숫자를 치면 그 시간으로 바뀐다.
     $("mpDayTable").addEventListener("mousedown", (event) => {
-      // 보일러 T/D 칸: 누르면 우리 사정 운휴 24시간
+      // 보일러 T/D 칸: 누르면 자체 운휴 24시간
       const pick = event.target instanceof Element ? event.target.closest(".mp-idle-pick") : null;
       if (pick) {
         event.preventDefault();
