@@ -600,18 +600,20 @@ module-safety 와 같은 방식으로 플랫폼 SPA 안에서 iframe 으로 열�
 
 > 화면의 버튼 숨김은 사용성용입니다. 실제 권한은 API 의 `@PreAuthorize` 로 서버에서 막습니다.
 
-### 5-2. 화면을 플랫폼에 띄우려면 필요한 core/app 작업 (**core·app 에 추가 필요**)
+### 5-2. 화면을 플랫폼에 띄우려면 필요한 작업 (**develop 에 반영 완료**)
 
-업무 모듈 규칙상 core·app 을 수정하지 않았기 때문에, 아래 2가지가 반영되기 전에는 운영에서 화면이 열리지 않습니다.
-(미리보기 환경에서는 같은 내용을 임시로 적용해 동작을 확인했으며, 그 수정은 커밋하지 않았습니다.)
+아래 3가지가 모두 있어야 플랫폼 메뉴에서 화면이 열립니다. ①·② 는 사용자 허락을 받아 develop 브랜치에 반영했습니다 (core `SecurityConfig` 는 수정하지 않음).
 
-**① core `SecurityConfig` 공개 경로 추가** — iframe 진입은 Authorization 헤더를 보낼 수 없어 지금은 401 이 납니다. 데이터 API(`/security_log-api/**`)는 계속 JWT 로 보호됩니다.
+**① 모듈 등록** — `settings.gradle` 에 `include 'module-security_log'`, `app/build.gradle` 에 `implementation project(':module-security_log')` (develop 커밋 e0003d6).
+
+**② app `static/index.html` iframe 라우팅** — `/security_log/` 로 시작하는 메뉴 URL 을 CCKB 와 같은 방식으로 SPA 안 iframe 으로 엽니다 (`seclogMenuNames` / `isSeclogPage` / `seclog::` / `navigateToSeclogPage`, develop 커밋 3adb7cd). 제목은 메뉴명, 경로 표시는 '모듈 > 보안로그 관리 > 메뉴명'.
+
+**③ 모듈 안 화면 파일 공개 설정** — `config/SecLogSecurityConfig.java` (module-kims `KimsSecurityConfig`·module-cckb `CckbSecurityConfig` 와 같은 방식, `@Order(-2)`). iframe 이 화면 파일을 불러올 때는 Authorization 헤더가 없어 401 이 나므로 **화면 파일만** 공개합니다.
 ```java
-// core/src/main/java/com/company/core/config/SecurityConfig.java 의 기존 permitAll 목록에 추가
-.requestMatchers("/security_log/**").permitAll()   // 화면 (플랫폼 SPA 안에서 iframe 로드)
+.securityMatcher("/security_log/*.html", "/security_log/css/**", "/security_log/js/**")
 ```
-
-**② app `static/index.html` 에 iframe 라우팅 추가** — 플랫폼 SPA 는 `/kims/`, `/safety/` 로 시작하는 메뉴만 iframe 으로 엽니다. `/security_log/` 도 같은 방식으로 열도록 추가해야 합니다. (`isSafetyPage` 처리와 같은 패턴. `menuUrl` 이 `/security_log/` 로 시작하면 `navigateToSafetyPage(menuUrl)` 와 같은 iframe 로더로 열기)
+- 공개: 화면 모양(HTML·CSS·JS)만. 데이터는 들어 있지 않습니다.
+- 공개 안 함: 데이터 API `/security_log-api/**` 는 이 체인에 들어가지 않아 core 메인 체인(JWT 인증 + `@PreAuthorize` 역할 검사)을 그대로 탑니다.
 
 **③ 메뉴 등록** — 아래 값으로 `core_menu` / `core_role_menu` 에 등록합니다 (`MODULE_GUIDE.md` 3장 절차).
 
@@ -964,11 +966,12 @@ sql/module-security_log/
 - **생성형 AI 업로드 파일 내역 동점 처리 + 사업부·부서 관리 화면 정리 (추가분)**: DB·SQL·API 변경 없음. ① 06 상위 10명 순위 = 로그 줄 수 많은 순 → **같으면 보안 위험도 높은 순(상 > 중 > 하, 직접 고른 값 우선, 없으면 자동 제안 값)** → 같으면 사람 구분 값 순, 10명에서 자름(10위 동점이면 위험도가 높은 사람이 들어감). 판정 기준(URL ↔ 생성형 AI 79종 목록, 상세 내용·내용·서브 채널)과 이용 빈도(로그 줄 수)는 그대로. ② DLP 관리 > 사업부·부서 관리: 표에서 '승인 대장' 칸·'부서 N개' 글자 삭제, [사업부 추가]·[부서 추가](사업부 선택 + 이름)를 표 위 한 상자에 함께 배치(줄마다 있던 [부서 추가] 버튼 삭제), 화면 폭 820px로 줄임(꽉 차지 않게). 확인: 2026-10 건 수 1건 동점 2명 → 위험도 '중'이 '하'보다 위 / ADMIN 부서 추가(사업부 선택 + Enter) 정상, USER 추가 상자·버튼 없음, 머리글 사업부·부서·사용, 오류 0건. 테스트 부서는 소프트 삭제.
 - **05 생성형 AI 판정 문구에서 'AI 열' 설명 삭제 / 06 사용 서비스 여러 개 표시 확인 (추가분)**: DB·SQL·API·서버 변경 없음(`dlp-report.html` 문구만). 화면 05 아래 판정 문구에서 '목록에 없으면 로그의 'AI' 열 값 사용' 삭제(실제 로그에 AI 열 없음, URL로만 판정). 06 '사용 서비스'는 원래 그 사람이 쓴 서비스를 모두 표시(많이 쓴 순, 쉼표 구분) — 코드 변경 없음. 확인: 미리보기 로그 1줄을 잠시 Claude로 바꿔 김홍두 = 'ChatGPT, Claude' 가 화면·PPT 8쪽 모두 표시됨을 확인 후 원래 값으로 복구, 화면 오류 0건.
 - **메일 알림 — 받는 사람·참조는 회사 메일만 (추가분, 모든 규칙 · 도메인 = 서버 환경 변수)**: DB 컬럼 변경 없음(`19` 기본 규칙 값·COMMENT만 변경), 엔드포인트 수 69개 유지. ① 저장할 때: 받는 사람·참조의 @ 뒤가 `SECLOG_MAIL_ALLOWED_DOMAINS` 와 똑같지 않으면 400(비슷한 도메인 `evilcompany.co.kr` 도 막음, 대소문자 무시). ② 보낼 때 한 번 더: DB에 회사 밖 주소가 있으면 그 메일은 보내지 않고 보낸 기록에 '실패(회사 밖 주소라 보내지 않음)'. ③ 도메인 미설정이면 규칙은 저장되지만 아무 데도 보내지 않음('회사 도메인 미설정 - N명 대기'). ④ 받는 사람이 비어 있으면 켤 수 없음(꺼진 상태로만 저장, 화면 토글도 막음). ⑤ 기본 규칙 받는 사람 비움 + 꺼짐(미리보기 DB도 같게 고침). ⑥ 화면: 메일 서버 상태 옆에 '받는 사람: 회사 메일만 / 회사 도메인 미설정' 표시, 받는 사람 칸 아래 안내, 목록에 '받는 사람 없음' 빨간 글자. 확인: 미설정 → 외부 주소 규칙 저장됨·지금 보내기 '회사 도메인 미설정 - 1명 대기' / `company.co.kr` 설정(미리보기 임시) → 외부 받는 사람 400 · 외부 참조 400 · 비슷한 도메인 400 · `a@Company.CO.KR` 200 · DB에 외부 참조 직접 넣고 보내기 → 실패 1통·메일 0통 · 회사 주소만 → 보냄 1통(To: a@company.co.kr) / 받는 사람 없음 + 켜짐 400, 꺼짐 201 / 화면 오류 0건. 테스트 규칙·기록 소프트 삭제, 미리보기 임시 환경 변수·테스트 메일 서버 원래대로.
+- **개발 서버 메뉴 클릭 시 반응 없음 해결 — 화면 파일 공개 설정 추가 (추가분, 사용자 허락)**: DB·SQL·API 변경 없음(엔드포인트 69개 유지). 원인 ① app `index.html` 에 `/security_log/` iframe 라우팅이 없어 메뉴를 눌러도 반응이 없었음 → develop 에 CCKB 와 같은 방식으로 추가(3adb7cd). 원인 ② iframe 은 Authorization 헤더 없이 화면 파일을 불러와 401 → 모듈 안에 `config/SecLogSecurityConfig.java` 추가(kims·cckb 와 같은 방식, `@Order(-2)`), 공개 범위는 `/security_log/*.html`·`css/**`·`js/**` 만, 데이터 API `/security_log-api/**` 는 계속 JWT + 역할 검사. core `SecurityConfig` 는 수정하지 않음. 5-2 절 갱신.
 
 | 번호 | 검수 항목 | 결과 | 비고 |
 |---|---|---|---|
 | 1 | User/Auth/Role/Menu/Security 관련 클래스가 생성되지 않았는가? | 통과 | 클래스명 자동 스캔 결과 0건 |
-| 2 | SecurityConfig, JwtProvider, AuthController가 생성되지 않았는가? | 통과 | |
+| 2 | SecurityConfig, JwtProvider, AuthController가 생성되지 않았는가? | 통과 | core `SecurityConfig`·JWT·인증 클래스는 만들지 않음. 화면 파일 공개용 `SecLogSecurityConfig`(kims·cckb 와 같은 방식, 사용자 허락)만 모듈 안에 있음 |
 | 3 | application.yml, application.properties가 생성되지 않았는가? | 통과 | 설정값은 `SecLogConstants` 상수 + README 8-2. API 인증값은 환경변수 |
 | 4 | Dockerfile, docker-compose.yml, Nginx 설정이 생성되지 않았는가? | 통과 | |
 | 5 | SpringBootApplication main class가 생성되지 않았는가? | 통과 | bootJar 없음, `jar { enabled = true }` |

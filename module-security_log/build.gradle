@@ -18,7 +18,7 @@ dependencies {
     // 카카오톡 승인 기한 경과 차단 요청 메일 (SMTP 정보는 서버 환경 변수 SPRING_MAIL_* 로 넣음, 없으면 발송만 대기)
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
-    // SecurityConfig/JWT 구현 금지
+    // core SecurityConfig/JWT 구현 금지 (모듈 안에는 화면 파일 공개용 SecLogSecurityConfig 만 둠 — kims·cckb 와 같은 방식)
     // @PreAuthorize 등 기존 core 권한 체계 사용을 위한 컴파일 참조만 허용
     compileOnly 'org.springframework.boot:spring-boot-starter-security'
 
