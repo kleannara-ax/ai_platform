@@ -269,6 +269,7 @@ let kimsMenuNames = {};  // /kims/{page}.html -> 메뉴명 (KIMS 하위 메뉴 �
 let safetyMenuNames = {};  // /safety/{page}.html -> 메뉴명 (안전 작업방식 매뉴얼 하위 메뉴 제목/브레드크럼용)
 let steamMenuNames = {};  // /steam/{page}.html -> 메뉴명 (스팀에너지관리 하위 메뉴 제목/브레드크럼용)
 let cckbMenuNames = {};  // /cckb/{page}.html -> 메뉴명 (CCKB 후면 색상검사 하위 메뉴 제목/브레드크럼용)
+let seclogMenuNames = {};  // /security_log/{page}.html -> 메뉴명 (보안로그 관리 하위 메뉴 제목/브레드크럼용)
 
 // ══ 소방 모듈 iframe 메시지 수신 ══
 window.addEventListener('message', function(e) {
@@ -493,7 +494,7 @@ async function enterApp() {
   var requestedPage = normalizePage(new URLSearchParams(window.location.search || '').get('page'));
   var validPages = Object.values(menuCodeToPage).concat(['dashboard']);
   // KIMS 페이지(kims::/kims/xxx.html)는 동적 URL이라 menuCodeToPage에 없으므로 접두사로 허용
-  var isValidPage = function(p){ return validPages.includes(p) || (typeof p === 'string' && (p.indexOf('kims::') === 0 || p.indexOf('safety::') === 0 || p.indexOf('steam::') === 0 || p.indexOf('cckb::') === 0)); };
+  var isValidPage = function(p){ return validPages.includes(p) || (typeof p === 'string' && (p.indexOf('kims::') === 0 || p.indexOf('safety::') === 0 || p.indexOf('steam::') === 0 || p.indexOf('cckb::') === 0 || p.indexOf('seclog::') === 0)); };
   var fallbackPage = isValidPage(normalizePage(currentPage)) ? normalizePage(currentPage) : 'dashboard';
   navigate(requestedPage && isValidPage(requestedPage) ? requestedPage : fallbackPage);
   saveSession();
@@ -680,6 +681,10 @@ async function loadUserMenus() {
     cckbMenuNames = {};
     (function walkCckb(nodes){ (nodes||[]).forEach(function(m){ if(m.menuUrl && String(m.menuUrl).indexOf('/cckb/')===0){ cckbMenuNames[m.menuUrl]=m.menuName; } if(m.children&&m.children.length) walkCckb(m.children); }); })(userMenus);
 
+    // 보안로그 관리(module-security_log) 하위 메뉴: url -> 이름 맵 구축 (페이지 제목/브레드크럼용)
+    seclogMenuNames = {};
+    (function walkSeclog(nodes){ (nodes||[]).forEach(function(m){ if(m.menuUrl && String(m.menuUrl).indexOf('/security_log/')===0){ seclogMenuNames[m.menuUrl]=m.menuName; } if(m.children&&m.children.length) walkSeclog(m.children); }); })(userMenus);
+
     // ── cell_auth 기반 세부공장일보 사이드바 필터링 ──
     // admin이 아닌 사용자: cell_auth 보유 여부로 dailyreport 메뉴 표시 결정
     // core_role_menu에는 ROLE_USER에 세부공장일보 열려있으나,
@@ -729,10 +734,13 @@ function renderSidebarMenus() {
     const isSteamPage = menu.menuUrl && String(menu.menuUrl).indexOf('/steam/') === 0;
     // CCKB(후면 색상검사) 모듈: /cckb/ 로 시작하는 메뉴 URL은 SPA 안에서 iframe으로 연다
     const isCckbPage = menu.menuUrl && String(menu.menuUrl).indexOf('/cckb/') === 0;
+    // 보안로그 관리(module-security_log) 모듈: /security_log/ 로 시작하는 메뉴 URL은 SPA 안에서 iframe으로 연다
+    const isSeclogPage = menu.menuUrl && String(menu.menuUrl).indexOf('/security_log/') === 0;
     const page = isKimsPage ? ('kims::' + menu.menuUrl)
                : isSafetyPage ? ('safety::' + menu.menuUrl)
                : isSteamPage ? ('steam::' + menu.menuUrl)
                : isCckbPage ? ('cckb::' + menu.menuUrl)
+               : isSeclogPage ? ('seclog::' + menu.menuUrl)
                : pageForMenuCode(menu.menuCode);
     const icon = menuIcons[normalizedCode] || menuIcons[menu.menuCode] || menuIcons['_DEFAULT'];
     const displayName = displayMenuName(menu);
@@ -825,6 +833,15 @@ function navigate(page, el) {
     document.getElementById('breadcrumb').textContent = '모듈 > CCKB 후면 색상검사 > ' + cckbName;
     document.getElementById('topbarActions').innerHTML = '';
     navigateToCckbPage(cckbUrl);
+    return;
+  }
+  if (typeof page === 'string' && page.indexOf('seclog::') === 0) {
+    var seclogUrl = page.slice(8);
+    var seclogName = (seclogMenuNames && seclogMenuNames[seclogUrl]) || '보안로그 관리';
+    document.getElementById('pageTitle').textContent = seclogName;
+    document.getElementById('breadcrumb').textContent = '모듈 > 보안로그 관리 > ' + seclogName;
+    document.getElementById('topbarActions').innerHTML = '';
+    navigateToSeclogPage(seclogUrl);
     return;
   }
   if (typeof page === 'string' && page.indexOf('kims::') === 0) {
@@ -2251,6 +2268,23 @@ function navigateToCckbPage(path) {
   var iframe = document.createElement('iframe');
   iframe.className = 'fire-iframe';
   iframe.id = 'cckbIframe';
+  iframe.onload = function() { iframe.classList.add('loaded'); };
+  iframe.src = path;
+  el.innerHTML = '';
+  el.appendChild(iframe);
+}
+
+// ══ 보안로그 관리(module-security_log) 모듈 ══
+function navigateToSeclogPage(path) {
+  // 보안로그 관리(ISMS 로그 점검·DLP 모니터링) 모듈 페이지를 SPA 내부 iframe으로 로드.
+  // 인증은 fireweb_user(localStorage)를 통해 전달된다 — 모듈 쪽 js(seclog.js)가
+  // 저장된 토큰을 읽어 /security_log-api/** 호출에 Authorization 헤더로 붙인다.
+  var el = document.getElementById('pageContent');
+  el.className = 'page fire-iframe-mode';
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3)"><span>불러오는 중...</span></div>';
+  var iframe = document.createElement('iframe');
+  iframe.className = 'fire-iframe';
+  iframe.id = 'seclogIframe';
   iframe.onload = function() { iframe.classList.add('loaded'); };
   iframe.src = path;
   el.innerHTML = '';
