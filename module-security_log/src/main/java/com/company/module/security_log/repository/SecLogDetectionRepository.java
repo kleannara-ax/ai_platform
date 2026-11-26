@@ -18,6 +18,9 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
 
     Optional<SecLogDetection> findByDetectionIdAndDeletedYn(Long detectionId, String deletedYn);
 
+    /** 업로드의 탐지 건 전체 (DLP 점검 보고서용, 줄 번호 순) */
+    List<SecLogDetection> findByUploadIdAndDeletedYnOrderByLineNumberAsc(Long uploadId, String deletedYn);
+
     @Query("""
             SELECT d FROM SecLogDetection d
              WHERE d.deletedYn = 'N'
@@ -85,7 +88,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
               FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId)
              GROUP BY d.ruleCode, d.ruleName, d.severity
              ORDER BY COUNT(d) DESC
             """)
@@ -97,7 +100,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
               FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
              GROUP BY d.ruleCode, d.ruleName, d.severity
              ORDER BY COUNT(d) DESC
             """)
@@ -109,7 +112,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
             SELECT COUNT(d) FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
                AND d.reviewStatus = :reviewStatus
             """)
     long countForMonthByReviewStatusAndSystems(@Param("targetYm") String targetYm,
@@ -121,7 +124,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
             SELECT u.systemId, d.reviewStatus, COUNT(d) FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
              GROUP BY u.systemId, d.reviewStatus
             """)
     List<Object[]> countBySystemAndReview(@Param("targetYm") String targetYm,
@@ -136,7 +139,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
             SELECT d, u.systemName FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
              ORDER BY u.systemName, d.severity DESC, d.detectionId
             """)
     List<Object[]> findForMonthAndSystems(@Param("targetYm") String targetYm,
@@ -150,7 +153,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
             SELECT d.createdAt FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
                AND d.reviewStatus = com.company.module.security_log.entity.ReviewStatus.PENDING
             """)
     List<java.time.LocalDateTime> findPendingCreatedAt(@Param("targetYm") String targetYm,
@@ -162,7 +165,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
               FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
                AND d.reviewStatus = com.company.module.security_log.entity.ReviewStatus.PENDING
              GROUP BY u.uploadId, u.systemId, u.systemName
              ORDER BY MIN(d.createdAt)
@@ -175,7 +178,7 @@ public interface SecLogDetectionRepository extends JpaRepository<SecLogDetection
             SELECT COUNT(d) FROM SecLogDetection d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId)
                AND d.reviewStatus = :reviewStatus
             """)
     long countForMonthByReviewStatus(@Param("targetYm") String targetYm,

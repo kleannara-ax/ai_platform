@@ -55,6 +55,8 @@ public class LogUploadResponse {
     /** 대상 월 안의 첫/마지막 로그일 (yyyy-MM-dd) */
     private String firstLogDate;
     private String lastLogDate;
+    /** 같은 달·같은 시스템에서 이 파일 전에 올린(분석에서 빠진) 파일 수 */
+    private Integer olderFileCount;
 
     public static LogUploadResponse from(SecLogUpload u) {
         return LogUploadResponse.builder()

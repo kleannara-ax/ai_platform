@@ -25,7 +25,7 @@ public interface SecLogAccessDailyRepository extends JpaRepository<SecLogAccessD
               FROM SecLogAccessDaily d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
                AND d.logDate >= :fromDate AND d.logDate < :toDate
              GROUP BY u.systemId, d.logDate
             """)
@@ -40,7 +40,7 @@ public interface SecLogAccessDailyRepository extends JpaRepository<SecLogAccessD
               FROM SecLogAccessDaily d, SecLogUpload u
              WHERE d.uploadId = u.uploadId
                AND d.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
              GROUP BY u.uploadId, u.systemId
             """)
     List<Object[]> rangeByUpload(@Param("targetYm") String targetYm,

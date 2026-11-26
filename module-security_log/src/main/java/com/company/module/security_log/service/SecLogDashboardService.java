@@ -105,6 +105,7 @@ public class SecLogDashboardService {
                 .systemCount(n).accessRegistered(accessReg).accessReviewed(st.getAccessDoneCount())
                 .closeRate(rate(st.getAccessDoneCount(), n))
                 .riskAccountCount(rows.stream().mapToLong(MonthlyStatusResponse.Row::getAccessRiskAccounts).sum())
+                .riskPendingCount(rows.stream().mapToLong(MonthlyStatusResponse.Row::getAccessRiskPending).sum())
                 .pendingDetectionCount(sum.pending()).detectionCount(sum.total())
                 .criticalCount(sum.critical()).highCount(sum.high())
                 .mediumCount(sum.medium()).lowCount(sum.low())
@@ -179,22 +180,38 @@ public class SecLogDashboardService {
         // 월 1회 업로드: 대상 월이 끝나기 전(이번 달)에는 '미등록'을 참고(INFO)로만 표시
         boolean waiting = !YearMonth.parse(ym, YM).isBefore(YearMonth.from(today()));
         for (MonthlyStatusResponse.Row r : rows) {
-            if (r.getAccessRiskAccounts() > 0 && !"REVIEWED".equals(r.getAccessStatus())) {
-                t.add(todo("WARN", "PENDING_DETECTION", r, "위험 접속 계정 " + r.getAccessRiskAccounts() + "개 · 탐지 "
-                        + r.getDetectionCount() + "건 검토 필요", "detail.html?id=" + r.getLatestUploadId() + "#access"));
+            if (r.getAccessRiskPending() > 0 && !"REVIEWED".equals(r.getAccessStatus())) {
+                t.add(todo("WARN", "PENDING_ACCOUNT", r, "위험 접속 계정 " + r.getAccessRiskPending() + "개 검토 필요 (전체 위험 계정 "
+                        + r.getAccessRiskAccounts() + "개)", "detail.html?id=" + r.getLatestUploadId() + "#access"));
+            }
+            if (r.getPiiPending() > 0 && !"REVIEWED".equals(r.getAccessStatus())) {
+                t.add(todo("WARN", "PENDING_PII", r, "개인정보 다운로드 " + r.getPiiPending() + "건 사유 확인 필요 (전체 "
+                        + r.getPiiDownloadCount() + "건)", "detail.html?id=" + r.getLatestUploadId() + "#pii"));
+            }
+            if (r.isPiiTarget() && "NOT_FOUND".equals(r.getPiiSheetStatus()) && !"REVIEWED".equals(r.getAccessStatus())) {
+                t.add(todo("INFO", "NO_PII_SHEET", r, "올린 파일에 개인정보 다운로드 내역 탭이 없음 · 다운로드 내역이 없는 달이 맞는지 확인",
+                        "detail.html?id=" + r.getLatestUploadId() + "#pii"));
             }
             boolean noAccess = "NONE".equals(r.getAccessStatus());
             if (noAccess) {
-                t.add(todo(waiting ? "INFO" : "WARN", "NO_DATA", r, "접속·행위 로그 미등록 · 로그 파일 업로드 필요",
+                t.add(todo(waiting ? "INFO" : "WARN", "NO_DATA", r, YearMonth.parse(ym, YM).getMonthValue() + "월 로그를 올려 주세요 (접속·행위 로그 미등록)",
                         "upload.html?systemId=" + r.getSystemId() + "&ym=" + ym));
             }
-            if (!noAccess && !"REVIEWED".equals(r.getAccessStatus()) && r.getAccessRiskAccounts() == 0) {
-                t.add(todo("INFO", "READY_TO_CLOSE", r, "위험 없음 · 최종 검토완료 가능", "detail.html?id=" + r.getLatestUploadId()));
+            if (!noAccess && !"REVIEWED".equals(r.getAccessStatus()) && r.getAccessRiskPending() == 0
+                    && r.getPiiPending() == 0 && pendingDetections(ym, r.getSystemId()) == 0) {
+                t.add(todo("INFO", "READY_TO_CLOSE", r, r.isPiiTarget()
+                        ? "탐지·위험 계정·개인정보 다운로드 검토 끝 · 최종 검토완료 가능"
+                        : "탐지·위험 계정 검토 끝 · 최종 검토완료 가능", "detail.html?id=" + r.getLatestUploadId()));
             }
         }
         List<String> order = List.of("DANGER", "WARN", "INFO");
         t.sort(Comparator.comparingInt(x -> order.indexOf(x.getLevel())));
         return t;
+    }
+
+    /** 시스템의 미검토 탐지 건수 (최신 파일 기준) */
+    private long pendingDetections(String ym, Long systemId) {
+        return detectionRepository.countForMonthByReviewStatusAndSystems(ym, ReviewStatus.PENDING, Set.of(systemId));
     }
 
     private static DashboardResponse.Todo todo(String level, String kind, MonthlyStatusResponse.Row r, String msg, String link) {
@@ -218,12 +235,12 @@ public class SecLogDashboardService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "사용 중인 점검 대상 시스템이 아닙니다."));
         DashboardResponse.CalendarRow cal = calendar(ym, List.of(row)).stream().findFirst().orElse(null);
 
-        List<LogUploadResponse> uploads = uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N).stream()
+        List<LogUploadResponse> uploads = uploadRepository.findLatestByTargetYm(ym).stream()
                 .filter(u -> systemId.equals(u.getSystemId()))
                 .sorted(Comparator.comparing(SecLogUpload::getUploadId).reversed())
                 .map(LogUploadResponse::from).toList();
 
-        // 계정별 접속 집계: 같은 달 여러 번 수집된 계정은 합산
+        // 계정별 접속 집계 (시스템별 가장 최근에 올린 파일 1개 기준)
         Map<String, long[]> nums = new LinkedHashMap<>();
         Map<String, Set<String>> flags = new LinkedHashMap<>();
         Map<String, String[]> seen = new LinkedHashMap<>();
@@ -296,9 +313,15 @@ public class SecLogDashboardService {
             if ("NONE".equals(r.getAccessStatus())) {
                 next = "로그 파일 업로드";
                 link = "upload.html?systemId=" + r.getSystemId() + "&ym=" + ym;
+            } else if (r.getAccessRiskPending() > 0) {
+                next = "위험 계정 " + r.getAccessRiskPending() + "개 검토";
+                link = "detail.html?id=" + r.getLatestUploadId() + "#access";
             } else if (pending > 0) {
                 next = "탐지 " + pending + "건 검토";
                 link = "detail.html?id=" + r.getLatestUploadId();
+            } else if (r.getPiiPending() > 0 && !"REVIEWED".equals(r.getAccessStatus())) {
+                next = "개인정보 다운로드 " + r.getPiiPending() + "건 사유 확인";
+                link = "detail.html?id=" + r.getLatestUploadId() + "#pii";
             } else if (!"REVIEWED".equals(r.getAccessStatus())) {
                 next = "접속 로그 최종 검토완료";
                 link = "detail.html?id=" + r.getLatestUploadId();
@@ -359,7 +382,7 @@ public class SecLogDashboardService {
         Set<Long> ids = activeIds(rows);
         boolean monthOver = m.isBefore(YearMonth.from(today()));
         Map<Long, List<SecLogUpload>> ups = new LinkedHashMap<>();
-        uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N).forEach(u -> {
+        uploadRepository.findLatestByTargetYm(ym).forEach(u -> {
             if (u.getSystemId() != null && ids.contains(u.getSystemId())) {
                 ups.computeIfAbsent(u.getSystemId(), k -> new ArrayList<>()).add(u);
             }
@@ -422,7 +445,7 @@ public class SecLogDashboardService {
             lines += u.getTotalLines();
             accounts += u.getAccountCount();
         }
-        int unchecked = (int) uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N).stream()
+        int unchecked = (int) uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N).stream() // 관리용: 이전 파일 포함
                 .filter(u -> u.getDateUnknownCount() == null).count();
         return DashboardResponse.UploadSummary.builder()
                 .systemCount(list.size()).uploadedCount(uploaded).missingCount(list.size() - uploaded)
@@ -463,7 +486,7 @@ public class SecLogDashboardService {
         }
         // 그 달 접속 로그 파일이 올라온 시스템
         Set<Long> delivered = new LinkedHashSet<>();
-        uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N).forEach(u -> {
+        uploadRepository.findLatestByTargetYm(ym).forEach(u -> {
             if (u.getSystemId() != null) {
                 delivered.add(u.getSystemId());
             }
@@ -636,7 +659,7 @@ public class SecLogDashboardService {
             return new DetSum(0, 0, 0, 0, 0, List.of());
         }
         long c = 0, h = 0, m = 0, l = 0;
-        for (SecLogUpload u : uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N)) {
+        for (SecLogUpload u : uploadRepository.findLatestByTargetYm(ym)) {
             if (u.getSystemId() == null || !active.contains(u.getSystemId())) {
                 continue;
             }

@@ -72,7 +72,7 @@
   const { api, esc, fmtSize, toast, LOG_TYPES } = SECLOG;
   const $ = (id) => document.getElementById(id);
   const id = SECLOG.qs('id');
-  if (!id) { location.href = 'index.html'; return; }
+  if (!id) { location.href = 'detail.html'; return; }
   const detailUrl = 'detail.html?id=' + id;
   $('btnBack').href = $('btnCancel').href = detailUrl;
 

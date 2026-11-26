@@ -9,7 +9,7 @@ import java.util.List;
 
 /** 계정별 접속 행위 집계 */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class AccessSummaryResponse {
 
     private Long summaryId;
@@ -25,6 +25,14 @@ public class AccessSummaryResponse {
     private String firstSeen;
     private String lastSeen;
     private List<String> riskFlags;
+
+    // ---- 계정 검토 (업로드 1건 기준 접속 행위 분석에서만 채움, 미검토면 null)
+    /** NORMAL / CONFIRMED / RESOLVED (null = 미검토) */
+    private String reviewStatus;
+    private String reviewStatusLabel;
+    private String reviewComment;
+    private java.time.LocalDateTime reviewedAt;
+    private Long reviewedBy;
 
     public static AccessSummaryResponse from(SecLogAccessSummary s) {
         List<String> flags = s.getRiskFlags() == null || s.getRiskFlags().isBlank()

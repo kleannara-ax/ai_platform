@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DLP 모니터링</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body class="lr-page">
+<main class="sl-main" id="dlpPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-user-lock"></i></span><span>DLP 모니터링</span></h1>
+    <div class="lr-filters" role="search" aria-label="모니터링 월 선택">
+      <label class="lr-f"><span>모니터링 월</span><input type="month" class="form-control" id="dmYm" aria-label="모니터링 월 (연월)"></label>
+    </div>
+  </header>
+
+  <!-- DLP 모니터링 전용 메뉴 (ISMS 로그 점검과 별도) -->
+  <nav class="sl-tabs" aria-label="DLP 모니터링 메뉴">
+    <a href="dlp.html" class="active" aria-current="page"><i class="fas fa-user-lock"></i> DLP 모니터링</a>
+    <a href="dlp-report.html"><i class="fas fa-file-powerpoint"></i> 보고서 작성</a>
+    <a href="dlp-kakao.html"><i class="fas fa-comment"></i> 카카오톡 사용자 현황</a>
+  </nav>
+
+  <!-- 3단계: 유출 로그 올리기 → Privacy-I Agent 현황 올리기 → 보고서 작성 -->
+  <section class="dm-steps" aria-label="DLP 모니터링 순서">
+    <article class="dm-step" id="step1">
+      <div class="dm-step-no">1</div>
+      <div class="dm-step-body"><h2>유출 로그 올리기</h2><p id="step1Txt">DLP 관리시스템에서 받은 유출 로그 파일</p></div>
+      <button class="btn-m btn-primary-m hidden" id="btnUp"><i class="fas fa-upload"></i>올리기</button>
+    </article>
+    <article class="dm-step" id="stepAgent">
+      <div class="dm-step-no">2</div>
+      <div class="dm-step-body"><h2>Privacy-I Agent 현황 올리기</h2><p id="stepAgentTxt">재설치·장기 미접속 확인용 Agent List 파일</p></div>
+      <button class="btn-m btn-primary-m hidden" id="btnAgent"><i class="fas fa-upload"></i>올리기</button>
+    </article>
+    <article class="dm-step" id="step2">
+      <div class="dm-step-no">3</div>
+      <div class="dm-step-body"><h2>보고서 작성 · PPT</h2><p id="step2Txt">유출 로그를 올리면 작성 가능</p></div>
+      <a class="btn-m btn-primary-m disabled" id="btnReport" href="dlp-report.html" aria-disabled="true"><i class="fas fa-file-powerpoint"></i>보고서 작성</a>
+    </article>
+  </section>
+
+  <div class="lr-empty hidden" id="dmEmpty"></div>
+
+  <!-- 올린 파일 -->
+  <section class="lr-rules hidden" aria-labelledby="dmFileTitle" id="dmFileSec">
+    <h3 class="lr-rules-title" id="dmFileTitle">이 달에 올린 파일</h3>
+    <div class="table-responsive">
+      <table class="table dm-ev-tbl align-middle">
+        <thead><tr><th>구분</th><th>파일</th><th>유출 로그</th><th>로그 기간</th><th>올린 일시</th><th></th></tr></thead>
+        <tbody id="dmFileBody"></tbody>
+      </table>
+    </div>
+    <ul class="lr-rules-note"><li>보고서는 가장 최근에 올린 파일 1개 기준</li><li>파일 이름 클릭 → 원본 내려받기</li></ul>
+  </section>
+</main>
+
+<!-- 유출 로그 올리기 -->
+<div class="modal fade" id="upModal" tabindex="-1" aria-labelledby="upModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="upForm">
+      <div class="modal-header"><h5 class="modal-title" id="upModalTitle"><i class="fas fa-upload me-1"></i> 유출 로그 올리기</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label" for="upYm">모니터링 월<span class="req">*</span></label><input type="month" class="form-control" id="upYm" required></div>
+        <div class="mb-1"><label class="form-label" for="upFile">유출 로그 파일<span class="req">*</span></label><input type="file" class="form-control" id="upFile" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
+          <div class="form-text">DLP 관리시스템에서 받은 파일 그대로 (xlsx·xls·csv, 최대 50MB)</div></div>
+        <ul class="dm-up-note">
+          <li>'… 샘플 데이터' 열(실제 개인정보 값)은 저장 안 함</li>
+          <li>올리면 바로 보고서 작성 화면에서 확인 가능</li>
+        </ul>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn-m btn-outline-m" data-bs-dismiss="modal">취소</button><button type="submit" class="btn-m btn-primary-m" id="upSubmit"><i class="fas fa-upload"></i>올리기</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Privacy-I Agent 현황 올리기 -->
+<div class="modal fade" id="agModal" tabindex="-1" aria-labelledby="agModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="agForm">
+      <div class="modal-header"><h5 class="modal-title" id="agModalTitle"><i class="fas fa-upload me-1"></i> Privacy-I Agent 현황 올리기</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label" for="agYm">모니터링 월<span class="req">*</span></label><input type="month" class="form-control" id="agYm" required></div>
+        <div class="mb-1"><label class="form-label" for="agFile">Agent 현황 파일<span class="req">*</span></label><input type="file" class="form-control" id="agFile" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
+          <div class="form-text">Privacy-I 에서 받은 'Agent List' 엑셀 그대로 (xlsx·xls·csv, 최대 20MB)</div></div>
+        <ul class="dm-up-note">
+          <li>재설치 인원 = '설치 일시'가 모니터링 월인 사람 → 보고서 03</li>
+          <li>장기 미접속 인원 = '미접속일' 7일 이상인 사람 → 보고서 04</li>
+          <li>같은 달에 다시 올리면 이전 내용 교체</li>
+        </ul>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn-m btn-outline-m" data-bs-dismiss="modal">취소</button><button type="submit" class="btn-m btn-primary-m" id="agSubmit"><i class="fas fa-upload"></i>올리기</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, fmtYm, fmtDt, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const canWrite = SECLOG.canWrite(), isAdmin = SECLOG.isAdmin();
+  const st = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_dlp_ym') || SECLOG.reviewYm(), data: null };
+  const md = (t) => t ? `${+t.slice(5, 7)}/${+t.slice(8, 10)}` : '';
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  const toInput = (ym) => ym.slice(0, 4) + '-' + ym.slice(4);
+  const upModal = new bootstrap.Modal($('upModal'));
+  const agModal = new bootstrap.Modal($('agModal'));
+
+  if (canWrite) { $('btnUp').classList.remove('hidden'); $('btnAgent').classList.remove('hidden'); }
+
+  function saveBase64(f) {
+    const bin = atob(f.contentBase64); const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr]));
+    const a = document.createElement('a'); a.href = url; a.download = f.fileName; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function steps(up, ag) {
+    $('step1').classList.toggle('done', !!up);
+    $('stepAgent').classList.toggle('done', !!ag);
+    $('step2').classList.toggle('ready', !!up);
+    $('step1Txt').textContent = up ? `${up.originalFileName} · 유출 로그 ${fmtNum(up.eventCount)}건` : `${fmtYm(st.ym)} 유출 로그 없음`;
+    $('stepAgentTxt').textContent = ag ? `${ag.fileName || '-'} · 재설치 ${fmtNum(ag.reinstallCount)}명 · 장기 미접속 ${fmtNum(ag.offlineCount)}명`
+      : `${fmtYm(st.ym)} Agent 현황 없음 (보고서 03·04 가 비어 있게 됨)`;
+    $('step2Txt').textContent = up ? `${fmtYm(st.ym)} 보고서 · 내용 확인·입력 후 PPT${ag ? '' : ' (② 를 올리면 03·04 채움)'}` : '유출 로그를 올리면 작성 가능';
+    $('btnReport').classList.toggle('disabled', !up); $('btnReport').setAttribute('aria-disabled', String(!up));
+    $('btnReport').href = `dlp-report.html?ym=${st.ym}`;
+  }
+
+  async function load() {
+    loading(true);
+    try {
+      sessionStorage.setItem('seclog_dlp_ym', st.ym);
+      const d = st.data = await api(`/dlp-leak/monthly?targetYm=${st.ym}`);
+      const up = d.upload;
+      steps(up, d.agent);
+      $('dmFileSec').classList.toggle('hidden', !up);
+      if (!up) {
+        $('dmEmpty').classList.remove('hidden');
+        $('dmEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 유출 로그 없음 → ${canWrite ? '① [올리기]로 DLP 관리시스템에서 받은 유출 로그 올리기 · ② Privacy-I Agent 현황 올리기' : '담당자가 올리면 표시'}`;
+        return;
+      }
+      $('dmEmpty').classList.toggle('hidden', !up.analysisNote);
+      if (up.analysisNote) $('dmEmpty').innerHTML = `<i class="fas fa-circle-info me-1"></i> ${esc(up.analysisNote)}`;
+      $('dmFileBody').innerHTML = (d.files || []).map(f => `<tr>
+          <td>${f.leakUploadId === up.leakUploadId ? '<span class="badge-st use-y">보고서 기준</span>' : '<span class="badge-st use-n">이전 파일</span>'}</td>
+          <td><a href="#" class="dm-dl" data-id="${f.leakUploadId}" title="원본 내려받기"><i class="fas fa-file-arrow-down me-1"></i>${esc(f.originalFileName)}</a></td>
+          <td>${fmtNum(f.eventCount)}건</td>
+          <td class="text-nowrap">${f.periodFrom ? `${md(f.periodFrom)} ~ ${md(f.periodTo)}` : '-'}</td>
+          <td class="text-nowrap">${fmtDt(f.createdAt)}</td>
+          <td>${isAdmin ? `<button class="btn-m btn-outline-m btn-xs dm-del" data-id="${f.leakUploadId}" data-name="${esc(f.originalFileName)}"><i class="fas fa-trash"></i>삭제</button>` : ''}</td></tr>`).join('');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+
+  // ① 올리기
+  $('btnUp').onclick = () => { $('upForm').reset(); $('upYm').value = toInput(st.ym); upModal.show(); };
+  $('upForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = $('upFile').files[0]; const ym = ($('upYm').value || '').replace('-', '');
+    if (!f || !/^\d{6}$/.test(ym)) { toast('모니터링 월과 파일을 선택', 'error'); return; }
+    const fd = new FormData(); fd.append('file', f); fd.append('targetYm', ym);
+    $('upSubmit').disabled = true; loading(true);
+    try {
+      const r = await SECLOG.upload('/dlp-leak/uploads', fd);
+      upModal.hide();
+      toast(`올리기 완료 · 유출 로그 ${fmtNum(r.eventCount)}건`);
+      st.ym = r.targetYm; $('dmYm').value = toInput(st.ym);
+      await load();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { $('upSubmit').disabled = false; loading(false); }
+  };
+
+  // ② Privacy-I Agent 현황 올리기 (재설치 + 장기 미접속)
+  $('btnAgent').onclick = () => { $('agForm').reset(); $('agYm').value = toInput(st.ym); agModal.show(); };
+  $('agForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = $('agFile').files[0]; const ym = ($('agYm').value || '').replace('-', '');
+    if (!f || !/^\d{6}$/.test(ym)) { toast('모니터링 월과 파일을 선택', 'error'); return; }
+    const fd = new FormData(); fd.append('file', f);
+    $('agSubmit').disabled = true; loading(true);
+    try {
+      const r = await SECLOG.upload(`/dlp-leak/privacyi?targetYm=${ym}&kind=AGENT`, fd);
+      agModal.hide();
+      toast(`올리기 완료 · 전체 ${fmtNum(r.totalCount)}명 중 재설치 ${fmtNum(r.reinstallCount)}명 · 장기 미접속 ${fmtNum(r.offlineCount)}명`);
+      st.ym = ym; $('dmYm').value = toInput(st.ym);
+      await load();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { $('agSubmit').disabled = false; loading(false); }
+  };
+
+  // ③ 보고서 작성 (로그 없으면 이동 안 함)
+  $('btnReport').onclick = (e) => { if ($('btnReport').classList.contains('disabled')) e.preventDefault(); };
+
+  $('dmFileBody').onclick = async (e) => {
+    const dl = e.target.closest('.dm-dl');
+    if (dl) {
+      e.preventDefault();
+      try { saveBase64(await api(`/dlp-leak/uploads/${dl.dataset.id}/file`)); } catch (err) { toast(err.message, 'error'); }
+      return;
+    }
+    const del = e.target.closest('.dm-del');
+    if (del && confirm(`'${del.dataset.name}' 파일을 삭제할까?`)) {
+      loading(true);
+      try { await api(`/dlp-leak/uploads/${del.dataset.id}`, { method: 'DELETE' }); toast('삭제 완료'); await load(); }
+      catch (err) { toast(err.message, 'error'); } finally { loading(false); }
+    }
+  };
+
+  $('dmYm').value = toInput(st.ym);
+  $('dmYm').onchange = () => { const v = ($('dmYm').value || '').replace('-', ''); if (/^\d{6}$/.test(v)) { st.ym = v; load(); } };
+  load();
+})();
+</script>
+</body>
+</html>

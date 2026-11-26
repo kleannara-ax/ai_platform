@@ -85,6 +85,14 @@ public class SecLogUpload {
     @Column(name = "OUT_OF_MONTH_COUNT")
     private Integer outOfMonthCount;
 
+    /** 개인정보 다운로드 내역 탭 읽기 결과 (FOUND / NOT_FOUND / NULL=대상 시스템 아님) */
+    @Column(name = "PII_SHEET_STATUS", length = 20)
+    private String piiSheetStatus;
+
+    /** 읽은 개인정보 다운로드 내역 탭 이름 */
+    @Column(name = "PII_SHEET_NAME", length = 100)
+    private String piiSheetName;
+
     /** 탐지 결과 중 최고 위험도 (탐지 0건이면 NULL) */
     @Enumerated(EnumType.STRING)
     @Column(name = "MAX_SEVERITY", length = 20)
@@ -210,6 +218,12 @@ public class SecLogUpload {
     public void applyDateCheck(int dateUnknownCount, int outOfMonthCount) {
         this.dateUnknownCount = dateUnknownCount;
         this.outOfMonthCount = outOfMonthCount;
+    }
+
+    /** 개인정보 다운로드 내역 탭 읽기 결과 (재분석 시 다시 기록) */
+    public void applyPiiSheet(String piiSheetStatus, String piiSheetName) {
+        this.piiSheetStatus = piiSheetStatus;
+        this.piiSheetName = piiSheetName;
     }
 
     /** 정보보안팀 최종 검토 완료 */

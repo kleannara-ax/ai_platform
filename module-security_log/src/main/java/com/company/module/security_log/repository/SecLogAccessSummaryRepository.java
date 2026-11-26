@@ -13,6 +13,9 @@ public interface SecLogAccessSummaryRepository extends JpaRepository<SecLogAcces
 
     List<SecLogAccessSummary> findByUploadIdAndDeletedYnOrderByFailCountDescSuccessCountDesc(Long uploadId, String deletedYn);
 
+    /** 여러 업로드의 계정 집계 (위험 계정 검토 남은 수 계산) */
+    List<SecLogAccessSummary> findByUploadIdInAndDeletedYn(java.util.Collection<Long> uploadIds, String deletedYn);
+
     /** 월별 시스템별 접속 집계 [systemId, 계정 수(중복 제외), 성공 합, 실패 합, 위험계정 수(중복 제외)] - 매일 수집돼도 같은 계정은 1번만 셈 */
     @Query("""
             SELECT u.systemId, COUNT(DISTINCT s.accountId), SUM(s.successCount), SUM(s.failCount),
@@ -20,7 +23,7 @@ public interface SecLogAccessSummaryRepository extends JpaRepository<SecLogAcces
               FROM SecLogAccessSummary s, SecLogUpload u
              WHERE s.uploadId = u.uploadId
                AND s.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IS NOT NULL
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IS NOT NULL
              GROUP BY u.systemId
             """)
     List<Object[]> aggregateBySystem(@Param("targetYm") String targetYm);
@@ -31,7 +34,7 @@ public interface SecLogAccessSummaryRepository extends JpaRepository<SecLogAcces
               FROM SecLogAccessSummary s, SecLogUpload u
              WHERE s.uploadId = u.uploadId
                AND s.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
                AND s.riskFlags IS NOT NULL AND s.riskFlags <> ''
             """)
     List<Object[]> findRiskForMonth(@Param("targetYm") String targetYm,
@@ -43,7 +46,7 @@ public interface SecLogAccessSummaryRepository extends JpaRepository<SecLogAcces
               FROM SecLogAccessSummary s, SecLogUpload u
              WHERE s.uploadId = u.uploadId
                AND s.deletedYn = 'N' AND u.deletedYn = 'N'
-               AND u.targetYm = :targetYm AND u.systemId IN :systemIds
+               AND u.targetYm = :targetYm AND u.uploadId = (SELECT MAX(u2.uploadId) FROM SecLogUpload u2 WHERE u2.deletedYn = 'N' AND u2.targetYm = :targetYm AND u2.systemId = u.systemId) AND u.systemId IN :systemIds
             """)
     List<Object[]> findAllForMonth(@Param("targetYm") String targetYm,
                                    @Param("systemIds") java.util.Collection<Long> systemIds);

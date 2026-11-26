@@ -26,9 +26,16 @@ public class LogUploadDetailResponse {
     /** 룰별 탐지 건수 */
     private List<RuleHitCount> ruleHits;
 
+    /** 이 파일이 그 달·그 시스템에서 가장 최근에 올린 파일(분석 대상)인지. false 면 이전 파일이라 월 집계에서 빠짐 */
+    private boolean latest;
+    /** 그 달·그 시스템의 가장 최근 파일 (분석 대상) */
+    private Long latestUploadId;
+
     public static LogUploadDetailResponse of(SecLogUpload u, Map<String, Long> reviewStatusCounts,
-                                             List<RuleHitCount> ruleHits) {
+                                             List<RuleHitCount> ruleHits, Long latestUploadId) {
         return LogUploadDetailResponse.builder()
+                .latest(latestUploadId == null || latestUploadId.equals(u.getUploadId()))
+                .latestUploadId(latestUploadId)
                 .upload(LogUploadResponse.from(u))
                 .reviewComment(u.getReviewComment())
                 .reviewedAt(u.getReviewedAt())

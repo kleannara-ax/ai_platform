@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DLP 관리</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="css/seclog.css" rel="stylesheet">
+</head>
+<body class="lr-page">
+<main class="sl-main" id="dlpAdminPage">
+  <header class="page-header">
+    <h1><span class="icon-badge"><i class="fas fa-cog"></i></span><span>DLP 관리</span></h1>
+  </header>
+
+  <nav class="sl-tabs" aria-label="DLP 관리 메뉴">
+    <a href="#mail" class="active" aria-current="page" data-view="viewMail"><i class="fas fa-envelope"></i> 메일 알림 관리</a>
+    <a href="#org" data-view="viewOrg"><i class="fas fa-sitemap"></i> 사업부·부서 관리</a>
+  </nav>
+
+  <!-- 사업부·부서 관리 -->
+  <section id="viewOrg" class="hidden og-wrap" aria-label="사업부·부서 관리">
+    <section class="lr-rules rp-sec" aria-labelledby="ogTitle">
+      <h3 class="lr-rules-title" id="ogTitle">사업부·부서 목록 <span class="dm-sub" id="ogCnt"></span></h3>
+      <div class="og-adds hidden" id="ogAdds">
+        <div class="og-add-row"><span class="og-add-lbl">사업부 추가</span>
+          <input class="form-control form-control-sm" id="ogDivName" maxlength="200" placeholder="새 사업부 이름" aria-label="새 사업부 이름">
+          <button type="button" class="btn-m btn-primary-m btn-xs" id="ogDivBtn"><i class="fas fa-plus"></i>사업부 추가</button></div>
+        <div class="og-add-row"><span class="og-add-lbl">부서 추가</span>
+          <select class="form-select form-select-sm" id="ogDeptDiv" aria-label="부서를 넣을 사업부"></select>
+          <input class="form-control form-control-sm" id="ogDeptName" maxlength="200" placeholder="새 부서 이름" aria-label="새 부서 이름">
+          <button type="button" class="btn-m btn-primary-m btn-xs" id="ogDeptBtn"><i class="fas fa-plus"></i>부서 추가</button></div>
+      </div>
+      <div class="table-responsive"><table class="table rp-tbl align-middle og-tbl">
+        <thead><tr><th>사업부</th><th>부서</th><th>사용</th><th></th></tr></thead>
+        <tbody id="ogBody"></tbody>
+      </table></div>
+      <ul class="rp-note-list">
+        <li>여기 목록이 <b>카카오톡 사용 승인 대장</b> 등록·수정 때 사업부·부서 드롭다운으로 나옴 (사업부를 고르면 그 사업부의 부서만 표시)</li>
+        <li><b>부서 이름은 DLP 유출 로그에 나오는 부서 이름과 글자까지 똑같이</b> 넣어야 보고서에서 같은 사람으로 맞춰짐</li>
+        <li>안 쓰는 사업부·부서는 삭제 대신 <b>사용 끄기</b> → 드롭다운에서만 빠지고 이미 등록된 대장 값은 그대로</li>
+        <li>이름을 바꿔도 이미 등록된 대장 값은 바뀌지 않음 · 추가·이름 바꾸기·사용 켜기/끄기는 관리자만</li>
+      </ul>
+    </section>
+  </section>
+
+  <!-- 메일 알림 관리 -->
+  <section id="viewMail" aria-label="메일 알림 관리">
+    <section class="lr-rules rp-sec" aria-label="메일 서버 상태">
+      <div class="ma-server" id="maServer"></div>
+    </section>
+
+    <section class="lr-rules rp-sec" aria-labelledby="maRuleTitle">
+      <h3 class="lr-rules-title" id="maRuleTitle">메일 알림 규칙 <span class="dm-sub" id="maRuleCnt"></span>
+        <button type="button" class="btn-m btn-primary-m btn-xs hidden ms-auto" id="maAddBtn"><i class="fas fa-plus"></i>규칙 추가</button></h3>
+      <div class="table-responsive"><table class="table rp-tbl align-middle">
+        <thead><tr><th>활성화</th><th>규칙 이름</th><th>보내는 날</th><th>보내는 시각</th><th>받는 사람 / 참조</th><th>보낼 대기</th><th>보냄</th><th>실패</th><th>마지막 실행</th><th></th></tr></thead>
+        <tbody id="maRuleBody"></tbody>
+      </table></div>
+      <ul class="rp-note-list">
+        <li>대상 = 카카오톡 사용자 현황(승인 대장)의 '신청중' 건 · 같은 사람(부서+이름)은 신청 종료일이 가장 늦은 건 기준</li>
+        <li>보내는 날이 되면 매일 정한 시각에 자동으로 보냄 · <b>신청 종료일이 같은 사람은 메일 1통에 모두 담아 보냄</b> (사람마다 규칙당 1번, 보낸 건은 다시 안 보냄, 실패한 건은 다음 날 다시 보냄)</li>
+        <li>활성화 토글 = 켜면 정한 시각에 자동으로 보냄, 끄면 자동으로 보내지 않음 (규칙은 그대로 남고 [지금 보내기]는 가능) · 새 규칙은 켜진 상태로 만들어짐</li>
+        <li>규칙을 만든 날보다 앞서 보내는 날이 지난 건은 보내지 않음 · 규칙 추가·수정·삭제·활성화·지금 보내기는 관리자만</li>
+        <li><b>받는 사람·참조는 회사 메일만</b> (저장할 때 막고, 보낼 때 한 번 더 확인) · 받는 사람이 없으면 규칙을 켤 수 없음</li>
+      </ul>
+    </section>
+
+    <!-- 규칙 입력 (추가·수정) -->
+    <section class="lr-rules rp-sec hidden" id="maForm" aria-labelledby="maFormTitle">
+      <h3 class="lr-rules-title" id="maFormTitle">규칙 추가</h3>
+      <form id="maFormEl" class="ma-form" novalidate>
+        <label class="ma-f ma-f-wide">규칙 이름 <input class="form-control form-control-sm" id="fName" maxlength="100" placeholder="예: 카카오톡 승인 기한 경과 차단 요청" required></label>
+        <label class="ma-f">보내는 날
+          <span class="ma-inline">신청 종료일
+            <select class="form-select form-select-sm" id="fDir" aria-label="전·후"><option value="1">+ (후)</option><option value="-1">- (전)</option></select>
+            <input type="number" class="form-control form-control-sm ma-num" id="fDays" min="0" max="90" value="1" aria-label="일수"> 일</span>
+          <small class="lr-r-sub" id="fDaysHint"></small></label>
+        <label class="ma-f">보내는 시각 (매일) <input type="time" class="form-control form-control-sm" id="fTime" value="11:00" required></label>
+        <label class="ma-f ma-f-wide">받는 사람 <input class="form-control form-control-sm" id="fTo" maxlength="1000" placeholder="a@회사.co.kr, b@회사.co.kr (쉼표로 여러 명)">
+          <small class="lr-r-sub ma-dom-hint" id="fToHint"></small></label>
+        <label class="ma-f ma-f-wide">참조 <input class="form-control form-control-sm" id="fCc" maxlength="1000" placeholder="없으면 비움"></label>
+        <label class="ma-f ma-f-full">메일 제목 <input class="form-control form-control-sm" id="fSubject" maxlength="300" required></label>
+        <label class="ma-f ma-f-full">메일 본문 <textarea class="form-control form-control-sm" id="fBody" rows="8" maxlength="2000" required></textarea></label>
+        <div class="ma-f ma-f-full">
+          <span class="lr-r-sub">자리표시 (누르면 커서 위치에 넣음 · 보낼 때 실제 값으로 바뀜) · <b>'사람마다' 자리표시가 들어간 줄은 인원 수만큼 반복</b> (예: 3명이면 3줄) · 제목의 {이름} 은 여러 명이면 '김철수 외 2명'</span>
+          <div class="ma-ph" id="fPh"></div>
+        </div>
+        <div class="ma-f ma-f-full ma-actions">
+          <button type="button" class="btn-m btn-outline-m btn-xs" id="fCancel">취소</button>
+          <button type="submit" class="btn-m btn-primary-m btn-xs" id="fSave"><i class="fas fa-save"></i>저장</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="lr-rules rp-sec" aria-labelledby="maLogTitle">
+      <h3 class="lr-rules-title" id="maLogTitle">보낸 기록 <span class="dm-sub" id="maLogCnt"></span>
+        <select class="form-select form-select-sm ms-auto ma-log-sel" id="maLogRule" aria-label="규칙 거르기"><option value="">규칙 전체</option></select></h3>
+      <div class="table-responsive"><table class="table rp-tbl align-middle">
+        <thead><tr><th>시도 일시</th><th>규칙</th><th>부서</th><th>이름</th><th>신청 종료일</th><th>받는 사람</th><th>결과</th><th>제목</th></tr></thead>
+        <tbody id="maLogBody"></tbody>
+      </table></div>
+      <p class="rp-note">최근 300건 · 제목을 누르면 보낸 본문 보기</p>
+    </section>
+  </section>
+</main>
+
+<div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/seclog.js"></script>
+<script>
+(() => {
+  if (!SECLOG.requireAuth()) return;
+  const { api, esc, fmtNum, toast } = SECLOG;
+  const $ = (id) => document.getElementById(id);
+  const loading = (on) => $('loading').classList.toggle('show', on);
+  const isAdmin = SECLOG.isAdmin();
+  const dash = '<span class="lr-r-zero">-</span>';
+  const fmtDt = (v) => v ? String(v).replace('T', ' ').slice(0, 16) : '';
+  const st = { d: null, editId: null, logs: [] };
+  if (isAdmin) $('maAddBtn').classList.remove('hidden');
+
+  // ---------------- 규칙 목록
+  async function loadRules() {
+    try {
+      const d = st.d = await api('/dlp-leak/mail-rules');
+      const doms = d.allowedDomains || [];
+      const domTxt = doms.length ? `회사 메일(${doms.map(x => '@' + x).join(', ')})만 가능 · 회사 밖 주소는 저장·발송 안 됨` : '회사 도메인 미설정 → 아무 데도 보내지 않음 (서버 환경 변수 SECLOG_MAIL_ALLOWED_DOMAINS 설정 필요)';
+      $('fToHint').textContent = domTxt;
+      $('maServer').innerHTML = `<span class="badge-st ${doms.length ? 'kk-mail-sent' : 'kk-mail-fail'}">${doms.length ? '받는 사람: 회사 메일만' : '회사 도메인 미설정'}</span>
+        <span class="lr-r-sub">${esc(domTxt)}</span><span class="ma-server-gap"></span>
+        <span class="badge-st ${d.smtpReady ? 'kk-mail-sent' : 'kk-mail-fail'}">${d.smtpReady ? '메일 서버 연결 설정됨' : '메일 서버 미설정'}</span>
+        <span class="lr-r-sub">${d.smtpReady ? `보내는 주소 ${esc(d.fromAddr || '-')}` : '인프라팀 메일 서버 정보를 받아 서버에 설정하면 그때부터 보냄 · 그 전에는 규칙을 만들어 두면 대기 건으로 쌓임'}</span>`;
+      $('maRuleCnt').textContent = `· ${d.rules.length}개 · 활성 ${d.rules.filter(r => r.useYn === 'Y').length}개`;
+      $('maRuleBody').innerHTML = d.rules.length ? d.rules.map(r => `<tr class="${r.useYn === 'Y' ? '' : 'kk-row-off'}">
+          <td class="text-center"><div class="form-check form-switch ma-switch"><input class="form-check-input use-toggle ma-toggle" type="checkbox" role="switch" data-id="${r.mailRuleId}" ${r.useYn === 'Y' ? 'checked' : ''} ${isAdmin ? '' : 'disabled'} aria-label="${esc(r.ruleName)} 활성화"></div>
+            <div class="lr-r-sub ma-switch-txt">${r.useYn === 'Y' ? '켜짐' : '꺼짐'}</div></td>
+          <td><b>${esc(r.ruleName)}</b>${r.basic ? '<div class="lr-r-sub">기본 규칙</div>' : ''}</td>
+          <td class="text-nowrap">${esc(r.offsetText)}</td><td class="text-center">매일 ${esc(r.sendTime)}</td>
+          <td>${r.toAddrs ? esc(r.toAddrs) : '<span class="rp-red">받는 사람 없음</span>'}${r.ccAddrs ? `<div class="lr-r-sub">참조 ${esc(r.ccAddrs)}</div>` : ''}</td>
+          <td class="text-center">${r.pendingCount ? `<span class="rp-red">${fmtNum(r.pendingCount)}명</span>` : dash}</td>
+          <td class="text-center">${r.sentCount ? fmtNum(r.sentCount) + '건' : dash}</td>
+          <td class="text-center">${r.failCount ? `<span class="rp-red">${fmtNum(r.failCount)}건</span>` : dash}</td>
+          <td>${r.lastRunAt ? `${esc(fmtDt(r.lastRunAt))}<div class="lr-r-sub">${esc(r.lastRunResult || '')}</div>` : '<span class="lr-r-sub">아직 없음</span>'}</td>
+          <td class="text-nowrap">${isAdmin ? `<button class="btn-m btn-outline-m btn-xs ma-edit" data-id="${r.mailRuleId}">수정</button>
+            <button class="btn-m btn-outline-m btn-xs ma-run" data-id="${r.mailRuleId}" data-name="${esc(r.ruleName)}">지금 보내기</button>
+            <button class="btn-m btn-outline-m btn-xs ma-del" data-id="${r.mailRuleId}" data-name="${esc(r.ruleName)}">삭제</button>` : ''}</td></tr>`).join('')
+        : `<tr><td colspan="10" class="lr-r-empty">메일 알림 규칙 없음${isAdmin ? ' → [규칙 추가]' : ''}</td></tr>`;
+      const sel = $('maLogRule'), cur = sel.value;
+      sel.innerHTML = '<option value="">규칙 전체</option>' + d.rules.map(r => `<option value="${r.mailRuleId}">${esc(r.ruleName)}</option>`).join('');
+      sel.value = d.rules.some(r => String(r.mailRuleId) === cur) ? cur : '';
+      $('fPh').innerHTML = d.placeholders.map(p => `<button type="button" class="ma-ph-btn" data-k="${esc(p.key)}" title="${esc(p.desc)}">${esc(p.key)} <small>${esc(p.desc)}</small></button>`).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ---------------- 보낸 기록
+  async function loadLogs() {
+    try {
+      const id = $('maLogRule').value;
+      const list = st.logs = await api('/dlp-leak/mail-logs' + (id ? `?ruleId=${id}` : ''));
+      $('maLogCnt').textContent = `· ${fmtNum(list.length)}건`;
+      $('maLogBody').innerHTML = list.length ? list.map((l, i) => `<tr>
+          <td class="text-nowrap">${esc(fmtDt(l.lastTryAt))}</td><td>${esc(l.ruleName || '-')}</td><td>${esc(l.deptName)}</td><td><b>${esc(l.userName)}</b></td>
+          <td class="text-center">${esc(l.endDate)}</td><td>${esc(l.toAddrs)}${l.ccAddrs ? `<div class="lr-r-sub">참조 ${esc(l.ccAddrs)}</div>` : ''}</td>
+          <td class="text-center">${l.sendStatus === 'SENT' ? `<span class="badge-st kk-mail-sent">보냄</span>` : `<span class="badge-st kk-mail-fail">실패</span><div class="lr-r-sub">${esc((l.errorMessage || '').slice(0, 40))}</div>`}${l.tryCount > 1 ? `<div class="lr-r-sub">시도 ${l.tryCount}회</div>` : ''}</td>
+          <td><a href="#" class="ma-log-view" data-i="${i}">${esc(l.subject)}</a></td></tr>`).join('')
+        : '<tr><td colspan="8" class="lr-r-empty">보낸 기록 없음</td></tr>';
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  $('maLogRule').onchange = loadLogs;
+  $('maLogBody').onclick = (e) => {
+    const a = e.target.closest('.ma-log-view'); if (!a) return;
+    e.preventDefault();
+    const l = st.logs[+a.dataset.i];
+    alert(`제목: ${l.subject}\n받는 사람: ${l.toAddrs}${l.ccAddrs ? '\n참조: ' + l.ccAddrs : ''}\n\n${l.body}`);
+  };
+
+  // ---------------- 규칙 입력
+  const DEF_SUBJECT = '[DLP] 카카오톡 승인 기한 경과 차단 요청 - {부서} {이름}';
+  const DEF_BODY = '아래 {인원수}명의 DLP 카카오톡 승인 기한({신청종료일})이 경과하였으니 차단 요청드립니다.\n\n{번호}. {부서} {이름} (신청 기간 {신청시작일} ~ {신청종료일}, 문서번호 {문서번호})';
+  const daysHint = () => {
+    const n = +$('fDays').value || 0, dir = +$('fDir').value;
+    $('fDaysHint').textContent = n === 0 ? '= 신청 종료일 당일' : dir > 0 ? `= 신청 종료일 ${n}일 뒤 (예: 종료일 10-31 → 11-${String(n).padStart(2, '0')} 이후 첫 실행)` : `= 신청 종료일 ${n}일 전`;
+  };
+  ['fDays', 'fDir'].forEach(k => { $(k).oninput = daysHint; $(k).onchange = daysHint; });
+  function openForm(r) {
+    st.editId = r ? r.mailRuleId : null;
+    $('maFormTitle').textContent = r ? `규칙 수정 - ${r.ruleName}` : '규칙 추가';
+    $('fName').value = r ? r.ruleName : '';
+    const off = r ? r.offsetDays : 1;
+    $('fDir').value = off < 0 ? '-1' : '1'; $('fDays').value = Math.abs(off);
+    $('fTime').value = r ? r.sendTime : '11:00';
+    $('fTo').value = r ? r.toAddrs : ''; $('fCc').value = r ? (r.ccAddrs || '') : '';
+    $('fSubject').value = r ? r.subjectTpl : DEF_SUBJECT; $('fBody').value = r ? r.bodyTpl : DEF_BODY;
+    daysHint();
+    $('maForm').classList.remove('hidden'); $('maForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('fName').focus();
+  }
+  const closeForm = () => { st.editId = null; $('maForm').classList.add('hidden'); };
+  $('maAddBtn').onclick = () => openForm(null);
+  $('fCancel').onclick = closeForm;
+  $('fPh').onclick = (e) => {
+    const b = e.target.closest('.ma-ph-btn'); if (!b) return;
+    const t = document.activeElement === $('fSubject') ? $('fSubject') : $('fBody');
+    const s = t.selectionStart ?? t.value.length, en = t.selectionEnd ?? t.value.length;
+    t.value = t.value.slice(0, s) + b.dataset.k + t.value.slice(en); t.focus(); t.selectionStart = t.selectionEnd = s + b.dataset.k.length;
+  };
+  $('fPh').onmousedown = (e) => { if (e.target.closest('.ma-ph-btn')) e.preventDefault(); };
+  $('maFormEl').onsubmit = async (e) => {
+    e.preventDefault(); if (!isAdmin) return;
+    const days = $('fDays').value.trim();
+    if (!$('fName').value.trim() || !$('fSubject').value.trim() || !$('fBody').value.trim() || days === '' || !$('fTime').value) {
+      toast('규칙 이름·보내는 날·보내는 시각·제목·본문을 입력', 'error'); return;
+    }
+    // 받는 사람이 없으면 꺼진 상태로만 저장 (나중에 받는 사람을 넣고 켬)
+    const noTo = !$('fTo').value.trim();
+    const curUse = st.editId ? (st.d.rules.find(x => x.mailRuleId === st.editId)?.useYn || 'Y') : 'Y';
+    const n = parseInt(days, 10);
+    if (isNaN(n) || n < 0 || n > 90) { toast('일수는 0~90', 'error'); $('fDays').focus(); return; }
+    const body = { ruleName: $('fName').value.trim(), offsetDays: n * +$('fDir').value, sendTime: $('fTime').value.slice(0, 5),
+      toAddrs: $('fTo').value.trim(), ccAddrs: $('fCc').value.trim(), subjectTpl: $('fSubject').value.trim(), bodyTpl: $('fBody').value, useYn: noTo ? 'N' : curUse };
+    $('fSave').disabled = true;
+    try {
+      await api(st.editId ? `/dlp-leak/mail-rules/${st.editId}` : '/dlp-leak/mail-rules', { method: st.editId ? 'PUT' : 'POST', body });
+      toast((st.editId ? '규칙 수정 완료' : '규칙 추가 완료') + (noTo && curUse === 'Y' ? ' · 받는 사람이 없어 꺼진 상태로 저장' : '')); closeForm(); await loadRules();
+    } catch (err) { toast(err.message, 'error'); } finally { $('fSave').disabled = false; }
+  };
+
+  // 활성화 토글: 규칙의 다른 값은 그대로 두고 사용 여부만 바꿔 저장
+  $('maRuleBody').onchange = async (e) => {
+    const t = e.target.closest('.ma-toggle'); if (!t || !isAdmin) return;
+    const r = st.d.rules.find(x => x.mailRuleId === +t.dataset.id); if (!r) return;
+    const on = t.checked;
+    if (on && !r.toAddrs) { toast('받는 사람이 없어 켤 수 없음 → [수정]에서 받는 사람을 넣은 뒤 켜기', 'error'); t.checked = false; return; }
+    t.disabled = true;
+    try {
+      await api(`/dlp-leak/mail-rules/${r.mailRuleId}`, { method: 'PUT', body: { ruleName: r.ruleName, offsetDays: r.offsetDays, sendTime: r.sendTime,
+        toAddrs: r.toAddrs, ccAddrs: r.ccAddrs || '', subjectTpl: r.subjectTpl, bodyTpl: r.bodyTpl, useYn: on ? 'Y' : 'N' } });
+      toast(`'${r.ruleName}' ${on ? '활성화 (자동으로 보냄)' : '비활성화 (자동으로 보내지 않음)'}`);
+      await loadRules();
+    } catch (err) { toast(err.message, 'error'); t.checked = !on; t.disabled = false; }
+  };
+  $('maRuleBody').onclick = async (e) => {
+    const ed = e.target.closest('.ma-edit');
+    if (ed) { openForm(st.d.rules.find(r => r.mailRuleId === +ed.dataset.id)); return; }
+    const run = e.target.closest('.ma-run');
+    if (run) {
+      if (!confirm(`'${run.dataset.name}' 규칙으로 지금 보낼까? (보내는 날이 된 사람 중 아직 안 보낸 사람만)`)) return;
+      loading(true);
+      try { const r = await api(`/dlp-leak/mail-rules/${run.dataset.id}/run`, { method: 'POST' }); toast(r.result); await loadRules(); await loadLogs(); }
+      catch (err) { toast(err.message, 'error'); } finally { loading(false); }
+      return;
+    }
+    const del = e.target.closest('.ma-del');
+    if (del && confirm(`'${del.dataset.name}' 규칙을 삭제할까? (보낸 기록은 남음)`)) {
+      try { await api(`/dlp-leak/mail-rules/${del.dataset.id}`, { method: 'DELETE' }); toast('규칙 삭제 완료'); if (st.editId === +del.dataset.id) closeForm(); await loadRules(); await loadLogs(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+  };
+
+  // ---------------- 사업부·부서 관리
+  const og = { list: [], edit: null };
+  if (isAdmin) $('ogAdds').classList.remove('hidden');
+  async function loadOrgs() {
+    try { og.list = await api('/dlp-leak/orgs'); renderOrgs(); } catch (e) { toast(e.message, 'error'); }
+  }
+  const useCell = (o) => `<div class="form-check form-switch ma-switch"><input class="form-check-input og-use" type="checkbox" role="switch" data-id="${o.orgId}" ${o.useYn === 'Y' ? 'checked' : ''} ${isAdmin ? '' : 'disabled'} aria-label="${esc(o.orgName)} 사용"></div>`;
+  const nameCell = (o) => og.edit === o.orgId
+    ? `<span class="og-add"><input class="form-control form-control-sm og-name-in" data-id="${o.orgId}" value="${esc(o.orgName)}" maxlength="200" aria-label="이름">
+        <button class="btn-m btn-primary-m btn-xs og-name-save" data-id="${o.orgId}">저장</button> <button class="btn-m btn-outline-m btn-xs og-cancel">취소</button></span>`
+    : `<b class="${o.useYn === 'Y' ? '' : 'og-off'}">${esc(o.orgName)}</b>${o.useYn === 'Y' ? '' : ' <span class="lr-r-sub">(사용 안 함)</span>'}`;
+  const actCell = (o) => isAdmin && og.edit !== o.orgId ? `<button class="btn-m btn-outline-m btn-xs og-rename" data-id="${o.orgId}">이름 바꾸기</button>` : '';
+  function renderOrgs() {
+    const depts = og.list.reduce((n, d) => n + d.depts.length, 0);
+    $('ogCnt').textContent = `· 사업부 ${fmtNum(og.list.length)}개 · 부서 ${fmtNum(depts)}개`;
+    $('ogBody').innerHTML = og.list.length ? og.list.map(d => {
+      const rows = d.depts.map(t => `<tr class="${t.useYn === 'Y' && d.useYn === 'Y' ? '' : 'kk-row-off'}"><td></td><td>${nameCell(t)}</td>
+          <td class="text-center">${useCell(t)}</td><td class="text-nowrap text-end">${actCell(t)}</td></tr>`).join('');
+      return `<tr class="og-div ${d.useYn === 'Y' ? '' : 'kk-row-off'}"><td>${nameCell(d)}</td><td></td>
+          <td class="text-center">${useCell(d)}</td><td class="text-nowrap text-end">${actCell(d)}</td></tr>${rows}`;
+    }).join('') : `<tr><td colspan="4" class="lr-r-empty">등록된 사업부 없음${isAdmin ? ' → 위에서 [사업부 추가]' : ''}</td></tr>`;
+    // 부서 추가: 사업부 고르기 (고른 값 유지)
+    const sel = $('ogDeptDiv'), cur = sel.value;
+    sel.innerHTML = '<option value="">사업부 선택</option>' + og.list.map(d => `<option value="${d.orgId}">${esc(d.orgName)}${d.useYn === 'Y' ? '' : ' (사용 안 함)'}</option>`).join('');
+    sel.value = og.list.some(d => String(d.orgId) === cur) ? cur : '';
+    const f = $('ogBody').querySelector('.og-name-in'); if (f) f.focus();
+  }
+  const findOrg = (id) => { for (const d of og.list) { if (d.orgId === id) return d; const t = d.depts.find(x => x.orgId === id); if (t) return t; } return null; };
+  async function saveOrg(id, body, msg) {
+    try {
+      await api(id ? `/dlp-leak/orgs/${id}` : '/dlp-leak/orgs', { method: id ? 'PUT' : 'POST', body });
+      toast(msg); og.edit = null; await loadOrgs(); return true;
+    } catch (e) { toast(e.message, 'error'); return false; }
+  }
+  $('ogDivBtn').onclick = async () => {
+    const n = $('ogDivName').value.trim(); if (!n) { toast('사업부 이름을 입력', 'error'); $('ogDivName').focus(); return; }
+    if (await saveOrg(null, { orgName: n }, `사업부 '${n}' 추가 완료`)) $('ogDivName').value = '';
+  };
+  $('ogDeptBtn').onclick = async () => {
+    const div = $('ogDeptDiv').value, n = $('ogDeptName').value.trim();
+    if (!div) { toast('부서를 넣을 사업부를 선택', 'error'); $('ogDeptDiv').focus(); return; }
+    if (!n) { toast('부서 이름을 입력', 'error'); $('ogDeptName').focus(); return; }
+    if (await saveOrg(null, { parentOrgId: +div, orgName: n }, `부서 '${n}' 추가 완료`)) { $('ogDeptName').value = ''; $('ogDeptName').focus(); }
+  };
+  $('ogDivName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('ogDivBtn').click(); } };
+  $('ogDeptName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('ogDeptBtn').click(); } };
+  $('ogBody').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b || !isAdmin) return;
+    const id = +b.dataset.id;
+    if (b.classList.contains('og-rename')) { og.edit = id; renderOrgs(); }
+    else if (b.classList.contains('og-cancel')) { og.edit = null; renderOrgs(); }
+    else if (b.classList.contains('og-name-save')) {
+      const o = findOrg(id), n = $('ogBody').querySelector('.og-name-in').value.trim();
+      if (!n) { toast('이름을 입력', 'error'); return; }
+      saveOrg(id, { orgName: n, useYn: o.useYn }, '이름 변경 완료 (이미 등록된 대장 값은 그대로)');
+    }
+  };
+  $('ogBody').onkeydown = (e) => {
+    if (e.key === 'Escape') { og.edit = null; renderOrgs(); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const btn = e.target.closest('.og-add')?.querySelector('.og-name-save'); if (btn) btn.click();
+  };
+  $('ogBody').onchange = async (e) => {
+    const t = e.target.closest('.og-use'); if (!t || !isAdmin) return;
+    const o = findOrg(+t.dataset.id); t.disabled = true;
+    if (!(await saveOrg(o.orgId, { orgName: o.orgName, useYn: t.checked ? 'Y' : 'N' }, `'${o.orgName}' ${t.checked ? '사용 (드롭다운에 표시)' : '사용 안 함 (드롭다운에서 빠짐)'}`))) { t.checked = !t.checked; t.disabled = false; }
+  };
+
+  // ---------------- 탭 (주소 #mail / #org)
+  function showView() {
+    const v = location.hash === '#org' ? 'viewOrg' : 'viewMail';
+    document.querySelectorAll('.sl-tabs a[data-view]').forEach(a => {
+      const on = a.dataset.view === v; a.classList.toggle('active', on);
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    $('viewMail').classList.toggle('hidden', v !== 'viewMail'); $('viewOrg').classList.toggle('hidden', v !== 'viewOrg');
+  }
+  window.addEventListener('hashchange', showView); showView();
+
+  loading(true);
+  Promise.all([loadRules(), loadLogs(), loadOrgs()]).finally(() => loading(false));
+})();
+</script>
+</body>
+</html>

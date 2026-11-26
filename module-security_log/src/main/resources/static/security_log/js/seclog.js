@@ -125,7 +125,6 @@ const SECLOG = (() => {
   const TABS = [
     ['dashboard', 'dashboard.html', 'fa-gauge-high', '대시보드'],
     ['status', 'status.html', 'fa-table-cells', '월별 점검 현황'],
-    ['logs', 'index.html', 'fa-list', '접속·보안 로그'],
     ['result', 'detail.html', 'fa-magnifying-glass-chart', '분석 결과 (접속 행위·이상징후)'],
     ['systems', 'systems.html', 'fa-server', '점검 대상 시스템'],
     ['admin', 'rules.html', 'fa-gear', '관리'],
@@ -190,6 +189,41 @@ const SECLOG = (() => {
     if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
     return y + String(m).padStart(2, '0');
   };
+  // ---- 점검 대상 월: N월에는 지난달(N-1월) 로그를 올리고 검토 (마감: 다음 달 10일) ----
+  const reviewYm = () => shiftYm(currentYm(), -1);
+  const monthOf = (ym) => +String(ym).slice(4) + '월';
+  const reviewDue = (ym) => { const n = shiftYm(ym, 1); return +n.slice(4) + '/10'; };
+  /**
+   * 화면 위쪽 안내: "2026년 10월 로그를 올려 주세요" (지금 보는 달이 다르면 [10월로 가기])
+   * @param viewYm 지금 화면에서 보고 있는(또는 고른) 연월
+   * @param onGo   [점검 대상 월로 가기] 눌렀을 때 실행할 함수 (없으면 버튼 숨김)
+   * @param opt    { el: 넣을 위치(기본 #slNotice, 없으면 탭 아래 생성), label: '지금 보고 있는 달' }
+   */
+  function reviewNotice(viewYm, onGo, opt = {}) {
+    let box = opt.el || document.getElementById('slNotice');
+    if (!box) {
+      const tabs = document.getElementById('adminMenu') || document.getElementById('slTabs');
+      if (!tabs) return;
+      box = document.createElement('div'); box.id = 'slNotice';
+      tabs.after(box);
+    }
+    const ry = reviewYm(), now = currentYm();
+    const due = reviewDue(ry);
+    const late = kstToday() > shiftYm(ry, 1).slice(0, 4) + '-' + shiftYm(ry, 1).slice(4) + '-10';
+    const ask = canWrite() ? `${fmtYm(ry)} 로그를 올려 주세요` : `${fmtYm(ry)} 로그 점검 결과를 확인해 주세요`;
+    const label = opt.label || '지금 보고 있는 달';
+    const other = viewYm && viewYm !== ry;
+    box.className = 'review-notice' + (other ? ' other' : '');
+    box.innerHTML = `<i class="fas fa-bullhorn rn-ic"></i>
+      <div class="rn-body"><div class="rn-main">${ask}</div>
+        <div class="rn-sub">지금은 ${fmtYm(now)}입니다. 매달 <b>지난달 로그</b>를 올리고 검토합니다 ·
+          <span class="${late ? 'rn-late' : ''}">검토 마감 ${due}${late ? ' (지남)' : ''}</span></div>
+        ${other ? `<div class="rn-other"><i class="fas fa-triangle-exclamation"></i> ${label}: <b>${fmtYm(viewYm)}</b> (점검 대상 월이 아닙니다)</div>` : ''}
+      </div>
+      ${other && onGo ? `<button type="button" class="btn-m btn-primary-m btn-sm-m rn-go">${monthOf(ry)}로 가기 <i class="fas fa-angle-right"></i></button>` : ''}`;
+    const b = box.querySelector('.rn-go');
+    if (b) b.onclick = () => onGo(ry);
+  }
   // data-sev: 마우스를 올리면 위험도 기준 팝오버 표시
   const sevBadge = (s) => s ? `<span class="badge-sev ${SEVERITY[s]?.cls || ''}" data-sev="${s}">${SEVERITY[s]?.label || s}</span>` : '<span class="badge-sev sev-none" data-sev-help>탐지없음</span>';
   const reviewBadge = (s) => `<span class="badge-rv ${REVIEW[s]?.cls || ''}">${REVIEW[s]?.label || s}</span>`;
@@ -337,7 +371,7 @@ const SECLOG = (() => {
   return {
     kstTime, kstToday,
     api, upload, requireAuth, isAdmin, canWrite, getRoles, session,
-    esc, fmtDt, fmtNum, fmtSize, fmtYm, currentYm,
+    esc, fmtDt, fmtNum, fmtSize, fmtYm, currentYm, reviewYm, reviewDue, monthOf, reviewNotice,
     SEVERITY, REVIEW, STATUS, LOG_TYPES, sevBadge, sevHelp, reviewBadge, statusBadge,
     RISK_FLAGS, riskBadges,
     renderTabs, fillSystemSelect, shiftYm, ago,

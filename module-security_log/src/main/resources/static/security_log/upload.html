@@ -15,16 +15,18 @@
     <h1><span class="icon-badge"><i class="fas fa-upload"></i></span>로그 업로드 (등록)</h1>
     <div class="header-actions">
       <a href="status.html" class="btn-m btn-gray-m"><i class="fas fa-table-cells"></i>점검 현황</a>
-      <a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>
     </div>
   </header>
+
+  <div id="slNotice"></div>
 
   <div class="alert-m alert-info">
     <i class="fas fa-circle-info mt-1"></i>
     <div>업로드하면 <b>① 접속 행위 분석</b>(계정별 로그인 성공/실패, 업무시간 외, 외부 IP, 특권계정)과
       <b>② 이상징후 탐지</b>(선택한 로그 유형 + 공통 룰)를 동시에 수행합니다.
       인식 형식: <b>관리 콘솔 엑셀/CSV 감사로그</b>(머리글에 아이디·IP·일시·유형 열, 예: DLP 관리자 감사), sshd, Windows 4624/4625, AWS CloudTrail ConsoleLogin(UTC → 한국시간 보정), key=value(user=, src=), 일반 텍스트(login/로그인 + 성공/실패).<br>
-      원본 파일은 SHA-256 해시와 함께 보관되며, 같은 월·시스템에 같은 파일은 중복 업로드할 수 없습니다.</div>
+      원본 파일은 SHA-256 해시와 함께 보관되며, 같은 월·시스템에 같은 파일은 중복 업로드할 수 없습니다.<br>
+      <b>같은 달·같은 시스템에 다른 파일을 다시 올리면, 가장 최근에 올린 파일 1개만 분석·집계합니다.</b> (이전 파일은 보관만 됨)</div>
   </div>
 
   <form class="card-m" id="uploadForm" novalidate>
@@ -51,7 +53,7 @@
       </div>
       <div class="col-md-8">
         <label class="form-label" for="remark">비고</label>
-        <input type="text" class="form-control" id="remark" maxlength="1000" placeholder="예: 10월 정기 점검분">
+        <input type="text" class="form-control" id="remark" maxlength="1000" placeholder="예: 10월분 정기 점검">
       </div>
       <div class="col-12">
         <label class="form-label">로그 파일<span class="req">*</span></label>
@@ -65,7 +67,7 @@
       </div>
     </div>
     <div class="d-flex justify-content-end gap-2 mt-4">
-      <a href="index.html" class="btn-m btn-gray-m">취소</a>
+      <a href="status.html" class="btn-m btn-gray-m">취소</a>
       <button type="submit" class="btn-m btn-primary-m" id="btnSubmit"><i class="fas fa-magnifying-glass-chart"></i>업로드 및 분석</button>
     </div>
   </form>
@@ -93,12 +95,12 @@
     document.querySelector('main').innerHTML =
       '<div class="card-m text-center" style="padding:50px"><i class="fas fa-lock fa-2x mb-3" style="color:#cbd5e1"></i>' +
       '<h5>로그 업로드 권한이 없습니다</h5><p class="text-muted-m">관리자 또는 일반 사용자(ROLE_MANAGER)만 업로드할 수 있습니다.</p>' +
-      '<a href="index.html" class="btn-m btn-outline-m">목록으로</a></div>';
+      '<a href="dashboard.html" class="btn-m btn-outline-m">대시보드로</a></div>';
     return;
   }
 
   LOG_TYPES.forEach(([v, l]) => $('logType').insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`));
-  const ym = sessionStorage.getItem('seclog_ym') || SECLOG.currentYm();
+  const ym = sessionStorage.getItem('seclog_ym') || SECLOG.reviewYm();
   $('targetYm').value = ym.slice(0, 4) + '-' + ym.slice(4);
 
   // 점검 대상 시스템 (선택 시 기본 로그 유형 자동 지정)
@@ -111,6 +113,11 @@
     if (o && o.dataset.logtype) $('logType').value = o.dataset.logtype;
   };
   if (SECLOG.qs('ym')) { const q = SECLOG.qs('ym'); $('targetYm').value = q.slice(0, 4) + '-' + q.slice(4); }
+  // 'N월 로그를 올려 주세요' 안내: 고른 대상 연월이 점검 대상 월(지난달)과 다르면 주황색으로 알림
+  const showNotice = () => SECLOG.reviewNotice($('targetYm').value.replace('-', ''),
+    (ry) => { $('targetYm').value = ry.slice(0, 4) + '-' + ry.slice(4); showNotice(); }, { label: '고른 대상 연월' });
+  $('targetYm').addEventListener('change', showNotice);
+  showNotice();
 
   const ALLOWED = ['xlsx', 'xls', 'csv', 'tsv', 'log', 'txt', 'json', 'out'];
   const MAX = 50 * 1024 * 1024;

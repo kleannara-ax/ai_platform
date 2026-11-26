@@ -13,8 +13,13 @@
 <main class="sl-main">
   <header class="page-header">
     <h1><span class="icon-badge"><i class="fas fa-file-shield"></i></span><span id="pageTitle">로그 상세</span></h1>
+    <!-- 로그 분석 및 검토: 분석 기간 · 시스템 필터 (결과 화면에서만 표시) -->
+    <div class="lr-filters hidden" id="lrFilters" role="search" aria-label="분석 기간과 시스템 선택">
+      <label class="lr-f"><span>분석 기간</span><input type="month" class="form-control" id="lrYm" aria-label="분석 기간 (연월)"></label>
+      <label class="lr-f"><span>시스템</span><select class="form-select" id="lrSys" aria-label="시스템 선택"></select></label>
+    </div>
     <div class="header-actions" id="headerActions">
-      <a href="index.html" class="btn-m btn-gray-m"><i class="fas fa-list"></i>목록</a>
+      <a href="detail.html" class="btn-m btn-gray-m"><i class="fas fa-folder-open"></i>로그 고르기</a>
     </div>
   </header>
 
@@ -25,7 +30,8 @@
     <div class="guide-box">
       <i class="fas fa-circle-info"></i>
       <div><b>볼 로그를 하나 고르세요.</b> [점검 대상 시스템]에서 <b>사용</b>으로 표시한 시스템의 로그만 보입니다. 고른 로그의 <b>① 접속 행위 분석</b>(누가 언제 어디서 접속했는지)과
-        <b>② 이상징후 탐지</b>(룰셋에 걸린 행위)를 한 화면에서 봅니다. 위험도가 높은 로그부터 보여 드립니다.</div>
+        <b>② 이상징후 탐지</b>(룰셋에 걸린 행위)를 한 화면에서 봅니다. 위험도가 높은 로그부터 보여 드립니다.<br>
+        <b>시스템마다 가장 최근에 올린 파일 1개만</b> 보이고 분석합니다. 같은 달에 다시 올리면 새 파일로 바뀝니다.</div>
     </div>
     <section class="card-m">
       <div class="section-title">
@@ -42,123 +48,82 @@
   </section>
 
   <div id="resultView">
-  <!-- 다른 결과로 바로 이동 + 화면 안 바로가기 -->
-  <section class="res-bar" id="resBar">
-    <div class="rb-pick">
-      <label for="rbSelect"><i class="fas fa-right-left"></i> 다른 로그 보기</label>
-      <select class="form-select" id="rbSelect"></select>
-      <a class="rb-month" id="rbMonth" href="detail.html"><i class="fas fa-calendar"></i> 다른 달에서 고르기</a>
+  <!-- 로그 분석 및 검토: 요약 카드 4개 -->
+  <section class="lr-summary" id="lrSummary" aria-label="분석·검토 요약">
+    <div class="lr-cards" id="lrCards">
+      <article class="lr-card"><h3 class="lr-title">분석 대상</h3><div class="lr-sys" id="lrSysName">-</div></article>
+      <article class="lr-card"><h3 class="lr-title">분석 완료</h3><div class="lr-val" id="lrAnalyzed">-</div></article>
+      <article class="lr-card lr-click" id="lrCardTarget" role="button" tabindex="0" aria-label="검토 대상 전체 목록 보기">
+        <h3 class="lr-title">검토 대상</h3><div class="lr-val lr-orange" id="lrTarget">-</div></article>
+      <article class="lr-card lr-click" id="lrCardDone" role="button" tabindex="0" aria-label="검토 완료 항목만 보기">
+        <h3 class="lr-title">검토 완료</h3><div class="lr-val lr-blue" id="lrDone">-</div>
+        <button type="button" class="lr-pend" id="lrPend">미검토 -건</button></article>
     </div>
-    <nav class="rb-jump" aria-label="화면 안 바로가기">
-      <a href="#access"><i class="fas fa-right-to-bracket"></i> ① 접속 행위 분석</a>
-      <a href="#detect"><i class="fas fa-triangle-exclamation"></i> ② 이상징후 탐지</a>
-      <a href="#detSection"><i class="fas fa-list"></i> 탐지 결과 목록</a>
-    </nav>
+    <div class="lr-empty hidden" id="lrEmpty"></div>
+    <!-- 룰셋별 분석 결과 (현재 시스템·분석 기간의 룰별 집계) -->
+    <section class="lr-rules" id="lrRules" aria-labelledby="lrRulesTitle">
+      <h3 class="lr-rules-title" id="lrRulesTitle">룰셋별 분석 결과</h3>
+      <div class="lr-rules-wrap">
+        <table class="lr-rtbl">
+          <thead><tr><th scope="col">분석 룰셋</th><th scope="col">위험도</th><th scope="col">검토 대상</th><th scope="col">검토 완료</th></tr></thead>
+          <tbody id="lrRulesBody"><tr><td colspan="4" class="lr-r-empty">불러오는 중...</td></tr></tbody>
+        </table>
+      </div>
+      <ul class="lr-rules-note" id="lrRulesNote"></ul>
+    </section>
+    <!-- 카드 클릭 시 보이는 검토 항목 목록 -->
+    <section class="lr-list hidden" id="lrList" aria-live="polite">
+      <div class="lr-list-head">
+        <h3 id="lrListTitle">검토 대상 목록</h3>
+        <div class="lr-seg" role="tablist" aria-label="목록 거르기">
+          <button type="button" data-lr="ALL" role="tab">전체</button>
+          <button type="button" data-lr="DONE" role="tab">검토 완료</button>
+          <button type="button" data-lr="PENDING" role="tab">미검토</button>
+        </div>
+        <button type="button" class="lr-close" id="lrClose" aria-label="목록 닫기"><i class="fas fa-xmark"></i></button>
+      </div>
+      <div class="tbl-wrap"><table class="tbl lr-tbl"><thead><tr><th class="num">번호</th><th>위험도</th><th>검토 항목</th><th class="num">건수</th><th>검토 상태</th><th class="center">보기 / 검토</th></tr></thead>
+        <tbody id="lrBody"></tbody></table></div>
+    </section>
   </section>
+
 
   <div id="reviewAlert"></div>
 
-  <!-- 기본 정보 -->
-  <section class="card-m">
-    <h2><i class="fas fa-circle-info"></i>업로드 정보</h2>
-    <div class="info-grid" id="infoGrid"></div>
-  </section>
-
-  <!-- ① 접속 행위 분석 -->
-  <h2 class="sec-title" id="access"><i class="fas fa-right-to-bracket"></i>① 접속 행위 분석 <span class="sec-sub" id="accessSub"></span></h2>
-  <section class="card-m">
-    <div class="kpi-grid" id="accessKpi"></div>
-    <div class="filter-bar mb-2">
-      <div class="f-item"><label for="fRisk">표시</label>
-        <select class="form-select" id="fRisk" style="width:220px">
-          <option value="RISK">위험 표시 계정만</option><option value="">전체 계정</option>
-          <option value="FAIL_MANY">로그인 실패 5회↑</option><option value="OFF_HOUR">업무시간 외 접속</option>
-          <option value="EXTERNAL_IP">외부 IP</option><option value="MULTI_IP">다중 IP</option><option value="PRIV_ACCOUNT">특권/공용 계정</option><option value="IP_DENIED">허용 외 IP 접속 시도</option>
-        </select></div>
-      <div class="f-item"><label for="fAccQ">계정 검색</label><input class="form-control" id="fAccQ" style="width:180px" placeholder="계정 ID"></div>
-    </div>
-    <div class="tbl-wrap" style="max-height:480px;overflow:auto">
-      <table class="tbl">
-        <thead><tr><th>계정</th><th class="num">성공</th><th class="num">실패</th><th class="num">업무시간 외</th>
-          <th class="num">외부 IP 접속</th><th class="num">IP 수</th><th>접속 IP</th><th>최초 / 최종</th><th>위험 표시</th></tr></thead>
-        <tbody id="accessBody"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
-      </table>
-    </div>
-    <div class="form-text mt-2">업무시간 외: 22시~06시 로그인 성공(UTC 표기는 한국시간으로 환산) · 외부 IP: [관리 › 내부 IP 설정]에 등록된 대역 이외 · 특권/공용: root, admin, administrator, sa, sys, oracle, postgres, dba, guest 등 · 허용 외 IP: 장비의 '접속 IP 제한'에 걸린 로그인 시도.
-      '최초 / 최종'은 로그인 성공·실패 이벤트 기준입니다.
-      위험 표시는 참고용이며, 최종 판단은 아래 이상징후 탐지 검토와 함께 기록하세요.</div>
-  </section>
-
-  <!-- ② 이상징후 탐지 요약 -->
-  <h2 class="sec-title" id="detect"><i class="fas fa-triangle-exclamation"></i>② 이상징후 탐지 (룰셋) <span class="sec-sub" id="detectSub"></span></h2>
-  <section class="kpi-grid" id="kpiGrid"></section>
-
-  <section class="row g-3 mb-3">
-    <div class="col-lg-8">
-      <div class="card-m h-100 mb-0">
-        <h2><i class="fas fa-list-check"></i>룰별 탐지 건수</h2>
-        <p class="text-muted-m rule-hint">룰을 눌러 해당 룰의 로그를 확인하고, 같은 사유(예: 단순 비밀번호 오입력)라면 <b>룰 일괄 검토</b>로 한 번에 조치 내용을 남길 수 있습니다. <b>탐지된 룰만 표시</b>하며, 탐지 없는 룰은 아래 버튼으로 펼쳐 볼 수 있습니다.</p>
-        <div id="ruleHits"></div>
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="card-m h-100 mb-0">
-        <h2><i class="fas fa-clipboard-check"></i>검토 현황</h2>
-        <div id="reviewCounts"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 탐지 목록 -->
-  <section class="card-m" id="detSection">
-    <h2><i class="fas fa-triangle-exclamation"></i>탐지 결과 <span class="text-muted-m" style="font-size:.8rem;font-weight:600" id="detTotal"></span></h2>
-    <div class="filter-bar mb-3">
-      <div class="f-item">
-        <label for="fRule">룰</label>
-        <select class="form-select" id="fRule" style="width:260px"><option value="">전체</option></select>
-      </div>
-      <div class="f-item">
-        <label for="fSev">위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></label>
-        <select class="form-select" id="fSev" style="width:120px">
-          <option value="">전체</option><option value="CRITICAL">심각</option><option value="HIGH">높음</option><option value="MEDIUM">보통</option><option value="LOW">낮음</option>
-        </select>
-      </div>
-      <div class="f-item">
-        <label for="fRv">검토 상태</label>
-        <select class="form-select" id="fRv" style="width:150px">
-          <option value="">전체</option><option value="PENDING">미검토</option><option value="CONFIRMED">이상징후 확인</option>
-          <option value="RESOLVED">조치완료</option><option value="FALSE_POSITIVE">오탐</option>
-        </select>
-      </div>
-      <div class="f-item rule-filter-act hidden" id="ruleFilterAct">
-        <button class="btn-m btn-outline-m reviewable" id="btnRuleReviewF"><i class="fas fa-layer-group"></i>이 룰 일괄 검토</button>
-        <button class="btn-m btn-gray-m" id="btnRuleClear"><i class="fas fa-xmark"></i>룰 필터 해제</button>
-      </div>
-    </div>
-    <div class="review-panel reviewable" id="reviewPanel">
-      <span style="font-weight:700;font-size:.85rem">선택 <span id="selCount">0</span>건</span>
-      <select class="form-select" id="rvStatus" style="width:170px">
-        <option value="CONFIRMED">이상징후 확인</option><option value="RESOLVED">조치완료</option>
-        <option value="FALSE_POSITIVE">오탐</option><option value="PENDING">미검토로 되돌리기</option>
-      </select>
-      <input type="text" class="form-control" id="rvAction" maxlength="2000" placeholder="검토 의견 / 조치 내용" style="flex:1;min-width:220px">
-      <button class="btn-m btn-primary-m" id="btnReview"><i class="fas fa-check"></i>선택 건 검토 저장</button>
-    </div>
-    <div class="tbl-wrap">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th class="center reviewable" style="width:40px"><input type="checkbox" class="form-check-input" id="chkAll"></th>
-            <th class="num">라인</th><th>위험도<i class="fas fa-circle-info sev-help-ic" data-sev-help tabindex="0" role="button" aria-label="위험도 기준 보기"></i></th><th>룰</th><th>로그 원문</th><th>검토 상태</th><th>조치 내용</th><th>검토 일시</th>
-          </tr>
-        </thead>
-        <tbody id="detBody"><tr class="empty-row"><td colspan="8">불러오는 중...</td></tr></tbody>
-      </table>
-    </div>
-    <div class="pager" id="pager"></div>
-  </section>
   </div>
 </main>
+
+<!-- DLP 보고서 항목 검토 모달 -->
+<div class="modal fade" id="irModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="fas fa-clipboard-check me-2" style="color:var(--brand)"></i>항목 검토 <span class="text-muted-m" style="font-size:.85rem" id="irCount"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="ir-target-box"><div class="rs-title">검토할 항목</div><ul id="irTarget" class="ir-target"></ul></div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-4">
+            <label class="form-label" for="irStatus">검토 결과<span class="req">*</span></label>
+            <select class="form-select" id="irStatus">
+              <option value="FALSE_POSITIVE">정상 확인 (업무상 정상·오탐)</option>
+              <option value="CONFIRMED">이상 확인 (조치 필요)</option>
+              <option value="RESOLVED">조치완료</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="irComment">검토 내용<span class="req">*</span> <span class="text-muted-m" style="font-size:.78rem">확인 방법·근거 기재</span></label>
+            <textarea class="form-control" id="irComment" rows="4" maxlength="2000" placeholder="예: 담당자에게 확인 - 10/14 협력사 점검용 PC IP를 허용 목록에 추가(요청서 #2026-104). 변경 이력과 일치함."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-m btn-outline-m hidden me-auto" id="irReset"><i class="fas fa-rotate-left"></i>미검토로 되돌리기</button>
+        <button class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
+        <button class="btn-m btn-primary-m" id="irSave"><i class="fas fa-check"></i>검토 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- 룰 일괄 검토 모달 -->
 <div class="modal fade" id="ruleModal" tabindex="-1">
@@ -197,6 +162,37 @@
         <button class="btn-m btn-outline-m" id="rmViewLogs"><i class="fas fa-magnifying-glass"></i>로그 전체 보기</button>
         <button class="btn-m btn-gray-m" data-bs-dismiss="modal">취소</button>
         <button class="btn-m btn-primary-m" id="rmSubmit"><i class="fas fa-check"></i>일괄 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 위험 계정 검토 창 (요약 카드 목록 [계정 보기 / 검토]) -->
+<div class="modal fade" id="accModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="fas fa-user-shield me-2" style="color:var(--brand)"></i>위험 계정 검토</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <dl class="acc-info" id="amInfo"></dl>
+        <div class="row g-3" id="amForm">
+          <div class="col-md-5">
+            <label class="form-label" for="amStatus">검토 결과<span class="req">*</span></label>
+            <select class="form-select" id="amStatus">
+              <option value="NORMAL">정상 확인</option><option value="CONFIRMED">이상 확인 (조치 필요)</option>
+              <option value="RESOLVED">조치완료</option><option value="PENDING">미검토로 되돌리기</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="amComment">소명·조치 내용 <span class="text-muted-m" style="font-size:.78rem">(이상 확인·조치완료는 필수)</span></label>
+            <textarea class="form-control" id="amComment" rows="3" maxlength="2000" placeholder="예: 담당자 비밀번호 오입력 확인, 출장 중 외부 접속"></textarea>
+          </div>
+        </div>
+        <p class="text-muted-m mb-0 hidden" id="amLockNote" style="font-size:.82rem"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-m btn-gray-m" data-bs-dismiss="modal">닫기</button>
+        <button class="btn-m btn-primary-m" id="amSave"><i class="fas fa-check"></i>검토 저장</button>
       </div>
     </div>
   </div>
@@ -242,7 +238,7 @@
     $('resultView').classList.add('hidden');
     $('pageTitle').textContent = '분석 결과 (접속 행위·이상징후)';
     $('headerActions').innerHTML = SECLOG.canWrite() ? '<a href="upload.html" class="btn-m btn-primary-m"><i class="fas fa-upload"></i>로그 올리기</a>' : '';
-    let ym = SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm();
+    let ym = SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.reviewYm();
     const last = localStorage.getItem('seclog_last_result');
     const card = (u) => {
       const pend = u.pendingCount || 0;
@@ -251,6 +247,7 @@
       return `<a class="pick-card sev-${(u.maxSeverity || 'none').toLowerCase()}" href="detail.html?id=${u.uploadId}">
           <div class="pc-top"><b class="pc-sys">${esc(u.systemName)}</b>${sev}</div>
           <div class="pc-file" title="${esc(u.originalFileName)}"><i class="fas fa-file-lines"></i> ${esc(u.originalFileName)}</div>
+          <div class="pc-older">${u.olderFileCount ? `<i class="fas fa-clock-rotate-left"></i> ${fmtDt(u.createdAt).slice(5)}에 올린 최신 파일 · 이전 파일 ${u.olderFileCount}개는 분석에서 뺐습니다` : `<i class="fas fa-clock"></i> ${fmtDt(u.createdAt).slice(5)}에 올림`}</div>
           <div class="pc-nums"><span>로그 <b>${fmtNum(u.totalLineCount)}</b>줄</span><span>탐지 <b>${fmtNum(u.detectionCount)}</b>건</span>
             <span class="${pend ? 'pc-pend' : 'pc-done'}">${pend ? `미검토 <b>${fmtNum(pend)}</b>건` : (u.detectionCount ? '<i class="fas fa-check"></i> 검토 끝' : '탐지 없음')}</span></div>
           <div class="pc-foot">${period ? `<span><i class="fas fa-calendar-day"></i> ${period}</span>` : ''}${statusBadge(u.status)}<span class="pc-go">결과 보기 <i class="fas fa-angle-right"></i></span></div>
@@ -259,14 +256,15 @@
     async function loadPick() {
       sessionStorage.setItem('seclog_ym', ym);
       $('pkYm').textContent = fmtYm(ym);
+      SECLOG.reviewNotice(ym, (y) => { ym = y; loadPick(); });
       $('pickList').innerHTML = '<div class="text-muted-m">불러오는 중...</div>';
       try {
-        const d = await api(`/uploads?targetYm=${ym}&sort=SEVERITY&activeOnly=true&page=0&size=200`);
+        const d = await api(`/uploads?targetYm=${ym}&sort=SEVERITY&activeOnly=true&latestOnly=true&page=0&size=200`);
         const rows = d.content || [];
-        $('pickCount').textContent = `(${fmtYm(ym)} · ${fmtNum(d.totalElements)}건)`;
+        $('pickCount').textContent = `(${fmtYm(ym)} · 시스템 ${fmtNum(d.totalElements)}개)`;
         $('pickList').innerHTML = rows.length ? rows.map(card).join('')
           : `<div class="pick-empty"><i class="fas fa-inbox"></i><div>${fmtYm(ym)}에 사용 중인 점검 대상 시스템의 분석 로그가 없습니다.</div>
-              <div class="text-muted-m">왼쪽 화살표로 이전 달을 보거나, ${SECLOG.canWrite() ? '<a href="upload.html">로그를 먼저 올려 주세요</a>' : '로그가 올라오면 여기에 나타납니다'}.</div></div>`;
+              <div class="text-muted-m">왼쪽 화살표로 이전 달을 보거나, ${SECLOG.canWrite() ? `<a href="upload.html?ym=${ym}">${SECLOG.monthOf(ym)} 로그를 먼저 올려 주세요</a>` : '로그가 올라오면 여기에 나타납니다'}.</div></div>`;
       } catch (e) { $('pickList').innerHTML = `<div class="pick-empty">${esc(e.message)}</div>`; }
     }
     if (last) {
@@ -282,32 +280,14 @@
     loadPick();
   }
 
-  // ---- 다른 로그로 바로 이동 (같은 달, 위험도 높은 순) ----
-  async function fillResBar(u) {
-    $('rbMonth').href = `detail.html?ym=${u.targetYm}`;
-    try {
-      const d = await api(`/uploads?targetYm=${u.targetYm}&sort=SEVERITY&activeOnly=true&page=0&size=200`);
-      const rows = d.content || [];
-      const opt = (r, sel, tail = '') => {
-        const sevL = r.maxSeverity ? SECLOG.SEVERITY[r.maxSeverity].label : '탐지 없음';
-        return `<option value="${r.uploadId}" ${sel ? 'selected' : ''}>${esc(r.systemName)} · ${esc(r.originalFileName)} (${sevL} · 탐지 ${fmtNum(r.detectionCount)}건)${tail}</option>`;
-      };
-      // 지금 보는 로그가 '사용 안 함' 시스템이면 목록 맨 위에 따로 표시 (다른 로그로는 사용 중 시스템만 이동)
-      const inList = rows.some(r => String(r.uploadId) === String(id));
-      $('rbSelect').innerHTML = (inList ? '' : opt(u, true, ' - 사용 안 함 시스템'))
-        + rows.map(r => opt(r, String(r.uploadId) === String(id))).join('');
-    } catch (e) { $('rbSelect').innerHTML = `<option>${esc(u.systemName)}</option>`; }
+  /** 화면 안 이동 */
+  function goTo(sel, smooth) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
   }
-  $('rbSelect').onchange = () => { if ($('rbSelect').value && $('rbSelect').value !== String(id)) SECLOG.go('detail.html', { id: $('rbSelect').value }); };
-  document.querySelector('#resBar .rb-jump').onclick = (e) => {
-    const a = e.target.closest('a[href^="#"]');
-    if (!a) return;
-    e.preventDefault();
-    document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
-  const PAGE_SIZE = 50;
-  const st = { page: 0, detail: null, selected: new Set(), zeroOpen: false };
+  const st = { detail: null };
   const loading = (on) => $('loading').classList.toggle('show', on);
   const isAdmin = SECLOG.isAdmin(), canWrite = SECLOG.canWrite();
   const completeModal = new bootstrap.Modal($('completeModal'));
@@ -319,8 +299,8 @@
     st.detail = d;
     const u = d.upload;
     const reviewed = u.status === 'REVIEWED';
-    $('pageTitle').textContent = `${u.systemName} · ${fmtYm(u.targetYm)}`;
-    if (!st.barDone) { st.barDone = true; fillResBar(u); }
+    $('pageTitle').textContent = '로그 분석 및 검토';
+    if (!st.barDone) { st.barDone = true; initLr(u).catch(e => toast(e.message, 'error')); }
     document.title = u.systemName + ' - 보안로그 상세';
 
     // 상단 버튼 (권한 + 상태별)
@@ -333,127 +313,19 @@
     if (isAdmin && !reviewed) btns += `<button class="btn-m btn-success-m" id="btnComplete"><i class="fas fa-stamp"></i>최종 검토완료</button>`;
     if (isAdmin && reviewed) btns += `<button class="btn-m btn-gray-m" id="btnCancelReview"><i class="fas fa-rotate-left"></i>검토취소</button>`;
     if (isAdmin) btns += `<button class="btn-m btn-danger-m" id="btnDelete"><i class="fas fa-trash"></i>삭제</button>`;
-    btns += `<a href="index.html?ym=${u.targetYm}" class="btn-m btn-gray-m"><i class="fas fa-list"></i>로그 목록</a>`;
+    btns += `<a href="detail.html?ym=${u.targetYm}" class="btn-m btn-gray-m"><i class="fas fa-folder-open"></i>로그 고르기</a>`;
     $('headerActions').innerHTML = btns;
     bindHeader();
 
-    $('reviewAlert').innerHTML = reviewed
+    const olderNote = d.latest ? '' : `<div class="alert-m alert-warn"><i class="fas fa-clock-rotate-left mt-1"></i><div><b>이전에 올린 파일입니다.</b> 같은 달 ${esc(u.systemName)}에 더 최근에 올린 파일이 있어서 이 파일은 <b>월 점검 집계(대시보드·월별 점검 현황·엑셀)에서 빠져 있습니다.</b>
+        <a href="detail.html?id=${d.latestUploadId}" class="ms-1"><b>최신 파일 결과 보기 <i class="fas fa-angle-right"></i></b></a></div></div>`;
+    $('reviewAlert').innerHTML = olderNote + (reviewed
       ? `<div class="alert-m alert-ok"><i class="fas fa-circle-check mt-1"></i><div><b>정보보안팀 검토완료</b> · ${fmtDt(d.reviewedAt)} (검토자 ID ${esc(d.reviewedBy)})<br>${esc(d.reviewComment)}</div></div>`
-      : (d.reviewStatusCounts.PENDING > 0
-        ? `<div class="alert-m alert-warn"><i class="fas fa-hourglass-half mt-1"></i><div>미검토 탐지가 <b>${d.reviewStatusCounts.PENDING}건</b> 남아 있습니다. 모든 건을 검토해야 최종 검토완료할 수 있습니다.</div></div>`
-        : '');
+      : (d.reviewStatusCounts.PENDING > 0 && !st.report
+        ? `<div class="alert-m alert-warn det-pending-note"><i class="fas fa-hourglass-half mt-1"></i><div>미검토 탐지가 <b>${d.reviewStatusCounts.PENDING}건</b> 남아 있습니다. 모든 건을 검토해야 최종 검토완료할 수 있습니다.</div></div>`
+        : ''));
 
-    $('infoGrid').innerHTML = [
-      ['대상 연월', fmtYm(u.targetYm)], ['시스템명', esc(u.systemName)], ['로그 유형', `<span class="badge-type">${esc(u.logTypeLabel)}</span>`],
-      ['상태', statusBadge(u.status)], ['원본 파일명', `<span class="mono">${esc(u.originalFileName)}</span>`],
-      ['파일 크기 / 인코딩', `${fmtSize(u.fileSize)} · ${esc(u.fileCharset)}`],
-      ['SHA-256', `<span class="mono" style="font-size:.72rem">${esc(u.fileHash)}</span>`],
-      ['분석 일시', fmtDt(u.analyzedAt)], ['업로드', `${fmtDt(u.createdAt)} (사용자 ID ${esc(u.createdBy)})`],
-      ['최종 수정', d.updatedAt ? fmtDt(d.updatedAt) + (d.updatedBy ? ` (사용자 ID ${esc(d.updatedBy)})` : '') : '-'],
-      ['비고', esc(u.remark) || '-'],
-    ].map(([l, v]) => `<div class="i-item"><span class="i-label">${l}</span><span class="i-value">${v}</span></div>`).join('');
-
-    const hitRules = d.ruleHits.filter(r => r.hitCount > 0);
-    $('detectSub').textContent = `(탐지 ${fmtNum(u.detectionCount)}건 · 적용 룰 ${fmtNum(d.ruleHits.length)}개 중 ${fmtNum(hitRules.length)}개 탐지)`;
-    $('kpiGrid').innerHTML = `
-      <div class="kpi"><div class="k-label">분석 라인</div><div class="k-value">${fmtNum(u.totalLineCount)}</div></div>
-      <div class="kpi"><div class="k-label">탐지 합계</div><div class="k-value">${fmtNum(u.detectionCount)}</div><div class="k-sub">최고 위험도 ${sevBadge(u.maxSeverity)}</div></div>
-      <div class="kpi k-critical" data-sev="CRITICAL" tabindex="0"><div class="k-label">심각</div><div class="k-value">${u.criticalCount}</div></div>
-      <div class="kpi k-high" data-sev="HIGH" tabindex="0"><div class="k-label">높음</div><div class="k-value">${u.highCount}</div></div>
-      <div class="kpi k-medium" data-sev="MEDIUM" tabindex="0"><div class="k-label">보통</div><div class="k-value">${u.mediumCount}</div></div>
-      <div class="kpi k-low" data-sev="LOW" tabindex="0"><div class="k-label">낮음</div><div class="k-value">${u.lowCount}</div></div>`;
-
-    const canRuleReview = canWrite && !reviewed;
-    const zeroCount = d.ruleHits.length - hitRules.length;
-    const curRule = $('fRule').value;
-    const scopeBadge = (sc) => sc === 'SYSTEM' ? '<span class="rule-scope sc-sys">전용</span>'
-      : sc === 'COMMON' ? '<span class="rule-scope sc-com">공통</span>' : '';
-    $('ruleHits').innerHTML = d.ruleHits.length === 0
-      ? '<p class="text-muted-m mb-0" style="font-size:.85rem">이 업로드에 적용된 룰이 없습니다. [관리 › 탐지 룰셋 편집]에서 이 시스템의 룰셋 사용 여부를 확인하세요.</p>'
-      : '<div class="tbl-wrap"><table class="tbl rule-tbl"><thead><tr><th>룰</th><th>위험도' + SECLOG.sevHelp() + '</th><th class="num">건수</th><th style="width:150px">검토 진행</th><th class="center">로그 확인 / 검토</th></tr></thead><tbody>' +
-        d.ruleHits.map(r => {
-          if (!r.hitCount) {
-            const thr = r.thresholdCount > 1 ? ` title="${r.thresholdCount}건 이상 매칭될 때만 탐지하는 룰입니다 (그보다 적게 매칭된 경우도 0건으로 표시)"` : '';
-            return `<tr class="rule-zero" data-rule-zero="${esc(r.ruleCode)}"${st.zeroOpen ? '' : ' hidden'}>
-              <td><div class="mono" style="font-weight:700">${esc(r.ruleCode)} ${scopeBadge(r.scope)}</div><div style="font-size:.78rem">${esc(r.ruleName)}</div></td>
-              <td>${sevBadge(r.severity)}</td>
-              <td class="num"${thr}>0${r.thresholdCount > 1 ? `<div class="rule-thr">${r.thresholdCount}건↑ 탐지</div>` : ''}</td>
-              <td><span class="rule-none">탐지 없음</span></td>
-              <td class="center"><span class="text-muted-m" style="font-size:.76rem">-</span></td></tr>`;
-          }
-          const t = r.hitCount || 1, w = (n) => (n / t * 100).toFixed(1) + '%';
-          const prog = `<div class="rv-bar" title="조치완료 ${r.resolvedCount} · 오탐 ${r.falsePositiveCount} · 이상징후 확인 ${r.confirmedCount} · 미검토 ${r.pendingCount}">
-              <span class="s-res" style="width:${w(r.resolvedCount)}"></span><span class="s-fp" style="width:${w(r.falsePositiveCount)}"></span>
-              <span class="s-conf" style="width:${w(r.confirmedCount)}"></span><span class="s-pend" style="width:${w(r.pendingCount)}"></span></div>
-            ${r.pendingCount > 0 ? `<span class="rule-pend">미검토 ${fmtNum(r.pendingCount)}건</span>` : '<span class="rv-done"><i class="fas fa-check"></i> 검토 끝</span>'}`;
-          return `<tr class="${curRule === r.ruleCode ? 'rule-active' : ''}" data-rule="${esc(r.ruleCode)}">
-            <td><div class="mono" style="font-weight:700">${esc(r.ruleCode)} ${scopeBadge(r.scope)}</div><div style="font-size:.78rem">${esc(r.ruleName)}</div></td>
-            <td>${sevBadge(r.severity)}</td>
-            <td class="num"><b>${fmtNum(r.hitCount)}</b></td>
-            <td>${prog}</td>
-            <td class="center" style="white-space:nowrap">
-              <button class="btn-m btn-outline-m btn-xs" data-act="logs" data-rule="${esc(r.ruleCode)}"><i class="fas fa-magnifying-glass"></i>로그 보기</button>
-              ${canRuleReview ? `<button class="btn-m btn-primary-m btn-xs" data-act="review" data-rule="${esc(r.ruleCode)}"><i class="fas fa-layer-group"></i>룰 일괄 검토</button>` : ''}
-            </td></tr>`;
-        }).join('') +
-        (hitRules.length === 0 ? '<tr class="rule-empty"><td colspan="5">이 로그에서 탐지된 룰이 없습니다.</td></tr>' : '') +
-        '</tbody></table></div>' +
-        (zeroCount > 0 ? `<button type="button" class="rule-zero-toggle" id="btnZeroToggle" aria-expanded="${st.zeroOpen}">
-            <i class="fas fa-chevron-${st.zeroOpen ? 'up' : 'down'}"></i>${st.zeroOpen ? '탐지 없는 룰 숨기기' : `탐지 없는 룰 ${fmtNum(zeroCount)}개 보기`}</button>` : '');
-
-    // 탐지 목록 룰 필터 옵션 (현재 선택 유지)
-    $('fRule').innerHTML = '<option value="">전체</option>' + hitRules.map(r =>
-      `<option value="${esc(r.ruleCode)}">${esc(r.ruleCode)} · ${esc(r.ruleName)} (${fmtNum(r.hitCount)})</option>`).join('');
-    $('fRule').value = hitRules.some(r => r.ruleCode === curRule) ? curRule : '';
-    syncRuleFilter();
-
-    const total = Object.values(d.reviewStatusCounts).reduce((a, b) => a + b, 0);
-    $('reviewCounts').innerHTML = Object.entries(d.reviewStatusCounts).map(([k, v]) => {
-      const pct = total ? Math.round(v / total * 100) : 0;
-      return `<div class="d-flex align-items-center gap-2 mb-2"><div style="width:110px">${reviewBadge(k)}</div>
-        <div class="flex-grow-1" style="background:#f1f5f9;border-radius:99px;height:8px"><div style="width:${pct}%;height:8px;border-radius:99px;background:var(--brand)"></div></div>
-        <div style="width:60px;text-align:right;font-weight:700">${v}건</div></div>`;
-    }).join('') + `<div class="text-muted-m mt-2" style="font-size:.78rem">합계 ${total}건</div>`;
-
-    const lockReview = reviewed || !canWrite;
-    document.querySelectorAll('.reviewable').forEach(el => el.classList.toggle('hidden', lockReview));
   }
-
-  async function loadDetections() {
-    const p = new URLSearchParams({ page: st.page, size: PAGE_SIZE });
-    if ($('fSev').value) p.set('severity', $('fSev').value);
-    if ($('fRv').value) p.set('reviewStatus', $('fRv').value);
-    if ($('fRule').value) p.set('ruleCode', $('fRule').value);
-    const data = await api(`/uploads/${id}/detections?` + p.toString());
-    st.selected.clear(); updateSel(); $('chkAll').checked = false;
-    $('detTotal').textContent = `(${fmtNum(data.totalElements)}건)`;
-    const lock = st.detail.upload.status === 'REVIEWED' || !canWrite;
-    const rows = data.content || [];
-    $('detBody').innerHTML = rows.length === 0
-      ? '<tr class="empty-row"><td colspan="8">조건에 맞는 탐지 결과가 없습니다.</td></tr>'
-      : rows.map(x => `<tr>
-          <td class="center ${lock ? 'hidden' : ''}"><input type="checkbox" class="form-check-input det-chk" value="${x.detectionId}"></td>
-          <td class="num">${x.lineNumber}</td>
-          <td>${sevBadge(x.severity)}</td>
-          <td><div class="mono" style="font-weight:700">${esc(x.ruleCode)}</div><div style="font-size:.78rem">${esc(x.ruleName)}</div></td>
-          <td><div class="log-line">${esc(x.logContent)}</div></td>
-          <td>${reviewBadge(x.reviewStatus)}</td>
-          <td style="font-size:.8rem;max-width:220px">${esc(x.actionContent) || '<span class="text-muted-m">-</span>'}</td>
-          <td style="font-size:.78rem">${x.reviewedAt ? fmtDt(x.reviewedAt) + '<br><span class="text-muted-m">ID ' + esc(x.reviewedBy) + '</span>' : '-'}</td>
-        </tr>`).join('');
-    renderPager(data.totalPages || 0);
-  }
-
-  function renderPager(totalPages) {
-    if (totalPages <= 1) { $('pager').innerHTML = ''; return; }
-    const cur = st.page, start = Math.max(0, cur - 4), end = Math.min(totalPages, start + 9);
-    let h = `<button ${cur === 0 ? 'disabled' : ''} data-p="${cur - 1}"><i class="fas fa-chevron-left"></i></button>`;
-    for (let i = start; i < end; i++) h += `<button class="${i === cur ? 'active' : ''}" data-p="${i}">${i + 1}</button>`;
-    h += `<button ${cur >= totalPages - 1 ? 'disabled' : ''} data-p="${cur + 1}"><i class="fas fa-chevron-right"></i></button>`;
-    $('pager').innerHTML = h;
-  }
-
-  const updateSel = () => { $('selCount').textContent = st.selected.size; $('btnReview').disabled = st.selected.size === 0; };
 
   async function run(fn, okMsg) {
     loading(true);
@@ -462,45 +334,362 @@
     finally { loading(false); }
   }
   let accessRows = [];
-  function renderAccess() {
-    const f = $('fRisk').value, q = $('fAccQ').value.trim().toLowerCase();
-    const rows = accessRows.filter(a => (!q || a.accountId.toLowerCase().includes(q)) &&
-      (f === '' ? true : f === 'RISK' ? a.riskFlags.length > 0 : a.riskFlags.includes(f)));
-    $('accessBody').innerHTML = accessRows.length === 0
-      ? '<tr class="empty-row"><td colspan="9">로그에서 로그인(접속) 이벤트를 찾지 못했습니다. 인식 형식은 업로드 화면 안내를 참고하세요.</td></tr>'
-      : rows.length === 0 ? '<tr class="empty-row"><td colspan="9">조건에 맞는 계정이 없습니다.</td></tr>'
-      : rows.map(a => `<tr class="${a.riskFlags.length ? 'row-risk' : ''}">
-          <td class="mono"><b>${esc(a.accountId)}</b></td><td class="num">${fmtNum(a.successCount)}</td>
-          <td class="num" style="color:${a.failCount >= 5 ? '#dc2626' : 'inherit'};font-weight:${a.failCount ? 700 : 400}">${fmtNum(a.failCount)}</td>
-          <td class="num">${fmtNum(a.offHourCount)}</td><td class="num">${fmtNum(a.externalIpCount)}</td><td class="num">${fmtNum(a.ipCount)}</td>
-          <td class="mono" style="max-width:260px">${esc(a.ipList || '-')}</td>
-          <td style="font-size:.76rem;white-space:nowrap">${esc(a.firstSeen || '-')}<br>${esc(a.lastSeen || '-')}</td>
-          <td>${SECLOG.riskBadges(a.riskFlags)}</td></tr>`).join('');
-  }
+  const ACC_RV = { NORMAL: ['정상 확인', 'rv-resolved'], CONFIRMED: ['이상 확인', 'rv-confirmed'], RESOLVED: ['조치완료', 'rv-resolved'] };
+  const accLocked = () => !canWrite || (st.detail && st.detail.upload.status === 'REVIEWED');
+  /** 접속 계정 (요약 카드 '검토 대상'의 위험 계정 수 계산용, 화면 표는 없음) */
   async function loadAccess() {
-    try {
-      const r = await api(`/uploads/${id}/access`);
-      accessRows = r.accounts || [];
-      const cnt = (fl) => accessRows.filter(a => a.riskFlags.includes(fl)).length;
-      $('accessSub').textContent = `(접속 계정 ${fmtNum(r.accountCount)}개)`;
-      $('accessKpi').innerHTML = `
-        <div class="kpi"><div class="k-label">접속 계정</div><div class="k-value">${fmtNum(r.accountCount)}</div><div class="k-sub">위험 표시 ${fmtNum(r.riskAccountCount)}개</div></div>
-        <div class="kpi k-low"><div class="k-label">로그인 성공</div><div class="k-value">${fmtNum(r.successTotal)}</div></div>
-        <div class="kpi k-critical"><div class="k-label">로그인 실패</div><div class="k-value">${fmtNum(r.failTotal)}</div><div class="k-sub">5회↑ 계정 ${cnt('FAIL_MANY')}개</div></div>
-        <div class="kpi k-medium"><div class="k-label">업무시간 외</div><div class="k-value">${cnt('OFF_HOUR')}</div><div class="k-sub">계정 수</div></div>
-        <div class="kpi k-high"><div class="k-label">외부 IP 접속</div><div class="k-value">${cnt('EXTERNAL_IP')}</div><div class="k-sub">계정 수</div></div>
-        <div class="kpi k-critical"><div class="k-label">특권/공용 계정</div><div class="k-value">${cnt('PRIV_ACCOUNT')}</div><div class="k-sub">계정 수</div></div>
-        <div class="kpi k-critical"><div class="k-label">허용 외 IP 접속 시도</div><div class="k-value">${cnt('IP_DENIED')}</div><div class="k-sub">접속 IP 제한 위반 계정</div></div>`;
-      if (r.riskAccountCount === 0) $('fRisk').value = '';
-      renderAccess();
-    } catch (e) { $('accessBody').innerHTML = `<tr class="empty-row"><td colspan="9">${esc(e.message)}</td></tr>`; }
+    try { accessRows = (await api(`/uploads/${id}/access`)).accounts || []; }
+    catch (e) { accessRows = []; }
   }
-  $('fRisk').onchange = renderAccess;
-  $('fAccQ').oninput = renderAccess;
+  // ---- 위험 계정 검토 창
+  const accModal = new bootstrap.Modal($('accModal'));
+  let amTarget = null;
+  function openAcc(accountId) {
+    const a = accessRows.find(x => x.accountId === accountId);
+    if (!a) return;
+    amTarget = a;
+    const lock = accLocked(), rv = ACC_RV[a.reviewStatus];
+    $('amInfo').innerHTML = [
+      ['계정', `<b class="mono">${esc(a.accountId)}</b>`], ['위험 표시', SECLOG.riskBadges(a.riskFlags) || '-'],
+      ['로그인', `성공 ${fmtNum(a.successCount)} · 실패 ${fmtNum(a.failCount)} · 업무시간 외 ${fmtNum(a.offHourCount)} · 외부 IP ${fmtNum(a.externalIpCount)}`],
+      ['접속 IP', `<span class="mono">${esc(a.ipList || '-')}</span>`], ['최초 / 최종', `${esc(a.firstSeen || '-')} / ${esc(a.lastSeen || '-')}`],
+      ['현재 검토', a.reviewStatus ? `<span class="badge-rv ${rv ? rv[1] : ''}">${esc(rv ? rv[0] : a.reviewStatusLabel)}</span> ${esc(a.reviewComment || '')}
+        <span class="text-muted-m" style="font-size:.76rem">${fmtDt(a.reviewedAt)} · 검토자 ID ${esc(a.reviewedBy)}</span>` : '<span class="badge-rv rv-pending">미검토</span>'],
+    ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+    $('amStatus').value = a.reviewStatus || 'NORMAL';
+    $('amComment').value = a.reviewComment || '';
+    $('amForm').classList.toggle('hidden', lock);
+    $('amSave').classList.toggle('hidden', lock);
+    $('amLockNote').classList.toggle('hidden', !lock);
+    $('amLockNote').textContent = !canWrite ? '조회 권한 · 검토는 담당자·관리자만 가능' : '최종 검토완료된 로그 · 변경은 검토취소 후 가능';
+    accModal.show();
+  }
+  $('amSave').onclick = () => {
+    if (!amTarget) return;
+    const status = $('amStatus').value, comment = $('amComment').value.trim();
+    if ((status === 'CONFIRMED' || status === 'RESOLVED') && !comment) { $('amComment').focus(); return toast('소명·조치 내용을 입력해 주세요.', 'error'); }
+    const acc = amTarget.accountId;
+    accModal.hide();
+    run(() => api(`/uploads/${id}/access/review`, { method: 'PUT', body: { accountIds: [acc], reviewStatus: status, reviewComment: comment || null } }),
+      status === 'PENDING' ? `${acc} 계정을 미검토로 되돌렸습니다.` : `${acc} 계정 검토를 저장했습니다.`);
+  };
 
-  async function reload() { await loadDetail(); await Promise.all([loadDetections(), loadAccess()]);
+  // ===== 개인정보 다운로드 검토 (자사몰·임직원몰) =====
+  let piiData = null;
+  const PII_RV = { PENDING: ['미검토', 'rv-pending'], NORMAL: ['정상 업무', 'rv-resolved'], CONFIRMED: ['사유 불명확·조치 필요', 'rv-confirmed'], RESOLVED: ['조치완료', 'rv-resolved'] };
+  const piiDt = (p) => p.downloadAt ? fmtDt(p.downloadAt).slice(0, 16) : esc(p.downloadAtText || '-');
+  /** 개인정보 다운로드 이력 (자사몰·임직원몰, 요약 카드 '검토 대상' 계산용 · 검토는 연동 룰셋의 분석 근거 화면에서) */
+  async function loadPii() {
+    try { piiData = await api(`/uploads/${id}/pii-downloads`); }
+    catch (e) { piiData = null; }
+  }
+  /** 룰셋 분석 근거 화면 주소 */
+  const evHref = (rc, hash) => `rule-evidence.html?id=${encodeURIComponent(id)}&rule=${encodeURIComponent(rc)}${hash || ''}`;
+
+  async function reload() {
+    await loadDetail();
+    await loadDlpReport(st.reportDone);
+    if (st.report) applyDlpLayout();               // DLP: 요약 카드 + 룰셋별 분석 결과만
+    else await Promise.all([loadAccess(), loadPii()]);
+    await loadRuleResults();
+    renderLr();
+    // 예전 위치 링크(대시보드·월별 현황): #pii → 연동 룰셋의 다운로드 이력 화면, #access·#detect → 미검토 목록
     const h = location.hash;
-    if (!st.scrolled && ['#access', '#detect', '#detSection'].includes(h)) { st.scrolled = true; document.querySelector(h).scrollIntoView(); } }
+    if (!st.scrolled) {
+      st.scrolled = true;
+      if (h === '#pii' && piiData && piiData.target && piiData.ruleCode) { location.replace(evHref(piiData.ruleCode, '#pii')); return; }
+      if (['#access', '#detect', '#detSection', '#pii'].includes(h)) setLrFilter('PENDING');
+      else if (h === '#lrRules') goTo(h, false);
+    }
+  }
+
+  // ===== 룰셋별 분석 결과 (분석 룰셋 / 검토 대상 / 검토 완료) =====
+  // 건수 기준: DLP = 계정별 묶음(요약 카드 '검토 대상'과 같은 기준) · 그 외 = 탐지 건수
+  // 미분석·분석 실패 룰은 0건으로 표시하지 않음 (검토 대상 칸에 상태 표시, 검토 완료 '—')
+  // 행 아무 곳이나 눌러도 이동 (링크 자체 클릭은 브라우저 기본 동작)
+  $('lrRulesBody').onclick = (e) => {
+    if (e.target.closest('a')) return;
+    const tr = e.target.closest('tr.lr-r-link');
+    if (tr) location.href = tr.dataset.href;
+  };
+  async function loadRuleResults() {
+    try { st.ruleRes = await api(`/uploads/${id}/rule-results`); }
+    catch (e) { st.ruleRes = null; $('lrRulesBody').innerHTML = `<tr><td colspan="4" class="lr-r-empty">${esc(e.message)}</td></tr>`; return; }
+    renderRuleResults();
+  }
+  function renderRuleResults() {
+    const r = st.ruleRes;
+    if (!r) return;
+    let byItem = null;
+    if (st.report) {                                  // DLP: 보고서 항목(룰 × 계정) 기준으로 셈
+      byItem = {};
+      (st.report.items || []).forEach(i => {
+        const c = byItem[i.ruleCode] = byItem[i.ruleCode] || [0, 0];
+        c[0]++; if (i.reviewStatus && !i.pendingCount) c[1]++;
+      });
+    }
+    const rows = (r.rows || []).map(x => {
+      const c = byItem ? (byItem[x.ruleCode] || [0, 0]) : [x.reviewTarget, x.reviewDone];
+      return { ...x, target: c[0], done: c[1] };
+    });
+    const grp = (x) => x.status === 'NOT_RUN' ? 3 : x.status === 'FAILED' ? 1 : x.target > 0 ? 0 : 2;
+    const lvl = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+    rows.sort((a, b) => grp(a) - grp(b) || (grp(a) === 0 ? b.target - a.target : 0) || (lvl[b.severity] || 0) - (lvl[a.severity] || 0));
+    const dash = '<span class="lr-r-zero">—</span>';
+    $('lrRulesBody').innerHTML = rows.length ? rows.map(x => {
+      let tg, dn;
+      const sv = x.severity ? sevBadge(x.severity) : dash;
+      if (x.status === 'NOT_RUN') { tg = '<span class="lr-r-state">미분석</span>'; dn = dash; }
+      else if (x.status === 'FAILED') { tg = `<span class="lr-r-state lr-r-fail" title="${esc(x.failReason || '')}">분석 실패</span>`; dn = dash; }
+      else if (!x.target) { tg = '<span class="lr-r-zero">0건</span>'; dn = dash; }
+      else { tg = `${fmtNum(x.target)}건`; dn = x.done ? `<span class="lr-r-done">${fmtNum(x.done)}건</span>` : '<span class="lr-r-zero">0건</span>'; }
+      // 검토 대상이 있는 룰만 근거 화면(왜 검토 대상인지)으로 이동
+      if (x.status !== 'NOT_RUN' && x.status !== 'FAILED' && x.target > 0) {
+        const href = `rule-evidence.html?id=${encodeURIComponent(id)}&rule=${encodeURIComponent(x.ruleCode)}`;
+        const tip = x.piiLinked ? '다운로드한 개인정보 파일 · 검토 여부 보기' : '왜 검토 대상인지 보기';
+        const sub = x.piiLinked ? `<div class="lr-r-sub"><i class="fas fa-file-arrow-down"></i> 개인정보 다운로드 이력 ${fmtNum(x.piiCount)}건 연동</div>` : '';
+        return `<tr class="lr-r-link" data-href="${esc(href)}"><th scope="row"><a class="lr-r-name" href="${esc(href)}" title="${tip}">${esc(x.ruleName)}</a><i class="fas fa-chevron-right lr-r-go" aria-hidden="true"></i>${sub}</th><td class="lr-r-sev">${sv}</td><td>${tg}</td><td>${dn}</td></tr>`;
+      }
+      const sub = x.piiLinked ? `<div class="lr-r-sub"><i class="fas fa-file-arrow-down"></i> 개인정보 다운로드 이력 연동 · 다운로드 0건</div>` : '';
+      return `<tr><th scope="row">${esc(x.ruleName)}${sub}</th><td class="lr-r-sev">${sv}</td><td>${tg}</td><td>${dn}</td></tr>`;
+    }).join('') : '<tr><td colspan="4" class="lr-r-empty">이 시스템에 적용된 룰셋 없음 ([관리 › 탐지 룰셋 편집]에서 확인)</td></tr>';
+    const hasLink = rows.some(x => x.status !== 'NOT_RUN' && x.status !== 'FAILED' && x.target > 0);
+    const notes = [];
+    if (hasLink) notes.push('검토 대상이 있는 룰셋 클릭 → 왜 검토 대상인지(탐지 조건 · 걸린 로그) 확인');
+    const pl = rows.find(x => x.piiLinked);
+    if (pl) notes.push(`'${pl.ruleName}' 룰셋 = 개인정보 다운로드 이력 연동 (검토 대상에 다운로드 ${pl.piiCount}건 포함, 클릭 → 다운로드한 파일·검토 여부 확인·사유 검토)`);
+    notes.push('위험도 = 룰셋에 설정한 위험도 ([관리 › 탐지 룰셋 편집]에서 변경)');
+    notes.push(byItem ? '건수 기준: 룰 × 계정 묶음 (요약 카드 \'검토 대상\'과 같은 기준)' : '건수 기준: 탐지 건수');
+    const nNot = rows.filter(x => x.status === 'NOT_RUN').length, nFail = rows.filter(x => x.status === 'FAILED');
+    if (nNot) notes.push(`미분석 ${nNot}개: 마지막 분석 이후 추가·변경·사용 전환한 룰 → [재분석] 시 반영`);
+    if (nFail.length) notes.push(`분석 실패 ${nFail.length}개: ${nFail.map(x => `${x.ruleName} (${x.failReason || '사유 없음'})`).join(' · ')}`);
+    $('lrRulesNote').innerHTML = notes.map(t => `<li>${esc(t)}</li>`).join('');
+  }
+
+  // ===== 로그 분석 및 검토: 요약 카드 4개 + 카드 클릭 시 검토 항목 목록 =====
+  // 검토 대상 = 담당자 확인이 필요한 전체 항목 (검토 완료 포함)
+  //   DLP: 점검 보고서 항목(룰 × 계정) / 그 외: 탐지된 룰 + 위험 표시 계정
+  const lr = { init: false, filter: null, items: [], ups: [], sysId: null };
+  const LR_TITLE = { ALL: '검토 대상 전체', DONE: '검토 완료 항목', PENDING: '미검토 항목' };
+  const lrUnit = (n) => `${fmtNum(n)}<span class="lr-unit">건</span>`;
+
+  async function initLr(u) {
+    if (lr.init) return;
+    lr.init = true;
+    document.body.classList.add('lr-page');
+    $('lrFilters').classList.remove('hidden');
+    $('lrYm').value = u.targetYm.slice(0, 4) + '-' + u.targetYm.slice(4);
+    lr.sysId = u.systemId;
+    await fillLrSys(u.targetYm, u);
+  }
+  /** 시스템 선택 목록 (사용 중 시스템 · 해당 달 로그 없으면 '로그 없음' 표시) */
+  async function fillLrSys(ym, cur) {
+    const [systems, ups] = await Promise.all([api('/systems?activeOnly=true'),
+      api(`/uploads?targetYm=${ym}&activeOnly=true&latestOnly=true&page=0&size=200`)]);
+    lr.ups = ups.content || [];
+    const has = new Set(lr.ups.map(x => String(x.systemId)));
+    const list = systems.slice();
+    // 지금 보는 로그가 '사용 안 함' 시스템이면 맨 위에 따로 표시
+    if (cur && !list.some(sy => String(sy.systemId) === String(cur.systemId))) list.unshift({ systemId: cur.systemId, systemName: cur.systemName, off: true });
+    const tail = (sy) => sy.off ? ' (사용 안 함)' : has.has(String(sy.systemId)) ? '' : ' (로그 없음)';
+    $('lrSys').innerHTML = list.map(sy => `<option value="${sy.systemId}" ${String(sy.systemId) === String(lr.sysId) ? 'selected' : ''}>${esc(sy.systemName)}${tail(sy)}</option>`).join('');
+  }
+  /** 분석 기간 · 시스템 변경 → 해당 조건의 최신 로그로 이동 (카드 값 갱신) */
+  async function lrChange() {
+    const ym = ($('lrYm').value || '').replace('-', '');
+    if (!/^\d{6}$/.test(ym)) return;
+    lr.sysId = $('lrSys').value;
+    try {
+      const u = st.detail.upload;
+      await fillLrSys(ym, ym === u.targetYm ? u : null);
+      const hit = lr.ups.find(x => String(x.systemId) === String(lr.sysId));
+      if (hit && String(hit.uploadId) !== String(id)) { location.href = `detail.html?id=${hit.uploadId}`; return; }
+      lrEmpty(hit ? null : ym);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  $('lrYm').onchange = lrChange;
+  $('lrSys').onchange = lrChange;
+
+  /** 고른 기간·시스템에 로그가 없을 때: 카드는 '-' + 안내, 아래 결과 화면은 숨김 */
+  function lrEmpty(ym) {
+    const rv = $('resultView');
+    $('headerActions').classList.toggle('hidden', !!ym);
+    $('lrRules').classList.toggle('hidden', !!ym);
+    if (!ym) { rv.classList.remove('lr-noresult'); $('lrEmpty').classList.add('hidden'); renderLr(); return; }
+    rv.classList.add('lr-noresult');
+    lrClose();
+    const name = ($('lrSys').selectedOptions[0] || {}).textContent || '-';
+    const nm = name.replace(/ \((로그 없음|사용 안 함)\)$/, '');
+    $('lrSysName').textContent = nm;
+    $('lrAnalyzed').textContent = '-'; $('lrTarget').textContent = '-'; $('lrDone').textContent = '-';
+    $('lrPend').textContent = '미검토 -건';
+    $('lrEmpty').classList.remove('hidden');
+    $('lrEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(ym))} · ${esc(nm)}</b> 분석 로그 없음
+      → ${canWrite ? `<a href="upload.html?ym=${ym}">로그 올리기</a> 후 확인` : '로그가 올라오면 표시'}`;
+  }
+
+  function lrItems() {
+    if (st.report) return (st.report.items || []).map(i => ({ kind: 'dlp', done: !!i.reviewStatus && !i.pendingCount, it: i }));
+    const d = st.detail;
+    if (!d) return [];
+    const rules = (d.ruleHits || []).filter(r => r.hitCount > 0).map(r => ({ kind: 'rule', done: !r.pendingCount, it: r }));
+    const accs = (accessRows || []).filter(a => a.riskFlags.length).map(a => ({ kind: 'acc', done: !!a.reviewStatus, it: a }));
+    const piis = piiData && piiData.target ? (piiData.items || []).map(p => ({ kind: 'pii', done: p.reviewStatus !== 'PENDING', it: p })) : [];
+    return rules.concat(accs, piis);
+  }
+  function renderLr() {
+    const d = st.detail;
+    if (!d || $('resultView').classList.contains('lr-noresult')) return;
+    const u = d.upload, items = lrItems(), done = items.filter(x => x.done).length;
+    lr.items = items;
+    $('lrSysName').textContent = u.systemName;
+    $('lrAnalyzed').innerHTML = lrUnit(st.report ? st.report.totalRows : u.totalLineCount);
+    $('lrTarget').innerHTML = lrUnit(items.length);
+    $('lrDone').innerHTML = `${lrUnit(done)}<span class="lr-of">/ ${fmtNum(items.length)}건</span>`;
+    $('lrPend').textContent = `미검토 ${fmtNum(items.length - done)}건`;
+    if (lr.filter) renderLrList();
+  }
+  function setLrFilter(f) {
+    lr.filter = f;
+    $('lrList').classList.remove('hidden');
+    renderLrList();
+    $('lrList').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function lrClose() {
+    lr.filter = null;
+    $('lrList').classList.add('hidden');
+    ['lrCardTarget', 'lrCardDone', 'lrPend'].forEach(k => $(k).classList.remove('is-active'));
+  }
+  function renderLrList() {
+    const f = lr.filter;
+    const rows = lr.items.filter(x => f === 'ALL' ? true : f === 'DONE' ? x.done : !x.done);
+    $('lrListTitle').innerHTML = `${LR_TITLE[f]} <span class="lr-cnt">${fmtNum(rows.length)}건</span>`;
+    document.querySelectorAll('.lr-seg button').forEach(b => { b.classList.toggle('is-active', b.dataset.lr === f); b.setAttribute('aria-selected', b.dataset.lr === f); });
+    $('lrCardTarget').classList.toggle('is-active', f === 'ALL');
+    $('lrCardDone').classList.toggle('is-active', f === 'DONE');
+    $('lrPend').classList.toggle('is-active', f === 'PENDING');
+    const locked = !canWrite || st.detail.upload.status === 'REVIEWED';
+    $('lrBody').innerHTML = rows.length ? rows.map((x, n) => lrRow(x, n + 1, locked)).join('')
+      : `<tr class="empty-row"><td colspan="6">${f === 'PENDING' ? '<i class="fas fa-circle-check" style="color:#16a34a"></i> 미검토 항목 없음 — 모두 검토 완료'
+        : f === 'DONE' ? '검토 완료 항목 없음' : '검토 대상 없음 — 확인이 필요한 탐지·위험 계정·개인정보 다운로드 없음'}</td></tr>`;
+  }
+  const lrBtn = (cls, attr, val, icon, label) => `<button type="button" class="btn-m ${cls} btn-xs" ${attr}="${esc(val)}"><i class="fas ${icon}"></i>${label}</button>`;
+  function lrRow(x, n, locked) {
+    if (x.kind === 'dlp') {
+      const i = x.it, lv = LV[i.level] || { icon: '', label: i.level };
+      return `<tr><td class="num">${i.no}</td><td style="white-space:nowrap">${lv.icon} ${lv.label}</td>
+        <td><b>${esc(i.ruleName)}</b><div class="lr-item-sub"><span class="mono">${esc(i.account)}</span> ${esc(i.name || '')}</div></td>
+        <td class="num">${esc(i.countText)}</td>
+        <td>${irBadge(i)}${i.reviewStatus && i.pendingCount ? `<div class="lr-item-sub">미검토 탐지 ${fmtNum(i.pendingCount)}건</div>` : ''}</td>
+        <td class="center lr-act">${irCanEdit() ? lrBtn('btn-primary-m', 'data-lr-ir', i.itemKey, 'fa-pen-to-square', x.done ? '검토 수정' : '검토하기') : '<span class="text-muted-m">-</span>'}</td></tr>`;
+    }
+    if (x.kind === 'rule') {
+      const r = x.it;
+      return `<tr><td class="num">${n}</td><td>${sevBadge(r.severity)}</td>
+        <td><b>${esc(r.ruleName)}</b><div class="lr-item-sub"><span class="mono">${esc(r.ruleCode)}</span> · 탐지 룰</div></td>
+        <td class="num">${fmtNum(r.hitCount)}건</td>
+        <td>${r.pendingCount ? `<span class="badge-rv rv-pending">미검토 ${fmtNum(r.pendingCount)}건</span>` : '<span class="badge-rv rv-resolved"><i class="fas fa-check"></i> 검토 완료</span>'}</td>
+        <td class="center lr-act">${lrBtn('btn-gray-m', 'data-lr-logs', r.ruleCode, 'fa-magnifying-glass', '근거 로그 보기')}${locked ? '' : lrBtn('btn-primary-m', 'data-lr-rule', r.ruleCode, 'fa-layer-group', '룰 일괄 검토')}</td></tr>`;
+    }
+    if (x.kind === 'pii') {
+      const p = x.it, [l, c] = PII_RV[p.reviewStatus] || [p.reviewStatusLabel, ''];
+      return `<tr><td class="num">${n}</td><td><span class="badge-rv rv-confirmed">개인정보 다운로드</span></td>
+        <td><b>${esc(p.formName || p.fileTarget || '다운로드')}</b><div class="lr-item-sub"><span class="mono">${esc(p.adminId || '-')}</span> · ${piiDt(p)} · ${p.rowNo}행</div></td>
+        <td class="num">1건</td>
+        <td><span class="badge-rv ${c}">${esc(l)}</span></td>
+        <td class="center lr-act">${lrBtn('btn-gray-m', 'data-lr-pii', String(p.piiDownloadId), 'fa-file-arrow-down', locked ? '다운로드 이력 보기' : '보기 / 검토')}</td></tr>`;
+    }
+    const a = x.it, rv = ACC_RV[a.reviewStatus];
+    return `<tr><td class="num">${n}</td><td><span class="badge-rv rv-confirmed">위험 계정</span></td>
+      <td><b class="mono">${esc(a.accountId)}</b><div class="lr-item-sub">${SECLOG.riskBadges(a.riskFlags)}</div></td>
+      <td class="num">${fmtNum((a.successCount || 0) + (a.failCount || 0))}회</td>
+      <td>${a.reviewStatus ? `<span class="badge-rv ${rv ? rv[1] : ''}">${esc(rv ? rv[0] : a.reviewStatusLabel)}</span>` : '<span class="badge-rv rv-pending">미검토</span>'}</td>
+      <td class="center lr-act">${lrBtn('btn-gray-m', 'data-lr-acc', a.accountId, 'fa-user', locked ? '계정 보기' : '계정 보기 / 검토')}</td></tr>`;
+  }
+  const lrKey = (fn) => (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+  $('lrCardTarget').onclick = () => setLrFilter('ALL');
+  $('lrCardDone').onclick = () => setLrFilter('DONE');
+  $('lrCardTarget').onkeydown = lrKey(() => setLrFilter('ALL'));
+  $('lrCardDone').onkeydown = (e) => { if (e.target === $('lrCardDone')) lrKey(() => setLrFilter('DONE'))(e); };
+  $('lrPend').onclick = (e) => { e.stopPropagation(); setLrFilter('PENDING'); };
+  $('lrList').onclick = (e) => {
+    const seg = e.target.closest('.lr-seg button');
+    if (seg) { setLrFilter(seg.dataset.lr); return; }
+    if (e.target.closest('#lrClose')) { lrClose(); return; }
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.lrIr) openIr([b.dataset.lrIr]);
+    else if (b.dataset.lrLogs) location.href = evHref(b.dataset.lrLogs);
+    else if (b.dataset.lrRule) openRuleReview(b.dataset.lrRule);
+    else if (b.dataset.lrAcc) openAcc(b.dataset.lrAcc);
+    else if (b.dataset.lrPii && piiData && piiData.ruleCode) location.href = evHref(piiData.ruleCode, '#pii-' + b.dataset.lrPii);
+  };
+
+  /** DLP 화면: 기존 분석 영역(업로드 정보·접속 행위 분석·이상징후 탐지·탐지 목록)과 바로가기 줄 숨김 */
+  function applyDlpLayout() {
+    document.querySelectorAll('.rb-legacy, .det-pending-note').forEach(el => el.classList.add('hidden'));
+  }
+
+  // ===== DLP 검토 항목 데이터 (요약 카드·카드 목록·룰셋별 분석 결과용, 보고서 화면은 표시 안 함) =====
+  const LV = { HIGH: { icon: '🔴', label: '높음', cls: 'lv-high' }, MEDIUM: { icon: '🟡', label: '보통', cls: 'lv-mid' }, LOW: { icon: '🟢', label: '낮음', cls: 'lv-low' } };
+
+  async function loadDlpReport(force) {
+    if (st.reportDone && !force) return;
+    st.reportDone = true;
+    let r;
+    try { r = await api(`/uploads/${id}/dlp-report`); }
+    catch (e) { r = null; }
+    if (!r || !r.applicable) return; // DLP 가 아니면 기존 화면 그대로
+    st.report = r;
+  }
+
+  // ---- 항목 검토 표시
+  const IR = { FALSE_POSITIVE: ['정상 확인', 'rv-resolved', 'fa-circle-check'], CONFIRMED: ['이상 확인', 'rv-confirmed', 'fa-triangle-exclamation'],
+    RESOLVED: ['조치완료', 'rv-resolved', 'fa-screwdriver-wrench'], MIXED: ['검토 완료', 'rv-resolved', 'fa-circle-check'], PARTIAL: [null, 'rv-pending', 'fa-hourglass-half'] };
+  const irCanEdit = () => canWrite && st.report && !st.report.reviewLocked;
+  function irBadge(i) {
+    if (!i.reviewStatus) return '<span class="badge-rv rv-pending ir-badge"><i class="far fa-clock"></i> 미검토</span>';
+    const [l, c, ic] = IR[i.reviewStatus] || [null, '', 'fa-check'];
+    return `<span class="badge-rv ${c} ir-badge"><i class="fas ${ic}"></i> ${esc(l || i.reviewStatusLabel)}</span>`;
+  }
+  // ---- 항목 검토 창
+  const irModal = new bootstrap.Modal($('irModal'));
+  let irKeys = [];
+  function openIr(keys) {
+    const its = keys.map(k => st.report.items.find(i => i.itemKey === k)).filter(Boolean);
+    if (!its.length) return;
+    irKeys = its.map(i => i.itemKey);
+    $('irTarget').innerHTML = its.slice(0, 8).map(i => `<li>${LV[i.level].icon} <b>${i.no}.</b> <span class="mono">${esc(i.account)}</span> · ${esc(i.ruleName)} ${fmtNum(i.count)}회 ${irBadge(i)}</li>`).join('')
+      + (its.length > 8 ? `<li class="text-muted-m">외 ${its.length - 8}개</li>` : '');
+    const nDet = its.reduce((n, i) => n + (i.detectionIds || []).length, 0);
+    $('irCount').textContent = `(${its.length > 1 ? `${its.length}개 항목 · ` : ''}탐지 ${fmtNum(nDet)}건에 같은 내용으로 저장)`;
+    const one = its.length === 1 ? its[0] : null;
+    $('irStatus').value = one && IR[one.reviewStatus] && IR[one.reviewStatus][0] && one.reviewStatus !== 'MIXED' ? one.reviewStatus : 'FALSE_POSITIVE';
+    $('irComment').value = one && one.reviewComment ? one.reviewComment : '';
+    $('irReset').classList.toggle('hidden', !its.some(i => i.reviewStatus));
+    irModal.show();
+    setTimeout(() => $('irComment').focus(), 400);
+  }
+  async function saveIr(status) {
+    const comment = $('irComment').value.trim();
+    if (status !== 'PENDING' && !comment) return toast('검토 내용(어떻게 확인했는지)을 입력해 주세요.', 'error');
+    if (status === 'PENDING' && !confirm('선택한 항목을 미검토로 되돌릴까요?')) return;
+    loading(true);
+    try {
+      const ids = irKeys.flatMap(k => (st.report.items.find(i => i.itemKey === k) || {}).detectionIds || []);
+      for (let i = 0; i < ids.length; i += 1000) {
+        await api(`/uploads/${id}/detections/review`, { method: 'PUT', body: { detectionIds: ids.slice(i, i + 1000), reviewStatus: status, actionContent: comment || null } });
+      }
+      irModal.hide();
+      toast(status === 'PENDING' ? `${irKeys.length}개 항목(탐지 ${fmtNum(ids.length)}건)을 미검토로 되돌렸습니다.` : `${irKeys.length}개 항목(탐지 ${fmtNum(ids.length)}건) 검토를 저장했습니다.`);
+      await loadDlpReport(true);
+      renderLr();
+      await loadRuleResults();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { loading(false); }
+  }
+  $('irSave').onclick = () => saveIr($('irStatus').value);
+  $('irReset').onclick = () => saveIr('PENDING');
 
   function bindHeader() {
     $('btnDownload').onclick = async () => {
@@ -525,7 +714,7 @@
     if ($('btnDelete')) $('btnDelete').onclick = async () => {
       if (!confirm('이 업로드와 탐지 결과를 삭제하시겠습니까?\n(소프트 삭제: 데이터는 DB에 보존됩니다)')) return;
       loading(true);
-      try { await api(`/uploads/${id}`, { method: 'DELETE' }); toast('삭제되었습니다.'); setTimeout(() => location.href = 'index.html', 600); }
+      try { await api(`/uploads/${id}`, { method: 'DELETE' }); toast('삭제되었습니다.'); setTimeout(() => location.href = 'detail.html?ym=' + st.detail.upload.targetYm, 600); }
       catch (e) { toast(e.message, 'error'); loading(false); }
     };
   }
@@ -537,37 +726,6 @@
     run(() => api(`/uploads/${id}/review`, { method: 'POST', body: { reviewComment: c } }), '최종 검토완료 처리되었습니다.');
   };
 
-  $('detBody').onchange = (e) => {
-    if (!e.target.classList.contains('det-chk')) return;
-    const v = +e.target.value;
-    e.target.checked ? st.selected.add(v) : st.selected.delete(v);
-    updateSel();
-  };
-  $('chkAll').onchange = (e) => {
-    document.querySelectorAll('.det-chk').forEach(c => { c.checked = e.target.checked; e.target.checked ? st.selected.add(+c.value) : st.selected.delete(+c.value); });
-    updateSel();
-  };
-  $('btnReview').onclick = () => {
-    if (st.selected.size === 0) return;
-    run(() => api(`/uploads/${id}/detections/review`, {
-      method: 'PUT',
-      body: { detectionIds: [...st.selected], reviewStatus: $('rvStatus').value, actionContent: $('rvAction').value.trim() || null },
-    }).then(() => { $('rvAction').value = ''; }), `${st.selected.size}건 검토 내용이 저장되었습니다.`);
-  };
-  $('fSev').onchange = $('fRv').onchange = () => { st.page = 0; loadDetections().catch(e => toast(e.message, 'error')); };
-
-  // ===== 룰 단위 로그 확인 / 일괄 검토 =====
-  function syncRuleFilter() {
-    const rc = $('fRule').value;
-    $('ruleFilterAct').classList.toggle('hidden', !rc);
-    document.querySelectorAll('#ruleHits tr[data-rule]').forEach(tr => tr.classList.toggle('rule-active', tr.dataset.rule === rc));
-  }
-  function showRuleLogs(rc) {
-    $('fRule').value = rc; $('fSev').value = ''; $('fRv').value = '';
-    st.page = 0; syncRuleFilter();
-    loadDetections().then(() => $('detSection').scrollIntoView({ behavior: 'smooth', block: 'start' }))
-      .catch(e => toast(e.message, 'error'));
-  }
   async function openRuleReview(rc) {
     const r = (st.detail.ruleHits || []).find(x => x.ruleCode === rc);
     if (!r || !r.hitCount) return;
@@ -588,24 +746,7 @@
       $('rmSamples').innerHTML = data.content.map(x => `<div class="rs-line"><span class="rs-no">#${x.lineNumber}</span><span class="log-line">${esc(x.logContent)}</span>${reviewBadge(x.reviewStatus)}</div>`).join('');
     } catch (e) { $('rmSamples').innerHTML = `<div class="text-muted-m">${esc(e.message)}</div>`; }
   }
-  $('ruleHits').onclick = (e) => {
-    const tg = e.target.closest('#btnZeroToggle');
-    if (tg) {
-      st.zeroOpen = !st.zeroOpen;
-      document.querySelectorAll('#ruleHits tr.rule-zero').forEach(tr => { tr.hidden = !st.zeroOpen; });
-      const n = document.querySelectorAll('#ruleHits tr.rule-zero').length;
-      tg.setAttribute('aria-expanded', st.zeroOpen);
-      tg.innerHTML = `<i class="fas fa-chevron-${st.zeroOpen ? 'up' : 'down'}"></i>${st.zeroOpen ? '탐지 없는 룰 숨기기' : `탐지 없는 룰 ${fmtNum(n)}개 보기`}`;
-      return;
-    }
-    const b = e.target.closest('button[data-act]');
-    if (!b) return;
-    b.dataset.act === 'logs' ? showRuleLogs(b.dataset.rule) : openRuleReview(b.dataset.rule);
-  };
-  $('fRule').onchange = () => { syncRuleFilter(); st.page = 0; loadDetections().catch(e => toast(e.message, 'error')); };
-  $('btnRuleClear').onclick = () => { $('fRule').value = ''; $('fRule').onchange(); };
-  $('btnRuleReviewF').onclick = () => { if ($('fRule').value) openRuleReview($('fRule').value); };
-  $('rmViewLogs').onclick = () => { ruleModal.hide(); if (ruleTarget) showRuleLogs(ruleTarget.ruleCode); };
+  $('rmViewLogs').onclick = () => { ruleModal.hide(); if (ruleTarget) location.href = evHref(ruleTarget.ruleCode); };
   $('rmSubmit').onclick = () => {
     if (!ruleTarget) return;
     const scope = document.querySelector('input[name=rmScope]:checked').value;
@@ -622,14 +763,13 @@
       .catch(e => toast(e.message, 'error'))
       .finally(() => loading(false));
   };
-  $('pager').onclick = (e) => { const b = e.target.closest('button[data-p]'); if (b && !b.disabled) { st.page = +b.dataset.p; loadDetections().catch(er => toast(er.message, 'error')); } };
 
   (async () => {
     loading(true);
     try { await reload(); }
     catch (e) {
       toast(e.message, 'error');
-      document.querySelector('main').innerHTML = `<div class="card-m text-center" style="padding:50px"><h5>${esc(e.message)}</h5><a href="index.html" class="btn-m btn-outline-m mt-2">목록으로</a></div>`;
+      document.querySelector('main').innerHTML = `<div class="card-m text-center" style="padding:50px"><h5>${esc(e.message)}</h5><a href="detail.html" class="btn-m btn-outline-m mt-2">로그 고르기로</a></div>`;
     } finally { loading(false); }
   })();
 })();

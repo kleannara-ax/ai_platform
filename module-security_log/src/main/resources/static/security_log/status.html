@@ -27,7 +27,7 @@
 
   <div class="guide-box">
     <i class="fas fa-circle-info"></i>
-    <div>시스템마다 <b>이번 달 점검이 어디까지 왔는지</b> 봅니다. 점검은 세 단계입니다.
+    <div>시스템마다 <b>선택한 달의 점검이 어디까지 왔는지</b> 봅니다. 점검은 세 단계입니다.
       <div class="guide-steps"><span>① 로그 올리기</span><span>② 분석 결과 검토</span><span>③ 검토 완료(마감)</span></div>
       각 줄 맨 오른쪽 <b>[다음 할 일]</b> 버튼을 누르면 그 작업 화면으로 바로 갑니다.</div>
   </div>
@@ -46,20 +46,21 @@
             <th>시스템</th>
             <th>① 로그 올리기</th>
             <th>② 분석 결과 검토</th>
-            <th>③ 검토 완료</th>
             <th>다음 할 일</th>
           </tr>
         </thead>
-        <tbody id="statusBody"><tr class="empty-row"><td colspan="5">불러오는 중...</td></tr></tbody>
+        <tbody id="statusBody"><tr class="empty-row"><td colspan="4">불러오는 중...</td></tr></tbody>
       </table>
     </div>
-    <div class="form-text mt-2">② 의 '위험 계정'은 로그인 실패 5회 이상·업무시간 외·외부 IP·특권 계정 등 접속 행위 분석에서 표시된 계정 수, '미검토'는 아직 검토하지 않은 이상징후 탐지 건수입니다.</div>
+    <div class="form-text mt-2">① 완료 = 그 달 로그 파일을 올림 · ② 완료 = 이상징후 탐지와 위험 표시 접속 계정을 모두 검토함(둘 다 없으면 완료). 자세한 내용은 [다음 할 일] 버튼을 눌러 결과 화면에서 봅니다.</div>
   </section>
 </main>
 
 <div class="loading" id="loading"><div class="spinner"></div><span>불러오는 중...</span></div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/seclog.js"></script>
+<script src="js/upload-modal.js"></script>
 <script>
 (() => {
   if (!SECLOG.requireAuth()) return;
@@ -67,56 +68,49 @@
   const $ = (id) => document.getElementById(id);
   SECLOG.renderTabs('status');
   const canWrite = SECLOG.canWrite(), isAdmin = SECLOG.isAdmin();
-  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.currentYm(), filter: SECLOG.qs('f') || 'ALL', rows: [] };
+  const state = { ym: SECLOG.qs('ym') || sessionStorage.getItem('seclog_ym') || SECLOG.reviewYm(), filter: SECLOG.qs('f') || 'ALL', rows: [] };
   const md = (x) => x ? `${+x.slice(5, 7)}/${+x.slice(8)}` : '';
 
   // 시스템 한 줄의 단계 상태 계산
   function stepOf(s, up, rv) {
     const has = s.accessStatus !== 'NONE';
     const pend = rv ? rv.detectionPending : 0;
+    const riskPend = s.accessRiskPending || 0;   // 검토 안 한 위험 접속 계정
+    const piiPend = s.piiPending || 0;           // 사유 확인 안 한 개인정보 다운로드 (자사몰·임직원몰)
     const reviewed = s.accessStatus === 'REVIEWED';
     const id = s.latestUploadId;
     const many = (s.accessUploadCount || 0) > 1;
-    const listLink = `index.html?ym=${state.ym}&system=${encodeURIComponent(s.systemName)}`;
+    const listLink = `detail.html?ym=${state.ym}`;  // 파일이 여러 개면 분석 결과의 로그 고르기 화면
     const resLink = many ? listLink : `detail.html?id=${id}`;
     let group, next;
     if (!has) {
       group = 'NONE';
-      next = canWrite ? `<a class="next-btn up" href="upload.html?systemId=${s.systemId}&ym=${state.ym}"><i class="fas fa-upload"></i>로그 올리기</a>`
-        : '<span class="next-btn muted"><i class="fas fa-hourglass"></i>로그 올라오길 기다리는 중</span>';
+      next = canWrite ? `<a class="next-btn up" href="upload.html?systemId=${s.systemId}&ym=${state.ym}"><i class="fas fa-upload"></i>${SECLOG.monthOf(state.ym)} 로그 올리기</a>`
+        : `<span class="next-btn muted"><i class="fas fa-hourglass"></i>${SECLOG.monthOf(state.ym)} 로그 올라오길 기다리는 중</span>`;
     } else if (reviewed) {
       group = 'DONE';
       next = `<a class="next-btn ok" href="${resLink}"><i class="fas fa-circle-check"></i>완료 · 결과 보기</a>`;
-    } else if (pend > 0 || s.accessRiskAccounts > 0 && pend > 0) {
+    } else if (riskPend > 0) {
       group = 'REVIEW';
-      next = `<a class="next-btn go" href="${many ? listLink : resLink + '#detect'}"><i class="fas fa-magnifying-glass"></i>검토하기 (미검토 ${fmtNum(pend)}건)</a>`;
+      next = `<a class="next-btn go" href="detail.html?id=${id}#access"><i class="fas fa-user-shield"></i>분석 결과 검토하기 (${fmtNum(riskPend)}개)</a>`;
+    } else if (pend > 0) {
+      group = 'REVIEW';
+      next = `<a class="next-btn go" href="detail.html?id=${id}#detect"><i class="fas fa-magnifying-glass"></i>검토하기 (미검토 ${fmtNum(pend)}건)</a>`;
+    } else if (piiPend > 0) {
+      group = 'REVIEW';
+      next = `<a class="next-btn go" href="detail.html?id=${id}#pii"><i class="fas fa-file-arrow-down"></i>다운로드 사유 확인 (${fmtNum(piiPend)}건)</a>`;
     } else {
       group = 'CLOSE';
       next = isAdmin ? `<a class="next-btn go" href="${resLink}"><i class="fas fa-stamp"></i>마감하기</a>`
         : `<a class="next-btn up" href="${resLink}"><i class="fas fa-hourglass-half"></i>관리자 마감 대기</a>`;
     }
-    // ① 로그 올리기
-    let s1;
-    if (!has) s1 = '<span class="stp no"><i class="far fa-circle"></i>아직 안 올림</span>';
-    else {
-      const check = up && up.status === 'CHECK';
-      const period = up && up.firstLogDate ? `${md(up.firstLogDate)} ~ ${md(up.lastLogDate)}` : '';
-      s1 = `<span class="stp ${check ? 'wait' : 'ok'}"><i class="fas ${check ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>${check ? '올림 · 기간 확인' : '올림'}</span>
-        <span class="stp-sub">${period ? '로그 ' + period : ''}${many ? ` · 파일 ${s.accessUploadCount}개` : ''}</span>
-        ${check ? (up.checkReasons || []).map(r => `<span class="up-reason"><i class="fas fa-triangle-exclamation"></i> ${esc(r)}</span>`).join('') : ''}`;
-    }
-    // ② 분석 결과 검토
-    let s2;
-    if (!has) s2 = '<span class="stp no"><i class="far fa-circle"></i>-</span>';
-    else if (reviewed || pend === 0) s2 = `<span class="stp ok"><i class="fas fa-circle-check"></i>${s.detectionCount ? '검토 끝' : '탐지 없음'}</span>
-        <span class="stp-sub">접속 계정 ${fmtNum(s.accessAccountCount)}개 · 위험 계정 ${fmtNum(s.accessRiskAccounts)}개 · 탐지 ${fmtNum(s.detectionCount)}건</span>`;
-    else s2 = `<span class="stp wait"><i class="fas fa-hourglass-half"></i>미검토 ${fmtNum(pend)}건</span>
-        <span class="stp-sub">접속 계정 ${fmtNum(s.accessAccountCount)}개 · <b style="color:${s.accessRiskAccounts ? '#c2410c' : 'inherit'}">위험 계정 ${fmtNum(s.accessRiskAccounts)}개</b> · 탐지 ${fmtNum(s.detectionCount)}건</span>`;
-    // ③ 검토 완료
-    const s3 = reviewed ? '<span class="stp ok"><i class="fas fa-circle-check"></i>마감</span>'
-      : has && pend === 0 ? '<span class="stp wait"><i class="fas fa-hourglass-half"></i>마감 가능</span>'
-      : '<span class="stp no"><i class="far fa-circle"></i>아직</span>';
-    return { group, next, s1, s2, s3 };
+    // ① 로그 올리기 / ② 분석 결과 검토: 완료·미완료만 표시
+    const done = (ok) => ok ? '<span class="stp ok"><i class="fas fa-circle-check"></i>완료</span>'
+      : '<span class="stp no"><i class="far fa-circle"></i>미완료</span>';
+    const s1 = done(has);
+    const ok2 = has && (reviewed || (pend === 0 && riskPend === 0 && piiPend === 0));
+    const s2 = done(ok2);
+    return { group, next, s1, s2, ok2 };
   }
 
   const FILTERS = [['ALL', '전체'], ['TODO', '할 일 남음'], ['NONE', '로그 미등록'], ['REVIEW', '검토 중'], ['CLOSE', '마감 가능'], ['DONE', '마감 완료']];
@@ -125,15 +119,15 @@
     const cnt = (g) => g === 'ALL' ? rows.length : g === 'TODO' ? rows.filter(r => r.step.group !== 'DONE').length : rows.filter(r => r.step.group === g).length;
     $('stFilter').innerHTML = FILTERS.map(([k, l]) => `<button type="button" data-f="${k}" class="${state.filter === k ? 'active' : ''}" aria-pressed="${state.filter === k}">${l}<b>${cnt(k)}</b></button>`).join('');
     const list = rows.filter(r => state.filter === 'ALL' || (state.filter === 'TODO' ? r.step.group !== 'DONE' : r.step.group === state.filter));
-    if (rows.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="5">사용 중인 점검 대상 시스템이 없습니다. [점검 대상 시스템] 메뉴에서 등록하세요.</td></tr>'; return; }
-    if (list.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="5">이 조건에 해당하는 시스템이 없습니다.</td></tr>'; return; }
+    if (rows.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="4">사용 중인 점검 대상 시스템이 없습니다. [점검 대상 시스템] 메뉴에서 등록하세요.</td></tr>'; return; }
+    if (list.length === 0) { $('statusBody').innerHTML = '<tr class="empty-row"><td colspan="4">이 조건에 해당하는 시스템이 없습니다.</td></tr>'; return; }
     let cat = null, h = '';
     list.forEach(r => {
       const s = r.sys;
-      if (s.category !== cat) { cat = s.category; h += `<tr class="cat-row"><td colspan="5"><i class="fas fa-folder-open me-1"></i>${esc(cat)}</td></tr>`; }
+      if (s.category !== cat) { cat = s.category; h += `<tr class="cat-row"><td colspan="4"><i class="fas fa-folder-open me-1"></i>${esc(cat)}</td></tr>`; }
       h += `<tr data-sys="${s.systemId}">
         <td class="sys-cell"><b>${esc(s.systemName)}</b>${s.managerName ? `<small>담당 ${esc(s.managerName)}</small>` : ''}</td>
-        <td>${r.step.s1}</td><td>${r.step.s2}</td><td>${r.step.s3}</td><td>${r.step.next}</td></tr>`;
+        <td>${r.step.s1}</td><td>${r.step.s2}</td><td>${r.step.next}</td></tr>`;
     });
     $('statusBody').innerHTML = h;
   }
@@ -143,21 +137,33 @@
     const up = rows.filter(r => r.sys.accessStatus !== 'NONE').length;
     const rc = d.reviewCounts || {};
     const tot = Object.values(rc).reduce((a, b) => a + b, 0), pend = rc.PENDING || 0;
+    // ② 검토 대상 = 탐지 건 + 위험 표시 계정
+    const ra = d.riskAccountCount || 0, rp = d.riskPendingCount || 0;
+    const all = tot + ra, left = pend + rp;
     const done = rows.filter(r => r.step.group === 'DONE').length;
     const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    // ② 분석 결과 검토 = 사용 중 시스템 기준 (표의 '② 분석 결과 검토' 완료 시스템 / 사용 중 시스템). 로그 미등록은 미완료
+    const rvDone = rows.filter(r => r.step.ok2).length, rvLeft = n - rvDone, noLog = n - up;
+    const rvSub = !n ? '사용 중인 점검 대상 시스템이 없습니다'
+      : !rvLeft ? '모든 시스템 분석 결과 검토 완료'
+      : `검토 남은 시스템 ${rvLeft}개` + (noLog ? ` (로그 미등록 ${noLog}개 포함)` : '')
+        + (pend || rp ? ` · 미검토 탐지 ${fmtNum(pend)}건 · 위험 계정 ${fmtNum(rp)}개` : '');
     const dd = d.closeDDay;
     const ddTxt = d.closed ? '마감 완료' : dd < 0 ? `${-dd}일 지남` : `마감까지 D-${dd}`;
-    const step = (no, cls, title, val, sub, p, cta, f) => `<button type="button" class="f3-step ${cls}" data-f="${f}">
+    const step = (no, cls, title, val, sub, p, cta, f, attr = '') => `<button type="button" class="f3-step ${cls}" data-f="${f}"${attr}>
         <div class="f3-head"><span class="f3-no">${cls === 'done' ? '<i class="fas fa-check"></i>' : no}</span>${title}</div>
         <div class="f3-val">${val}</div><div class="f3-sub">${sub}</div>
         <div class="progress-m"><span style="width:${p}%"></span></div><div class="f3-cta">${cta}</div></button>`;
     $('flow3').innerHTML =
       step(1, up === n && n ? 'done' : 'todo', '로그 올리기', `${up} <small>/ ${n}개 시스템</small>`,
         up === n ? '모든 시스템 로그가 올라왔습니다' : `아직 안 올린 시스템 ${n - up}개`, pct(up, n),
-        up === n ? '완료' : '안 올린 시스템 보기 <i class="fas fa-angle-right"></i>', up === n ? 'ALL' : 'NONE') +
-      step(2, tot && !pend ? 'done' : pend ? 'todo' : '', '분석 결과 검토', tot ? `${pct(tot - pend, tot)}<small>%</small>` : '-',
-        tot ? `전체 탐지 ${fmtNum(tot)}건 중 미검토 ${fmtNum(pend)}건` : '검토할 탐지가 없습니다', pct(tot - pend, tot),
-        pend ? '검토할 시스템 보기 <i class="fas fa-angle-right"></i>' : '완료', 'REVIEW') +
+        canWrite ? (up === n ? '완료 <span class="f3-cta-up"><i class="fas fa-upload"></i> 로그 올리기</span>' : '<i class="fas fa-upload"></i> 로그 올리기')
+          : (up === n ? '완료' : '안 올린 시스템 보기 <i class="fas fa-angle-right"></i>'), up === n ? 'ALL' : 'NONE',
+        canWrite ? ' data-upload="" aria-haspopup="dialog" title="로그 올리기 창 열기"' : '') +
+      step(2, n && !rvLeft ? 'done' : 'todo', '분석 결과 검토', n ? `${pct(rvDone, n)}<small>%</small>` : '-',
+        rvSub, pct(rvDone, n),
+        n && !rvLeft ? '완료 <span class="f3-cta-up">분석 결과 보기 <i class="fas fa-angle-right"></i></span>' : '분석 결과 보기 <i class="fas fa-angle-right"></i>', 'REVIEW',
+        ` data-go="detail.html?ym=${state.ym}" title="분석 결과 (접속 행위·이상징후) 화면으로 이동"`) +
       step(3, done === n && n ? 'done' : 'todo', '검토 완료(마감)', `${done} <small>/ ${n}개 시스템</small>`,
         `${ddTxt} · 기준일 ${d.closeDueDate ? d.closeDueDate.slice(5).replace('-', '/') : '-'}`, pct(done, n),
         done === n && n ? '완료' : '마감할 시스템 보기 <i class="fas fa-angle-right"></i>', done === n ? 'DONE' : 'TODO');
@@ -176,7 +182,7 @@
       renderTable();
     } catch (e) {
       toast(e.message, 'error');
-      $('statusBody').innerHTML = `<tr class="empty-row"><td colspan="5">${esc(e.message)}</td></tr>`;
+      $('statusBody').innerHTML = `<tr class="empty-row"><td colspan="4">${esc(e.message)}</td></tr>`;
     } finally { $('loading').classList.remove('show'); }
   }
 
@@ -184,6 +190,13 @@
   $('flow3').onclick = (e) => {
     const b = e.target.closest('button[data-f]');
     if (!b) return;
+    // ② 분석 결과 검토 카드 → 분석 결과 메뉴 화면
+    if (b.dataset.go) { location.href = b.dataset.go; return; }
+    // ① 로그 올리기 카드 (관리자·담당자) → 로그 올리기 창
+    if (b.hasAttribute('data-upload')) {
+      SECLOG_UPLOAD.open({ ym: state.ym, onDone: (r) => (r.targetYm !== state.ym ? setYm(r.targetYm) : load()) });
+      return;
+    }
     state.filter = b.dataset.f; renderTable();
     $('statusTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -191,6 +204,7 @@
     state.ym = ym; sessionStorage.setItem('seclog_ym', ym);
     $('ymLabel').textContent = fmtYm(ym);
     $('ymPicker').value = ym.slice(0, 4) + '-' + ym.slice(4);
+    SECLOG.reviewNotice(ym, setYm);
     load();
   };
   $('btnPrevYm').onclick = () => setYm(shiftYm(state.ym, -1));

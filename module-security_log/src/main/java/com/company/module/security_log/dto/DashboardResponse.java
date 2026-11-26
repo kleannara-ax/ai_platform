@@ -22,6 +22,8 @@ public class DashboardResponse {
     /** 월 마감률: 접속·행위 로그 검토완료 시스템 / 시스템 수 */
     private int closeRate;
     private long riskAccountCount;
+    /** 위험 표시 계정 중 검토가 남은 계정 수 (사용 중 시스템, 최신 파일 기준) */
+    private long riskPendingCount;
     private long pendingDetectionCount;
     private long detectionCount;
     private long criticalCount;

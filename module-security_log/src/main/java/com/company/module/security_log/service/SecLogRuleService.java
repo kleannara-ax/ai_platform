@@ -37,6 +37,7 @@ public class SecLogRuleService {
     private final SecLogRuleRepository ruleRepository;
     private final SecLogSystemRepository systemRepository;
     private final LogAnalysisEngine analysisEngine;
+    private final SecLogInternalIpService internalIpService;
 
     /**
      * 룰 목록
@@ -128,7 +129,7 @@ public class SecLogRuleService {
     public RuleTestResponse test(RuleTestRequest request) {
         List<LogAnalysisEngine.MatchedLine> matched = analysisEngine.test(
                 request.getMatchType(), request.getPattern(), request.getSampleLog(),
-                SecLogConstants.MAX_TEST_RESULT_LINES);
+                SecLogConstants.MAX_TEST_RESULT_LINES, internalIpService.internalMatcher());
 
         return RuleTestResponse.builder()
                 .totalLineCount(analysisEngine.countLines(request.getSampleLog()))

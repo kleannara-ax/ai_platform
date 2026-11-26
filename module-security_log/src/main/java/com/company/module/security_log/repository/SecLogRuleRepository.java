@@ -16,6 +16,8 @@ public interface SecLogRuleRepository extends JpaRepository<SecLogRule, Long> {
 
     Optional<SecLogRule> findByRuleIdAndDeletedYn(Long ruleId, String deletedYn);
 
+    Optional<SecLogRule> findFirstByRuleCodeAndDeletedYn(String ruleCode, String deletedYn);
+
     boolean existsByRuleCode(String ruleCode);
 
     /** 룰셋 편집 화면 목록 조회 (삭제 제외) */

@@ -12,6 +12,7 @@ import com.company.module.security_log.dto.LogUploadResponse;
 import com.company.module.security_log.dto.LogUploadUpdateRequest;
 import com.company.module.security_log.dto.MonthlySummaryResponse;
 import com.company.module.security_log.dto.RuleHitCount;
+import com.company.module.security_log.dto.RuleResultsResponse;
 import com.company.module.security_log.dto.UploadReviewRequest;
 import com.company.module.security_log.entity.LogType;
 import com.company.module.security_log.entity.SecLogAccessSummary;
@@ -19,6 +20,7 @@ import com.company.module.security_log.entity.SecLogSystem;
 import com.company.module.security_log.entity.ReviewStatus;
 import com.company.module.security_log.entity.SecLogDetection;
 import com.company.module.security_log.entity.SecLogRule;
+import com.company.module.security_log.entity.SecLogRuleRun;
 import com.company.module.security_log.entity.SecLogUpload;
 import com.company.module.security_log.entity.SecLogUploadFile;
 import com.company.module.security_log.entity.Severity;
@@ -27,6 +29,8 @@ import com.company.module.security_log.repository.SecLogAccessSummaryRepository;
 import com.company.module.security_log.repository.SecLogAccessDailyRepository;
 import com.company.module.security_log.entity.SecLogAccessDaily;
 import com.company.module.security_log.repository.SecLogDetectionRepository;
+import com.company.module.security_log.repository.SecLogRuleRepository;
+import com.company.module.security_log.repository.SecLogRuleRunRepository;
 import com.company.module.security_log.repository.SecLogUploadFileRepository;
 import com.company.module.security_log.repository.SecLogUploadRepository;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +80,10 @@ public class SecLogUploadService {
     private final SecLogAccessDailyRepository accessDailyRepository;
     private final SecLogSystemService systemService;
     private final SecLogInternalIpService internalIpService;
+    private final SecLogAccountReviewService accountReviewService;
+    private final SecLogRuleRunRepository ruleRunRepository;
+    private final SecLogPiiDownloadService piiDownloadService;
+    private final SecLogRuleRepository ruleRepository;
 
     private static final String MSG_INVALID_EXT = "허용 확장자: log, txt, csv, tsv, json, out, xlsx, xls";
     private static final String MSG_REVIEWED_LOCKED = "검토완료된 건은 변경할 수 없습니다. 검토취소 후 진행하세요.";
@@ -94,7 +102,7 @@ public class SecLogUploadService {
     public Page<LogUploadResponse> getList(String targetYm, String systemName, LogType logType,
                                            UploadStatus status, Severity maxSeverity, String sort,
                                            int page, int size) {
-        return getList(targetYm, systemName, logType, status, maxSeverity, sort, false, page, size);
+        return getList(targetYm, systemName, logType, status, maxSeverity, sort, false, false, page, size);
     }
 
     /**
@@ -102,10 +110,11 @@ public class SecLogUploadService {
      *
      * @param activeOnly true 면 [점검 대상 시스템]에서 '사용'으로 표시한 시스템의 업로드만 반환
      *                   (사용 안 함 시스템, 시스템 목록에 없는 직접 입력 업로드는 제외)
+     * @param latestOnly true 면 시스템마다 가장 최근에 올린 파일 1개만 반환 (분석 대상). 각 행에 이전 파일 수(olderFileCount)를 붙임
      */
     public Page<LogUploadResponse> getList(String targetYm, String systemName, LogType logType,
                                            UploadStatus status, Severity maxSeverity, String sort,
-                                           boolean activeOnly, int page, int size) {
+                                           boolean activeOnly, boolean latestOnly, int page, int size) {
         validateYm(targetYm);
         String sortKey = StringUtils.hasText(sort) ? sort.trim().toUpperCase(Locale.ROOT) : "LATEST";
         if (!LIST_SORTS.contains(sortKey)) {
@@ -122,7 +131,21 @@ public class SecLogUploadService {
                     .toList();
         }
 
-        List<LogUploadResponse> rows = withListInfo(targetYm, uploads);
+        // 같은 달·같은 시스템 업로드 수 (이전 파일 수 = 전체 - 1)
+        Map<Long, Long> perSystem = new java.util.HashMap<>();
+        uploadRepository.findByTargetYmAndDeletedYn(targetYm, SecLogConstants.DELETED_N).stream()
+                .filter(u -> u.getSystemId() != null)
+                .forEach(u -> perSystem.merge(u.getSystemId(), 1L, Long::sum));
+        if (latestOnly) {
+            java.util.Set<Long> latestIds = new java.util.HashSet<>();
+            uploadRepository.findLatestByTargetYm(targetYm).forEach(u -> latestIds.add(u.getUploadId()));
+            uploads = uploads.stream().filter(u -> latestIds.contains(u.getUploadId())).toList();
+        }
+
+        List<LogUploadResponse> rows = withListInfo(targetYm, uploads).stream()
+                .map(r -> r.toBuilder().olderFileCount(r.getSystemId() == null ? 0
+                        : (int) Math.max(0, perSystem.getOrDefault(r.getSystemId(), 1L) - 1)).build())
+                .toList();
         java.util.Comparator<LogUploadResponse> latest =
                 java.util.Comparator.comparing(LogUploadResponse::getUploadId, java.util.Comparator.reverseOrder());
         java.util.Comparator<LogUploadResponse> bySeverity =
@@ -212,13 +235,24 @@ public class SecLogUploadService {
         }
 
         List<RuleHitCount> hits = withRuleReviewCounts(uploadId, toRuleHits(detectionRepository.countByRule(uploadId)));
-        return LogUploadDetailResponse.of(upload, statusCounts, withZeroHitRules(upload, hits));
+        return LogUploadDetailResponse.of(upload, statusCounts, withZeroHitRules(upload, hits), latestUploadIdOf(upload));
+    }
+
+    /** 같은 달·같은 시스템에서 가장 최근에 올린 업로드 ID (시스템 미지정 업로드는 null = 비교 안 함) */
+    private Long latestUploadIdOf(SecLogUpload upload) {
+        if (upload.getSystemId() == null) {
+            return null;
+        }
+        return uploadRepository.findLatestByTargetYm(upload.getTargetYm()).stream()
+                .filter(u -> upload.getSystemId().equals(u.getSystemId()))
+                .map(SecLogUpload::getUploadId).findFirst().orElse(null);
     }
 
     /** 월별 모니터링 요약 */
     public MonthlySummaryResponse getMonthlySummary(String targetYm) {
         validateYm(targetYm);
-        List<SecLogUpload> uploads = uploadRepository.findByTargetYmAndDeletedYn(targetYm, SecLogConstants.DELETED_N);
+        // 시스템별 가장 최근에 올린 파일 1개만 집계
+        List<SecLogUpload> uploads = uploadRepository.findLatestByTargetYm(targetYm);
 
         long totalLines = 0;
         long critical = 0;
@@ -310,6 +344,8 @@ public class SecLogUploadService {
                 .build());
 
         runAnalysis(upload, analysisText(originalName, content), null);
+        // 자사몰·임직원몰: 개인정보 다운로드 내역 탭 읽기 (원본 엑셀 기준)
+        piiDownloadService.extract(upload, originalName, content, userId);
         return LogUploadResponse.from(upload);
     }
 
@@ -358,6 +394,16 @@ public class SecLogUploadService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "미검토 탐지 건이 " + pending + "건 남아 있어 검토완료할 수 없습니다.");
         }
+        long riskPending = accountReviewService.riskPending(List.of(uploadId)).getOrDefault(uploadId, 0L);
+        if (riskPending > 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "검토하지 않은 위험 접속 계정이 " + riskPending + "개 남아 있어 검토완료할 수 없습니다. ① 접속 행위 분석에서 계정을 검토하세요.");
+        }
+        long piiPending = piiDownloadService.pendingCount(uploadId);
+        if (piiPending > 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "검토하지 않은 개인정보 다운로드가 " + piiPending + "건 남아 있어 검토완료할 수 없습니다. 개인정보 다운로드 검토에서 다운로드 사유를 확인하세요.");
+        }
         upload.completeReview(request.getReviewComment(), userId);
         return LogUploadResponse.from(upload);
     }
@@ -379,6 +425,9 @@ public class SecLogUploadService {
     public void delete(Long uploadId, Long userId) {
         findUpload(uploadId); // 존재 여부 검증
 
+        accountReviewService.softDeleteByUpload(uploadId, userId);
+        piiDownloadService.softDeleteByUpload(uploadId, userId);
+        ruleRunRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         detectionRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         accessSummaryRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         accessDailyRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
@@ -407,22 +456,29 @@ public class SecLogUploadService {
         SecLogUploadFile file = uploadFileRepository
                 .findByUploadIdAndDeletedYn(upload.getUploadId(), SecLogConstants.DELETED_N)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.RESOURCE_NOT_FOUND));
-        byte[] content = analysisText(upload.getOriginalFileName(), gunzip(file.getFileData()));
+        byte[] original = gunzip(file.getFileData());
+        byte[] content = analysisText(upload.getOriginalFileName(), original);
         Long uploadId = upload.getUploadId();
 
+        // 재분석하면 접속 계정 집계가 새로 만들어지므로 계정 검토도 초기화 (탐지 검토와 같은 방식)
+        accountReviewService.softDeleteByUpload(uploadId, userId);
+        piiDownloadService.softDeleteByUpload(uploadId, userId);
+        ruleRunRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         detectionRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         accessSummaryRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         accessDailyRepository.softDeleteByUploadId(uploadId, userId, SecLogTime.now());
         // clearAutomatically 로 detach 되었으므로 재조회 후 반영
         SecLogUpload managed = findUpload(uploadId);
         runAnalysis(managed, content, userId);
+        // 재분석하면 개인정보 다운로드 내역도 다시 읽음 (검토는 초기화)
+        piiDownloadService.extract(managed, managed.getOriginalFileName(), original, userId);
         return managed;
     }
 
     private void runAnalysis(SecLogUpload upload, byte[] content, Long updatedBy) {
         List<SecLogRule> rules = ruleService.getActiveRules(upload.getSystemId(), upload.getLogType());
         LogAnalysisEngine.AnalysisResult result =
-                analysisEngine.analyze(content, toCharset(upload.getFileCharset()), rules);
+                analysisEngine.analyze(content, toCharset(upload.getFileCharset()), rules, internalIpService.internalMatcher());
 
         Long creator = updatedBy != null ? updatedBy : upload.getCreatedBy();
         int critical = 0;
@@ -455,6 +511,21 @@ public class SecLogUploadService {
             }
         }
         detectionRepository.saveAll(detections);
+        // 룰별 분석 실행 기록 (탐지 0건 룰 포함) → 룰셋별 분석 결과의 분석 완료·실패·미분석 판정
+        if (result.getRuleRuns() != null) {
+            ruleRunRepository.saveAll(result.getRuleRuns().stream().map(r -> SecLogRuleRun.builder()
+                    .uploadId(upload.getUploadId())
+                    .ruleId(r.rule().getRuleId())
+                    .ruleCode(r.rule().getRuleCode())
+                    .ruleName(r.rule().getRuleName())
+                    .severity(r.rule().getSeverity())
+                    .matchCount(r.matchCount())
+                    .storedCount(r.storedCount())
+                    .timeoutLines(r.timeoutLines())
+                    .failReason(r.failReason())
+                    .createdBy(creator)
+                    .build()).toList());
+        }
         saveAccessSummaries(upload.getUploadId(), content, toCharset(upload.getFileCharset()), creator);
         java.util.Map<Integer, Integer> detected = new java.util.HashMap<>();
         detections.forEach(d -> detected.merge(d.getLineNumber(), 1, Integer::sum));
@@ -462,12 +533,116 @@ public class SecLogUploadService {
         upload.applyAnalysisResult(result.getTotalLineCount(), critical, high, medium, low, updatedBy);
     }
 
-    /** 접속 행위 분석 결과 조회 (계정별 로그인 성공/실패/시간외/외부IP) */
+    /**
+     * 룰셋별 분석 결과 (적용 룰마다 분석 상태 + 검토 대상·검토 완료 건수)
+     * - 분석 기록 있음: DONE / FAILED
+     * - 기록 없음 + 탐지 있음: DONE (기록 기능 이전 분석, 탐지가 있으므로 분석된 룰)
+     * - 기록 없음 + 탐지 없음 + 지금 적용 중인 룰: 기록 기능 이전 분석이고 룰·시스템 룰셋 설정이 분석 이후 바뀌지 않았으면 DONE,
+     *   그 밖에는 NOT_RUN (미분석 - 0건으로 보지 않음)
+     * - 정렬: 검토 대상 있는 룰(많은 순) → 분석 실패 → 0건 → 미분석, 같은 그룹은 위험도·정렬 순서
+     */
+    public RuleResultsResponse getRuleResults(Long uploadId) {
+        SecLogUpload upload = findUpload(uploadId);
+        List<SecLogRuleRun> runs = ruleRunRepository.findByUploadIdAndDeletedYn(uploadId, SecLogConstants.DELETED_N);
+
+        Map<String, long[]> cnt = new java.util.HashMap<>();       // [검토 대상, 검토 완료]
+        for (Object[] r : detectionRepository.countByRuleAndReview(uploadId)) {
+            long[] c = cnt.computeIfAbsent((String) r[0], k -> new long[2]);
+            long n = (Long) r[2];
+            c[0] += n;
+            if (r[1] != ReviewStatus.PENDING) {
+                c[1] += n;
+            }
+        }
+        List<SecLogRule> active = ruleService.getActiveRules(upload.getSystemId(), upload.getLogType());
+        Map<String, SecLogRule> activeByCode = new LinkedHashMap<>();
+        active.forEach(r -> activeByCode.putIfAbsent(r.getRuleCode(), r));
+
+        Map<String, RuleResultsResponse.Row> rows = new LinkedHashMap<>();
+        for (SecLogRuleRun run : runs) {
+            long[] c = cnt.getOrDefault(run.getRuleCode(), new long[2]);
+            rows.put(run.getRuleCode(), RuleResultsResponse.Row.builder()
+                    .ruleCode(run.getRuleCode()).ruleName(run.getRuleName()).severity(run.getSeverity())
+                    .status(run.getRunStatus().name()).statusLabel(run.getRunStatus().getLabel())
+                    .failReason(run.getFailReason()).reviewTarget(c[0]).reviewDone(c[1]).build());
+        }
+        for (Object[] r : detectionRepository.countByRule(uploadId)) {
+            String code = (String) r[0];
+            if (rows.containsKey(code)) {
+                continue;
+            }
+            long[] c = cnt.getOrDefault(code, new long[2]);
+            rows.put(code, RuleResultsResponse.Row.builder()
+                    .ruleCode(code).ruleName((String) r[1]).severity((Severity) r[2])
+                    .status("DONE").statusLabel("분석 완료").reviewTarget(c[0]).reviewDone(c[1]).build());
+        }
+        // 기록 기능 이전 분석: 룰·시스템 룰셋 설정이 분석 이후 바뀌지 않았으면 그 룰로 분석한 것으로 판정 (분석 완료)
+        //   (사용 전환·수정·삭제 시 UPDATED_AT 이 바뀌므로, 분석 시점보다 이전이면 분석 당시에도 지금과 같은 '사용' 상태)
+        java.time.LocalDateTime analyzed = upload.getAnalyzedAt();
+        boolean sysSame = true;
+        if (upload.getSystemId() != null) {
+            SecLogSystem sys = systemService.findSystem(upload.getSystemId());
+            java.time.LocalDateTime st = sys.getUpdatedAt() != null ? sys.getUpdatedAt() : sys.getCreatedAt();
+            sysSame = st == null || analyzed == null || !st.isAfter(analyzed);
+        }
+        for (SecLogRule r : activeByCode.values()) {
+            java.time.LocalDateTime t = r.getUpdatedAt() != null ? r.getUpdatedAt() : r.getCreatedAt();
+            boolean inferredRun = runs.isEmpty() && analyzed != null && sysSame && t != null && !t.isAfter(analyzed);
+            rows.putIfAbsent(r.getRuleCode(), RuleResultsResponse.Row.builder()
+                    .ruleCode(r.getRuleCode()).ruleName(r.getRuleName()).severity(r.getSeverity())
+                    .status(inferredRun ? "DONE" : "NOT_RUN").statusLabel(inferredRun ? "분석 완료" : "미분석").build());
+        }
+
+        // 개인정보 다운로드 이력 연동 (자사몰·임직원몰): 연동 룰의 검토 대상·검토 완료에 다운로드 건수 더함
+        String linked = piiDownloadService.linkedRuleCode(upload.getSystemId());
+        if (linked != null) {
+            long[] pc = piiDownloadService.countsByUploads(List.of(uploadId)).getOrDefault(uploadId, new long[2]);
+            RuleResultsResponse.Row cur = rows.get(linked);
+            SecLogRule lr = cur == null ? ruleRepository.findFirstByRuleCodeAndDeletedYn(linked, SecLogConstants.DELETED_N).orElse(null) : null;
+            boolean read = upload.getPiiSheetStatus() != null;
+            String status = read ? "DONE" : cur != null ? cur.getStatus() : "NOT_RUN";
+            rows.put(linked, RuleResultsResponse.Row.builder()
+                    .ruleCode(linked)
+                    .ruleName(cur != null ? cur.getRuleName() : lr != null ? lr.getRuleName() : SecLogPiiDownloadService.FALLBACK_RULE_NAME)
+                    .severity(cur != null ? cur.getSeverity() : lr != null ? lr.getSeverity() : Severity.HIGH)
+                    .status(status).statusLabel("DONE".equals(status) ? "분석 완료" : "FAILED".equals(status) ? "분석 실패" : "미분석")
+                    .failReason(cur != null ? cur.getFailReason() : null)
+                    .reviewTarget((cur == null ? 0 : cur.getReviewTarget()) + pc[0])
+                    .reviewDone((cur == null ? 0 : cur.getReviewDone()) + (pc[0] - pc[1]))
+                    .piiLinked(true).piiCount(pc[0])
+                    .build());
+        }
+
+        java.util.function.ToIntFunction<RuleResultsResponse.Row> group = x ->
+                "NOT_RUN".equals(x.getStatus()) ? 3 : "FAILED".equals(x.getStatus()) ? 1 : x.getReviewTarget() > 0 ? 0 : 2;
+        java.util.function.ToIntFunction<RuleResultsResponse.Row> order = x -> {
+            SecLogRule r = activeByCode.get(x.getRuleCode());
+            return r == null || r.getSortOrder() == null ? Integer.MAX_VALUE : r.getSortOrder();
+        };
+        List<RuleResultsResponse.Row> sorted = rows.values().stream()
+                .sorted(java.util.Comparator.comparingInt(group)
+                        .thenComparing(java.util.Comparator.comparingLong(RuleResultsResponse.Row::getReviewTarget).reversed())
+                        .thenComparingInt(x -> x.getSeverity() == null ? 0 : -x.getSeverity().getLevel())
+                        .thenComparingInt(order)
+                        .thenComparing(RuleResultsResponse.Row::getRuleCode))
+                .toList();
+        return RuleResultsResponse.builder()
+                .uploadId(uploadId).analyzedAt(upload.getAnalyzedAt()).recorded(!runs.isEmpty()).rows(sorted).build();
+    }
+
+    /** 접속 행위 분석 결과 조회 (계정별 로그인 성공/실패/시간외/외부IP + 계정 검토) */
     public AccessReportResponse getAccessReport(Long uploadId) {
         findUpload(uploadId);
+        Map<String, com.company.module.security_log.entity.SecLogAccountReview> reviews = accountReviewService.reviewsOf(uploadId);
         List<AccessSummaryResponse> list = accessSummaryRepository
                 .findByUploadIdAndDeletedYnOrderByFailCountDescSuccessCountDesc(uploadId, SecLogConstants.DELETED_N)
                 .stream().map(AccessSummaryResponse::from)
+                .map(a -> {
+                    var r = reviews.get(a.getAccountId());
+                    return r == null ? a : a.toBuilder().reviewStatus(r.getReviewStatus().name())
+                            .reviewStatusLabel(r.getReviewStatus().getLabel()).reviewComment(r.getReviewComment())
+                            .reviewedAt(r.getReviewedAt()).reviewedBy(r.getReviewedBy()).build();
+                })
                 .sorted(java.util.Comparator.comparingInt((AccessSummaryResponse a) -> a.getRiskFlags().isEmpty() ? 1 : 0)
                         .thenComparing(java.util.Comparator.comparingInt(AccessSummaryResponse::getFailCount).reversed()))
                 .toList();
@@ -477,6 +652,9 @@ public class SecLogUploadService {
                 .riskAccountCount((int) list.stream().filter(a -> !a.getRiskFlags().isEmpty()).count())
                 .successTotal(list.stream().mapToLong(AccessSummaryResponse::getSuccessCount).sum())
                 .failTotal(list.stream().mapToLong(AccessSummaryResponse::getFailCount).sum())
+                .riskReviewedCount((int) list.stream().filter(a -> !a.getRiskFlags().isEmpty() && a.getReviewStatus() != null).count())
+                .riskPendingCount((int) list.stream().filter(a -> !a.getRiskFlags().isEmpty() && a.getReviewStatus() == null).count())
+                .otherReviewedCount((int) list.stream().filter(a -> a.getRiskFlags().isEmpty() && a.getReviewStatus() != null).count())
                 .accounts(list)
                 .build();
     }

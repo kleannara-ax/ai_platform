@@ -50,7 +50,49 @@ public class ExcelTextConverter {
         return ext != null && ("xlsx".equalsIgnoreCase(ext) || "xls".equalsIgnoreCase(ext));
     }
 
-    public byte[] toTsv(byte[] content) {
+    /** 엑셀 한 행 (rowNo = 엑셀 행 번호, 1부터. cells = 앞쪽 빈 열을 뺀 셀 값) */
+    public record SheetRow(int rowNo, List<String> cells) {
+    }
+
+    /** 엑셀 시트 1개 (name = 탭 이름) */
+    public record NamedSheet(String name, List<SheetRow> rows) {
+    }
+
+    /**
+     * 엑셀 → 모든 시트의 행 목록 (빈 시트 제외). 개인정보 다운로드 내역 탭처럼
+     * 첫 번째가 아닌 시트를 읽을 때 사용.
+     */
+    public List<NamedSheet> readAllSheets(byte[] content) {
+        if (content.length > MAX_EXCEL_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "엑셀 파일은 최대 20MB 까지 업로드할 수 있습니다. 더 큰 파일은 CSV 로 저장해 올려 주세요.");
+        }
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+            DataFormatter fmt = new DataFormatter(Locale.KOREA);
+            FormulaEvaluator ev = wb.getCreationHelper().createFormulaEvaluator();
+            List<NamedSheet> out = new ArrayList<>();
+            for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+                Sheet sh = wb.getSheetAt(i);
+                List<SheetRow> rows = rowsOf(sh, fmt, ev);
+                if (!rows.isEmpty()) {
+                    out.add(new NamedSheet(sh.getSheetName(), rows));
+                }
+            }
+            return out;
+        } catch (EncryptedDocumentException e) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "암호가 걸린 엑셀은 업로드할 수 없습니다. 암호를 해제한 뒤 올려 주세요.");
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지 확인해 주세요.");
+        }
+    }
+
+    /**
+     * 엑셀 → 행 목록 (원본 엑셀 행 번호 포함). 빈 행·앞쪽 빈 열은 건너뛴다.
+     * 근거 로그를 엑셀 행 번호로 보여 줄 때 사용 (DLP 점검 보고서).
+     */
+    public List<SheetRow> readRows(byte[] content) {
         if (content.length > MAX_EXCEL_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
                     "엑셀 파일은 최대 20MB 까지 업로드할 수 있습니다. 더 큰 파일은 CSV 로 저장해 올려 주세요.");
@@ -62,50 +104,11 @@ public class ExcelTextConverter {
             }
             DataFormatter fmt = new DataFormatter(Locale.KOREA);
             FormulaEvaluator ev = wb.getCreationHelper().createFormulaEvaluator();
-
-            // 1차: 셀 값 추출 + 앞쪽 빈 열 계산
-            List<List<String>> rows = new ArrayList<>();
-            int minCol = Integer.MAX_VALUE;
-            for (Row row : sheet) {
-                if (rows.size() >= MAX_ROWS) {
-                    break;
-                }
-                List<String> vals = new ArrayList<>();
-                int first = -1;
-                int last = Math.min(row.getLastCellNum(), MAX_COLS);
-                for (int c = 0; c < last; c++) {
-                    String v = cellText(row.getCell(c), fmt, ev);
-                    vals.add(v);
-                    if (first < 0 && !v.isEmpty()) {
-                        first = c;
-                    }
-                }
-                if (first < 0) {
-                    continue; // 빈 행
-                }
-                minCol = Math.min(minCol, first);
-                rows.add(vals);
-            }
-            if (rows.isEmpty()) {
+            List<SheetRow> out = rowsOf(sheet, fmt, ev);
+            if (out.isEmpty()) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀에 데이터가 없습니다.");
             }
-
-            // 2차: TSV 작성
-            StringBuilder sb = new StringBuilder(content.length * 2);
-            for (List<String> vals : rows) {
-                int end = vals.size();
-                while (end > minCol && vals.get(end - 1).isEmpty()) {
-                    end--;
-                }
-                for (int c = minCol; c < end; c++) {
-                    if (c > minCol) {
-                        sb.append('\t');
-                    }
-                    sb.append(vals.get(c));
-                }
-                sb.append('\n');
-            }
-            return sb.toString().getBytes(StandardCharsets.UTF_8);
+            return out;
         } catch (EncryptedDocumentException e) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "암호가 걸린 엑셀은 업로드할 수 없습니다. 암호를 해제한 뒤 올려 주세요.");
         } catch (BusinessException e) {
@@ -113,6 +116,55 @@ public class ExcelTextConverter {
         } catch (IOException | RuntimeException e) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "엑셀 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지 확인해 주세요.");
         }
+    }
+
+    public byte[] toTsv(byte[] content) {
+        List<SheetRow> rows = readRows(content);
+        StringBuilder sb = new StringBuilder(content.length * 2);
+        for (SheetRow r : rows) {
+            sb.append(String.join("\t", r.cells())).append('\n');
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** 시트 1개 → 행 목록 (빈 행·앞쪽 빈 열 제거, 데이터가 없으면 빈 목록) */
+    private static List<SheetRow> rowsOf(Sheet sheet, DataFormatter fmt, FormulaEvaluator ev) {
+        // 1차: 셀 값 추출 + 앞쪽 빈 열 계산
+        List<List<String>> rows = new ArrayList<>();
+        List<Integer> rowNos = new ArrayList<>();
+        int minCol = Integer.MAX_VALUE;
+        for (Row row : sheet) {
+            if (rows.size() >= MAX_ROWS) {
+                break;
+            }
+            List<String> vals = new ArrayList<>();
+            int first = -1;
+            int last = Math.min(row.getLastCellNum(), MAX_COLS);
+            for (int c = 0; c < last; c++) {
+                String v = cellText(row.getCell(c), fmt, ev);
+                vals.add(v);
+                if (first < 0 && !v.isEmpty()) {
+                    first = c;
+                }
+            }
+            if (first < 0) {
+                continue; // 빈 행
+            }
+            minCol = Math.min(minCol, first);
+            rows.add(vals);
+            rowNos.add(row.getRowNum() + 1);
+        }
+        // 2차: 앞쪽 빈 열·뒤쪽 빈 셀 제거
+        List<SheetRow> out = new ArrayList<>(rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            List<String> vals = rows.get(i);
+            int end = vals.size();
+            while (end > minCol && vals.get(end - 1).isEmpty()) {
+                end--;
+            }
+            out.add(new SheetRow(rowNos.get(i), minCol >= end ? List.of() : new ArrayList<>(vals.subList(minCol, end))));
+        }
+        return out;
     }
 
     private static Sheet firstDataSheet(Workbook wb) {
@@ -125,6 +177,25 @@ public class ExcelTextConverter {
         return null;
     }
 
+    /** 수식 셀: 계산 실패(배열 수식 등)하면 파일에 저장된 마지막 계산 값 사용 */
+    private static String formulaText(Cell cell, DataFormatter fmt, FormulaEvaluator ev) {
+        try {
+            return fmt.formatCellValue(cell, ev);
+        } catch (RuntimeException e) {
+            try {
+                return switch (cell.getCachedFormulaResultType()) {
+                    case STRING -> cell.getStringCellValue();
+                    case NUMERIC -> fmt.formatRawCellContents(cell.getNumericCellValue(), cell.getCellStyle().getDataFormat(),
+                            cell.getCellStyle().getDataFormatString());
+                    case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+                    default -> "";
+                };
+            } catch (RuntimeException ignore) {
+                return "";
+            }
+        }
+    }
+
     private static String cellText(Cell cell, DataFormatter fmt, FormulaEvaluator ev) {
         if (cell == null) {
             return "";
@@ -134,6 +205,8 @@ public class ExcelTextConverter {
         if (type == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             LocalDateTime dt = cell.getLocalDateTimeCellValue();
             v = dt == null ? "" : dt.format(DT);
+        } else if (cell.getCellType() == CellType.FORMULA) {
+            v = formulaText(cell, fmt, ev);
         } else {
             v = fmt.formatCellValue(cell, ev);
         }

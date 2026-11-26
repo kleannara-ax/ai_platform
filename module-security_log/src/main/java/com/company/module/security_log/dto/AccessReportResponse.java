@@ -15,5 +15,10 @@ public class AccessReportResponse {
     private int riskAccountCount;
     private long successTotal;
     private long failTotal;
+    /** 위험 표시 계정 중 검토한 계정 수 / 검토가 남은 계정 수 */
+    private int riskReviewedCount;
+    private int riskPendingCount;
+    /** 위험 표시 없는 계정 중 검토(선택)한 계정 수 */
+    private int otherReviewedCount;
     private List<AccessSummaryResponse> accounts;
 }

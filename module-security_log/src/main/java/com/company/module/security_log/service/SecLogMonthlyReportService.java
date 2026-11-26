@@ -6,6 +6,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.module.security_log.dto.DashboardResponse;
 import com.company.module.security_log.dto.MonthlyStatusResponse;
 import com.company.module.security_log.entity.SecLogAccessSummary;
+import com.company.module.security_log.entity.SecLogAccountReview;
 import com.company.module.security_log.entity.SecLogDetection;
 import com.company.module.security_log.entity.SecLogUpload;
 import com.company.module.security_log.repository.SecLogAccessSummaryRepository;
@@ -67,6 +68,7 @@ public class SecLogMonthlyReportService {
     private final SecLogUploadRepository uploadRepository;
     private final SecLogDetectionRepository detectionRepository;
     private final SecLogAccessSummaryRepository accessSummaryRepository;
+    private final SecLogAccountReviewService accountReviewService;
 
     public record ReportFile(String fileName, byte[] content) {
     }
@@ -84,6 +86,7 @@ public class SecLogMonthlyReportService {
             accessSheet(wb, s, ym, active);
             detectionSheet(wb, s, ym, active);
             privSheet(wb, s, d);
+            accountReviewSheet(wb, s, ym, active);
             for (int i = 0; i < wb.getNumberOfSheets(); i++) {
                 printSetup(wb.getSheetAt(i), i == 0);
             }
@@ -121,7 +124,8 @@ public class SecLogMonthlyReportService {
                 {"탐지 건수", d.getDetectionCount() + "건  (심각 " + d.getCriticalCount() + " · 높음 " + d.getHighCount()
                         + " · 보통 " + d.getMediumCount() + " · 낮음 " + d.getLowCount() + ")"},
                 {"미검토 탐지", d.getPendingDetectionCount() + "건  (7일 초과 " + (d.getAging().getD8to14() + d.getAging().getOver14()) + "건)"},
-                {"위험 접속 계정", d.getRiskAccountCount() + "개"},
+                {"위험 접속 계정", d.getRiskAccountCount() + "개  (검토 " + (d.getRiskAccountCount() - d.getRiskPendingCount())
+                        + " · 미검토 " + d.getRiskPendingCount() + ", 6번 시트)"},
                 {"특권/공용 계정", d.getPrivAccounts().size() + "개 활동"},
         };
         for (String[] e : kv) {
@@ -215,7 +219,7 @@ public class SecLogMonthlyReportService {
                 "상태", "검토 의견", "검토일시", "등록일시"};
         header(sh.createRow(0), h, s);
         int r = 1;
-        for (SecLogUpload u : uploadRepository.findByTargetYmAndDeletedYn(ym, SecLogConstants.DELETED_N)) {
+        for (SecLogUpload u : uploadRepository.findLatestByTargetYm(ym)) {
             if (u.getSystemId() == null || !active.contains(u.getSystemId())) {
                 continue;
             }
@@ -302,6 +306,68 @@ public class SecLogMonthlyReportService {
         cell(sh.createRow(r), 0, "특권/공용 계정 기준: root, admin, administrator, sa, sys, system, oracle, postgres, dba, superuser, guest", s.muted);
         widths(sh, 18, 18, 11, 11, 11, 9, 20, 40);
         sh.createFreezePane(0, 1);
+    }
+
+    // ------------------------------------------------------------------ 6. 위험 계정 검토
+
+    /** 접속 행위 분석의 계정별 검토 (위험 표시 계정 전부 + 위험 표시 없이 검토한 계정), 시스템별 최신 파일 기준 */
+    private void accountReviewSheet(XSSFWorkbook wb, Styles s, String ym, Set<Long> active) {
+        Sheet sh = wb.createSheet("6.위험 계정 검토");
+        String[] h = {"시스템", "계정", "위험 표시", "로그인 성공", "로그인 실패", "업무시간 외", "외부 IP",
+                "검토 상태", "소명·조치 내용", "검토자 ID", "검토일시"};
+        header(sh.createRow(0), h, s);
+        List<Object[]> rows = active.isEmpty() ? List.of() : accessSummaryRepository.findAllForMonth(ym, active);
+        Map<Long, Map<String, SecLogAccountReview>> reviews = accountReviewService.reviewsOf(
+                rows.stream().map(o -> (Long) o[3]).distinct().toList());
+        List<Object[]> target = new ArrayList<>();
+        for (Object[] o : rows) {
+            SecLogAccessSummary x = (SecLogAccessSummary) o[0];
+            boolean risk = x.getRiskFlags() != null && !x.getRiskFlags().isBlank();
+            SecLogAccountReview rv = reviews.getOrDefault((Long) o[3], Map.of()).get(x.getAccountId());
+            if (risk || rv != null) {
+                target.add(new Object[]{x, o[2], rv, risk});
+            }
+        }
+        // 시스템 → 위험 표시 계정 먼저 → 미검토 먼저 → 계정
+        target.sort(java.util.Comparator.comparing((Object[] t) -> String.valueOf(t[1]))
+                .thenComparing(t -> (Boolean) t[3] ? 0 : 1)
+                .thenComparing(t -> t[2] == null ? 0 : 1)
+                .thenComparing(t -> ((SecLogAccessSummary) t[0]).getAccountId()));
+        int r = 1;
+        for (Object[] t : target) {
+            SecLogAccessSummary x = (SecLogAccessSummary) t[0];
+            SecLogAccountReview rv = (SecLogAccountReview) t[2];
+            Row row = sh.createRow(r++);
+            int c = 0;
+            cell(row, c++, (String) t[1], s.td);
+            cell(row, c++, x.getAccountId(), s.tdBold);
+            cell(row, c++, x.getRiskFlags() == null || x.getRiskFlags().isBlank() ? "-"
+                    : flags(java.util.Arrays.asList(x.getRiskFlags().split(","))), s.td);
+            num(row, c++, x.getSuccessCount(), s);
+            num(row, c++, x.getFailCount(), s);
+            num(row, c++, x.getOffHourCount(), s);
+            num(row, c++, x.getExternalIpCount(), s);
+            if (rv == null) {
+                cell(row, c++, "미검토", s.bad);
+                cell(row, c++, "", s.td);
+                cell(row, c++, "", s.td);
+                cell(row, c++, "", s.td);
+            } else {
+                cell(row, c++, rv.getReviewStatus().getLabel(),
+                        rv.getReviewStatus() == com.company.module.security_log.entity.AccountReviewStatus.CONFIRMED ? s.warn : s.ok);
+                cell(row, c++, rv.getReviewComment() == null ? "" : rv.getReviewComment(), s.tdWrap);
+                cell(row, c++, rv.getReviewedBy() == null ? "" : String.valueOf(rv.getReviewedBy()), s.td);
+                cell(row, c++, fmt(rv.getReviewedAt()), s.td);
+            }
+        }
+        if (r == 1) {
+            cell(sh.createRow(r), 0, "이 달 위험 표시 접속 계정이 없습니다.", s.muted);
+        }
+        r += 2;
+        cell(sh.createRow(r), 0, "검토 상태: 정상 확인 / 이상 확인(조치 필요) / 조치완료 / 미검토 · 위험 표시 계정은 모두 검토해야 최종 검토완료(마감)할 수 있습니다.", s.muted);
+        widths(sh, 18, 18, 34, 11, 11, 11, 9, 18, 44, 10, 16);
+        sh.createFreezePane(0, 1);
+        sh.setAutoFilter(new CellRangeAddress(0, Math.max(target.size(), 0), 0, h.length - 1));
     }
 
     // ------------------------------------------------------------------ util
