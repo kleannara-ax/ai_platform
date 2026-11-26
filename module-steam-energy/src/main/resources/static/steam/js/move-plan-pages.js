@@ -593,24 +593,37 @@
     });
 
     const dim = result.daysInMonth;
+    // 비교 보기: 합계·평균 줄도 실적이 있는 날만 모아 실적 / 계획 / 차이로 보여 준다
+    const cmpDays = compareMode ? result.days.filter((x) => x.isActual && x.plan) : [];
+    const sumOf = (list, get) => list.reduce((s, x) => s + (get(x) || 0), 0);
     const summary = (label, pick, digits) => {
-      const cells = [`<th colspan="2">${label}</th>`];
+      const cmp = cmpDays.length > 0;
+      const title = cmp ? `${label}<br><span class="mp-cmp-note">실적 ${cmpDays.length}일</span>` : label;
+      const cells = [`<th colspan="2">${title}</th>`];
       MACHINES.forEach((m) => {
         const hours = result.days.reduce((s, x) => s + (num((resolved.days[x.day] || {})[m.down]) || 0), 0);
         cells.push(`<td>${label === "합계" && hours > 0 ? fmt0(hours) : ""}</td>`);
       });
-      cells.push(`<td>${fmtN(pick(result.days.reduce((s, x) => s + x.demand, 0)), digits)}</td>`);
+      if (cmp) cells.push(compareCell(pick(sumOf(cmpDays, (x) => x.demand)), pick(sumOf(cmpDays, (x) => x.plan.demand)), "mp-demand", `필요 스팀량 ${label}`, digits));
+      else cells.push(`<td>${fmtN(pick(result.days.reduce((s, x) => s + x.demand, 0)), digits)}</td>`);
       SHOWN_BOILERS.forEach((b) => {
         const stop = result.days.reduce((s, x) => s + (num((resolved.days[x.day] || {})[b.stop]) || 0), 0);
+        cells.push(`<td>${label === "합계" && stop > 0 ? fmt0(stop) : ""}</td>`);
+        if (cmp) {
+          cells.push(compareCell(pick(sumOf(cmpDays, (x) => x.alloc[b.code])), pick(sumOf(cmpDays, (x) => x.plan.alloc[b.code])), "", `${b.label} ${label}`, digits));
+          return;
+        }
         const tons = result.days.reduce((s, x) => s + x.alloc[b.code], 0);
-        cells.push(`<td>${label === "합계" && stop > 0 ? fmt0(stop) : ""}</td>`, `<td>${tons > 0.05 ? fmtN(pick(tons), digits) : ""}</td>`);
+        cells.push(`<td>${tons > 0.05 ? fmtN(pick(tons), digits) : ""}</td>`);
       });
-      if (showExt) cells.push(`<td>${fmtN(pick(result.extTons), digits)}</td>`);
-      cells.push(`<td>${fmtN(pick(result.totalSteam), digits)}</td>`);
-      cells.push(`<td>${result.shortageSum > 0.5 ? fmtN(pick(result.shortageSum), digits) : ""}</td>`);
-      return `<tr class="summary-row">${cells.join("")}</tr>`;
+      if (showExt) cells.push(`<td>${cmp ? "" : fmtN(pick(result.extTons), digits)}</td>`);
+      if (cmp) cells.push(compareCell(pick(sumOf(cmpDays, (x) => x.total)), pick(sumOf(cmpDays, (x) => x.plan.total)), "mp-strong", `합계 ${label}`, digits));
+      else cells.push(`<td>${fmtN(pick(result.totalSteam), digits)}</td>`);
+      cells.push(`<td>${!cmp && result.shortageSum > 0.5 ? fmtN(pick(result.shortageSum), digits) : ""}</td>`);
+      return `<tr class="summary-row${cmp ? " mp-cmp-summary" : ""}">${cells.join("")}</tr>`;
     };
-    body.push(summary("합계", (v) => v, 0), summary("일 평균 (T/D)", (v) => v / dim, 0), summary("시간 평균 (T/H)", (v) => v / dim / 24, 1));
+    const avgDays = cmpDays.length > 0 ? cmpDays.length : dim;
+    body.push(summary("합계", (v) => v, 0), summary("일 평균 (T/D)", (v) => v / avgDays, 0), summary("시간 평균 (T/H)", (v) => v / avgDays / 24, 1));
 
     $("mpDayTable").innerHTML = `<thead><tr>${head1.join("")}</tr><tr>${head2.join("")}</tr></thead><tbody>${body.join("")}</tbody>`;
     // 머리글 틀고정: 둘째 줄을 첫 줄 높이만큼 내려 붙인다
@@ -620,14 +633,15 @@
   }
 
   /** 비교 칸 — 실적 / 계획 을 작게, 차이(실적 − 계획)를 빨강(많음)·초록(적음)으로 */
-  function compareCell(actual, plan, extraClass, label) {
+  function compareCell(actual, plan, extraClass, label, digits = 0) {
     const a = actual || 0;
     const p = plan || 0;
     const gap = a - p;
-    const tone = Math.abs(gap) < 0.5 ? "same" : gap > 0 ? "over" : "under";
-    const gapText = tone === "same" ? "0" : (gap > 0 ? "+" : "−") + fmt0(Math.abs(gap));
-    return `<td class="computed mp-num mp-cmp mp-cmp-${tone}${extraClass ? " " + extraClass : ""}" title="${esc(label)} — 실적 ${fmt0(a)} / 계획 ${fmt0(p)} / 차이 ${gapText}">`
-      + `<span class="mp-cmp-vals"><span class="mp-cmp-a">${fmt0(a)}</span><span class="mp-cmp-p">${fmt0(p)}</span></span>`
+    const f = (v) => fmtN(v, digits);
+    const tone = Math.abs(gap) < (digits > 0 ? 0.05 : 0.5) ? "same" : gap > 0 ? "over" : "under";
+    const gapText = tone === "same" ? "0" : (gap > 0 ? "+" : "−") + f(Math.abs(gap));
+    return `<td class="computed mp-num mp-cmp mp-cmp-${tone}${extraClass ? " " + extraClass : ""}" title="${esc(label)} — 실적 ${f(a)} / 계획 ${f(p)} / 차이 ${gapText}">`
+      + `<span class="mp-cmp-vals"><span class="mp-cmp-a">${f(a)}</span><span class="mp-cmp-p">${f(p)}</span></span>`
       + `<span class="mp-cmp-gap">${gapText}</span></td>`;
   }
 

@@ -7,7 +7,7 @@
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="css/common.css?v=20260608-sticky3" />
   <link rel="stylesheet" href="css/inc-design.css?v=20260608-sticky3" />
-  <link rel="stylesheet" href="css/page-move-plan.css?v=20261126-mp14" />
+  <link rel="stylesheet" href="css/page-move-plan.css?v=20261126-mp15" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
   <script src="/steam/js/platform-iframe-compat.js?v=20260916-auth3"></script>
@@ -65,7 +65,7 @@
             <span class="mp-card-sub">운휴 칸을 누르면 하루 종일(24시간) 운휴로 바뀌고, 한 번 더 누르면 풀립니다. 일부만 세울 때는 시간을 숫자로 넣습니다. 보일러 T/D 칸을 누르면 자체 운휴(고정비 발생)가 됩니다.</span>
             <button type="button" class="period-tab-button mp-compare-btn" id="mpCompare" aria-pressed="false" title="실적이 있는 날에 계획값과 실적값, 차이를 같이 봅니다">비교</button>
           </h3>
-          <p class="mp-compare-legend" id="mpCompareLegend" hidden>실적일 칸: <b>실적</b> / 계획 · 차이(실적 − 계획) <span class="mp-cmp-over-text">+ 계획보다 많음</span> <span class="mp-cmp-under-text">△ 계획보다 적음</span></p>
+          <p class="mp-compare-legend" id="mpCompareLegend" hidden>실적일 칸 · 합계·평균 줄(실적일만 모음): <b>실적</b> / 계획 · 차이(실적 − 계획) <span class="mp-cmp-over-text">+ 계획보다 많음</span> <span class="mp-cmp-under-text">△ 계획보다 적음</span></p>
           <div class="mp-controls">
             <label>실적 반영 <select id="mpActualUntil"></select></label>
             <span class="mp-legend"><i class="mp-dot mp-dot-actual"></i>실적 <i class="mp-dot mp-dot-plan"></i>계획 <i class="mp-dot mp-dot-down"></i>설비 운휴 <i class="mp-dot mp-dot-maint"></i>보일러 정비 <i class="mp-dot mp-dot-idle"></i>자체 운휴(고정비) <i class="mp-dot mp-dot-lng"></i>LNG 가동</span>
@@ -91,7 +91,7 @@
   <script>if (new URLSearchParams(window.location.search).get("embedded") === "1") document.body.classList.add("embedded-mode");</script>
   <script src="/steam/js/excel-upload-errors.js?v=20260608-sticky3"></script>
   <script src="/steam/js/steam-energy-api.js?v=20261120-spec3"></script>
-  <script src="/steam/js/move-plan-calc.js?v=20261126-mp14"></script>
-  <script src="/steam/js/move-plan-pages.js?v=20261126-mp14"></script>
+  <script src="/steam/js/move-plan-calc.js?v=20261126-mp15"></script>
+  <script src="/steam/js/move-plan-pages.js?v=20261126-mp15"></script>
 </body>
 </html>

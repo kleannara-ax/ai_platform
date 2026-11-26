@@ -137,3 +137,5 @@ body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody t
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.computed.mp-num.mp-cmp-under { background:#e9f7ef !important; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp-under .mp-cmp-gap { color:#1e8449; }
 body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr > td.mp-cmp-same .mp-cmp-gap { color:#94a3b0; }
+/* 비교 보기 — 합계·평균 줄도 실적일만 모아 비교 */
+body.landing-body:not(#_)[data-page-kind="move-plan"] table.mp-day-table tbody tr.mp-cmp-summary > th .mp-cmp-note { display:block; font-size:10.5px; font-weight:500; color:#5b6b78; }
