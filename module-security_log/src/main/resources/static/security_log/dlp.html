@@ -49,13 +49,21 @@
   <!-- 올린 파일 -->
   <section class="lr-rules hidden" aria-labelledby="dmFileTitle" id="dmFileSec">
     <h3 class="lr-rules-title" id="dmFileTitle">이 달에 올린 파일</h3>
+    <h4 class="dm-file-sub"><span class="dm-file-no">1</span>유출 로그</h4>
     <div class="table-responsive">
       <table class="table dm-ev-tbl align-middle">
         <thead><tr><th>구분</th><th>파일</th><th>유출 로그</th><th>로그 기간</th><th>올린 일시</th><th></th></tr></thead>
         <tbody id="dmFileBody"></tbody>
       </table>
     </div>
-    <ul class="lr-rules-note"><li>보고서는 가장 최근에 올린 파일 1개 기준</li><li>파일 이름 클릭 → 원본 내려받기</li></ul>
+    <h4 class="dm-file-sub"><span class="dm-file-no">2</span>Privacy-I 현황</h4>
+    <div class="table-responsive">
+      <table class="table dm-ev-tbl align-middle">
+        <thead><tr><th>구분</th><th>파일</th><th>재설치</th><th>장기 미접속</th><th>올린 일시</th></tr></thead>
+        <tbody id="dmAgentBody"></tbody>
+      </table>
+    </div>
+    <ul class="lr-rules-note"><li>보고서는 ①·② 각각 가장 최근에 올린 파일 1개 기준</li><li>유출 로그 파일 이름 클릭 → 원본 내려받기</li><li>Privacy-I 현황은 마지막에 올린 파일만 표시 (다시 올리면 바뀜, 원본은 보관하지 않음)</li></ul>
   </section>
 </main>
 
@@ -143,16 +151,26 @@
     try {
       sessionStorage.setItem('seclog_dlp_ym', st.ym);
       const d = st.data = await api(`/dlp-leak/monthly?targetYm=${st.ym}`);
-      const up = d.upload;
-      steps(up, d.agent);
-      $('dmFileSec').classList.toggle('hidden', !up);
-      if (!up) {
+      const up = d.upload, ag = d.agent;
+      steps(up, ag);
+      // 이 달에 올린 파일: ① 유출 로그 · ② Privacy-I 현황 중 하나라도 있으면 표시
+      $('dmFileSec').classList.toggle('hidden', !up && !ag);
+      if (!up && !ag) {
         $('dmEmpty').classList.remove('hidden');
-        $('dmEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 유출 로그 없음 → ${canWrite ? '① [올리기]로 DLP 관리시스템에서 받은 유출 로그 올리기 · ② Privacy-I Agent 현황 올리기' : '담당자가 올리면 표시'}`;
+        $('dmEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 올린 파일 없음 → ${canWrite ? '① [올리기]로 DLP 관리시스템에서 받은 유출 로그 올리기 · ② Privacy-I Agent 현황 올리기' : '담당자가 올리면 표시'}`;
         return;
       }
-      $('dmEmpty').classList.toggle('hidden', !up.analysisNote);
-      if (up.analysisNote) $('dmEmpty').innerHTML = `<i class="fas fa-circle-info me-1"></i> ${esc(up.analysisNote)}`;
+      const note = up && up.analysisNote;
+      $('dmEmpty').classList.toggle('hidden', !note);
+      if (note) $('dmEmpty').innerHTML = `<i class="fas fa-circle-info me-1"></i> ${esc(note)}`;
+      $('dmAgentBody').innerHTML = ag ? `<tr>
+          <td><span class="badge-st use-y">보고서 기준</span></td>
+          <td><i class="fas fa-file-excel me-1 text-muted"></i>${esc(ag.fileName || '-')}</td>
+          <td>${fmtNum(ag.reinstallCount)}명</td>
+          <td>${fmtNum(ag.offlineCount)}명</td>
+          <td class="text-nowrap">${fmtDt(ag.uploadedAt)}</td></tr>`
+        : `<tr><td colspan="5" class="lr-r-empty">이 달에 올린 파일 없음</td></tr>`;
+      if (!up) { $('dmFileBody').innerHTML = `<tr><td colspan="6" class="lr-r-empty">이 달에 올린 파일 없음</td></tr>`; return; }
       $('dmFileBody').innerHTML = (d.files || []).map(f => `<tr>
           <td>${f.leakUploadId === up.leakUploadId ? '<span class="badge-st use-y">보고서 기준</span>' : '<span class="badge-st use-n">이전 파일</span>'}</td>
           <td><a href="#" class="dm-dl" data-id="${f.leakUploadId}" title="원본 내려받기"><i class="fas fa-file-arrow-down me-1"></i>${esc(f.originalFileName)}</a></td>
