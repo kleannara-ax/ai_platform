@@ -39,7 +39,7 @@
     </article>
     <article class="dm-step" id="step2">
       <div class="dm-step-no">3</div>
-      <div class="dm-step-body"><h2>보고서 작성 · PPT</h2><p id="step2Txt">유출 로그를 올리면 작성 가능</p></div>
+      <div class="dm-step-body"><h2>보고서 작성 · PPT</h2><p id="step2Txt">① 또는 ② 중 하나를 올리면 작성 가능</p></div>
       <a class="btn-m btn-primary-m disabled" id="btnReport" href="dlp-report.html" aria-disabled="true"><i class="fas fa-file-powerpoint"></i>보고서 작성</a>
     </article>
   </section>
@@ -127,12 +127,14 @@
   function steps(up, ag) {
     $('step1').classList.toggle('done', !!up);
     $('stepAgent').classList.toggle('done', !!ag);
-    $('step2').classList.toggle('ready', !!up);
+    const can = !!up || !!ag;   // ① 유출 로그 또는 ② Agent 현황 중 하나만 있어도 보고서 작성 가능
+    $('step2').classList.toggle('ready', can);
     $('step1Txt').textContent = up ? `${up.originalFileName} · 유출 로그 ${fmtNum(up.eventCount)}건` : `${fmtYm(st.ym)} 유출 로그 없음`;
     $('stepAgentTxt').textContent = ag ? `${ag.fileName || '-'} · 재설치 ${fmtNum(ag.reinstallCount)}명 · 장기 미접속 ${fmtNum(ag.offlineCount)}명`
       : `${fmtYm(st.ym)} Agent 현황 없음 (보고서 03·04 가 비어 있게 됨)`;
-    $('step2Txt').textContent = up ? `${fmtYm(st.ym)} 보고서 · 내용 확인·입력 후 PPT${ag ? '' : ' (② 를 올리면 03·04 채움)'}` : '유출 로그를 올리면 작성 가능';
-    $('btnReport').classList.toggle('disabled', !up); $('btnReport').setAttribute('aria-disabled', String(!up));
+    $('step2Txt').textContent = !can ? '① 또는 ② 중 하나를 올리면 작성 가능'
+      : `${fmtYm(st.ym)} 보고서 · 내용 확인·입력 후 PPT${!up ? ' (① 을 올리면 01·02·05·06 채움)' : !ag ? ' (② 를 올리면 03·04 채움)' : ''}`;
+    $('btnReport').classList.toggle('disabled', !can); $('btnReport').setAttribute('aria-disabled', String(!can));
     $('btnReport').href = `dlp-report.html?ym=${st.ym}`;
   }
 

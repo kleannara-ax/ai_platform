@@ -157,10 +157,12 @@
       sessionStorage.setItem('seclog_dlp_ym', st.ym);
       const d = st.d = await api(`/dlp-leak/report-data?targetYm=${st.ym}`);
       st.dirty = false;
-      $('btnPpt').disabled = !d.upload;
-      $('rpEmpty').classList.toggle('hidden', !!d.upload);
-      $('rpBody').classList.toggle('hidden', !d.upload);
-      if (!d.upload) { $('rpEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 유출 로그 없음 → [DLP 모니터링]에서 유출 로그를 먼저 올리기`; return; }
+      // ① 유출 로그 또는 ② Agent 현황(03·04 파일 이름) 중 하나만 있어도 보고서 작성 가능
+      const has = !!d.upload || !!(d.reinstall && d.reinstall.fileName) || !!(d.offline && d.offline.fileName);
+      $('btnPpt').disabled = !has;
+      $('rpEmpty').classList.toggle('hidden', has);
+      $('rpBody').classList.toggle('hidden', !has);
+      if (!has) { $('rpEmpty').innerHTML = `<i class="fas fa-inbox me-1"></i> <b>${esc(fmtYm(st.ym))}</b> 올린 파일 없음 → [DLP 모니터링]에서 ① 유출 로그 또는 ② Privacy-I Agent 현황 중 하나를 먼저 올리기`; return; }
       render(d);
     } catch (e) { toast(e.message, 'error'); }
     finally { loading(false); }
