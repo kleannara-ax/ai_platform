@@ -77,8 +77,12 @@ public class SecLogDlpLeakReportService {
 
     public OriginalFileResponse build(String targetYm) {
         DlpReportDataResponse d = dataService.getData(targetYm);
-        if (d.getUpload() == null) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, ym(targetYm) + " 유출 로그가 없습니다. 먼저 유출 로그를 올려 주세요.");
+        // ① 유출 로그 또는 ② Privacy-I Agent 현황(03·04 파일 이름) 중 하나만 있어도 만듦
+        boolean hasAgent = (d.getReinstall() != null && d.getReinstall().getFileName() != null)
+                || (d.getOffline() != null && d.getOffline().getFileName() != null);
+        if (d.getUpload() == null && !hasAgent) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    ym(targetYm) + " 올린 파일이 없습니다. 유출 로그 또는 Privacy-I Agent 현황 중 하나를 먼저 올려 주세요.");
         }
         try (XMLSlideShow ppt = new XMLSlideShow(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             ppt.setPageSize(new Dimension(W, H));
@@ -98,7 +102,7 @@ public class SecLogDlpLeakReportService {
             ppt.write(out);
             byte[] bytes = out.toByteArray();
             String name = "DLP_모니터링_보고서_" + targetYm + ".pptx";
-            return OriginalFileResponse.builder().uploadId(d.getUpload().getLeakUploadId()).fileName(name)
+            return OriginalFileResponse.builder().uploadId(d.getUpload() == null ? null : d.getUpload().getLeakUploadId()).fileName(name)
                     .fileSize(bytes.length).contentBase64(Base64.getEncoder().encodeToString(bytes)).build();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "보고서를 만들지 못했습니다.");
