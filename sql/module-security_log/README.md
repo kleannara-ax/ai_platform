@@ -509,6 +509,7 @@
 | Method | URL | 설명 | 권한 |
 |---|---|---|---|
 | GET | `/dlp-leak/report-data?targetYm=202610` | 보고서 자료: 표지(보고 기간 자동) / 01 외장하드·USB(차단·등록·미등록 건수, 미등록 인원) / 02 카카오톡(부서별 사용 인원·부서 인원, 사용자·사전승인) / 03·04 Privacy-I 재설치·장기 미접속(목록 + 7일 이상·조치완료·휴직 및 퇴사·미조치 및 보류) / 05 생성형 AI 서비스별·부서별(상위 10) / 06 업로드 상위 10명(보안 위험도: 입력값 또는 자동 제안 + 이유) | ADMIN, MANAGER, USER |
+| GET | `/dlp-leak/usb-unreg-events?targetYm=202610` | 보고서 01 **'등록 안 된 외장하드로 업로드' 근거 로그** (카드 숫자와 같은 기준: 외장하드·USB 채널 + 차단 아님 + 등록 여부 '등록 안 됨', 그 달 최근 유출 로그 1개 기준) `{ targetYm, fileName, total, limit: 500, rows: [{ rowNo, occurredAt, occurredAtText, deptName, userName, userId, computerName, fileList, fileSizeText, subChannel }] }` — 최근 발생 순 최대 500건 | ROLE_ADMIN, ROLE_MANAGER, ROLE_USER |
 | PUT | `/dlp-leak/report-data?targetYm=202610` | 입력값 저장 `{ "cover": { "reportType", "targetSystem", "writerDept", "companyKeywords" }, "items": [{ "section": "USB_UNREG", "itemKey": "cspark", "value1": "미승인", "value2": "검토 결과" }] }` → 저장 후 자료 반환 | ADMIN, MANAGER |
 | POST | `/dlp-leak/privacyi?targetYm=202610&kind=AGENT\|REINSTALL\|OFFLINE` | **kind=AGENT (DLP 모니터링 ② Privacy-I Agent 현황 올리기)**: Agent List 파일 1개로 재설치·장기 미접속을 함께 채움 — **재설치 = '설치 일시'가 모니터링 월인 사람**(다른 달·설치 일시 없음 제외), 장기 미접속 = 미접속일 7일 이상. 파일 정보는 `sec_log_dlp_report_item`(SECTION `PI_AGENT`, ITEM_KEY `FILE`, VALUE1 = 읽은 인원, VALUE2 = 파일 이름)에 저장. 응답 `{ targetYm, kind, fileName, totalCount, reinstallCount, reinstallOtherMonth, reinstallNoDate, offlineCount, offlineShort, offlineNoDate }`. kind=REINSTALL/OFFLINE: Privacy-I 목록 파일 올리기 (multipart `file`, xlsx·xls·csv, 20MB·2만 행). Privacy-I 'Agent List' 엑셀 그대로 올림 — 앞 300행에서 '사용자 이름'(이름·성명) 머리글을 찾음(위쪽 부서별 요약 표 건너뜀), 부서·아이디·설치 일시/최종 오프라인 일시·미접속일 열 인식(미접속일 없으면 월말 기준 계산). **장기 미접속(OFFLINE)은 미접속일 7일 이상만 저장**. 같은 달·같은 종류는 교체. 응답 `{ rowCount(저장), totalCount(읽은 인원), shortCount(7일 미만 제외), unknownCount(미접속일 없음 제외) }` | ADMIN, MANAGER |
 
@@ -969,6 +970,7 @@ sql/module-security_log/
 - **개발 서버 메뉴 클릭 시 반응 없음 해결 — 화면 파일 공개 설정 추가 (추가분, 사용자 허락)**: DB·SQL·API 변경 없음(엔드포인트 69개 유지). 원인 ① app `index.html` 에 `/security_log/` iframe 라우팅이 없어 메뉴를 눌러도 반응이 없었음 → develop 에 CCKB 와 같은 방식으로 추가(3adb7cd). 원인 ② iframe 은 Authorization 헤더 없이 화면 파일을 불러와 401 → 모듈 안에 `config/SecLogSecurityConfig.java` 추가(kims·cckb 와 같은 방식, `@Order(-2)`), 공개 범위는 `/security_log/*.html`·`css/**`·`js/**` 만, 데이터 API `/security_log-api/**` 는 계속 JWT + 역할 검사. core `SecurityConfig` 는 수정하지 않음. 5-2 절 갱신.
 - **보고서 작성 — ① 유출 로그 또는 ② Privacy-I Agent 현황 중 하나만 올려도 작성 가능 (추가분, 개발서버 테스트 중 요청)**: DB·SQL·API 변경 없음(엔드포인트 69개 유지). ① DLP 모니터링(`dlp.html`) ③ [보고서 작성] 버튼 = ① 또는 ② 중 하나만 있어도 열림(안내 '① 또는 ② 중 하나를 올리면 작성 가능', ① 만 없으면 '(① 을 올리면 01·02·05·06 채움)'). ② 보고서 화면(`dlp-report.html`) = 유출 로그 또는 03·04 Agent 파일 이름이 있으면 내용·[PPT 내려받기] 표시, 둘 다 없으면 '올린 파일 없음 → ① 또는 ② 중 하나를 먼저 올리기'. ③ PPT(`SecLogDlpLeakReportService.build`) = 둘 다 없을 때만 400 '올린 파일이 없습니다. 유출 로그 또는 Privacy-I Agent 현황 중 하나를 먼저 올려 주세요.', 유출 로그 없이 만들면 01·02·05·06 은 0건·'해당 없음'으로 표시.
 - **DLP 모니터링 '이 달에 올린 파일' — ① 유출 로그 · ② Privacy-I 현황 두 칸으로 나눠 표시 (추가분, A안)**: DB·SQL·API·서버 변경 없음(`dlp.html`·`seclog.css` 만, 엔드포인트 69개 유지, 기존 `GET /dlp-leak/monthly` 의 `files`·`agent` 사용). ① 유출 로그 칸 = 기존과 같음(보고서 기준/이전 파일 · 파일 이름 클릭 원본 내려받기 · 건수 · 로그 기간 · 올린 일시 · ADMIN 삭제). ② Privacy-I 현황 칸 = 보고서 기준 · 파일 이름 · 재설치 N명 · 장기 미접속 N명 · 올린 일시 (마지막에 올린 파일 1개만, 원본은 보관하지 않아 내려받기 없음). 둘 중 하나만 올려도 표시, 안 올린 칸은 '이 달에 올린 파일 없음', 둘 다 없으면 '올린 파일 없음' 안내.
+- **보고서 01 '등록 안 된 외장하드로 업로드' 카드 → 근거 로그 펼쳐 보기 (추가분, 권한 A안 · 500건 A안)**: DB·SQL 변경 없음, 엔드포인트 69개 → **70개** (`GET /dlp-leak/usb-unreg-events`, ADMIN·MANAGER·USER). 카드를 누르면 같은 화면 카드 아래에 로그 표가 펼쳐지고 다시 누르면(또는 [접기]) 숨김. 처음 펼칠 때만 서버에서 불러옴. 칸 = 발생 일시 / 부서 / 이름(아이디) / 컴퓨터 이름 / 파일 목록 / 서브 채널 / 원본 행. 고르는 기준은 카드 숫자와 같음(외장하드·USB 채널 + 차단 아님 + '등록 안 됨'), 최근 발생 순 최대 500건, 넘으면 '전체 N건 중 최근 500건 표시 · 전체는 원본 파일에서 확인'. 0건이면 카드를 눌러도 펼쳐지지 않음. PPT 변경 없음. 가짜 20,000행 CSV(1,654건)로 카드 숫자 = 전체 건수, 500건 제한, 3개 역할 200 · 로그인 없음 401 확인.
 
 | 번호 | 검수 항목 | 결과 | 비고 |
 |---|---|---|---|
@@ -991,7 +993,7 @@ sql/module-security_log/
 | 17 | SQL에 무조건 DELETE가 없는가? | 통과 | DELETE 문 없음 |
 | 18 | SQL에 ALTER TABLE DROP COLUMN이 없는가? | 통과 | `03`·`07`·`08` 의 ALTER 는 모두 `ADD COLUMN IF NOT EXISTS` |
 | 19 | core_user, core_menu, core_role 등 core 테이블에 FK를 생성하지 않았는가? | 통과 | SQL 파일의 FK 모두 업무 테이블 간 (information_schema 확인, core 참조 0건, `sec_log_rule_run`·`sec_log_pii_download` 는 sec_log_upload 만, `sec_log_dlp_leak_file`·`sec_log_dlp_leak_event` 는 sec_log_dlp_leak_upload 만 참조, `sec_log_dlp_kakao_approval` 은 FK 없음, `sec_log_dlp_mail_send_log` 는 sec_log_dlp_mail_rule·sec_log_dlp_kakao_approval 만 참조) |
-| 20 | Controller 응답이 ApiResponse<T>로 감싸져 있는가? | 통과 | 69개 엔드포인트 전체 (파일·엑셀은 Base64) |
+| 20 | Controller 응답이 ApiResponse<T>로 감싸져 있는가? | 통과 | 70개 엔드포인트 전체 (파일·엑셀은 Base64) |
 | 21 | Entity를 Controller에서 직접 반환하지 않는가? | 통과 | `from(Entity)` Response DTO 변환 |
 | 22 | RuntimeException, IllegalArgumentException을 직접 throw하지 않는가? | 통과 | 엔진 내부 private 정규식 타임아웃 신호 클래스는 외부로 전파되지 않음 |
 | 23 | ddl-auto에 의존하지 않고 SQL DDL을 제공했는가? | 통과 | |

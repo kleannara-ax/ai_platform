@@ -54,6 +54,14 @@
     <section class="lr-rules rp-sec" aria-labelledby="secUsb">
       <h3 class="lr-rules-title" id="secUsb"><span class="rp-no">01</span> Removable Drive (외장하드 및 USB) 사용 현황</h3>
       <div class="rp-kpis" id="usbKpi"></div>
+      <!-- '등록 안 된 외장하드로 업로드' 카드를 누르면 펼쳐지는 근거 로그 (처음 펼칠 때 불러옴) -->
+      <div class="rp-ev hidden" id="usbEvWrap">
+        <div class="rp-ev-head"><b>등록 안 된 외장하드로 업로드 — 로그</b><span id="usbEvInfo"></span>
+          <button type="button" class="btn-m btn-outline-m btn-xs" id="usbEvClose"><i class="fas fa-chevron-up"></i>접기</button></div>
+        <div class="table-responsive rp-ev-scroll"><table class="table rp-tbl align-middle">
+          <thead><tr><th>발생 일시</th><th>부서</th><th>이름</th><th>컴퓨터 이름</th><th>파일 목록</th><th>서브 채널</th><th>원본 행</th></tr></thead>
+          <tbody id="usbEvBody"></tbody></table></div>
+      </div>
       <h4 class="rp-sub">등록 안 된 외장하드로 파일 업로드한 인원 <span class="rp-red" id="usbCnt"></span></h4>
       <div class="table-responsive"><table class="table rp-tbl align-middle"><thead><tr><th>부서</th><th>이름</th><th>건 수</th><th>승인여부</th><th>검토 결과</th></tr></thead><tbody id="usbBody"></tbody></table></div>
       <p class="rp-note">대상 = 채널·서브 채널에 USB·이동식·외장·Removable·Media · 차단 = 대응 행동 '차단' · 등록 여부 = '이동식 저장 매체 등록 여부' 열</p>
@@ -145,6 +153,34 @@
       <div class="lr-r-sub ${p.source === 'CHECK' ? 'rp-red' : ''}">${esc(p.autoNote || '')}${p.needConfirm && !p.manual1 ? ' → 확인 후 승인/미승인을 골라 주세요' : ''}</div>`;
   };
   const inp = (sec, key, v, ph, f = 'v2', cls = '') => `<input class="form-control form-control-sm rp-in ${cls}" data-sec="${sec}" data-key="${esc(key)}" data-f="${f}" value="${esc(v || '')}" placeholder="${ph}" maxlength="${f === 'v1' ? 6 : 1000}" ${dis}>`;
+  // 01 '등록 안 된 외장하드로 업로드' 근거 로그 (같은 화면 펼침 · 처음 펼칠 때 서버에서 불러옴 · 최대 500건)
+  const usbEv = { loadedYm: null };
+  async function toggleUsbEv() {
+    const wrap = $('usbEvWrap');
+    if (!wrap.classList.contains('hidden')) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    if (usbEv.loadedYm === st.ym) return;
+    $('usbEvInfo').textContent = '';
+    $('usbEvBody').innerHTML = '<tr><td colspan="7" class="lr-r-empty">불러오는 중...</td></tr>';
+    try {
+      const r = await api(`/dlp-leak/usb-unreg-events?targetYm=${st.ym}`);
+      usbEv.loadedYm = st.ym;
+      $('usbEvInfo').textContent = r.total > r.rows.length
+        ? `전체 ${fmtNum(r.total)}건 중 최근 ${fmtNum(r.rows.length)}건 표시 · 전체는 원본 파일에서 확인`
+        : `총 ${fmtNum(r.total)}건 · 최근 발생 순`;
+      $('usbEvBody').innerHTML = r.rows.length ? r.rows.map(e => `<tr>
+          <td class="text-nowrap">${e.occurredAt ? esc(SECLOG.fmtDt(e.occurredAt)) : esc(e.occurredAtText || '-')}</td>
+          <td>${esc(e.deptName || '-')}</td><td>${person(e.userName, e.userId)}</td>
+          <td>${esc(e.computerName || '-')}</td>
+          <td class="rp-files">${esc(e.fileList || '-')}</td>
+          <td>${esc(e.subChannel || '-')}</td><td class="text-nowrap">${e.rowNo ? fmtNum(e.rowNo) + '행' : '-'}</td></tr>`).join('')
+        : empty(7);
+    } catch (e) {
+      $('usbEvBody').innerHTML = empty(7, '로그를 불러오지 못했습니다');
+      toast(e.message, 'error');
+    }
+  }
+
   const empty = (n, t = '해당 없음') => `<tr><td colspan="${n}" class="lr-r-empty">${t}</td></tr>`;
   const kpi = (items) => items.map(([l, v, cls, sub, unit, desc]) => `<div class="rp-kpi ${cls || ''}"><span>${l}</span>${desc ? `<i class="rp-kpi-desc">(${desc})</i>` : ''}<b>${fmtNum(v)}${unit ? `<em>${unit}</em>` : ''}</b>${sub ? `<small>${sub}</small>` : ''}</div>`).join('');
 
@@ -177,8 +213,15 @@
     const u = d.usb;
     $('usbKpi').innerHTML = kpi([['업로드 차단', u.blocked, '', '차단', '건', '외장하드 및 USB로 업로드 시 차단된 건수'],
       ['등록된 외장하드로 업로드', u.allowedRegistered, '', '허용', '건', '등록된 외장하드로 업로드 시 허용된 건수'],
-      ['등록 안 된 외장하드로 업로드', u.allowedUnregistered, 'red', '허용', '건', '등록되지 않은 외장하드로 업로드된 건수'],
+      ['등록 안 된 외장하드로 업로드', u.allowedUnregistered, 'red rp-kpi-btn', u.allowedUnregistered ? '허용 · 눌러서 로그 보기' : '허용', '건', '등록되지 않은 외장하드로 업로드된 건수'],
       ['외장하드·USB 업로드 전체', u.total, 'navy', `차단 ${fmtNum(u.blocked)}건 · 허용 ${fmtNum(u.allowedRegistered + u.allowedUnregistered)}건`, '건', '외장하드 및 USB 사용 건의 차단·허용 건수 합계']]);
+    usbEv.loadedYm = null; $('usbEvWrap').classList.add('hidden');
+    const unregCard = $('usbKpi').querySelector('.rp-kpi-btn');
+    if (unregCard && u.allowedUnregistered) {
+      unregCard.setAttribute('role', 'button'); unregCard.tabIndex = 0; unregCard.title = '눌러서 로그 보기 / 접기';
+      unregCard.onclick = toggleUsbEv;
+      unregCard.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleUsbEv(); } };
+    } else if (unregCard) { unregCard.classList.remove('rp-kpi-btn'); }
     $('usbCnt').textContent = `(총 ${u.unregUsers.length}명)`;
     $('usbBody').innerHTML = u.unregUsers.length ? u.unregUsers.map(p => `<tr><td class="rp-auto">${esc(p.deptName || '-')}</td><td class="rp-auto">${person(p.userName, p.userId)}</td><td class="rp-auto">${fmtNum(p.count)}</td>
         <td>${sel('USB_UNREG', p.itemKey, ['승인', '미승인'], p.value1, '승인여부')}</td><td>${inp('USB_UNREG', p.itemKey, p.value2, '검토 결과')}</td></tr>`).join('') : empty(5);
@@ -249,6 +292,7 @@
   }
 
   $('btnSave').onclick = () => save(false);
+  $('usbEvClose').onclick = () => $('usbEvWrap').classList.add('hidden');
   $('btnPpt').onclick = async () => {
     if (canWrite && st.dirty && !(await save(true))) return;
     loading(true);

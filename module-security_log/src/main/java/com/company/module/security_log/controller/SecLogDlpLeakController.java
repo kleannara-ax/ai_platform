@@ -13,6 +13,7 @@ import com.company.module.security_log.dto.DlpLeakUploadRequest;
 import com.company.module.security_log.dto.DlpLeakUploadResponse;
 import com.company.module.security_log.dto.DlpReportDataResponse;
 import com.company.module.security_log.dto.DlpReportSaveRequest;
+import com.company.module.security_log.dto.DlpUsbUnregEventResponse;
 import com.company.module.security_log.dto.OriginalFileResponse;
 import com.company.module.security_log.service.SecLogDlpKakaoApprovalService;
 import com.company.module.security_log.service.SecLogDlpMailRuleService;
@@ -195,6 +196,13 @@ public class SecLogDlpLeakController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<ApiResponse<DlpReportDataResponse>> getReportData(@RequestParam String targetYm) {
         return ResponseEntity.ok(ApiResponse.success(monitorReportService.getData(targetYm)));
+    }
+
+    /** 보고서 01 '등록 안 된 외장하드로 업로드' 근거 로그 (카드 숫자와 같은 기준, 최근 발생 순 최대 500건) */
+    @GetMapping("/usb-unreg-events")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
+    public ResponseEntity<ApiResponse<DlpUsbUnregEventResponse>> getUsbUnregEvents(@RequestParam String targetYm) {
+        return ResponseEntity.ok(ApiResponse.success(monitorReportService.getUsbUnregEvents(targetYm)));
     }
 
     /** 보고서 입력값 저장 (표지 정보 + 승인여부·검토 결과·사전승인·사유·조치·부서 인원·보안 위험도) */

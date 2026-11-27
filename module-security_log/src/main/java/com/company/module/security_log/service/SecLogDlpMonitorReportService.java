@@ -5,6 +5,7 @@ import com.company.core.common.exception.ErrorCode;
 import com.company.module.security_log.dto.DlpLeakUploadResponse;
 import com.company.module.security_log.dto.DlpReportDataResponse;
 import com.company.module.security_log.dto.DlpReportSaveRequest;
+import com.company.module.security_log.dto.DlpUsbUnregEventResponse;
 import com.company.module.security_log.entity.SecLogDlpKakaoApproval;
 import com.company.module.security_log.entity.SecLogDlpLeakEvent;
 import com.company.module.security_log.entity.SecLogDlpLeakUpload;
@@ -173,6 +174,39 @@ public class SecLogDlpMonitorReportService {
         return DlpReportDataResponse.Usb.builder()
                 .blocked(blocked).allowedRegistered(reg).allowedUnregistered(unreg).total(blocked + reg + unreg)
                 .unregUsers(users).unregTotalCount(unreg).build();
+    }
+
+    /** 01 '등록 안 된 외장하드로 업로드' 근거 로그 — 화면에 보내는 최대 건수 */
+    public static final int USB_UNREG_LIMIT = 500;
+
+    /**
+     * 01 '등록 안 된 외장하드로 업로드' 카드의 근거 로그 (카드 숫자와 같은 기준, 최근 발생 순 최대 500건)
+     * - 기준 파일 = 그 달 가장 최근에 올린 유출 로그 1개 (보고서와 같음)
+     */
+    public DlpUsbUnregEventResponse getUsbUnregEvents(String targetYm) {
+        validateYm(targetYm);
+        List<SecLogDlpLeakUpload> ups = uploadRepository.findByTargetYmAndDeletedYnOrderByLeakUploadIdDesc(targetYm, SecLogConstants.DELETED_N);
+        if (ups.isEmpty()) {
+            return DlpUsbUnregEventResponse.builder().targetYm(targetYm).total(0).limit(USB_UNREG_LIMIT).rows(List.of()).build();
+        }
+        SecLogDlpLeakUpload up = ups.get(0);
+        List<SecLogDlpLeakEvent> hit = new ArrayList<>();
+        for (SecLogDlpLeakEvent e : eventRepository.findByLeakUploadIdAndDeletedYnOrderByRowNoAsc(up.getLeakUploadId(), SecLogConstants.DELETED_N)) {
+            if (REMOVABLE.matcher(nz(e.getChannel()) + " " + nz(e.getSubChannel())).find()
+                    && !nz(e.getActionName()).contains("차단") && isUnregistered(e.getMediaRegistered())) {
+                hit.add(e);
+            }
+        }
+        hit.sort(Comparator.comparing(SecLogDlpLeakEvent::getOccurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(SecLogDlpLeakEvent::getRowNo, Comparator.nullsLast(Comparator.naturalOrder())));
+        List<DlpUsbUnregEventResponse.Row> rows = hit.stream().limit(USB_UNREG_LIMIT)
+                .map(e -> DlpUsbUnregEventResponse.Row.builder().rowNo(e.getRowNo()).occurredAt(e.getOccurredAt())
+                        .occurredAtText(e.getOccurredAtText()).deptName(e.getDeptName()).userName(e.getUserName())
+                        .userId(e.getUserId()).computerName(e.getComputerName()).fileList(e.getFileList())
+                        .fileSizeText(e.getFileSizeText()).subChannel(e.getSubChannel()).build())
+                .toList();
+        return DlpUsbUnregEventResponse.builder().targetYm(targetYm).fileName(up.getOriginalFileName())
+                .total(hit.size()).limit(USB_UNREG_LIMIT).rows(rows).build();
     }
 
     static boolean isUnregistered(String media) {
