@@ -899,6 +899,9 @@ body.lr-page{background:#f3f4f6}
 .dm-grid2 .lr-rules{margin-bottom:0}
 .dm-cnt-tbl tbody td{width:100px}
 .dm-ev-tbl{font-size:13px;margin:0}
+.dm-file-sub{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#374151;margin:14px 0 6px}
+.dm-file-sub:first-of-type{margin-top:0}
+.dm-file-no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#eef2ff;color:#4f46e5;font-size:12px;font-weight:800}
 .dm-ev-tbl thead th{font-size:12px;color:#4b5563;background:#f9fafb;white-space:nowrap}
 .dm-up-note{margin:12px 0 0;padding-left:18px;font-size:12px;color:#6b7280}
 @media (max-width:900px){.dm-grid2{grid-template-columns:1fr}}
