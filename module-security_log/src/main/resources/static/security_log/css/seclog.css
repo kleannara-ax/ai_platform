@@ -1034,6 +1034,15 @@ body.lr-page{background:#f3f4f6}
 /* 보고서 숫자 카드: 단위 · 설명 한 줄 */
 .rp-kpi b em{font-style:normal;font-size:13px;font-weight:600;margin-left:2px}
 .rp-kpi small{font-size:12px;color:#6b7280;font-weight:700}
+.rp-kpi-btn{cursor:pointer;transition:box-shadow .15s,transform .15s}
+.rp-kpi-btn:hover,.rp-kpi-btn:focus{box-shadow:0 0 0 2px #f5a3a3;outline:none;transform:translateY(-1px)}
+.rp-ev{border:1px solid #f5c6c6;border-radius:10px;background:#fffafa;padding:10px 12px;margin:8px 0 4px}
+.rp-ev-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:13px}
+.rp-ev-head b{color:#b91c1c}
+.rp-ev-head span{color:#6b7280;font-size:12px}
+.rp-ev-head .btn-m{margin-left:auto}
+.rp-ev-scroll{max-height:420px;overflow:auto}
+.rp-ev-scroll thead th{position:sticky;top:0;z-index:1}
 .rp-kpi .rp-kpi-desc{font-style:normal;font-size:11px;color:#6b7280;line-height:1.35}
 .rp-kpi.navy .rp-kpi-desc{color:#c7d2fe}
 .rp-kpi.navy small{color:#c7d2fe}
